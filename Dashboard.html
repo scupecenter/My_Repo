@@ -23,9 +23,11 @@
   --risk-bg:rgba(219,139,42,.14); --crit-bg:rgba(229,72,77,.14);
   --logo-plate:rgba(255,255,255,.94);
   --shadow:0 8px 24px rgba(0,0,0,.4);
+  --geo-land:#2b3646; --geo-stroke:#51627a;
 }
 [data-theme="light"]{
   --bg:#f4f6f9; --panel:#ffffff; --panel2:#eef1f5; --line:#d8dee6; --grid:#e6eaef;
+  --geo-land:#dfe5ec; --geo-stroke:#aab6c4;
   --ink:#1a2230; --muted:#5a6675; --dim:#8b98a5;
   --ok:#1a7f37; --watch:#9a7d0a; --risk:#b8600f; --crit:#c62a2f;
   --accent:#e5591a; --accent2:#c9490f; --blue:#2f6fed; --blue2:#2456c9;
@@ -386,7 +388,7 @@ tr.clickable{cursor:pointer}
 .geo-panel{display:flex;flex-direction:column}
 .geo-wrap{position:relative;margin-top:8px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;overflow:hidden;flex:1 1 0;min-height:180px;cursor:zoom-in}
 .geo-wrap svg{position:absolute;inset:0;width:100%;height:100%}
-.geo-land{fill:var(--panel);stroke:var(--line);stroke-width:1.2;stroke-linejoin:round}
+.geo-land{fill:var(--geo-land);stroke:var(--geo-stroke);stroke-width:1.5;stroke-linejoin:round}
 .geo-dot{cursor:pointer;stroke:rgba(0,0,0,.35);stroke-width:.6;transition:r .1s}
 .geo-dot:hover{stroke:var(--ink);stroke-width:1.6}
 .geo-legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:9px;font-size:11px;color:var(--muted)}

@@ -22,6 +22,12 @@ per-session log live in
 
 ## [Unreleased]
 
+### Fixed
+- Geographic map (Overview + modal): the Libya landmass was nearly
+  indistinguishable from the panel background in dark mode. Added
+  theme-aware `--geo-land`/`--geo-stroke` tokens and a stronger outline so
+  the country shape reads clearly in both dark and light themes.
+
 ### Added
 - Persisted the engineering reference at `docs/GSDN_Dashboard_Reference.md`
   (architecture, data model, business rules, SLA rules, full project history)
