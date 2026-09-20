@@ -2016,6 +2016,11 @@ function pageOverview(rows,M){
     <span class="cum-only" style="display:contents">${teCard('OPEN ISSUES','<b>'+S.issues+'</b>','sites',S.issues?'crit':'ok','<span>'+(ISS[0]?'top issue: '+esc(ISS[0].k):'none')+'</span>')}</span>
   </div>
 
+  <div class="kgrid" style="grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px">
+    ${teCard('SITE PAC STATUS','<b>'+S.pac+'</b>','PAC achieved',S.pac/N>=.6?'ok':S.pac?'watch':'neutral','<span><b>'+Math.max(0,S.live-S.pac)+'</b> onair awaiting PAC · '+pct(100*S.pac/N)+' of '+N+' scope</span>')}
+    ${teCard('DELIVERED TO O&amp;M','<b>'+S.oam+'</b>','handed over',S.oam/N>=.6?'ok':S.oam?'watch':'neutral','<span><b>'+Math.max(0,N-S.oam)+'</b> not yet delivered · '+pct(100*S.oam/N)+' of '+N+' scope</span>')}
+  </div>
+
   <div class="row w2" style="margin-bottom:14px">
     <div class="panel"><h3>Completion by Region <span class="hint">click to drill</span></h3><div class="sub">Share of sites onair</div><div id="ovRegBars"></div></div>
     <div class="panel"><h3>Overall Status <span class="hint">ONAIR = Done · click a slice to filter</span></h3><div class="sub">Share of the ${N} in-scope sites</div>

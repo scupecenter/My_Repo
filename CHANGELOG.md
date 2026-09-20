@@ -20,3 +20,5 @@ registered here under the `[Unreleased]` section before it is committed.
 
 ### Added
 - `CHANGELOG.md` to track all changes to the project going forward.
+- Overview tab: **Site PAC Status** KPI card — PAC achieved, with onair-sites-awaiting-PAC and % of scope.
+- Overview tab: **Delivered to O&M** KPI card — sites handed over, with not-yet-delivered count and % of scope.
