@@ -27,6 +27,10 @@ per-session log live in
   indistinguishable from the panel background in dark mode. Added
   theme-aware `--geo-land`/`--geo-stroke` tokens and a stronger outline so
   the country shape reads clearly in both dark and light themes.
+- Geographic map: the dense cluster of site dots along the northern coast
+  merged into a solid green mass that read as a "glow" on the map edge.
+  Reduced the Overview dot radius (7 → 5) and gave each dot a thin
+  land-coloured separating ring, so overlapping sites read as distinct dots.
 
 ### Added
 - Persisted the engineering reference at `docs/GSDN_Dashboard_Reference.md`
