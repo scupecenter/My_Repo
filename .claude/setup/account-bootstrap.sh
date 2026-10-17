@@ -10,6 +10,7 @@ set -uo pipefail
 SK="$HOME/.claude/skills"; AG="$HOME/.claude/agents"
 mkdir -p "$SK" "$AG"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+[ -x /opt/pw-browsers/chromium ] && export CHROME_PATH=/opt/pw-browsers/chromium
 
 # --- 1) Catalog plugins (user scope) --------------------------------------
 claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1 || true
@@ -26,7 +27,7 @@ done
 claude mcp add firecrawl  -s user -e 'FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY}'   -- npx -y firecrawl-mcp@3.27.3            >/dev/null 2>&1 || true
 claude mcp add perplexity -s user -e 'PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}' -- npx -y @perplexity-ai/mcp-server@1.3.0 >/dev/null 2>&1 || true
 claude mcp add rea        -s user -- npx -y rea-agents@6.4.0 mcp                 >/dev/null 2>&1 || true
-claude mcp add chrome-devtools -s user -- npx -y chrome-devtools-mcp@1.10.1 --executablePath /opt/pw-browsers/chromium --headless --isolated --chromeArg=--no-sandbox >/dev/null 2>&1 || true
+claude mcp add chrome-devtools -s user -- npx -y chrome-devtools-mcp@1.10.1 --executablePath /opt/pw-browsers/chromium --headless --isolated --chromeArg=--no-sandbox --performanceCrux=false --usageStatistics=false >/dev/null 2>&1 || true
 if [ -x /opt/pw-browsers/chromium ]; then
   claude mcp add playwright -s user -- npx -y @playwright/mcp@0.0.83 --browser chromium \
     --executable-path /opt/pw-browsers/chromium --headless --no-sandbox --isolated >/dev/null 2>&1 || true
