@@ -1,4 +1,8 @@
 {
+  "enabledPlugins": {
+    "claude-code-setup@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true
+  },
   "extraKnownMarketplaces": {
     "claude-plugins-official": {
       "source": {
@@ -6,8 +10,5 @@
         "repo": "anthropics/claude-plugins-official"
       }
     }
-  },
-  "enabledPlugins": {
-    "claude-code-setup@claude-plugins-official": true
   }
 }
