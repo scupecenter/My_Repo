@@ -12,6 +12,21 @@ mkdir -p "$SK" "$AG"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 [ -x /opt/pw-browsers/chromium ] && export CHROME_PATH=/opt/pw-browsers/chromium
 
+# --- 0) Default model: opusplan (Opus for plan mode, Sonnet for execution) -
+#     Merged into ~/.claude/settings.json, preserving any existing keys.
+python3 -I - <<'PY_EOF' >/dev/null 2>&1 || true
+import json, os
+p = os.path.expanduser("~/.claude/settings.json")
+try:
+    with open(p) as f: cfg = json.load(f)
+except Exception:
+    cfg = {}
+if not isinstance(cfg, dict): cfg = {}
+cfg["model"] = "opusplan"
+os.makedirs(os.path.dirname(p), exist_ok=True)
+with open(p, "w") as f: json.dump(cfg, f, indent=2)
+PY_EOF
+
 # --- 1) Catalog plugins (user scope) --------------------------------------
 claude plugin marketplace add anthropics/claude-plugins-official >/dev/null 2>&1 || true
 for p in \
