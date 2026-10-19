@@ -5,13 +5,11 @@ from openpyxl.utils import get_column_letter as L
 
 from common import (AL_C, AL_L, AL_LW, BORDER, C_CALC, C_CALC_HDR, C_HDR, C_RED_BG, C_RED_FG,
                     C_SLA_BLOCK, C_SLA_HDR, C_INPUT, Col, DATE_FMT, PCT_FMT, T, fill, font,
-                    register, style, title, valid, wd)
-
-M0, M1 = 5, 504   # Master data rows
+                    register, style, title, valid, wd, M0, M1, SLA_R0)
 
 
 def SC(col):
-    return "'Site Calc'!$" + col + "$5:$" + col + "$504"
+    return "'Site Calc'!$" + col + "$5:$" + col + "$" + str(M1)
 
 
 # ---------------------------------------------------------------- Site Calc
@@ -25,8 +23,8 @@ def build_site_calc(wb, names, wh_items):
     for i, h in enumerate(hdr):
         c = ws.cell(4, i + 1, h)
         style(c, font(9), fill(C_CALC_HDR), AL_C)
-        ws.cell(3, i + 1).value = (f"=SUBTOTAL(102,{L(i+1)}5:{L(i+1)}504)" if i in (5, 6, 7, 8, 9)
-                                   else f"=SUBTOTAL(103,{L(i+1)}5:{L(i+1)}504)")
+        ws.cell(3, i + 1).value = (f"=SUBTOTAL(102,{L(i+1)}5:{L(i+1)}{M1})" if i in (5, 6, 7, 8, 9)
+                                   else f"=SUBTOTAL(103,{L(i+1)}5:{L(i+1)}{M1})")
         style(ws.cell(3, i + 1), font(9), fill(C_CALC), AL_C)
         ws.column_dimensions[L(i + 1)].width = 14.75 if i in (5, 9) else 12
     ws.row_dimensions[4].height = 39.95
@@ -77,10 +75,10 @@ def build_site_calc(wb, names, wh_items):
             c = ws.cell(r, i + 1, f.format(r=r))
             style(c, font(9), fill(C_CALC), AL_C, fmts[i] or "General")
     ws.freeze_panes = "B5"
-    ws.auto_filter.ref = "A4:J504"
+    ws.auto_filter.ref = f"A4:J{M1}"
     for i, n in enumerate(["SC_Site", "SC_Sel", "SC_CW", "SC_TE", "SC_RFI", "SC_LLD", "SC_Cam",
                            "SC_Int", "SC_MW", "SC_Dispatch"]):
-        names.add(n, f"'Site Calc'!${L(i+1)}$5:${L(i+1)}$504")
+        names.add(n, f"'Site Calc'!${L(i+1)}$5:${L(i+1)}${M1}")
     ws.protection.sheet = True
     ws.protection.autoFilter = False
     ws.protection.sort = False
@@ -219,7 +217,6 @@ STEPS = [
      mref("DN"), mref("FV"), COLD),
 ]
 
-SLA_R0 = 13  # first data row (Master row 5)
 
 
 def code_key(code):
@@ -408,19 +405,19 @@ def build_baseline(wb, names):
             '=IF($A{r}="","",IF(N(' + S + ')=0,"No start date",IF(COUNTIFS(cBLA_SiteID,$A{r},cBLA_Current,"Yes")>0,'
             '"Approved","Proposed")))', w=11),
     ]
-    # proposal table aligned with Master rows 5..504
+    # proposal table aligned with Master rows
     for i, c in enumerate(cols):
         ci = i + 1
         style(ws.cell(4, ci, c.name), font(9), fill(C_CALC_HDR), AL_C)
-        ws.cell(3, ci, f"=SUBTOTAL({102 if c.fmt else 103},{L(ci)}5:{L(ci)}504)")
+        ws.cell(3, ci, f"=SUBTOTAL({102 if c.fmt else 103},{L(ci)}5:{L(ci)}{M1})")
         style(ws.cell(3, ci), font(9), fill(C_CALC), AL_C)
         ws.column_dimensions[L(ci)].width = c.w or 14.75
-        for r in range(5, 505):
+        for r in range(M0, M1 + 1):
             style(ws.cell(r, ci, c.f.format(r=r)), font(9), fill(C_CALC), AL_C,
                   DATE_FMT if c.fmt == "date" else "General")
     ws.row_dimensions[4].height = 39.95
     from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn, TableFormula
-    t = Table(displayName="tblBaselineProposal", ref="A4:L504")
+    t = Table(displayName="tblBaselineProposal", ref=f"A4:L{M1}")
     t.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=False)
     t._initialise_columns()
     for tc, c in zip(t.tableColumns, cols):

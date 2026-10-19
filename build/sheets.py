@@ -7,7 +7,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 
 from common import (AL_C, AL_L, AL_LW, BORDER, C_CALC, C_CALC_HDR, C_DQ_HDR, C_GROUP, C_HDR, C_INPUT,
                     C_RED_BG, C_RED_FG, C_SLA_BLOCK, C_TITLE, C_YEL_BG, C_YEL_FG, Col, DATE_FMT, PCT_FMT, T,
-                    fill, font, register, style, title, valid)
+                    fill, font, register, style, title, valid, M1, NSITES, SLA_R1)
 
 
 def red():
@@ -117,12 +117,12 @@ PROCEDURES = [
                            "Master reads it. Record the re-plan reason in Change Control (Baseline Re-plan)."),
     ("Add list values", "Type the new value in the next empty row inside its table in Setting; the drop-downs grow "
                         "automatically. Do not delete values that are already used."),
-    ("More than 500 sites", "Insert copied rows inside Master (above row 504), then extend Site Calc, SLA and "
-                            "Baseline Proposal rows by the same number and the Master_* names."),
+    ("More than " + str(NSITES) + " sites", "Insert copied rows inside Master (above row " + str(M1) + "), then extend "
+                            "Site Calc, SLA and Baseline Proposal rows by the same number and the Master_* names."),
 ]
 EXCEL_TEST = ["Open in Excel 365: no repair message.", "Formulas › Calculate Now: no #REF!, #NAME?, #VALUE!.",
               "Test drop-downs, filters and sorting on Master and registers.",
-              "Save As Excel Binary Workbook (.xlsb), close and reopen.", "Check calculation speed with 500 sites."]
+              "Save As Excel Binary Workbook (.xlsb), close and reopen.", "Check calculation speed with " + str(NSITES) + " sites."]
 
 
 def build_guide(wb, names):
@@ -290,7 +290,7 @@ def build_dashboard(wb, names):
     ws["B4"] = ("Blank selectors = All. Scope = sites the item applies to (not cancelled). Pending = its turn has "
                 "arrived (previous step done). Not Due = previous step not done. Exceptions and WH are project-wide.")
     ws["B4"].font = font(8, italic=True)
-    names.add("DashSel", "('Site Calc'!$B$5:$B$504=1)*(Master!$FZ$5:$FZ$504<>\"Cancelled\")")
+    names.add("DashSel", f"('Site Calc'!$B$5:$B${M1}=1)*(Master!$FZ$5:$FZ${M1}<>\"Cancelled\")")
     # -------------------------------------------------- 1 Milestone Delivery
     r = 6
     band(ws, r, 2, 13, "1 · MILESTONE DELIVERY · approved baseline vs achievement")
@@ -409,7 +409,7 @@ def build_dashboard(wb, names):
         cell(ws, r, 8, "=" + sp(*base, v("DP"), '(Master_DF="Success")', "(N(+Master_DI)=0)")
              .replace("(N(+Master_DI)=0)", "(Master_DI=0)"))
         cell(ws, r, 9, "=SUMPRODUCT(DashSel*" + zm + ",Master_DI)")
-        win = ("SUMPRODUCT(DashSel*" + zm + "*(ISNUMBER(SLA!{c}13:{c}512))*(SLA!{c}13:{c}512>N(SLA!{c}7)))")
+        win = ("SUMPRODUCT(DashSel*" + zm + "*(ISNUMBER(SLA!{c}13:{c}" + str(SLA_R1) + "))*(SLA!{c}13:{c}" + str(SLA_R1) + ">N(SLA!{c}7)))")
         cell(ws, r, 10, "=" + win.format(c=sla_col("S-3")) + "+" + win.format(c=sla_col("S-4")))
         cell(ws, r, 11, '=IF(N(RptDate)=0,"",' + sp("DashSel", zm, '(Master_FN="Yes")', "(1-" + v("FQ") + ")",
                                                      v("FP"), "(Master_FP<RptDate)") + ')')
@@ -946,8 +946,8 @@ def build_project_status(wb, names):
         dv.add(f"{col}{r}")
     names.add("PSPhase", "'Project Status'!$C$9")
     names.add("PSBatch", "'Project Status'!$E$9")
-    names.add("PSSel", "(Master!$B$5:$B$504<>\"\")*(Master!$FZ$5:$FZ$504<>\"Cancelled\")*(((PSPhase=\"\")+(Master!"
-                       "$X$5:$X$504=PSPhase))>0)*(((PSBatch=\"\")+(Master!$Y$5:$Y$504=PSBatch))>0)")
+    names.add("PSSel", ("(Master!$B$5:$B$504<>\"\")*(Master!$FZ$5:$FZ$504<>\"Cancelled\")*(((PSPhase=\"\")+(Master!"
+                       "$X$5:$X$504=PSPhase))>0)*(((PSBatch=\"\")+(Master!$Y$5:$Y$504=PSBatch))>0)").replace("$504", "$" + str(M1)))
     # result row
     r = 11
     heads = ["ACTUAL PROGRESS", "PLANNED PROGRESS", "SPI (Actual ÷ Planned)", "PLAN COVERAGE",
@@ -1147,7 +1147,7 @@ def finish(wb, names):
     cols = {}
     for k, st in enumerate(cs.STEPS):
         cols[st[0]] = (L(c0 + k), L(o0 + k))
-    last = cs.SLA_R0 + 499
+    last = SLA_R1
     ds = wb["Dashboard"]
     open_over = "+".join(f'COUNTIF(SLA!{o}{cs.SLA_R0}:{o}{last},">"&N(SLA!{c}$7))' for c, o in cols.values())
     comp_over = "+".join(f'COUNTIF(SLA!{c}{cs.SLA_R0}:{c}{last},">"&N(SLA!{c}$7))' for c, o in cols.values())
