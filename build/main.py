@@ -11,7 +11,7 @@ import master
 import registers as R
 import setting
 import wh
-from common import Names, register, title, font, localize, factor_matches, M0, M1, SLA_R0, SLA_R1
+from common import Names, register, title, font
 
 ORDER = ["Guide", "Master", "Dashboard", "Project Status", "Progress & Plan", "RF & Design", "Acquisition",
          "PR-PO", "GECOL", "HLC", "As-Built", "WH", "WH Serials", "Risk Register", "Permits & HSE",
@@ -76,14 +76,6 @@ def main(rebuilt, old, out):
     setting.build(wb, names)
     calc_sheets.build_site_calc(wb, names, wh.ITEMS)
     sheets.finish(wb, names)
-    # Row-by-row reads of another sheet go through hidden mirror columns, and a site lookup repeated
-    # across a row is done once in a hidden helper column: the long formulas then hold no sheet
-    # reference, are stored once per column (shared) and calculate faster.
-    for sheet, r0, r1, off, hdr in (("SLA", SLA_R0, SLA_R1, SLA_R0 - M0, 3), ("Master", M0, M1, 0, 3),
-                                    ("Baseline", M0, M1, 0, 4), ("Site Calc", M0, M1, 0, 4)):
-        start = wb[sheet].max_column + 2
-        cols = localize(wb, sheet, r0, r1, off, start, hdr)
-        factor_matches(wb, sheet, r0, r1, start + len(cols) + (1 if cols else 0), hdr)
     wb._sheets = [wb[n] for n in ORDER]
     wb.active = 0
     wb.calculation.fullCalcOnLoad = True
