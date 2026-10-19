@@ -5,9 +5,9 @@ from openpyxl.utils import get_column_letter as L, column_index_from_string as C
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.styles import PatternFill
 
-from common import NEW_THEME, copy_style_resolved, valid, C_CALC_HDR, fill
+from common import NEW_THEME, copy_style_resolved, valid, C_CALC_HDR, fill, M0, M1
 
-FIRST, LAST = 5, 504
+FIRST, LAST = M0, M1
 B = "$B{r}"
 
 
