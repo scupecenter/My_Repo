@@ -1,0 +1,4 @@
+# Playwright MCP page snapshots and console logs
+.playwright-mcp/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
