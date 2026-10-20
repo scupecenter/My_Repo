@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GSDN Site Delivery</title>
+<style>
+@@CSS@@
+</style>
+@@SHEETJS@@
+</head>
+<body>
+<div id="gate">
+  <div class="gate-art">
+    <div class="gate-top"></div>
+    <div class="cap"><h1>GSDN Site Delivery</h1>
+      <p>Every site in the Master, from release to handover: where it is, what it waits for, and who has to move it.</p></div>
+  </div>
+  <div class="gate-side">
+    <div style="display:flex;justify-content:flex-end"><button class="ibtn themeBtn" aria-label="Switch theme"></button></div>
+    <div><h2>Load the Master workbook</h2>
+      <p>The file is read in this browser only. Nothing is uploaded or stored; closing the page clears it.</p></div>
+    <div class="drop" id="drop">
+      <strong id="dropMsg">Drop the Master workbook here</strong>
+      <span class="muted">GSDN Site Master · .xlsx or .xlsb</span>
+      <button class="btn" id="pick" type="button">Choose file</button>
+      <input type="file" id="file" accept=".xlsx,.xlsb,.xlsm" class="hidden">
+    </div>
+    <div class="gate-err" id="gateErr"></div>
+    <p class="gate-note">The dashboard reads the values the Master has calculated. If the workbook was just generated or edited outside Excel, open it in Excel, calculate, and save before loading it.</p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header class="rail"><div class="rail-in">
+    <div class="mark">@@MARK@@<span>GSDN<br><small>Site Delivery</small></span></div>
+    <nav class="seg" aria-label="Page">
+      <button data-page="ov" class="on">Project Overview</button>
+      <button data-page="cw">CW</button>
+      <button data-page="te">TE</button>
+    </nav>
+    <span class="sp"></span>
+    <div class="asof"><b id="asofD">—</b><span id="asofL">Report date</span></div>
+    <button class="ibtn" id="printBtn" title="Print this page (A4 landscape, one sheet)" aria-label="Print">@@PRINT@@</button>
+    <button class="ibtn themeBtn" title="Switch theme" aria-label="Switch theme"></button>
+    <button class="ibtn" id="newBtn" title="Load another file" aria-label="Load another file">@@FILE@@</button>
+  </div></header>
+  <div class="filters" id="filters"></div>
+  <main id="main"></main>
+  <footer class="foot" id="foot"></footer>
+</div>
+
+<div id="scrim"></div>
+<aside id="drawer" aria-label="Site"></aside>
+<div id="modal" role="dialog" aria-modal="true"></div>
+<div class="tip" id="tip"></div>
+<div id="printSheet"></div>
+<script>
+@@LIBYA@@
+@@APP@@
+</script>
+</body>
+</html>
