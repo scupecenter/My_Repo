@@ -120,9 +120,6 @@ PROCEDURES = [
     ("More than " + str(NSITES) + " sites", "Insert copied rows inside Master (above row " + str(M1) + "), then extend "
                             "Site Calc, SLA and Baseline Proposal rows by the same number and the Master_* names."),
 ]
-EXCEL_TEST = ["Open in Excel 365: no repair message.", "Formulas › Calculate Now: no #REF!, #NAME?, #VALUE!.",
-              "Test drop-downs, filters and sorting on Master and registers.",
-              "Save As Excel Binary Workbook (.xlsb), close and reopen.", "Check calculation speed with " + str(NSITES) + " sites."]
 
 
 def build_guide(wb, names):
@@ -169,13 +166,6 @@ def build_guide(wb, names):
         ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=3)
         style(ws.cell(r, 2, t), font(9), None, AL_L)
         style(ws.cell(r, 4, "☐ Done / N/A"), font(9), None, AL_C)
-    r += 2
-    band(ws, r, 1, 4, "5 · EXCEL ACCEPTANCE TEST")
-    for i, t in enumerate(EXCEL_TEST):
-        r += 1
-        style(ws.cell(r, 1, i + 1), font(9), None, AL_C)
-        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
-        style(ws.cell(r, 2, t), font(9), None, AL_L)
     return ws
 
 
