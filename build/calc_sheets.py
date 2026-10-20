@@ -5,11 +5,7 @@ from openpyxl.utils import get_column_letter as L
 
 from common import (AL_C, AL_L, AL_LW, BORDER, C_CALC, C_CALC_HDR, C_HDR, C_RED_BG, C_RED_FG,
                     C_SLA_BLOCK, C_SLA_HDR, C_INPUT, Col, DATE_FMT, PCT_FMT, T, fill, font,
-                    register, style, title, valid, wd, M0, M1, SLA_R0)
-
-
-def SC(col):
-    return "'Site Calc'!$" + col + "$5:$" + col + "$" + str(M1)
+                    register, shift_cols, style, title, valid, wd, M0, M1, SLA_R0)
 
 
 # ---------------------------------------------------------------- Site Calc
@@ -18,16 +14,18 @@ def build_site_calc(wb, names, wh_items):
     title(ws, "A1", "SITE CALC · shared per-site results (read only, rows aligned with Master)")
     ws["A2"] = ("Calculated automatically. Do not edit. Each row reads the Master row with the same number.")
     ws["A2"].font = font(9, italic=True)
-    hdr = ["Site ID", "In Selection", "CW Applies", "TE Applies", "RFI Applies", "LLD Approved Date",
+    # header row 3, SUBTOTAL + filter row 4, data from row 5 (aligned with Master); A = row number
+    hdr = ["#", "Site ID", "In Selection", "CW Applies", "TE Applies", "RFI Applies", "LLD Approved Date",
            "Cambium Sector Need", "Intracom Sector Need", "MW Half-link Need", "TE Dispatch Complete Date"]
     for i, h in enumerate(hdr):
-        c = ws.cell(4, i + 1, h)
+        c = ws.cell(3, i + 1, h)
         style(c, font(9), fill(C_CALC_HDR), AL_C)
-        ws.cell(3, i + 1).value = (f"=SUBTOTAL(102,{L(i+1)}5:{L(i+1)}{M1})" if i in (5, 6, 7, 8, 9)
+        ws.cell(4, i + 1).value = (f"=SUBTOTAL(102,{L(i+1)}5:{L(i+1)}{M1})" if i in (6, 7, 8, 9, 10)
                                    else f"=SUBTOTAL(103,{L(i+1)}5:{L(i+1)}{M1})")
-        style(ws.cell(3, i + 1), font(9), fill(C_CALC), AL_C)
-        ws.column_dimensions[L(i + 1)].width = 14.75 if i in (5, 9) else 12
-    ws.row_dimensions[4].height = 39.95
+        style(ws.cell(4, i + 1), font(9), fill(C_CALC), AL_C)
+        ws.column_dimensions[L(i + 1)].width = 5 if i == 0 else 14.75 if i in (6, 10) else 12
+    ws.cell(4, 1).value = f"=SUBTOTAL(103,B5:B{M1})"
+    ws.row_dimensions[3].height = 39.95
     # unit -> item names (complements) from WH header
     by_unit = {}
     for it in wh_items:
@@ -69,16 +67,18 @@ def build_site_calc(wb, names, wh_items):
         '=IF(OR($A{r}="",$D{r}<>"Yes"),"",IFERROR(IF(AND(' + ",".join(conds) + '),IF(' + last_dn + '=0,"",'
         + last_dn + '),""),""))',
     ]
+    F = [shift_cols(f) for f in F]
     fmts = [None, "0", None, None, None, DATE_FMT, "0", "0", "0", DATE_FMT]
     for r in range(M0, M1 + 1):
+        style(ws.cell(r, 1, r - M0 + 1), font(9), None, AL_C)
         for i, f in enumerate(F):
-            c = ws.cell(r, i + 1, f.format(r=r))
+            c = ws.cell(r, i + 2, f.format(r=r))
             style(c, font(9), fill(C_CALC), AL_C, fmts[i] or "General")
-    ws.freeze_panes = "B5"
-    ws.auto_filter.ref = f"A4:J{M1}"
+    ws.freeze_panes = "C5"
+    ws.auto_filter.ref = f"A4:K{M1}"
     for i, n in enumerate(["SC_Site", "SC_Sel", "SC_CW", "SC_TE", "SC_RFI", "SC_LLD", "SC_Cam",
                            "SC_Int", "SC_MW", "SC_Dispatch"]):
-        names.add(n, f"'Site Calc'!${L(i+1)}$5:${L(i+1)}${M1}")
+        names.add(n, f"'Site Calc'!${L(i+2)}$5:${L(i+2)}${M1}")
     ws.protection.sheet = True
     ws.protection.autoFilter = False
     ws.protection.sort = False
@@ -91,15 +91,15 @@ def mref(c):
 
 
 ALL = 'Master!$B{m}<>""'
-CW = "'Site Calc'!$C{m}=\"Yes\""
-TE = "'Site Calc'!$D{m}=\"Yes\""
-RFI = "'Site Calc'!$E{m}=\"Yes\""
+CW = "'Site Calc'!$D{m}=\"Yes\""
+TE = "'Site Calc'!$E{m}=\"Yes\""
+RFI = "'Site Calc'!$F{m}=\"Yes\""
 TOWER = 'Master!$AA{m}="Yes"'
 ADAPT = 'AND(Master!$AB{m}="Yes",Master!$AA{m}<>"Yes")'
 RT = 'Master!$O{m}="RT"'
 GF = 'Master!$O{m}="GF"'
 ANALYSIS = 'OR(Master!$AP{m}="STA",Master!$AP{m}="ST")'
-MW = "N('Site Calc'!$I{m})>0"
+MW = "N('Site Calc'!$J{m})>0"
 HOT = 'Master!$Z{m}="Hot Swap"'
 COLD = 'Master!$Z{m}="Cold Swap"'
 SWAP = "OR(" + HOT + "," + COLD + ")"
@@ -141,7 +141,7 @@ HELPERS = [
     ("Window Approved", _blank0('_xlfn.MAXIFS(cChg_ApprovalDate,cChg_SiteID,Master!$B{m},cChg_ChangeType,'
                                 '"Cutover Window",cChg_Approval,"Approved")')),
     ("E2E CW Start", 'IF(Master!$AG{m}="Outsourced",{H0},{H1})'),
-    ("TE Dispatch Complete", "IF('Site Calc'!$J{m}=\"\",\"\",'Site Calc'!$J{m})"),
+    ("TE Dispatch Complete", "IF('Site Calc'!$K{m}=\"\",\"\",'Site Calc'!$K{m})"),
 ]
 
 
@@ -354,13 +354,13 @@ def build_baseline(wb, names):
     def wdy(x, n):
         return "WORKDAY.INTL(" + x + "," + n + ",7,Holidays)"
     S = "$B{r}"
-    cw = "'Site Calc'!$C{r}"
-    te = "'Site Calc'!$D{r}"
-    rfi = "'Site Calc'!$E{r}"
+    cw = "'Site Calc'!$D{r}"
+    te = "'Site Calc'!$E{r}"
+    rfi = "'Site Calc'!$F{r}"
     tower = m("AA") + '="Yes"'
     rt = m("O") + '="RT"'
     analysis = "OR(" + m("AP") + '="STA",' + m("AP") + '="ST")'
-    mw = "N('Site Calc'!$I{r})>0"
+    mw = "N('Site Calc'!$J{r})>0"
     precw_n = ("BLink01+IF(" + m("AG") + '="Outsourced",SLA_Max_B2,0)+SLA_Max_B3+SLA_Max_B4+IF(' + analysis
                + ",SLA_Max_B5,0)+SLA_Max_B6+SLA_Max_B7")
     cols = [
@@ -405,42 +405,42 @@ def build_baseline(wb, names):
             '=IF($A{r}="","",IF(N(' + S + ')=0,"No start date",IF(COUNTIFS(cBLA_SiteID,$A{r},cBLA_Current,"Yes")>0,'
             '"Approved","Proposed")))', w=11),
     ]
-    # proposal table aligned with Master rows
+    # proposal range aligned with Master rows: A = row number, header row 3, SUBTOTAL + filter row 4, data from 5
+    style(ws.cell(3, 1, "#"), font(9), fill(C_HDR), AL_C)
+    style(ws.cell(4, 1, f"=SUBTOTAL(103,B5:B{M1})"), font(9), fill(C_CALC), AL_C)
+    ws.column_dimensions["A"].width = 5
+    for r in range(M0, M1 + 1):
+        style(ws.cell(r, 1, r - M0 + 1), font(9), None, AL_C)
     for i, c in enumerate(cols):
-        ci = i + 1
-        style(ws.cell(4, ci, c.name), font(9), fill(C_CALC_HDR), AL_C)
-        ws.cell(3, ci, f"=SUBTOTAL({102 if c.fmt else 103},{L(ci)}5:{L(ci)}{M1})")
-        style(ws.cell(3, ci), font(9), fill(C_CALC), AL_C)
+        ci = i + 2
+        f = shift_cols(c.f)
+        style(ws.cell(3, ci, c.name), font(9), fill(C_CALC_HDR), AL_C)
+        ws.cell(4, ci, f"=SUBTOTAL({102 if c.fmt else 103},{L(ci)}5:{L(ci)}{M1})")
+        style(ws.cell(4, ci), font(9), fill(C_CALC), AL_C)
         ws.column_dimensions[L(ci)].width = c.w or 14.75
         for r in range(M0, M1 + 1):
-            style(ws.cell(r, ci, c.f.format(r=r)), font(9), fill(C_CALC), AL_C,
+            style(ws.cell(r, ci, f.format(r=r)), font(9), fill(C_CALC), AL_C,
                   DATE_FMT if c.fmt == "date" else "General")
-    ws.row_dimensions[4].height = 39.95
-    from openpyxl.worksheet.table import Table, TableStyleInfo, TableColumn, TableFormula
-    t = Table(displayName="tblBaselineProposal", ref=f"A4:L{M1}")
-    t.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=False)
-    t._initialise_columns()
-    for tc, c in zip(t.tableColumns, cols):
-        tc.name = c.name
-        tc.calculatedColumnFormula = TableFormula(attr_text=c.f.format(r=5)[1:])
-    ws.add_table(t)
-    # links table (D39) at N4
-    lc = 14
+    ws.row_dimensions[3].height = 39.95
+    ws.auto_filter.ref = f"A4:{L(len(cols) + 1)}{M1}"
+    from openpyxl.worksheet.table import Table, TableStyleInfo
+    # links table (D39) at O3
+    lc = len(cols) + 3
     for i, h in enumerate(["Link", "From", "To", "Min (wd)", "Max (wd)"]):
-        style(ws.cell(4, lc + i, h), font(9), fill(C_HDR), AL_C)
+        style(ws.cell(3, lc + i, h), font(9), fill(C_HDR), AL_C)
     for k, (lk, f, to, mn, mx) in enumerate(LINKS):
-        r = 5 + k
+        r = 4 + k
         for i, v in enumerate([lk, f, to, mn, mx]):
             c = ws.cell(r, lc + i, v)
             style(c, font(9), fill(C_INPUT) if i >= 3 else None, AL_C)
         names.add("BLink" + lk[1:], f"Baseline!${L(lc + 4)}${r}")
     for i, w in enumerate([7, 16, 18, 8, 8]):
         ws.column_dimensions[L(lc + i)].width = w
-    t2 = Table(displayName="tblBaselineLinks", ref=f"{L(lc)}4:{L(lc + 4)}{4 + len(LINKS)}")
+    t2 = Table(displayName="tblBaselineLinks", ref=f"{L(lc)}3:{L(lc + 4)}{3 + len(LINKS)}")
     t2.tableStyleInfo = TableStyleInfo(name="TableStyleLight1", showRowStripes=False)
     ws.add_table(t2)
-    # approved table at T
-    ac = 20
+    # approved table at U
+    ac = lc + 6
     acols = [Col("Site ID", dv="SiteIDs", w=11),
              Col("Site Name", "calc", T('=IF([[Site ID]]="","",IFERROR(INDEX(cRF_SiteName,MATCH([[Site ID]],'
                                         'cRF_SiteID,0))&"",""))'), w=16)]
@@ -448,7 +448,6 @@ def build_baseline(wb, names):
     acols += [Col("Version", w=8), Col("Approval Date", dv=("date",), fmt="date"),
               Col("Current", "calc", T('=IF([[Site ID]]="","",IF(N([[Approval Date]])=_xlfn.MAXIFS(cBLA_ApprovalDate,'
                                        'cBLA_SiteID,[[Site ID]]),"Yes","No"))'), w=8)]
-    register(ws, names, "tblBaselineApproved", "cBLA", acols, first_col=ac, sub_row=3, hdr_row=4, nrows=10)
-    style(ws.cell(2, ac), None)
-    ws.freeze_panes = "B5"
+    register(ws, names, "tblBaselineApproved", "cBLA", acols, first_col=ac, sub_row=2, hdr_row=3, nrows=10)
+    ws.freeze_panes = "C5"
     return ws

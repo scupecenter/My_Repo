@@ -1,4 +1,5 @@
 """Shared helpers for the GSDN workbook builder: colours, styles, tables, names."""
+import re
 import colorsys
 from copy import copy
 
@@ -10,7 +11,7 @@ from openpyxl.worksheet.table import Table, TableColumn, TableFormula, TableStyl
 
 # ---------------------------------------------------------------- colours
 # Theme palettes (Excel theme index order: lt1, dk1, lt2, dk2, accent1..6)
-NSITES = 1000                     # site capacity: Master, Site Calc, SLA and Baseline rows
+NSITES = 500                      # site capacity: Master, Site Calc, SLA and Baseline rows
 M0, M1 = 5, 5 + NSITES - 1        # Master / Site Calc / Baseline data rows
 SLA_R0, SLA_R1 = 13, 13 + NSITES - 1
 
@@ -212,13 +213,14 @@ def register(ws, names, tname, prefix, cols, first_col=1, sub_row=1, hdr_row=2,
         if c.kind == "num":
             hf = fill(hdr_fill or C_HDR)
         style(h, font(9, False), hf, AL_C)
-        # subtotal row (D45): counts non-blank visible values
-        s = ws.cell(sub_row, ci)
-        if c.fmt in ("date", "int", "dec", "pct") or c.kind == "calc" and c.fmt:
-            s.value = f"=SUBTOTAL(102,{col}{first}:{col}{last})"
-        else:
-            s.value = f"=SUBTOTAL(103,{col}{first}:{col}{last})"
-        style(s, font(9), fill(C_CALC), AL_C)
+        # subtotal row (D45): counts non-blank visible values; sub_row=None writes none
+        if sub_row:
+            s = ws.cell(sub_row, ci)
+            if c.fmt in ("date", "int", "dec", "pct") or c.kind == "calc" and c.fmt:
+                s.value = f"=SUBTOTAL(102,{col}{first}:{col}{last})"
+            else:
+                s.value = f"=SUBTOTAL(103,{col}{first}:{col}{last})"
+            style(s, font(9), fill(C_CALC), AL_C)
         ws.column_dimensions[col].width = default_width(c)
         for r in range(first, last + 1):
             cell = ws.cell(r, ci)
@@ -303,3 +305,12 @@ def T(template):
 def rf_lookup(field, key="$B{r}"):
     return f"INDEX(cRF_{field},MATCH({key},cRF_SiteID,0))"
 
+
+
+_SAME_ROW = re.compile(r"(?<![!\w$])\$([A-Z]{1,3})\{r\}")
+
+
+def shift_cols(f, n=1):
+    """Move same-sheet same-row references ($X{r}) n columns right; other-sheet references (Sheet!$X{r}) stay."""
+    from openpyxl.utils import column_index_from_string as _ci
+    return _SAME_ROW.sub(lambda m: "$" + L(_ci(m.group(1)) + n) + "{r}", f)

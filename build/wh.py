@@ -240,7 +240,7 @@ def build_serials(wb, names):
               DATE_FMT if t == "Installed" else "General")
     lk = 'IFERROR(MATCH([[{d}]],cMov_DocNo,0),0)'
     cols = [
-        Col("#", "num", T('=IF([[Serial No.]]="","",ROW()-6)'), w=5),
+        Col("#", "num", T('=IF([[Serial No.]]="","",ROW()-5)'), w=5),
         Col("Serial No.", w=16),
         Col("Item Name", dv="WHItemNames", w=18),
         Col("Item Code", "calc", T('=IF([[Item Name]]="","",IFERROR(INDEX(WHItemCodes,MATCH([[Item Name]],WHItemNames,'
@@ -274,6 +274,6 @@ def build_serials(wb, names):
         Col("Installed Key (helper)", "calc",
             T('=IF(AND([[Site ID]]<>"",ISNUMBER([[Installed]])),[[Site ID]]&"|"&[[Item Code]],"")'), w=10),
     ]
-    register(ws, names, "tblWHSerials", "cSer", cols, sub_row=5, hdr_row=6, nrows=20)
-    ws.freeze_panes = "C7"
+    register(ws, names, "tblWHSerials", "cSer", cols, sub_row=4, hdr_row=5, nrows=20)
+    ws.freeze_panes = "C6"
     return ws

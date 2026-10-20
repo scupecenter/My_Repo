@@ -185,16 +185,16 @@ def formulas():
                 + ',' + analysis_ok + ',' + valid("$AR{r}") + ',' + valid("$AS{r}") + ',' + valid("$AT{r}")
                 + ',' + valid("$AU{r}") + ')')
     F["AW"] = ('=IF($B{r}="","",IFERROR(IF(NOT(' + valid("$W{r}") + '),"",IF(' + unresolved + ',"",IF('
-               + sc("C") + '="N/A",$W{r},IF(' + cw_conds + ',MAX($W{r},' + po_date + ',$AL{r},$AO{r},$AR{r},'
+               + sc("D") + '="N/A",$W{r},IF(' + cw_conds + ',MAX($W{r},' + po_date + ',$AL{r},$AO{r},$AR{r},'
                '$AS{r},$AU{r}),"")))),""))')
-    F["AX"] = gate("$AW{r}", ("Access - CW", "PTW - CW"), stop="PTW - CW", na_test=sc("C") + '="N/A"')
+    F["AX"] = gate("$AW{r}", ("Access - CW", "PTW - CW"), stop="PTW - CW", na_test=sc("D") + '="N/A"')
     # ---- BP CW Completion
     tower_ok = 'OR($AA{r}<>"Yes",AND(' + ",".join(done(c) for c in ("BA", "BB", "BC")) + '))'
     adapt_ok = 'OR($AB{r}<>"Yes",AND(' + ",".join(done(c) for c in ("BD", "BE", "BF", "BG", "BH", "BI", "BJ")) + '))'
-    F["BP"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("C") + '="N/A","N/A",IF(NOT(' + valid("$AX{r}") + '),"",IF(AND('
+    F["BP"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(NOT(' + valid("$AX{r}") + '),"",IF(AND('
                + tower_ok + ',' + adapt_ok + ',' + valid("$BN{r}") + ',N($BN{r})>=N($AX{r})),$BN{r},""))),""))')
-    F["BQ"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(' + sc("C") + '="Yes",'
-               + gate_body("$BP{r}") + ',IF(' + sc("C") + '="N/A",' + gate_body("$AW{r}") + ',""))),""))')
+    F["BQ"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("F") + '="N/A","N/A",IF(' + sc("D") + '="Yes",'
+               + gate_body("$BP{r}") + ',IF(' + sc("D") + '="N/A",' + gate_body("$AW{r}") + ',""))),""))')
     F["BW"] = ('=IF($B{r}="","",IF($AC{r}="N/A","N/A",IFERROR(INDEX(cPwr_Status,MATCH($B{r},cPwr_SiteID,0))&"",'
                'IF($AC{r}="Yes","Pending",""))))')
     F["BX"] = ('=IF($B{r}="","",IF($AD{r}="N/A","N/A",IFERROR(INDEX(cFib_Status,MATCH($B{r},cFib_SiteID,0))&"",'
@@ -202,21 +202,21 @@ def formulas():
     # ---- BZ Site RFI
     pwr_on = sidx("cPwr_PowerOnDateMeterCharging", "cPwr_SiteID")
     tx = sidx("cFib_TXLinkTestedDate", "cFib_SiteID")
-    cw_pac_ok = 'OR(' + sc("C") + '<>"Yes",AND(' + valid("$BV{r}") + ',' + snag_ok("BS", "BT") + '))'
-    F["BZ"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(NOT(' + valid("$BQ{r}") + '),"",IF(AND('
+    cw_pac_ok = 'OR(' + sc("D") + '<>"Yes",AND(' + valid("$BV{r}") + ',' + snag_ok("BS", "BT") + '))'
+    F["BZ"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("F") + '="N/A","N/A",IF(NOT(' + valid("$BQ{r}") + '),"",IF(AND('
                + cw_pac_ok + ',OR($BW{r}="Done",$BW{r}="N/A"),OR($BX{r}="Done",$BX{r}="N/A"),OR($AD{r}<>"Yes",'
-               + valid(tx) + ')),MAX($BQ{r},IF(' + sc("C") + '="Yes",$BV{r},0),IF($AC{r}="Yes",' + pwr_on
+               + valid(tx) + ')),MAX($BQ{r},IF(' + sc("D") + '="Yes",$BV{r},0),IF($AC{r}="Yes",' + pwr_on
                + ',0),IF($AD{r}="Yes",' + tx + ',0)),""))),""))')
     # ---- CA TE Installation Readiness
-    ca_pred = 'IF(' + sc("E") + '="N/A",$V{r},$BZ{r})'
-    ca = gate("$CA_PRED{r}", ("Access - TE", "PTW - TE"), stop="PTW - TE", na_test=sc("D") + '="N/A"')
+    ca_pred = 'IF(' + sc("F") + '="N/A",$V{r},$BZ{r})'
+    ca = gate("$CA_PRED{r}", ("Access - TE", "PTW - TE"), stop="PTW - TE", na_test=sc("E") + '="N/A"')
     F["CA"] = ca.replace("$CA_PRED{r}", ca_pred)
     acc_te = minifs("cPrm_ValidFrom", "cPrm_SiteID,$B{r}", 'cPrm_Type,"Access - TE"', 'cPrm_Status,"Approved"')
     F["CB"] = '=IF($B{r}="","",IFERROR(' + date_or_blank(acc_te) + ',""))'
     F["CE"] = '=IF($B{r}="","",' + first_order("Team", TE_TEST) + ')'
     # ---- CU TE Completion
     items = 'IF($AE{r}="Yes",AND(' + ",".join(done(c) for c in ("CK", "CL", "CM", "CN", "CO")) + '),$CL{r}="Done")'
-    F["CU"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(NOT(' + valid("$CA{r}") + '),"",IF(AND('
+    F["CU"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(NOT(' + valid("$CA{r}") + '),"",IF(AND('
                + items + ',' + valid("$CS{r}") + ',N($CS{r})>=N($CA{r})),$CS{r},""))),""))')
     psafe = sidx("cRdy_CommissioningPowerSafeDate", "cRdy_SiteID")
     F["CV"] = gate("$CU{r}", extra='IF(' + valid(psafe) + ',' + psafe + ',99999)')
@@ -234,8 +234,8 @@ def formulas():
     freq = sidx("cRF_FrequencyLicenseDate", "cRF_SiteID")
     win = 'COUNTIFS(cChg_SiteID,$B{r},cChg_ChangeType,"Cutover Window",cChg_Approval,"Approved",cChg_ApprovalDate,">="&DateMin)'
     swap = 'OR($Z{r}="Cold Swap",$Z{r}="Hot Swap")'
-    mw = 'N(' + sc("I") + ')>0'
-    F["DP"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(NOT(' + valid("$CV{r}") + '),"",IF(AND('
+    mw = 'N(' + sc("J") + ')>0'
+    F["DP"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(NOT(' + valid("$CV{r}") + '),"",IF(AND('
                + valid("$DN{r}") + ',N($DN{r})>=N($CV{r}),' + valid("$CW{r}") + ',' + valid("$DA{r}") + ',OR(NOT('
                + mw + '),AND(' + valid("$CX{r}") + ',' + valid(freq) + ')),OR($L{r}="",$L{r}="N/A",' + valid(uplink)
                + '),OR(NOT(' + swap + '),AND(' + valid("$DC{r}") + ',' + win + '>0))),$DN{r},""))),""))')
@@ -245,19 +245,19 @@ def formulas():
              + ')),' + valid("$DT{r}") + ',' + ",".join(done(c) for c in ("DU", "DV", "DW", "DX")) + ',' + valid("$DY{r}")
              + ',' + ",".join(done(c) for c in ("DZ", "EA", "EB", "EC", "ED")) + ',' + valid("$EE{r}") + ','
              + valid("$EF{r}") + ',' + snag_ok("EG", "EH") + ')')
-    F["EL"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(NOT(' + valid("$DQ{r}") + '),"",IF('
+    F["EL"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(NOT(' + valid("$DQ{r}") + '),"",IF('
                + tepac + ',$EJ{r},""))),""))')
     F["EM"] = gate("$EL{r}")
     F["EN"] = '=IF($B{r}="","",$G{r}&"")'
     F["EQ"] = ('=IF($B{r}="","",IF($EN{r}="","Missing Cluster ID",IF(COUNTIFS(Master_EN,$EN{r},Master_EP,">0")=0,'
                '"No Source",IF(COUNTIFS(Master_EN,$EN{r},Master_EP,">0")>1,"Multiple Sources","Valid"))))')
     src = maxifs("Master_EP", "Master_EN,$EN{r}")
-    F["ES"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(OR(NOT(' + valid("$EM{r}") + '),$EQ{r}'
+    F["ES"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(OR(NOT(' + valid("$EM{r}") + '),$EQ{r}'
                '<>"Valid"),"",IF(AND(' + valid(src) + ',' + src + '>=N($EM{r})),' + src + ',""))),""))')
     F["ET"] = gate("$ES{r}")
     F["EW"] = pull_val("cRdy_HOTOPackageValidDate", "cRdy_SiteID")
     ops = sidx("cRdy_OpsAcceptanceValidDate", "cRdy_SiteID")
-    F["EY"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("D") + '="N/A","N/A",IF(NOT(' + valid("$ET{r}") + '),"",IF(AND('
+    F["EY"] = ('=IF($B{r}="","",IFERROR(IF(' + sc("E") + '="N/A","N/A",IF(NOT(' + valid("$ET{r}") + '),"",IF(AND('
                + valid("$EU{r}") + ',' + valid("$EV{r}") + ',' + valid("$EW{r}") + ',' + valid(ops) + ',' + ops
                + '>=N($ET{r})),' + ops + ',""))),""))')
     F["EZ"] = gate("$EY{r}")

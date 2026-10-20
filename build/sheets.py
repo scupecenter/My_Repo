@@ -290,7 +290,7 @@ def build_dashboard(wb, names):
     ws["B4"] = ("Blank selectors = All. Scope = sites the item applies to (not cancelled). Pending = its turn has "
                 "arrived (previous step done). Not Due = previous step not done. Exceptions and WH are project-wide.")
     ws["B4"].font = font(8, italic=True)
-    names.add("DashSel", f"('Site Calc'!$B$5:$B${M1}=1)*(Master!$FZ$5:$FZ${M1}<>\"Cancelled\")")
+    names.add("DashSel", f"('Site Calc'!$C$5:$C${M1}=1)*(Master!$FZ$5:$FZ${M1}<>\"Cancelled\")")
     # -------------------------------------------------- 1 Milestone Delivery
     r = 6
     band(ws, r, 2, 13, "1 · MILESTONE DELIVERY · approved baseline vs achievement")
@@ -607,19 +607,19 @@ def build_progress(wb, names):
            '+COUNTIFS(cPrm_SiteID,[[Site ID]],cPrm_Type,"Access - "&[[SOW]],cPrm_Validity,"N/A")>0,"Yes","No"))')
     tomorrow = [_c.copy(x) for x in base] + [Col("Access Valid", "calc", T("=" + acc), w=8),
                                              Col("Planned Work", w=24), Col("Remark", w=22)]
+    # block title (A:B) with its date in C, header on the next row, 10 rows, no SUBTOTAL row (user layout)
     for blk, cols, r0, nm, f in (("Daily Progress", daily, 1, "TodayDate", "=TODAY()"),
-                                 ("Tomorrow Plan", tomorrow, 15, "TomorrowDate",
+                                 ("Tomorrow Plan", tomorrow, 14, "TomorrowDate",
                                   "=WORKDAY.INTL(TODAY(),1,7,Holidays)")):
-        cols[0] = Col("No.", "num", T('=IF([[Site ID]]="","",ROW()-' + str(r0 + 2) + ')'), w=5)
+        cols[0] = Col("No.", "num", T('=IF([[Site ID]]="","",ROW()-' + str(r0 + 1) + ')'), w=5)
         title(ws, f"A{r0}", blk, 12)
-        style(ws.cell(r0, 3, "Date"), font(9, True), fill(C_HDR), AL_C)
-        style(ws.cell(r0, 4, f), font(10, True), fill(C_CALC), AL_C, DATE_FMT)
-        style(ws.cell(r0, 6, "Day"), font(9, True), fill(C_HDR), AL_C)
-        style(ws.cell(r0, 7, f'=TEXT(D{r0},"dddd")'), font(10, True), fill(C_CALC), AL_C)
-        names.add(nm, f"'Progress & Plan'!$D${r0}")
+        ws.merge_cells(start_row=r0, start_column=1, end_row=r0, end_column=2)
+        style(ws.cell(r0, 3, f), font(10, True), fill(C_CALC), AL_C, DATE_FMT)
+        names.add(nm, f"'Progress & Plan'!$C${r0}")
         tname = "tblDailyProgress" if r0 == 1 else "tblTomorrowPlan"
-        register(ws, names, tname, "cDP" if r0 == 1 else "cTP", cols, sub_row=r0 + 1, hdr_row=r0 + 2, nrows=10)
-    ws.freeze_panes = "C4"
+        register(ws, names, tname, "cDP" if r0 == 1 else "cTP", cols, sub_row=None, hdr_row=r0 + 1, nrows=10,
+                 header_h=24)
+    ws.freeze_panes = "C3"
     return ws
 
 
