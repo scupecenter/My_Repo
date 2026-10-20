@@ -7,6 +7,7 @@ import sys
 import openpyxl
 
 import calc_sheets
+import layout
 import master
 import registers as R
 import setting
@@ -76,6 +77,7 @@ def main(rebuilt, old, out):
     setting.build(wb, names)
     calc_sheets.build_site_calc(wb, names, wh.ITEMS)
     sheets.finish(wb, names)
+    layout.apply(wb)
     wb._sheets = [wb[n] for n in ORDER]
     wb.active = 0
     wb.calculation.fullCalcOnLoad = True
