@@ -523,7 +523,7 @@ const LIBYA_RING=[11.566,33.18, 11.56,33.144, 11.53,33.084, 11.52,32.984, 11.488
 "use strict";
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const DAY = 864e5;
 const nf = new Intl.NumberFormat("en-US");
 const fmt = n => n == null || isNaN(n) ? "—" : nf.format(Math.round(n));
@@ -1286,7 +1286,7 @@ function decisions(rows, Tn, sec) {
   Object.entries(own).sort((a, b) => b[1].length - a[1].length).slice(0, 2).forEach(([o, l]) => {
     const old = Math.max(...l.map(s => s.issueAge || 0));
     if (l.length >= 2) out.push({ w: l.length * 1.6 + old / 20, sev: old > 60 || l.length >= 10 ? "crit" : "watch",
-      t: `${o} holds ${fmt(l.length)} open site issues`, d: `Oldest ${fmt(old)} days · top: ${esc(mode(l.map(s => txt(s.issue))))}.`, go: { list: "issues", owner: o } });
+      t: `${o} holds ${fmt(l.length)} open site issues`, d: `Oldest ${fmt(old)} days · top: ${mode(l.map(s => txt(s.issue)))}.`, go: { list: "issues", owner: o } });
   });
   const crit = S.risks.filter(r => !/closed/i.test(txt(r.Status)) && /critical|high/i.test(txt(r["Risk Level"])));
   if (crit.length && !sec) out.push({ w: crit.length * 2.2, sev: crit.some(r => /critical/i.test(txt(r["Risk Level"]))) ? "crit" : "watch",
@@ -1306,7 +1306,7 @@ const mode = a => { const c = {}; let b = "", n = 0; a.forEach(x => { if (!x) re
 function decisionList(items) {
   if (!items.length) return `<div class="empty">Nothing needs a decision: no milestone is more than 3 sites behind baseline and no owner holds several open issues.</div>`;
   return `<div class="dec">${items.map((d, i) => `<div class="it" data-go='${esc(JSON.stringify(d.go))}'><span class="rk">${i + 1}</span>
-    <span class="tx"><b>${esc(d.t)}</b><span>${d.d}</span></span><span class="sev"><span class="tag ${d.sev}">${d.sev === "crit" ? "Act now" : "Watch"}</span></span></div>`).join("")}</div>`;
+    <span class="tx"><b>${esc(d.t)}</b><span>${esc(d.d)}</span></span><span class="sev"><span class="tag ${d.sev}">${d.sev === "crit" ? "Act now" : "Watch"}</span></span></div>`).join("")}</div>`;
 }
 
 /* ================================================================ narrative */
