@@ -1,4 +1,4 @@
-"""Layout set by hand in the workbook (column widths, title merges), carried into every rebuild."""
+"""Layout set by hand in the workbook (column widths, row heights, title merges), carried into every rebuild."""
 from openpyxl.utils import range_boundaries
 
 WIDTHS = {
@@ -25,10 +25,18 @@ WIDTHS = {
     "Project Status": {"B": 32.33, "C": 15.55, "D": 19.55, "G": 14.0, "I": 11.0, "J": 11.11, "M": 7.33},
     "Progress & Plan": {"C": 15.66, "D": 15.66, "G": 10.44, "L": 15.44, "M": 15.44, "N": 25.33},
     "WH Serials": {"B": 12.44},
-    "Risk Register": {"A": 6.0, "L": 21.0, "P": 9.55},
+    "Risk Register": {"A": 6.0, "F": 9.11, "L": 21.0, "P": 9.55},
     "Data Quality": {"D": 29.66},
-    "SLA": {"D": 12.0, "V": 12.11, "AE": 12.0, "AP": 11.33, "BO": 11.44, "BX": 11.0},
+    "SLA": {"D": 12.0, "J": 10.78, "V": 12.11, "AE": 12.0, "AP": 11.33, "BO": 11.44, "BX": 11.0},
     "Setting": {"B": 15.44, "R": 6.66, "T": 5.33, "AB": 3.33, "AD": 2.89},
+}
+
+WIDTHS["WH"] = {"S": 14.11, "AB": 13.44, "AC": 13.22, "AD": 12.11}
+
+HEIGHTS = {
+    "SLA": {3: 30.6, 4: 81.6, 5: 30.6},
+    "Acquisition": {2: 36.0},
+    "PR-PO": {2: 24.0},
 }
 
 MERGES = {
@@ -47,6 +55,9 @@ def apply(wb):
         ws = wb[sheet]
         for col, w in cols.items():
             ws.column_dimensions[col].width = w
+    for sheet, rows in HEIGHTS.items():
+        for r, h in rows.items():
+            wb[sheet].row_dimensions[r].height = h
     for sheet, refs in MERGES.items():
         ws = wb[sheet]
         for ref in refs:
