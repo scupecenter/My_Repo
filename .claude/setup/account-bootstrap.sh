@@ -50,14 +50,16 @@ else
   claude mcp add playwright -s user -- npx -y @playwright/mcp@0.0.83 >/dev/null 2>&1 || true
 fi
 
-# --- 3) Vendored skills + agents from your GSDN_DashBoard repo -------------
-#     (impeccable, reverse-engineer-anything, playwright-cli, unlazy + impeccable agents)
-#     Requires this environment's GitHub access to clone the repo.
-if git clone --depth 1 https://github.com/mscit-admin/GSDN_DashBoard.git "$TMP/gsdn" >/dev/null 2>&1; then
+# --- 3) Vendored skills + agents + commands from your my_repo repo ---------
+#     (impeccable, reverse-engineer-anything, playwright-cli, unlazy + impeccable
+#      agents + the /security-review command). Needs GitHub access to the repo.
+CMD="$HOME/.claude/commands"; mkdir -p "$CMD"
+if git clone --depth 1 https://github.com/scupecenter/my_repo.git "$TMP/myrepo" >/dev/null 2>&1; then
   for s in impeccable reverse-engineer-anything playwright-cli unlazy ; do
-    [ -d "$TMP/gsdn/.claude/skills/$s" ] && { rm -rf "$SK/$s"; cp -R "$TMP/gsdn/.claude/skills/$s" "$SK/$s"; }
+    [ -d "$TMP/myrepo/.claude/skills/$s" ] && { rm -rf "$SK/$s"; cp -R "$TMP/myrepo/.claude/skills/$s" "$SK/$s"; }
   done
-  for a in "$TMP/gsdn/.claude/agents/"impeccable-*.md ; do [ -f "$a" ] && cp "$a" "$AG/"; done
+  for a in "$TMP/myrepo/.claude/agents/"impeccable-*.md ; do [ -f "$a" ] && cp "$a" "$AG/"; done
+  for c in "$TMP/myrepo/.claude/commands/"*.md ; do [ -f "$c" ] && cp "$c" "$CMD/"; done
 fi
 
 # --- 4) OmniRoute skill set (45 skills + ponytail + config-codex-cli) ------
@@ -120,6 +122,36 @@ fi
 # --- 11) design-motion-principles (Kyle Zantos, MIT) -----------------------
 if git clone --depth 1 https://github.com/kylezantos/design-motion-principles.git "$TMP/mo" >/dev/null 2>&1; then
   [ -d "$TMP/mo/skills/design-motion-principles" ] && { rm -rf "${SK:?}/design-motion-principles"; cp -R "$TMP/mo/skills/design-motion-principles" "$SK/design-motion-principles"; }
+fi
+
+# --- 12) Scrapling: library + MCP server (social/web scraping, no API key) --
+#     HTTP tools work immediately; browser tools use the container Chromium.
+command -v uv >/dev/null 2>&1 && uv tool install "scrapling[ai]==0.5" >/dev/null 2>&1 || true
+if command -v scrapling-mcp >/dev/null 2>&1; then
+  if [ -x /opt/pw-browsers/chromium ]; then
+    claude mcp add scrapling -s user -- "$HOME/.local/bin/scrapling-mcp" \
+      --executable-path /opt/pw-browsers/chromium >/dev/null 2>&1 || true
+  else
+    claude mcp add scrapling -s user -- "$HOME/.local/bin/scrapling-mcp" >/dev/null 2>&1 || true
+  fi
+fi
+
+# --- 13) scrapling-official agent skill (D4Vinci/Scrapling, BSD-3) ----------
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/D4Vinci/Scrapling.git "$TMP/scr" >/dev/null 2>&1; then
+  git -C "$TMP/scr" sparse-checkout set agent-skill/Scrapling-Skill >/dev/null 2>&1 || true
+  [ -d "$TMP/scr/agent-skill/Scrapling-Skill" ] && { rm -rf "$SK/scrapling-official"; cp -R "$TMP/scr/agent-skill/Scrapling-Skill" "$SK/scrapling-official"; }
+fi
+
+# --- 14) vercel-react-best-practices (vercel-labs/agent-skills, MIT) --------
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel-labs/agent-skills.git "$TMP/va" >/dev/null 2>&1; then
+  git -C "$TMP/va" sparse-checkout set skills/react-best-practices >/dev/null 2>&1 || true
+  [ -d "$TMP/va/skills/react-best-practices" ] && { rm -rf "$SK/vercel-react-best-practices"; cp -R "$TMP/va/skills/react-best-practices" "$SK/vercel-react-best-practices"; }
+fi
+
+# --- 15) orca-cli skill (stablyai/orca, MIT; large repo -> sparse fetch) ----
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/stablyai/orca.git "$TMP/orca" >/dev/null 2>&1; then
+  git -C "$TMP/orca" sparse-checkout set skills/orca-cli >/dev/null 2>&1 || true
+  [ -d "$TMP/orca/skills/orca-cli" ] && { rm -rf "$SK/orca-cli"; cp -R "$TMP/orca/skills/orca-cli" "$SK/orca-cli"; }
 fi
 
 echo "[account-bootstrap] done: $(ls "$SK" | wc -l) skills, $(ls "$AG" 2>/dev/null | wc -l) agents"
