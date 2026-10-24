@@ -1,0 +1,1372 @@
+// GSDN PMIS - Prisma schema (PostgreSQL 16)
+// Migrations only: never hand-edit the database. Raw SQL (append-only trigger, RLS) lives in db/sql/ and is
+// applied through a Prisma migration (prisma migrate dev --create-only, then paste the SQL file).
+// Field names are snake_case on purpose: they match db/sql, the importer mapping.csv and the API contract.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserStatus {
+  pending_assignment
+  active
+  suspended
+  disabled
+}
+
+enum PermissionLevel {
+  view
+  entry
+  review
+  approve
+  admin
+}
+
+enum TeamKind {
+  cw
+  te
+  both
+  none
+}
+
+enum DelegationScope {
+  full
+  partial
+}
+
+enum DeliveryScenario {
+  new_build
+  expansion
+  hot_swap
+  cold_swap
+  relocation
+}
+
+enum OverallStatus {
+  not_started
+  in_progress
+  on_hold
+  completed
+  cancelled
+}
+
+enum ScopeFlag {
+  yes
+  na
+}
+
+enum TaskState {
+  locked
+  open
+  entry
+  in_review
+  in_approval
+  approved
+  rejected
+  na
+  skipped
+  suspended
+}
+
+enum WorkflowAction {
+  submit
+  approve
+  reject
+  auto_skip
+  claim
+  release
+  reassign
+  admin_override
+  reopen
+}
+
+enum MatrixRule {
+  any_one
+  all_members
+}
+
+enum AssigneeKind {
+  user
+  role
+  sub_role
+  group
+}
+
+enum DocKind {
+  scanned_document
+  photo
+  email
+  report
+  excel_template
+}
+
+enum DocPlacementKind {
+  task
+  qc
+  register
+}
+
+enum DocStatus {
+  missing
+  uploaded
+  in_review
+  approved
+  rejected
+}
+
+enum AppliesTo {
+  new_tasks_only
+  open_tasks_too
+}
+
+enum SnagStatus {
+  open
+  fix_uploaded
+  in_review
+  closed
+  cancelled
+}
+
+enum GeofenceResult {
+  inside
+  outside
+  no_gps
+  not_checked
+}
+
+enum BatchStatus {
+  uploaded
+  validated
+  in_review
+  partially_approved
+  approved
+  rejected
+  failed
+}
+
+enum RowAction {
+  create
+  update
+  unchanged
+  error
+}
+
+enum RowDecision {
+  pending
+  approved
+  rejected
+}
+
+enum ChangeKind {
+  scope_change
+  date_change
+  suspension
+  resumption
+  other
+}
+
+enum ChangeStatus {
+  requested
+  approved
+  rejected
+  applied
+}
+
+enum LogLevel {
+  debug
+  info
+  warn
+  error
+}
+
+enum NotifyChannel {
+  in_app
+  email
+}
+
+enum RegisterStatus {
+  open
+  in_progress
+  closed
+  na
+}
+
+enum ExternalPartyType {
+  cw_contractor
+  te_vendor
+  gecol
+  hlc
+  supplier
+  landlord
+  other
+}
+
+// ============================================================================
+// 1. IDENTITY, ROLES, ACCESS
+// ============================================================================
+
+model Region {
+  id      Int     @id // fixed ids 1..7 so RLS can compare integers
+  code    String  @unique // Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha
+  name_en String
+  name_ar String?
+
+  sites        Site[]
+  user_regions UserRegion[]
+
+  @@map("regions")
+}
+
+model Role {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code      String  @unique
+  name_en   String
+  name_ar   String?
+  sort      Int     @default(0)
+  is_active Boolean @default(true)
+
+  sub_roles SubRole[]
+  users     User[]
+
+  @@map("roles")
+}
+
+model SubRole {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  role_id   String   @db.Uuid
+  code      String   @unique
+  name_en   String
+  name_ar   String?
+  team      TeamKind @default(none)
+  is_active Boolean  @default(true)
+
+  role  Role          @relation(fields: [role_id], references: [id])
+  users UserSubRole[]
+
+  @@index([role_id])
+  @@map("sub_roles")
+}
+
+model User {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  m365_object_id   String          @unique // Entra ID oid claim
+  email            String          @unique
+  display_name     String
+  employee_id      String?         @unique @db.Char(4) // 4-digit, entered at first sign-in
+  status           UserStatus      @default(pending_assignment)
+  role_id          String?         @db.Uuid
+  team             TeamKind        @default(none)
+  permission_level PermissionLevel @default(view)
+  locale           String          @default("en")
+  theme            String          @default("light")
+  is_break_glass   Boolean         @default(false)
+  totp_secret_enc  String? // break-glass admin only, encrypted
+  last_login_at    DateTime?       @db.Timestamptz(6)
+  created_at       DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime        @updatedAt @db.Timestamptz(6)
+
+  role             Role?         @relation(fields: [role_id], references: [id])
+  sub_roles        UserSubRole[]
+  regions          UserRegion[]
+  modules          UserModule[]
+  group_members    GroupMember[]
+  delegations_from Delegation[]  @relation("DelegationFrom")
+  delegations_to   Delegation[]  @relation("DelegationTo")
+
+  @@index([status])
+  @@index([role_id])
+  @@map("users")
+}
+
+model UserSubRole {
+  user_id     String  @db.Uuid
+  sub_role_id String  @db.Uuid
+  user        User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  sub_role    SubRole @relation(fields: [sub_role_id], references: [id])
+
+  @@id([user_id, sub_role_id])
+  @@map("user_sub_roles")
+}
+
+// No rows for a user = all regions (default visibility is everything).
+model UserRegion {
+  user_id   String @db.Uuid
+  region_id Int
+  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  region    Region @relation(fields: [region_id], references: [id])
+
+  @@id([user_id, region_id])
+  @@map("user_regions")
+}
+
+// No rows for a user = all modules.
+model UserModule {
+  user_id    String @db.Uuid
+  module_key String // sites, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports
+  user       User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, module_key])
+  @@map("user_modules")
+}
+
+model Group {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name             String   @unique
+  description      String?
+  is_system_admins Boolean  @default(false) // the System Admins group
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  members GroupMember[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  group_id String   @db.Uuid
+  user_id  String   @db.Uuid
+  added_at DateTime @default(now()) @db.Timestamptz(6)
+  group    Group    @relation(fields: [group_id], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [user_id], references: [id])
+
+  @@id([group_id, user_id])
+  @@index([user_id])
+  @@map("group_members")
+}
+
+model Delegation {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_user_id String          @db.Uuid
+  to_user_id   String          @db.Uuid
+  scope        DelegationScope
+  permissions  Json? // for partial: list of rights, e.g. ["approve","matrix.edit"]
+  valid_from   DateTime        @db.Timestamptz(6)
+  valid_to     DateTime?       @db.Timestamptz(6) // null = until revoked
+  revoked      Boolean         @default(false)
+  revoked_at   DateTime?       @db.Timestamptz(6)
+  revoked_by   String?         @db.Uuid
+  reason       String?
+  created_at   DateTime        @default(now()) @db.Timestamptz(6)
+
+  from_user User @relation("DelegationFrom", fields: [from_user_id], references: [id])
+  to_user   User @relation("DelegationTo", fields: [to_user_id], references: [id])
+
+  @@index([to_user_id, revoked])
+  @@map("delegations")
+}
+
+// ============================================================================
+// 2. SITES AND CLUSTERS
+// ============================================================================
+
+model Cluster {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cluster_code        String    @unique // Master G / EN
+  name                String?
+  region_id           Int?
+  kpi_acceptance_date DateTime? @db.Date // recorded once per cluster, applied to all sites
+  kpi_source_date     DateTime? @db.Date
+  kpi_validated       Boolean   @default(false)
+
+  sites Site[]
+
+  @@map("clusters")
+}
+
+model Site {
+  id                      String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_code               String            @unique // Master B Site ID
+  owner_site_id           String? // Master C
+  name                    String
+  region_id               Int
+  sub_region              String?
+  cluster_id              String?           @db.Uuid
+  latitude                Decimal?          @db.Decimal(9, 6)
+  longitude               Decimal?          @db.Decimal(9, 6)
+  address                 String?
+  site_type               String?
+  site_scenario           String? // Master K, RF classification
+  uplink_site             String?
+  tower_owner             String?
+  existing_or_new         String?
+  rt_or_gf                String?
+  tower_type              String?
+  tower_height_m          Decimal?          @db.Decimal(6, 1)
+  config_summary          String? // WL/MW/IP/PWR text (computed in Master)
+  rf_survey_date          DateTime?         @db.Date
+  acquisition_date        DateTime?         @db.Date
+  project_phase           String?
+  delivery_batch          String?
+  delivery_scenario       DeliveryScenario?
+  cw_delivery_model       String? // outsourced / internal
+  // Scope flags (Master AA:AF)
+  scope_tower_erection    ScopeFlag         @default(na)
+  scope_site_adaption     ScopeFlag         @default(na)
+  scope_gecol_power       ScopeFlag         @default(na)
+  scope_hlc_fiber         ScopeFlag         @default(na)
+  scope_te_full           ScopeFlag         @default(na)
+  scope_te_ip_router_only ScopeFlag         @default(na)
+  overall_status          OverallStatus     @default(not_started)
+  current_milestone       String?
+  next_milestone          String?
+  is_active               Boolean           @default(true)
+  created_at              DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime          @updatedAt @db.Timestamptz(6)
+
+  region  Region         @relation(fields: [region_id], references: [id])
+  cluster Cluster?       @relation(fields: [cluster_id], references: [id])
+  tasks   TaskInstance[]
+  Snag    Snag[]
+
+  @@index([region_id, overall_status])
+  @@index([cluster_id])
+  @@index([delivery_scenario])
+  @@index([project_phase, delivery_batch])
+  @@map("sites")
+}
+
+// ============================================================================
+// 3. STAGES, TASKS, WORKFLOW, MATRIX
+// ============================================================================
+
+model StageDefinition {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code            String  @unique // S01..S10 (10 milestones)
+  seq             Int     @unique
+  name_en         String
+  name_ar         String?
+  milestone_name  String // Site Release, PRE-CW Completion, ...
+  approval_levels Int     @default(3) // configurable per stage
+  is_active       Boolean @default(true)
+
+  tasks        TaskDefinition[]
+  matrix_cells MatrixCell[]
+
+  @@map("stage_definitions")
+}
+
+model TaskDefinition {
+  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String             @unique // e.g. CW_STA, TE_PAC (shared with domain-analyst catalogue)
+  stage_id               String             @db.Uuid
+  seq                    Int
+  name_en                String
+  name_ar                String?
+  has_documents          Boolean            @default(true)
+  is_milestone_task      Boolean            @default(false)
+  approval_levels        Int? // null = inherit stage
+  sla_working_days       Int?
+  sla_from_task_code     String? // e.g. D-1 measured from SITE_RFI
+  condition_rule         Json? // scope-flag / scenario applicability rule
+  default_external_party ExternalPartyType?
+  is_active              Boolean            @default(true)
+
+  stage          StageDefinition         @relation(fields: [stage_id], references: [id])
+  instances      TaskInstance[]
+  matrix_cells   MatrixCell[]
+  doc_placements DocumentTypePlacement[]
+
+  @@index([stage_id, seq])
+  @@map("task_definitions")
+}
+
+model TaskInstance {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                  String    @db.Uuid
+  region_id                Int // denormalised from site for RLS and filters
+  task_def_id              String    @db.Uuid
+  state                    TaskState @default(locked)
+  current_level            Int       @default(0) // 1 entry, 2 review, 3 approve
+  levels_required          Int       @default(3) // frozen at creation
+  ball_in_court_user_id    String?   @db.Uuid
+  ball_in_court_group_id   String?   @db.Uuid
+  ball_in_court_role_id    String?   @db.Uuid
+  external_party_id        String?   @db.Uuid
+  baseline_date            DateTime? @db.Date
+  planned_date             DateTime? @db.Date
+  planned_start            DateTime? @db.Date
+  actual_start             DateTime? @db.Date
+  actual_date              DateTime? @db.Date
+  submitted_date           DateTime? @db.Date
+  approved_date            DateTime? @db.Date
+  values                   Json? // task-specific extra fields (result, analysis type, status text)
+  lock_reason              String?
+  is_na                    Boolean   @default(false)
+  na_reason                String?
+  admin_override           Boolean   @default(false)
+  has_override_flag_in_kpi Boolean   @default(false)
+  due_date                 DateTime? @db.Date
+  version                  Int       @default(1)
+  created_at               DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime  @updatedAt @db.Timestamptz(6)
+
+  site           Site           @relation(fields: [site_id], references: [id])
+  task_def       TaskDefinition @relation(fields: [task_def_id], references: [id])
+  external_party ExternalParty? @relation(fields: [external_party_id], references: [id])
+  steps          WorkflowStep[]
+  slots          DocumentSlot[]
+  comments       Comment[]
+  snags          Snag[]
+
+  @@unique([site_id, task_def_id])
+  @@index([region_id, state])
+  @@index([state, ball_in_court_user_id])
+  @@index([ball_in_court_group_id, state])
+  @@index([ball_in_court_role_id, state])
+  @@index([task_def_id, state])
+  @@index([due_date])
+  @@map("task_instances")
+}
+
+model WorkflowStep {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id         String         @db.Uuid
+  level           Int
+  action          WorkflowAction
+  holder_user_id  String?        @db.Uuid // resolved holder at that time
+  holder_group_id String?        @db.Uuid
+  acted_by        String?        @db.Uuid
+  on_behalf_of    String?        @db.Uuid // delegation: "X on behalf of System Admin"
+  claimed_by      String?        @db.Uuid
+  note            String? // mandatory on reject
+  admin_override  Boolean        @default(false)
+  override_reason String?
+  stepup_verified Boolean        @default(false)
+  batch_row_id    String?        @db.Uuid
+  before_state    TaskState?
+  after_state     TaskState?
+  created_at      DateTime       @default(now()) @db.Timestamptz(6)
+
+  task TaskInstance @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@index([task_id, created_at])
+  @@index([acted_by])
+  @@map("workflow_steps")
+}
+
+// Responsibility Matrix: stage or task x level -> assignees. task_def_id null = stage default.
+model MatrixCell {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stage_id    String     @db.Uuid
+  task_def_id String?    @db.Uuid
+  level       Int // 1 entry, 2 review, 3 approve
+  rule        MatrixRule @default(any_one)
+  region_id   Int? // optional region-specific cell
+  updated_by  String?    @db.Uuid
+  updated_at  DateTime   @updatedAt @db.Timestamptz(6)
+
+  stage     StageDefinition      @relation(fields: [stage_id], references: [id])
+  task_def  TaskDefinition?      @relation(fields: [task_def_id], references: [id])
+  assignees MatrixCellAssignee[]
+
+  @@unique([stage_id, task_def_id, level, region_id])
+  @@index([stage_id, level])
+  @@map("matrix_cells")
+}
+
+model MatrixCellAssignee {
+  id      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cell_id String       @db.Uuid
+  kind    AssigneeKind
+  ref_id  String       @db.Uuid // user / role / sub_role / group id according to kind
+  cell    MatrixCell   @relation(fields: [cell_id], references: [id], onDelete: Cascade)
+
+  @@unique([cell_id, kind, ref_id])
+  @@index([kind, ref_id])
+  @@map("matrix_cell_assignees")
+}
+
+// Vendors, contractors, GECOL, HLC, suppliers: never log in, shown on tasks for delay attribution.
+model ExternalParty {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name           String            @unique
+  type           ExternalPartyType
+  company_type   String?
+  contract_ref   String?
+  contract_start DateTime?         @db.Date
+  contract_end   DateTime?         @db.Date
+  is_active      Boolean           @default(true)
+
+  tasks TaskInstance[]
+  teams ExternalTeam[]
+
+  @@map("external_parties")
+}
+
+model ExternalTeam {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  party_id       String        @db.Uuid
+  name           String
+  team_type      String?
+  specialization String?
+  is_active      Boolean       @default(true)
+  party          ExternalParty @relation(fields: [party_id], references: [id])
+
+  @@unique([party_id, name])
+  @@map("external_teams")
+}
+
+// ============================================================================
+// 4. DOCUMENT LIBRARY, SLOTS, FILES
+// ============================================================================
+
+model DocumentType {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code               String    @unique // A1, A2, B1 ...
+  name_en            String
+  name_ar            String?
+  kind               DocKind   @default(scanned_document)
+  is_mandatory       Boolean   @default(true)
+  condition_rule     Json? // when conditional, e.g. {"all":[{"site.scope_tower_erection":"yes"}]}
+  formats            String[]  @default(["pdf", "jpg", "jpeg", "png"])
+  max_size_mb        Int       @default(20)
+  min_files          Int       @default(1)
+  max_files          Int? // null = unlimited
+  photo_rules        Json? // required shot types, min count, EXIF rule
+  has_expiry         Boolean   @default(false)
+  expiry_field       String?
+  blank_form_file_id String?   @db.Uuid
+  applies_to         AppliesTo @default(new_tasks_only)
+  is_active          Boolean   @default(true) // deactivated, never deleted
+  version            Int       @default(1)
+  created_at         DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime  @updatedAt @db.Timestamptz(6)
+
+  placements DocumentTypePlacement[]
+  slots      DocumentSlot[]
+
+  @@map("document_types")
+}
+
+model DocumentTypePlacement {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doc_type_id  String           @db.Uuid
+  kind         DocPlacementKind
+  task_def_id  String?          @db.Uuid
+  snag_type_id String?          @db.Uuid
+  register_key String? // e.g. permits_hse, procurement
+
+  doc_type  DocumentType    @relation(fields: [doc_type_id], references: [id])
+  task_def  TaskDefinition? @relation(fields: [task_def_id], references: [id])
+  snag_type SnagType?       @relation(fields: [snag_type_id], references: [id])
+
+  @@index([doc_type_id])
+  @@index([task_def_id])
+  @@map("document_type_placements")
+}
+
+model DocumentSlot {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id         String?   @db.Uuid
+  site_id         String    @db.Uuid
+  region_id       Int
+  doc_type_id     String    @db.Uuid
+  candidate_label String? // e.g. each SAR candidate
+  status          DocStatus @default(missing)
+  reject_reason   String?
+  valid_to        DateTime? @db.Date // expiry
+  created_at      DateTime  @default(now()) @db.Timestamptz(6)
+
+  task     TaskInstance?  @relation(fields: [task_id], references: [id])
+  doc_type DocumentType   @relation(fields: [doc_type_id], references: [id])
+  files    DocumentFile[]
+
+  @@index([task_id])
+  @@index([site_id, doc_type_id])
+  @@index([region_id, status])
+  @@map("document_slots")
+}
+
+// Superseded versions are kept: (slot_id, file_group_id, version).
+model DocumentFile {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slot_id       String    @db.Uuid
+  file_group_id String    @db.Uuid // same logical file across versions
+  version       Int       @default(1)
+  is_current    Boolean   @default(true)
+  original_name String
+  stored_name   String // SITE_TASK_DOC_APPROVEDDATE.ext
+  storage_key   String // MinIO object key
+  mime_type     String
+  size_bytes    BigInt
+  sha256        String
+  uploaded_by   String    @db.Uuid
+  uploaded_at   DateTime  @default(now()) @db.Timestamptz(6)
+  approved_date DateTime? @db.Date
+
+  slot DocumentSlot @relation(fields: [slot_id], references: [id])
+
+  @@unique([file_group_id, version])
+  @@index([slot_id, is_current])
+  @@index([sha256])
+  @@map("document_files")
+}
+
+// ============================================================================
+// 5. QC SNAGS AND PHOTO EVIDENCE
+// ============================================================================
+
+model SnagType {
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                          String   @unique
+  name_en                       String
+  name_ar                       String?
+  min_photos                    Int      @default(1)
+  required_shots                Json? // ["before","after","wide"]
+  formats                       String[] @default(["jpg", "png", "heic"])
+  max_size_mb                   Int      @default(20)
+  blocks_preliminary_acceptance Boolean  @default(true)
+  is_active                     Boolean  @default(true)
+
+  snags          Snag[]
+  doc_placements DocumentTypePlacement[]
+
+  @@map("snag_types")
+}
+
+model Snag {
+  id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id              String     @db.Uuid
+  region_id            Int
+  task_id              String?    @db.Uuid // task whose approval it blocks
+  snag_type_id         String     @db.Uuid
+  scope                String // CW or TE
+  stage_ref            String? // CW PAC, TE PAC, CW FAC, TE FAC
+  description          String
+  severity             String?
+  status               SnagStatus @default(open)
+  raised_by            String     @db.Uuid
+  raised_at            DateTime   @default(now()) @db.Timestamptz(6)
+  target_date          DateTime?  @db.Date
+  closed_at            DateTime?  @db.Timestamptz(6)
+  closed_by            String?    @db.Uuid
+  responsible_party_id String?    @db.Uuid
+
+  site      Site          @relation(fields: [site_id], references: [id])
+  task      TaskInstance? @relation(fields: [task_id], references: [id])
+  snag_type SnagType      @relation(fields: [snag_type_id], references: [id])
+  photos    SnagPhoto[]
+
+  @@index([site_id, status])
+  @@index([region_id, status])
+  @@index([task_id, status])
+  @@map("snags")
+}
+
+model SnagPhoto {
+  id                   String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snag_id              String         @db.Uuid
+  shot_type            String?
+  storage_key          String
+  mime_type            String
+  size_bytes           BigInt
+  sha256               String
+  exif_date            DateTime?      @db.Timestamptz(6)
+  unknown_capture_date Boolean        @default(false)
+  before_snag_raised   Boolean        @default(false) // rejected when true
+  gps_lat              Decimal?       @db.Decimal(9, 6)
+  gps_lon              Decimal?       @db.Decimal(9, 6)
+  distance_m           Decimal?       @db.Decimal(9, 1)
+  geofence_result      GeofenceResult @default(not_checked)
+  geofence_radius_m    Int            @default(300)
+  captured_in_app      Boolean        @default(false)
+  stamp_meta           Json? // site id, name, address, coordinates, engineer, task
+  uploaded_by          String         @db.Uuid
+  uploaded_at          DateTime       @default(now()) @db.Timestamptz(6)
+  review_note          String?
+
+  snag Snag @relation(fields: [snag_id], references: [id], onDelete: Cascade)
+
+  @@index([snag_id])
+  @@index([geofence_result])
+  @@map("snag_photos")
+}
+
+// ============================================================================
+// 6. TEMPLATES AND IMPORT BATCHES
+// ============================================================================
+
+model TemplateDefinition {
+  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id      String  @unique // embedded in hidden sheet _tpl
+  name             String
+  target_entity    String // sites, task_dates, procurement ...
+  is_master_format Boolean @default(false)
+  is_active        Boolean @default(true)
+
+  versions TemplateVersion[]
+
+  @@map("template_definitions")
+}
+
+model TemplateVersion {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_def_id String   @db.Uuid
+  version         Int
+  header_checksum String // sha256 of the header row; mismatch rejects the upload
+  columns         Json // ordered column spec and validation
+  storage_key     String?
+  is_current      Boolean  @default(true)
+  published_by    String?  @db.Uuid
+  published_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  template TemplateDefinition @relation(fields: [template_def_id], references: [id])
+  batches  ImportBatch[]
+
+  @@unique([template_def_id, version])
+  @@map("template_versions")
+}
+
+model ImportBatch {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_version_id String      @db.Uuid
+  source              String      @default("upload") // upload, master_import
+  file_name           String
+  file_sha256         String
+  status              BatchStatus @default(uploaded)
+  uploaded_by         String      @db.Uuid
+  region_scope        Int[] // regions touched, for RLS
+  rows_total          Int         @default(0)
+  rows_error          Int         @default(0)
+  approve_mode        String? // row_by_row or all_at_once
+  created_at          DateTime    @default(now()) @db.Timestamptz(6)
+  approved_at         DateTime?   @db.Timestamptz(6)
+
+  template_version TemplateVersion  @relation(fields: [template_version_id], references: [id])
+  rows             ImportBatchRow[]
+
+  @@index([status, created_at])
+  @@index([uploaded_by])
+  @@map("import_batches")
+}
+
+model ImportBatchRow {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batch_id      String      @db.Uuid
+  row_no        Int
+  site_code     String?
+  region_id     Int?
+  target_entity String
+  target_id     String?     @db.Uuid
+  action        RowAction   @default(create)
+  payload       Json // parsed row
+  diff          Json? // field -> {old, new}
+  errors        Json?
+  decision      RowDecision @default(pending)
+  decided_by    String?     @db.Uuid
+  decided_at    DateTime?   @db.Timestamptz(6)
+  decision_note String?
+
+  batch ImportBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
+
+  @@unique([batch_id, row_no])
+  @@index([batch_id, decision])
+  @@index([site_code])
+  @@map("import_batch_rows")
+}
+
+// ============================================================================
+// 7. COMMENTS, NOTIFICATIONS, HOLIDAYS, BASELINE, CHANGE CONTROL
+// ============================================================================
+
+model Comment {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id           String?  @db.Uuid
+  entity_type       String? // for register records
+  entity_id         String?  @db.Uuid
+  author_id         String   @db.Uuid
+  body              String
+  is_rejection_note Boolean  @default(false)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  task TaskInstance? @relation(fields: [task_id], references: [id])
+
+  @@index([task_id, created_at])
+  @@index([entity_type, entity_id])
+  @@map("comments")
+}
+
+model Notification {
+  id         String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String        @db.Uuid
+  channel    NotifyChannel @default(in_app)
+  kind       String // assigned, rejected, overdue, delegation ...
+  title      String
+  body       String?
+  task_id    String?       @db.Uuid
+  link       String?
+  read_at    DateTime?     @db.Timestamptz(6)
+  sent_at    DateTime?     @db.Timestamptz(6)
+  created_at DateTime      @default(now()) @db.Timestamptz(6)
+
+  @@index([user_id, read_at])
+  @@index([channel, sent_at])
+  @@map("notifications")
+}
+
+model Holiday {
+  id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date DateTime @unique @db.Date
+  name String
+
+  @@map("holidays")
+}
+
+model BaselineVersion {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version     Int       @unique
+  label       String?
+  status      String    @default("draft") // draft, approved, superseded
+  approved_by String?   @db.Uuid
+  approved_at DateTime? @db.Timestamptz(6)
+  created_at  DateTime  @default(now()) @db.Timestamptz(6)
+
+  entries BaselineEntry[]
+
+  @@map("baseline_versions")
+}
+
+// Baseline date per site per milestone (10 milestones).
+model BaselineEntry {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version_id     String    @db.Uuid
+  site_id        String    @db.Uuid
+  region_id      Int
+  milestone_code String // S01..S10
+  baseline_date  DateTime? @db.Date
+  planned_start  DateTime? @db.Date
+
+  version BaselineVersion @relation(fields: [version_id], references: [id])
+
+  @@unique([version_id, site_id, milestone_code])
+  @@index([site_id])
+  @@index([region_id])
+  @@map("baseline_entries")
+}
+
+// Min/max working-day gap between consecutive milestones (Baseline sheet Link/From/To/Min/Max).
+model PhaseGateRule {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  link_code      String @unique // B01..B09
+  from_milestone String
+  to_milestone   String
+  min_wd         Int
+  max_wd         Int
+
+  @@map("phase_gate_rules")
+}
+
+// Change Control register: scope/date changes plus Suspension -> Resumption pairs that shift gates.
+model ChangeRequest {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  change_code        String       @unique // Master "Change ID"
+  site_id            String?      @db.Uuid
+  region_id          Int?
+  kind               ChangeKind
+  scope_item         String?
+  old_value          String?
+  new_value          String?
+  reason             String?
+  request_date       DateTime?    @db.Date
+  status             ChangeStatus @default(requested)
+  approved_by        String?      @db.Uuid
+  approval_date      DateTime?    @db.Date
+  ticket_id          String?
+  requested_by       String       @db.Uuid
+  // Suspension / resumption
+  suspension_start   DateTime?    @db.Date
+  resumption_date    DateTime?    @db.Date
+  paired_change_id   String?      @db.Uuid
+  shift_working_days Int? // computed on resumption, applied to gates
+
+  @@index([site_id, kind])
+  @@index([region_id, status])
+  @@map("change_requests")
+}
+
+// ============================================================================
+// 8. REGISTERS (lean; each is its own module)
+// ============================================================================
+
+model RfDesignRecord {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                   String    @unique @db.Uuid
+  region_id                 Int
+  nominal_plan_issue_date   DateTime? @db.Date
+  nominal_lat               Decimal?  @db.Decimal(9, 6)
+  nominal_lon               Decimal?  @db.Decimal(9, 6)
+  search_ring_radius_m      Int?
+  search_ring_received_date DateTime? @db.Date
+  deviation_from_nominal_m  Decimal?  @db.Decimal(9, 1)
+  antenna_height_m          Decimal?  @db.Decimal(6, 1)
+  sectors                   Int?
+  azimuths                  String?
+  tilt                      String?
+  tss_plan_date             DateTime? @db.Date
+
+  @@index([region_id])
+  @@map("rf_design_records")
+}
+
+model AcquisitionCandidate {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id               String    @db.Uuid
+  region_id             Int
+  candidate_no          String
+  latitude              Decimal?  @db.Decimal(9, 6)
+  longitude             Decimal?  @db.Decimal(9, 6)
+  address               String?
+  distance_to_nominal_m Decimal?  @db.Decimal(9, 1)
+  within_search_ring    Boolean?
+  submitted_date        DateTime? @db.Date
+  mw_los_check          String?
+  test_pit_result       String?
+  tss_date              DateTime? @db.Date
+  selected              Boolean   @default(false)
+  selection_date        DateTime? @db.Date
+  owner_name            String?
+  ownership_type        String?
+  contact_person        String?
+  phone                 String?
+  email                 String?
+  negotiation_start     DateTime? @db.Date
+  contract_no           String?
+  contract_signoff_date DateTime? @db.Date
+  lease_expiry_date     DateTime? @db.Date
+  title_verified        Boolean?
+
+  @@unique([site_id, candidate_no])
+  @@index([region_id])
+  @@map("acquisition_candidates")
+}
+
+model ProcurementRecord {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id      String    @db.Uuid
+  region_id    Int
+  scope        String // CW or TE
+  delivery     String? // outsourced / internal
+  pr_no        String?
+  pr_date      DateTime? @db.Date
+  po_wo_no     String?
+  po_wo_date   DateTime? @db.Date
+  party_id     String?   @db.Uuid
+  team_id      String?   @db.Uuid
+  order_status String?
+  remark       String?
+
+  @@index([site_id])
+  @@index([region_id, order_status])
+  @@map("procurement_records")
+}
+
+model GecolRecord {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                 String    @unique @db.Uuid
+  region_id               Int
+  pr_no                   String?
+  contractor              String?
+  survey_date             DateTime? @db.Date
+  layout_received         DateTime? @db.Date
+  layout_approved         DateTime? @db.Date
+  notice_date             DateTime? @db.Date
+  mos_date                DateTime? @db.Date
+  installation_finish     DateTime? @db.Date
+  aat_acceptance_date     DateTime? @db.Date
+  docs_approval_date      DateTime? @db.Date
+  meter_no                String?
+  power_on_date           DateTime? @db.Date
+  billing_conversion_date DateTime? @db.Date
+  status                  String?
+  remark                  String?
+
+  @@index([region_id, status])
+  @@map("gecol_records")
+}
+
+model HlcRecord {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id             String    @unique @db.Uuid
+  region_id           Int
+  request_no          String?
+  request_date        DateTime? @db.Date
+  fiber_uplink        String?
+  fiber_status        String?
+  internal_fiber_team String?
+  installation_date   DateTime? @db.Date
+  tx_link_tested_date DateTime? @db.Date
+  status              String?
+  remark              String?
+
+  @@index([region_id, status])
+  @@map("hlc_records")
+}
+
+model PermitRecord {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id          String    @db.Uuid
+  region_id        Int
+  permit_type      String
+  applied_date     DateTime? @db.Date
+  status           String?
+  valid_from       DateTime? @db.Date
+  valid_to         DateTime? @db.Date
+  na_reason        String?
+  na_approved_by   String?
+  hse_checks       Json? // JSA/TRA, toolbox talk, work at height, lifting, LOTO, rescue
+  stop_work        Boolean   @default(false)
+  stop_lifted_date DateTime? @db.Date
+  remark           String?
+
+  @@index([site_id])
+  @@index([region_id, status])
+  @@index([valid_to])
+  @@map("permit_records")
+}
+
+model WarehouseItem {
+  id         String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_code  String            @unique
+  item_group String // WL, MW, IP, PWR, CW ...
+  name       String
+  unit       String?
+  serialised Boolean           @default(false)
+  serials    WarehouseSerial[]
+
+  @@map("warehouse_items")
+}
+
+model WarehouseSerial {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  item_id          String        @db.Uuid
+  serial_no        String        @unique
+  pl_invoice_no    String?
+  box_no           String?
+  dn_no            String?
+  rn_no            String?
+  site_id          String?       @db.Uuid
+  region_id        Int?
+  dispatch_date    DateTime?     @db.Date
+  return_condition String?
+  status           String?
+  installed        Boolean       @default(false)
+  item             WarehouseItem @relation(fields: [item_id], references: [id])
+
+  @@index([site_id])
+  @@index([region_id, status])
+  @@map("warehouse_serials")
+}
+
+model WarehouseSiteQty {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id    String  @db.Uuid
+  region_id  Int
+  item_id    String  @db.Uuid
+  required   Decimal @default(0) @db.Decimal(12, 2)
+  dispatched Decimal @default(0) @db.Decimal(12, 2)
+  installed  Decimal @default(0) @db.Decimal(12, 2)
+
+  @@unique([site_id, item_id])
+  @@index([region_id])
+  @@map("warehouse_site_qty")
+}
+
+model QualityInspection {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  record_code        String    @unique
+  record_type        String
+  site_id            String    @db.Uuid
+  region_id          Int
+  stage              String?
+  activity           String?
+  point_type         String?
+  description        String?
+  severity           String?
+  team               String?
+  party_id           String?   @db.Uuid
+  raised_date        DateTime? @db.Date
+  target_date        DateTime? @db.Date
+  result             String?
+  closed_date        DateTime? @db.Date
+  released_by        String?
+  root_cause         String?
+  linked_record_code String?
+  na_reason          String?
+  status             String?
+  blocking           Boolean   @default(false)
+  snag_id            String?   @db.Uuid
+
+  @@index([site_id])
+  @@index([region_id, status])
+  @@map("quality_inspections")
+}
+
+model Issue {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id     String         @db.Uuid
+  region_id   Int
+  title       String
+  detail      String?
+  owner_id    String?        @db.Uuid
+  owner_text  String?
+  party_id    String?        @db.Uuid
+  raised_date DateTime       @db.Date
+  due_date    DateTime?      @db.Date
+  status      RegisterStatus @default(open)
+  closed_date DateTime?      @db.Date
+  delay_days  Int?
+
+  @@index([site_id, status])
+  @@index([region_id, status])
+  @@map("issues")
+}
+
+model Risk {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  risk_code      String         @unique
+  statement      String
+  category       String?
+  scope          String?
+  affected_sites Int?
+  probability    Int
+  impact         Int
+  response       String?
+  mitigation     String?
+  risk_owner     String?
+  action_owner   String?
+  target_date    DateTime?      @db.Date
+  status         RegisterStatus @default(open)
+  trend          String?
+  last_review    DateTime?      @db.Date
+  next_review    DateTime?      @db.Date
+  region_id      Int?
+
+  @@index([status])
+  @@map("risks")
+}
+
+model ReadinessHandover {
+  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                  String    @unique @db.Uuid
+  region_id                Int
+  commissioning_power_safe Boolean?
+  uplink_ready_date        DateTime? @db.Date
+  om_checklist             String?
+  na_reason                String?
+  om_accepted_by           String?
+  om_acceptance_date       DateTime? @db.Date
+  site_access_keys_handed  Boolean?
+  hoto_package_date        DateTime? @db.Date
+  legacy_handover_date     DateTime? @db.Date
+  obligations_closure_date DateTime? @db.Date
+  closure_approved_by      String?
+  closure_approval_date    DateTime? @db.Date
+  closure_ready            Boolean   @default(false)
+
+  @@index([region_id])
+  @@map("readiness_handover")
+}
+
+model AsBuiltRecord {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id        String    @unique @db.Uuid
+  region_id      Int
+  submitted_date DateTime? @db.Date
+  quantities     Json // item -> quantity (tower m, cables, trays, rods ...)
+
+  @@index([region_id])
+  @@map("as_built_records")
+}
+
+model Meeting {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  meeting_date DateTime        @db.Timestamptz(6)
+  region_id    Int?
+  attendees    Json?
+  minutes      String?
+  actions      MeetingAction[]
+
+  @@index([meeting_date])
+  @@map("meetings")
+}
+
+model MeetingAction {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  meeting_id  String         @db.Uuid
+  description String
+  owner_id    String?        @db.Uuid
+  due_date    DateTime?      @db.Date
+  status      RegisterStatus @default(open)
+  site_id     String?        @db.Uuid
+  meeting     Meeting        @relation(fields: [meeting_id], references: [id], onDelete: Cascade)
+
+  @@index([meeting_id])
+  @@map("meeting_actions")
+}
+
+// ============================================================================
+// 9. LOGS AND SETTINGS
+// ============================================================================
+
+// Append-only. Enforced by triggers in db/sql/001_audit_append_only.sql plus REVOKE UPDATE, DELETE.
+model AuditLog {
+  id                BigInt   @id @default(autoincrement())
+  at                DateTime @default(now()) @db.Timestamptz(6)
+  actor_id          String?  @db.Uuid
+  on_behalf_of      String?  @db.Uuid
+  action            String // create, update, delete, approve, reject, download, login, override ...
+  entity_type       String
+  entity_id         String?
+  site_id           String?  @db.Uuid
+  region_id         Int?
+  before            Json?
+  after             Json?
+  reason            String?
+  is_admin_override Boolean  @default(false)
+  ip                String?
+  user_agent        String?
+  request_id        String?
+
+  @@index([entity_type, entity_id])
+  @@index([actor_id, at])
+  @@index([site_id, at])
+  @@index([at])
+  @@map("audit_log")
+}
+
+// Separate from the audit log; purged after 12 months by a scheduled job.
+model SystemLog {
+  id         BigInt   @id @default(autoincrement())
+  at         DateTime @default(now()) @db.Timestamptz(6)
+  level      LogLevel
+  source     String // api, importer, template-check, job
+  message    String
+  context    Json?
+  user_id    String?  @db.Uuid
+  request_id String?
+
+  @@index([at])
+  @@index([level, at])
+  @@index([source, at])
+  @@map("system_log")
+}
+
+model Setting {
+  key         String   @id // require_mfa, geofence_radius_m, sla.default_levels ...
+  value       Json
+  description String?
+  updated_by  String?  @db.Uuid
+  updated_at  DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("settings")
+}
