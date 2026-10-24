@@ -220,8 +220,8 @@ model Region {
   name_en String
   name_ar String?
 
-  sites        Site[]
-  user_regions UserRegion[]
+  sites                    Site[]
+  UserRoleAssignmentRegion UserRoleAssignmentRegion[]
 
   @@map("regions")
 }
@@ -234,8 +234,8 @@ model Role {
   sort      Int     @default(0)
   is_active Boolean @default(true)
 
-  sub_roles SubRole[]
-  users     User[]
+  sub_roles          SubRole[]
+  UserRoleAssignment UserRoleAssignment[]
 
   @@map("roles")
 }
@@ -249,73 +249,91 @@ model SubRole {
   team      TeamKind @default(none)
   is_active Boolean  @default(true)
 
-  role  Role          @relation(fields: [role_id], references: [id])
-  users UserSubRole[]
+  role               Role                 @relation(fields: [role_id], references: [id])
+  UserRoleAssignment UserRoleAssignment[]
 
   @@index([role_id])
   @@map("sub_roles")
 }
 
 model User {
-  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  m365_object_id   String          @unique // Entra ID oid claim
-  email            String          @unique
-  display_name     String
-  employee_id      String?         @unique @db.Char(4) // 4-digit, entered at first sign-in
-  status           UserStatus      @default(pending_assignment)
-  role_id          String?         @db.Uuid
-  team             TeamKind        @default(none)
-  permission_level PermissionLevel @default(view)
-  locale           String          @default("en")
-  theme            String          @default("light")
-  is_break_glass   Boolean         @default(false)
-  totp_secret_enc  String? // break-glass admin only, encrypted
-  last_login_at    DateTime?       @db.Timestamptz(6)
-  created_at       DateTime        @default(now()) @db.Timestamptz(6)
-  updated_at       DateTime        @updatedAt @db.Timestamptz(6)
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  m365_object_id  String     @unique // Entra ID oid claim
+  email           String     @unique
+  display_name    String
+  employee_id     String?    @unique @db.Char(4) // 4-digit, entered at first sign-in
+  status          UserStatus @default(pending_assignment)
+  locale          String     @default("en")
+  theme           String     @default("light")
+  is_break_glass  Boolean    @default(false)
+  totp_secret_enc String? // break-glass admin only, encrypted
+  last_login_at   DateTime?  @db.Timestamptz(6)
+  created_at      DateTime   @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime   @updatedAt @db.Timestamptz(6)
 
-  role             Role?         @relation(fields: [role_id], references: [id])
-  sub_roles        UserSubRole[]
-  regions          UserRegion[]
-  modules          UserModule[]
+  // Role, sub-role, permission level, team, regions and modules live on the assignments (many-to-many).
+  // There is deliberately no user-level default: effective access is the union of the active assignments.
+  assignments      UserRoleAssignment[]
+  assigned_by_me   UserRoleAssignment[] @relation("AssignmentAssignedBy")
   group_members    GroupMember[]
-  delegations_from Delegation[]  @relation("DelegationFrom")
-  delegations_to   Delegation[]  @relation("DelegationTo")
+  delegations_from Delegation[]         @relation("DelegationFrom")
+  delegations_to   Delegation[]         @relation("DelegationTo")
 
   @@index([status])
-  @@index([role_id])
   @@map("users")
 }
 
-model UserSubRole {
-  user_id     String  @db.Uuid
-  sub_role_id String  @db.Uuid
-  user        User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  sub_role    SubRole @relation(fields: [sub_role_id], references: [id])
+// One row = one person holding one role OR one sub-role, with its own level, scope and validity.
+// Exactly one of role_id / sub_role_id is set (CHECK in migration 0004). A person can hold many rows.
+model UserRoleAssignment {
+  id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String          @db.Uuid
+  role_id          String?         @db.Uuid
+  sub_role_id      String?         @db.Uuid
+  permission_level PermissionLevel @default(view)
+  team             TeamKind        @default(none)
+  valid_from       DateTime        @default(now()) @db.Timestamptz(6)
+  valid_to         DateTime?       @db.Timestamptz(6) // null = until removed
+  all_regions      Boolean         @default(false) // explicit opt-in to every region; false + no region rows = no regions
+  all_modules      Boolean         @default(false) // explicit opt-in to every module
+  is_primary       Boolean         @default(false) // at most one per user (partial unique index, migration 0004)
+  assigned_by      String?         @db.Uuid
+  assigned_at      DateTime        @default(now()) @db.Timestamptz(6)
 
-  @@id([user_id, sub_role_id])
-  @@map("user_sub_roles")
+  user     User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role     Role?                      @relation(fields: [role_id], references: [id])
+  sub_role SubRole?                   @relation(fields: [sub_role_id], references: [id])
+  assigner User?                      @relation("AssignmentAssignedBy", fields: [assigned_by], references: [id])
+  regions  UserRoleAssignmentRegion[]
+  modules  UserRoleAssignmentModule[]
+
+  @@index([user_id, valid_to])
+  @@index([role_id])
+  @@index([sub_role_id])
+  @@map("user_role_assignments")
 }
 
-// No rows for a user = all regions (default visibility is everything).
-model UserRegion {
-  user_id   String @db.Uuid
-  region_id Int
-  user      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  region    Region @relation(fields: [region_id], references: [id])
+// Scope is explicit: rows here, or all_regions = true on the assignment. No rows and all_regions = false gives no access
+// (a deferred constraint trigger refuses to commit such an active assignment).
+model UserRoleAssignmentRegion {
+  assignment_id String             @db.Uuid
+  region_id     Int
+  assignment    UserRoleAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  region        Region             @relation(fields: [region_id], references: [id])
 
-  @@id([user_id, region_id])
-  @@map("user_regions")
+  @@id([assignment_id, region_id])
+  @@index([region_id])
+  @@map("user_role_assignment_regions")
 }
 
-// No rows for a user = all modules.
-model UserModule {
-  user_id    String @db.Uuid
-  module_key String // sites, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports
-  user       User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+// Rows here, or all_modules = true on the assignment; otherwise no modules.
+model UserRoleAssignmentModule {
+  assignment_id String             @db.Uuid
+  module_key    String // sites, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports
+  assignment    UserRoleAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
 
-  @@id([user_id, module_key])
-  @@map("user_modules")
+  @@id([assignment_id, module_key])
+  @@map("user_role_assignment_modules")
 }
 
 model Group {
@@ -373,6 +391,7 @@ model Cluster {
   cluster_code        String    @unique // Master G / EN
   name                String?
   region_id           Int?
+  is_global           Boolean   @default(false) // explicit global row; NULL region alone never means global
   kpi_acceptance_date DateTime? @db.Date // recorded once per cluster, applied to all sites
   kpi_source_date     DateTime? @db.Date
   kpi_validated       Boolean   @default(false)
@@ -532,6 +551,7 @@ model TaskInstance {
   comments                 Comment[]
   snags                    Snag[]
 
+  @@unique([id, region_id])
   @@unique([site_id, task_def_id])
   @@index([region_id, state])
   @@index([state, ball_in_court_user_id])
@@ -576,6 +596,7 @@ model MatrixCell {
   level       Int // 1 entry, 2 review, 3 approve
   rule        MatrixRule @default(any_one)
   region_id   Int? // optional region-specific cell
+  is_global   Boolean    @default(false) // explicit global row; NULL region alone never means global
   updated_by  String?    @db.Uuid
   updated_at  DateTime   @updatedAt @db.Timestamptz(6)
 
@@ -894,17 +915,16 @@ model ImportBatchRow {
 // ============================================================================
 
 model Comment {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task_id           String?  @db.Uuid
-  region_id         Int? // register comments only; task comments inherit from the task
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id           String?       @db.Uuid
+  region_id         Int // from the task (composite FK) or the register row
   entity_type       String? // for register records
-  entity_id         String?  @db.Uuid
-  author_id         String   @db.Uuid
+  entity_id         String?       @db.Uuid
+  author_id         String        @db.Uuid
   body              String
-  is_rejection_note Boolean  @default(false)
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-
-  task TaskInstance? @relation(fields: [task_id], references: [id])
+  is_rejection_note Boolean       @default(false)
+  created_at        DateTime      @default(now()) @db.Timestamptz(6)
+  task              TaskInstance? @relation(fields: [task_id, region_id], references: [id, region_id], onUpdate: Cascade, onDelete: Cascade)
 
   @@index([task_id, created_at])
   @@index([entity_type, entity_id])
@@ -988,7 +1008,8 @@ model ChangeRequest {
   change_code        String       @unique // Master "Change ID"
   site_id            String?      @db.Uuid
   region_id          Int?
-  site               Site?        @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
+  is_global          Boolean      @default(false) // explicit global row; NULL region alone never means global
+  site               Site?        @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade, onDelete: Restrict)
   kind               ChangeKind
   scope_item         String?
   old_value          String?
@@ -1179,7 +1200,8 @@ model WarehouseSerial {
   rn_no            String?
   site_id          String?       @db.Uuid
   region_id        Int?
-  site             Site?         @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
+  is_global        Boolean       @default(false) // explicit global row; NULL region alone never means global
+  site             Site?         @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade, onDelete: Restrict)
   dispatch_date    DateTime?     @db.Date
   return_condition String?
   status           String?
@@ -1277,6 +1299,7 @@ model Risk {
   last_review    DateTime?      @db.Date
   next_review    DateTime?      @db.Date
   region_id      Int?
+  is_global      Boolean        @default(false) // explicit global row; NULL region alone never means global
 
   @@index([status])
   @@map("risks")
@@ -1322,6 +1345,7 @@ model Meeting {
   title        String
   meeting_date DateTime        @db.Timestamptz(6)
   region_id    Int?
+  is_global    Boolean         @default(false) // explicit global row; NULL region alone never means global
   attendees    Json?
   minutes      String?
   actions      MeetingAction[]

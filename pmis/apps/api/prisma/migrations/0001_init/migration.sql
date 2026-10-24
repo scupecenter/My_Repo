@@ -119,9 +119,6 @@ CREATE TABLE "users" (
     "display_name" TEXT NOT NULL,
     "employee_id" CHAR(4),
     "status" "UserStatus" NOT NULL DEFAULT 'pending_assignment',
-    "role_id" UUID,
-    "team" "TeamKind" NOT NULL DEFAULT 'none',
-    "permission_level" "PermissionLevel" NOT NULL DEFAULT 'view',
     "locale" TEXT NOT NULL DEFAULT 'en',
     "theme" TEXT NOT NULL DEFAULT 'light',
     "is_break_glass" BOOLEAN NOT NULL DEFAULT false,
@@ -134,27 +131,38 @@ CREATE TABLE "users" (
 );
 
 -- CreateTable
-CREATE TABLE "user_sub_roles" (
+CREATE TABLE "user_role_assignments" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "user_id" UUID NOT NULL,
-    "sub_role_id" UUID NOT NULL,
+    "role_id" UUID,
+    "sub_role_id" UUID,
+    "permission_level" "PermissionLevel" NOT NULL DEFAULT 'view',
+    "team" "TeamKind" NOT NULL DEFAULT 'none',
+    "valid_from" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "valid_to" TIMESTAMPTZ(6),
+    "all_regions" BOOLEAN NOT NULL DEFAULT false,
+    "all_modules" BOOLEAN NOT NULL DEFAULT false,
+    "is_primary" BOOLEAN NOT NULL DEFAULT false,
+    "assigned_by" UUID,
+    "assigned_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "user_sub_roles_pkey" PRIMARY KEY ("user_id","sub_role_id")
+    CONSTRAINT "user_role_assignments_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "user_regions" (
-    "user_id" UUID NOT NULL,
+CREATE TABLE "user_role_assignment_regions" (
+    "assignment_id" UUID NOT NULL,
     "region_id" INTEGER NOT NULL,
 
-    CONSTRAINT "user_regions_pkey" PRIMARY KEY ("user_id","region_id")
+    CONSTRAINT "user_role_assignment_regions_pkey" PRIMARY KEY ("assignment_id","region_id")
 );
 
 -- CreateTable
-CREATE TABLE "user_modules" (
-    "user_id" UUID NOT NULL,
+CREATE TABLE "user_role_assignment_modules" (
+    "assignment_id" UUID NOT NULL,
     "module_key" TEXT NOT NULL,
 
-    CONSTRAINT "user_modules_pkey" PRIMARY KEY ("user_id","module_key")
+    CONSTRAINT "user_role_assignment_modules_pkey" PRIMARY KEY ("assignment_id","module_key")
 );
 
 -- CreateTable
@@ -202,6 +210,7 @@ CREATE TABLE "clusters" (
     "cluster_code" TEXT NOT NULL,
     "name" TEXT,
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
     "kpi_acceptance_date" DATE,
     "kpi_source_date" DATE,
     "kpi_validated" BOOLEAN NOT NULL DEFAULT false,
@@ -351,6 +360,7 @@ CREATE TABLE "matrix_cells" (
     "level" INTEGER NOT NULL,
     "rule" "MatrixRule" NOT NULL DEFAULT 'any_one',
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
     "updated_by" UUID,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -602,7 +612,7 @@ CREATE TABLE "import_batch_rows" (
 CREATE TABLE "comments" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "task_id" UUID,
-    "region_id" INTEGER,
+    "region_id" INTEGER NOT NULL,
     "entity_type" TEXT,
     "entity_id" UUID,
     "author_id" UUID NOT NULL,
@@ -683,6 +693,7 @@ CREATE TABLE "change_requests" (
     "change_code" TEXT NOT NULL,
     "site_id" UUID,
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
     "kind" "ChangeKind" NOT NULL,
     "scope_item" TEXT,
     "old_value" TEXT,
@@ -857,6 +868,7 @@ CREATE TABLE "warehouse_serials" (
     "rn_no" TEXT,
     "site_id" UUID,
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
     "dispatch_date" DATE,
     "return_condition" TEXT,
     "status" TEXT,
@@ -946,6 +958,7 @@ CREATE TABLE "risks" (
     "last_review" DATE,
     "next_review" DATE,
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "risks_pkey" PRIMARY KEY ("id")
 );
@@ -989,6 +1002,7 @@ CREATE TABLE "meetings" (
     "title" TEXT NOT NULL,
     "meeting_date" TIMESTAMPTZ(6) NOT NULL,
     "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
     "attendees" JSONB,
     "minutes" TEXT,
 
@@ -1080,7 +1094,16 @@ CREATE UNIQUE INDEX "users_employee_id_key" ON "users"("employee_id");
 CREATE INDEX "users_status_idx" ON "users"("status");
 
 -- CreateIndex
-CREATE INDEX "users_role_id_idx" ON "users"("role_id");
+CREATE INDEX "user_role_assignments_user_id_valid_to_idx" ON "user_role_assignments"("user_id", "valid_to");
+
+-- CreateIndex
+CREATE INDEX "user_role_assignments_role_id_idx" ON "user_role_assignments"("role_id");
+
+-- CreateIndex
+CREATE INDEX "user_role_assignments_sub_role_id_idx" ON "user_role_assignments"("sub_role_id");
+
+-- CreateIndex
+CREATE INDEX "user_role_assignment_regions_region_id_idx" ON "user_role_assignment_regions"("region_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "groups_name_key" ON "groups"("name");
@@ -1141,6 +1164,9 @@ CREATE INDEX "task_instances_task_def_id_state_idx" ON "task_instances"("task_de
 
 -- CreateIndex
 CREATE INDEX "task_instances_due_date_idx" ON "task_instances"("due_date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "task_instances_id_region_id_key" ON "task_instances"("id", "region_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "task_instances_site_id_task_def_id_key" ON "task_instances"("site_id", "task_def_id");
@@ -1395,22 +1421,25 @@ CREATE INDEX "system_log_source_at_idx" ON "system_log"("source", "at");
 ALTER TABLE "sub_roles" ADD CONSTRAINT "sub_roles_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_sub_roles" ADD CONSTRAINT "user_sub_roles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_sub_roles" ADD CONSTRAINT "user_sub_roles_sub_role_id_fkey" FOREIGN KEY ("sub_role_id") REFERENCES "sub_roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_sub_role_id_fkey" FOREIGN KEY ("sub_role_id") REFERENCES "sub_roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_regions" ADD CONSTRAINT "user_regions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_regions" ADD CONSTRAINT "user_regions_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignment_regions" ADD CONSTRAINT "user_role_assignment_regions_assignment_id_fkey" FOREIGN KEY ("assignment_id") REFERENCES "user_role_assignments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_modules" ADD CONSTRAINT "user_modules_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignment_regions" ADD CONSTRAINT "user_role_assignment_regions_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_role_assignment_modules" ADD CONSTRAINT "user_role_assignment_modules_assignment_id_fkey" FOREIGN KEY ("assignment_id") REFERENCES "user_role_assignments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "group_members" ADD CONSTRAINT "group_members_group_id_fkey" FOREIGN KEY ("group_id") REFERENCES "groups"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1500,7 +1529,7 @@ ALTER TABLE "import_batches" ADD CONSTRAINT "import_batches_template_version_id_
 ALTER TABLE "import_batch_rows" ADD CONSTRAINT "import_batch_rows_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "import_batches"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "comments" ADD CONSTRAINT "comments_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "task_instances"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "comments" ADD CONSTRAINT "comments_task_id_region_id_fkey" FOREIGN KEY ("task_id", "region_id") REFERENCES "task_instances"("id", "region_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1509,7 +1538,7 @@ ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_site_id_region_i
 ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "baseline_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "change_requests" ADD CONSTRAINT "change_requests_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "change_requests" ADD CONSTRAINT "change_requests_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "rf_design_records" ADD CONSTRAINT "rf_design_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1530,7 +1559,7 @@ ALTER TABLE "hlc_records" ADD CONSTRAINT "hlc_records_site_id_region_id_fkey" FO
 ALTER TABLE "permit_records" ADD CONSTRAINT "permit_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "warehouse_serials" ADD CONSTRAINT "warehouse_serials_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "warehouse_serials" ADD CONSTRAINT "warehouse_serials_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "warehouse_serials" ADD CONSTRAINT "warehouse_serials_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "warehouse_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

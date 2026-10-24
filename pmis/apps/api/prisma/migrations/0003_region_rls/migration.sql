@@ -3,10 +3,11 @@
 -- Unset/empty = no rows (fail closed). The table owner/migration role is also subject to the policies (FORCE),
 -- so seed and migration jobs must set app.region_ids = '*'. The app role must not own the tables.
 --
--- Two predicates:
---   app_region_check(r)        strict: NULL region is allowed only for '*'. Used for USING on site-bound tables
---                              and for WITH CHECK everywhere.
---   app_region_using_global(r) NULL region means a truly global row, visible to any session. USING only.
+-- Global rows are explicit: a boolean is_global column (never "region_id IS NULL"). CHECK constraints tie the flag to the
+-- region columns. Predicates:
+--   app_region_check(r)        strict: NULL region passes only for '*'.
+--   app_region_read(g, r)      USING on region-optional tables: session set AND (is_global OR region visible).
+--   app_region_write(g, r)     WITH CHECK: is_global rows can be written only by '*'; others need a visible, non-null region.
 
 CREATE OR REPLACE FUNCTION app_region_check(r integer) RETURNS boolean
 LANGUAGE sql STABLE AS $$
@@ -18,11 +19,16 @@ LANGUAGE sql STABLE AS $$
   END
 $$;
 
-CREATE OR REPLACE FUNCTION app_region_using_global(r integer) RETURNS boolean
+CREATE OR REPLACE FUNCTION app_region_read(g boolean, r integer) RETURNS boolean
+LANGUAGE sql STABLE AS $$
+  SELECT coalesce(current_setting('app.region_ids', true), '') <> '' AND (coalesce(g, false) OR app_region_check(r))
+$$;
+
+CREATE OR REPLACE FUNCTION app_region_write(g boolean, r integer) RETURNS boolean
 LANGUAGE sql STABLE AS $$
   SELECT CASE
     WHEN coalesce(current_setting('app.region_ids', true), '') = '' THEN false
-    WHEN r IS NULL THEN true
+    WHEN coalesce(g, false) THEN current_setting('app.region_ids', true) = '*'
     ELSE app_region_check(r)
   END
 $$;
@@ -38,18 +44,15 @@ LANGUAGE sql STABLE AS $$
   END
 $$;
 
-CREATE OR REPLACE FUNCTION app_regions_using_global(a integer[]) RETURNS boolean
-LANGUAGE sql STABLE AS $$
-  SELECT CASE
-    WHEN coalesce(current_setting('app.region_ids', true), '') = '' THEN false
-    WHEN a IS NULL OR cardinality(a) = 0 THEN true
-    ELSE app_regions_check(a)
-  END
-$$;
+-- import_batches: an empty region_scope is NOT global; only '*' sees/writes such batches.
 
--- Integrity: a row with a site must carry the region (the composite FK only fires when both columns are non-null).
-ALTER TABLE change_requests   ADD CONSTRAINT change_requests_site_region_both   CHECK ((site_id IS NULL) = (region_id IS NULL));
-ALTER TABLE warehouse_serials ADD CONSTRAINT warehouse_serials_site_region_both CHECK ((site_id IS NULL) = (region_id IS NULL));
+-- Integrity: is_global <=> no site/region; otherwise a region is mandatory (the composite FK only fires when both are non-null).
+ALTER TABLE change_requests   ADD CONSTRAINT change_requests_global_xor_region   CHECK ((is_global AND site_id IS NULL AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE warehouse_serials ADD CONSTRAINT warehouse_serials_global_xor_region CHECK ((is_global AND site_id IS NULL AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE risks             ADD CONSTRAINT risks_global_xor_region             CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE meetings          ADD CONSTRAINT meetings_global_xor_region          CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE clusters          ADD CONSTRAINT clusters_global_xor_region          CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE matrix_cells      ADD CONSTRAINT matrix_cells_global_xor_region      CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 
 -- Helper to apply a policy.
 CREATE OR REPLACE FUNCTION _rls_apply(t text, using_expr text, check_expr text) RETURNS void
@@ -74,12 +77,12 @@ BEGIN
   END LOOP;
 END $$;
 
--- (2) Region-optional tables: NULL region = global row, readable by any session, writable only by '*'.
+-- (2) Region-optional tables: explicit is_global rows are readable by any session with a region value, writable only by '*'.
 DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['change_requests','warehouse_serials','risks','meetings','clusters','matrix_cells'] LOOP
-    PERFORM _rls_apply(t, 'app_region_using_global(region_id)', 'app_region_check(region_id)');
+    PERFORM _rls_apply(t, 'app_region_read(is_global, region_id)', 'app_region_write(is_global, region_id)');
   END LOOP;
 END $$;
 
@@ -99,12 +102,11 @@ SELECT _rls_apply('matrix_cell_assignees',
 SELECT _rls_apply('meeting_actions',
   'EXISTS (SELECT 1 FROM meetings p WHERE p.id = meeting_id)',
   'EXISTS (SELECT 1 FROM meetings p WHERE p.id = meeting_id)');
--- Comments: task comments follow the task; register comments carry their own region_id.
-SELECT _rls_apply('comments',
-  '(task_id IS NOT NULL AND EXISTS (SELECT 1 FROM task_instances p WHERE p.id = task_id)) OR (task_id IS NULL AND app_region_using_global(region_id))',
-  '(task_id IS NOT NULL AND EXISTS (SELECT 1 FROM task_instances p WHERE p.id = task_id)) OR (task_id IS NULL AND app_region_check(region_id))');
+-- Comments: region_id NOT NULL, tied to the task by composite FK (task_id, region_id) ON DELETE CASCADE; register comments
+-- carry their own region. No global comments.
+SELECT _rls_apply('comments', 'app_region_check(region_id)', 'app_region_check(region_id)');
 -- Import: batches by region_scope array; rows through their batch plus their own region_id when set.
-SELECT _rls_apply('import_batches', 'app_regions_using_global(region_scope)', 'app_regions_check(region_scope)');
+SELECT _rls_apply('import_batches', 'app_regions_check(region_scope)', 'app_regions_check(region_scope)');
 SELECT _rls_apply('import_batch_rows',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id) AND (region_id IS NULL OR app_region_check(region_id))',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id) AND (region_id IS NULL OR app_region_check(region_id))');
@@ -119,7 +121,7 @@ DROP FUNCTION _rls_apply(text, text, text);
 -- (4) Changing a site's region. Children carrying (site_id, region_id) follow automatically because the composite FKs are
 -- ON UPDATE CASCADE. Direct changes are blocked unless the admin-only path sets app.allow_region_change = 'on'
 -- (the API does so only after step-up MFA, with a reason, and writes an audit_log row). Snapshots that are not FK-bound
--- (import_batch_rows.region_id, audit_log.region_id, risks/meetings/clusters/comments region_id) are not rewritten.
+-- (import_batch_rows.region_id, audit_log.region_id, risks/meetings/clusters region_id) are not rewritten.
 CREATE OR REPLACE FUNCTION sites_block_region_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
