@@ -1,0 +1,1654 @@
+<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GSDN PMIS Blueprint 1.1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Kufi+Arabic:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F5F6F4; --surface:#FFFFFF; --surface2:#EEF1EF; --ink:#18212B; --muted:#56616C; --dim:#8A949D;
+  --line:#DCE1E2; --accent:#0E6B70; --accent-soft:#E1EFEF; --gate:#B7801A; --gate-soft:#F6ECD8;
+  --ok:#2E7D4F; --ok-soft:#E3F1E8; --crit:#B23B2E; --crit-soft:#F6E2DF;
+  --f-body:"IBM Plex Sans Arabic",system-ui,"Segoe UI",Tahoma,sans-serif;
+  --f-disp:"Noto Kufi Arabic","IBM Plex Sans Arabic",Tahoma,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#11161B; --surface:#182028; --surface2:#1E2831; --ink:#E6ECEF; --muted:#A0ABB4; --dim:#76828C;
+    --line:#2B3640; --accent:#44B5BA; --accent-soft:#16333A; --gate:#DDA84A; --gate-soft:#3A2F1A;
+    --ok:#5BBE83; --ok-soft:#173226; --crit:#E0776A; --crit-soft:#3A201D; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11161B; --surface:#182028; --surface2:#1E2831; --ink:#E6ECEF; --muted:#A0ABB4; --dim:#76828C;
+  --line:#2B3640; --accent:#44B5BA; --accent-soft:#16333A; --gate:#DDA84A; --gate-soft:#3A2F1A;
+  --ok:#5BBE83; --ok-soft:#173226; --crit:#E0776A; --crit-soft:#3A201D; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15.5px;line-height:1.75;margin:0}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px;padding-block:28px 64px}
+h1,h2,h3{font-family:var(--f-disp);text-wrap:balance;margin:0;line-height:1.35}
+h1{font-size:30px;letter-spacing:-.2px}
+h2{font-size:21px;display:flex;gap:12px;align-items:baseline}
+h2 .n{font-family:var(--f-mono);font-size:13px;color:var(--accent);font-weight:500}
+h3{font-size:16px;font-family:var(--f-body);font-weight:700}
+p{margin:0}
+.mono{font-family:var(--f-mono);font-size:.88em;direction:ltr;unicode-bidi:isolate}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.8px;color:var(--accent);text-transform:uppercase;direction:ltr;display:inline-block}
+header.top{display:grid;gap:14px;padding-bottom:22px;border-bottom:1px solid var(--line)}
+header.top .lead{color:var(--muted);max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--surface2);color:var(--muted);border:1px solid var(--line)}
+nav.toc{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px;font-size:13.5px}
+nav.toc a{color:var(--accent);text-decoration:none}
+nav.toc a:hover{text-decoration:underline}
+section{padding-top:38px;display:grid;gap:14px}
+.muted{color:var(--muted)}
+.callout{background:var(--accent-soft);border-inline-start:3px solid var(--accent);padding:14px 16px;border-radius:6px}
+.callout.gate{background:var(--gate-soft);border-color:var(--gate)}
+ul.clean{margin:0;padding-inline-start:20px;display:grid;gap:6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:grid;gap:8px;align-content:start}
+.card h3{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.card ul{margin:0;padding-inline-start:18px;color:var(--muted);font-size:14px;display:grid;gap:3px}
+.tag{font-size:11.5px;font-family:var(--f-mono);padding:1px 8px;border-radius:4px;background:var(--surface2);color:var(--muted);white-space:nowrap}
+.tag.m{background:var(--gate-soft);color:var(--gate)}
+.tag.c{background:var(--accent-soft);color:var(--accent)}
+.tag.n{background:var(--ok-soft);color:var(--ok)}
+.diagram{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;direction:ltr}
+.diagram pre.mermaid{margin:0;background:transparent;text-align:center}
+.cap{font-size:13px;color:var(--dim)}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:start;vertical-align:top}
+th{background:var(--surface2);font-weight:600;font-size:13px;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.c{text-align:center;font-family:var(--f-mono);white-space:nowrap}
+td.pq{font-size:13.5px}
+td.fld{font-size:13.5px}
+.y{color:var(--ok);font-weight:600}.r{color:var(--dim)}.e{color:var(--gate);font-weight:600}
+/* menu tree */
+.menu{display:grid;gap:12px}
+.mgroup{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.mgroup > .gh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--line)}
+.mgroup > .gh b{font-size:14.5px}
+.mgroup > .gh span{font-size:12.5px;color:var(--dim)}
+.mitem{display:grid;grid-template-columns:52px 1fr;gap:12px;padding:11px 16px;border-bottom:1px solid var(--line)}
+.mitem:last-child{border-bottom:0}
+.mitem .no{font-family:var(--f-mono);font-size:13.5px;color:var(--accent);direction:ltr;text-align:end;padding-top:1px}
+.mitem .t{font-weight:600;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.mitem .d{font-size:14px;color:var(--muted)}
+.mitem.sub{padding-inline-start:40px;background:color-mix(in srgb,var(--surface2) 40%,var(--surface))}
+.chg{display:grid;gap:8px}
+.chg .it{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:14.5px}
+.chg .k{font-size:11.5px;font-family:var(--f-mono);padding:2px 8px;border-radius:4px;white-space:nowrap;margin-top:3px}
+.k.add{background:var(--ok-soft);color:var(--ok)}.k.mv{background:var(--accent-soft);color:var(--accent)}.k.ren{background:var(--gate-soft);color:var(--gate)}
+/* Site 360 mock */
+.mock{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.mock .bar{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--line)}
+.mock .sid{font-family:var(--f-mono);font-size:18px;font-weight:500;direction:ltr}
+.mock .st{font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-weight:600}
+.mock .tabs{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--line);overflow-x:auto;background:var(--surface2)}
+.mock .tabs span{font-size:13px;padding:5px 11px;border-radius:6px;white-space:nowrap;color:var(--muted)}
+.mock .tabs span.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.mock .row{display:grid;grid-template-columns:minmax(130px,1.5fr) repeat(2,minmax(92px,1fr)) minmax(96px,1fr) minmax(170px,1.4fr);gap:8px;padding:9px 16px;border-bottom:1px solid var(--line);font-size:13.5px;align-items:center}
+.mock .row:last-child{border-bottom:0}
+.mock .row.h{font-size:12px;color:var(--dim)}
+.mock .row .d{font-family:var(--f-mono);font-size:12.5px;direction:ltr;text-align:start;font-variant-numeric:tabular-nums}
+.pill{font-size:11.5px;padding:2px 8px;border-radius:999px;justify-self:start;white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.w{background:var(--gate-soft);color:var(--gate)}.pill.x{background:var(--crit-soft);color:var(--crit)}.pill.n{background:var(--surface2);color:var(--dim)}
+.docs{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn{font:inherit;font-size:12px;padding:3px 9px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--accent);cursor:default;display:inline-flex;gap:5px;align-items:center;white-space:nowrap}
+.btn svg{width:13px;height:13px}
+.btn.miss{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,var(--line))}
+.ver{font-size:11px;color:var(--dim);font-family:var(--f-mono);direction:ltr}
+.mock-scroll{overflow-x:auto}
+.mock-scroll .rows{min-width:640px}
+.phases{display:grid;gap:10px}
+.phase{display:grid;grid-template-columns:70px 1fr;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.phase .p{font-family:var(--f-mono);color:var(--accent);font-size:13px;direction:ltr}
+.phase h3{margin-bottom:4px}
+.phase p{color:var(--muted);font-size:14px}
+.qgroup{display:grid;gap:10px}
+.qgroup h3{font-size:14.5px;color:var(--accent)}
+ol.q{margin:0;padding-inline-start:24px;display:grid;gap:9px}
+ol.q b{color:var(--ink)}
+ol.q .muted{font-size:14px}
+details.fold{background:var(--surface);border:1px solid var(--line);border-radius:8px}
+details.fold>summary{cursor:pointer;padding:10px 14px;font-weight:600;font-size:14px;list-style-position:inside}
+details.fold[open]>summary{border-bottom:1px solid var(--line)}
+details.fold .tbl-wrap{border:0;border-radius:0 0 8px 8px}
+.mx td.c{font-size:15px}
+.phones{display:flex;flex-wrap:wrap;gap:14px;justify-content:center}
+.phone{width:210px;border:2px solid var(--line);border-radius:22px;background:var(--surface);padding:12px 10px;display:grid;gap:8px;align-content:start;font-size:12.5px}
+.phone .pt{font-weight:700;font-size:13px;text-align:center}
+.phone .it{border:1px solid var(--line);border-radius:8px;padding:7px 8px;display:grid;gap:3px}
+.phone .bt{background:var(--accent);color:#fff;border-radius:8px;padding:7px;text-align:center;font-weight:600}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.shot{aspect-ratio:4/3;border-radius:6px;background:var(--surface2);border:1px solid var(--line);position:relative;overflow:hidden}
+.shot span{position:absolute;inset-inline-start:4px;bottom:3px;font-family:var(--f-mono);font-size:9.5px;color:var(--muted);direction:ltr}
+.shot.x{outline:2px solid var(--crit)}
+.split{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:0}
+.split .nav{border-inline-end:1px solid var(--line);padding:8px;display:grid;gap:4px;align-content:start;font-size:13px}
+.split .nav span{padding:5px 8px;border-radius:6px;color:var(--muted)}
+.split .nav span.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.split .body{padding:12px 14px;display:grid;gap:10px;align-content:start}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:2px}
+.kpi b{font-size:20px;font-family:var(--f-mono);direction:ltr;text-align:start}
+.kpi small{color:var(--dim);font-size:11.5px}
+@media (max-width:560px){.split{grid-template-columns:1fr}.split .nav{border-inline-end:0;border-bottom:1px solid var(--line);grid-auto-flow:column;overflow-x:auto}.split .nav span{white-space:nowrap}}
+footer{margin-top:44px;padding-top:16px;border-top:1px solid var(--line);font-size:13px;color:var(--dim)}
+a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:560px){ h1{font-size:25px} .phase{grid-template-columns:1fr} .mitem{grid-template-columns:40px 1fr} .mitem.sub{padding-inline-start:22px} }
+</style>
+</head><body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-eye" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" d="M12 21V9m0 0-5 5m5-5 5 5M4 5h16"/></symbol>
+</svg>
+
+<div class="wrap" dir="rtl" lang="ar">
+
+<header class="top">
+  <span class="eyebrow">GSDN · Project Management Information System</span>
+  <h1>مخطط منظومة إدارة مشروع GSDN</h1>
+  <p class="lead">منظومة ويب على سيرفر خاص تحل محل ملف الماستر، وتصبح المصدر الوحيد لبيانات المشروع ومستنداته: بوابات المواقع والـ Milestones، الاعتماد والتوثيق، الخطط، المخزن، المشاكل، ولوحة القيادة.</p>
+  <div class="meta">
+    <span class="chip">الإصدار 1.1 · 24-10-2026</span>
+    <span class="chip">مبني على GSDN Site Master الجديد · 23 ورقة · 187 عموداً</span>
+    <span class="chip">مشروع واحد: GSDN</span>
+  </div>
+  <nav class="toc" aria-label="المحتويات">
+    <a href="#s0">الملخص</a><a href="#s1">المبادئ</a><a href="#s2">هيكل المنظومة</a><a href="#s3">سير العمل</a><a href="#s4">الإدخال والاعتماد</a><a href="#s5">التوثيق</a><a href="#s6">الأوزان والمؤشرات</a><a href="#s7">الشاشات</a><a href="#s8">الخطط والحضور</a><a href="#s9">المشاكل والمخاطر</a><a href="#s10">المخزن</a><a href="#s11">المقاولون والفرق</a><a href="#s12">ضبط الجودة</a><a href="#s13">الإشعارات والتقارير</a><a href="#s14">الأدوار والمسؤوليات</a><a href="#s15">الذكاء الاصطناعي</a><a href="#s16">البنية</a><a href="#s17">الترحيل</a><a href="#s18">مراحل التنفيذ</a><a href="#s19">مدخلات مطلوبة</a><a href="#s20">أسئلة مفتوحة</a><a href="#s21">سجل التحديث 1.1</a>
+  </nav>
+</header>
+
+<section id="s0">
+  <h2><span class="n">00</span>الملخص التنفيذي</h2>
+  <div class="callout"><b>الغاية:</b> منظومة ويب على سيرفر خاص مع تطبيق هاتف، تحل محل ملف الماستر وتصبح المصدر الوحيد لبيانات مشروع GSDN ومستنداته، ويبقى الماستر قناة لرفع البيانات إليها (القسم 17). فريق المشروع وحده يستخدمها، والبيانات المالية خارج نطاقها.</div>
+  <div class="callout"><b>الإصدار 1.1:</b> حُدِّث المخطط كاملاً ليطابق الماستر الجديد (23 ورقة، 187 عموداً في Master، وقرارات إعادة البناء D1 إلى D88)، ولوحة القيادة الجديدة، والاتفاقات الأخيرة: تعريف RFI، والأدوار الستة، ومسؤولية الخطوات. ما تغيّر وما يحتاج قراراً في <a href="#s21">القسم 21</a>.</div>
+  <div class="grid2">
+    <div class="card"><h3>كيف تعمل</h3><ul>
+      <li>عشر مراحل تتابعية، لكل مرحلة <b>بوابة جاهزية</b> (9 بوابات) و <b>Milestone</b> (10): Site Release، PRE-CW Completion، CW Completion، Site RFI، TE Completion، On-Air، TE PAC، KPI Acceptance، HOTO، Final Closure</li>
+      <li>ستة مسارات للعمل والمسؤولية: A التصميم والاستحواذ، B الأعمال المدنية، C الكهرباء والفايبر، D تركيب TE، E الفك، F التحسين لكل Cluster</li>
+      <li>49 خطوة بحدود SLA من ورقة SLA بالماستر (أيام عمل، الجمعة والسبت والعطل لا تُحسب)</li>
+      <li>الخطوة مقفلة حتى تتحقق بوابتها، وكل إدخال يمر بالمراجعة والاعتماد، والمؤشرات من المعتمد فقط، وكل تجاوز في سجل تدقيق لا يُعدَّل</li></ul></div>
+    <div class="card"><h3>الوحدات</h3><ul>
+      <li>الشبكة وصفحة الموقع 360، التوثيق والنماذج المعبّأة، قوالب Excel</li>
+      <li>الخطط مع الجاهزية والتوليد التلقائي، ضبط الجودة (QC · Snag · ITP · NCR)</li>
+      <li>المخزن، المقاولون والفرق، القضايا والمخاطر، الإشعارات والتقارير، لوحة القيادة</li></ul></div>
+    <div class="card"><h3>التنفيذ</h3><ul>
+      <li>سبع مراحل (القسم 18): P0 التصميم، P1 الأساس، P2 الأعمال المدنية، P3 TE والمخزن، P4 الميدان، P5 التحكم، P6 التوسعة</li>
+      <li>PostgreSQL، خادم تطبيق، واجهة React، تطبيق Flutter (القسم 16)</li></ul></div>
+    <div class="card"><h3>المطلوب لإكمال التصميم</h3><ul>
+      <li>مدخلات: بيانات المخزن، النماذج الرسمية، أوزان المستويات 1–4، أسماء الأشخاص لكل دور، وثائق سياسات الأمن والسرية، قنوات التنبيه (القسم 19)</li>
+      <li>قرارات: نقاط المطابقة مع الماستر (القسم 21)، والأسئلة الثلاثة المتبقية (القسم 20)</li></ul></div>
+  </div>
+</section>
+
+
+<section id="s1">
+  <h2><span class="n">01</span>المبادئ</h2>
+  <div class="grid2">
+    <div class="card"><h3>الموقع هو المحور</h3><p class="muted" style="font-size:14.5px">البيانات تُدخل مرة واحدة وتظهر في كل قسم يحتاجها. البوابات والمستندات والأوزان و SLA تُعرَّف من الإعدادات، فالتغيير تعديل بيانات لا برمجة.</p></div>
+    <div class="card"><h3>لا شيء يُحتسب قبل اعتماده</h3><p class="muted" style="font-size:14.5px">كل إدخال أو تعديل أو مستند يمر بمراجعة ثم اعتماد، والمؤشرات تُبنى على المعتمد فقط. وحده الترحيل الأول من الماستر يدخل معتمداً، موسوماً "مرحّل من الماستر"، وكل رفع بعده يمر بالاعتماد.</p></div>
+    <div class="card"><h3>المستند يؤكد التاريخ ولا يمنعه</h3><p class="muted" style="font-size:14.5px">التاريخ يُحفظ فوراً ويبقى "بانتظار التأكيد" حتى يُعتمد مستنده، لكنه يُحسب في المؤشرات متى اعتُمد التاريخ نفسه، مع تنبيه "بحاجة لرفع" ونقص في اكتمال التوثيق. المستند المرفوض وحده يُخرج التاريخ من المؤشرات حتى يُعتمد بديله. التاريخ الفعلي هو تاريخ الحدث لا تاريخ الاعتماد.</p></div>
+    <div class="card"><h3>البوابة مقفلة حتى تتحقق شروطها</h3><p class="muted" style="font-size:14.5px">افتراضياً تبقى الخطوة رمادية لا تقبل إدخالاً ولا تعديلاً حتى تتحقق شروط فتحها في جدول الخطوات، وتُفتح عند اعتماد تاريخ سابقتها. مدير المنظومة يفتح ما يشاء ويتجاوز الحدود، بسبب إلزامي يُسجَّل، وتظهر الخطوة بعلامة "فُتحت بتجاوز" (الصلاحية له افتراضياً، ويمكن منحها لدور آخر من مصفوفة الأدوار). داخل الخطوة المفتوحة، قيم التواريخ تُفحص بتنبيهات لا تمنع الحفظ.</p></div>
+    <div class="card"><h3>سجل كامل</h3><p class="muted" style="font-size:14.5px">كل إجراء موثّق باسم المستخدم ووقته وقيمته قبل وبعد. الحذف أرشفة لا إزالة. سجل التدقيق نفسه لا يُعدَّل ولا يُحذف، حتى من مدير المنظومة.</p></div>
+  </div>
+</section>
+
+<section id="s2">
+  <h2><span class="n">02</span>هيكل المنظومة</h2>
+  <p class="muted">شبكة المواقع تعرض مسار العمل، والسجلات تعرض القيود نفسها بتفاصيلها. البيانات واحدة، تُدخل من أي الجهتين وتظهر في الاثنتين. السجلات هي سجلات الماستر الجديد نفسها، بالأسماء والحقول المعتمدة (القسم 17).</p>
+  <div class="menu">
+    <div class="mgroup">
+      <div class="gh"><b>المتابعة</b><span>للجميع حسب الصلاحية</span></div>
+      <div class="mitem"><span class="no">0</span><div><div class="t">لوحة القيادة</div><div class="d">إنجاز المشروع (Project Status)، الـ Milestones العشرة وبوابات المراحل التسع، المخطط مقابل الفعلي، الاستثناءات والتنبيهات، أداء المقاولين والموردين، المخزن، والخريطة.</div></div></div>
+      <div class="mitem"><span class="no">1</span><div><div class="t">شبكة المواقع</div><div class="d">جدول بنمط Excel: المواقع صفوفاً، وأعمدة الماستر مجموعات بنفس ترتيبه (التعريف، النطاق، PRE-CW، CW، RFI، TE، On-Air، TE PAC، التحسين، HOTO، الإغلاق، الفك، الحالة والقضايا). منه إضافة المواقع وتعديلها وأرشفتها، والإجراءات الجماعية، والعروض المحفوظة لكل خطوة (القسم 07). مساراتها:</div></div></div>
+      <div class="mitem sub"><span class="no">A</span><div><div class="t">التصميم والاستحواذ</div><div class="d">من Search Ring وأول مرشّح إلى TSSR والعقد و LLD، وينتهي بـ Milestone Site Release.</div></div></div>
+      <div class="mitem sub"><span class="no">B · C</span><div><div class="t">الأعمال المدنية، والكهرباء والفايبر</div><div class="d">PRE-CW ثم CW حتى CW Completion، ثم RFI = CW PAC مع GECOL Power-On و HLC TX Link حيث يلزمان. C يبدأ من CW PR / WO.</div></div></div>
+      <div class="mitem sub"><span class="no">D</span><div><div class="t">تركيب TE <span class="tag">بعد RFI</span></div><div class="d">من TE Installation Readiness إلى TE Completion ثم On-Air ثم TE PAC ثم HOTO.</div></div></div>
+      <div class="mitem sub"><span class="no">E</span><div><div class="t">الفك <span class="tag">مسار موازٍ</span></div><div class="d">فك CW و TE من RFD حتى الإرجاع بـ CW RN و TE RN، وتسليم معدات Swap القديمة لمالكها (Legacy Handover Date).</div></div></div>
+      <div class="mitem sub"><span class="no">F</span><div><div class="t">التحسين <span class="tag">لكل Cluster</span></div><div class="d">Cluster Optimization ثم KPI Acceptance بمصدر واحد صالح للـ Cluster. شرط لـ HOTO.</div></div></div>
+      <div class="mitem"><span class="no">2</span><div><div class="t">الخطط ومهامي</div><div class="d">صفحة التقدم اليومي وخطة الغد (ورقة Progress &amp; Plan)، والخطط الأسبوعية والشهرية مع التوليد التلقائي وفحص الجاهزية، و"مهامي"، والاجتماع الأسبوعي.</div></div></div>
+      <div class="mitem"><span class="no">3</span><div><div class="t">ضبط الجودة</div><div class="d">سجلات QC و Snag و ITP و NCR (ورقة Quality Inspections)، والسجل المعيق (Hold غير مُفرج، NCR مفتوح، Snag Major / Critical مفتوح) يمنع الاستلام.</div></div></div>
+    </div>
+    <div class="mgroup">
+      <div class="gh"><b>السجلات</b><span>بترتيب أوراق الماستر</span></div>
+      <div class="mitem"><span class="no">4</span><div><div class="t">سجل المواقع والتصميم <span class="tag">RF &amp; Design</span></div><div class="d">صف لكل موقع، ومصدر بيانات الموقع التي يقرؤها الماستر (C:Q و S): المعرّفات، المنطقة، الإحداثيات، النوع، السيناريو، Uplink Site (محسوب من MW Far-end Site)، البرج، Cluster ID، TSSR، LOS، Link Budget، رخصة التردد، LLD، والطوبولوجيا.</div></div></div>
+      <div class="mitem"><span class="no">5</span><div><div class="t">سجل الاستحواذ <span class="tag">Acquisition</span></div><div class="d">صف لكل مرشّح: SAR، فحص MW LOS، Test Pit، TSS، الاختيار (Selected و Selection Date، مرشّح واحد فقط)، المالك وبيانات التواصل، العقد وتاريخه، انتهاء الإيجار وإنهاؤه. Acquisition Status محسوب بخمس قيم.</div></div></div>
+      <div class="mitem"><span class="no">6</span><div><div class="t">التصاريح والسلامة <span class="tag">Permits &amp; HSE</span></div><div class="d">جدول واحد: تصاريح الجهات (البلدية، الطيران المدني، التصريح الأمني…)، وأذونات الدخول (Survey · CW · TE · Dismantle · QC / Maintenance)، وتصاريح العمل PTW (CW · TE · Dismantle) بفحوصها (JSA، Toolbox Talk، Work at Height، Lifting Plan، LOTO، Rescue Plan، Stop Work). منه CW Access و TE Access وشروط البوابات.</div></div></div>
+      <div class="mitem"><span class="no">7</span><div><div class="t">أوامر الشراء والمقاولون والفرق <span class="tag">PR-PO</span></div><div class="d">ثلاثة جداول: الطلبات والتكليفات (صف لكل طلب، Scope و Delivery = Outsourced / In-House / TE Vendor، بلا قيم مالية)، والشركات (عقد واحد لكل شركة)، والفرق (Team Type و Specialization). منه حالة PR و PO والمقاول والفريق، ومورّد TE وفريقه.</div></div></div>
+      <div class="mitem"><span class="no">8</span><div><div class="t">سجل الكهرباء <span class="tag">GECOL</span></div><div class="d">صف لكل موقع عليه GECOL = Yes: المسح، الـ Layout، الإشعار، MOS، انتهاء التركيب، قبول AAT، المستندات، العداد، Power-On، التحويل للفوترة. Status محسوب.</div></div></div>
+      <div class="mitem"><span class="no">9</span><div><div class="t">سجل الفايبر <span class="tag">HLC</span></div><div class="d">صف لكل موقع عليه HLC = Yes: رقم الطلب وتاريخه، نقطة الربط (Exchange / Post)، Fiber Status، الفريق الداخلي، التركيب، واختبار رابط TX.</div></div></div>
+      <div class="mitem"><span class="no">10</span><div><div class="t">ما رُكّب فعلاً <span class="tag">As-Built</span></div><div class="d">الكميات المركّبة والتهيئة لكل موقع (بديل سجل BOQ السابق)، ومنه Configuration (WL/MW/IP/PWR) لانطباق MW Alignment، و RSL المخطط لحساب الانحراف.</div></div></div>
+      <div class="mitem"><span class="no">11</span><div><div class="t">المخزن <span class="tag">WH · WH Serials</span></div><div class="d">مخزن رئيسي واحد بعمود لكل صنف، وملخص الرصيد، وجدول حركة واحد (PL · OPEN · ADJ · CW DN · TE DN · CW RN · TE RN)، والأرقام التسلسلية (القسم 10).</div></div></div>
+      <div class="mitem"><span class="no">12</span><div><div class="t">سجل المخاطر <span class="tag">Risk Register</span></div><div class="d">18 عموداً: الاحتمال والأثر والدرجة والمستوى، الاستجابة، Risk Owner و Action Owner، المراجعة الدورية.</div></div></div>
+      <div class="mitem"><span class="no">13</span><div><div class="t">ضبط الجودة <span class="tag">Quality Inspections</span></div><div class="d">سجل واحد لأنواع QC و Snag و ITP و NCR بخطورة Critical / Major / Minor، ونقاط Hold، و Status و Blocking محسوبان.</div></div></div>
+      <div class="mitem"><span class="no">14</span><div><div class="t">التغييرات <span class="tag">Change Control</span></div><div class="d">صف لكل تغيير: Scope Change، Suspension، Resumption، Cancellation، Relocation، Baseline Re-plan، Data Correction، Cutover Rollback، Cutover Window. بقيمة قديمة وجديدة وطلب واعتماد.</div></div></div>
+      <div class="mitem"><span class="no">15</span><div><div class="t">الجاهزية والتسليم <span class="tag">Readiness &amp; Handover</span></div><div class="d">صف لكل موقع: سلامة كهرباء التشغيل، جاهزية الـ Uplink، قائمة O&amp;M وقبولها، تسليم المفاتيح، حزمة HOTO، تسليم القديم، إغلاق الالتزامات واعتماد الإغلاق، و Open Controls محسوب.</div></div></div>
+      <div class="mitem"><span class="no">16</span><div><div class="t">الأرشفة والمستندات</div><div class="d">كل المستندات ونسخها، البحث، تقرير النواقص، والإصدار الجماعي للنماذج. وحدة في المنظومة لا تقابلها ورقة في الماستر.</div></div></div>
+    </div>
+    <div class="mgroup">
+      <div class="gh"><b>الإدارة</b><span>مدير المنظومة</span></div>
+      <div class="mitem"><span class="no">17</span><div><div class="t">المستخدمون والمسؤوليات</div><div class="d">الأدوار الستة الرئيسية والفرعية (القسم 14)، الصلاحيات، سجل التدقيق.</div></div></div>
+      <div class="mitem"><span class="no">18</span><div><div class="t">الإعدادات</div><div class="d">مقابل ورقة Setting: Report Date، فترتا الضمان، حدود التواريخ، مدة تنبيه الانتهاء، حدود الخطر، تسامح RSL، العطل، الموظفون، وكل القوائم. ومعها البوابات والـ Milestones، حدود SLA (ورقة SLA)، الأوزان (Project Status)، أنواع المستندات، قوالب Excel والنماذج، مصفوفة الإشعارات، قواعد التنبيه، والمسميات العربية للواجهة.</div></div></div>
+    </div>
+  </div>
+  <p class="cap">واجهة إنجليزية أساسية وعربية بتبديل لحظي. البيانات نفسها (المواقع، المناطق، المقاولون) تبقى كما تُدخل ولا تُعرَّب. البيانات المالية (قيم PO، الفواتير، الدفعات) خارج نطاق المنظومة. وفي أعلى كل الشاشات شريط بحث موحّد في المواقع والمستندات والقضايا والتعليقات والمقاولين والفرق والأرقام التسلسلية، بحسب صلاحيات المستخدم.</p>
+
+  <h3 style="margin-top:6px">لوحة القيادة</h3>
+  <p class="muted">الأساس لوحة <b>GSDN Site Delivery Dashboard</b> الجديدة المبنية على الماستر الجديد، وورقة Dashboard داخل الماستر (6 جداول). في المنظومة تُبنى الصفحات نفسها على البيانات المعتمدة بدل ملف الماستر، مع الفلاتر نفسها و drill-down حتى صفحة الموقع 360.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الصفحة</th><th>المحتوى في اللوحة الجديدة</th><th>يُضاف في المنظومة</th></tr></thead>
+      <tbody>
+        <tr><td>Project Overview</td><td>صحة المشروع، الـ Milestones مقابل الخطة، نسبة Project Status والمخطط و SPI، الخريطة، و Decisions required مرتبة حسب الحجم والعمر</td><td>مؤشر الصحة، والإنجاز بالمستويات 1–4</td></tr>
+        <tr><td>CW · TE (القالب نفسه، 8 تبويبات)</td><td class="mono" style="font-family:var(--f-body)">1 Cockpit · 2 Milestones &amp; checkpoints · 3 Schedule · 4 Flow &amp; SLA · 5 Constraints &amp; ownership · 6 Partners · 7 Quality &amp; closure · 8 Site register</td><td>التوثيق والاعتماد (المعلّق، الناقص، الاعتماد من أول مرة) · الخطط (المخطط مقابل المنجز) · المخزن (الرصيد، المصروف، النقص)</td></tr>
+        <tr><td>ورقة Dashboard في الماستر</td><td>(1) Milestone Delivery مقابل Baseline · (2) التقدم حسب المنطقة · (3) Project Checkpoint · (4) Exceptions &amp; Alerts · (5) WH Complete Units · (6) Swap &amp; Relocation</td><td>تصبح صفحات وتقارير في المنظومة بالفلاتر نفسها</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">قواعد اللوحة الجديدة تبقى في المنظومة: الفلاتر Project Phase و Delivery Batch و Delivery Scenario و Region و Cluster ID و Site Type و Tower Owner، و Contractor في CW، و Vendor في TE · فلتر الفترة From / To يعرض ما أُنجز داخلها، وبدونه العرض تراكمي حتى Report Date · نمط كل جدول Scope ثم Done ثم Pending (جاء دوره) ثم Not Due ثم % Done · الموقع الملغى (Overall Status = Cancelled) يُستبعد من النطاق ويبقى في الفك · اللوحة تعرض ما يحسبه الماستر (المعالم، البوابات، الحالة، SLA، Project Status، Data Quality، المخاطر، الجودة) ولا تعيد حسابه · الأعمدة تُقرأ بأسماء عناوينها لا بمواقعها، والعمود المطلوب الناقص يوقف التحميل برسالة · Report Date من Setting.</p>
+</section>
+
+
+<section id="s3">
+  <h2><span class="n">03</span>سير العمل والـ Milestones وبوابات المراحل</h2>
+  <p class="muted">العمل <b>تتابعي (شلالي)</b> كما في الماستر الجديد: عشر مراحل، كل مرحلة تبدأ بـ <b>بوابة جاهزية</b> (Phase Gate) وتنتهي بـ <b>Milestone</b>. تاريخ البوابة هو تاريخ الـ Milestone السابق، ومنه تُحسب مدد SLA. والـ Milestone تاريخ محسوب لا يُكتب يدوياً، يظهر عند تحقق البوابة وكل الشروط، ويساوي آخر تاريخ بينها. الإيقاف المعتمد (Suspension) في Change Control ينقل البوابة إلى تاريخ الاستئناف المعتمد، وبلا استئناف تبقى مقفلة. المسارات الستة (A إلى F) تبقى تنظيماً للشاشات والمسؤوليات فوق هذه المراحل.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TB
+  M1(["1 · Site Release<br/>TSSR · contract · LLD · LOS and link budget"])
+  M2(["2 · PRE-CW Completion<br/>PR · PO / WO · access · survey · layout · CW DN"])
+  M3(["3 · CW Completion<br/>CW MOS · tower and adaption items"])
+  M4(["4 · Site RFI<br/>CW PAC · power and fiber"])
+  M5(["5 · TE Completion<br/>TE DN · dispatch complete · TE MOS · install"])
+  M6(["6 · On-Air<br/>commissioning · MW · integration · cutover"])
+  M7(["7 · TE PAC<br/>SSV · HWID · EIR · PAT · As-Built"])
+  M8(["8 · KPI Acceptance<br/>per cluster"])
+  M9(["9 · HOTO<br/>launch · reconciliation · HOTO package"])
+  M10(["10 · Final Closure<br/>CW FAC · TE FAC · obligations"])
+  M1 -- "Pre-CW Readiness" --> M2
+  M2 -- "CW Readiness · Access and PTW CW" --> M3
+  M3 -- "RFI Readiness" --> M4
+  M4 -- "TE Installation Readiness · Access and PTW TE" --> M5
+  M5 -- "On-Air Readiness · power safe" --> M6
+  M6 -- "TE PAC Readiness" --> M7
+  M7 -- "Cluster Optimization Readiness" --> M8
+  M8 -- "HOTO Readiness" --> M9
+  M9 -- "Final Closure Readiness" --> M10
+  PO["CW PR / WO"] -.-> GEC["GECOL Power-On"] --> M4
+  PO -.-> HLC["HLC TX link tested"] --> M4
+  M2 --- PO
+  DIS["Dismantle · on request<br/>RFD · CW RN · TE RN"]
+  M1 -. "no RFI scope" .-> M5
+</pre>
+  </div>
+
+  <h3 style="margin-top:6px">المراحل العشر · من البوابة إلى الـ Milestone</h3>
+  <p class="muted">مطابقة لأعمدة الماستر (V إلى FM) ولورقة Guide. المسؤول بالأدوار الرئيسية الستة (القسم 14).</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>المرحلة</th><th>تبدأ بـ (البوابة · من)</th><th>شروط فتح البوابة</th><th>تنتهي بـ (Milestone)</th><th>شرط الإنجاز</th><th>المسؤول</th></tr></thead>
+      <tbody>
+        <tr><td class="c">1</td><td>RF &amp; Acquisition</td><td>إنشاء الموقع (Search Ring)</td><td>—</td><td><b>Site Release</b> <span class="mono">V</span></td><td>ثمانية شروط (قرار D32): Site ID فريد، ومرشّح واحد Selected = Yes والاستحواذ مكتمل، و Contract Sign-off Date، و TSSR Approved، و LLD Approved، وتصريح الطيران المدني إن طُلب، ولمواقع HUB و Terminal فقط: MW LOS Survey و LOS = Pass، و Link Budget Date</td><td>RF &amp; Design / Acquisition Team Lead</td></tr>
+        <tr><td class="c">2</td><td>PRE-CW</td><td><b>Pre-CW Readiness</b> <span class="mono">W</span> من Site Release</td><td>لا إيقاف قائم</td><td><b>PRE-CW Completion</b> <span class="mono">AW</span></td><td>النطاق محسوم (AA:AF)، و PR و PO / WO صادران، و CW Access، والمسح والتحليل، والـ Layout و CW DN معتمدان (لمواقع CW)</td><td>CW Team Lead · Project Support</td></tr>
+        <tr><td class="c">3</td><td>CW</td><td><b>CW Readiness</b> <span class="mono">AX</span> من PRE-CW Completion</td><td>Access - CW و PTW - CW معتمدان وساريان، ولا Stop Work ولا إيقاف</td><td><b>CW Completion</b> <span class="mono">BP</span></td><td>بنود البرج والأدابشن المطلوبة Done أو N/A، وتاريخ انتهاء فعلي</td><td>CW Team Lead</td></tr>
+        <tr><td class="c">4</td><td>RFI</td><td><b>RFI Readiness</b> <span class="mono">BQ</span> من CW Completion، أو من PRE-CW Completion للموقع بلا نطاق CW</td><td>لا إيقاف قائم</td><td><b>Site RFI</b> <span class="mono">BZ</span></td><td>نهاية الأعمال المدنية شاملة الكهرباء والفايبر: CW PAC بعد معالجة الملاحظات، و Power-On لـ GECOL، واختبار رابط TX لـ HLC حيث يلزمان</td><td>CW Team Lead</td></tr>
+        <tr><td class="c">5</td><td>TE Installation</td><td><b>TE Installation Readiness</b> <span class="mono">CA</span> من Site RFI، أو من Site Release حيث لا تنطبق RFI</td><td>Access - TE و PTW - TE معتمدان وساريان، ولا إيقاف</td><td><b>TE Completion</b> <span class="mono">CU</span></td><td>بنود التركيب Done أو N/A، وتاريخ انتهاء فعلي</td><td>TE Team Lead · Inventory Supervisor</td></tr>
+        <tr><td class="c">6</td><td>On-Air</td><td><b>On-Air Readiness</b> <span class="mono">CV</span> من TE Completion</td><td>Commissioning Power Safe Date في Readiness &amp; Handover، والبوابة تأخذ التاريخ الأحدث</td><td><b>On-Air</b> <span class="mono">DP</span></td><td>Commissioning و Integration، وضبط MW مع رخصة التردد، وجاهزية موقع الـ Uplink (Uplink Ready Date)، ولمواقع Swap: MOP ونافذة معتمدان</td><td>TE Team Lead (التنفيذ على مورّد TE)</td></tr>
+        <tr><td class="c">7</td><td>TE PAC</td><td><b>TE PAC Readiness</b> <span class="mono">DQ</span> من On-Air</td><td>لا Stop Work على PTW - TE، ولا إيقاف</td><td><b>TE PAC</b> <span class="mono">EL</span></td><td>SSV Pass، و HWID و EIR و PAT، و NOC Alarm Verification، و As-Built، والملاحظات معالجة، وتاريخ TE PAC فعلي</td><td>TE Team Lead</td></tr>
+        <tr><td class="c">8</td><td>Cluster Optimization</td><td><b>Cluster Optimization Readiness</b> <span class="mono">EM</span> من TE PAC</td><td>لا إيقاف قائم</td><td><b>KPI Acceptance</b> <span class="mono">ES</span></td><td>مصدر KPI صالح واحد للـ Cluster (EQ = Valid)، وتاريخه بعد بوابة الموقع</td><td>RF &amp; Design / Acquisition Team Lead</td></tr>
+        <tr><td class="c">9</td><td>HOTO</td><td><b>HOTO Readiness</b> <span class="mono">ET</span> من KPI Acceptance</td><td>لا إيقاف قائم</td><td><b>HOTO</b> <span class="mono">EY</span></td><td>Launch، و Material Reconciliation، وحزمة HOTO، وقبول O&amp;M بقائمة الفحص (14 بنداً في Guide)</td><td>TE Team Lead · Inventory Supervisor</td></tr>
+        <tr><td class="c">10</td><td>Final Closure</td><td><b>Final Closure Readiness</b> <span class="mono">EZ</span> من HOTO</td><td>لا إيقاف قائم</td><td><b>Final Closure</b> <span class="mono">FM</span></td><td>CW FAC (بعد CW PAC + 90 يوماً) و TE FAC (بعد TE PAC + 12 شهراً)، وإغلاق الالتزامات، ولا NCR معيق مفتوح، واعتماد الإغلاق</td><td>Project Manager</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout"><b>تخطّي المراحل غير المطلوبة:</b> الموقع بلا نطاق CW تبدأ RFI عنده من PRE-CW Completion. وحيث لا تنطبق RFI (Hot Swap و Cold Swap، أو موقع بلا CW ولا GECOL ولا HLC) يبدأ التركيب من Site Release. لكل Milestone عمود Baseline بجانبه من الخطة المعتمدة (القسم 08). والحالة العامة للموقع (Overall Status في FZ) خمس قيم: Not Started، In Progress، On Hold، Completed (عند Final Closure)، Cancelled (إلغاء معتمد في Change Control).</div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>المسار</th><th>يغطي المراحل</th><th>المسؤول</th></tr></thead>
+      <tbody>
+        <tr><td>A · التصميم والاستحواذ</td><td>1 · حتى Site Release</td><td>RF &amp; Design / Acquisition Team Lead</td></tr>
+        <tr><td>B · الأعمال المدنية</td><td>2 و 3 · حتى CW Completion، ثم CW PAC ضمن RFI و CW FAC ضمن الإغلاق</td><td>CW Team Lead</td></tr>
+        <tr><td>C · الكهرباء والفايبر</td><td>ضمن 4 · تبدأ من CW PR / WO (قرار D38)، وللموقع بلا نطاق CW من Site Release</td><td>CW Team Lead (GECOL Power Team · HLC Fiber Team)</td></tr>
+        <tr><td>D · TE</td><td>5 و 6 و 7 و 9 · من TE Installation Readiness حتى HOTO، ثم TE FAC ضمن الإغلاق</td><td>TE Team Lead</td></tr>
+        <tr><td>E · الفك</td><td>مسار موازٍ عند الطلب: Site CW RFD و Site TE RFD حتى CW RN و TE RN</td><td>CW Team Lead (CW) · TE Team Lead (TE)</td></tr>
+        <tr><td>F · التحسين</td><td>8 · لكل Cluster</td><td>RF &amp; Design / Acquisition Team Lead</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:6px">تسلسل الخطوات حسب سيناريو التسليم · Delivery Scenario</h3>
+  <p class="muted">Delivery Scenario حقل إلزامي في الماستر (Z) بخمس قيم: New Build و Expansion و Hot Swap و Cold Swap و Relocation. كل قيمة قالب في الإعدادات يحدد ترتيب الخطوات وما هو N/A، فإضافة قالب لا تحتاج إعادة بناء. Swap يخص معدات قائمة وتعمل (On-Air).</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>المسار</th><th>New Build</th><th>Expansion</th><th>Cold Swap</th><th>Hot Swap</th><th>Relocation</th></tr></thead>
+      <tbody>
+        <tr><td>التعريف</td><td>موقع جديد</td><td>توسعة موقع قائم <span class="tag m">قالبه للنقاش</span></td><td>مساحة بديلة: يُركَّب الجديد بجانب القديم، ثم Cutover، ثم فك القديم</td><td>لا مساحة بديلة: فك القديم ثم تركيب الجديد ثم Cutover، في نافذة واحدة</td><td>فك المعدات نفسها وإعادة تركيبها في موقع جديد، بنفس Site ID</td></tr>
+        <tr><td>المراحل 1 إلى 3</td><td>كاملة حسب أعلام النطاق</td><td>حسب أعلام النطاق</td><td>حسب أعلام النطاق، وغالباً N/A</td><td>مثل Cold Swap</td><td>كاملة في الموقع الجديد</td></tr>
+        <tr><td>RFI</td><td>شرط</td><td>حسب النطاق</td><td>N/A، والتركيب يبدأ من Site Release</td><td>N/A</td><td>شرط في الموقع الجديد</td></tr>
+        <tr><td>On-Air</td><td>عادي</td><td>عادي</td><td>تركيب موازٍ، ثم MOP (S-1) ونافذة (S-2)، ثم Cutover = On-Air</td><td>MOP ونافذة، ثم داخل النافذة: فك ثم تركيب ثم Cutover = On-Air</td><td>عادي في الموقع الجديد</td></tr>
+        <tr><td>الفك والمعدات القديمة</td><td>عند الطلب</td><td>عند الطلب</td><td>خلال يوم عمل من On-Air (S-5، و Legacy Dismantle Due في DH). تسليم القديم لمالكه: Legacy Handover Date</td><td>داخل النافذة. تسليم القديم: Legacy Handover Date</td><td>في الموقع القديم قبل التركيب في الجديد، بـ TE RN ثم TE DN</td></tr>
+        <tr><td>SLA الخاصة</td><td>—</td><td>—</td><td>S-1 · S-2 · S-4 · S-5</td><td>S-1 · S-2 · S-3</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Cutover الناجح هو On-Air بتاريخه. في الماستر: MOP Submitted و MOP Approved و Window Start و Window End و Cutover Result و Pre-Swap و Post-Swap KPI (DB:DL)، و Outage Duration و Legacy Dismantle Due و Rollback Count محسوبة. طلب النافذة واعتمادها صف من نوع Cutover Window في Change Control، وكل Rollback صف Cutover Rollback فيه. النقل (Relocation) يحتفظ بنفس Site ID ويُسجَّل في Change Control.</p>
+
+  <h3 style="margin-top:6px">مواصفات الخطوات</h3>
+  <p class="muted">صف لكل خطوة، وهو المرجع للبرمجة. رمز SLA هو رمز ورقة SLA في الماستر نفسه، والحدود الأدنى والأعلى منها بأيام العمل (الجمعة والسبت والعطل الرسمية لا تُحسب). "رابط تخطيط" = رابط بلا خطوة SLA في Baseline (B01 إلى B07). الـ MS = Milestone محسوب.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الكود</th><th>الخطوة</th><th>حقل الاكتمال في الماستر</th><th>المصدر</th><th>SLA (أدنى–أعلى)</th><th>N/A عندما</th></tr></thead>
+      <tbody>
+        <tr><td colspan="6"><b>المرحلة 1 · RF &amp; Acquisition</b> · RF &amp; Design / Acquisition Team Lead</td></tr>
+        <tr><td class="mono">A1</td><td>البحث وأول مرشّح</td><td>Search Ring Received ← أول Candidate Submitted (SAR)</td><td>RF &amp; Design · Acquisition</td><td class="mono">A-1 · 10–20</td><td>—</td></tr>
+        <tr><td class="mono">A2</td><td>اعتماد TSSR</td><td>TSSR Submitted ← TSSR Approved</td><td>RF &amp; Design</td><td class="mono">A-3 · 1–2</td><td>—</td></tr>
+        <tr><td class="mono">A3</td><td>الاستحواذ</td><td>Acquisition Date <span class="mono">T</span> (المرشّح المختار + Contract Sign-off)</td><td>Acquisition</td><td>حسب الخطة</td><td>—</td></tr>
+        <tr><td class="mono">A4</td><td>اعتماد LLD</td><td>LLD Approved Date</td><td>RF &amp; Design</td><td>حسب الخطة</td><td>—</td></tr>
+        <tr><td class="mono">MS1</td><td><b>Site Release</b></td><td>Site Release Date <span class="mono">V</span> (مخطط في U)</td><td>محسوب</td><td>—</td><td>—</td></tr>
+        <tr><td colspan="6"><b>المرحلة 2 · PRE-CW</b> · البوابة Pre-CW Readiness · CW Team Lead</td></tr>
+        <tr><td class="mono">B1</td><td>PR</td><td>PR Status <span class="mono">AH</span> · PR Date</td><td>PR-PO</td><td>رابط B01 · 0–1</td><td>بلا نطاق CW، أو CW Delivery Model = In-House</td></tr>
+        <tr><td class="mono">B2</td><td>PO / WO والمقاول</td><td>PO / WO Status <span class="mono">AI</span> · Contractor <span class="mono">AJ</span> · Team <span class="mono">AK</span></td><td>PR-PO</td><td class="mono">B-2 · 1–2</td><td>بلا نطاق CW</td></tr>
+        <tr><td class="mono">B3</td><td>إذن الدخول CW</td><td>CW Access Date <span class="mono">AL</span></td><td>Permits &amp; HSE · Access - CW</td><td class="mono">B-3 · 1–2</td><td>بلا نطاق CW</td></tr>
+        <tr><td class="mono">B4</td><td>المسح</td><td>CW Survey Actual <span class="mono">AO</span></td><td>Master</td><td class="mono">B-4 · 1–2</td><td></td></tr>
+        <tr><td class="mono">B5</td><td>STA / ST</td><td>Analysis Type و Result و Submitted <span class="mono">AP:AR</span></td><td>Master</td><td class="mono">B-5 · 1–2</td><td>Analysis Type ليس STA أو ST</td></tr>
+        <tr><td class="mono">B6</td><td>تقديم الـ Layout</td><td>من AR (مع تحليل) أو AO ← Approved <span class="mono">AS</span></td><td>Master</td><td class="mono">B-6 · 1–2</td><td></td></tr>
+        <tr><td class="mono">B7</td><td>اعتماد الـ Layout و CW DN</td><td>Layout Approved <span class="mono">AS</span> · CW DN Submitted / Approved <span class="mono">AT:AU</span></td><td>Master</td><td class="mono">B-7 · 1–2</td><td></td></tr>
+        <tr><td class="mono">MS2</td><td><b>PRE-CW Completion</b></td><td><span class="mono">AW</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 3 · CW</b> · البوابة CW Readiness · CW Team Lead</td></tr>
+        <tr><td class="mono">B8</td><td>MOS البرج</td><td>CW MOS Actual <span class="mono">AZ</span></td><td>Master</td><td class="mono">B-8 · 1–2</td><td>Tower Erection ≠ Yes</td></tr>
+        <tr><td class="mono">B9</td><td>MOS الأدابشن</td><td>CW MOS Actual <span class="mono">AZ</span></td><td>Master</td><td class="mono">B-9 · 1–2</td><td>Site Adaption ≠ Yes</td></tr>
+        <tr><td class="mono">B10</td><td>تركيب البرج</td><td>Tower Foundation · Steel Erection · Lightning &amp; Grounding <span class="mono">BA:BC</span> · Actual End <span class="mono">BN</span></td><td>Master · Quality Inspections (نقاط Hold)</td><td class="mono">B-10a RT · 14–21 · B-10b GF · 30–45</td><td>Tower Erection ≠ Yes</td></tr>
+        <tr><td class="mono">B11</td><td>الأدابشن</td><td>Cabinet Foundation … Site GND <span class="mono">BD:BJ</span> · Actual End <span class="mono">BN</span></td><td>Master</td><td class="mono">B-11 · 4–8</td><td>Site Adaption ≠ Yes</td></tr>
+        <tr><td class="mono">MS3</td><td><b>CW Completion</b></td><td><span class="mono">BP</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 4 · RFI</b> · البوابة RFI Readiness · CW Team Lead</td></tr>
+        <tr><td class="mono">B13</td><td>CW PAC</td><td>Snags Found · Snags Cleared · CW As-Built Submitted · CW PAC Actual <span class="mono">BR:BV</span></td><td>Master · Quality Inspections (لا Snag Major / Critical مفتوح)</td><td class="mono">B-13 · 1–3</td><td>بلا نطاق CW</td></tr>
+        <tr><td class="mono">C1</td><td>طلب GECOL</td><td>GECOL PR</td><td>PR-PO (Scope = GECOL)</td><td>رابط B02 · 0–1 من CW PR / WO</td><td>GECOL Power ≠ Yes</td></tr>
+        <tr><td class="mono">C2</td><td>توصيل الكهرباء</td><td>Installation Finish · Power-On Date · GECOL Status <span class="mono">BW</span></td><td>GECOL</td><td class="mono">C-2 · 7–10</td><td>GECOL Power ≠ Yes</td></tr>
+        <tr><td class="mono">C3</td><td>طلب HLC</td><td>HLC Request Date</td><td>HLC</td><td>رابط B03 · 0–1 من CW PR / WO</td><td>HLC Fiber ≠ Yes</td></tr>
+        <tr><td class="mono">C4</td><td>توصيل الفايبر</td><td>Installation Date · TX Link Tested Date · HLC Fiber Status <span class="mono">BX</span></td><td>HLC</td><td class="mono">C-4 · 7–10</td><td>HLC Fiber ≠ Yes</td></tr>
+        <tr><td class="mono">MS4</td><td><b>Site RFI</b></td><td><span class="mono">BZ</span></td><td>محسوب</td><td class="mono">RFI · 1 (من RFI Readiness)</td><td>Hot / Cold Swap، أو بلا CW ولا GECOL ولا HLC</td></tr>
+        <tr><td colspan="6"><b>المرحلة 5 · TE Installation</b> · البوابة TE Installation Readiness · TE Team Lead</td></tr>
+        <tr><td class="mono">D1</td><td>إذن الدخول TE</td><td>TE Access Date <span class="mono">CB</span></td><td>Permits &amp; HSE · Access - TE</td><td class="mono">D-1 · 3–5</td><td>—</td></tr>
+        <tr><td class="mono">D2</td><td>المسح والمورّد</td><td>Survey Date <span class="mono">CC</span> · Vendor Name <span class="mono">CD</span> · Vendor Team <span class="mono">CE</span> (من PR-PO)</td><td>Master · PR-PO (Scope = TE Installation · Delivery = TE Vendor)</td><td class="mono">D-2 · 1–2</td><td></td></tr>
+        <tr><td class="mono">D3</td><td>تقديم DN</td><td>TE DN Submitted <span class="mono">CG</span></td><td>Master</td><td class="mono">D-3 · 1–2</td><td></td></tr>
+        <tr><td class="mono">D4</td><td>اعتماد DN</td><td>TE DN Approved <span class="mono">CH</span></td><td>Master</td><td class="mono">D-4 · 1–2</td><td></td></tr>
+        <tr><td class="mono">D4b</td><td>اكتمال الصرف</td><td>TE Dispatch Complete Date (Site Calc): آخر DN جعل المصروف ناقص المرتجع يغطي كامل الاحتياج المحسوب من التصميم</td><td>WH · Site Calc</td><td>رابط B04 · 0–1</td><td></td></tr>
+        <tr><td class="mono">D5</td><td>TE MOS</td><td>TE MOS Actual <span class="mono">CJ</span></td><td>Master</td><td class="mono">D-5 · 1 (من اكتمال الصرف)</td><td></td></tr>
+        <tr><td class="mono">D6</td><td>التركيب</td><td>MTS Cabinet … DC / OF Cable <span class="mono">CK:CO</span> · Actual End <span class="mono">CS</span></td><td>Master</td><td class="mono">D-6 · 3–5</td><td></td></tr>
+        <tr><td class="mono">MS5</td><td><b>TE Completion</b></td><td><span class="mono">CU</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 6 · On-Air</b> · البوابة On-Air Readiness · TE Team Lead</td></tr>
+        <tr><td class="mono">D7</td><td>Commissioning</td><td>Commissioning Date <span class="mono">CW</span></td><td>Master</td><td class="mono">D-7 · 1</td><td></td></tr>
+        <tr><td class="mono">D8</td><td>MW Alignment</td><td>MW Alignment Date · Measured RSL · RSL Deviation (ضمن ±2 dB) <span class="mono">CX:CZ</span></td><td>Master · As-Built (RSL المخطط)</td><td class="mono">D-8 · 1</td><td>بلا MW (Configuration في As-Built)</td></tr>
+        <tr><td class="mono">D9</td><td>Integration</td><td>Integration Date <span class="mono">DA</span></td><td>Master</td><td class="mono">D-9 · 1</td><td></td></tr>
+        <tr><td class="mono">D10a</td><td>اعتماد MOP</td><td>MOP Submitted · Approved <span class="mono">DB:DC</span></td><td>Master</td><td class="mono">S-1 · 1</td><td>New Build و Expansion و Relocation</td></tr>
+        <tr><td class="mono">D10b</td><td>اعتماد النافذة</td><td>Request و Approval لصف Cutover Window · Window Start / End <span class="mono">DD:DE</span></td><td>Change Control · Master</td><td class="mono">S-2 · 1 · النافذة S-3 / S-4</td><td>New Build و Expansion و Relocation</td></tr>
+        <tr><td class="mono">D10</td><td>On-Air</td><td>On-Air Planned / Actual <span class="mono">DM:DN</span> · Cutover Result</td><td>Master · Readiness (Uplink Ready)</td><td class="mono">D-10 · 1</td><td></td></tr>
+        <tr><td class="mono">MS6</td><td><b>On-Air</b></td><td><span class="mono">DP</span></td><td>محسوب</td><td class="mono">E2E-D1 · 8–12 (TE MOS ← On-Air)</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 7 · TE PAC</b> · البوابة TE PAC Readiness · TE Team Lead</td></tr>
+        <tr><td class="mono">D11</td><td>SSV</td><td>SSV Date · SSV Result <span class="mono">DR:DS</span></td><td>Master</td><td class="mono">D-11 · 3–5</td><td></td></tr>
+        <tr><td class="mono">D12</td><td>HWID</td><td>HWID Date <span class="mono">DT</span></td><td>Master</td><td class="mono">D-12 · 1</td><td></td></tr>
+        <tr><td class="mono">D13</td><td>EIR</td><td>PWR · WL · MW · IP · EIR Date <span class="mono">DU:DY</span></td><td>Master</td><td class="mono">D-13 · 3–5</td><td></td></tr>
+        <tr><td class="mono">D14</td><td>PAT</td><td>PWR · WL · MW · IP · NOC Alarm Verification · PAT Date <span class="mono">DZ:EE</span></td><td>Master</td><td class="mono">D-14 · 3–5</td><td></td></tr>
+        <tr><td class="mono">D15</td><td>As-Built</td><td>As-Built Date <span class="mono">EF</span></td><td>Master · As-Built</td><td class="mono">D-15 · 1–2</td><td></td></tr>
+        <tr><td class="mono">D16</td><td>TE PAC</td><td>TE Snags · TE PAC Planned / Actual <span class="mono">EG:EJ</span></td><td>Master · Quality Inspections</td><td class="mono">D-16 · 5–10</td><td></td></tr>
+        <tr><td class="mono">MS7</td><td><b>TE PAC</b></td><td><span class="mono">EL</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 8 · Cluster Optimization</b> · البوابة Cluster Optimization Readiness · RF &amp; Design / Acquisition Team Lead</td></tr>
+        <tr><td class="mono">F1</td><td>تحسين الـ Cluster</td><td>Cluster ID <span class="mono">EN</span> (من RF &amp; Design) · Cluster Optimization Date <span class="mono">EO</span></td><td>Master</td><td>رابط B05 · 1–5 (TE PAC ← KPI)</td><td>التحسين خارج نطاق العقد</td></tr>
+        <tr><td class="mono">F2</td><td>مصدر KPI</td><td>KPI Acceptance Source Date <span class="mono">EP</span> · KPI Source Validation <span class="mono">EQ</span></td><td>Master</td><td></td><td></td></tr>
+        <tr><td class="mono">MS8</td><td><b>KPI Acceptance</b></td><td><span class="mono">ES</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 9 · HOTO</b> · البوابة HOTO Readiness · TE Team Lead</td></tr>
+        <tr><td class="mono">D17</td><td>الإطلاق والتسليم</td><td>Launch Date <span class="mono">EU</span> · Material Reconciliation <span class="mono">EV</span> · HOTO Package <span class="mono">EW</span> · قبول O&amp;M</td><td>Master · Readiness &amp; Handover</td><td class="mono">D-17 · 3–5 (من KPI Acceptance)</td><td></td></tr>
+        <tr><td class="mono">MS9</td><td><b>HOTO</b></td><td><span class="mono">EY</span></td><td>محسوب</td><td class="mono">E2E-D2 · 30–51 (TE Access ← HOTO)</td><td></td></tr>
+        <tr><td colspan="6"><b>المرحلة 10 · Final Closure</b> · البوابة Final Closure Readiness · Project Manager</td></tr>
+        <tr><td class="mono">B14</td><td>ضمان CW</td><td>CW DLP Start / End <span class="mono">FA:FB</span> = CW PAC + 90 يوماً تقويمياً</td><td>محسوب</td><td>ليس SLA</td><td></td></tr>
+        <tr><td class="mono">B15</td><td>CW FAC</td><td>Snags · CW FAC Date <span class="mono">FC:FE</span></td><td>Master</td><td class="mono">B-15 · 3–10</td><td>بلا نطاق CW</td></tr>
+        <tr><td class="mono">D18</td><td>TE FAC</td><td>TE DLP Start / End <span class="mono">FF:FG</span> (12 شهراً) · Snags · TE FAC Date <span class="mono">FH:FJ</span></td><td>Master</td><td>رابط B06 · 3–10</td><td></td></tr>
+        <tr><td class="mono">Z1</td><td>إغلاق الالتزامات</td><td>Contractual Obligations Closure <span class="mono">FK</span> · اعتماد الإغلاق</td><td>Readiness &amp; Handover</td><td>رابط B07 · 1–3</td><td></td></tr>
+        <tr><td class="mono">MS10</td><td><b>Final Closure</b></td><td><span class="mono">FM</span></td><td>محسوب</td><td>—</td><td></td></tr>
+        <tr><td colspan="6"><b>المسار E · الفك</b> · موازٍ عند الطلب</td></tr>
+        <tr><td class="mono">E1</td><td>RFD</td><td>Site CW RFD <span class="mono">FN</span> · Site TE RFD <span class="mono">FS</span></td><td>Master</td><td>—</td><td></td></tr>
+        <tr><td class="mono">E2</td><td>الفك</td><td>Contractor / Vendor · Planned · Actual <span class="mono">FO:FQ · FT:FV</span></td><td>Master · PR-PO (CW Dismantle · TE Dismantle)</td><td class="mono">S-5 · 1 في Cold Swap</td><td></td></tr>
+        <tr><td class="mono">E3</td><td>الإرجاع</td><td>CW RN Date <span class="mono">FR</span> · TE RN Date <span class="mono">FW</span></td><td>WH (CW RN · TE RN)</td><td>حسب الخطة</td><td>TE RN لمعدات Swap القديمة</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">المدد الكلية للأعمال المدنية ثابتة لكل المواقع (قرار D40): E2E-B1 أدابشن فقط 11–23، و E2E-B2 مع برج RT 22–38، و E2E-B3 مع برج GF 38–62، من PR (أو PO / WO للتنفيذ الداخلي) حتى CW PAC. اعتمادية الشبكة: مواقع HUB و Terminal وحدها لها MW Far-end Site و Uplink Site؛ مواقع Core و MFN و FN تُكتب N/A ولا تُفحص عندها قاعدة On-Air للـ Uplink (قرار D31).</p>
+
+  <h3 style="margin-top:6px">قواعد التنبيه</h3>
+  <p class="muted">فتح الخطوة نفسه قفل. هذه القواعد تفحص قيم التواريخ داخل الخطوات المفتوحة، وما يُفتح بتجاوز أو يُرحَّل من الماستر، وهي تنبيهات لا تمنع الحفظ. أساسها فحوص Data Quality في الماستر (27 فحصاً)، ومنها:</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>القاعدة</th><th>فحص الماستر</th></tr></thead>
+      <tbody>
+        <tr><td class="c">0</td><td>تاريخ نهاية أي خطوة لا يسبق بدايتها (مدة SLA سالبة)</td><td class="mono">DQ10</td></tr>
+        <tr><td class="c">1</td><td>تاريخ فعلي مُدخل والـ Milestone غير متحقق (البوابة أو الشروط ناقصة)</td><td class="mono">DQ11</td></tr>
+        <tr><td class="c">2</td><td>Milestone متحقق وما قبله ناقص</td><td class="mono">DQ12</td></tr>
+        <tr><td class="c">3</td><td>Overall Status لا يطابق سلسلة الـ Milestones</td><td class="mono">DQ13</td></tr>
+        <tr><td class="c">4</td><td>موقع نشط (In Progress / On Hold) بلا Baseline معتمد، أو Baseline بلا Version أو Approval Date</td><td class="mono">DQ14 · DQ15</td></tr>
+        <tr><td class="c">5</td><td>PAC مؤرَّخ مع Snag رئيسي مفتوح أو غير مصنف</td><td class="mono">DQ22</td></tr>
+        <tr><td class="c">6</td><td>ضوابط Swap / Relocation ناقصة (MOP، النافذة المعتمدة، Pre-Swap KPI، تسليم القديم)</td><td class="mono">DQ23</td></tr>
+        <tr><td class="c">7</td><td>تعارض النطاق: سجل GECOL / HLC لموقع نطاقه N/A، أو Fiber Status = No Fiber أو Through MW Link مع HLC = Yes</td><td class="mono">DQ07</td></tr>
+        <tr><td class="c">8</td><td>Uplink / MW Far-end غير صالح (ناقص لـ HUB / Terminal، أو مُدخل لمواقع الفايبر، أو ربط ذاتي)</td><td class="mono">DQ04</td></tr>
+        <tr><td class="c">9</td><td>Cluster ID مفقود، أو أكثر من مصدر KPI في Cluster واحد</td><td class="mono">DQ09</td></tr>
+        <tr><td class="c">10</td><td>N/A بلا سبب أو بلا معتمِد (التصاريح، الجودة، الجاهزية)</td><td class="mono">DQ17</td></tr>
+        <tr><td class="c">11</td><td>التاريخ الفعلي لا يكون في المستقبل، وخطوة N/A لا يكون لها تاريخ</td><td>قاعدة المنظومة</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:6px">حالات الخطوة</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>البُعد</th><th>القيم</th></tr></thead>
+      <tbody>
+        <tr><td>التنفيذ</td><td>لم تبدأ · مقفلة رمادية حتى تتحقق بوابتها · Pending (جاء دورها) · Ongoing قيد التنفيذ · منجزة (التاريخ = انتهاء التنفيذ) · N/A خارج النطاق · معطّلة (من مشكلة مفتوحة)</td></tr>
+        <tr><td>الاعتماد</td><td>مسودة · بانتظار المراجعة · بانتظار الاعتماد · معتمد · مرفوض</td></tr>
+        <tr><td>المستند</td><td>معتمد · بانتظار الاعتماد · مرفوض · ناقص · صدر النموذج · لا يلزم</td></tr>
+        <tr><td>العلامات</td><td>فُتحت بتجاوز · خطوة سابقة بانتظار التأكيد · معلّقة على اعتماد سابقتها · صرف جزئي · تغيّر بسبب النطاق · مرحّل من الماستر · اعتماد ذاتي · عُدّل بعد التسليم</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">التاريخ المعتمد لاكتمال خطوة يجعل التالية Pending، ولا تتحول إلى Ongoing تلقائياً: مسؤول المرحلة يحوّلها بنفسه عند بدء العمل، بتاريخ البدء (افتراضياً اليوم، ولتركيب TE تاريخ TE MOS). Ongoing لا تُحتسب إنجازاً. وفي لوحة القيادة تُعرض الحالة بنمط الماستر: Scope ثم Done ثم Pending (جاء دوره) ثم Not Due (السابق لم يكتمل).</p>
+
+  <h3 style="margin-top:6px">فتح الخطوة والتجاوز وعضوية الـ Cluster</h3>
+  <div class="grid2">
+    <div class="card"><h3>فتح الخطوة التالية</h3><ul>
+      <li>تُفتح عند اعتماد تاريخ السابقة، والإدخال وحده لا يكفي</li>
+      <li>غياب المستند لا يمنع الاعتماد ولا الفتح، ويبقى تنبيه "بحاجة لرفع"</li>
+      <li>رفض المستند لاحقاً يعيد التاريخ "بانتظار التأكيد" ويُخرجه من المؤشرات حتى يُعتمد البديل، والخطوات التي فُتحت بعده لا تُقفل</li></ul></div>
+    <div class="card"><h3>الفتح بتجاوز</h3><ul>
+      <li>سبب إلزامي في سجل التدقيق، وعلامة "فُتحت بتجاوز" في المنظومة ولوحة القيادة</li>
+      <li>مدخلاتها تمر بالاعتماد العادي ولا تدخل المؤشرات قبله</li>
+      <li>خياران مطفآن افتراضياً: اعتماد ثانٍ للتجاوز، ومدة صلاحية له</li></ul></div>
+  </div>
+  <div class="card" style="margin-top:12px"><h3>الـ Cluster · المسار F</h3><ul>
+    <li>Cluster ID في RF &amp; Design، والماستر يقرؤه في EN. فحص جودة: Cluster ID مفقود (DQ09)</li>
+    <li>قاعدة الماستر: بوابة كل موقع تُفتح من TE PAC، و KPI Acceptance للموقع = تاريخ مصدر KPI الوحيد الصالح لـ Cluster، متى كان بعد بوابة الموقع. أكثر من مصدر في الـ Cluster نفسه = Multiple Sources ولا يتحقق القبول</li>
+    <li>الموقع الملغى يُستبعد من الـ Cluster. نقل موقع بين Clusters بعد القبول يمر بالاعتماد ويظهر بعلامة "تغيّرت عضوية الـ Cluster"</li></ul></div>
+
+  <h3 style="margin-top:6px">الإعادة والإيقاف والإلغاء وتغيير النطاق</h3>
+  <div class="grid2">
+    <div class="card"><h3>رفض الجهة وإعادة التقديم</h3><ul>
+      <li>ما يُقدَّم للجهة (Layout، DN، EIR، PAT…) يُسجَّل محاولات بتاريخها ونتيجتها وسبب الرفض، وإعادة التقديم لا تمسح السابقة</li>
+      <li>SLA الخطوة من أول تقديم، وعدد المحاولات يغذّي "الاعتماد من أول مرة"</li></ul></div>
+    <div class="card"><h3>الإيقاف المؤقت</h3><ul>
+      <li>صف Suspension ثم Resumption معتمدان في Change Control، والماستر يقرؤهما في كل البوابات و Overall Status = On Hold</li>
+      <li>عدّاد SLA يتوقف في بطاقة أداء المقاول فقط، ويستمر في مؤشرات المشروع</li></ul></div>
+    <div class="card"><h3>الإلغاء</h3><ul>
+      <li>صف Cancellation معتمد في Change Control = Overall Status Cancelled. حالة الاستحواذ Cancelled تُحسب منه</li>
+      <li>الموقع الملغى يخرج من نطاق التنفيذ والأوزان ويبقى في صفحات الفك، ويُفتح له الفك إن كان فيه عمل منفّذ أو معدات مركّبة</li>
+      <li>الإيجار يُنهى بـ Lease Termination Notice Date فتصبح حالة الاستحواذ Terminated، و Site Handback Date للتسليم</li></ul></div>
+    <div class="card"><h3>تغيير النطاق</h3><ul>
+      <li>تغيير أعلام النطاق (AA:AF) أو Delivery Scenario أو النقل: صف في Change Control (Scope Change أو Relocation) بقيمة قديمة وجديدة واعتماد</li>
+      <li>عند اعتماده يُعاد حساب N/A والأقفال والأوزان و SLA. خط الأساس المعتمد لا يتغير تلقائياً، وإعادة التخطيط صف Baseline Re-plan</li>
+      <li>التصحيح الإداري للبيانات صف Data Correction، والتواريخ والمستندات المعتمدة لا تُحذف</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">سير العمل الأفقي · يسري على كل الخطوات</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الدورة</th><th>التسلسل</th><th>التفاصيل</th></tr></thead>
+      <tbody>
+        <tr><td>التفعيل والتصعيد</td><td>اعتماد تاريخ خطوة ← التالية Pending (المتوقع = اكتمال السابقة + حد SLA الأعلى) ← إشعار ← Ongoing ← إشعار عند الأصفر وتصعيد عند الأحمر</td><td class="mono">13 · 14</td></tr>
+        <tr><td>الإدخال والاعتماد</td><td>يدوي، أو قالب Excel أو ملف الماستر (دفعة برقم) ← فحص ← مراجعة ← اعتماد، أو رفض بملاحظة</td><td class="mono">04</td></tr>
+        <tr><td>المستند</td><td>تاريخ "بانتظار التأكيد" ← (نموذج معبّأ ← توقيع وختم) ← رفع ← اعتماد، أو رفض يعيده</td><td class="mono">05</td></tr>
+        <tr><td>المشكلة</td><td>قضية الموقع (Pending Issue · Issue Owner · Issue Raised Date · Issue Status) ← معالجة ← Closed</td><td class="mono">09</td></tr>
+        <tr><td>الجودة</td><td>سجل QC / Snag / ITP / NCR ← نتيجة ← إغلاق أو إفراج، والسجل المعيق يمنع الاستلام</td><td class="mono">12</td></tr>
+        <tr><td>المخزن</td><td>DN معتمد ← حجز ← صرف حتى اكتمال احتياج الموقع ← TE MOS. التالف: TE RN ثم TE DN بديل</td><td class="mono">10</td></tr>
+        <tr><td>تعديل الإعدادات</td><td>تعديل وزن أو SLA أو قاعدة أو قالب ← اعتماد ← يسري رجعياً أو من تاريخ محدد</td><td class="mono">06</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+
+<section id="s4">
+  <h2><span class="n">04</span>إدخال البيانات والاعتماد</h2>
+  <p class="muted">طريقتان للإدخال تمران بدورة الاعتماد نفسها: يدوياً من صفحة الموقع أو البوابة، أو جماعياً بقالب Excel. القالب بهيكل الماستر نفسه، فملف الماستر المحدَّث يُرفع كما هو، ويبقى قناة دائمة بجانب الإدخال اليدوي.</p>
+  <div class="callout"><b>قالب Excel جاهز:</b> مدخل البيانات لا يصمم ملفاً ولا يطابق أعمدة. يحمّل القالب من صفحة الرفع، ويعبّئه وفق تخطيطه، ويعيد رفعه من المكان نفسه فيُقبل.</div>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  DL["Download template<br/>upload page"] --> FL["Fill<br/>template layout"] --> UP["Upload<br/>same page"] --> VA["Validate<br/>template · rules"] --> DU["Duplicate check<br/>new · changed · identical"] --> PV["Preview"] --> RV["Review"] --> AP{{"Approve"}}
+  VA -.-> RJ["Rejected rows<br/>sheet · row · column"]
+</pre>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>القالب</h3><ul>
+      <li>يُولَّد من الإعدادات لحظة التحميل، فيطابق دائماً الحقول الحالية</li>
+      <li>بهيكل الماستر وأوراقه وأقسامه، ويمكن تحميل جزء منه لإدخال محدد: مواقع جديدة (بيانات الموقع بهيكل ورقة RF &amp; Design)، تواريخ كل مسار (A إلى F)، الاستحواذ، التصاريح والدخول، الجيكول، الفايبر، المخزن</li>
+      <li>رؤوس أعمدة مقفلة، قوائم منسدلة للقيم المسموحة (المنطقة، المقاول، Yes / N/A…)، وتنسيق تاريخ موحّد</li>
+      <li>ورقة تعليمات: وصف كل عمود ومثال عليه</li>
+      <li>تتعرّف المنظومة على القالب ونسخته، وعلى ملف الماستر، من أسماء الأوراق ورؤوس الأعمدة مقابل قاموس البيانات. الأعمدة المحسوبة (الرمادية) لا تُقرأ</li>
+      <li>يمكن تحميله معبّأً بمواقع مختارة لتحديثها بدل كتابة معرّفاتها</li></ul></div>
+    <div class="card"><h3>عند الرفع</h3><ul>
+      <li>التعرّف على القالب ونسخته، ثم فحص بقواعد الإدخال اليدوي نفسها</li>
+      <li>الخانة التي تقع في خطوة مقفلة لا توقف بقية الصف: تُعلَّق داخل الدفعة بحالة "معلّقة على اعتماد سابقتها"، وتنتقل للمراجعة تلقائياً عند اعتماد تاريخ السابقة، في الدفعة نفسها أو لاحقاً. ما يبقى معلّقاً يظهر في تقرير الدفعة بسببه، ويمكن للمراجع رفضه بملاحظة</li>
+      <li>كل رفع دفعة برقم (Batch ID)، وحدود حجم الملف وعدد الصفوف تُضبط في الإعدادات</li>
+      <li>فحص شكلي قبل الإرسال: المواقع غير الموجودة، التواريخ غير الصالحة، القيم خارج القوائم المعتمدة. الصف المخالف يُستبعد ويُعرض بسببه ورقم صفّه وعموده، ولا يوقف السليم</li>
+      <li>كشف المكرر: "207 صفاً: 200 موجود (منها 12 بقيم مختلفة) و7 جديد". تختار: الجديد فقط، أو الجديد مع التغييرات، والخيار متاح دائماً. المطابق تماماً يُتجاهل دائماً</li>
+      <li>معاينة قبل الإرسال: المضاف، المتغيّر (القيمة قبل وبعد)، والمستبعد بسببه</li>
+      <li>تقرير الدفعة: المضاف، المتغيّر، المستبعد، والمعلّق على اعتماد سابقته، كلٌّ بسببه</li>
+      <li>التعارض والفروقات مع بيانات المنظومة تُعرض للمراجع بالقيمة قبل وبعد، ليختار ما يُعتمد</li>
+      <li>ما يدخل من ملف الماستر يُوسَم في سجل التدقيق "مرحّل من الماستر" مع اسم الملف وتاريخ الرفع ورقم الدفعة</li>
+      <li>الملف الأصلي يُحفظ في الأرشيف</li></ul></div>
+    <div class="card"><h3>قالب قديم أو ملف آخر</h3><ul>
+      <li>نسخة قديمة أعمدتها ما زالت قائمة: تُقبل، والأعمدة الأحدث تبقى فارغة مع تنبيه</li>
+      <li>نسخة فيها عمود حُذف أو تغيّر: تُرفض برسالة تحدد الورقة والعمود، وتطلب تحميل القالب الحالي</li>
+      <li>ملف ليس بهيكل الماستر أو القالب: لا يُقبل من صفحة الرفع. الترحيل الأول مسار منفصل (القسم 17)</li></ul></div>
+    <div class="card"><h3>دورة الاعتماد</h3><ul>
+      <li>الرفض يعود بملاحظة إلى مدخل البيانات</li>
+      <li>الاعتماد للدفعة كاملة، أو صفاً صفاً، أو خانة خانة</li>
+      <li>المراجع والمعتمِد يعدّلان ويحذفان إن مُنحا الصلاحية، ويُسجَّل تعديلهما</li>
+      <li>تعديل قيمة معتمدة يفتح دورة جديدة، والقيمة السابقة سارية حتى الاعتماد</li></ul></div>
+    <div class="card"><h3>التراجع عن دفعة معتمدة</h3><ul>
+      <li>تُعاد القيم إلى ما كانت عليه قبل الدفعة، بصلاحية تُحدَّد في إعدادات الأدوار والمسؤوليات</li>
+      <li>القيمة التي عُدّلت بعد الدفعة لا تُعاد تلقائياً، بل تُعرض للقرار</li>
+      <li>التراجع يُسجَّل في سجل التدقيق برقم الدفعة</li></ul></div>
+    <div class="card"><h3>صندوق "بانتظار اعتمادي"</h3><ul>
+      <li>تبويب داخل "مهامي" يجمع كل ما ينتظر المستخدم: خانات الشبكة، المستندات والنماذج، أنشطة QC، دفعات Excel، تغييرات النطاق والإعدادات، تحويلات Ongoing</li>
+      <li>لكل بند: النوع، الموقع، الخطوة، القيمة قبل وبعد، المدخل، العمر. فلترة بالنوع، واعتماد أو رفض فردي وجماعي</li>
+      <li>تأخر الاعتماد: تذكير للمراجع بعد يومي عمل، وتصعيد لمسؤول المسار بعد أربعة (قابلان للتعديل)</li></ul></div>
+  </div>
+  <p class="cap">القبول مضمون ما دام تخطيط القالب لم يُغيَّر. إعادة ترتيب الأعمدة أو تغيير أسمائها أو دمج خلاياها يُرفض برسالة واضحة، لا بخطأ صامت.</p>
+</section>
+
+<section id="s5">
+  <h2><span class="n">05</span>التوثيق والأرشيف</h2>
+  <p class="muted">مستند كل خطوة محدد في جدول مواصفات الخطوات (القسم 03). بجانب كل تاريخ خانة تعرض حالة مستنده (حالات المستند في القسم 03)، مع العرض والتحميل والنسخة.</p>
+  <div class="mock" aria-label="نموذج لخانة المستند بجانب التاريخ">
+    <div class="mock-scroll"><div class="rows">
+      <div class="row h"><span>التاريخ · المستند</span><span>المخطط</span><span>الفعلي</span><span>SLA</span><span>المستند</span></div>
+      <div class="row"><span>CW PAC Actual · CW PAC</span><span class="d">2024-04-14</span><span class="d">2024-04-16</span><span class="pill ok">1–3 ضمن</span>
+        <span class="docs"><span class="btn"><svg><use href="#i-eye"/></svg>عرض</span><span class="btn"><svg><use href="#i-dl"/></svg>تحميل</span><span class="ver">v2</span></span></div>
+      <div class="row"><span>HLC Request · HLC Request Email</span><span class="d">2024-02-01</span><span class="d">2024-02-05 <span class="pill n" style="font-family:var(--f-body)">بانتظار التأكيد</span></span><span class="pill ok">ضمن</span>
+        <span class="docs"><span class="btn"><svg><use href="#i-eye"/></svg>عرض</span><span class="pill w">بانتظار الاعتماد</span></span></div>
+      <div class="row"><span>PO Date · PO / WO Email</span><span class="d">2024-01-20</span><span class="d">2024-01-22 <span class="pill n" style="font-family:var(--f-body)">بانتظار التأكيد</span></span><span class="pill ok">ضمن</span>
+        <span class="docs"><span class="btn miss"><svg><use href="#i-up"/></svg>مستند ناقص · رفع</span></span></div>
+      <div class="row"><span>Layout Approval · Approval Email</span><span class="d">2024-02-10</span><span class="d">2024-02-12 <span class="pill n" style="font-family:var(--f-body)">بانتظار التأكيد</span></span><span class="pill ok">ضمن</span>
+        <span class="docs"><span class="pill x">مرفوض · إعادة رفع</span></span></div>
+      <div class="row"><span>CW FAC Actual · CW FAC</span><span class="d">2024-07-15</span><span class="d">—</span><span class="pill w">Pending</span>
+        <span class="docs"><span class="btn"><svg><use href="#i-dl"/></svg>النموذج معبّأ</span><span class="pill w">صدر · بانتظار التوقيع</span></span></div>
+      <div class="row"><span>Site RFI</span><span class="d">2024-04-17</span><span class="d">2024-04-17</span><span class="pill ok">1 ضمن</span>
+        <span class="docs"><span class="pill n">بلا مستند</span></span></div>
+    </div></div>
+  </div>
+  <p class="cap">نموذج توضيحي. التواريخ أمثلة.</p>
+
+
+  <div class="grid2">
+    <div class="card"><h3>قواعد المستندات</h3><ul>
+      <li>المستند مطلوب متى أُدخل تاريخ خطوته. الخطوة بلا مستند في الجدول يمكن إضافة مستند لها من الإعدادات</li>
+      <li>PO / WO و Layout / TSSR: خانة واحدة لكل منهما، يختلف الاسم حسب الحالة</li>
+      <li>MOS Proof: قائمة فحص بصور بإحداثيات المواد في الموقع. الصورة بلا إحداثيات يقرر المراجع قبولها</li>
+      <li>Snags Closure: عند وجود ملاحظات، صورة بريد أو رابطه يثبت إقفالها</li>
+      <li>TE PAC: توقيع إلكتروني من فريق المشروع</li>
+      <li>الصيغ: PDF والصور. أقصى حجم مبدئياً <bdi dir="ltr">5 MB</bdi> للملف، ويُعدَّل من الإعدادات. صور QC تُضغط عند الرفع</li>
+      <li>السرية: صلاحية كل نوع مستند تُحدَّد بالاتفاق مع مدير المشروع ووفق سياسات إدارة التخطيط والتحول الرقمي، وتُطبَّق من مصفوفة الأدوار (القسم 14)</li></ul></div>
+    <div class="card"><h3>المستندات والأرشيف</h3><ul>
+      <li>اسمان لكل ملف: اسم تخزين داخلي ثابت عشوائي لا يحمل معنى ولا يتغير أبداً، واسم عرض وتنزيل منظّم يُحفظ في قاعدة البيانات ويُولَّد عند التنزيل، مثل <span class="mono">MI001_CW-PAC_2024-04-16_v2.pdf</span></li>
+      <li>النسخ محفوظة مع من رفعها ومتى، والاسم الأصلي للملف المرفوع يبقى في بياناته</li>
+      <li>عرض PDF والصور داخل المتصفح</li>
+      <li>تقرير النواقص: تاريخ أو حالة بلا مستند معتمد</li>
+      <li>كشف الصور المكررة، والتحقق من إحداثيات الصورة مقابل الموقع</li></ul></div>
+    <div class="card"><h3>ملف الموقع الكامل · Site Dossier</h3><ul>
+      <li>بضغطة من صفحة الموقع أو الشبكة (فردي أو جماعي): PDF مجمّع بفهرس، و ZIP بالملفات الأصلية</li>
+      <li>يضم كل المعتمد: بيانات الموقع، الخطوات وتواريخها، المستندات والنماذج الموقّعة، As-Built، صور QC، الأرقام التسلسلية المركّبة، السجل</li>
+      <li>يُجمَّع تلقائياً مرتّباً حسب المسار والخطوة، مع صفحة ملخّص ببيانات الموقع وتواريخه، ويُنزَّل حزمة واحدة بالتسمية المنظّمة</li>
+      <li>لقطات مجمّدة تُحفظ تلقائياً عند اعتماد <b>CW FAC</b> (المساران B و C) و <b>HOTO</b> (المسار D)، وفي الموقع بلا نطاق أعمال مدنية الذي يحتاج جيكول أو فايبر لقطة مستقلة للمسار C عند اعتماد <b>RFI</b>، وعند اعتماد <b>النقل (Relocation)</b> لقطة للموقع كله قبل إعادة المرور بالخطوات. كل لقطة: نسخة ثابتة من البيانات وقائمة المستندات بإصداراتها، بالتاريخ والوقت</li>
+      <li>تاريخ اعتماد ملف الموقع عند HOTO هو HOTO Package Date في الماستر (EW، من Readiness &amp; Handover)</li>
+      <li>التعديل بعد اللقطة مسموح عبر المراجعة والاعتماد، واللقطة لا تتغيّر. تظهر على الموقع علامة "عُدّل بعد التسليم" مع الفرق بين اللقطة والحالية</li>
+      <li>التنزيل للحالة الحالية أو لأي لقطة محفوظة</li></ul></div>
+  </div>
+  <h3 style="margin-top:6px">النماذج المعبّأة تلقائياً</h3>
+  <div class="callout gate"><b>شرط التفعيل:</b> تُرفع النماذج الرسمية الحالية أولاً لتكون القوالب الأساسية. بدونها لا تُصدر المنظومة أي نموذج.</div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>المكان</th><th>ما يظهر فيه</th></tr></thead>
+      <tbody>
+        <tr><td>خانة المستند عند الخطوة</td><td>زر "النموذج معبّأ" بجانب خانة الرفع نفسها: CW PAC، CW FAC، قائمة الملاحظات Snags، TE PAC، HOTO</td></tr>
+        <tr><td>كميات CW (As-Built)</td><td>نموذج CW PAC يتضمن جدول كميات الأعمال المدنية للموقع، تُدخل في شاشة ما قبل الإصدار وتُعتمد مع النموذج</td></tr>
+        <tr><td>المخزن (القسم 10)</td><td>TE DN من احتياج الموقع المحسوب من التصميم والأرقام التسلسلية المختارة، و TE RN من المعدات المرتجعة وحالتها · CW DN لصرف مواد CW لموقع مستلم مع أمر العمل PO / WO، و CW RN لمواد CW المرتجعة بحالتها وسببها، ولمواد الفك بسبب Dismantle مع أمري العمل (الشراء والفك)</td></tr>
+        <tr><td>الأرشفة والمستندات</td><td>إصدار نموذج واحد لعدة مواقع دفعة واحدة في ملف مضغوط</td></tr>
+        <tr><td>الإعدادات</td><td>إدارة القوالب ونسخها</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>دورة النموذج</h3><ul>
+      <li>يظهر الزر عندما تُفتح الخطوة (Pending)، ولا يظهر في خطوة مقفلة</li>
+      <li>شاشة قبل الإصدار: حقول البيانات (الموقع، التواريخ، المقاول) كما هي في المنظومة ولا تُعدَّل إلا بالإدخال العادي، والحقول الحرة (الملاحظات، الموقّعون، التعليقات) تُعدَّل هنا</li>
+      <li>الإصدار بصيغتي Word و PDF، برقم مرجعي و QR، مثل <span class="mono">GSDN-CW PAC-MI001-01</span></li>
+      <li>طباعة وتوقيع وختم، ثم رفع في الخانة نفسها. الـ QR يطابق الموقع والنموذج، والرفع على موقع آخر يظهر تنبيهاً</li>
+      <li>ثم المراجعة والاعتماد كأي مستند. النموذج الصادر غير المرفوع يظهر في تقرير النواقص</li></ul></div>
+    <div class="card"><h3>القوالب</h3><ul>
+      <li>النموذج الرسمي بصيغة Word، بشكله وشعاره، تُوضع فيه أسماء الحقول مثل <span class="mono">{{site_id}}</span> و <span class="mono">{{pac_date}}</span></li>
+      <li>الجداول المتغيرة الطول (بنود DN، الملاحظات) تتكرر صفوفها تلقائياً</li>
+      <li>تعديل شكل القالب أو حقوله يمر بالمراجعة والاعتماد، ويسري من تاريخ اعتماده</li>
+      <li>كل قالب بنسخ، وكل نموذج صادر يُحفظ بالنسخة التي صدر بها</li></ul></div>
+    <div class="card"><h3>الحدود</h3><ul>
+      <li>ما يُعدَّل في ملف Word بعد تحميله لا تراه المنظومة. المحتسب هو المعتمد فيها، والمراجع يلاحظ أي اختلاف</li>
+      <li>صحة الختم والتوقيع على النسخة الممسوحة مسؤولية المراجع</li></ul></div>
+  </div>
+</section>
+
+<section id="s6">
+  <h2><span class="n">06</span>الأوزان و SLA والمؤشرات</h2>
+  <p class="muted">الأوزان على خمسة مستويات، وحدود SLA، وعوامل مؤشر صحة المشروع، كلها تُعدَّل وتُضاف من الإعدادات. القاعدة في كل المستويات واحدة: <b>ما هو خارج النطاق يُستبعد ويُعاد توزيع وزنه</b> على الباقي، فلا تحتاج أي حالة خاصة إلى تعريف مسبق.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>المستوى</th><th>ما يُوزن</th><th>يُستبعد تلقائياً</th><th>الناتج</th></tr></thead>
+      <tbody>
+        <tr><td>1 · المكوّن</td><td>مكوّنات كل مرحلة: أدابشن (BD–BJ)، البرج (BA–BC)، تركيب TE (CK–CO)</td><td>المكوّن N/A في الماستر</td><td>نسبة إنجاز المرحلة في الموقع</td></tr>
+        <tr><td>2 · المرحلة</td><td>مراحل الموقع: الاستحواذ، الأعمال المدنية، الجيكول، الفايبر، TE، الاستلام والتسليم</td><td>الجيكول أو الفايبر حيث Required = N/A</td><td>نسبة إنجاز الموقع</td></tr>
+        <tr><td>3 · الموقع</td><td>وزن كل موقع في المشروع: متساوٍ افتراضياً، ويمكن إضافة عوامل (نوع الموقع HUB / FN / Terminal، برج جديد، داخلي أو خارجي)</td><td>المواقع الملغاة وخارج النطاق</td><td>إنجاز المواقع مجتمعة، وحسب المنطقة والمقاول</td></tr>
+        <tr><td>4 · صحة المشروع</td><td>عوامل تُضاف وتُوزن: الإنجاز، الالتزام بخط الأساس، الالتزام بـ SLA، اكتمال التوثيق، الاعتماد من أول مرة، المشاكل الحرجة المفتوحة</td><td>العامل الذي لا بيانات له بعد</td><td>مؤشر صحة المشروع من 100</td></tr>
+        <tr><td>5 · إنجاز المشروع الكامل</td><td>8 أنشطة على مستوى العقد مجموع أوزانها 100، وتحتها 45 بنداً مجموع أوزانها في كل نشاط 100 (ورقة Project Status في الماستر)</td><td>البند بلا وحدات منطبقة، والمواقع الملغاة</td><td>نسبة الإنجاز الإجمالية = مجموع (وزن النشاط × نسبة إنجازه)، ومعها المخطط و SPI</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:6px">المستوى 5: إنجاز المشروع · ورقة Project Status</h3>
+  <p class="muted">الهيكل المعتمد في ورقة Project Status بالماستر الجديد (قرار D65): 8 أنشطة و45 بنداً، وأوزانها بالجهد لا بالقيمة المالية، وفق ممارسة AACE / PMI للتقدّم الفيزيائي. نطاق القياس ينتهي عند HOTO، فـ FAC و Final Closure غير مقاسين. البند بوزن 0 يُستبعد ويظهر "Not weighted". في المنظومة تُحسب البنود نفسها من البيانات المعتمدة، وتُدار الأوزان من الإعدادات.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>النشاط</th><th class="c">الوزن</th><th class="c">البنود</th><th>المصدر (رموز الخطوات من القسم 03)</th></tr></thead>
+      <tbody>
+        <tr><td class="c">1</td><td class="mono" style="font-family:var(--f-body)">Survey &amp; Engineering</td><td class="c">12</td><td class="c">5</td><td>A2 · B7 · A4 لكل موقع · يدوي: HLD ونماذج المستندات</td></tr>
+        <tr><td class="c">2</td><td class="mono" style="font-family:var(--f-body)">Site Acquisition &amp; Permits</td><td class="c">8</td><td class="c">3</td><td>Selection Date · A3 · B3</td></tr>
+        <tr><td class="c">3</td><td class="mono" style="font-family:var(--f-body)">Procurement &amp; Supply</td><td class="c">5</td><td class="c">10</td><td>B2 · استلامات WH مقابل Contract Qty · يدوي: NMS و Billing</td></tr>
+        <tr><td class="c">4</td><td class="mono" style="font-family:var(--f-body)">Civil Work &amp; Site Readiness</td><td class="c">25</td><td class="c">8</td><td>بنود B10 و B11 · C2 · C4 · MS4 · B13</td></tr>
+        <tr><td class="c">5</td><td class="mono" style="font-family:var(--f-body)">TE Installation</td><td class="c">20</td><td class="c">4</td><td>D4 · D5 · بنود D6 · D12</td></tr>
+        <tr><td class="c">6</td><td class="mono" style="font-family:var(--f-body)">Integration &amp; On-Air</td><td class="c">12</td><td class="c">6</td><td>D7 · D8 · D9 · MS6 · يدوي: Pilot و NMS integration</td></tr>
+        <tr><td class="c">7</td><td class="mono" style="font-family:var(--f-body)">Testing &amp; Acceptance</td><td class="c">13</td><td class="c">7</td><td>بنود D13 و D14 · D11 · D15 · MS7 · MS8 · يدوي: NMS acceptance</td></tr>
+        <tr><td class="c">8</td><td class="mono" style="font-family:var(--f-body)">Training &amp; Handover</td><td class="c">5</td><td class="c">2</td><td>يدوي: تدريب المورّدين · MS9 HOTO</td></tr>
+        <tr><td></td><td><b>الإجمالي</b></td><td class="c"><b>100</b></td><td class="c"><b>45</b></td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <details class="fold"><summary>البنود الـ45 ومصدرها في الماستر ووزنها داخل نشاطها</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الكود</th><th>البند</th><th>الطريقة</th><th>المصدر في الماستر · أساس الخطة</th><th class="c">الوزن</th></tr></thead>
+      <tbody>
+<tr><td class="mono"><b>1</b></td><td colspan="4"><b>Survey &amp; Engineering</b> · وزن النشاط 12</td></tr>
+<tr><td class="mono">1.1</td><td>TSSR approved</td><td>وحدات منجزة</td><td>RF &amp; Design · TSSR Approved Date</td><td class="c">30</td></tr>
+<tr><td class="mono">1.2</td><td>Layout / STA / ST report approved</td><td>وحدات منجزة</td><td>Master AS · خطة: Baseline AV</td><td class="c">25</td></tr>
+<tr><td class="mono">1.3</td><td>HLD</td><td>0/100 لكل وحدة</td><td>Deliverables Log · HLD</td><td class="c">15</td></tr>
+<tr><td class="mono">1.4</td><td>LLD (لكل موقع)</td><td>وحدات منجزة</td><td>RF &amp; Design · LLD Approved Date · خطة: Master U</td><td class="c">20</td></tr>
+<tr><td class="mono">1.5</td><td>Technical document templates</td><td>0/100 لكل وحدة</td><td>Deliverables Log · DOC</td><td class="c">10</td></tr>
+<tr><td class="mono"><b>2</b></td><td colspan="4"><b>Site Acquisition &amp; Permits</b> · وزن النشاط 8</td></tr>
+<tr><td class="mono">2.1</td><td>Candidate selected</td><td>وحدات منجزة</td><td>Acquisition · Selection Date · خطة: Master U</td><td class="c">30</td></tr>
+<tr><td class="mono">2.2</td><td>Site acquired</td><td>وحدات منجزة</td><td>Master T · خطة: Master U</td><td class="c">50</td></tr>
+<tr><td class="mono">2.3</td><td>CW access permission</td><td>وحدات منجزة</td><td>Permits &amp; HSE · Access - CW (Master AL) · خطة: Baseline AV</td><td class="c">20</td></tr>
+<tr><td class="mono"><b>3</b></td><td colspan="4"><b>Procurement &amp; Supply</b> · وزن النشاط 5</td></tr>
+<tr><td class="mono">3.1</td><td>CW PO / WO issued</td><td>وحدات منجزة</td><td>Master AI · خطة: Baseline AV</td><td class="c">15</td></tr>
+<tr><td class="mono">3.2</td><td>BTS</td><td>المستلم ÷ Contract Qty</td><td>WH · Progress Item Code BTS</td><td class="c">14.45</td></tr>
+<tr><td class="mono">3.3</td><td>PtP</td><td>المستلم ÷ Contract Qty</td><td>WH · PTP</td><td class="c">14.45</td></tr>
+<tr><td class="mono">3.4</td><td>CPE</td><td>المستلم ÷ Contract Qty</td><td>WH · CPE</td><td class="c">8.5</td></tr>
+<tr><td class="mono">3.5</td><td>Battery</td><td>المستلم ÷ Contract Qty</td><td>WH · BATTERY</td><td class="c">17</td></tr>
+<tr><td class="mono">3.6</td><td>Cabinet</td><td>المستلم ÷ Contract Qty</td><td>WH · CABINET</td><td class="c">17</td></tr>
+<tr><td class="mono">3.7</td><td>Router</td><td>المستلم ÷ Contract Qty</td><td>WH · ROUTER</td><td class="c">8.5</td></tr>
+<tr><td class="mono">3.8</td><td>NMS</td><td>0/100 لكل وحدة</td><td>Deliverables Log · NMS-S</td><td class="c">3.4</td></tr>
+<tr><td class="mono">3.9</td><td>Core server</td><td>المستلم ÷ Contract Qty</td><td>WH · CORE-SERVER</td><td class="c">1.7</td></tr>
+<tr><td class="mono">3.10</td><td>Billing system</td><td>0/100 لكل وحدة</td><td>Deliverables Log · BILL · وزن 0 = Not weighted</td><td class="c">0</td></tr>
+<tr><td class="mono"><b>4</b></td><td colspan="4"><b>Civil Work &amp; Site Readiness</b> · وزن النشاط 25</td></tr>
+<tr><td class="mono">4.1</td><td>Site adaption items</td><td>وحدة لكل بند</td><td>Master BD BE BF BG BJ = Done · خطة: Baseline BO</td><td class="c">35</td></tr>
+<tr><td class="mono">4.2</td><td>Tower erection items</td><td>وحدة لكل بند</td><td>Master BA BB BC = Done · خطة: Baseline BO</td><td class="c">10</td></tr>
+<tr><td class="mono">4.3</td><td>Power · internal AC / DC</td><td>وحدات منجزة</td><td>Master BI = Done</td><td class="c">8</td></tr>
+<tr><td class="mono">4.4</td><td>Power · GECOL Power-On</td><td>وحدات منجزة</td><td>Master BW = Done · خطة: BY</td><td class="c">12</td></tr>
+<tr><td class="mono">4.5</td><td>Fiber · site optical fiber</td><td>وحدات منجزة</td><td>Master BH = Done</td><td class="c">6</td></tr>
+<tr><td class="mono">4.6</td><td>Fiber · HLC link installed</td><td>وحدات منجزة</td><td>Master BX = Done · خطة: BY</td><td class="c">9</td></tr>
+<tr><td class="mono">4.7</td><td>Site RFI</td><td>وحدات منجزة</td><td>Master BZ · خطة: BY</td><td class="c">15</td></tr>
+<tr><td class="mono">4.8</td><td>CW PAC</td><td>وحدات منجزة</td><td>Master BV · خطة: BY</td><td class="c">5</td></tr>
+<tr><td class="mono"><b>5</b></td><td colspan="4"><b>TE Installation</b> · وزن النشاط 20</td></tr>
+<tr><td class="mono">5.1</td><td>TE DN approved</td><td>وحدات منجزة</td><td>Master CH · خطة: CT</td><td class="c">5</td></tr>
+<tr><td class="mono">5.2</td><td>TE material on site (MOS)</td><td>وحدات منجزة</td><td>Master CJ · خطة: CT</td><td class="c">15</td></tr>
+<tr><td class="mono">5.3</td><td>TE installation items</td><td>وحدة لكل بند</td><td>Master CK–CO = Done · خطة: CT</td><td class="c">70</td></tr>
+<tr><td class="mono">5.4</td><td>HW installation document (HWID)</td><td>وحدات منجزة</td><td>Master DT · خطة: EK</td><td class="c">10</td></tr>
+<tr><td class="mono"><b>6</b></td><td colspan="4"><b>Integration &amp; On-Air</b> · وزن النشاط 12</td></tr>
+<tr><td class="mono">6.1</td><td>Pilot sites</td><td>0/100 لكل وحدة</td><td>Deliverables Log · PILOT</td><td class="c">10</td></tr>
+<tr><td class="mono">6.2</td><td>Commissioning</td><td>وحدات منجزة</td><td>Master CW · خطة: DO</td><td class="c">20</td></tr>
+<tr><td class="mono">6.3</td><td>MW alignment</td><td>وحدات منجزة</td><td>Master CX · خطة: DO</td><td class="c">10</td></tr>
+<tr><td class="mono">6.4</td><td>Integration</td><td>وحدات منجزة</td><td>Master DA · خطة: DO</td><td class="c">15</td></tr>
+<tr><td class="mono">6.5</td><td>On-Air</td><td>وحدات منجزة</td><td>Master DP · خطة: DO</td><td class="c">35</td></tr>
+<tr><td class="mono">6.6</td><td>NMS integration</td><td>0/100 لكل وحدة</td><td>Deliverables Log · NMS-I</td><td class="c">10</td></tr>
+<tr><td class="mono"><b>7</b></td><td colspan="4"><b>Testing &amp; Acceptance</b> · وزن النشاط 13</td></tr>
+<tr><td class="mono">7.1</td><td>Site standalone test (EIR) per system</td><td>وحدة لكل نظام</td><td>Master DU–DX = Done · خطة: EK</td><td class="c">20</td></tr>
+<tr><td class="mono">7.2</td><td>Network test (PAT) per system</td><td>وحدة لكل نظام</td><td>Master DZ–EC = Done · خطة: EK</td><td class="c">20</td></tr>
+<tr><td class="mono">7.3</td><td>SSV</td><td>وحدات منجزة</td><td>Master DS = Pass · خطة: EK</td><td class="c">10</td></tr>
+<tr><td class="mono">7.4</td><td>As-Built</td><td>وحدات منجزة</td><td>Master EF · خطة: EK</td><td class="c">10</td></tr>
+<tr><td class="mono">7.5</td><td>TE PAC</td><td>وحدات منجزة</td><td>Master EL · خطة: EK</td><td class="c">20</td></tr>
+<tr><td class="mono">7.6</td><td>KPI Acceptance</td><td>وحدات منجزة</td><td>Master ES · خطة: ER</td><td class="c">10</td></tr>
+<tr><td class="mono">7.7</td><td>NMS acceptance</td><td>0/100 لكل وحدة</td><td>Deliverables Log · NMS-A</td><td class="c">10</td></tr>
+<tr><td class="mono"><b>8</b></td><td colspan="4"><b>Training &amp; Handover</b> · وزن النشاط 5</td></tr>
+<tr><td class="mono">8.1</td><td>Vendor training</td><td>0/100 لكل وحدة</td><td>Deliverables Log · TRN</td><td class="c">50</td></tr>
+<tr><td class="mono">8.2</td><td>O&amp;M Handover (HOTO)</td><td>وحدات منجزة</td><td>Master EY · خطة: EX</td><td class="c">50</td></tr>
+      </tbody>
+    </table>
+  </div></details>
+
+  <div class="grid2">
+    <div class="card"><h3>قواعد الاحتساب</h3><ul>
+      <li><b>وحدات منجزة:</b> المنجز المعتمد ÷ المنطبق، بحد أقصى 100%. المنطبق هو المواقع النشطة ضمن نطاق البند: نطاق CW (برج أو أدابشن)، الأدابشن، البرج، الجيكول، الفايبر، RFI ليس N/A، أو مواقع MW (Site Type ليس FN / MFN / Core)</li>
+      <li><b>بنود مجمّعة:</b> كل مكوّن ليس N/A وحدة منطبقة، وتُنجَز بحالة Done. والخانة الفارغة تُحتسب منطبقة</li>
+      <li><b>0/100 لكل وحدة:</b> البنود المركزية تُسجَّل وحداتٍ (الكود، الوحدة، Site ID للـ Pilot و NMS integration، تاريخ الخطة، تاريخ الإنجاز)، والوحدة منجزة بتاريخ إنجازها مع مستند يثبتها. لا تُدخل نسبة يدوية</li>
+      <li><b>التوريد:</b> المستلم في WH (PL و OPEN و ADJ) ÷ Contract Qty للصنف، بحسب Progress Item Code (القسم 10)</li>
+      <li>لا اعتماد إلا بدليل: تاريخ، أو Done للمكوّنات</li>
+      <li>المواقع النشطة = Overall Status ليس Cancelled. المقام هو المواقع النشطة في الماستر لا نطاق PH1 (425)، والفرق مواقع بديلة أو إضافية، ويظهر مع العقد الكلي (825) في بطاقة النطاق</li>
+      <li>الكهرباء إما توصيل داخلي AC/DC (BI) أو GECOL Power-On (BW)، والفايبر إما داخلي (BH) أو رابط HLC (BX)، وكل منها بند مستقل بوزنه</li>
+      <li><b>وزن 0:</b> البند يُستبعد من الحساب والاكتمال ويظهر "Not weighted" (مثل Billing)</li>
+      <li>البند بلا وحدات منطبقة يُستبعد ويُعاد توزيع وزنه داخل نشاطه، والنشاط بلا بنود منطبقة يُعاد توزيع وزنه على بقية الأنشطة</li></ul></div>
+    <div class="card"><h3>المخطط و SPI ومنحنى S</h3><ul>
+      <li><b>المخطط:</b> الأوزان نفسها على تواريخ الخطة: خط الأساس المعتمد للخطوة المقابلة (القسم 08؛ في الماستر أعمدة Baseline من النسخة الحالية، و Site Release المخطط U)، و Planned Delivery Date في WH، وتاريخ خطة كل وحدة يدوية</li>
+      <li>البند يأخذ نسبة مخططة فقط إذا كان لكل وحداته المنطبقة تاريخ خطة، وإلا فهو "غير متوفّر". المخطط الكلي و SPI يُعرضان فقط عند اكتمال كل البنود الموزونة</li>
+      <li><b>SPI</b> = الفعلي ÷ المخطط. <b>تغطية الخطة</b> = نسبة الوزن التي اكتملت تواريخ خطتها</li>
+      <li><b>منحنى S شهري</b> (في المنظومة فقط، ورقة Project Status بلا منحنى S): الفعلي في نهاية كل شهر من تواريخ الإنجاز. البنود المجمّعة تُحتسب بتاريخ انتهاء مرحلتها: Adaption Actual End و EIR Date و PAT Date. ومن شهر التقرير يُحتسب بالحالة الحالية. والمخطط من تواريخ الخطة</li>
+      <li><b>عند فلترة المواقع</b> (منطقة، مقاول، نوع…): يُعرض إنجاز المواقع وحده، فتُستبعد البنود المركزية (1.3، 1.5، 3.2–3.10، 6.1، 6.6، 7.7، 8.1) ويُعاد توزيع الأوزان. ويُحتسب Pilot و NMS integration بحسب Site ID في سجلهما</li>
+      <li><b>عند فلترة الفترة:</b> الإنجاز المكتسب = الإنجاز في نهاية الفترة − الإنجاز في بدايتها</li></ul></div>
+  </div>
+  <p class="cap">مؤشر الصحة منفصل عن الإنجاز عمداً: خلط الجودة والتوثيق مع الإنجاز يجعل الموقع المنفَّذ بلا مستندات يبدو غير منجز، ويخفي المشكلتين معاً.</p>
+
+  <h3 style="margin-top:6px">السيناريو يتكوّن تلقائياً لكل موقع</h3>
+  <div class="grid2">
+    <div class="card"><h3>الأعمال المدنية</h3><ul>
+      <li>جدولان أساسيان، خارجي وداخلي، من Site Scenario (Outdoor / Indoor في RF &amp; Design، العمود K في الماستر)</li>
+      <li>البرج يدخل حيث Tower Erection = Yes (العمود AA في الماستر)</li></ul></div>
+    <div class="card"><h3>TE</h3><ul>
+      <li>جدول أساسي واحد: MTS Cabinet، Indoor IP Router، RF Antenna، MW Antenna، DC / OF Cable</li>
+      <li>"راوتر داخلي فقط" (IP Router Only) ينتج وحده: الباقي N/A، فيأخذ الراوتر 100%</li></ul></div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>مثال: تركيبات TE</th><th class="c">مواقع</th><th>الأوزان بعد إعادة التوزيع</th></tr></thead>
+      <tbody>
+        <tr><td>Cabinet · RF · Cable</td><td class="c">84</td><td>Cabinet 38% · RF 38% · Cable 24%</td></tr>
+        <tr><td>Cabinet · RF · MW · Cable</td><td class="c">77</td><td>Cabinet 31% · RF 31% · MW 19% · Cable 19%</td></tr>
+        <tr><td>Router · RF · Cable (داخلي)</td><td class="c">50</td><td>Router 33% · RF 42% · Cable 25%</td></tr>
+        <tr><td>Router فقط</td><td class="c">2</td><td>Router 100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">مثال بأوزان افتراضية (Cabinet 25، Router 20، RF 25، MW 15، Cable 15) لشرح الطريقة، وأعداد المواقع من بيانات الإصدار السابق للتوضيح فقط. مسؤول المرحلة يستطيع تغيير سيناريو موقع بعينه عبر سلسلة الاعتماد، والموقع بلا Site Scenario يظهر في تقرير جودة البيانات.</p>
+
+  <h3 style="margin-top:6px">SLA · أيام عمل</h3>
+  <p class="muted">حد كل خطوة في جدول مواصفات الخطوات (القسم 03). الجمعة والسبت والعطل الرسمية لا تُحسب. أخضر ≤ الحد الأدنى، أصفر ≤ الأعلى، أحمر فوقه.</p>
+  <div class="grid2">
+    <div class="card"><h3>المدد الكلية · PR → CW PAC</h3><ul>
+      <li>تُحسب تلقائياً من مجموع الخطوات حسب النطاق ونوع البرج</li>
+      <li>أدابشن فقط: 11–23</li>
+      <li>برج RT: 22–38 · برج GF: 38–62</li>
+      <li>TE: الهدفان الكليان 8–12 لـ TE MOS → On-Air (E2E-D1) و 30–51 لـ TE Access → HOTO (E2E-D2)، كما في ورقة SLA بالماستر، هما المرجع المعتمد. SSV بالتوازي فلا يدخل المجموع</li>
+      <li>هدف إداري أو تعاقدي للمدة الكلية، إن وُجد، يُحفظ معاملاً منفصلاً ولا يُحسب عليه تجاوز SLA</li>
+      <li>ورقة SLA في الماستر (44 خطوة) هي المصدر الوحيد للمدد: الحدان في الصفين 6 و7 فوق كل خطوة، برموز A-1 و A-3 و B-2 … B-15 و C-2 و C-4 و RFI و D-1 … D-17 و E2E و S-1 … S-5، فتنتقل إلى الإعدادات كما هي. D-17 تبدأ من KPI Acceptance، و D-5 من TE Dispatch Complete Date، و D-8 تقرأ Configuration من As-Built</li>
+      <li>روابط التخطيط بلا خطوة SLA في Baseline (قرار D39): B01 Site Release ← CW PR / WO 0–1، B02 و B03 CW PR / WO ← GECOL PR و HLC Request 0–1، B04 DN Approved ← TE Dispatch Complete 0–1، B05 TE PAC ← KPI Acceptance 1–5، B06 TE DLP End ← TE FAC 3–10، B07 آخر FAC / HOTO ← Final Closure 1–3</li>
+      <li>Swap (ورقة SLA بالماستر): S-1 اعتماد MOP، S-2 اعتماد النافذة، S-3 مدة نافذة Hot Swap، S-4 مدة نافذة Cold Swap، S-5 فك القديم في Cold Swap من On-Air. كلها يوم عمل واحد. RFI و D-1 لا ينطبقان على Cold / Hot Swap</li></ul></div>
+    <div class="card"><h3>قواعد خاصة</h3><ul>
+      <li>DLP ليس SLA: نهاية الضمان = CW PAC + 90 يوماً تقويمياً، وضمان TE = TE PAC + 12 شهراً، تُحسبان تلقائياً</li>
+      <li>A-0 حُذفت (قرار D43) لأنها بلا مصدر بيانات. A-1 Site Search (Search Ring → أول SAR) بحد 10–20</li>
+      <li>E2E-B للمواقع In-House تبدأ من PO / WO Date (لا PR)</li>
+      <li>D5 (TE MOS): SLA من TE Dispatch Complete Date (اكتمال صرف احتياج الموقع)، لا من اعتماد DN</li>
+      <li>"حسب الخطة": الخطوة بلا SLA تُنفَّذ وفق الخطة، ويصل إشعار لمالكها ثم تصعيد عند تجاوز تاريخها المخطط دون تنفيذ</li>
+      <li>الخطوة N/A (مثل STA حيث Analysis Type ليس STA أو ST، و MW Alignment بلا MW) تُستبعد من الحساب والمدد الكلية</li></ul></div>
+  </div>
+  <h3 style="margin-top:6px">قاموس المؤشرات</h3>
+  <p class="muted">كل مؤشر يُحسب من البيانات المعتمدة، بأيام العمل، مع استبعاد N/A والملغى وخارج النطاق، وبتاريخ مرجعي واحد هو اليوم. المؤشرات مأخوذة من لوحة القيادة الحالية ومبنية هنا على رموز الخطوات.</p>
+  <details class="fold"><summary>35 مؤشراً</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الفئة</th><th>المؤشر</th><th>المعادلة</th></tr></thead>
+      <tbody>
+        <tr><td>الإنجاز</td><td>إنجاز الخطوة / الـ Milestone</td><td>منجزة معتمدة ÷ (المواقع في النطاق − N/A). الملغاة وخارج النطاق مستبعدة</td></tr>
+        <tr><td>الإنجاز</td><td>إنجاز الموقع والمشروع</td><td>المستويات 1–5 في هذا القسم</td></tr>
+        <tr><td>الإنجاز</td><td>إنجاز PH1: الفعلي، المخطط، SPI، تغطية الخطة</td><td>المستوى 5: الفعلي = Σ وزن النشاط × إنجازه، والمخطط بالأوزان نفسها على تواريخ الخطة، و SPI = الفعلي ÷ المخطط، والتغطية = الوزن المكتمل التواريخ. والمخطط غير متوفّر حتى تكتمل التواريخ</td></tr>
+        <tr><td>الإنجاز</td><td>مؤشر صحة المشروع</td><td>عوامل المستوى 4، كل عامل ≤ 100، ويُعاد توزيع وزن العامل بلا بيانات</td></tr>
+        <tr><td>التدفق</td><td>Lead Time</td><td>PR (B1) → CW PAC (B13) للأعمال المدنية، و Site RFI → TE PAC للـ TE: الوسيط و P85</td></tr>
+        <tr><td>التدفق</td><td>Execution Time</td><td>MOS → الانتهاء (B8/B9 → MS3، D5 → MS5)، أي البدء إلى الانتهاء فعلاً</td></tr>
+        <tr><td>التدفق</td><td>Lag Time · Flow Efficiency</td><td>Lag = Lead − Execution لكل موقع (الوسيط). الكفاءة = Σ Execution ÷ Σ Lead</td></tr>
+        <tr><td>التدفق</td><td>مدة كل خطوة</td><td>من اكتمال السابقة (ولـ D5 من اكتمال الصرف) إلى اكتمالها: الوسيط، P85، P90، والأقصى</td></tr>
+        <tr><td>SLA</td><td>الالتزام بـ SLA</td><td>نسبة الخطوات المنجزة ضمن الحد الأعلى، وعدد التجاوزات، لكل خطوة ومقاول ومنطقة</td></tr>
+        <tr><td>الجدول</td><td>الانحراف عن خط الأساس والتوقع</td><td>الفعلي − خط الأساس المعدّل الحالي (افتراضياً، مع خيار الأصلي)، والفعلي − التوقع، لكل خطوة: المتوسط، نسبة المتأخر، الأسوأ. بلا خط أساس: غير متوفّر</td></tr>
+        <tr><td>الجدول</td><td>SPI(t) · Earned Schedule</td><td>يُحسب لـ Milestone متى غطى خط الأساس ≥ 60% من المواقع. ES ÷ AT</td></tr>
+        <tr><td>الجدول</td><td>منحنى S</td><td>تراكمي شهري للمخطط (خط الأساس) مقابل الفعلي المعتمد لكل Milestone</td></tr>
+        <tr><td>الجدول</td><td>Float · مستحق قريباً</td><td>خط الأساس − اليوم للخطوات المفتوحة: متأخر، خلال 7 أيام، خلال 14</td></tr>
+        <tr><td>الجدول</td><td>Burn-up · ECD</td><td>السرعة = متوسط الإنجاز الأسبوعي لآخر 6 أسابيع متضمناً الأسابيع الصفرية. ECD = اليوم + المتبقي ÷ السرعة</td></tr>
+        <tr><td>WIP</td><td>WIP والتقادم لكل خطوة</td><td>المواقع عند الخطوة (Pending أو Ongoing). العمر = اليوم − تاريخ فتحها</td></tr>
+        <tr><td>WIP</td><td>Cumulative Flow</td><td>تراكمي أسبوعي للمواقع التي تجاوزت كل Milestone</td></tr>
+        <tr><td>الجودة</td><td>الاعتماد من أول مرة</td><td>المقبول من أول محاولة ÷ المقدَّم، لكل خطوة بمحاولات ولكل نشاط QC</td></tr>
+        <tr><td>الجودة</td><td>جودة الاستلام CW</td><td>PAC بلا ملاحظات ÷ PAC، و FAC كذلك</td></tr>
+        <tr><td>الجودة</td><td>اكتمال التوثيق</td><td>المستندات المعتمدة ÷ المطلوبة للخطوات المنجزة</td></tr>
+        <tr><td>الجودة</td><td>إقفال QC</td><td>أنشطة QC المعتمدة ÷ أنشطة النطاق، لكل موقع ومسار</td></tr>
+        <tr><td>الجاهزية</td><td>فجوة الجاهزية</td><td>CW PAC منجز و RFI غير منجز، مصنفة بالسبب: الجيكول (العداد أو Power-On)، الفايبر</td></tr>
+        <tr><td>الجاهزية</td><td>جاهز للإغلاق</td><td>القسم 07: المستندات، المشاكل الحرجة، الملاحظات، As-Built، تطابق المصروف مع As-Built</td></tr>
+        <tr><td>القضايا</td><td>ترتيب القضايا المفتوحة</td><td>حسب نوع الموقع Core ثم MFN ثم FN ثم HUB ثم Terminal، ثم الأقدم أولاً بأيام العمل من Issue Raised Date (قرار D41)</td></tr>
+        <tr><td>المخاطر</td><td>درجة الخطر والتعرّض</td><td>الاحتمال × الأثر: ≥ 15 حرج، ≥ 10 عالٍ، ≥ 5 متوسط. التعرّض = مجموع الدرجات المفتوحة</td></tr>
+        <tr><td>المقاولون</td><td>بطاقة الأداء</td><td>عوامل القسم 14: الالتزام بـ SLA (بالأيام المُسندة إليه والمعتمدة فقط)، الرفض، الالتزام بالخطة، التوثيق، السلامة، بأوزان من الإعدادات</td></tr>
+        <tr><td>التأخير</td><td>التأخير حسب المسؤول <span class="tag m">للنقاش</span></td><td>أيام فترات التأخير المعتمد إسنادها لكل جهة (من تواريخها)، لكل خطوة ومنطقة ومقاول، ونسبة غير المُسند، وعدد الفترات المتداخلة</td></tr>
+        <tr><td>السلامة</td><td>مؤشرات HSE <span class="tag m">للنقاش</span></td><td>الحوادث وكاد يقع، الأيام منذ آخر حادث، التقييمات المستوفاة ÷ المنفذة، الإجراءات المفتوحة</td></tr>
+        <tr><td>الفرق</td><td>استغلال الفرق وفجوة السعة <span class="tag m">للنقاش</span></td><td>المواقع المفتوحة المسندة ÷ سعة الفريق، والمواقع المخططة ناقص السعة المتاحة لكل منطقة ونوع عمل</td></tr>
+        <tr><td>الحضور</td><td>تنفيذ الزيارات <span class="tag m">للنقاش</span></td><td>الزيارات المنفذة ÷ المخططة، والوقت في الموقع، والتسجيل خارج النطاق</td></tr>
+        <tr><td>المخزن</td><td>الرصيد والنقص المتوقع</td><td>الرصيد (ومنه المسترجع السليم من الفك لأصناف CW)، المحجوز بـ DN معتمد (TE DN و CW DN)، المتاح = الرصيد − المحجوز · النقص مقابل حاجة المواقع المخططة في المسار D لأصناف TE فقط</td></tr>
+        <tr><td>Swap</td><td>مدة الانقطاع</td><td>Window Start → Window End بأيام العمل لكل موقع Swap، مقابل حد S-3 (Hot) و S-4 (Cold)، ونسبة النوافذ ضمن الحد</td></tr>
+        <tr><td>Swap</td><td>Cutover الناجح من أول مرة</td><td>مواقع On-Air بنتيجة Success وبلا أي Rollback ÷ مواقع Swap التي تم فيها Cutover</td></tr>
+        <tr><td>Swap</td><td>عدد مرات الرجوع (Rollback)</td><td>صفوف Cutover Rollback في Change Control (Rollback Count في DI)، لكل موقع ونوع ومقاول</td></tr>
+        <tr><td>Swap</td><td>الفك المتأخر</td><td>مواقع Cold Swap تجاوزت On-Air + يوم عمل: مفتوح دون فك، أو فُكّ بعد الموعد</td></tr>
+        <tr><td>البيانات</td><td>جودة البيانات</td><td>عدد مخالفات قواعد التنبيه لكل قاعدة وموقع</td></tr>
+      </tbody>
+    </table>
+  </div></details>
+  <p class="cap">لقطات أسبوعية: تحفظ المنظومة قيم كل المؤشرات كل أسبوع تلقائياً (ومع إقفال كل شهر)، ومنها تُحسب الاتجاهات في بطاقات لوحة القيادة ومقارنة أي أسبوعين. اللقطة لا تتغير بعد حفظها. صُحّح هنا ما وُجد في كود اللوحة الحالية: مدة التنفيذ كانت من المسح لا من البدء، ومؤشر صحة CW كان يحتسب RFI مرتين، وتاريخ PAC لم يكن يُقرأ في عدة مؤشرات، والخلية الفارغة كانت تُعدّ منجزة في TE، والسرعة تتجاهل الأسابيع الصفرية، والتاريخ المرجعي كان مزدوجاً.</p>
+  <div class="grid2">
+    <div class="card"><h3>قواعد التعديل</h3><ul>
+      <li>إضافة عامل أو مكوّن أو مرحلة أو حد SLA، وتعديل أي وزن، من الإعدادات</li>
+      <li>SLA والعوامل والقواعد: عند الحفظ تختار أثراً رجعياً على كل البيانات، أو من تاريخ محدد، وزر لإعادة الحساب الرجعي لاحقاً</li>
+      <li>الأوزان: كل تعديل إصدار جديد بتاريخ سريان، يُطبَّق من تاريخه فصاعداً دون أثر رجعي</li>
+      <li>كل تعديل نسخة بتاريخ سريان، فأي تقرير سابق يُستعاد كما صدر. لقطات التقدّم والمؤشرات لا يُعاد حسابها أبداً، ومنها منحنى S التاريخي</li>
+      <li>تغيير النطاق يُقيَّد في Change Control، وأثره على النسبة يظهر بعلامة "تغيّر بسبب النطاق" (القسم 03)</li>
+      <li>الموقع الذي مجموع أوزانه المنطبقة صفر: التقدّم "غير منطبق" لا 0%، ويُستبعد من المتوسطات والمجاميع</li>
+      <li>التعديل يمر عبر سلسلة الأدوار والمسؤوليات</li></ul></div>
+  </div>
+</section>
+
+<section id="s7">
+  <h2><span class="n">07</span>الشاشات الرئيسية</h2>
+  <p class="muted">الشبكة واجهة العمل اليومي لكل المواقع معاً، والضغط على رمز أي موقع يفتح صفحته 360 للتفاصيل. تليهما نماذج بقية الشاشات. كل النماذج توضيحية، والقيم أمثلة.</p>
+  <h3 style="margin-top:6px">شبكة المواقع</h3>
+  <div class="mock" aria-label="نموذج توضيحي لشبكة المواقع">
+    <div class="bar" style="font-size:13px">
+      <div class="docs"><span class="btn">بحث: رمز موقع</span><span class="btn">فلاتر</span><span class="btn">العرض: الخطوات</span><span class="btn">A · B · C · D · E · F · QC</span></div>
+      <div class="docs"><span class="btn">إدخال تاريخ جماعي</span><span class="btn"><svg><use href="#i-dl"/></svg>نموذج للمحدد</span><span class="btn"><svg><use href="#i-up"/></svg>رفع</span><span class="btn">إرسال للمراجعة</span><span class="btn">اعتماد</span><span class="btn">Excel</span><span class="btn">الخريطة</span></div>
+    </div>
+    <div class="mock-scroll"><table style="min-width:760px;font-size:13px">
+      <thead><tr><th>☐</th><th>الموقع</th><th>المنطقة</th><th>MS3 · CW</th><th>CW QC</th><th>B13 · CW PAC</th><th>RFI</th><th>D5 · TE MOS</th></tr></thead>
+      <tbody>
+        <tr><td>☑</td><td class="mono">MI022</td><td>Middle</td><td><span class="pill ok">2024-04-10</span></td><td><span class="pill ok">مغلق</span></td><td><span class="pill w">Pending</span></td><td><span class="pill n">مقفلة</span></td><td><span class="pill n">مقفلة</span></td></tr>
+        <tr><td>☑</td><td class="mono">MI014</td><td>Middle</td><td><span class="pill ok">2024-04-12</span></td><td><span class="pill ok">مغلق</span></td><td><span class="pill w">Pending</span></td><td><span class="pill n">مقفلة</span></td><td><span class="pill n">مقفلة</span></td></tr>
+        <tr><td>☐</td><td class="mono">WE203</td><td>West</td><td><span class="pill ok">2024-03-28</span></td><td><span class="pill w">6 / 7</span></td><td><span class="pill n">مقفلة</span></td><td><span class="pill n">مقفلة</span></td><td><span class="pill n">مقفلة</span></td></tr>
+        <tr><td>☐</td><td class="mono">WE117</td><td>West</td><td><span class="pill ok">2024-02-19</span></td><td><span class="pill ok">مغلق</span></td><td><span class="pill ok">2024-02-22</span></td><td><span class="pill ok">2024-02-23</span></td><td><span class="pill x">متأخر 4</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+  <p class="cap">نموذج توضيحي. الأعمدة المختارة مثال.</p>
+  <div class="grid2">
+    <div class="card"><h3>الصفوف والأعمدة</h3><ul>
+      <li>صف لكل موقع، وأعمدة مثبتة: الاختيار، الرمز، الاسم، المنطقة، المقاول، النطاق، الحالة. وأعمدة البيانات الأساسية (الإحداثيات، النوع، الطوبولوجيا، البرج…) مجموعة تُطوى كغيرها</li>
+      <li>الأعمدة مجمّعة حسب المسارات A–F ثم CW QC و TE QC، تُطوى وتُفتح، وشريط للانتقال إلى أي مجموعة</li>
+      <li>ثلاثة عروض: الـ Milestones (10) والبوابات (9)، الخطوات (جدول المواصفات)، المكوّنات وأنشطة الجودة</li>
+      <li>الخلية: التاريخ ولون حالته، أيقونة المستند، وعلامة "بانتظار الاعتماد". الضغط يفتح لوحة جانبية: الإدخال، المستند، المحاولات، السجل. المقفلة لا تقبل إدخالاً</li></ul></div>
+    <div class="card"><h3>شريط الأدوات</h3><ul>
+      <li>بحث برمز الموقع يعرضه وحده بكل أعمدته، وفلاتر بأي عمود أو حالة</li>
+      <li>عرض الخريطة: المواقع المفلترة على خريطة ملوّنة بالحالة، والضغط على موقع يفتح صفحته 360</li>
+      <li>التعليقات: خيط لكل موقع ولكل خلية، مع إشارة @ لزميل ومرفقات. التعليق نقاش لا إدخال، فلا يمر بالاعتماد، ويُحفظ في سجل الموقع</li>
+      <li>عروض محفوظة لكل مستخدم، وعروض جاهزة لكل خطوة (مثل "Pending عند B13") تحل محل قوائم العمل</li>
+      <li>على المحدد: إدخال تاريخ جماعي، نموذج معبّأ، رفع النسخ الموقّعة (مطابقة بالـ QR)، إرسال للمراجعة، اعتماد أو رفض</li>
+      <li>إضافة موقع يدوياً، وأرشفة المحدد. Excel: تصدير، قالب معبّأ بالمحدد، رفع. واختيار الأعمدة وترتيبها</li></ul></div>
+    <div class="card"><h3>قواعد الإجراء الجماعي</h3><ul>
+      <li>التاريخ الجماعي واحد لكل المحدد، ويمكن تعديل أي خلية منفردة قبل الإرسال</li>
+      <li>يُنفَّذ على المؤهل فقط، والمستبعد يظهر بسببه (مقفلة، QC غير مغلق…)</li>
+      <li>مثال: فلتر "CW منجز + QC مغلق + PAC فارغ" ← تحديد ← نموذج CW PAC ← رفع الموقّع ← تاريخ جماعي ← مراجعة ← اعتماد</li>
+      <li>سطح المكتب فقط، وتطبيق الهاتف للعمل الميداني</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">صفحة الموقع 360</h3>
+  <p class="muted">رأس يعرض حالة الموقع بعدة أبعاد، ثم تبويب لكل مسار. التعديل ورفع المستند من نفس المكان.</p>
+  <div class="mock" aria-label="نموذج توضيحي لصفحة موقع">
+    <div class="bar">
+      <div style="display:grid;gap:2px"><span class="sid">MI001</span><span class="muted" style="font-size:13.5px">Site Name · Middle Area · MFN · Outdoor · GF</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="st">قيد التنفيذ</span><span class="chip">المرحلة: TE · Pending منذ 6 أيام</span><span class="chip">الانحراف: <bdi dir="ltr">+4</bdi> أيام عن خط الأساس</span><span class="chip">التالي: TE MOS · م. أحمد</span><span class="chip">مشكلة حرجة: 1</span><span class="chip">الإنجاز: <bdi dir="ltr">64%</bdi></span><span class="chip">التوثيق 14 / 17</span><span class="chip">آخر تحديث: 25-09</span></div>
+    </div>
+    <div class="tabs"><span>بيانات الموقع</span><span>A</span><span>B · C</span><span class="on">D · TE</span><span>E</span><span>As-Built والمخزن</span><span>المستندات</span><span>QC</span><span>المشاكل</span><span>التعليقات</span><span>السجل</span></div>
+    <div class="mock-scroll"><div class="rows">
+      <div class="row h"><span>المهمة</span><span>المخطط</span><span>الفعلي</span><span>SLA</span><span>المستند</span></div>
+      <div class="row"><span>DN Approved</span><span class="d">2024-04-24</span><span class="d">2024-04-25</span><span class="pill ok">1–2 ضمن</span><span class="docs"><span class="btn"><svg><use href="#i-eye"/></svg>عرض</span><span class="btn"><svg><use href="#i-dl"/></svg>تحميل</span></span></div>
+      <div class="row"><span>TE MOS</span><span class="d">2024-05-02</span><span class="d">—</span><span class="pill w">Pending</span><span class="docs"><span class="pill n">يُطلب عند الإدخال</span></span></div>
+    </div></div>
+  </div>
+  <p class="cap">نموذج توضيحي. الحالة العامة كما في Overall Status بالماستر: Not Started، In Progress، On Hold، Completed، Cancelled، ومعها علامة "معطّل بقضية" مع السبب. ومؤشر "جاهز للإغلاق" يُحسب من: كل المستندات معتمدة، لا مشكلة حرجة مفتوحة، إقفال الملاحظات موثّق، As-Built موجود، وتطابق As-Built مع المصروف. مؤشر وتقرير فقط، لا منع.</p>
+
+  <h3 style="margin-top:6px">مهامي · بانتظار اعتمادي</h3>
+  <div class="mock" aria-label="نموذج صندوق الاعتماد">
+    <div class="tabs"><span>مهامي 12</span><span class="on">بانتظار اعتمادي 7</span><span>أرسلتُها 3</span></div>
+    <div class="bar" style="font-size:13px"><div class="docs"><span class="btn">النوع: الكل</span><span class="btn">المسار</span><span class="btn">الأقدم أولاً</span></div><div class="docs"><span class="btn">اعتماد المحدد</span><span class="btn miss">رفض بملاحظة</span></div></div>
+    <div class="mock-scroll"><table style="min-width:720px;font-size:13px">
+      <thead><tr><th>☐</th><th>النوع</th><th>الموقع · الخطوة</th><th>قبل → بعد</th><th>المدخل</th><th>العمر</th></tr></thead>
+      <tbody>
+        <tr><td>☑</td><td>تاريخ</td><td class="mono">MI022 · B13</td><td><bdi dir="ltr" class="mono">— → 2024-04-16</bdi></td><td>م. سامي</td><td><span class="pill ok">اليوم</span></td></tr>
+        <tr><td>☐</td><td>مستند</td><td class="mono">MI014 · CW PAC</td><td>نسخة موقّعة v1</td><td>م. سامي</td><td><span class="pill w">3 أيام</span></td></tr>
+        <tr><td>☐</td><td>QC</td><td class="mono">WE203 · Cable Tray</td><td>8 صور</td><td>م. أحمد</td><td><span class="pill ok">يوم</span></td></tr>
+        <tr><td>☐</td><td>تغيير نطاق</td><td class="mono">TR045</td><td>GECOL: Yes → N/A</td><td>مسؤول B</td><td><span class="pill x">5 أيام</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <h3 style="margin-top:6px">معرض CW QC</h3>
+  <div class="mock" aria-label="نموذج معرض QC">
+    <div class="bar"><div style="display:grid;gap:2px"><span class="sid">WE203 · CW QC</span><span class="muted" style="font-size:13px">6 / 7 معتمد</span></div><div class="docs"><span class="btn">اعتماد النشاط</span><span class="btn miss">رفض بملاحظة</span></div></div>
+    <div class="split">
+      <div class="nav"><span>Cabinet Foundation ✓</span><span>Mounting Pole ✓</span><span class="on">Cable Tray · 8</span><span>Indoor Rack ✓</span><span>Site Optical Fiber ✓</span><span>AC / DC Box ✓</span><span>Site GND ✓</span><span>البرج · N/A</span></div>
+      <div class="body">
+        <div class="shots"><div class="shot"><span>WE203 · 2024-04-08 · 32.37,15.09</span></div><div class="shot"><span>WE203 · 2024-04-08</span></div><div class="shot x"><span>WE203 · 2024-04-08</span></div><div class="shot"><span>WE203 · 2024-04-09</span></div><div class="shot"><span>WE203 · 2024-04-09</span></div><div class="shot"><span>WE203 · 2024-04-09</span></div><div class="shot"><span>WE203 · 2024-04-09</span></div><div class="shot"><span>WE203 · 2024-04-09</span></div></div>
+        <p class="cap">المؤطّر بالأحمر صورة عليها ملاحظة. الصورة تُكبَّر بالضغط، مع بياناتها: الوقت، الإحداثيات، المسافة عن الموقع، المهندس.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:6px">تطبيق الهاتف</h3>
+  <div class="phones" aria-label="نماذج شاشات التطبيق">
+    <div class="phone"><div class="pt">مواقع اليوم</div><div class="it"><b class="mono">MI001</b><span>TE · MOS · بانتظار الدخول</span></div><div class="it"><b class="mono">WE203</b><span>CW QC · Cable Tray</span></div><div class="it"><b class="mono">MI014</b><span>زيارة متابعة</span></div><div class="bt">الملاحة إلى الموقع</div></div>
+    <div class="phone"><div class="pt">تسجيل الدخول · MI001</div><div class="it"><span>المسافة عن الموقع</span><b class="mono">32 m</b><span class="pill ok">ضمن الهامش <bdi dir="ltr">50 m</bdi></span></div><div class="it"><span>دقة الموقع <bdi dir="ltr">±8 m</bdi> · دون اتصال: سيُرسل لاحقاً</span></div><div class="bt">تسجيل الدخول</div><div class="it"><span>بعده: تقييم السلامة</span></div></div>
+    <div class="phone"><div class="pt">CW QC · Cable Tray</div><div class="shots" style="grid-template-columns:1fr 1fr"><div class="shot"><span>WE203</span></div><div class="shot"><span>WE203</span></div><div class="shot"><span>WE203</span></div><div class="shot"><span>+</span></div></div><div class="it"><span>3 / 10 صور · الختم تلقائي</span></div><div class="bt">التقاط صورة</div></div>
+  </div>
+
+  <h3 style="margin-top:6px">الإعدادات</h3>
+  <div class="mock" aria-label="نموذج الإعدادات">
+    <div class="split">
+      <div class="nav"><span>المسارات والخطوات</span><span class="on">حدود SLA</span><span>الأوزان</span><span>أنواع المستندات</span><span>قوالب النماذج</span><span>أنشطة QC</span><span>العطل الرسمية</span><span>الإشعارات</span><span>الأدوار والصلاحيات</span><span>المسميات العربية</span></div>
+      <div class="body">
+        <div class="mock-scroll"><table style="min-width:460px;font-size:13px"><thead><tr><th>الخطوة</th><th>الأدنى</th><th>الأعلى</th><th>ساري من</th></tr></thead><tbody>
+          <tr><td class="mono">B13 · CW PAC</td><td class="mono">1</td><td class="mono">3</td><td class="mono">2026-01-01</td></tr>
+          <tr><td class="mono">B10 · Tower RT</td><td class="mono">14</td><td class="mono">21</td><td class="mono">2026-01-01</td></tr>
+          <tr><td class="mono">C2 · GECOL</td><td class="mono">7</td><td class="mono">10</td><td class="mono">2026-01-01</td></tr></tbody></table></div>
+        <div class="docs"><span class="btn">يسري: رجعياً</span><span class="btn">يسري: من تاريخ</span><span class="btn">إرسال للاعتماد</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 style="margin-top:6px">لوحة القيادة · المشروع</h3>
+  <div class="mock" aria-label="نموذج لوحة القيادة">
+    <div class="tabs"><span class="on">المشروع</span><span>CW</span><span>TE</span><span>QC</span><span>المخزن</span></div>
+    <div class="body" style="padding:12px 14px;display:grid;gap:10px">
+      <div class="docs"><span class="btn">المنطقة</span><span class="btn">المقاول</span><span class="btn">النطاق</span><span class="btn">الحالة</span><span class="btn">إعادة ضبط</span></div>
+      <div class="kpis"><div class="kpi"><small>الإنجاز الكلي</small><b>62%</b><small>الهدف <bdi dir="ltr">70%</bdi> · ↘</small></div><div class="kpi"><small>مؤشر الصحة</small><b>74</b><small>مراقبة</small></div><div class="kpi"><small>On-Air</small><b>199 / 259</b><small>+6 هذا الأسبوع</small></div><div class="kpi"><small>SLA أحمر</small><b>18</b><small>مسؤول D: 11</small></div><div class="kpi"><small>بانتظار الاعتماد</small><b>23</b><small>الأقدم 5 أيام</small></div></div>
+      <p class="cap">تحت البطاقات: سلسلة التسليم، منحنى S، أداء المناطق، ما يحتاج قرار الإدارة، بحسب صفحات القسم 02.</p>
+    </div>
+  </div>
+</section>
+
+<section id="s8">
+  <h2><span class="n">08</span>الخطط ومهامي والحضور</h2>
+  <p class="muted">الخطط لا تُكتب من الصفر: خط الأساس يُولَّد من حدود SLA عند فتح المسار (وللمواقع المرحّلة من تواريخ الماستر المخططة)، ومسودة الخطة تتولد تلقائياً ويعدّلها المخطِّط ثم تُعتمد وتُنشر. الفعلي يُدخله مالك المهمة ويمر بالاعتماد.</p>
+  <div class="grid2">
+    <div class="card"><h3>الطبقات</h3><ul>
+      <li><b>شهرية:</b> عدد المهام المخططة لكل Milestone ومنطقة، مقابل المنجز المعتمد</li>
+      <li><b>أسبوعية:</b> المواقع ومهامها لكل مالك مهمة، مع الإجراء التالي</li>
+      <li><b>يومية:</b> مهام اليوم والمتأخر وخطة الغد، وسبب عدم الإنجاز. بشكل ورقة Progress &amp; Plan: Site ID، SOW (CW / TE)، العمل المخطط والمنجز، السبب، وبيانات الموقع والمقاول أو المورّد والمشرف من الماستر، و Access Valid لخطة الغد</li></ul></div>
+    <div class="card"><h3>خط الأساس والتوقع · ثلاث طبقات</h3><ul>
+      <li><b>الأصلي:</b> مثل ورقة Baseline في الماستر: مقترح محسوب من Site Release (الفعلي أو المخطط U) وحدود SLA العليا وروابط التخطيط، بتسعة تواريخ (PRE-CW Completion إلى Final Closure)، ثم يعتمده Project Manager فيصبح نسخة برقم Version وتاريخ اعتماد. يُجمَّد عند اعتماده</li>
+      <li><b>المعدّل:</b> نسخة جديدة بقرار Project Manager، وأحدث تاريخ اعتماد هو الحالية (Current). سبب إعادة التخطيط صف Baseline Re-plan في Change Control. الإصدارات السابقة تبقى محفوظة</li>
+      <li><b>التوقع:</b> يُحسب تلقائياً = آخر فعلي معتمد + حدود SLA العليا للخطوات المتبقية. مسؤول المرحلة يعدّله بسبب، ويمر التعديل بالاعتماد</li>
+      <li>الانحراف يُعرض مقابل خط الأساس المعدّل الحالي افتراضياً، مع خيار الأصلي، ومقابل التوقع. الموقع بلا خط أساس: "غير متوفّر" لا صفر</li></ul></div>
+    <div class="card"><h3>تطبيق الهاتف لمهندس الموقع</h3><ul>
+      <li>تطبيق أصلي (Android / iOS) ملحق بالمنظومة، محدود الوظائف: مواقع اليوم، المهام العالقة المسندة إليه، إدخال التاريخ والصور والمستندات</li>
+      <li>تسجيل الدخول والخروج في الموقع، ثم تقييم السلامة قبل العمل</li>
+      <li>كاميرا تختم الصورة، صور QC، وزر الملاحة إلى الموقع</li>
+      <li>يعمل دون اتصال، ويرسل عند توفر الشبكة</li></ul></div>
+    <div class="card"><h3>التقارير</h3><ul>
+      <li>تقارير الخطط اليومية والأسبوعية والشهرية بشكل أوراق Daily Progress و Weekly Plan، ضمن قائمة التقارير (القسم 13)</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">الجاهزية والتخطيط التلقائي</h3>
+  <p class="muted">المنظومة تجهّز مسودة الخطة اليومية أو الأسبوعية أو الشهرية تلقائياً عند الطلب، من البيانات المتاحة لحظتها. المخطِّط يعدّلها ثم تُعتمد وتُنشر إلى التطبيق.</p>
+  <div class="grid2">
+    <div class="card"><h3>فحص الجاهزية لكل موقع مخطط</h3><ul>
+      <li>الخطوة التالية مفتوحة غير مقفلة</li>
+      <li>إذن الدخول ساري طوال مدة العمل</li>
+      <li>المواد محجوزة أو متاحة في المخزن</li>
+      <li>فريق متخصص في نوع العمل متاح ضمن سعته، ومهندس مشرف متاح</li>
+      <li>موقع الـ Uplink جاهز حيث يلزم، ولا تذكرة معطِّلة مفتوحة، والموقع غير متوقف</li>
+      <li>النتيجة: جاهز، أو غير جاهز مع كل الأسباب</li></ul></div>
+    <div class="card"><h3>توليد الخطة</h3><ul>
+      <li>زر "توليد خطة" لليوم أو الأسبوع أو الشهر، بفلاتر المنطقة والمسار والمقاول</li>
+      <li>يختار المواقع الجاهزة ويرتبها بالأولوية: المتأخر أولاً، ثم الأقل Float، ثم ما يفك اعتمادية مواقع أخرى</li>
+      <li>يسند الفرق المتخصصة المتاحة بحسب المنطقة والسعة، والمهندسين، ويجمع مواقع المنطقة الواحدة</li>
+      <li>الشهرية أرقام لكل Milestone ومنطقة من التوقع والسعة، بلا إسناد فرق</li></ul></div>
+    <div class="card"><h3>المخرجات والحدود</h3><ul>
+      <li>مسودة قابلة للتعديل، وقائمة "غير جاهز" بأسبابها ومن يزيل كل قيد</li>
+      <li>الاعتماد ينشرها إلى "مواقع اليوم" في التطبيق، ويحدّث التوقع</li>
+      <li>الخطة اقتراح بقواعد واضحة لا قرار آلي: المخطِّط يغيّر ويضيف ويحذف، والسبب يُسجَّل</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">الحضور في الموقع · Clock-in / Clock-out <span class="tag m">للنقاش</span></h3>
+  <p class="cap">الماستر الجديد بلا حضور ولا إحداثيات حضور (قرار D69)، فهذه وحدة في المنظومة فقط وتُعتمد أو تؤجل (القسم 21).</p>
+  <div class="grid2">
+    <div class="card"><h3>الدورة</h3><ul>
+      <li>الخطة اليومية تُسند الموقع لمهندس، فيظهر في "مواقع اليوم" في تطبيقه</li>
+      <li>تسجيل الدخول عند البدء والخروج عند المغادرة: يقارن التطبيق موقع الهاتف بإحداثيات الموقع، ضمن هامش يُعدَّل من الإعدادات (افتراضياً 50 متراً)</li>
+      <li>خارج الهامش يُسمح بالتسجيل بعلامة "خارج النطاق" مع المسافة، ويظهر للمراجع وفي التقارير</li>
+      <li>دون اتصال: يُسجَّل على الهاتف ويُرسل لاحقاً، بوقت الهاتف ووقت وصوله للخادم معاً</li></ul></div>
+    <div class="card"><h3>ما يُسجَّل والضوابط</h3><ul>
+      <li>الإحداثيات ودقة الـ GPS، المسافة عن الموقع، الوقتان، معرّف الجهاز</li>
+      <li>كشف تزييف الموقع، والإحداثيات تُلتقط لحظة التسجيل فقط، دون تتبع مستمر</li>
+      <li>إحداثيات موقع خاطئة: أول تسجيل صحيح يقترح تصحيحها، والتصحيح بالاعتماد</li>
+      <li>الحضور دليل للمراجع، ولا يغيّر حالة الخطوة</li></ul></div>
+    <div class="card"><h3>التقارير</h3><ul>
+      <li>الزيارات المخططة مقابل المنفذة، والمخطط بلا دخول يصل إشعاراً</li>
+      <li>الوقت في كل موقع لكل مهندس، والزيارات بلا خروج، والتسجيلات خارج النطاق</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">السلامة · HSE <span class="tag m">للنقاش</span></h3>
+  <p class="cap">في الماستر: فحوص PTW (JSA، Toolbox Talk، Work at Height، Lifting Plan، LOTO، Rescue Plan، Stop Work) في Permits &amp; HSE وتدخل بوابتي CW و TE. أما الحوادث وكاد يقع فلا تُسجَّل في الماستر (قرار D35)، فبلاغها وحدة في المنظومة فقط.</p>
+  <div class="grid2">
+    <div class="card"><h3>قبل العمل</h3><ul>
+      <li>PTW معتمد وساري بفحوصه قبل بدء العمل، و Stop Work يوقف البوابة حتى Stop Lifted Date</li>
+      <li>تقييم السلامة بعد تسجيل الدخول: قائمة فحص من الإعدادات (معدات الوقاية، العمل على ارتفاع، الكهرباء…)</li>
+      <li>بند غير مستوفٍ يوقف العمل ويُبلغ مسؤول المسار</li></ul></div>
+    <div class="card"><h3>البلاغ من الميدان</h3><ul>
+      <li>حادث أو "كاد يقع" أو ملاحظة خطر، من التطبيق بصورة وموقع ووقت ودرجة خطورة</li>
+      <li>يتحول إلى تذكرة إجراء تصحيحي بمالك وموعد، وإغلاقها بالاعتماد</li>
+      <li>الحادث يُبلغ مدير المشروع ومسؤول السلامة فوراً</li></ul></div>
+    <div class="card"><h3>المؤشرات</h3><ul>
+      <li>الحوادث وكاد يقع لكل مقاول ومنطقة، والأيام منذ آخر حادث</li>
+      <li>نسبة التقييمات المستوفاة، والإجراءات التصحيحية المفتوحة</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">اجتماع التقدم الأسبوعي</h3>
+  <div class="grid2">
+    <div class="card"><h3>قبل الاجتماع</h3><ul>
+      <li>جدول أعمال يتولّد تلقائياً: الأحمر، القرارات المطلوبة، غير الجاهز، المخاطر المستحقة المراجعة، بنود الاجتماع السابق المفتوحة</li></ul></div>
+    <div class="card"><h3>المحضر وبنود الإجراء</h3><ul>
+      <li>محضر بالحضور والقرارات، وبنود إجراء بمالك وموعد مربوطة بالمواقع أو التذاكر</li>
+      <li>البند يمكن تحويله إلى تذكرة، ويتابع في "مهامي" حتى إغلاقه</li>
+      <li>المحضر يُعتمد ويُصدَّر PDF ويُحفظ في الأرشيف</li></ul></div>
+  </div>
+</section>
+
+<section id="s9">
+  <h2><span class="n">09</span>القضايا والمخاطر والتأخير</h2>
+  <p class="muted">لا توجد ورقة Issue Log في الماستر الجديد: قضية كل موقع في أعمدته Pending Issue و Issue Owner و Issue Raised Date و Issue Status (Open · In Progress · Closed) و Remark (GA:GE). في المنظومة تصبح كل قضية تذكرة مربوطة بالموقع، وتظهر إشعاراً عند مالكها.</p>
+  <div class="grid2">
+    <div class="card"><h3>حقول القضية</h3><ul>
+      <li>من الماستر: الموقع، القضية، المالك (Issue Owner)، تاريخ الرفع، الحالة، الملاحظة. القضية بلا مالك أو تاريخ أو حالة فحص جودة (DQ24)</li>
+      <li>تضيفها المنظومة: <b>البوابة التي تعطّلها</b>، تاريخ الاستحقاق، تاريخ الحل، السبب الجذري، الإجراء التصحيحي، صورة</li></ul></div>
+    <div class="card"><h3>الترتيب والدورة</h3><ul>
+      <li>ترتيب عرض القضايا المفتوحة (قرار D41): حسب نوع الموقع Core ثم MFN ثم FN ثم HUB ثم Terminal، ثم الأقدم أولاً بأيام العمل من Issue Raised Date. ترتيب عرض لا درجة خطورة</li>
+      <li>Open ← In Progress ← Closed، مع إعادة الفتح. وفي Dashboard: القضايا المفتوحة، والأقدم من مدة تنبيه الانتهاء (30 يوماً)</li>
+      <li>سبب عدم إنجاز متكرر في الخطة اليومية يتحول بضغطة إلى قضية</li></ul></div>
+    <div class="card"><h3>دورة حياة المخاطر</h3><ul>
+      <li>بحقول ورقة Risk Register (18 عموداً): Risk Score = الاحتمال × الأثر، والمستوى Critical ≥ 15، High ≥ 10، Medium ≥ 5</li>
+      <li>الحالة Open · Monitoring · Closed · Materialized، و Risk Owner و Action Owner من قائمة الموظفين، و Next Review Date يُلوَّن أحمر إذا فات ولم يُغلق</li>
+      <li>الخطر الذي يتحقق (Materialized) يتحول بضغطة إلى قضية مربوطة بالمواقع المتأثرة</li></ul></div>
+    <div class="card"><h3>إسناد التأخير <span class="tag m">في المنظومة فقط</span></h3><ul>
+      <li>الماستر لا يحمل عمود الجهة المسؤولة عن التأخير. المسؤولية الافتراضية من مالك الخطوة (R) في جدول الخطوات، والمهندس المشرف من الجيل دوره الإشراف ولا يُحمَّل التأخير</li>
+      <li>مقترح للمنظومة: فترات إسناد (من تاريخ إلى تاريخ) لجهة بسبب ومستند، يُدخلها مسؤول المسار وتمر بالاعتماد، وغير المُسند لا يُحمَّل على أحد. بطاقة المقاول تحتسب الأيام المُسندة إليه فقط</li></ul></div>
+    <div class="card"><h3>صلاحية التصاريح والعقود</h3><ul>
+      <li>Valid From و Valid To لكل تصريح، وصلاحيته محسوبة (Validity)، و Has Expiry لكل نوع في Setting</li>
+      <li>تنبيه قبل الانتهاء بمدة Expiring alert (30 يوماً) للتصاريح وعقود المواقع وعقود الشركات</li>
+      <li>خطة الغد تُظهر Access Valid لكل موقع (تصريح دخول ساري لهذا النطاق في تاريخ الغد)</li></ul></div>
+  </div>
+</section>
+
+<section id="s10">
+  <h2><span class="n">10</span>المخزن · معدات TE ومواد CW</h2>
+  <p class="muted">ورقة WH: مخزن رئيسي واحد بعمود لكل صنف، 49 صنفاً: 21 صنف TE (WL · CPE · MW · IP · PWR · CORE · Accessories) بالرقم التسلسلي أو الكمية، و28 صنف CW بالكمية. تحت الأصناف ملخص الرصيد، ثم جدول حركة واحد (صف لكل مستند). لا يُصرف شيء إلا بـ DN لكل موقع، واعتماد DN يحجز، والصرف يخصم.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  OB["OPEN · opening balance"] --> ST[("WH<br/>21 TE items · 28 CW items")]
+  RC["PL · supplier receipt"] --> ST
+  ADJ["ADJ · stocktake variance"] --> ST
+  ST --> TDN["TE DN · Approved = reserved"] --> TDD["TE DN · Dispatched = issued"] -- "need of the design covered" --> DC["TE Dispatch Complete Date"] --> MOS["TE MOS"]
+  ST --> CDN["CW DN · Approved"] --> CDD["CW DN · Dispatched"]
+  RTN["TE RN · CW RN<br/>Good / Faulty / Damaged · Reason"] --> ST
+</pre>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>رأس الأصناف (11 صفاً)</h3><ul>
+      <li>Group، Item Name، Manufacturer، Item Code، UoM (pcs / m / set)، Tracking (Serial أو Qty)، Contract Qty، Planned Delivery Date، Progress Item Code (يربط Project Status)، As-Built Item، Need Unit</li>
+      <li>الكابلات لا تُجمع: كل كابل بنوعه ومقاسه. وفي الراوتر العبرة بالكود الرئيسي</li></ul></div>
+    <div class="card"><h3>ملخص الرصيد (10 صفوف)</h3><ul>
+      <li>Received (PL + OPEN + ADJ)، Delivered % (÷ Contract Qty)، Issued (DN Dispatched)، Returned Good، Faulty / Damaged (لا يدخل الرصيد)، On Hand، Reserved (DN Approved)، Available، Need، Shortfall</li></ul></div>
+    <div class="card"><h3>الاحتياج من التصميم (قرارا D58 و D59)</h3><ul>
+      <li>القطاعات = Sectors في RF &amp; Design، ونوعها Cambium أو Intracom حسب المنطقة (جدول Region ← WL Vendor في Setting)</li>
+      <li>MW = عدد أنصاف الوصلات المنتهية عند الموقع (من MW Far-end Site)، وكل نصف Radio + Antenna. Router 1، Cabinet 1، Battery 2، LPU Kit 2</li>
+      <li><b>TE Dispatch Complete Date</b> = تاريخ آخر DN جعل المصروف ناقص المرتجع يغطي كامل احتياج الموقع. منه تبدأ SLA D-5 (TE MOS). الصرف الجزئي لا يكفي</li></ul></div>
+    <div class="card"><h3>جدول الحركة (11 عموداً قبل الأصناف)</h3><ul>
+      <li>#، Type (PL · OPEN · ADJ · TE DN · CW DN · TE RN · CW RN)، Doc No.، Date، Site ID، Site Name، Status، Condition (Good · Faulty / Damaged)، Reason (إلزامي لكل RN، من قائمة ReturnReason)، Remark، Check</li>
+      <li>دورة DN: Approved (حجز) ثم Dispatched (خصم). المحجوز لموقع لا يُصرف لغيره، وإلغاء DN أو الموقع يحرّر الحجز</li>
+      <li>CW RN بسبب الفك يغذّي CW RN Date في الماستر (FR)، و TE RN يغذّي TE RN Date (FW). معدات Swap القديمة خارج المخزن، وتسليمها لمالكها Legacy Handover Date في Readiness &amp; Handover</li></ul></div>
+    <div class="card"><h3>WH Serials</h3><ul>
+      <li>صف لكل رقم تسلسلي: Serial No.، Item Name، PL / Invoice No.، Pack / Box No.، DN No.، RN No. (إدخال)، ومحسوبة: Item Code، الموقع من DN، تاريخ الصرف، حالة الإرجاع، Status، و Installed (TE Completion Date)، و Check</li>
+      <li>صندوق بحث برقم تسلسلي</li></ul></div>
+    <div class="card"><h3>في لوحة القيادة</h3><ul>
+      <li>WH · Complete Units على مستوى المشروع كله: Cambium Sector، Intracom Sector، MW Half-link، Router، Cabinet، Battery، LPU Kit، لكل منها Need و Dispatched و Remaining Need و Available و Shortfall. Router = مجموع أنواعه، وبقية الوحدات = أندر مكوّناتها</li>
+      <li>الاستثناءات: DN معتمد غير مصروف، المرتجع التالف، صفوف حركة أو أرقام تسلسلية فاشلة، صنف رصيده المتاح سالب</li></ul></div>
+  </div>
+  <p class="cap">أُلغيت عن الإصدار 1.0: حقلا Site Receipt Date و Received By لاستلام DN في الموقع (قرار D61)، وجدول الاحتياج اليدوي (D57-a). تسوية المواد قبل HOTO تبقى تاريخاً (Material Reconciliation Date في Master EV) والمقارنة يدوية. النماذج المعبّأة (TE DN، TE RN، CW DN، CW RN) كما في القسم 05.</p>
+</section>
+
+<section id="s11">
+  <h2><span class="n">11</span>المقاولون والفرق</h2>
+  <p class="muted">في الماستر الجديد ضُمّت Contractor Log إلى ورقة PR-PO (قرار D26): جدول للشركات وجدول للفرق، ويُسند الفريق في صف الطلب نفسه.</p>
+  <div class="grid2">
+    <div class="card"><h3>الشركة (tblContractors)</h3><ul>
+      <li>Contractor، Company Type، Contract Ref، Contract Start، Contract End، Status، ومحسوبان: Contract Validity و Assigned Sites</li>
+      <li>عقد واحد لكل شركة. تنبيه انتهاء العقد بمدة Expiring alert</li></ul></div>
+    <div class="card"><h3>الفريق (tblTeams)</h3><ul>
+      <li>Team، Team Type، Contractor، Specialization (CW / TE / Fiber)، Status</li>
+      <li>مطابقة النطاق بالتخصص (Scope Match في Setting): CW و GECOL و Tower Erection و Site Adaption و CW Dismantle = CW، و TE Installation = TE، و TE Dismantle = TE أو CW</li></ul></div>
+    <div class="card"><h3>الإسناد</h3><ul>
+      <li>فريق واحد لكل صف طلب، بلا حجز ولا تاريخ تغيير. المقاول وفريقه يظهران في Master (AJ:AK للـ CW، و CD:CE للـ TE)</li>
+      <li>المهندس المشرف من الجيل (AAT SE في AM و CF) دوره الإشراف فقط، ولا يُقيَّم ولا يُحمَّل تأخير التنفيذ</li></ul></div>
+    <div class="card"><h3>خارج الماستر <span class="tag m">للنقاش</span></h3><ul>
+      <li>قرار D26 ألغى فحوص الإجازات والشهادات والسعة. أفراد الفرق، وسعة الفريق بالمواقع المتزامنة، وتوفر الفريق، وقالب بيانات المقاول: ميزات مقترحة للمنظومة لا تقابلها بيانات في الماستر، وتُعتمد أو تُحذف في P0</li></ul></div>
+  </div>
+</section>
+
+<section id="s12">
+  <h2><span class="n">12</span>ضبط الجودة · Quality Inspections</h2>
+  <p class="muted">سجل واحد في الماستر يضم أربعة أنواع (قرار D54): QC و Snag و ITP و NCR. لكل سجل: المرحلة، النشاط، نوع النقطة (Hold وغيرها)، الوصف، الخطورة Critical / Major / Minor، الفريق والمقاول، تواريخ الرفع والاستحقاق والإغلاق، النتيجة، المعتمِد، السبب والإجراء التصحيحي، والسجل المرتبط.</p>
+  <div class="grid2">
+    <div class="card"><h3>المعيق للاستلام</h3><ul>
+      <li>Blocking محسوب: نقطة Hold غير مُفرج عنها، أو NCR غير مغلق، أو Snag Major / Critical مفتوح</li>
+      <li>PAC مؤرَّخ مع Snag رئيسي مفتوح أو غير مصنف = فحص جودة (DQ22)، و Final Closure يشترط عدم وجود NCR معيق</li>
+      <li>نقطة Hold قبل صب قاعدة البرج، واختبار مقاومة التأريض، تُسجَّل QC في هذا السجل</li></ul></div>
+    <div class="card"><h3>في المنظومة</h3><ul>
+      <li>معرض صور لكل نشاط من تطبيق الهاتف، يراجعه مسؤول المرحلة ويعتمد أو يرفض بملاحظة، والرفض محاولة جديدة تغذّي "الاعتماد من أول مرة"</li>
+      <li>قائمة الأنشطة الافتراضية: بنود الأدابشن والبرج للـ CW (BA:BJ)، وبنود التركيب للـ TE (CK:CO)، والنشاط N/A في نطاق الموقع لا يظهر</li>
+      <li>مفتاح تفعيل شرط الصور في الإعدادات بتاريخ تفعيل. قبله يكفي سجل Quality Inspections دون صور</li></ul></div>
+  </div>
+</section>
+
+
+<section id="s13">
+  <h2><span class="n">13</span>الإشعارات والتقارير</h2>
+  <h3>مصفوفة الإشعارات</h3>
+  <p class="muted">القناة داخل المنظومة وتطبيق الهاتف دائماً، والبريد أو الرسائل النصية بحسب نوع الحدث: قناة كل حدث تُضبط في الإعدادات، وتُعتمد في P0 مع مدير المشروع. ✓ = يُجمَّع في الملخص اليومي بدل الإرسال الفردي. المواعيد والمستلمون قابلة للتعديل من الإعدادات.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الحدث</th><th>المستلم</th><th>التوقيت</th><th class="c">ملخص يومي</th></tr></thead>
+      <tbody>
+        <tr><td>فتح خطوة (Pending)</td><td>مسؤول المسار</td><td>فوراً</td><td class="c">✓</td></tr>
+        <tr><td>خطوة Pending تجاوزت الحد الأدنى لـ SLA دون تحويلها إلى Ongoing</td><td>مسؤول المسار</td><td>يومياً</td><td class="c">✓</td></tr>
+        <tr><td>SLA أصفر</td><td>مالك المهمة</td><td>عند التجاوز</td><td class="c">✓</td></tr>
+        <tr><td>SLA أحمر</td><td>مسؤول المسار</td><td>عند التجاوز</td><td class="c">—</td></tr>
+        <tr><td>ملخص الأحمر</td><td>مدير المشروع</td><td>أسبوعياً</td><td class="c">—</td></tr>
+        <tr><td>خطوة "حسب الخطة" تجاوزت تاريخها المخطط</td><td>المالك ثم مسؤول المسار</td><td>يومياً</td><td class="c">✓</td></tr>
+        <tr><td>بند مُرسل للمراجعة أو الاعتماد</td><td>المراجع · المعتمِد</td><td>فوراً</td><td class="c">✓</td></tr>
+        <tr><td>تأخر الاعتماد</td><td>المراجع، ثم مسؤول المسار</td><td>بعد يومي عمل · أربعة</td><td class="c">✓</td></tr>
+        <tr><td>رفض بملاحظة</td><td>مدخل البيانات · المهندس</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>تاريخ معتمد بلا مستند، أو نموذج صادر لم يُرفع</td><td>مالك المهمة</td><td>يومياً</td><td class="c">✓</td></tr>
+        <tr><td>تذكرة مشكلة مُسندة · متأخرة</td><td>مالك التذكرة · مسؤول المسار</td><td>فوراً · يومياً</td><td class="c">—</td></tr>
+        <tr><td>صور QC بانتظار المراجعة</td><td>مسؤول QC</td><td>يومياً</td><td class="c">✓</td></tr>
+        <tr><td>رفض نشاط QC</td><td>مهندس الموقع (التطبيق)</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>إسناد الخطة اليومية</td><td>مهندس الموقع (التطبيق)</td><td>صباحاً</td><td class="c">—</td></tr>
+        <tr><td>بند سلامة غير مستوفٍ أوقف العمل</td><td>مسؤول المسار · مسؤول السلامة</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>زيارة مخططة بلا تسجيل دخول · تسجيل خارج النطاق</td><td>مسؤول المسار</td><td>نهاية اليوم</td><td class="c">✓</td></tr>
+        <tr><td>اعتماد TE DN أو CW DN (حجز للموقع، جاهز للصرف)</td><td>Inventory Supervisor</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>شحنة مستلمة بانتظار الاعتماد · موعد الجرد</td><td>Inventory Supervisor</td><td>فوراً · حسب الجدول</td><td class="c">—</td></tr>
+        <tr><td>موعد مراجعة خطر · خطر تحقق</td><td>مالك الخطر · مدير المشروع</td><td>في موعده · فوراً</td><td class="c">✓</td></tr>
+        <tr><td>نقص متوقع في المخزون</td><td>Inventory Supervisor · مدير المشروع</td><td>أسبوعياً</td><td class="c">—</td></tr>
+        <tr><td>طلب تغيير نطاق أو إعدادات أو دفعة Excel</td><td>المعتمِد</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>خطوة أحمر بلا إسناد تأخير</td><td>مسؤول المسار</td><td>بعد 3 أيام عمل</td><td class="c">✓</td></tr>
+        <tr><td>بلاغ حادث · كاد يقع</td><td>مدير المشروع · مسؤول السلامة</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>إذن دخول أو عقد قارب الانتهاء</td><td>مسؤول المسار · RF &amp; Design / Acquisition Team Lead</td><td>قبل 30 يوماً</td><td class="c">✓</td></tr>
+        <tr><td>فريق تجاوز سعته · غير متخصص · غير متاح</td><td>مسؤول المسار (المخطِّط)</td><td>عند الإسناد</td><td class="c">—</td></tr>
+        <tr><td>قالب مقاول مرفوع بانتظار الاعتماد</td><td>مسؤول المسار</td><td>فوراً</td><td class="c">✓</td></tr>
+        <tr><td>مسودة خطة جاهزة للمراجعة · موقع مخطط صار غير جاهز</td><td>المخطِّط · مسؤول المسار</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>بند إجراء من الاجتماع مُسند · متأخر</td><td>مالك البند</td><td>فوراً · يومياً</td><td class="c">✓</td></tr>
+        <tr><td>إشارة @ في تعليق</td><td>المُشار إليه</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>فتح خطوة مقفلة بتجاوز المدير</td><td>مدير المشروع</td><td>فوراً</td><td class="c">—</td></tr>
+        <tr><td>انتهاء صلاحية تجاوز دون تحقق شروط الفتح (حيث الخيار مفعّل)</td><td>مدير المشروع</td><td>فوراً</td><td class="c">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3 style="margin-top:6px">قائمة التقارير</h3>
+  <p class="muted">كل تقرير يُفتح عند الطلب من الشبكة أو لوحة القيادة بالفلاتر نفسها، ويُصدَّر إلى Excel و PDF، ويُرسل تلقائياً في موعده.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>التقرير</th><th>المحتوى</th><th>المستلم</th><th>الموعد</th></tr></thead>
+      <tbody>
+        <tr><td>التقدم اليومي</td><td>لكل موقع: المخطط اليوم، المنجز، سبب عدم الإنجاز (Area of Focus). بشكل Daily Progress</td><td>مدير المشروع · مسؤولو المسارات</td><td>يومياً صباحاً</td></tr>
+        <tr><td>الخطة الأسبوعية</td><td>لكل مالك مهمة: المواقع والخطوات المستحقة والإجراء التالي. بشكل Weekly Plan</td><td>مسؤولو المسارات · المهندسون</td><td>أسبوعياً</td></tr>
+        <tr><td>التقرير الشهري</td><td>لكل Milestone ومنطقة: المخطط مقابل المنجز، منحنى S، أبرز المخاطر</td><td>الإدارة</td><td>شهرياً</td></tr>
+        <tr><td>ملخص الأحمر</td><td>الخطوات المتجاوزة للحد الأعلى: الموقع، الخطوة، الأيام، المالك</td><td>مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>النواقص</td><td>تاريخ بلا مستند معتمد، نماذج صادرة غير مرفوعة: الموقع، الخطوة، الخانة، الأيام</td><td>المالكون</td><td>أسبوعياً</td></tr>
+        <tr><td>تراكم الاعتماد</td><td>البنود المعلّقة لكل مراجع ومعتمِد وعمرها</td><td>مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>جودة البيانات</td><td>مخالفات قواعد التنبيه: القاعدة، الموقع، القيم</td><td>مدير المنظومة · مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>مخالفات الترحيل</td><td>مخالفات البيانات المرحّلة في الترحيل الأول من الماستر</td><td>مدير المشروع</td><td>مرة واحدة وعند الطلب</td></tr>
+        <tr><td>الإعدادات الناقصة</td><td>ما لم يُحدَّد بعد: أوزان، قوالب، أنشطة، مسؤولون</td><td>مدير المنظومة</td><td>عند الطلب</td></tr>
+        <tr><td>الحضور</td><td>الزيارات المخططة مقابل المنفذة، الوقت في الموقع، التسجيل خارج النطاق</td><td>مسؤولو المسارات</td><td>أسبوعياً</td></tr>
+        <tr><td>QC</td><td>حالة كل موقع ونشاط، المرفوض وأسبابه، المنتظر</td><td>مسؤولو QC · مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>المخزن</td><td>الرصيد، المستلم، المصروف، التالف، النقص المتوقع، المصروف مقابل الاحتياج، فروقات الجرد</td><td>Inventory Supervisor · مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>بطاقة المقاولين</td><td>مؤشرات كل مقاول ودرجته</td><td>مدير المشروع</td><td>شهرياً</td></tr>
+        <tr><td>الجاهزية للإغلاق</td><td>المواقع القريبة من الإغلاق وما ينقصها</td><td>مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>الجاهزية</td><td>المواقع المخططة غير الجاهزة للأسابيع الثلاثة القادمة، بالسبب ومن يزيله</td><td>مسؤولو المسارات · مدير المشروع</td><td>أسبوعياً</td></tr>
+        <tr><td>محضر الاجتماع</td><td>الحضور، القرارات، بنود الإجراء وحالتها</td><td>المشاركون</td><td>بعد كل اجتماع</td></tr>
+        <tr><td>الفرق والسعة</td><td>الفرق لكل مقاول ومنطقة، الاستغلال، فجوة السعة للأسابيع القادمة</td><td>مدير المشروع · مسؤولو المسارات</td><td>أسبوعياً</td></tr>
+        <tr><td>إسناد التأخير</td><td>أيام التأخير لكل جهة وخطوة ومقاول، بأسبابها ومستنداتها، وغير المُسند</td><td>مدير المشروع · الإدارة</td><td>شهرياً</td></tr>
+        <tr><td>السلامة</td><td>الحوادث وكاد يقع، التقييمات، الإجراءات التصحيحية</td><td>مدير المشروع · مسؤول السلامة</td><td>شهرياً</td></tr>
+        <tr><td>المخاطر</td><td>المخاطر المفتوحة، المصفوفة، التعرّض، المراجعات المتأخرة، المتحوّل إلى مشاكل</td><td>مدير المشروع · الإدارة</td><td>شهرياً</td></tr>
+        <tr><td>التدقيق</td><td>الفتح بتجاوز وأسبابه، الاعتماد الذاتي، دفعات الرفع والتراجع عنها، تغييرات النطاق والإعدادات وعضوية العناقيد، التعديل بعد التسليم، الحذف (الأرشفة)</td><td>مدير المشروع</td><td>شهرياً</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s14">
+  <h2><span class="n">14</span>الأدوار والمسؤوليات</h2>
+  <p class="muted">ستة أدوار رئيسية معتمدة للمشروع، وتحتها تسعة أدوار فرعية تعمل باسم دورها الرئيسي وبمراجعته. مدير المنظومة دور تقني للمنظومة نفسها، لا دور في المشروع. يُقترح أن تطابق قائمة Setting › tblStaffRole هذه الأدوار الخمسة عشر، ويُكتب اسم كل شخص في جدول tblStaff (Name · Role · Region · Status).</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الدور الرئيسي</th><th>الأدوار الفرعية</th><th>المراحل والسجلات</th></tr></thead>
+      <tbody>
+        <tr><td><b>Project Manager</b></td><td>—</td><td>اعتماد النطاق والدفعة، والخطة (Baseline)، والتغييرات (Change Control)، والمخاطر، و Final Closure</td></tr>
+        <tr><td><b>RF &amp; Design / Acquisition Team Lead</b></td><td>RF Engineer · Acquisition Team</td><td>المرحلة 1 حتى Site Release · RF &amp; Design · Acquisition · المرحلة 8 Cluster Optimization و KPI Acceptance</td></tr>
+        <tr><td><b>CW Team Lead</b></td><td>Site Engineers · Power Engineer · GECOL Power Team · HLC Fiber Team</td><td>المراحل 2 و 3 و 4 حتى Site RFI · GECOL · HLC · تصاريح CW · CW FAC · فك CW</td></tr>
+        <tr><td><b>TE Team Lead</b></td><td>MW Engineer · Site Engineers · HOTO Engineer</td><td>المراحل 5 و 6 و 7 و 9 · تصاريح TE · Readiness &amp; Handover · TE FAC · فك TE</td></tr>
+        <tr><td><b>Inventory Supervisor</b></td><td>—</td><td>WH · WH Serials · صرف المعدات واكتماله · Material Reconciliation</td></tr>
+        <tr><td><b>Project Support</b></td><td>Project Procurement Team</td><td>PR-PO والشركات والفرق · تسجيل Change Control و Baseline · Setting و Report Date · فحوص Data Quality قبل كل تقرير</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>المسؤولية عن الخطوة</h3><ul>
+      <li>لكل خطوة منفّذ (R) ومعتمِد (A) ومستشار (C) في الإعدادات. الأيام فوق حد SLA تُنسب للمنفّذ</li>
+      <li>خطوات التركيب حتى On-Air كلها على <b>مورّد TE</b> (المنفّذ)، و TE Team Lead يعتمد. الجيل تنفّذ اعتماد DN فقط</li>
+      <li>المهندس المشرف من الجيل (AAT SE) دوره الإشراف، يُستشار (C) ولا يُنسب إليه التأخير ولا يدخل في تقييم</li>
+      <li>الكهرباء والفايبر ضمن CW Team Lead لأنهما من شروط RFI</li></ul></div>
+    <div class="card"><h3>التعيين والتصعيد</h3><ul>
+      <li>مهام كل مرحلة تذهب إلى دورها الرئيسي تلقائياً، وهو يعيّن الأدوار الفرعية ومراجع الجودة من قائمة الموظفين</li>
+      <li>مالك المهمة يُدخل التاريخ والمستندات، ثم تُرفع للمراجعة والاعتماد</li>
+      <li>أصفر (تجاوز الحد الأدنى) ← إشعار لمالك المهمة. أحمر (تجاوز الحد الأعلى) ← تصعيد للدور الرئيسي. ملخص أسبوعي بكل الأحمر لـ Project Manager</li></ul></div>
+    <div class="card"><h3>الصلاحيات</h3><ul>
+      <li>الإجراء: عرض، إدخال، رفع جماعي، تعديل، أرشفة، مراجعة، اعتماد، مستندات، التراجع عن دفعة، وفتح خطوة مقفلة (لمدير المنظومة افتراضياً، بسبب إلزامي)</li>
+      <li>النطاق: مرحلة، سجل، نوع مستند، منطقة. والشخص قد يحمل أكثر من دور</li>
+      <li>الاعتماد الذاتي تحكمه الإعدادات، ويُوسَم "اعتماد ذاتي" في سجل التدقيق</li></ul></div>
+    <div class="card"><h3>من يستخدم المنظومة</h3><ul>
+      <li>فريق المشروع فقط. لا دور للمقاول ولا للمورّد ولا لممثل الجهة المستفيدة</li>
+      <li>الأشخاص لكل دور يحددهم Project Manager بالاستعانة بقادة الفرق</li>
+      <li>المقاولون والموردون يُقيَّمون ببطاقة أداء: SLA (بالأيام المنسوبة إليهم)، مرات الرفض، الالتزام بالخطة، اكتمال التوثيق</li></ul></div>
+  </div>
+  <h3 style="margin-top:6px">مسودة الصلاحيات الافتراضية</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الدور</th><th class="c">عرض</th><th class="c">إدخال</th><th class="c">رفع Excel</th><th class="c">مراجعة</th><th class="c">اعتماد</th><th class="c">مستندات</th><th class="c">الجودة</th><th class="c">المخزن</th><th class="c">الإعدادات</th><th class="c">فتح المقفل</th></tr></thead>
+      <tbody>
+        <tr><td>مدير المنظومة (تقني)</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">●</td></tr>
+        <tr><td>Project Manager</td><td class="c">●</td><td class="c">◐</td><td class="c">◐</td><td class="c">●</td><td class="c">●</td><td class="c">●</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td></tr>
+        <tr><td>RF &amp; Design / Acquisition Team Lead</td><td class="c">●</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td></tr>
+        <tr><td>CW Team Lead</td><td class="c">●</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td></tr>
+        <tr><td>TE Team Lead</td><td class="c">●</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td></tr>
+        <tr><td>Inventory Supervisor</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">●</td><td class="c">—</td><td class="c">—</td></tr>
+        <tr><td>Project Support</td><td class="c">●</td><td class="c">◐</td><td class="c">●</td><td class="c">—</td><td class="c">—</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">◐</td><td class="c">—</td></tr>
+        <tr><td>الأدوار الفرعية التسعة</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">◐</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td></tr>
+        <tr><td>مشاهد (الإدارة)</td><td class="c">◐</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">● كامل · ◐ ضمن نطاقه (مرحلته، منطقته، أو ما أُسند إليه) · — لا. مسودة تُعتمد في P0، والأدوار والصلاحيات قابلة للتعديل من الإعدادات.</p>
+</section>
+
+
+<section id="s15">
+  <h2><span class="n">15</span>الذكاء الاصطناعي</h2>
+  <p class="muted">يقترح ولا يعتمد: كل اقتراح يمر بدورة الاعتماد، ويُسجَّل أنه آلي، ويخضع لصلاحيات المستخدم.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الاستخدام</th><th>ماذا يفعل</th><th>الموثوقية</th></tr></thead>
+      <tbody>
+        <tr><td>قراءة المستندات</td><td>يقرأ شهادة PAC أو DN ويقترح الموقع ونوع المستند والتاريخ. يسرّع استيراد الأرشيف</td><td>عالية للمطبوع</td></tr>
+        <tr><td>فهم الصور</td><td>هل تُظهر الصورة المواد المطلوبة في قائمة الفحص، كاقتراح للمراجع</td><td>متوسطة</td></tr>
+        <tr><td>مساعد أسئلة</td><td>أسئلة بالعربية أو الإنجليزية على بيانات المنظومة، بإجابات من استعلامات فعلية</td><td>عالية</td></tr>
+        <tr><td>ملخصات وتوقع</td><td>ملخص التقرير الأسبوعي، والمواقع المرجح تأخرها</td><td>عالية / تتحسن مع البيانات</td></tr>
+        <tr><td>مساعدات أخرى</td><td>اقتراح الترجمة العربية لمسميات الواجهة، وتصنيف التذاكر وأولويتها</td><td>مسودة للمراجعة</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap"><b>مكان التشغيل:</b> الموصى به بيئة ذكاء اصطناعي محلية داخل الشبكة، تدرّبها فرق متخصصة في شركة الجيل الجديد، فلا تخرج البيانات. يحتاج ذلك سيرفر GPU، وجودة النموذج المحلي في العربية أقل من الخدمات السحابية. حالياً يُرجع في أي استخدام إلى سياسات مكتب أمن المعلومات بشركة الجيل والهيئة الوطنية لأمن وسلامة المعلومات.</p>
+</section>
+
+<section id="s16">
+  <h2><span class="n">16</span>البنية التقنية والبيانات</h2>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  U["Web · English / Arabic"] --> A["Application server<br/>gates · rules · SLA · approvals"]
+  M["Mobile app<br/>clock-in · QC photos · offline"] --> A
+  A --> DB[("PostgreSQL")]
+  A --> FS[("Document store<br/>versions · previews")]
+  A --> JOB["Scheduler<br/>alerts · escalation · reports · KPI snapshots"]
+  A --> AI["AI service<br/>local or cloud"]
+  A --> API["Open API"]
+  X["Master .xlsb · filled templates<br/>scanned archive"] -.-> MIG["Import service<br/>templates · validate · preview · approval queue"]
+  MIG --> A
+</pre>
+  </div>
+  <div class="diagram">
+<pre class="mermaid">
+erDiagram
+  SITE ||--o{ GATE_EVENT : records
+  GATE ||--o{ GATE_EVENT : defines
+  SCENARIO ||--o{ WEIGHT : "component / stage"
+  SCENARIO ||--o{ SLA_RULE : defines
+  SITE }o--|| SCENARIO : "work type"
+  PROJECT_ACTIVITY ||--o{ WEIGHT : "contract level"
+  HEALTH_FACTOR ||--o{ WEIGHT : "health index"
+  GATE ||--o{ SLA_RULE : governed_by
+  GATE ||--o{ DOC_TYPE : requires
+  GATE_EVENT ||--o{ DOCUMENT : evidenced_by
+  FORM_TEMPLATE ||--o{ TEMPLATE_VERSION : versions
+  TEMPLATE_VERSION ||--o{ DOCUMENT : generates
+  DOCUMENT ||--o{ DOC_VERSION : versions
+  USER ||--o{ TASK_ASSIGNMENT : "task owner"
+  GATE_EVENT ||--o| TASK_ASSIGNMENT : "owned by"
+  USER }o--o{ ROLE : holds
+  ROLE ||--o{ PERMISSION : grants
+  CHANGE_REQUEST }o--|| GATE_EVENT : "pending change"
+  IMPORT_BATCH ||--o{ CHANGE_REQUEST : creates
+  SITE ||--o{ ISSUE : raises
+  ISSUE }o--o| GATE : blocks
+  RISK }o--o{ SITE : affects
+  SITE ||--|| RF_DESIGN : "site data · RF · design"
+  SITE ||--o{ ACQUISITION : candidates
+  SITE ||--o{ PERMIT : "permits · access"
+  SITE }o--o| CLUSTER : "optimization"
+  SITE ||--o{ READINESS : "handover controls"
+  SITE ||--o{ INSPECTION : "QC · Snag · ITP · NCR"
+  SITE ||--o{ CHANGE : "change control"
+  SITE ||--o{ WORK_ORDER : "PR / PO"
+  SITE ||--o{ UTILITY_REQUEST : "GECOL / HLC"
+  SITE ||--o{ ASBUILT_LINE : quantities
+  ITEM ||--o{ SERIAL_UNIT : serials
+  SERIAL_UNIT }o--o| SITE : "reserved by DN · dispatched"
+  SERIAL_UNIT ||--o{ FAULT_TICKET : faulty
+  USER ||--o{ AUDIT_LOG : writes
+  SITE ||--o{ SITE_VISIT : "clock-in / out"
+  CONTRACTOR ||--o{ TEAM : has
+  TEAM ||--o{ TEAM_MEMBER : members
+  TEAM ||--o{ TASK_ASSIGNMENT : "assigned team"
+  SITE ||--o{ QC_ITEM : "CW QC / TE QC"
+  QC_ITEM ||--o{ QC_PHOTO : photos
+  GATE_EVENT ||--o{ SUBMISSION_ATTEMPT : attempts
+  GATE_EVENT ||--o{ BASELINE_VERSION : baselines
+  GATE_EVENT ||--o{ DELAY_ATTRIBUTION : "delay by party"
+  SITE ||--o{ COMMENT : comments
+  SITE ||--o{ HSE_REPORT : "incident · near-miss"
+  ITEM ||--o{ STOCK_RECEIPT : receipts
+  ITEM ||--o{ STOCK_RESERVATION : "reserved by DN"
+  ITEM ||--o{ STOCK_MOVEMENT : "TE DN · TE RN · CW DN · CW RN"
+  STOCK_MOVEMENT }o--o| WORK_ORDER : "site PO / WO · dismantle PO / WO"
+  ITEM ||--o{ STOCKTAKE_LINE : stocktake
+  MEETING ||--o{ ACTION_ITEM : actions
+  KPI ||--o{ KPI_SNAPSHOT : weekly
+  SITE ||--o{ DOSSIER_SNAPSHOT : "CW FAC · RFI · O&amp;M · Relocation"
+  IMPORT_BATCH ||--o{ AUDIT_LOG : "tagged"
+  GATE_EVENT {
+    string site_id FK
+    string gate_code FK
+    date baseline_plan
+    date forecast_plan
+    date start_date
+    date actual_date
+    string exec_status
+    string approval_status
+    string doc_status
+    string flags
+  }
+</pre>
+  </div>
+  <p class="cap">المخطط يعرض الكيانات والعلاقات الرئيسية لا كل الحقول. التفاصيل تُثبَّت في P0 مع قاموس البيانات.</p>
+  <div class="grid2">
+    <div class="card"><h3>الموصى به <span class="tag c">تطوير مخصص</span></h3><ul>
+      <li>PostgreSQL، و Django أو NestJS، وواجهة React بتبديل لغة و RTL، وجدول افتراضي العرض للشبكة (AG Grid، بعض ميزاته برخصة مدفوعة، أو TanStack Table مجاناً ببرمجة أكثر)، وتطبيق هاتف Flutter</li>
+      <li>مخزن ملفات (أو MinIO)، Docker، Nginx، HTTPS، نسخ احتياطي يومي</li></ul></div>
+    <div class="card"><h3>بديل منخفض الكود</h3><ul>
+      <li>NocoDB أو Budibase أو Appsmith فوق PostgreSQL</li>
+      <li>القيد: دورة الاعتماد و SLA بأيام العمل والتفعيل التلقائي وتطبيق الهاتف والذكاء الاصطناعي تحتاج برمجة إضافية وقد تتجاوز حدود المنصة</li></ul></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h3>الاستضافة والوصول</h3><ul>
+      <li>قابلة للتنصيب على سيرفر داخل شبكة الجهة أو على سحابة خاصة، بالبنية نفسها</li>
+      <li>الوصول من خارج الشبكة، ومنه تطبيق الهاتف في المواقع، محدود عبر شبكة افتراضية محمية VPN، وتُطبَّق عليه سياسات مكتب أمن المعلومات بشركة الجيل والهيئة الوطنية لأمن وسلامة المعلومات</li>
+      <li>التخزين يُحجَّم لصور QC وحدها بنحو <bdi dir="ltr">40–60 GB</bdi>، إضافة إلى المستندات</li></ul></div>
+    <div class="card"><h3>الدخول وكلمات المرور</h3><ul>
+      <li>الطرق الثلاث معاً: حسابات محلية، ودليل الجهة (LDAP / Active Directory)، ومصادقة ثنائية لمدير المنظومة</li>
+      <li>سياسة كلمات المرور مرجعها مكتب أمن المعلومات بشركة الجيل والهيئة الوطنية لأمن وسلامة المعلومات (<a href="https://nissa.gov.ly/main-services/policies/#password-police" style="color:var(--accent)">سياسة كلمات المرور</a>)، وما لا تغطيه يُستكمل من المعايير الدولية</li>
+      <li>أقصى فقدان بيانات وأقصى توقف ومدة الاحتفاظ: السؤال A (القسم 20)</li></ul></div>
+    <div class="card"><h3>تطبيق الهاتف · متطلبات مستقبلية</h3><ul>
+      <li>مرحلة متقدمة (P4)، لكن البنية تُصمَّم لها من البداية</li>
+      <li>التوزيع عبر المتجر أو ملف APK أو نظام إدارة أجهزة، ودعم iOS و Android</li>
+      <li>معالجة تعارض التعديل دون اتصال، وتُحدَّد طريقتها عند تصميم التطبيق</li></ul></div>
+  </div>
+
+  <h3 style="margin-top:6px">بوابات الأمن والتشغيل</h3>
+  <p class="muted">قائمة تحقق تسبق تشغيل التجربة ثم التعميم. القيم المعلّقة (أقصى فقدان البيانات والتوقف ومدة الاحتفاظ، ومعايير قبول التجربة) تُحدَّد في السؤالين A و B (القسم 20).</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>#</th><th>البوابة</th><th>متى</th></tr></thead>
+      <tbody>
+        <tr><td class="c">1</td><td>مراجعة أمنية من مكتب أمن المعلومات بشركة الجيل، وفق سياسات الهيئة الوطنية لأمن وسلامة المعلومات</td><td>قبل التجربة</td></tr>
+        <tr><td class="c">2</td><td>فحص ثغرات واختبار اختراق</td><td>قبل التجربة، ثم قبل التعميم</td></tr>
+        <tr><td class="c">3</td><td>سجل التدقيق غير قابل للتعديل أو الحذف، حتى من مدير المنظومة. أساسي لأن التجاوز والاعتماد الذاتي والرفع من الماستر والتراجع عن الدفعات كلها تُراجَع منه</td><td>قبل التجربة</td></tr>
+        <tr><td class="c">4</td><td>اختبار استرجاع فعلي للنسخ الاحتياطية. أقصى فقدان بيانات وأقصى توقف ومدة الاحتفاظ: السؤال A</td><td>قبل التجربة</td></tr>
+        <tr><td class="c">5</td><td>مصفوفة الأدوار والصلاحيات يعتمدها مدير المشروع، وتُراجع دورياً</td><td>قبل الإطلاق</td></tr>
+        <tr><td class="c">6</td><td>معايير قبول التجربة: السؤال B</td><td>قبل التعميم</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s17">
+  <h2><span class="n">17</span>الترحيل من الماستر</h2>
+  <div class="phases">
+    <div class="phase"><span class="p">1</span><div><h3>قاموس البيانات</h3><p>المرجع هو الماستر الجديد نفسه: ورقة Guide (فهرس الأوراق، تعريف الـ Milestones العشرة، الإجراءات، قائمة فحص O&amp;M)، وعناوين الصفوف الثلاثة في Master (187 عموداً)، وجداول السجلات بأسمائها (tblRF، tblCandidates، tblOrders…)، والقوائم في Setting، وسجل قرارات إعادة البناء (D1 إلى D88). يُثبَّت في P0 لكل عمود: النوع، القيم المسموحة، المرحلة، البوابة أو الـ Milestone، الإلزامية، القاعدة، والقسم الذي يذهب إليه في المنظومة.</p></div></div>
+    <div class="phase"><span class="p">2</span><div><h3>استيراد تجريبي وتقرير جودة</h3><p>نقطة البداية فحوص Data Quality في الماستر (27 فحصاً تحمي الحسابات)، وأعمدة Check في السجلات. في الترحيل الأول تُستورد البيانات نهائية ومعتمدة كما هي، موسومة "مرحّل من الماستر"، ومخالفاتها في تقرير منفصل. خط الأساس الأصلي = النسخة الحالية المعتمدة في Baseline › Approved (Current)، والموقع بلا نسخة معتمدة "بلا خط أساس". الماستر لا يعرف إلا التواريخ و Done و Pending و N/A، فلا تُرحَّل أي خطوة Ongoing.</p></div></div>
+    <div class="phase"><span class="p">3</span><div><h3>السجلات قبل الماستر</h3><p>الأعمدة المحسوبة في Master (70 عموداً: 69 برأس رمادي، و EZ) وفي السجلات وفي Site Calc و SLA و Baseline › Proposal لا تُرحَّل قيماً ولا تُقرأ في الرفع اللاحق: المنظومة تحسبها. يُرحَّل RF &amp; Design أولاً لأنه سجل المواقع، ثم Acquisition و Permits &amp; HSE و PR-PO و GECOL و HLC و As-Built و WH و WH Serials و Quality Inspections و Change Control و Readiness &amp; Handover و Risk Register، ثم Master، ثم Baseline › Approved.</p></div></div>
+    <div class="phase"><span class="p">4</span><div><h3>الأرشيف الممسوح</h3><p>الرفع الجماعي بلا حد ويُقسَّم دفعات. مطابقة آلية (اسم الملف، أو قراءة المستند بالذكاء الاصطناعي)، وقائمة بما لم يُطابق. كل ملف يأخذ اسم التخزين الداخلي واسم العرض (القسم 05).</p></div></div>
+    <div class="phase"><span class="p">5</span><div><h3>الماستر بعد الترحيل الأول</h3><p>لا يُجمَّد الماستر: يبقى قناة دائمة لرفع البيانات بجانب الإدخال اليدوي، بالملف كما هو (xlsx أو xlsb بعد الحساب والحفظ). يُرفع دفعةً برقم، فيمر بالفحص ثم المراجعة والاعتماد، والأعمدة تُقرأ بأسماء عناوينها كما في لوحة القيادة الجديدة، فإضافة عمود لا تكسر الرفع.</p></div></div>
+  </div>
+
+  <details class="fold"><summary>Master · 187 عموداً بترتيب المراحل</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الأعمدة</th><th>الحقول في الماستر</th><th>يقابل في المنظومة</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">A</td><td># وصف SUBTOTAL (الصف 4) والفلتر عليه، والبيانات من الصف 5 حتى 504 (500 موقع)</td><td>لا يُرحَّل</td></tr>
+        <tr><td class="mono">B</td><td>Site ID</td><td>المعرّف الفريد ومفتاح الربط بكل السجلات</td></tr>
+        <tr><td class="mono">C:T</td><td>Identification · Coordinates · Classification · Tower Information · RF Survey · Acquisition Date (محسوبة من RF &amp; Design و Acquisition و As-Built)</td><td>بيانات الموقع من سجلاتها · Site Type و Uplink لاعتمادية الشبكة · RT / GF لحد SLA البرج</td></tr>
+        <tr><td class="mono">U:V</td><td>Baseline · Milestone: Site Release Date</td><td>U خطة Site Release · V = MS1</td></tr>
+        <tr><td class="mono">W</td><td>Phase Gate: Pre-CW Readiness</td><td>بوابة المرحلة 2</td></tr>
+        <tr><td class="mono">X:AF</td><td>Project Phase · Delivery Batch · Delivery Scenario · CW SOW (Tower Erection، Site Adaption، GECOL Power، HLC Fiber) · TE SOW (Full Scope، IP Router Only)</td><td>حقول إلزامية (DQ06) · أعلام النطاق و N/A · قالب التسلسل</td></tr>
+        <tr><td class="mono">AG:AK</td><td>CW Delivery Model · PR Status · PO / WO Status · Contractor Name · Contractor Team</td><td>B1 · B2 (من PR-PO)</td></tr>
+        <tr><td class="mono">AL</td><td>CW Access Date</td><td>B3 (من Permits &amp; HSE)</td></tr>
+        <tr><td class="mono">AM:AS</td><td>AAT SE Name · Survey Planned / Actual · Analysis Type / Result · Report Submitted / Approved</td><td>المشرف · B4 · B5 · B6 · B7</td></tr>
+        <tr><td class="mono">AT:AU</td><td>CW DN Submitted · Approved</td><td>B7</td></tr>
+        <tr><td class="mono">AV:AW</td><td>Baseline · Milestone: PRE-CW Completion</td><td>MS2</td></tr>
+        <tr><td class="mono">AX</td><td>Phase Gate: CW Readiness</td><td>بوابة المرحلة 3</td></tr>
+        <tr><td class="mono">AY:AZ</td><td>CW MOS Planned · Actual</td><td>B8 · B9</td></tr>
+        <tr><td class="mono">BA:BJ</td><td>Tower Erection (3 بنود) · Site Adaption (7 بنود): Done / Pending / N/A</td><td>B10 · B11 · أوزان Project Status 4.1 إلى 4.5 · أنشطة الجودة</td></tr>
+        <tr><td class="mono">BK:BN</td><td>CW Installation: Planned / Actual Start · Planned / Actual End</td><td>B10 · B11</td></tr>
+        <tr><td class="mono">BO:BP</td><td>Baseline · Milestone: CW Completion</td><td>MS3</td></tr>
+        <tr><td class="mono">BQ</td><td>Phase Gate: RFI Readiness</td><td>بوابة المرحلة 4</td></tr>
+        <tr><td class="mono">BR:BV</td><td>CW PAC Planned · Snags Found · Snags Cleared · CW As-Built Submitted · CW PAC Actual</td><td>B13</td></tr>
+        <tr><td class="mono">BW:BX</td><td>GECOL Status · HLC Fiber Status (من GECOL و HLC)</td><td>C2 · C4</td></tr>
+        <tr><td class="mono">BY:BZ</td><td>Baseline · Milestone: Site RFI</td><td>MS4</td></tr>
+        <tr><td class="mono">CA</td><td>Phase Gate: TE Installation Readiness</td><td>بوابة المرحلة 5</td></tr>
+        <tr><td class="mono">CB:CF</td><td>TE Access Date · Survey Date · Vendor Name · Vendor Team · AAT SE Name</td><td>D1 · D2 · المورّد · المشرف</td></tr>
+        <tr><td class="mono">CG:CJ</td><td>TE DN Submitted / Approved · TE MOS Planned / Actual</td><td>D3 · D4 · D5</td></tr>
+        <tr><td class="mono">CK:CS</td><td>TE Installation Items (5) · Planned / Actual Start · Planned / Actual End</td><td>D6 · Project Status 5.3</td></tr>
+        <tr><td class="mono">CT:CU</td><td>Baseline · Milestone: TE Completion</td><td>MS5</td></tr>
+        <tr><td class="mono">CV</td><td>Phase Gate: On-Air Readiness</td><td>بوابة المرحلة 6</td></tr>
+        <tr><td class="mono">CW:DA</td><td>Commissioning · MW Alignment · MW Measured RSL · RSL Deviation · Integration</td><td>D7 · D8 · D9</td></tr>
+        <tr><td class="mono">DB:DL</td><td>Cutover: MOP Submitted / Approved · Window Start / End · Cutover Result · Outage Duration · Legacy Dismantle Due · Rollback Count · Pre-Swap KPI Baseline · Post-Swap KPI Check / Result</td><td>D10a · D10b · مؤشرات Swap</td></tr>
+        <tr><td class="mono">DM:DP</td><td>On-Air Planned · Actual · Baseline · Milestone</td><td>D10 · MS6</td></tr>
+        <tr><td class="mono">DQ</td><td>Phase Gate: TE PAC Readiness</td><td>بوابة المرحلة 7</td></tr>
+        <tr><td class="mono">DR:EJ</td><td>SSV Date / Result · HWID · EIR (PWR · WL · MW · IP · Date) · PAT (PWR · WL · MW · IP · NOC · Date) · As-Built Date · TE Snags · TE PAC Planned / Actual</td><td>D11 إلى D16</td></tr>
+        <tr><td class="mono">EK:EL</td><td>Baseline · Milestone: TE PAC</td><td>MS7</td></tr>
+        <tr><td class="mono">EM</td><td>Phase Gate: Cluster Optimization Readiness</td><td>بوابة المرحلة 8</td></tr>
+        <tr><td class="mono">EN:ES</td><td>Cluster ID · Cluster Optimization Date · KPI Acceptance Source Date · KPI Source Validation · Baseline · Milestone KPI Acceptance</td><td>F1 · F2 · MS8</td></tr>
+        <tr><td class="mono">ET</td><td>Phase Gate: HOTO Readiness</td><td>بوابة المرحلة 9</td></tr>
+        <tr><td class="mono">EU:EY</td><td>Launch Date · Material Reconciliation · HOTO Package · Baseline · Milestone HOTO</td><td>D17 · MS9</td></tr>
+        <tr><td class="mono">EZ</td><td>Phase Gate: Final Closure Readiness</td><td>بوابة المرحلة 10</td></tr>
+        <tr><td class="mono">FA:FM</td><td>CW DLP Start / End · Snags · CW FAC · TE DLP Start / End · Snags · TE FAC · Contractual Obligations Closure · Baseline · Milestone Final Closure</td><td>B14 · B15 · D18 · Z1 · MS10</td></tr>
+        <tr><td class="mono">FN:FW</td><td>CW Dismantle (Site CW RFD · Contractor / Vendor · Planned · Actual · CW RN Date) · TE Dismantle (Site TE RFD · Contractor / Vendor · Planned · Actual · TE RN Date)</td><td>E1 · E2 · E3</td></tr>
+        <tr><td class="mono">FX:FZ</td><td>Current Milestone · Next Milestone · Overall Status</td><td>الحالة العامة. Cancelled تُستبعد من النطاق والأوزان</td></tr>
+        <tr><td class="mono">GA:GE</td><td>Pending Issue · Issue Owner · Issue Raised Date · Issue Status · Remark</td><td>القضايا الافتتاحية (القسم 09)</td></tr>
+      </tbody>
+    </table>
+  </div></details>
+
+  <details class="fold"><summary>أوراق الماستر · 23 ورقة ومقابلها في المنظومة</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>الورقة</th><th>المحتوى</th><th>يقابل في المنظومة</th></tr></thead>
+      <tbody>
+        <tr><td>Guide</td><td>فهرس الأوراق، تعريف الـ Milestones العشرة، الإجراءات، قائمة فحص O&amp;M (14 بنداً)</td><td>قاموس البيانات والمساعدة داخل الشاشات</td></tr>
+        <tr><td>Master</td><td>صف لكل موقع، 187 عموداً</td><td>شبكة المواقع وصفحة الموقع 360</td></tr>
+        <tr><td>Dashboard</td><td>6 جداول بمحددات Phase / Batch / Scenario</td><td>لوحة القيادة (القسم 02)</td></tr>
+        <tr><td>Project Status</td><td>8 أنشطة و45 بنداً، و Manual Deliverables Log</td><td>المستوى 5 (القسم 06)، والسجل اليدوي وحدات بمستنداتها</td></tr>
+        <tr><td>Progress &amp; Plan</td><td>صفحة يومية تُكتب فوق نفسها: Daily Progress و Tomorrow Plan، 10 صفوف لكل منهما</td><td>الخطة اليومية وتقريرها (القسم 08)، مع أرشيف تاريخي في المنظومة</td></tr>
+        <tr><td>RF &amp; Design</td><td>سجل المواقع (52 عموداً)</td><td>سجل المواقع والتصميم · يُرحَّل أولاً</td></tr>
+        <tr><td>Acquisition</td><td>صف لكل مرشّح (34 عموداً)، Selected و Selection Date، و Acquisition Status محسوب</td><td>سجل الاستحواذ</td></tr>
+        <tr><td>PR-PO</td><td>tblOrders · tblContractors · tblTeams</td><td>سجل المشتريات والمقاولين والفرق (القسم 11)</td></tr>
+        <tr><td>GECOL · HLC</td><td>صف لكل موقع بنطاقه</td><td>سجلا الكهرباء والفايبر</td></tr>
+        <tr><td>As-Built</td><td>67 عموداً: الكميات والتهيئة و RSL</td><td>ما رُكّب فعلاً · مرفق CW PAC</td></tr>
+        <tr><td>WH · WH Serials</td><td>المخزن والأرقام التسلسلية</td><td>المخزن (القسم 10)</td></tr>
+        <tr><td>Risk Register</td><td>18 عموداً، ومنقول ببياناته</td><td>سجل المخاطر</td></tr>
+        <tr><td>Permits &amp; HSE</td><td>جدول واحد (22 عموداً) للتصاريح والدخول و PTW</td><td>سجل التصاريح والسلامة</td></tr>
+        <tr><td>Data Quality</td><td>27 فحصاً بعدد الصفوف والخطورة وطريقة الإصلاح</td><td>تقرير جودة البيانات وقواعد التنبيه (القسم 03)</td></tr>
+        <tr><td>Quality Inspections</td><td>QC · Snag · ITP · NCR (24 عموداً)</td><td>ضبط الجودة (القسم 12)</td></tr>
+        <tr><td>Change Control</td><td>15 عموداً، تسعة أنواع تغيير</td><td>طلبات التغيير عبر الاعتماد · سجل التدقيق على مستوى الحقل</td></tr>
+        <tr><td>Readiness &amp; Handover</td><td>22 عموداً لكل موقع</td><td>شروط On-Air و HOTO والإغلاق</td></tr>
+        <tr><td>SLA</td><td>44 خطوة × (منتهية · مفتوحة)، والحدان في الصفين 6 و7</td><td>حدود SLA في الإعدادات برموزها نفسها</td></tr>
+        <tr><td>Baseline</td><td>Proposal محسوب، و Approved نسخ تُلصق قيماً، وروابط التخطيط B01 إلى B07</td><td>خط الأساس وإصداراته (القسم 08)</td></tr>
+        <tr><td>Setting</td><td>Parameters، العطل، الموظفون، كل القوائم</td><td>الإعدادات</td></tr>
+        <tr><td>Site Calc</td><td>10 أعمدة محسوبة لكل موقع (منها TE Dispatch Complete Date واحتياج القطاعات و MW)</td><td>تحسبها المنظومة، لا تُرحَّل</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">أوراق الإصدار 1.0 التي لم تعد موجودة: Milestone Tracking (حلّت محلها Baseline)، Project Progress (Project Status)، Permission Log (Permits &amp; HSE)، Contractor Log (PR-PO)، BOQ (As-Built)، QC (Quality Inspections)، Change &amp; History (Change Control)، Issue Log (أعمدة GA:GE في Master)، Dictionary (Guide وقاموس P0).</p>
+  </details>
+
+  <details class="fold"><summary>الـ Milestones العشرة في الماستر والمنظومة</summary>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Milestone</th><th>عمود Baseline</th><th>عمود Milestone</th><th>المقابل في المنظومة</th></tr></thead>
+      <tbody>
+        <tr><td>Site Release</td><td class="mono">U</td><td class="mono">V</td><td>MS1 · نهاية المرحلة 1</td></tr>
+        <tr><td>PRE-CW Completion</td><td class="mono">AV</td><td class="mono">AW</td><td>MS2</td></tr>
+        <tr><td>CW Completion</td><td class="mono">BO</td><td class="mono">BP</td><td>MS3</td></tr>
+        <tr><td>Site RFI</td><td class="mono">BY</td><td class="mono">BZ</td><td>MS4 · نهاية الأعمال المدنية شاملة الكهرباء والفايبر</td></tr>
+        <tr><td>TE Completion</td><td class="mono">CT</td><td class="mono">CU</td><td>MS5</td></tr>
+        <tr><td>On-Air</td><td class="mono">DO</td><td class="mono">DP</td><td>MS6 · في Swap = Cutover الناجح</td></tr>
+        <tr><td>TE PAC</td><td class="mono">EK</td><td class="mono">EL</td><td>MS7</td></tr>
+        <tr><td>KPI Acceptance</td><td class="mono">ER</td><td class="mono">ES</td><td>MS8 · لكل Cluster</td></tr>
+        <tr><td>HOTO</td><td class="mono">EX</td><td class="mono">EY</td><td>MS9</td></tr>
+        <tr><td>Final Closure</td><td class="mono">FL</td><td class="mono">FM</td><td>MS10</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="cap">Milestones الإصدار 1.0 (RF Plan، Site Survey، Site Acquisition، CW، RFI، TE Installed، On-Air، TE PAC، KPI Acceptance، HOTO) استُبدلت بهذه العشرة: RF Plan و Site Survey و Site Acquisition صارت خطوات داخل المرحلة 1 قبل Site Release، وأُضيف PRE-CW Completion و Final Closure.</p>
+  </details>
+</section>
+
+
+<section id="s18">
+  <h2><span class="n">18</span>مراحل التنفيذ</h2>
+  <p class="muted">كل مرحلة تعمل وحدها وتعطي قيمة فعلية قبل التي تليها.</p>
+  <div class="phases">
+    <div class="phase"><span class="p">P0</span><div><h3>التصميم</h3><p>اعتماد البلوبرنت وتجميده، ثم أي تعديل عليه طلب تغيير يُعتمد وتُحدَّث به نسخة جديدة. تثبيت قاموس البيانات والأدوار والأوزان والنماذج، ونماذج الشاشات باللغتين، ثم مراجعة المسميات العربية للواجهة.</p></div></div>
+    <div class="phase"><span class="p">P1</span><div><h3>الأساس</h3><p>الدخول والأدوار والصلاحيات، الإعدادات والحقول المخصصة، الشبكة وصفحة الموقع 360، دورة الاعتماد وصندوق "بانتظار اعتمادي"، المستندات ومحرك النماذج المعبّأة، قوالب Excel والرفع، الترحيل، البحث الموحّد، التعليقات، الإيقاف والإلغاء وتغيير النطاق، خط الأساس والتوقع، التبديل بين اللغتين، لوحة قيادة أساسية.</p></div></div>
+    <div class="phase"><span class="p">P2</span><div><h3>الأعمال المدنية · المسارات A و B و C</h3><p>الاستحواذ، الأعمال المدنية حتى CW FAC، المشتريات، الجيكول، الفايبر، نماذج CW PAC و FAC مع كميات As-Built، صلاحية الدخول والعقود، تذاكر المشاكل. يبدأ بعد وصول الأوراق التفصيلية.</p></div></div>
+    <div class="phase"><span class="p">P3</span><div><h3>TE والمخزن · المسارات D و E و F</h3><p>TE حتى O&amp;M مع SSV، الفك، التحسين والقبول لكل Cluster حيث يكون ضمن النطاق، اعتمادية الشبكة، المخزن كاملاً (الاستلام، الحجز بـ DN، الصرف، الجرد، التالف)، احتياج TE من التصميم، نماذج TE DN و TE RN و CW DN و CW RN و TE PAC و TE FAC و O&amp;M، والتوقيع الإلكتروني لفريق المشروع.</p></div></div>
+    <div class="phase"><span class="p">P4</span><div><h3>الميدان</h3><p>تطبيق الهاتف دون اتصال، الحضور، السلامة HSE، CW QC و TE QC وقفلهما على الاستلام بمفتاح التفعيل، سجل المقاولين والفرق وإسنادها.</p></div></div>
+    <div class="phase"><span class="p">P5</span><div><h3>التحكم</h3><p>الجاهزية والتوليد التلقائي للخطط، الاجتماع الأسبوعي، المخاطر، إسناد التأخير، مصفوفة الإشعارات والتصعيد، التقارير التلقائية، لقطات المؤشرات، لوحة القيادة كاملة، بطاقة المقاولين، ملف الموقع الكامل، الخريطة، استيراد الأرشيف.</p></div></div>
+    <div class="phase"><span class="p">P6</span><div><h3>التوسعة</h3><p>الذكاء الاصطناعي (قراءة المستندات أولاً، ثم المساعد وفهم الصور)، API.</p></div></div>
+  </div>
+  <p class="cap"><b>التسليم:</b> كل مرحلة تُجرَّب أولاً على منطقة واحدة وما لا يقل عن 50 موقعاً، ثم تُعمَّم، وتسبق التجربةَ والتعميمَ بواباتُ الأمن والتشغيل (القسم 16). معايير قبول كل مرحلة والتدريب: السؤال B (القسم 20). تطبيق الهاتف مرحلة متقدمة (P4)، ومتطلباته المستقبلية محسوبة في البنية من P1 (القسم 16).</p>
+</section>
+
+<section id="s19">
+  <h2><span class="n">19</span>مدخلات مطلوبة منك</h2>
+  <p class="muted">ليست أسئلة، بل مواد يُبنى عليها. هيكل الماستر الجديد كله وصل (23 ورقة)، ومعه أوزان Project Status وحدود SLA وهيكل المخزن والقوائم.</p>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>المدخل</th><th>يُحتاج في</th></tr></thead>
+      <tbody>
+        <tr><td>بيانات المخزن: الرصيد الافتتاحي والاستلامات والأرقام التسلسلية و Contract Qty و Planned Delivery Date لكل صنف. ورقتا WH و WH Serials بهيكلهما الجديد وفارغتان</td><td class="c">P3</td></tr>
+        <tr><td>النماذج الرسمية الحالية بصيغة Word (أو PDF لإعادة بنائها): CW PAC، CW FAC، Snags، TE PAC، TE FAC، HOTO، TE DN، TE RN، CW DN، CW RN. شرط لتفعيل النماذج المعبّأة</td><td class="c">P1</td></tr>
+        <tr><td>أوزان المستويات 1 إلى 4 (المكوّنات، المراحل، عوامل المواقع، عوامل صحة المشروع). أوزان المستوى 5 موجودة في Project Status</td><td class="c">P0</td></tr>
+        <tr><td>الخطة المعتمدة: نسخة أولى في Baseline › Approved لكل موقع نشط، وتواريخ Planned Delivery Date في WH، وتواريخ خطة السجل اليدوي. بدونها يبقى المخطط و SPI غير متوفّرين (فحص DQ14)</td><td class="c">P1</td></tr>
+        <tr><td>أسماء الأشخاص لكل دور من الأدوار الخمسة عشر في جدول الموظفين (Setting › tblStaff)، وتحديث قائمة الأدوار لتطابقها</td><td class="c">P0</td></tr>
+        <tr><td>نطاق المشروع في Setting › tblProjectScope: عدد مواقع PH1 و PH2 والعقد الكلي، والمرجع وتاريخ الاعتماد</td><td class="c">P0</td></tr>
+        <tr><td>الحقول الإلزامية في Master لكل موقع (DQ06): Project Phase، Delivery Batch، Delivery Scenario، أعلام النطاق AA:AF، CW Delivery Model</td><td class="c">P0</td></tr>
+        <tr><td>جدول Region ← WL Vendor في Setting لكل منطقة (DQ27)، و Has Expiry لكل نوع تصريح (DQ16)</td><td class="c">P0</td></tr>
+        <tr><td>وثائق السياسات: مكتب أمن المعلومات بشركة الجيل، الهيئة الوطنية لأمن وسلامة المعلومات، وسياسات السرية في إدارة التخطيط والتحول الرقمي</td><td class="c">P0</td></tr>
+        <tr><td>قناة كل حدث في مصفوفة الإشعارات (داخل المنظومة، بريد، رسائل نصية)، من Project Manager</td><td class="c">P0</td></tr>
+        <tr><td>مراجعة المسميات العربية للواجهة (المراحل، البوابات، المؤشرات، القوائم) بعد انتهاء التصميم</td><td class="c">نهاية P0</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="s20">
+  <h2><span class="n">20</span>أسئلة مفتوحة</h2>
+  <p class="cap">أجوبة الجولات السابقة مطبّقة في أقسامها: الدخول وكلمات المرور والاستضافة (16)، تطبيق الهاتف (16 و 18)، التجريب (18)، قنوات التنبيه (13)، الأرشيف والصيغ والسرية (05 و 17)، الذكاء الاصطناعي (15). وقرارات إعادة بناء الماستر (D1 إلى D88) واتفاقات الأدوار وتعريف RFI مطبّقة في الإصدار 1.1، وملخصها في القسم 21.</p>
+  <div class="grid2" style="align-items:start">
+    <div class="qgroup card">
+      <h3>متبقٍ من الجولة السابقة</h3>
+      <ol class="q" style="list-style-type:upper-alpha">
+        <li><b>المتطلبات غير الوظيفية:</b> أقصى فقدان بيانات مقبول، وأقصى توقف مقبول، ومدة الاحتفاظ بالبيانات وبسجل التدقيق.</li>
+        <li><b>خطة التسليم:</b> معايير قبول كل مرحلة، والتدريب: من يُدرَّب وبأي طريقة.</li>
+      </ol>
+      <ol class="q">
+        <li><b>فريق التطوير:</b> من سيبني المنظومة، وبأي لغة؟ تطبيق الهاتف يحتاج خبرة Flutter أو ما يماثلها.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<section id="s21">
+  <h2><span class="n">21</span>سجل التحديث 1.1 ونقاط النقاش</h2>
+  <p class="muted">ما تغيّر عن الإصدار 1.0 ليطابق الماستر الجديد والاتفاقات الأخيرة، ثم ما يحتاج قراراً قبل اعتماد المخطط في P0.</p>
+  <h3 style="margin-top:6px">ما تغيّر</h3>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>البند</th><th>الإصدار 1.0</th><th>الإصدار 1.1 (حسب الماستر الجديد)</th><th>القسم</th></tr></thead>
+      <tbody>
+        <tr><td>المرجع</td><td>Site Master v1.0 · 195 عموداً · 15 سجلاً</td><td>الماستر الجديد · 23 ورقة · 187 عموداً · قرارات D1 إلى D88</td><td class="mono">00 · 17</td></tr>
+        <tr><td>الـ Milestones</td><td>RF Plan … HOTO</td><td>Site Release، PRE-CW Completion، CW Completion، Site RFI، TE Completion، On-Air، TE PAC، KPI Acceptance، HOTO، Final Closure</td><td class="mono">03</td></tr>
+        <tr><td>البوابات</td><td>5 بوابات KCP</td><td>9 بوابات مراحل في الماستر (W · AX · BQ · CA · CV · DQ · EM · ET · EZ)، وشروط KCP-3 و KCP-4 صارت شروط On-Air و TE PAC</td><td class="mono">03</td></tr>
+        <tr><td>تعريف RFI</td><td>CW PAC + Power-On + تركيب HLC</td><td>نهاية الأعمال المدنية شاملة الكهرباء والفايبر: CW PAC بعد معالجة الملاحظات + Power-On + اختبار رابط TX</td><td class="mono">03</td></tr>
+        <tr><td>Site Release</td><td>أول خطوة (تحرير العميل)، و A-0</td><td>Milestone نهاية التصميم والاستحواذ بثمانية شروط، و A-0 محذوفة</td><td class="mono">03 · 06</td></tr>
+        <tr><td>بداية GECOL و HLC</td><td>صدور PO</td><td>صدور CW PR / WO (روابط B02 و B03)</td><td class="mono">03</td></tr>
+        <tr><td>Delivery Scenario</td><td>4 قيم</td><td>5 قيم بإضافة Expansion</td><td class="mono">03</td></tr>
+        <tr><td>السجلات</td><td>Permission Log، Contractor Log، BOQ، QC، Change &amp; History، Issue Log، Milestone Tracking، Project Progress</td><td>Permits &amp; HSE، PR-PO، As-Built، Quality Inspections، Change Control، أعمدة GA:GE، Baseline، Project Status، وجديد: Readiness &amp; Handover</td><td class="mono">02 · 17</td></tr>
+        <tr><td>Project Status</td><td>8 أنشطة و42 بنداً</td><td>8 أنشطة و45 بنداً: Testing &amp; Acceptance 7 بنود (SSV و KPI Acceptance)، و Training &amp; Handover بندان (HOTO)، و LLD لكل موقع</td><td class="mono">06</td></tr>
+        <tr><td>Data Quality</td><td>131 فحصاً</td><td>27 فحصاً تحمي الحسابات</td><td class="mono">03 · 17</td></tr>
+        <tr><td>المخزن</td><td>احتياج من BOQ، و Site Receipt Date</td><td>احتياج محسوب من التصميم، و TE Dispatch Complete Date، وملخص بعشرة صفوف</td><td class="mono">10</td></tr>
+        <tr><td>القضايا</td><td>Issue Log، وشدة بالأثر × العمر</td><td>أعمدة GA:GE، وترتيب حسب نوع الموقع ثم العمر</td><td class="mono">09</td></tr>
+        <tr><td>الأدوار</td><td>مسؤول لكل مسار</td><td>6 أدوار رئيسية و9 فرعية، والمشرف من الجيل للإشراف فقط، وخطوات التركيب حتى On-Air على مورّد TE</td><td class="mono">14</td></tr>
+        <tr><td>لوحة القيادة</td><td>GSDN CW Checkpoint Report القديمة</td><td>GSDN Site Delivery Dashboard الجديدة: Project Overview و CW و TE بثمانية تبويبات</td><td class="mono">02</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 style="margin-top:6px">نقاط تحتاج قراراً</h3>
+  <ol class="q">
+    <li><b>ميزات في المنظومة لا تقابلها بيانات في الماستر:</b> الحضور في الموقع (Clock-in)، ووحدة السلامة HSE وبلاغات الحوادث (حُذفت من الماستر بقرار D35)، وسعة الفرق وتوفرها وشهاداتها (ألغيت فحوصها بقرار D26)، وإسناد التأخير بالفترات، ومؤشر صحة المشروع. تبقى في المنظومة، أم تُحذف أو تؤجل إلى P6؟</li>
+    <li><b>بداية SLA D-1 في الماستر:</b> ورقة SLA تقيس D-1 (TE Access) من Site Release، بينما بوابة التركيب تُفتح من Site RFI. حدّ 3–5 أيام من Site Release غير واقعي. المقترح: تعديل الماستر ليقيس D-1 من TE Installation Readiness.</li>
+    <li><b>قالب Expansion:</b> القيمة الخامسة في Delivery Scenario بلا قواعد مكتوبة. ما المراحل المنطبقة عليه، وهل تنطبق RFI؟</li>
+    <li><b>قاعدة الـ Cluster:</b> الإصدار 1.0 اشترط أن تصبح كل مواقع الـ Cluster On-Air قبل التحسين. الماستر يفتح بوابة كل موقع من TE PAC ويقبل KPI بمصدر واحد للـ Cluster. نعتمد قاعدة الماستر؟</li>
+    <li><b>Final Closure وقياس الإنجاز:</b> Final Closure صار Milestone عاشراً، لكن Project Status لا يقيسه (نطاق القياس ينتهي عند HOTO). يبقى كذلك؟</li>
+    <li><b>صور الجودة:</b> الماستر يسجل QC و Snag و ITP و NCR دون صور. يبقى معرض الصور من تطبيق الهاتف شرطاً للاستلام بعد تفعيله (P4)؟</li>
+    <li><b>توزيع الأدوار الفرعية:</b> Power Engineer تحت CW Team Lead، و Site Engineers تحت CW و TE معاً. يُعتمد هذا التوزيع؟</li>
+  </ol>
+</section>
+
+
+<footer>الإصدار 1.1 بتاريخ 24-10-2026. مبنية على GSDN Site Master الجديد (23 ورقة، 187 عموداً في Master، 13 سجلاً) وسجل قرارات إعادة بنائه D1 إلى D88، ولوحة GSDN Site Delivery Dashboard الجديدة، والاتفاقات الأخيرة: RFI نهاية الأعمال المدنية شاملة الكهرباء والفايبر، والأدوار الستة الرئيسية والتسعة الفرعية، والمشرف من الجيل للإشراف فقط، وخطوات التركيب حتى On-Air على مورّد TE. عشرة Milestones من Site Release إلى Final Closure وتسع بوابات مراحل. ما تغيّر عن الإصدار 1.0 ونقاط القرار في القسم 21.</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true,theme:"neutral",securityLevel:"strict"});</script>
+</body></html>
