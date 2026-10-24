@@ -13,7 +13,7 @@ Read before any work:
 4. `docs/spec/` (written by domain-analyst) and `contracts/openapi.yaml` (owned by tech-lead).
 
 ## Domain facts (do not change without an ADR)
-- 10 milestones in this order: Site Release, PRE-CW Completion, CW Completion, Site RFI, TE Completion, On-Air, TE PAC, KPI Acceptance, HOTO, Final Closure.
+- Default workflow (seed version 1; milestones and gates are admin-configurable, see Configuration): 10 milestones in this order: Site Release, PRE-CW Completion, CW Completion, Site RFI, TE Completion, On-Air, TE PAC, KPI Acceptance, HOTO, Final Closure.
 - 9 phase gates between them. A gate date equals the previous milestone date. A Suspension→Resumption in Change Control shifts it.
 - SLA counts working days. The weekend is Friday and Saturday (NETWORKDAYS.INTL code 7). Holidays come from a table.
 - Delivery Scenario: New Build, Expansion, Hot Swap, Cold Swap, Relocation. Overall Status: Not Started, In Progress, On Hold, Completed, Cancelled.
@@ -50,6 +50,37 @@ Roles, groups and administration
 - Admin overrides are all allowed: unlock a stage or task, skip or mark N/A, accept without document or workflow, reopen an approved task, edit any date, and change the rules (documents, SLA, templates, gates, number of approval levels, QC photo rules) from settings screens without code. Each override requires a reason and step-up MFA, is written to the audit log with before/after values, shows an "Admin override" badge, is reversible, and is excluded from or flagged in KPIs.
 - The default sub-role mapping (RF Engineer, MW Engineer, Acquisition Team under RF & Design / Acquisition TL; Power Engineer, GECOL Power Team, HLC Fiber Team, Site Engineers (CW) under CW TL; Site Engineers (TE), HOTO Engineer under TE TL; Project Procurement Team under Project Support) is seed data, editable in the UI.
 - Default approval is 3 levels for every stage, configurable per stage.
+
+Configuration owned by the System Admin (or a delegate)
+- **Every create, rename, edit, deactivate or delete of configuration is a System Admin action**, or that of a person the admin delegated it to. Examples are task definitions, fields, lists, documents, templates, SLA, weights, warehouse items and roles. The Roles & Responsibilities settings decide who may do what. Each change is audited with before/after values, needs a reason, and is versioned. Nothing referenced by data is hard-deleted; it is deactivated.
+- **Delegation covers anything, to anyone.** The System Admin can delegate any action in the permission grid (including configuration: warehouse items, task definitions, custom fields, lists, documents, templates, SLA, weights, workflow versions, roles and permission profiles) to any person, any role or any group, for all regions or selected ones, time-bound or until revoked. Delegation is configured in the Roles & Responsibilities settings and is simply a permission grant. The database checks every configuration write against the actor's effective permission (`app_has_permission`), not against a fixed admin flag, so a delegated person can do exactly what was delegated and nothing more. Safeguards stay: nobody can grant rights to themselves, a delegate cannot re-delegate unless the admin explicitly allows it for that delegation, a delegate cannot remove an admin, there is always at least one active admin, and every delegated action is logged as "X on behalf of System Admin".
+- **Warehouse item master data** (item names, units, categories, design-based need rules) is edited by the System Admin, and by the Inventory Supervisor only through delegation from the admin.
+- **Task definitions are editable.** The admin can add new tasks or sub-steps inside any existing stage (for example a new step in PRE-CW or CW, or in TE), and can rename, reorder, change predecessors, or deactivate tasks. A new task gets its SLA rule, Document Library slots, template and matrix cells like any other task. Milestones and phase gates are also configurable (see the next rule). Each task has a flag "counts toward the stage milestone" (default yes), so the admin decides whether a new task blocks the milestone. Changes apply to new site tasks. For open sites the admin chooses whether to add the new task to them.
+- **Milestones and phase gates are configurable by the admin (decision 2026-10-25, replaces "fixed").**
+  - **Light changes, applied immediately:**
+    - rename (EN/AR display names)
+    - custom fields on milestones and gates
+    - the gate conditions (which tasks, permits or dates a gate waits for)
+    - the gate SLA
+    - whether a milestone counts in Project Status
+  - **Structural changes** (add, remove or reorder a milestone or gate, or move tasks between stages) are published as a new version of the workflow definition, with a reason and step-up MFA.
+    - New sites use the new version. For open sites the admin chooses, per site or in bulk, whether to migrate them; the migration preview shows which tasks move and which dates change.
+    - Sites never silently change version.
+  - Every milestone and gate keeps a stable internal code, so renames never break history, KPIs or reports. Each one also carries its Master export column.
+  - The screen warns when a change affects the Master-format export or the parallel-run comparison. During the parallel-run month the warning requires an explicit confirmation.
+  - Project Status and the dashboard read the active workflow version per site.
+- **Roles are fully admin-defined.** The 6 main roles and 9 sub-roles are seed data only. The admin can create a new role with:
+  - a name (EN/AR) and a description of its duties
+  - a parent role if it is a sub-role
+  - a default permission profile
+  - default regions and modules
+  - whether it may hold matrix levels (entry/review/approve)
+
+  Example: a **Management** role with "view the dashboard and progress reports", read-only on all modules and all regions, and no entry or approval. Roles can be renamed or deactivated (never deleted while assigned). Every change is audited.
+- **Custom fields (like adding a column to the Master).** The admin can add fields to any register (Procurement PR/PO/WO, GECOL power, HLC fiber, RF survey and design, Acquisition, Permits, Warehouse, Quality, Issue, Risk, Change Control, Readiness & Handover, As-Built, Meetings), to sites and to tasks. Each field has: label EN/AR, type (text, number, date, list, multi-list, yes/no, user, external party, file), required or optional, validation (min/max, pattern), list values (themselves editable), default, order and section, which roles can see and which can edit it, whether it appears in templates, exports and the Master-format export (with its column), and whether it is shown in lists and filters. Fields are versioned and deactivated, never deleted, so their history is kept. Templates regenerate with a new version when fields change, and old template versions are rejected on upload with a clear message.
+
+Permissions (part of Roles & Responsibilities settings)
+- Beyond the matrix (entry/review/approve), each role or assignment has a **permission grid per module and screen**: view, create, edit, delete, approve, export, import, download documents, see the audit log, and administer. Optional **field-level** rules hide or make read-only specific fields, including custom fields. Navigation shows only what the person may use. Permission sets can be saved as named profiles and applied to many assignments. Effective permission = union of the person's active assignments, limited by their regions and modules. All of this is configured in the Roles & Responsibilities settings and audited.
 
 Business rules
 - SLA for D-1 (TE Access) is measured from TE Installation Readiness (the Site RFI date), not from Site Release.

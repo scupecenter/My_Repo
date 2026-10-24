@@ -1,6 +1,6 @@
 # GSDN PMIS - Entity Relationship Diagram
 
-Source of truth: `apps/api/prisma/schema.prisma` (63 models, PostgreSQL 16). Field names are snake_case and shared with the importer mapping (`tools/master-import/mapping.csv`). Task codes (`task_definitions.code`, for example `CW_STA`, `TE_PAC`) must be aligned with the domain-analyst task catalogue once it exists in `docs/spec/`.
+Source of truth: `apps/api/prisma/schema.prisma` (71 models, PostgreSQL 16). Field names are snake_case and shared with the importer mapping (`tools/master-import/mapping.csv`). Task codes (`task_definitions.code`, for example `CW_STA`, `TE_PAC`) must be aligned with the domain-analyst task catalogue once it exists in `docs/spec/`.
 
 ```mermaid
 erDiagram
@@ -66,6 +66,15 @@ erDiagram
   TASK_DEFINITIONS ||--o{ SLA_RULES : versions
   REGIONS ||--o{ SLA_RULES : override
   SLA_RULES ||--o{ TASK_INSTANCES : snapshot
+  TASK_DEFINITIONS ||--o{ TASK_PREDECESSORS : needs
+  FIELD_DEFINITIONS ||--o{ FIELD_LIST_VALUES : options
+  FIELD_DEFINITIONS ||--o{ FIELD_PERMISSIONS : access
+  TASK_DEFINITIONS ||--o{ FIELD_DEFINITIONS : task_scoped
+  ROLES ||--o{ FIELD_PERMISSIONS : by_role
+  PERMISSION_PROFILES ||--o{ FIELD_PERMISSIONS : by_profile
+  PERMISSION_PROFILES ||--o{ PERMISSION_GRANTS : grid
+  PERMISSION_PROFILES ||--o{ USER_ROLE_ASSIGNMENT_PROFILES : applied
+  USER_ROLE_ASSIGNMENTS ||--o{ USER_ROLE_ASSIGNMENT_PROFILES : has
   WEIGHT_SETS ||--o{ WEIGHT_ACTIVITIES : has
   WEIGHT_ACTIVITIES ||--o{ WEIGHT_ITEMS : has
   WEIGHT_SETS ||--o{ PROGRESS_SNAPSHOTS : used_by
@@ -92,6 +101,12 @@ Not drawn (no foreign keys by design): `audit_log`, `system_log`, `settings`, `h
 **Baseline, calendar and change control.** `baseline_versions` and `baseline_entries` hold one date per site per milestone per version; `phase_gate_rules` hold min/max working days per link. `holidays` feed working-day math (weekend Friday/Saturday is code, not data). `change_requests` cover scope and date changes and Suspension/Resumption pairs; on resumption `shift_working_days` is computed and applied to the gates.
 
 **Registers.** Lean tables, each its own module: `procurement_records` (PR/PO/WO), `external_parties` and `external_teams` (contractors, vendors, GECOL, HLC), `gecol_records`, `hlc_records`, `permit_records` (permits and HSE checks as JSON), `warehouse_items`/`warehouse_serials`/`warehouse_site_qty`, `quality_inspections`, `issues` (many per site), `risks`, `readiness_handover`, `as_built_records` (quantities JSON), `meetings`/`meeting_actions`. Region-bearing registers carry `region_id` for RLS. Global rows (risks, meetings, clusters, default matrix cells, project-wide change requests, unallocated warehouse serials) are marked by an explicit `is_global` flag with CHECK constraints; a NULL region alone never makes a row global, and only `*` sessions may write global rows. Site-bound children use composite FKs `(site_id, region_id)` to `sites`, RESTRICT on delete so a deleted site cannot orphan or expose rows. `comments.region_id` is NOT NULL, tied to the task by composite FK with ON DELETE CASCADE.
+
+**Editable task definitions.** Milestones (`stage_definitions`), phase gates (`phase_gate_rules`) and the milestone tasks are fixed: `is_protected` plus triggers forbid inserting, deleting, renaming, reordering or deactivating them (only `approval_levels` and the gate min/max are editable); the migration/seed role `pmis_migrator` creates them (protection bypass depends on the database role, never on a session setting). Ordinary `task_definitions` belong to a fixed stage that never changes and can be added, renamed, reordered (`sort_order`), re-linked (`task_predecessors`, cycles rejected), flagged `counts_toward_milestone` (default true) and deactivated. Every change bumps `version`, stamps `effective_from`, and requires a `reason` and `changed_by`. The admin function `admin_add_task_to_open_sites()` (definer, full-access session only, audited) adds a new task to the open sites chosen by the API, taking its SLA rule from `sla_rule_for()`; document slots, template and matrix cells come from the existing placement, template and matrix tables when the task opens.
+
+**Custom fields.** `field_definitions` (entity type covering sites, tasks and every register, code, EN/AR labels, data type, required, validation JSON, default, section, sort, in_templates/in_exports/in_list_filters, Master export column, version) and `field_list_values` (editable options). Values live in a `custom` JSONB column on each entity table, with a GIN index and a validation trigger that checks type, required, list membership, min/max/pattern and unknown keys. A field is deactivated, never deleted once it holds values (checked across all regions by a definer function); a deactivated field keeps its values read-only. `field_permissions` give field x role or permission profile -> hidden/read/edit (most permissive wins; no rule = the entity permission decides). `field_set_versions` counts changes per entity type, and `template_versions.field_set_version` records the count at build time so older templates are rejected.
+
+**Permission grid.** `permission_profiles` are named sets; `permission_grants` are profile x module/screen x action (view, create, edit, delete, approve, export, import, download_documents, view_audit, administer). Profiles attach to assignments many-to-many (`user_role_assignment_profiles`). `app_resolve_permissions(user)` returns the union over the user's active assignments, each limited to its own modules; `app_has_permission()` treats a grant on `sites` as covering `sites.*`; `app_resolve_field_access()` resolves field rules. All three are definer functions callable for oneself (`app.user_id`) or from a full-access session. Regions stay with RLS.
 
 **SLA and calendar.** `work_calendars` hold the weekend days (default Friday and Saturday) and own their `holidays`. `sla_rules` are versioned per task: min (target) and max (limit) working days, `start_event` (task code, milestone or gate code), optional scenario and region overrides, calendar, effective_from/to, reason, changed_by/at. An exclusion constraint forbids overlapping ranges for the same task and scope. A rule used by tasks is frozen (only `effective_to` may change; edits create a new version). `task_instances.sla_rule_id` is the snapshot taken when the task opens; `sla_rule_for()` picks the most specific rule, and re-pointing open tasks is an admin-only path (`app.allow_sla_repoint`, never for approved tasks).
 
