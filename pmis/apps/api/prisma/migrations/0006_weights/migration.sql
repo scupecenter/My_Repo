@@ -81,3 +81,22 @@ END $$;
 CREATE TRIGGER weight_sets_frozen   BEFORE UPDATE OR DELETE ON weight_sets       FOR EACH ROW EXECUTE FUNCTION weight_freeze();
 CREATE TRIGGER weight_activities_frozen BEFORE INSERT OR UPDATE OR DELETE ON weight_activities FOR EACH ROW EXECUTE FUNCTION weight_freeze();
 CREATE TRIGGER weight_items_frozen  BEFORE INSERT OR UPDATE OR DELETE ON weight_items      FOR EACH ROW EXECUTE FUNCTION weight_freeze();
+
+-- A child never changes parent: moving an activity out of/into a published set (or an item between activities) would escape
+-- the freeze and the 100% check, which look at one parent only. Forbidden outright; delete and re-create in a draft instead.
+CREATE OR REPLACE FUNCTION weight_no_reparent() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF TG_TABLE_NAME = 'weight_activities' THEN
+    IF NEW.weight_set_id IS DISTINCT FROM OLD.weight_set_id THEN
+      RAISE EXCEPTION 'weight_activities.weight_set_id cannot change' USING ERRCODE = 'check_violation';
+    END IF;
+  ELSE
+    IF NEW.activity_id IS DISTINCT FROM OLD.activity_id THEN
+      RAISE EXCEPTION 'weight_items.activity_id cannot change' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER weight_activities_no_reparent BEFORE UPDATE ON weight_activities FOR EACH ROW EXECUTE FUNCTION weight_no_reparent();
+CREATE TRIGGER weight_items_no_reparent BEFORE UPDATE ON weight_items FOR EACH ROW EXECUTE FUNCTION weight_no_reparent();

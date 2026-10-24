@@ -33,6 +33,21 @@ LANGUAGE sql STABLE AS $$
   END
 $$;
 
+-- Role that bypasses RLS and owns the SECURITY DEFINER integrity functions (see 004 and the sweep notes below).
+-- Cross-table integrity checks must see ALL rows, not just the caller's region, so they run as this role.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_definer') THEN
+    CREATE ROLE pmis_definer NOLOGIN BYPASSRLS;
+  END IF;
+END $$;
+GRANT USAGE ON SCHEMA public TO pmis_definer;
+
+CREATE OR REPLACE FUNCTION app_is_full_access() RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('app.region_ids', true), '') = '*' $$;
+
+CREATE OR REPLACE FUNCTION app_has_session() RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('app.region_ids', true), '') <> '' $$;
+
 -- Region arrays (import_batches.region_scope): every region in the array must be visible; empty array = global.
 CREATE OR REPLACE FUNCTION app_regions_check(a integer[]) RETURNS boolean
 LANGUAGE sql STABLE AS $$
@@ -55,14 +70,22 @@ ALTER TABLE clusters          ADD CONSTRAINT clusters_global_xor_region         
 ALTER TABLE progress_snapshots ADD CONSTRAINT progress_snapshots_global_xor_region CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 ALTER TABLE matrix_cells      ADD CONSTRAINT matrix_cells_global_xor_region      CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 
--- Helper to apply a policy.
-CREATE OR REPLACE FUNCTION _rls_apply(t text, using_expr text, check_expr text) RETURNS void
+-- Policy helper: one policy per command. READ predicate for SELECT; WRITE predicate for INSERT (check), UPDATE (using and check)
+-- and DELETE (using). Using the read predicate for DELETE/UPDATE would let a region user delete or edit global rows or
+-- children of global parents that they can merely see.
+CREATE OR REPLACE FUNCTION _rls_apply(t text, read_expr text, write_expr text) RETURNS void
 LANGUAGE plpgsql AS $$
+DECLARE pol text;
 BEGIN
   EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
   EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
-  EXECUTE format('DROP POLICY IF EXISTS region_filter ON %I', t);
-  EXECUTE format('CREATE POLICY region_filter ON %I USING (%s) WITH CHECK (%s)', t, using_expr, check_expr);
+  FOREACH pol IN ARRAY ARRAY['region_filter','rls_select','rls_insert','rls_update','rls_delete'] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', pol, t);
+  END LOOP;
+  EXECUTE format('CREATE POLICY rls_select ON %I FOR SELECT USING (%s)', t, read_expr);
+  EXECUTE format('CREATE POLICY rls_insert ON %I FOR INSERT WITH CHECK (%s)', t, write_expr);
+  EXECUTE format('CREATE POLICY rls_update ON %I FOR UPDATE USING (%s) WITH CHECK (%s)', t, write_expr, write_expr);
+  EXECUTE format('CREATE POLICY rls_delete ON %I FOR DELETE USING (%s)', t, write_expr);
 END $$;
 
 -- (1) Site-bound tables: region_id NOT NULL, tied to sites(id, region_id) by composite FK. Strict.
@@ -113,12 +136,28 @@ SELECT _rls_apply('import_batch_rows',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id) AND (region_id IS NULL OR app_region_check(region_id))',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id AND app_regions_check(p.region_scope)) AND (region_id IS NULL OR app_region_check(region_id))');
 
+-- (3b) Configuration and definition tables are not site data: everyone can read them, only a '*' session may write them.
+-- Shared master data (external parties/teams, warehouse items) is readable by all and writable by any session with a region value.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'regions','roles','sub_roles','stage_definitions','task_definitions','document_types','document_type_placements',
+    'snag_types','template_definitions','template_versions','work_calendars','holidays','sla_rules',
+    'weight_sets','weight_activities','weight_items','baseline_versions','phase_gate_rules','settings'
+  ] LOOP
+    PERFORM _rls_apply(t, 'true', 'app_is_full_access()');
+  END LOOP;
+  FOREACH t IN ARRAY ARRAY['external_parties','external_teams','warehouse_items'] LOOP
+    PERFORM _rls_apply(t, 'true', 'app_has_session()');
+  END LOOP;
+END $$;
+
 DROP FUNCTION _rls_apply(text, text, text);
 
--- Not region-filtered, by design: users, roles, sub_roles, user_*, groups, delegations, stage/task/document/snag/template
--- definitions, template_versions, external_parties/teams, warehouse_items, holidays, baseline_versions, phase_gate_rules,
--- settings (configuration, no site data); notifications (owner-scoped in the API); audit_log and system_log (admin only,
--- append-only); document_type_placements; baseline of other config. These carry no site data.
+-- Not RLS-protected, by design (identity and log tables, guarded by API RBAC / append-only triggers, no site data):
+-- users, user_role_assignments (+ _regions, _modules), groups, group_members, delegations, notifications, audit_log, system_log.
+-- Every other table is covered above: site/region tables (1)(2), children (3), config and shared master data (3b).
 
 -- (4) Changing a site's region. Children carrying (site_id, region_id) follow automatically because the composite FKs are
 -- ON UPDATE CASCADE. Direct changes are blocked unless the admin-only path sets app.allow_region_change = 'on'
