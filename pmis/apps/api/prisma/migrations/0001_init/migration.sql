@@ -71,6 +71,18 @@ CREATE TYPE "WeightSetCode" AS ENUM ('project_status', 'health_index', 'delay_at
 CREATE TYPE "WeightSetStatus" AS ENUM ('draft', 'published');
 
 -- CreateEnum
+CREATE TYPE "FieldEntityType" AS ENUM ('site', 'task_instance', 'rf_design', 'acquisition', 'procurement', 'gecol', 'hlc', 'permit', 'warehouse_item', 'warehouse_serial', 'quality', 'issue', 'risk', 'change_request', 'readiness', 'as_built', 'meeting', 'external_party');
+
+-- CreateEnum
+CREATE TYPE "FieldDataType" AS ENUM ('text', 'number', 'date', 'list', 'multi_list', 'bool', 'user', 'external_party', 'file');
+
+-- CreateEnum
+CREATE TYPE "FieldAccess" AS ENUM ('hidden', 'read', 'edit');
+
+-- CreateEnum
+CREATE TYPE "PermissionAction" AS ENUM ('view', 'create', 'edit', 'delete', 'approve', 'export', 'import', 'download_documents', 'view_audit', 'administer');
+
+-- CreateEnum
 CREATE TYPE "LogLevel" AS ENUM ('debug', 'info', 'warn', 'error');
 
 -- CreateEnum
@@ -263,6 +275,7 @@ CREATE TABLE "sites" (
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "sites_pkey" PRIMARY KEY ("id")
 );
@@ -276,6 +289,7 @@ CREATE TABLE "stage_definitions" (
     "name_ar" TEXT,
     "milestone_name" TEXT NOT NULL,
     "approval_levels" INTEGER NOT NULL DEFAULT 3,
+    "is_protected" BOOLEAN NOT NULL DEFAULT true,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
 
     CONSTRAINT "stage_definitions_pkey" PRIMARY KEY ("id")
@@ -286,17 +300,32 @@ CREATE TABLE "task_definitions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "code" TEXT NOT NULL,
     "stage_id" UUID NOT NULL,
-    "seq" INTEGER NOT NULL,
+    "sort_order" INTEGER NOT NULL,
     "name_en" TEXT NOT NULL,
     "name_ar" TEXT,
     "has_documents" BOOLEAN NOT NULL DEFAULT true,
     "is_milestone_task" BOOLEAN NOT NULL DEFAULT false,
+    "is_protected" BOOLEAN NOT NULL DEFAULT false,
+    "counts_toward_milestone" BOOLEAN NOT NULL DEFAULT true,
     "approval_levels" INTEGER,
     "condition_rule" JSONB,
     "default_external_party" "ExternalPartyType",
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "effective_from" DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reason" TEXT,
+    "changed_by" UUID,
+    "changed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "task_definitions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "task_predecessors" (
+    "task_def_id" UUID NOT NULL,
+    "predecessor_id" UUID NOT NULL,
+
+    CONSTRAINT "task_predecessors_pkey" PRIMARY KEY ("task_def_id","predecessor_id")
 );
 
 -- CreateTable
@@ -330,6 +359,7 @@ CREATE TABLE "task_instances" (
     "version" INTEGER NOT NULL DEFAULT 1,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "task_instances_pkey" PRIMARY KEY ("id")
 );
@@ -392,6 +422,7 @@ CREATE TABLE "external_parties" (
     "contract_start" DATE,
     "contract_end" DATE,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "external_parties_pkey" PRIMARY KEY ("id")
 );
@@ -564,6 +595,7 @@ CREATE TABLE "template_versions" (
     "template_def_id" UUID NOT NULL,
     "version" INTEGER NOT NULL,
     "header_checksum" TEXT NOT NULL,
+    "field_set_version" INTEGER NOT NULL DEFAULT 1,
     "columns" JSONB NOT NULL,
     "storage_key" TEXT,
     "is_current" BOOLEAN NOT NULL DEFAULT true,
@@ -716,6 +748,7 @@ CREATE TABLE "baseline_entries" (
 CREATE TABLE "phase_gate_rules" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "link_code" TEXT NOT NULL,
+    "is_protected" BOOLEAN NOT NULL DEFAULT true,
     "from_milestone" TEXT NOT NULL,
     "to_milestone" TEXT NOT NULL,
     "min_wd" INTEGER NOT NULL,
@@ -746,6 +779,7 @@ CREATE TABLE "change_requests" (
     "resumption_date" DATE,
     "paired_change_id" UUID,
     "shift_working_days" INTEGER,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "change_requests_pkey" PRIMARY KEY ("id")
 );
@@ -814,6 +848,100 @@ CREATE TABLE "progress_snapshots" (
 );
 
 -- CreateTable
+CREATE TABLE "field_definitions" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "entity_type" "FieldEntityType" NOT NULL,
+    "task_def_id" UUID,
+    "code" TEXT NOT NULL,
+    "label_en" TEXT NOT NULL,
+    "label_ar" TEXT,
+    "data_type" "FieldDataType" NOT NULL,
+    "required" BOOLEAN NOT NULL DEFAULT false,
+    "validation" JSONB,
+    "default_value" JSONB,
+    "section" TEXT,
+    "sort_order" INTEGER NOT NULL DEFAULT 0,
+    "in_templates" BOOLEAN NOT NULL DEFAULT false,
+    "in_exports" BOOLEAN NOT NULL DEFAULT false,
+    "master_export_column" TEXT,
+    "in_list_filters" BOOLEAN NOT NULL DEFAULT false,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "effective_from" DATE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "reason" TEXT,
+    "changed_by" UUID,
+    "changed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "field_definitions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "field_list_values" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "field_id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "label_en" TEXT NOT NULL,
+    "label_ar" TEXT,
+    "sort_order" INTEGER NOT NULL DEFAULT 0,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "field_list_values_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "field_permissions" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "field_id" UUID NOT NULL,
+    "role_id" UUID,
+    "profile_id" UUID,
+    "access" "FieldAccess" NOT NULL,
+
+    CONSTRAINT "field_permissions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "field_set_versions" (
+    "entity_type" "FieldEntityType" NOT NULL,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "field_set_versions_pkey" PRIMARY KEY ("entity_type")
+);
+
+-- CreateTable
+CREATE TABLE "permission_profiles" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "code" TEXT NOT NULL,
+    "name_en" TEXT NOT NULL,
+    "name_ar" TEXT,
+    "description" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "version" INTEGER NOT NULL DEFAULT 1,
+    "reason" TEXT,
+    "changed_by" UUID,
+    "changed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "permission_profiles_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "permission_grants" (
+    "profile_id" UUID NOT NULL,
+    "module_key" TEXT NOT NULL,
+    "action" "PermissionAction" NOT NULL,
+
+    CONSTRAINT "permission_grants_pkey" PRIMARY KEY ("profile_id","module_key","action")
+);
+
+-- CreateTable
+CREATE TABLE "user_role_assignment_profiles" (
+    "assignment_id" UUID NOT NULL,
+    "profile_id" UUID NOT NULL,
+
+    CONSTRAINT "user_role_assignment_profiles_pkey" PRIMARY KEY ("assignment_id","profile_id")
+);
+
+-- CreateTable
 CREATE TABLE "rf_design_records" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "site_id" UUID NOT NULL,
@@ -829,6 +957,7 @@ CREATE TABLE "rf_design_records" (
     "azimuths" TEXT,
     "tilt" TEXT,
     "tss_plan_date" DATE,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "rf_design_records_pkey" PRIMARY KEY ("id")
 );
@@ -860,6 +989,7 @@ CREATE TABLE "acquisition_candidates" (
     "contract_signoff_date" DATE,
     "lease_expiry_date" DATE,
     "title_verified" BOOLEAN,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "acquisition_candidates_pkey" PRIMARY KEY ("id")
 );
@@ -879,6 +1009,7 @@ CREATE TABLE "procurement_records" (
     "team_id" UUID,
     "order_status" TEXT,
     "remark" TEXT,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "procurement_records_pkey" PRIMARY KEY ("id")
 );
@@ -903,6 +1034,7 @@ CREATE TABLE "gecol_records" (
     "billing_conversion_date" DATE,
     "status" TEXT,
     "remark" TEXT,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "gecol_records_pkey" PRIMARY KEY ("id")
 );
@@ -921,6 +1053,7 @@ CREATE TABLE "hlc_records" (
     "tx_link_tested_date" DATE,
     "status" TEXT,
     "remark" TEXT,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "hlc_records_pkey" PRIMARY KEY ("id")
 );
@@ -941,6 +1074,7 @@ CREATE TABLE "permit_records" (
     "stop_work" BOOLEAN NOT NULL DEFAULT false,
     "stop_lifted_date" DATE,
     "remark" TEXT,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "permit_records_pkey" PRIMARY KEY ("id")
 );
@@ -953,6 +1087,7 @@ CREATE TABLE "warehouse_items" (
     "name" TEXT NOT NULL,
     "unit" TEXT,
     "serialised" BOOLEAN NOT NULL DEFAULT false,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "warehouse_items_pkey" PRIMARY KEY ("id")
 );
@@ -973,6 +1108,7 @@ CREATE TABLE "warehouse_serials" (
     "return_condition" TEXT,
     "status" TEXT,
     "installed" BOOLEAN NOT NULL DEFAULT false,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "warehouse_serials_pkey" PRIMARY KEY ("id")
 );
@@ -1015,6 +1151,7 @@ CREATE TABLE "quality_inspections" (
     "status" TEXT,
     "blocking" BOOLEAN NOT NULL DEFAULT false,
     "snag_id" UUID,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "quality_inspections_pkey" PRIMARY KEY ("id")
 );
@@ -1034,6 +1171,7 @@ CREATE TABLE "issues" (
     "status" "RegisterStatus" NOT NULL DEFAULT 'open',
     "closed_date" DATE,
     "delay_days" INTEGER,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "issues_pkey" PRIMARY KEY ("id")
 );
@@ -1059,6 +1197,7 @@ CREATE TABLE "risks" (
     "next_review" DATE,
     "region_id" INTEGER,
     "is_global" BOOLEAN NOT NULL DEFAULT false,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "risks_pkey" PRIMARY KEY ("id")
 );
@@ -1081,6 +1220,7 @@ CREATE TABLE "readiness_handover" (
     "closure_approved_by" TEXT,
     "closure_approval_date" DATE,
     "closure_ready" BOOLEAN NOT NULL DEFAULT false,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "readiness_handover_pkey" PRIMARY KEY ("id")
 );
@@ -1092,6 +1232,7 @@ CREATE TABLE "as_built_records" (
     "region_id" INTEGER NOT NULL,
     "submitted_date" DATE,
     "quantities" JSONB NOT NULL,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "as_built_records_pkey" PRIMARY KEY ("id")
 );
@@ -1105,6 +1246,7 @@ CREATE TABLE "meetings" (
     "is_global" BOOLEAN NOT NULL DEFAULT false,
     "attendees" JSONB,
     "minutes" TEXT,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "meetings_pkey" PRIMARY KEY ("id")
 );
@@ -1233,6 +1375,9 @@ CREATE INDEX "sites_delivery_scenario_idx" ON "sites"("delivery_scenario");
 CREATE INDEX "sites_project_phase_delivery_batch_idx" ON "sites"("project_phase", "delivery_batch");
 
 -- CreateIndex
+CREATE INDEX "sites_custom_idx" ON "sites" USING GIN ("custom");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "sites_id_region_id_key" ON "sites"("id", "region_id");
 
 -- CreateIndex
@@ -1245,7 +1390,10 @@ CREATE UNIQUE INDEX "stage_definitions_seq_key" ON "stage_definitions"("seq");
 CREATE UNIQUE INDEX "task_definitions_code_key" ON "task_definitions"("code");
 
 -- CreateIndex
-CREATE INDEX "task_definitions_stage_id_seq_idx" ON "task_definitions"("stage_id", "seq");
+CREATE INDEX "task_definitions_stage_id_sort_order_idx" ON "task_definitions"("stage_id", "sort_order");
+
+-- CreateIndex
+CREATE INDEX "task_predecessors_predecessor_id_idx" ON "task_predecessors"("predecessor_id");
 
 -- CreateIndex
 CREATE INDEX "task_instances_region_id_state_idx" ON "task_instances"("region_id", "state");
@@ -1267,6 +1415,9 @@ CREATE INDEX "task_instances_sla_rule_id_idx" ON "task_instances"("sla_rule_id")
 
 -- CreateIndex
 CREATE INDEX "task_instances_due_date_idx" ON "task_instances"("due_date");
+
+-- CreateIndex
+CREATE INDEX "task_instances_custom_idx" ON "task_instances" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "task_instances_id_region_id_key" ON "task_instances"("id", "region_id");
@@ -1294,6 +1445,9 @@ CREATE UNIQUE INDEX "matrix_cell_assignees_cell_id_kind_ref_id_key" ON "matrix_c
 
 -- CreateIndex
 CREATE UNIQUE INDEX "external_parties_name_key" ON "external_parties"("name");
+
+-- CreateIndex
+CREATE INDEX "external_parties_custom_idx" ON "external_parties" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "external_teams_party_id_name_key" ON "external_teams"("party_id", "name");
@@ -1413,6 +1567,9 @@ CREATE INDEX "change_requests_site_id_kind_idx" ON "change_requests"("site_id", 
 CREATE INDEX "change_requests_region_id_status_idx" ON "change_requests"("region_id", "status");
 
 -- CreateIndex
+CREATE INDEX "change_requests_custom_idx" ON "change_requests" USING GIN ("custom");
+
+-- CreateIndex
 CREATE INDEX "weight_sets_code_status_effective_from_idx" ON "weight_sets"("code", "status", "effective_from");
 
 -- CreateIndex
@@ -1431,13 +1588,46 @@ CREATE INDEX "progress_snapshots_snapshot_date_weight_set_id_idx" ON "progress_s
 CREATE INDEX "progress_snapshots_region_id_snapshot_date_idx" ON "progress_snapshots"("region_id", "snapshot_date");
 
 -- CreateIndex
+CREATE INDEX "field_definitions_entity_type_is_active_idx" ON "field_definitions"("entity_type", "is_active");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "field_definitions_entity_type_code_key" ON "field_definitions"("entity_type", "code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "field_list_values_field_id_code_key" ON "field_list_values"("field_id", "code");
+
+-- CreateIndex
+CREATE INDEX "field_permissions_field_id_idx" ON "field_permissions"("field_id");
+
+-- CreateIndex
+CREATE INDEX "field_permissions_role_id_idx" ON "field_permissions"("role_id");
+
+-- CreateIndex
+CREATE INDEX "field_permissions_profile_id_idx" ON "field_permissions"("profile_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "permission_profiles_code_key" ON "permission_profiles"("code");
+
+-- CreateIndex
+CREATE INDEX "permission_grants_module_key_idx" ON "permission_grants"("module_key");
+
+-- CreateIndex
+CREATE INDEX "user_role_assignment_profiles_profile_id_idx" ON "user_role_assignment_profiles"("profile_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "rf_design_records_site_id_key" ON "rf_design_records"("site_id");
 
 -- CreateIndex
 CREATE INDEX "rf_design_records_region_id_idx" ON "rf_design_records"("region_id");
 
 -- CreateIndex
+CREATE INDEX "rf_design_records_custom_idx" ON "rf_design_records" USING GIN ("custom");
+
+-- CreateIndex
 CREATE INDEX "acquisition_candidates_region_id_idx" ON "acquisition_candidates"("region_id");
+
+-- CreateIndex
+CREATE INDEX "acquisition_candidates_custom_idx" ON "acquisition_candidates" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "acquisition_candidates_site_id_candidate_no_key" ON "acquisition_candidates"("site_id", "candidate_no");
@@ -1449,16 +1639,25 @@ CREATE INDEX "procurement_records_site_id_idx" ON "procurement_records"("site_id
 CREATE INDEX "procurement_records_region_id_order_status_idx" ON "procurement_records"("region_id", "order_status");
 
 -- CreateIndex
+CREATE INDEX "procurement_records_custom_idx" ON "procurement_records" USING GIN ("custom");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "gecol_records_site_id_key" ON "gecol_records"("site_id");
 
 -- CreateIndex
 CREATE INDEX "gecol_records_region_id_status_idx" ON "gecol_records"("region_id", "status");
 
 -- CreateIndex
+CREATE INDEX "gecol_records_custom_idx" ON "gecol_records" USING GIN ("custom");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "hlc_records_site_id_key" ON "hlc_records"("site_id");
 
 -- CreateIndex
 CREATE INDEX "hlc_records_region_id_status_idx" ON "hlc_records"("region_id", "status");
+
+-- CreateIndex
+CREATE INDEX "hlc_records_custom_idx" ON "hlc_records" USING GIN ("custom");
 
 -- CreateIndex
 CREATE INDEX "permit_records_site_id_idx" ON "permit_records"("site_id");
@@ -1470,7 +1669,13 @@ CREATE INDEX "permit_records_region_id_status_idx" ON "permit_records"("region_i
 CREATE INDEX "permit_records_valid_to_idx" ON "permit_records"("valid_to");
 
 -- CreateIndex
+CREATE INDEX "permit_records_custom_idx" ON "permit_records" USING GIN ("custom");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "warehouse_items_item_code_key" ON "warehouse_items"("item_code");
+
+-- CreateIndex
+CREATE INDEX "warehouse_items_custom_idx" ON "warehouse_items" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "warehouse_serials_serial_no_key" ON "warehouse_serials"("serial_no");
@@ -1480,6 +1685,9 @@ CREATE INDEX "warehouse_serials_site_id_idx" ON "warehouse_serials"("site_id");
 
 -- CreateIndex
 CREATE INDEX "warehouse_serials_region_id_status_idx" ON "warehouse_serials"("region_id", "status");
+
+-- CreateIndex
+CREATE INDEX "warehouse_serials_custom_idx" ON "warehouse_serials" USING GIN ("custom");
 
 -- CreateIndex
 CREATE INDEX "warehouse_site_qty_region_id_idx" ON "warehouse_site_qty"("region_id");
@@ -1497,10 +1705,16 @@ CREATE INDEX "quality_inspections_site_id_idx" ON "quality_inspections"("site_id
 CREATE INDEX "quality_inspections_region_id_status_idx" ON "quality_inspections"("region_id", "status");
 
 -- CreateIndex
+CREATE INDEX "quality_inspections_custom_idx" ON "quality_inspections" USING GIN ("custom");
+
+-- CreateIndex
 CREATE INDEX "issues_site_id_status_idx" ON "issues"("site_id", "status");
 
 -- CreateIndex
 CREATE INDEX "issues_region_id_status_idx" ON "issues"("region_id", "status");
+
+-- CreateIndex
+CREATE INDEX "issues_custom_idx" ON "issues" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "risks_risk_code_key" ON "risks"("risk_code");
@@ -1509,10 +1723,16 @@ CREATE UNIQUE INDEX "risks_risk_code_key" ON "risks"("risk_code");
 CREATE INDEX "risks_status_idx" ON "risks"("status");
 
 -- CreateIndex
+CREATE INDEX "risks_custom_idx" ON "risks" USING GIN ("custom");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "readiness_handover_site_id_key" ON "readiness_handover"("site_id");
 
 -- CreateIndex
 CREATE INDEX "readiness_handover_region_id_idx" ON "readiness_handover"("region_id");
+
+-- CreateIndex
+CREATE INDEX "readiness_handover_custom_idx" ON "readiness_handover" USING GIN ("custom");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "as_built_records_site_id_key" ON "as_built_records"("site_id");
@@ -1521,7 +1741,13 @@ CREATE UNIQUE INDEX "as_built_records_site_id_key" ON "as_built_records"("site_i
 CREATE INDEX "as_built_records_region_id_idx" ON "as_built_records"("region_id");
 
 -- CreateIndex
+CREATE INDEX "as_built_records_custom_idx" ON "as_built_records" USING GIN ("custom");
+
+-- CreateIndex
 CREATE INDEX "meetings_meeting_date_idx" ON "meetings"("meeting_date");
+
+-- CreateIndex
+CREATE INDEX "meetings_custom_idx" ON "meetings" USING GIN ("custom");
 
 -- CreateIndex
 CREATE INDEX "meeting_actions_meeting_id_idx" ON "meeting_actions"("meeting_id");
@@ -1591,6 +1817,12 @@ ALTER TABLE "sites" ADD CONSTRAINT "sites_cluster_id_fkey" FOREIGN KEY ("cluster
 
 -- AddForeignKey
 ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_stage_id_fkey" FOREIGN KEY ("stage_id") REFERENCES "stage_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "task_predecessors" ADD CONSTRAINT "task_predecessors_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "task_predecessors" ADD CONSTRAINT "task_predecessors_predecessor_id_fkey" FOREIGN KEY ("predecessor_id") REFERENCES "task_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1696,6 +1928,30 @@ ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_weight_set_i
 
 -- AddForeignKey
 ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "field_definitions" ADD CONSTRAINT "field_definitions_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "field_list_values" ADD CONSTRAINT "field_list_values_field_id_fkey" FOREIGN KEY ("field_id") REFERENCES "field_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "field_permissions" ADD CONSTRAINT "field_permissions_field_id_fkey" FOREIGN KEY ("field_id") REFERENCES "field_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "field_permissions" ADD CONSTRAINT "field_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "field_permissions" ADD CONSTRAINT "field_permissions_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "permission_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "permission_grants" ADD CONSTRAINT "permission_grants_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "permission_profiles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_role_assignment_profiles" ADD CONSTRAINT "user_role_assignment_profiles_assignment_id_fkey" FOREIGN KEY ("assignment_id") REFERENCES "user_role_assignments"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_role_assignment_profiles" ADD CONSTRAINT "user_role_assignment_profiles_profile_id_fkey" FOREIGN KEY ("profile_id") REFERENCES "permission_profiles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "rf_design_records" ADD CONSTRAINT "rf_design_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;

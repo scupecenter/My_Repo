@@ -192,6 +192,58 @@ enum WeightSetStatus {
   published
 }
 
+enum FieldEntityType {
+  site
+  task_instance
+  rf_design
+  acquisition
+  procurement
+  gecol
+  hlc
+  permit
+  warehouse_item
+  warehouse_serial
+  quality
+  issue
+  risk
+  change_request
+  readiness
+  as_built
+  meeting
+  external_party
+}
+
+enum FieldDataType {
+  text
+  number
+  date
+  list
+  multi_list
+  bool
+  user
+  external_party
+  file
+}
+
+enum FieldAccess {
+  hidden
+  read
+  edit
+}
+
+enum PermissionAction {
+  view
+  create
+  edit
+  delete
+  approve
+  export
+  import
+  download_documents
+  view_audit
+  administer
+}
+
 enum LogLevel {
   debug
   info
@@ -249,6 +301,7 @@ model Role {
 
   sub_roles          SubRole[]
   UserRoleAssignment UserRoleAssignment[]
+  FieldPermission    FieldPermission[]
 
   @@map("roles")
 }
@@ -313,12 +366,13 @@ model UserRoleAssignment {
   assigned_by      String?         @db.Uuid
   assigned_at      DateTime        @default(now()) @db.Timestamptz(6)
 
-  user     User                       @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  role     Role?                      @relation(fields: [role_id], references: [id])
-  sub_role SubRole?                   @relation(fields: [sub_role_id], references: [id])
-  assigner User?                      @relation("AssignmentAssignedBy", fields: [assigned_by], references: [id])
-  regions  UserRoleAssignmentRegion[]
-  modules  UserRoleAssignmentModule[]
+  user                      User                        @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  role                      Role?                       @relation(fields: [role_id], references: [id])
+  sub_role                  SubRole?                    @relation(fields: [sub_role_id], references: [id])
+  assigner                  User?                       @relation("AssignmentAssignedBy", fields: [assigned_by], references: [id])
+  regions                   UserRoleAssignmentRegion[]
+  modules                   UserRoleAssignmentModule[]
+  UserRoleAssignmentProfile UserRoleAssignmentProfile[]
 
   @@index([user_id, valid_to])
   @@index([role_id])
@@ -473,12 +527,14 @@ model Site {
   Issue                Issue[]
   ReadinessHandover    ReadinessHandover[]
   AsBuiltRecord        AsBuiltRecord[]
+  custom               Json                   @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@unique([id, region_id]) // target of composite FKs (site_id, region_id)
   @@index([region_id, overall_status])
   @@index([cluster_id])
   @@index([delivery_scenario])
   @@index([project_phase, delivery_batch])
+  @@index([custom], type: Gin)
   @@map("sites")
 }
 
@@ -494,6 +550,7 @@ model StageDefinition {
   name_ar         String?
   milestone_name  String // Site Release, PRE-CW Completion, ...
   approval_levels Int     @default(3) // configurable per stage
+  is_protected    Boolean @default(true) // milestones are code-defined: no insert/delete/rename (trigger, migration 0007)
   is_active       Boolean @default(true)
 
   tasks        TaskDefinition[]
@@ -503,27 +560,50 @@ model StageDefinition {
 }
 
 model TaskDefinition {
-  id                     String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code                   String             @unique // e.g. CW_STA, TE_PAC (shared with domain-analyst catalogue)
-  stage_id               String             @db.Uuid
-  seq                    Int
-  name_en                String
-  name_ar                String?
-  has_documents          Boolean            @default(true)
-  is_milestone_task      Boolean            @default(false)
-  approval_levels        Int? // null = inherit stage
-  condition_rule         Json? // scope-flag / scenario applicability rule
-  default_external_party ExternalPartyType?
-  is_active              Boolean            @default(true)
+  id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                    String             @unique // immutable; shared with the task catalogue
+  stage_id                String             @db.Uuid // a task belongs to a fixed stage and never moves
+  sort_order              Int
+  name_en                 String
+  name_ar                 String?
+  has_documents           Boolean            @default(true)
+  is_milestone_task       Boolean            @default(false)
+  is_protected            Boolean            @default(false) // milestone/gate rows: cannot be deleted, renamed or deactivated
+  counts_toward_milestone Boolean            @default(true) // false = does not block the stage milestone
+  approval_levels         Int? // null = inherit stage
+  condition_rule          Json? // scope-flag / scenario applicability rule
+  default_external_party  ExternalPartyType?
+  is_active               Boolean            @default(true)
+  // versioning (bumped by trigger on every change; before/after values go to audit_log)
+  version                 Int                @default(1)
+  effective_from          DateTime           @default(now()) @db.Date
+  reason                  String?
+  changed_by              String?            @db.Uuid
+  changed_at              DateTime           @default(now()) @db.Timestamptz(6)
 
   stage          StageDefinition         @relation(fields: [stage_id], references: [id])
   instances      TaskInstance[]
   matrix_cells   MatrixCell[]
   doc_placements DocumentTypePlacement[]
   SlaRule        SlaRule[]
+  predecessors   TaskPredecessor[]       @relation("TaskHasPredecessors")
+  successors     TaskPredecessor[]       @relation("TaskIsPredecessorOf")
+  field_defs     FieldDefinition[]
 
-  @@index([stage_id, seq])
+  @@index([stage_id, sort_order])
   @@map("task_definitions")
+}
+
+// Predecessor links between tasks (any stage). Cycles are rejected by trigger.
+model TaskPredecessor {
+  task_def_id    String         @db.Uuid
+  predecessor_id String         @db.Uuid
+  task           TaskDefinition @relation("TaskHasPredecessors", fields: [task_def_id], references: [id], onDelete: Cascade)
+  predecessor    TaskDefinition @relation("TaskIsPredecessorOf", fields: [predecessor_id], references: [id])
+
+  @@id([task_def_id, predecessor_id])
+  @@index([predecessor_id])
+  @@map("task_predecessors")
 }
 
 model TaskInstance {
@@ -564,6 +644,7 @@ model TaskInstance {
   slots                    DocumentSlot[]
   comments                 Comment[]
   snags                    Snag[]
+  custom                   Json           @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@unique([id, region_id])
   @@unique([site_id, task_def_id])
@@ -574,6 +655,7 @@ model TaskInstance {
   @@index([task_def_id, state])
   @@index([sla_rule_id])
   @@index([due_date])
+  @@index([custom], type: Gin)
   @@map("task_instances")
 }
 
@@ -650,6 +732,9 @@ model ExternalParty {
   tasks TaskInstance[]
   teams ExternalTeam[]
 
+  custom Json @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+
+  @@index([custom], type: Gin)
   @@map("external_parties")
 }
 
@@ -860,15 +945,16 @@ model TemplateDefinition {
 }
 
 model TemplateVersion {
-  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  template_def_id String   @db.Uuid
-  version         Int
-  header_checksum String // sha256 of the header row; mismatch rejects the upload
-  columns         Json // ordered column spec and validation
-  storage_key     String?
-  is_current      Boolean  @default(true)
-  published_by    String?  @db.Uuid
-  published_at    DateTime @default(now()) @db.Timestamptz(6)
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_def_id   String   @db.Uuid
+  version           Int
+  header_checksum   String // sha256 of the header row; mismatch rejects the upload
+  field_set_version Int      @default(1) // field_set_versions.version of the target entity when built; older = rejected on upload
+  columns           Json // ordered column spec and validation
+  storage_key       String?
+  is_current        Boolean  @default(true)
+  published_by      String?  @db.Uuid
+  published_at      DateTime @default(now()) @db.Timestamptz(6)
 
   template TemplateDefinition @relation(fields: [template_def_id], references: [id])
   batches  ImportBatch[]
@@ -1054,8 +1140,9 @@ model BaselineEntry {
 
 // Min/max working-day gap between consecutive milestones (Baseline sheet Link/From/To/Min/Max).
 model PhaseGateRule {
-  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  link_code      String @unique // B01..B09
+  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  link_code      String  @unique // B01..B09
+  is_protected   Boolean @default(true) // fixed: no insert/delete/rename
   from_milestone String
   to_milestone   String
   min_wd         Int
@@ -1088,9 +1175,11 @@ model ChangeRequest {
   resumption_date    DateTime?    @db.Date
   paired_change_id   String?      @db.Uuid
   shift_working_days Int? // computed on resumption, applied to gates
+  custom             Json         @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id, kind])
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("change_requests")
 }
 
@@ -1180,6 +1269,133 @@ model ProgressSnapshot {
 }
 
 // ============================================================================
+// 7c. CUSTOM FIELDS AND PERMISSION GRID (System Admin configuration)
+// ============================================================================
+
+// Admin-defined field on a register, sites or tasks. Values live in the entity's `custom` JSONB column keyed by code and are
+// validated by trigger (db/sql/006). Fields are deactivated, never deleted once they hold values.
+model FieldDefinition {
+  id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_type          FieldEntityType
+  task_def_id          String?         @db.Uuid // only for entity_type = task_instance: field of one task type
+  code                 String
+  label_en             String
+  label_ar             String?
+  data_type            FieldDataType
+  required             Boolean         @default(false)
+  validation           Json? // {"min":..,"max":..,"min_length":..,"max_length":..,"pattern":".."}
+  default_value        Json?
+  section              String?
+  sort_order           Int             @default(0)
+  in_templates         Boolean         @default(false)
+  in_exports           Boolean         @default(false)
+  master_export_column String? // column letter/name in the Master-format export
+  in_list_filters      Boolean         @default(false)
+  is_active            Boolean         @default(true)
+  version              Int             @default(1)
+  effective_from       DateTime        @default(now()) @db.Date
+  reason               String?
+  changed_by           String?         @db.Uuid
+  changed_at           DateTime        @default(now()) @db.Timestamptz(6)
+
+  task_def    TaskDefinition?   @relation(fields: [task_def_id], references: [id])
+  list_values FieldListValue[]
+  permissions FieldPermission[]
+
+  @@unique([entity_type, code])
+  @@index([entity_type, is_active])
+  @@map("field_definitions")
+}
+
+model FieldListValue {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id   String  @db.Uuid
+  code       String
+  label_en   String
+  label_ar   String?
+  sort_order Int     @default(0)
+  is_active  Boolean @default(true)
+
+  field FieldDefinition @relation(fields: [field_id], references: [id])
+
+  @@unique([field_id, code])
+  @@map("field_list_values")
+}
+
+// Field x role or permission profile -> hidden / read / edit. No rule = follows the entity-level permission.
+// Several rules for one user: the most permissive wins (union).
+model FieldPermission {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  field_id   String      @db.Uuid
+  role_id    String?     @db.Uuid
+  profile_id String?     @db.Uuid
+  access     FieldAccess
+
+  field   FieldDefinition    @relation(fields: [field_id], references: [id])
+  role    Role?              @relation(fields: [role_id], references: [id])
+  profile PermissionProfile? @relation(fields: [profile_id], references: [id])
+
+  @@index([field_id])
+  @@index([role_id])
+  @@index([profile_id])
+  @@map("field_permissions")
+}
+
+// Per entity type counter bumped by trigger on any field or list change. Template versions record the value they were built at.
+model FieldSetVersion {
+  entity_type FieldEntityType @id
+  version     Int             @default(1)
+  updated_at  DateTime        @default(now()) @db.Timestamptz(6)
+
+  @@map("field_set_versions")
+}
+
+model PermissionProfile {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @unique
+  name_en     String
+  name_ar     String?
+  description String?
+  is_active   Boolean  @default(true)
+  version     Int      @default(1)
+  reason      String?
+  changed_by  String?  @db.Uuid
+  changed_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  grants      PermissionGrant[]
+  assignments UserRoleAssignmentProfile[]
+  field_perms FieldPermission[]
+
+  @@map("permission_profiles")
+}
+
+// Grid cell: profile x module/screen x action. Presence = allowed. module_key is a module ("sites") or screen ("sites.tasks").
+model PermissionGrant {
+  profile_id String           @db.Uuid
+  module_key String
+  action     PermissionAction
+
+  profile PermissionProfile @relation(fields: [profile_id], references: [id], onDelete: Cascade)
+
+  @@id([profile_id, module_key, action])
+  @@index([module_key])
+  @@map("permission_grants")
+}
+
+// Profiles applied to assignments (many-to-many). Part of the assignment family (admin-only through the API, no RLS).
+model UserRoleAssignmentProfile {
+  assignment_id String @db.Uuid
+  profile_id    String @db.Uuid
+
+  assignment UserRoleAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  profile    PermissionProfile  @relation(fields: [profile_id], references: [id])
+
+  @@id([assignment_id, profile_id])
+  @@index([profile_id])
+  @@map("user_role_assignment_profiles")
+}
+
+// ============================================================================
 // 8. REGISTERS (lean; each is its own module)
 // ============================================================================
 
@@ -1199,8 +1415,10 @@ model RfDesignRecord {
   azimuths                  String?
   tilt                      String?
   tss_plan_date             DateTime? @db.Date
+  custom                    Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([region_id])
+  @@index([custom], type: Gin)
   @@map("rf_design_records")
 }
 
@@ -1231,9 +1449,11 @@ model AcquisitionCandidate {
   contract_signoff_date DateTime? @db.Date
   lease_expiry_date     DateTime? @db.Date
   title_verified        Boolean?
+  custom                Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@unique([site_id, candidate_no])
   @@index([region_id])
+  @@index([custom], type: Gin)
   @@map("acquisition_candidates")
 }
 
@@ -1252,9 +1472,11 @@ model ProcurementRecord {
   team_id      String?   @db.Uuid
   order_status String?
   remark       String?
+  custom       Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id])
   @@index([region_id, order_status])
+  @@index([custom], type: Gin)
   @@map("procurement_records")
 }
 
@@ -1278,8 +1500,10 @@ model GecolRecord {
   billing_conversion_date DateTime? @db.Date
   status                  String?
   remark                  String?
+  custom                  Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("gecol_records")
 }
 
@@ -1297,8 +1521,10 @@ model HlcRecord {
   tx_link_tested_date DateTime? @db.Date
   status              String?
   remark              String?
+  custom              Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("hlc_records")
 }
 
@@ -1318,10 +1544,12 @@ model PermitRecord {
   stop_work        Boolean   @default(false)
   stop_lifted_date DateTime? @db.Date
   remark           String?
+  custom           Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id])
   @@index([region_id, status])
   @@index([valid_to])
+  @@index([custom], type: Gin)
   @@map("permit_records")
 }
 
@@ -1334,6 +1562,9 @@ model WarehouseItem {
   serialised Boolean           @default(false)
   serials    WarehouseSerial[]
 
+  custom Json @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+
+  @@index([custom], type: Gin)
   @@map("warehouse_items")
 }
 
@@ -1354,9 +1585,11 @@ model WarehouseSerial {
   status           String?
   installed        Boolean       @default(false)
   item             WarehouseItem @relation(fields: [item_id], references: [id])
+  custom           Json          @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id])
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("warehouse_serials")
 }
 
@@ -1400,9 +1633,11 @@ model QualityInspection {
   status             String?
   blocking           Boolean   @default(false)
   snag_id            String?   @db.Uuid
+  custom             Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id])
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("quality_inspections")
 }
 
@@ -1421,9 +1656,11 @@ model Issue {
   status      RegisterStatus @default(open)
   closed_date DateTime?      @db.Date
   delay_days  Int?
+  custom      Json           @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([site_id, status])
   @@index([region_id, status])
+  @@index([custom], type: Gin)
   @@map("issues")
 }
 
@@ -1447,8 +1684,10 @@ model Risk {
   next_review    DateTime?      @db.Date
   region_id      Int?
   is_global      Boolean        @default(false) // explicit global row; NULL region alone never means global
+  custom         Json           @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([status])
+  @@index([custom], type: Gin)
   @@map("risks")
 }
 
@@ -1470,8 +1709,10 @@ model ReadinessHandover {
   closure_approved_by      String?
   closure_approval_date    DateTime? @db.Date
   closure_ready            Boolean   @default(false)
+  custom                   Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([region_id])
+  @@index([custom], type: Gin)
   @@map("readiness_handover")
 }
 
@@ -1482,8 +1723,10 @@ model AsBuiltRecord {
   site           Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   submitted_date DateTime? @db.Date
   quantities     Json // item -> quantity (tower m, cables, trays, rods ...)
+  custom         Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([region_id])
+  @@index([custom], type: Gin)
   @@map("as_built_records")
 }
 
@@ -1496,8 +1739,10 @@ model Meeting {
   attendees    Json?
   minutes      String?
   actions      MeetingAction[]
+  custom       Json            @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@index([meeting_date])
+  @@index([custom], type: Gin)
   @@map("meetings")
 }
 

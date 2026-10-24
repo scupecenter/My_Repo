@@ -42,6 +42,23 @@ DO $$ BEGIN
 END $$;
 GRANT USAGE ON SCHEMA public TO pmis_definer;
 
+-- The migration/seed role. Protected-row bypass depends on THIS ROLE, never on a session setting (a setting can be set by the
+-- app role or by SQL injection). Deployment: run migrations and the seed as a login role that is pmis_migrator or a member of
+-- it (GRANT pmis_migrator TO <deploy_login>); pmis_app must never be a member. Superusers also qualify.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_migrator') THEN
+    CREATE ROLE pmis_migrator NOLOGIN;
+  END IF;
+END $$;
+
+-- True only for the migration/seed role (checked on current_user, so SET ROLE tricks by the app role do not help it).
+CREATE OR REPLACE FUNCTION app_is_seeding() RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT pg_has_role(current_user, 'pmis_migrator', 'member') $$;
+
+-- True inside the admin SECURITY DEFINER functions (their owner is pmis_definer) and for the migration role.
+CREATE OR REPLACE FUNCTION app_in_admin_path() RETURNS boolean
+LANGUAGE sql STABLE AS $$ SELECT current_user = 'pmis_definer' OR app_is_seeding() $$;
+
 CREATE OR REPLACE FUNCTION app_is_full_access() RETURNS boolean
 LANGUAGE sql STABLE AS $$ SELECT coalesce(current_setting('app.region_ids', true), '') = '*' $$;
 
@@ -137,18 +154,22 @@ SELECT _rls_apply('import_batch_rows',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id AND app_regions_check(p.region_scope)) AND (region_id IS NULL OR app_region_check(region_id))');
 
 -- (3b) Configuration and definition tables are not site data: everyone can read them, only a '*' session may write them.
--- Shared master data (external parties/teams, warehouse items) is readable by all and writable by any session with a region value.
+-- Warehouse items are config: the admin edits them; the Inventory Supervisor only through delegation, which the API handles
+-- through `delegations` (the database sees a '*' session in that case).
+-- Shared master data (external parties/teams) is readable by all and writable by any session with a region value.
 DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'regions','roles','sub_roles','stage_definitions','task_definitions','document_types','document_type_placements',
     'snag_types','template_definitions','template_versions','work_calendars','holidays','sla_rules',
-    'weight_sets','weight_activities','weight_items','baseline_versions','phase_gate_rules','settings'
+    'weight_sets','weight_activities','weight_items','baseline_versions','phase_gate_rules','settings',
+    'task_predecessors','field_definitions','field_list_values','field_permissions','field_set_versions',
+    'permission_profiles','permission_grants','warehouse_items'
   ] LOOP
     PERFORM _rls_apply(t, 'true', 'app_is_full_access()');
   END LOOP;
-  FOREACH t IN ARRAY ARRAY['external_parties','external_teams','warehouse_items'] LOOP
+  FOREACH t IN ARRAY ARRAY['external_parties','external_teams'] LOOP
     PERFORM _rls_apply(t, 'true', 'app_has_session()');
   END LOOP;
 END $$;
@@ -156,18 +177,18 @@ END $$;
 DROP FUNCTION _rls_apply(text, text, text);
 
 -- Not RLS-protected, by design (identity and log tables, guarded by API RBAC / append-only triggers, no site data):
--- users, user_role_assignments (+ _regions, _modules), groups, group_members, delegations, notifications, audit_log, system_log.
+-- users, user_role_assignments (+ _regions, _modules, _profiles), groups, group_members, delegations, notifications, audit_log, system_log.
 -- Every other table is covered above: site/region tables (1)(2), children (3), config and shared master data (3b).
 
 -- (4) Changing a site's region. Children carrying (site_id, region_id) follow automatically because the composite FKs are
--- ON UPDATE CASCADE. Direct changes are blocked unless the admin-only path sets app.allow_region_change = 'on'
--- (the API does so only after step-up MFA, with a reason, and writes an audit_log row). Snapshots that are not FK-bound
+-- ON UPDATE CASCADE. Direct changes are blocked unless they run inside admin_transfer_site_region() (SECURITY DEFINER, owner
+-- pmis_definer, below) or as the migration role. No session setting can open this path. Snapshots that are not FK-bound
 -- (import_batch_rows.region_id, audit_log.region_id, risks/meetings/clusters region_id) are not rewritten.
 CREATE OR REPLACE FUNCTION sites_block_region_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.region_id IS DISTINCT FROM OLD.region_id
-     AND coalesce(current_setting('app.allow_region_change', true), '') <> 'on' THEN
+     AND NOT app_in_admin_path() THEN
     RAISE EXCEPTION 'sites.region_id is immutable; use the admin region-transfer path' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
@@ -176,3 +197,31 @@ END $$;
 DROP TRIGGER IF EXISTS sites_region_immutable ON sites;
 CREATE TRIGGER sites_region_immutable BEFORE UPDATE OF region_id ON sites
   FOR EACH ROW EXECUTE FUNCTION sites_block_region_change();
+
+-- Admin region transfer: full-access session only, reason required, audited. Children follow by the composite FK cascade.
+CREATE OR REPLACE FUNCTION admin_transfer_site_region(p_site uuid, p_new_region integer, p_reason text) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE old_region integer;
+BEGIN
+  IF NOT public.app_is_full_access() THEN
+    RAISE EXCEPTION 'admin path: full-access session required' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF coalesce(btrim(p_reason), '') = '' THEN RAISE EXCEPTION 'a reason is required'; END IF;
+  SELECT region_id INTO old_region FROM public.sites WHERE id = p_site FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'site not found'; END IF;
+  UPDATE public.sites SET region_id = p_new_region, updated_at = now() WHERE id = p_site;
+  INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, is_admin_override, actor_id)
+  VALUES ('site_region_transfer', 'site', p_site::text, p_site, p_new_region,
+          jsonb_build_object('region_id', old_region), jsonb_build_object('region_id', p_new_region), p_reason, true,
+          nullif(current_setting('app.user_id', true), '')::uuid);
+END $$;
+ALTER FUNCTION admin_transfer_site_region(uuid, integer, text) OWNER TO pmis_definer;
+GRANT SELECT, UPDATE ON sites TO pmis_definer;
+GRANT INSERT ON audit_log TO pmis_definer;
+GRANT USAGE ON SEQUENCE audit_log_id_seq TO pmis_definer;
+REVOKE ALL ON FUNCTION admin_transfer_site_region(uuid, integer, text) FROM PUBLIC;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    GRANT EXECUTE ON FUNCTION admin_transfer_site_region(uuid, integer, text) TO pmis_app;
+  END IF;
+END $$;

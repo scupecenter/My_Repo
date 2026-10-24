@@ -70,14 +70,14 @@ BEGIN
 END $$;
 CREATE TRIGGER task_sla_lock BEFORE INSERT OR UPDATE OF sla_rule_id ON task_instances FOR EACH ROW EXECUTE FUNCTION task_sla_lock_rule();
 
--- A task keeps the rule it opened with. Re-pointing is the admin path only: the API sets app.allow_sla_repoint = 'on'
--- after step-up MFA and writes an audit row; approved tasks can never be re-pointed. Setting it for the first time
+-- A task keeps the rule it opened with. Re-pointing is possible only inside admin_repoint_sla() (SECURITY DEFINER, owner
+-- pmis_definer) or as the migration role; no session setting can open this path. Approved tasks can never be re-pointed. Setting it for the first time
 -- (NULL -> rule, when the task opens) is always allowed.
 CREATE OR REPLACE FUNCTION task_sla_snapshot_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF OLD.sla_rule_id IS NOT NULL AND NEW.sla_rule_id IS DISTINCT FROM OLD.sla_rule_id THEN
-    IF coalesce(current_setting('app.allow_sla_repoint', true), '') <> 'on' THEN
+    IF NOT app_in_admin_path() THEN
       RAISE EXCEPTION 'task_instances.sla_rule_id is a snapshot; use the admin re-point path' USING ERRCODE = 'insufficient_privilege';
     END IF;
     IF OLD.state = 'approved' THEN
@@ -99,3 +99,37 @@ LANGUAGE sql STABLE AS $$
   ORDER BY (region_id IS NOT NULL)::int * 2 + (scenario IS NOT NULL)::int DESC
   LIMIT 1
 $$;
+
+-- Admin re-point: moves OPEN (not approved) tasks from one rule to another version of the same task definition.
+-- Full-access session only, reason required, audited.
+CREATE OR REPLACE FUNCTION admin_repoint_sla(p_old uuid, p_new uuid, p_reason text) RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE n integer; nt uuid;
+BEGIN
+  IF NOT public.app_is_full_access() THEN
+    RAISE EXCEPTION 'admin path: full-access session required' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF coalesce(btrim(p_reason), '') = '' THEN RAISE EXCEPTION 'a reason is required'; END IF;
+  SELECT task_def_id INTO nt FROM public.sla_rules WHERE id = p_new;
+  IF nt IS NULL OR nt IS DISTINCT FROM (SELECT task_def_id FROM public.sla_rules WHERE id = p_old) THEN
+    RAISE EXCEPTION 'both rules must exist and belong to the same task definition';
+  END IF;
+  WITH u AS (
+    UPDATE public.task_instances SET sla_rule_id = p_new, updated_at = now()
+    WHERE sla_rule_id = p_old AND state <> 'approved' RETURNING 1)
+  SELECT count(*) INTO n FROM u;
+  INSERT INTO public.audit_log (action, entity_type, entity_id, reason, before, after, is_admin_override, actor_id)
+  VALUES ('sla_repoint', 'sla_rule', p_new::text, p_reason, jsonb_build_object('rule', p_old), jsonb_build_object('rule', p_new, 'tasks', n), true,
+          nullif(current_setting('app.user_id', true), '')::uuid);
+  RETURN n;
+END $$;
+ALTER FUNCTION admin_repoint_sla(uuid, uuid, text) OWNER TO pmis_definer;
+GRANT UPDATE ON task_instances TO pmis_definer;
+GRANT INSERT ON audit_log TO pmis_definer;
+GRANT USAGE ON SEQUENCE audit_log_id_seq TO pmis_definer;
+REVOKE ALL ON FUNCTION admin_repoint_sla(uuid, uuid, text) FROM PUBLIC;
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    GRANT EXECUTE ON FUNCTION admin_repoint_sla(uuid, uuid, text) TO pmis_app;
+  END IF;
+END $$;
