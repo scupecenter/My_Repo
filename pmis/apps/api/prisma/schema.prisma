@@ -422,11 +422,27 @@ model Site {
   created_at              DateTime          @default(now()) @db.Timestamptz(6)
   updated_at              DateTime          @updatedAt @db.Timestamptz(6)
 
-  region  Region         @relation(fields: [region_id], references: [id])
-  cluster Cluster?       @relation(fields: [cluster_id], references: [id])
-  tasks   TaskInstance[]
-  Snag    Snag[]
+  region               Region                 @relation(fields: [region_id], references: [id])
+  cluster              Cluster?               @relation(fields: [cluster_id], references: [id])
+  tasks                TaskInstance[]
+  Snag                 Snag[]
+  DocumentSlot         DocumentSlot[]
+  BaselineEntry        BaselineEntry[]
+  ChangeRequest        ChangeRequest[]
+  RfDesignRecord       RfDesignRecord[]
+  AcquisitionCandidate AcquisitionCandidate[]
+  ProcurementRecord    ProcurementRecord[]
+  GecolRecord          GecolRecord[]
+  HlcRecord            HlcRecord[]
+  PermitRecord         PermitRecord[]
+  WarehouseSerial      WarehouseSerial[]
+  WarehouseSiteQty     WarehouseSiteQty[]
+  QualityInspection    QualityInspection[]
+  Issue                Issue[]
+  ReadinessHandover    ReadinessHandover[]
+  AsBuiltRecord        AsBuiltRecord[]
 
+  @@unique([id, region_id]) // target of composite FKs (site_id, region_id)
   @@index([region_id, overall_status])
   @@index([cluster_id])
   @@index([delivery_scenario])
@@ -480,42 +496,41 @@ model TaskDefinition {
 }
 
 model TaskInstance {
-  id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  site_id                  String    @db.Uuid
+  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                  String         @db.Uuid
   region_id                Int // denormalised from site for RLS and filters
-  task_def_id              String    @db.Uuid
-  state                    TaskState @default(locked)
-  current_level            Int       @default(0) // 1 entry, 2 review, 3 approve
-  levels_required          Int       @default(3) // frozen at creation
-  ball_in_court_user_id    String?   @db.Uuid
-  ball_in_court_group_id   String?   @db.Uuid
-  ball_in_court_role_id    String?   @db.Uuid
-  external_party_id        String?   @db.Uuid
-  baseline_date            DateTime? @db.Date
-  planned_date             DateTime? @db.Date
-  planned_start            DateTime? @db.Date
-  actual_start             DateTime? @db.Date
-  actual_date              DateTime? @db.Date
-  submitted_date           DateTime? @db.Date
-  approved_date            DateTime? @db.Date
+  site                     Site           @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
+  task_def_id              String         @db.Uuid
+  state                    TaskState      @default(locked)
+  current_level            Int            @default(0) // 1 entry, 2 review, 3 approve
+  levels_required          Int            @default(3) // frozen at creation
+  ball_in_court_user_id    String?        @db.Uuid
+  ball_in_court_group_id   String?        @db.Uuid
+  ball_in_court_role_id    String?        @db.Uuid
+  external_party_id        String?        @db.Uuid
+  baseline_date            DateTime?      @db.Date
+  planned_date             DateTime?      @db.Date
+  planned_start            DateTime?      @db.Date
+  actual_start             DateTime?      @db.Date
+  actual_date              DateTime?      @db.Date
+  submitted_date           DateTime?      @db.Date
+  approved_date            DateTime?      @db.Date
   values                   Json? // task-specific extra fields (result, analysis type, status text)
   lock_reason              String?
-  is_na                    Boolean   @default(false)
+  is_na                    Boolean        @default(false)
   na_reason                String?
-  admin_override           Boolean   @default(false)
-  has_override_flag_in_kpi Boolean   @default(false)
-  due_date                 DateTime? @db.Date
-  version                  Int       @default(1)
-  created_at               DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime  @updatedAt @db.Timestamptz(6)
-
-  site           Site           @relation(fields: [site_id], references: [id])
-  task_def       TaskDefinition @relation(fields: [task_def_id], references: [id])
-  external_party ExternalParty? @relation(fields: [external_party_id], references: [id])
-  steps          WorkflowStep[]
-  slots          DocumentSlot[]
-  comments       Comment[]
-  snags          Snag[]
+  admin_override           Boolean        @default(false)
+  has_override_flag_in_kpi Boolean        @default(false)
+  due_date                 DateTime?      @db.Date
+  version                  Int            @default(1)
+  created_at               DateTime       @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime       @updatedAt @db.Timestamptz(6)
+  task_def                 TaskDefinition @relation(fields: [task_def_id], references: [id])
+  external_party           ExternalParty? @relation(fields: [external_party_id], references: [id])
+  steps                    WorkflowStep[]
+  slots                    DocumentSlot[]
+  comments                 Comment[]
+  snags                    Snag[]
 
   @@unique([site_id, task_def_id])
   @@index([region_id, state])
@@ -669,6 +684,7 @@ model DocumentSlot {
   task_id         String?   @db.Uuid
   site_id         String    @db.Uuid
   region_id       Int
+  site            Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   doc_type_id     String    @db.Uuid
   candidate_label String? // e.g. each SAR candidate
   status          DocStatus @default(missing)
@@ -734,27 +750,26 @@ model SnagType {
 }
 
 model Snag {
-  id                   String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  site_id              String     @db.Uuid
+  id                   String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id              String        @db.Uuid
   region_id            Int
-  task_id              String?    @db.Uuid // task whose approval it blocks
-  snag_type_id         String     @db.Uuid
+  site                 Site          @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
+  task_id              String?       @db.Uuid // task whose approval it blocks
+  snag_type_id         String        @db.Uuid
   scope                String // CW or TE
   stage_ref            String? // CW PAC, TE PAC, CW FAC, TE FAC
   description          String
   severity             String?
-  status               SnagStatus @default(open)
-  raised_by            String     @db.Uuid
-  raised_at            DateTime   @default(now()) @db.Timestamptz(6)
-  target_date          DateTime?  @db.Date
-  closed_at            DateTime?  @db.Timestamptz(6)
-  closed_by            String?    @db.Uuid
-  responsible_party_id String?    @db.Uuid
-
-  site      Site          @relation(fields: [site_id], references: [id])
-  task      TaskInstance? @relation(fields: [task_id], references: [id])
-  snag_type SnagType      @relation(fields: [snag_type_id], references: [id])
-  photos    SnagPhoto[]
+  status               SnagStatus    @default(open)
+  raised_by            String        @db.Uuid
+  raised_at            DateTime      @default(now()) @db.Timestamptz(6)
+  target_date          DateTime?     @db.Date
+  closed_at            DateTime?     @db.Timestamptz(6)
+  closed_by            String?       @db.Uuid
+  responsible_party_id String?       @db.Uuid
+  task                 TaskInstance? @relation(fields: [task_id], references: [id])
+  snag_type            SnagType      @relation(fields: [snag_type_id], references: [id])
+  photos               SnagPhoto[]
 
   @@index([site_id, status])
   @@index([region_id, status])
@@ -881,6 +896,7 @@ model ImportBatchRow {
 model Comment {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   task_id           String?  @db.Uuid
+  region_id         Int? // register comments only; task comments inherit from the task
   entity_type       String? // for register records
   entity_id         String?  @db.Uuid
   author_id         String   @db.Uuid
@@ -941,6 +957,7 @@ model BaselineEntry {
   version_id     String    @db.Uuid
   site_id        String    @db.Uuid
   region_id      Int
+  site           Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   milestone_code String // S01..S10
   baseline_date  DateTime? @db.Date
   planned_start  DateTime? @db.Date
@@ -971,6 +988,7 @@ model ChangeRequest {
   change_code        String       @unique // Master "Change ID"
   site_id            String?      @db.Uuid
   region_id          Int?
+  site               Site?        @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   kind               ChangeKind
   scope_item         String?
   old_value          String?
@@ -1001,6 +1019,7 @@ model RfDesignRecord {
   id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id                   String    @unique @db.Uuid
   region_id                 Int
+  site                      Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   nominal_plan_issue_date   DateTime? @db.Date
   nominal_lat               Decimal?  @db.Decimal(9, 6)
   nominal_lon               Decimal?  @db.Decimal(9, 6)
@@ -1021,6 +1040,7 @@ model AcquisitionCandidate {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id               String    @db.Uuid
   region_id             Int
+  site                  Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   candidate_no          String
   latitude              Decimal?  @db.Decimal(9, 6)
   longitude             Decimal?  @db.Decimal(9, 6)
@@ -1053,6 +1073,7 @@ model ProcurementRecord {
   id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id      String    @db.Uuid
   region_id    Int
+  site         Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   scope        String // CW or TE
   delivery     String? // outsourced / internal
   pr_no        String?
@@ -1073,6 +1094,7 @@ model GecolRecord {
   id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id                 String    @unique @db.Uuid
   region_id               Int
+  site                    Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   pr_no                   String?
   contractor              String?
   survey_date             DateTime? @db.Date
@@ -1097,6 +1119,7 @@ model HlcRecord {
   id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id             String    @unique @db.Uuid
   region_id           Int
+  site                Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   request_no          String?
   request_date        DateTime? @db.Date
   fiber_uplink        String?
@@ -1115,6 +1138,7 @@ model PermitRecord {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id          String    @db.Uuid
   region_id        Int
+  site             Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   permit_type      String
   applied_date     DateTime? @db.Date
   status           String?
@@ -1155,6 +1179,7 @@ model WarehouseSerial {
   rn_no            String?
   site_id          String?       @db.Uuid
   region_id        Int?
+  site             Site?         @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   dispatch_date    DateTime?     @db.Date
   return_condition String?
   status           String?
@@ -1170,6 +1195,7 @@ model WarehouseSiteQty {
   id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id    String  @db.Uuid
   region_id  Int
+  site       Site    @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   item_id    String  @db.Uuid
   required   Decimal @default(0) @db.Decimal(12, 2)
   dispatched Decimal @default(0) @db.Decimal(12, 2)
@@ -1186,6 +1212,7 @@ model QualityInspection {
   record_type        String
   site_id            String    @db.Uuid
   region_id          Int
+  site               Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   stage              String?
   activity           String?
   point_type         String?
@@ -1214,6 +1241,7 @@ model Issue {
   id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id     String         @db.Uuid
   region_id   Int
+  site        Site           @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   title       String
   detail      String?
   owner_id    String?        @db.Uuid
@@ -1258,6 +1286,7 @@ model ReadinessHandover {
   id                       String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id                  String    @unique @db.Uuid
   region_id                Int
+  site                     Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   commissioning_power_safe Boolean?
   uplink_ready_date        DateTime? @db.Date
   om_checklist             String?
@@ -1280,6 +1309,7 @@ model AsBuiltRecord {
   id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   site_id        String    @unique @db.Uuid
   region_id      Int
+  site           Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
   submitted_date DateTime? @db.Date
   quantities     Json // item -> quantity (tower m, cables, trays, rods ...)
 

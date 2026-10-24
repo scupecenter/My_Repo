@@ -602,6 +602,7 @@ CREATE TABLE "import_batch_rows" (
 CREATE TABLE "comments" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "task_id" UUID,
+    "region_id" INTEGER,
     "entity_type" TEXT,
     "entity_id" UUID,
     "author_id" UUID NOT NULL,
@@ -1109,6 +1110,9 @@ CREATE INDEX "sites_delivery_scenario_idx" ON "sites"("delivery_scenario");
 CREATE INDEX "sites_project_phase_delivery_batch_idx" ON "sites"("project_phase", "delivery_batch");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "sites_id_region_id_key" ON "sites"("id", "region_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "stage_definitions_code_key" ON "stage_definitions"("code");
 
 -- CreateIndex
@@ -1430,7 +1434,7 @@ ALTER TABLE "sites" ADD CONSTRAINT "sites_cluster_id_fkey" FOREIGN KEY ("cluster
 ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_stage_id_fkey" FOREIGN KEY ("stage_id") REFERENCES "stage_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_site_id_fkey" FOREIGN KEY ("site_id") REFERENCES "sites"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -1463,6 +1467,9 @@ ALTER TABLE "document_type_placements" ADD CONSTRAINT "document_type_placements_
 ALTER TABLE "document_type_placements" ADD CONSTRAINT "document_type_placements_snag_type_id_fkey" FOREIGN KEY ("snag_type_id") REFERENCES "snag_types"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "document_slots" ADD CONSTRAINT "document_slots_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "document_slots" ADD CONSTRAINT "document_slots_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "task_instances"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1472,7 +1479,7 @@ ALTER TABLE "document_slots" ADD CONSTRAINT "document_slots_doc_type_id_fkey" FO
 ALTER TABLE "document_files" ADD CONSTRAINT "document_files_slot_id_fkey" FOREIGN KEY ("slot_id") REFERENCES "document_slots"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "snags" ADD CONSTRAINT "snags_site_id_fkey" FOREIGN KEY ("site_id") REFERENCES "sites"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "snags" ADD CONSTRAINT "snags_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "snags" ADD CONSTRAINT "snags_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "task_instances"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1496,10 +1503,52 @@ ALTER TABLE "import_batch_rows" ADD CONSTRAINT "import_batch_rows_batch_id_fkey"
 ALTER TABLE "comments" ADD CONSTRAINT "comments_task_id_fkey" FOREIGN KEY ("task_id") REFERENCES "task_instances"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "baseline_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "change_requests" ADD CONSTRAINT "change_requests_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "rf_design_records" ADD CONSTRAINT "rf_design_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "acquisition_candidates" ADD CONSTRAINT "acquisition_candidates_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "procurement_records" ADD CONSTRAINT "procurement_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "gecol_records" ADD CONSTRAINT "gecol_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "hlc_records" ADD CONSTRAINT "hlc_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "permit_records" ADD CONSTRAINT "permit_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "warehouse_serials" ADD CONSTRAINT "warehouse_serials_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "warehouse_serials" ADD CONSTRAINT "warehouse_serials_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "warehouse_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "warehouse_site_qty" ADD CONSTRAINT "warehouse_site_qty_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "quality_inspections" ADD CONSTRAINT "quality_inspections_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "issues" ADD CONSTRAINT "issues_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "readiness_handover" ADD CONSTRAINT "readiness_handover_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "as_built_records" ADD CONSTRAINT "as_built_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "meeting_actions" ADD CONSTRAINT "meeting_actions_meeting_id_fkey" FOREIGN KEY ("meeting_id") REFERENCES "meetings"("id") ON DELETE CASCADE ON UPDATE CASCADE;
