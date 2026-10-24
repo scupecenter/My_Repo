@@ -52,6 +52,7 @@ ALTER TABLE warehouse_serials ADD CONSTRAINT warehouse_serials_global_xor_region
 ALTER TABLE risks             ADD CONSTRAINT risks_global_xor_region             CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 ALTER TABLE meetings          ADD CONSTRAINT meetings_global_xor_region          CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 ALTER TABLE clusters          ADD CONSTRAINT clusters_global_xor_region          CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
+ALTER TABLE progress_snapshots ADD CONSTRAINT progress_snapshots_global_xor_region CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 ALTER TABLE matrix_cells      ADD CONSTRAINT matrix_cells_global_xor_region      CHECK ((is_global AND region_id IS NULL) OR (NOT is_global AND region_id IS NOT NULL));
 
 -- Helper to apply a policy.
@@ -81,27 +82,28 @@ END $$;
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['change_requests','warehouse_serials','risks','meetings','clusters','matrix_cells'] LOOP
+  FOREACH t IN ARRAY ARRAY['change_requests','warehouse_serials','risks','meetings','clusters','matrix_cells','progress_snapshots'] LOOP
     PERFORM _rls_apply(t, 'app_region_read(is_global, region_id)', 'app_region_write(is_global, region_id)');
   END LOOP;
 END $$;
 
--- (3) Children without region_id: inherit the parent's policy through EXISTS (the sub-select is itself filtered by RLS).
+-- (3) Children without region_id: USING = EXISTS on the parent (the sub-select is itself filtered by RLS, so reads follow the
+-- parent). WITH CHECK = the parent's WRITE predicate, so a region user who can read a global parent cannot add children to it.
 SELECT _rls_apply('workflow_steps',
   'EXISTS (SELECT 1 FROM task_instances p WHERE p.id = task_id)',
-  'EXISTS (SELECT 1 FROM task_instances p WHERE p.id = task_id)');
+  'EXISTS (SELECT 1 FROM task_instances p WHERE p.id = task_id AND app_region_check(p.region_id))');
 SELECT _rls_apply('document_files',
   'EXISTS (SELECT 1 FROM document_slots p WHERE p.id = slot_id)',
-  'EXISTS (SELECT 1 FROM document_slots p WHERE p.id = slot_id)');
+  'EXISTS (SELECT 1 FROM document_slots p WHERE p.id = slot_id AND app_region_check(p.region_id))');
 SELECT _rls_apply('snag_photos',
   'EXISTS (SELECT 1 FROM snags p WHERE p.id = snag_id)',
-  'EXISTS (SELECT 1 FROM snags p WHERE p.id = snag_id)');
+  'EXISTS (SELECT 1 FROM snags p WHERE p.id = snag_id AND app_region_check(p.region_id))');
 SELECT _rls_apply('matrix_cell_assignees',
   'EXISTS (SELECT 1 FROM matrix_cells p WHERE p.id = cell_id)',
-  'EXISTS (SELECT 1 FROM matrix_cells p WHERE p.id = cell_id)');
+  'EXISTS (SELECT 1 FROM matrix_cells p WHERE p.id = cell_id AND app_region_write(p.is_global, p.region_id))');
 SELECT _rls_apply('meeting_actions',
   'EXISTS (SELECT 1 FROM meetings p WHERE p.id = meeting_id)',
-  'EXISTS (SELECT 1 FROM meetings p WHERE p.id = meeting_id)');
+  'EXISTS (SELECT 1 FROM meetings p WHERE p.id = meeting_id AND app_region_write(p.is_global, p.region_id))');
 -- Comments: region_id NOT NULL, tied to the task by composite FK (task_id, region_id) ON DELETE CASCADE; register comments
 -- carry their own region. No global comments.
 SELECT _rls_apply('comments', 'app_region_check(region_id)', 'app_region_check(region_id)');
@@ -109,7 +111,7 @@ SELECT _rls_apply('comments', 'app_region_check(region_id)', 'app_region_check(r
 SELECT _rls_apply('import_batches', 'app_regions_check(region_scope)', 'app_regions_check(region_scope)');
 SELECT _rls_apply('import_batch_rows',
   'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id) AND (region_id IS NULL OR app_region_check(region_id))',
-  'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id) AND (region_id IS NULL OR app_region_check(region_id))');
+  'EXISTS (SELECT 1 FROM import_batches p WHERE p.id = batch_id AND app_regions_check(p.region_scope)) AND (region_id IS NULL OR app_region_check(region_id))');
 
 DROP FUNCTION _rls_apply(text, text, text);
 

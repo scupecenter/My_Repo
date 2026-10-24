@@ -65,6 +65,12 @@ CREATE TYPE "ChangeKind" AS ENUM ('scope_change', 'date_change', 'suspension', '
 CREATE TYPE "ChangeStatus" AS ENUM ('requested', 'approved', 'rejected', 'applied');
 
 -- CreateEnum
+CREATE TYPE "WeightSetCode" AS ENUM ('project_status', 'health_index', 'delay_attribution');
+
+-- CreateEnum
+CREATE TYPE "WeightSetStatus" AS ENUM ('draft', 'published');
+
+-- CreateEnum
 CREATE TYPE "LogLevel" AS ENUM ('debug', 'info', 'warn', 'error');
 
 -- CreateEnum
@@ -286,8 +292,6 @@ CREATE TABLE "task_definitions" (
     "has_documents" BOOLEAN NOT NULL DEFAULT true,
     "is_milestone_task" BOOLEAN NOT NULL DEFAULT false,
     "approval_levels" INTEGER,
-    "sla_working_days" INTEGER,
-    "sla_from_task_code" TEXT,
     "condition_rule" JSONB,
     "default_external_party" "ExternalPartyType",
     "is_active" BOOLEAN NOT NULL DEFAULT true,
@@ -316,6 +320,7 @@ CREATE TABLE "task_instances" (
     "submitted_date" DATE,
     "approved_date" DATE,
     "values" JSONB,
+    "sla_rule_id" UUID,
     "lock_reason" TEXT,
     "is_na" BOOLEAN NOT NULL DEFAULT false,
     "na_reason" TEXT,
@@ -641,12 +646,44 @@ CREATE TABLE "notifications" (
 );
 
 -- CreateTable
+CREATE TABLE "work_calendars" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "weekend_days" INTEGER[] DEFAULT ARRAY[5, 6]::INTEGER[],
+    "is_default" BOOLEAN NOT NULL DEFAULT false,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "work_calendars_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "holidays" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "calendar_id" UUID NOT NULL,
     "date" DATE NOT NULL,
     "name" TEXT NOT NULL,
 
     CONSTRAINT "holidays_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "sla_rules" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "task_def_id" UUID NOT NULL,
+    "min_working_days" INTEGER NOT NULL,
+    "max_working_days" INTEGER NOT NULL,
+    "start_event" TEXT NOT NULL,
+    "scenario" "DeliveryScenario",
+    "region_id" INTEGER,
+    "calendar_id" UUID NOT NULL,
+    "effective_from" DATE NOT NULL,
+    "effective_to" DATE,
+    "reason" TEXT NOT NULL,
+    "changed_by" UUID NOT NULL,
+    "changed_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "sla_rules_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -711,6 +748,69 @@ CREATE TABLE "change_requests" (
     "shift_working_days" INTEGER,
 
     CONSTRAINT "change_requests_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "weight_sets" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "code" "WeightSetCode" NOT NULL,
+    "version" INTEGER NOT NULL,
+    "effective_from" DATE NOT NULL,
+    "effective_to" DATE,
+    "status" "WeightSetStatus" NOT NULL DEFAULT 'draft',
+    "reason" TEXT NOT NULL,
+    "changed_by" UUID NOT NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "published_at" TIMESTAMPTZ(6),
+
+    CONSTRAINT "weight_sets_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "weight_activities" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "weight_set_id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "name_ar" TEXT,
+    "weight" DECIMAL(7,3) NOT NULL,
+    "sort" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "weight_activities_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "weight_items" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "activity_id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "name_ar" TEXT,
+    "weight" DECIMAL(7,3) NOT NULL,
+    "unit" TEXT,
+    "measure_rule" JSONB,
+    "source" TEXT,
+    "sort" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "weight_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "progress_snapshots" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "snapshot_date" DATE NOT NULL,
+    "weight_set_id" UUID NOT NULL,
+    "region_id" INTEGER,
+    "is_global" BOOLEAN NOT NULL DEFAULT false,
+    "actual_pct" DECIMAL(6,3) NOT NULL,
+    "planned_pct" DECIMAL(6,3),
+    "spi" DECIMAL(6,3),
+    "plan_coverage" DECIMAL(6,3),
+    "health_index" DECIMAL(6,3),
+    "values" JSONB NOT NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "progress_snapshots_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1163,6 +1263,9 @@ CREATE INDEX "task_instances_ball_in_court_role_id_state_idx" ON "task_instances
 CREATE INDEX "task_instances_task_def_id_state_idx" ON "task_instances"("task_def_id", "state");
 
 -- CreateIndex
+CREATE INDEX "task_instances_sla_rule_id_idx" ON "task_instances"("sla_rule_id");
+
+-- CreateIndex
 CREATE INDEX "task_instances_due_date_idx" ON "task_instances"("due_date");
 
 -- CreateIndex
@@ -1274,7 +1377,16 @@ CREATE INDEX "notifications_user_id_read_at_idx" ON "notifications"("user_id", "
 CREATE INDEX "notifications_channel_sent_at_idx" ON "notifications"("channel", "sent_at");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "holidays_date_key" ON "holidays"("date");
+CREATE UNIQUE INDEX "work_calendars_code_key" ON "work_calendars"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "holidays_calendar_id_date_key" ON "holidays"("calendar_id", "date");
+
+-- CreateIndex
+CREATE INDEX "sla_rules_task_def_id_effective_from_idx" ON "sla_rules"("task_def_id", "effective_from");
+
+-- CreateIndex
+CREATE INDEX "sla_rules_region_id_idx" ON "sla_rules"("region_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "baseline_versions_version_key" ON "baseline_versions"("version");
@@ -1299,6 +1411,24 @@ CREATE INDEX "change_requests_site_id_kind_idx" ON "change_requests"("site_id", 
 
 -- CreateIndex
 CREATE INDEX "change_requests_region_id_status_idx" ON "change_requests"("region_id", "status");
+
+-- CreateIndex
+CREATE INDEX "weight_sets_code_status_effective_from_idx" ON "weight_sets"("code", "status", "effective_from");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "weight_sets_code_version_key" ON "weight_sets"("code", "version");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "weight_activities_weight_set_id_code_key" ON "weight_activities"("weight_set_id", "code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "weight_items_activity_id_code_key" ON "weight_items"("activity_id", "code");
+
+-- CreateIndex
+CREATE INDEX "progress_snapshots_snapshot_date_weight_set_id_idx" ON "progress_snapshots"("snapshot_date", "weight_set_id");
+
+-- CreateIndex
+CREATE INDEX "progress_snapshots_region_id_snapshot_date_idx" ON "progress_snapshots"("region_id", "snapshot_date");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "rf_design_records_site_id_key" ON "rf_design_records"("site_id");
@@ -1466,6 +1596,9 @@ ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_stage_id_fkey" F
 ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_sla_rule_id_fkey" FOREIGN KEY ("sla_rule_id") REFERENCES "sla_rules"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "task_instances" ADD CONSTRAINT "task_instances_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1532,6 +1665,18 @@ ALTER TABLE "import_batch_rows" ADD CONSTRAINT "import_batch_rows_batch_id_fkey"
 ALTER TABLE "comments" ADD CONSTRAINT "comments_task_id_region_id_fkey" FOREIGN KEY ("task_id", "region_id") REFERENCES "task_instances"("id", "region_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "holidays" ADD CONSTRAINT "holidays_calendar_id_fkey" FOREIGN KEY ("calendar_id") REFERENCES "work_calendars"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sla_rules" ADD CONSTRAINT "sla_rules_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sla_rules" ADD CONSTRAINT "sla_rules_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sla_rules" ADD CONSTRAINT "sla_rules_calendar_id_fkey" FOREIGN KEY ("calendar_id") REFERENCES "work_calendars"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1539,6 +1684,18 @@ ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_version_id_fkey"
 
 -- AddForeignKey
 ALTER TABLE "change_requests" ADD CONSTRAINT "change_requests_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "weight_activities" ADD CONSTRAINT "weight_activities_weight_set_id_fkey" FOREIGN KEY ("weight_set_id") REFERENCES "weight_sets"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "weight_items" ADD CONSTRAINT "weight_items_activity_id_fkey" FOREIGN KEY ("activity_id") REFERENCES "weight_activities"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_weight_set_id_fkey" FOREIGN KEY ("weight_set_id") REFERENCES "weight_sets"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "rf_design_records" ADD CONSTRAINT "rf_design_records_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;

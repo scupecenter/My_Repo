@@ -181,6 +181,17 @@ enum ChangeStatus {
   applied
 }
 
+enum WeightSetCode {
+  project_status
+  health_index
+  delay_attribution
+}
+
+enum WeightSetStatus {
+  draft
+  published
+}
+
 enum LogLevel {
   debug
   info
@@ -222,6 +233,8 @@ model Region {
 
   sites                    Site[]
   UserRoleAssignmentRegion UserRoleAssignmentRegion[]
+  SlaRule                  SlaRule[]
+  ProgressSnapshot         ProgressSnapshot[]
 
   @@map("regions")
 }
@@ -499,8 +512,6 @@ model TaskDefinition {
   has_documents          Boolean            @default(true)
   is_milestone_task      Boolean            @default(false)
   approval_levels        Int? // null = inherit stage
-  sla_working_days       Int?
-  sla_from_task_code     String? // e.g. D-1 measured from SITE_RFI
   condition_rule         Json? // scope-flag / scenario applicability rule
   default_external_party ExternalPartyType?
   is_active              Boolean            @default(true)
@@ -509,6 +520,7 @@ model TaskDefinition {
   instances      TaskInstance[]
   matrix_cells   MatrixCell[]
   doc_placements DocumentTypePlacement[]
+  SlaRule        SlaRule[]
 
   @@index([stage_id, seq])
   @@map("task_definitions")
@@ -535,6 +547,8 @@ model TaskInstance {
   submitted_date           DateTime?      @db.Date
   approved_date            DateTime?      @db.Date
   values                   Json? // task-specific extra fields (result, analysis type, status text)
+  sla_rule_id              String?        @db.Uuid // snapshot taken when the task opens; re-pointed only by the admin path
+  sla_rule                 SlaRule?       @relation(fields: [sla_rule_id], references: [id])
   lock_reason              String?
   is_na                    Boolean        @default(false)
   na_reason                String?
@@ -558,6 +572,7 @@ model TaskInstance {
   @@index([ball_in_court_group_id, state])
   @@index([ball_in_court_role_id, state])
   @@index([task_def_id, state])
+  @@index([sla_rule_id])
   @@index([due_date])
   @@map("task_instances")
 }
@@ -949,12 +964,59 @@ model Notification {
   @@map("notifications")
 }
 
-model Holiday {
-  id   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  date DateTime @unique @db.Date
-  name String
+// Weekend days per calendar (0 = Sunday ... 6 = Saturday). Default: Friday and Saturday (NETWORKDAYS.INTL code 7).
+model WorkCalendar {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code         String  @unique
+  name         String
+  weekend_days Int[]   @default([5, 6])
+  is_default   Boolean @default(false) // exactly one default (partial unique index, migration 0005)
+  is_active    Boolean @default(true)
 
+  holidays  Holiday[]
+  sla_rules SlaRule[]
+
+  @@map("work_calendars")
+}
+
+model Holiday {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calendar_id String       @db.Uuid
+  date        DateTime     @db.Date
+  name        String
+  calendar    WorkCalendar @relation(fields: [calendar_id], references: [id])
+
+  @@unique([calendar_id, date])
   @@map("holidays")
+}
+
+// Versioned SLA rule. min = target (green), max = limit (above = late), counted in working days of the calendar from
+// start_event (a task code, milestone code S01..S10 or gate code). Scenario/region NULL = applies to all.
+// Overlap of effective ranges for the same task+scenario+region is rejected by an exclusion constraint (migration 0005).
+// Edits create a new row; a rule referenced by task instances is immutable apart from effective_to.
+model SlaRule {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_def_id      String            @db.Uuid
+  min_working_days Int
+  max_working_days Int
+  start_event      String
+  scenario         DeliveryScenario?
+  region_id        Int?
+  calendar_id      String            @db.Uuid
+  effective_from   DateTime          @db.Date
+  effective_to     DateTime?         @db.Date // exclusive; null = open ended
+  reason           String
+  changed_by       String            @db.Uuid
+  changed_at       DateTime          @default(now()) @db.Timestamptz(6)
+
+  task_def  TaskDefinition @relation(fields: [task_def_id], references: [id])
+  region    Region?        @relation(fields: [region_id], references: [id])
+  calendar  WorkCalendar   @relation(fields: [calendar_id], references: [id])
+  instances TaskInstance[]
+
+  @@index([task_def_id, effective_from])
+  @@index([region_id])
+  @@map("sla_rules")
 }
 
 model BaselineVersion {
@@ -1030,6 +1092,91 @@ model ChangeRequest {
   @@index([site_id, kind])
   @@index([region_id, status])
   @@map("change_requests")
+}
+
+// ============================================================================
+// 7b. WEIGHT SETS AND PROGRESS SNAPSHOTS (editable Project Status, health index, delay attribution)
+// ============================================================================
+
+// Versioned. A published set is immutable (children frozen by trigger) and its effective range cannot overlap another
+// published set of the same code. The 100% rule (activities in a set, items in an activity) is enforced at commit by a
+// deferred constraint trigger for published sets (db/sql/005_weights.sql).
+model WeightSet {
+  id             String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code           WeightSetCode
+  version        Int
+  effective_from DateTime        @db.Date
+  effective_to   DateTime?       @db.Date // exclusive
+  status         WeightSetStatus @default(draft)
+  reason         String
+  changed_by     String          @db.Uuid
+  created_at     DateTime        @default(now()) @db.Timestamptz(6)
+  published_at   DateTime?       @db.Timestamptz(6)
+
+  activities WeightActivity[]
+  snapshots  ProgressSnapshot[]
+
+  @@unique([code, version])
+  @@index([code, status, effective_from])
+  @@map("weight_sets")
+}
+
+// Activity (Project Status), factor (health index) or cause (delay attribution).
+model WeightActivity {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  weight_set_id String  @db.Uuid
+  code          String
+  name          String
+  name_ar       String?
+  weight        Decimal @db.Decimal(7, 3) // percent; set total = 100
+  sort          Int     @default(0)
+
+  weight_set WeightSet    @relation(fields: [weight_set_id], references: [id], onDelete: Cascade)
+  items      WeightItem[]
+
+  @@unique([weight_set_id, code])
+  @@map("weight_activities")
+}
+
+model WeightItem {
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  activity_id  String  @db.Uuid
+  code         String // e.g. 1.1
+  name         String
+  name_ar      String?
+  weight       Decimal @db.Decimal(7, 3) // percent inside the activity; activity total = 100 (0 allowed = not weighted)
+  unit         String? // units, 0/100, one unit per item, ...
+  measure_rule Json? // method and source columns (done, applicable, plan basis)
+  source       String?
+  sort         Int     @default(0)
+
+  activity WeightActivity @relation(fields: [activity_id], references: [id], onDelete: Cascade)
+
+  @@unique([activity_id, code])
+  @@map("weight_items")
+}
+
+// Weekly snapshot per scope (project-wide = is_global, or one region). Keeps the values computed at the time.
+model ProgressSnapshot {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshot_date DateTime @db.Date
+  weight_set_id String   @db.Uuid
+  region_id     Int?
+  is_global     Boolean  @default(false)
+  actual_pct    Decimal  @db.Decimal(6, 3)
+  planned_pct   Decimal? @db.Decimal(6, 3)
+  spi           Decimal? @db.Decimal(6, 3)
+  plan_coverage Decimal? @db.Decimal(6, 3)
+  health_index  Decimal? @db.Decimal(6, 3)
+  values        Json // per activity and item values, factor values, site counts
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  weight_set WeightSet @relation(fields: [weight_set_id], references: [id])
+  region     Region?   @relation(fields: [region_id], references: [id])
+
+  @@index([snapshot_date, weight_set_id])
+  @@index([region_id, snapshot_date])
+  @@map("progress_snapshots")
 }
 
 // ============================================================================
