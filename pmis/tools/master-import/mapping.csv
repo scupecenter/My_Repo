@@ -1,0 +1,188 @@
+column_letter,header,target_table,target_field,transform,validation,notes
+A,#,,,,,"computed, not imported (row number)"
+B,Identification / Site ID,sites,site_code,trim; upper,required; unique; pattern per Master site-ID format,
+C,Identification / Site Owner ID,sites,owner_site_id,trim,optional,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+D,Identification / Site Name,sites,name,trim,required,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+E,Identification / Region,sites,region_id,lookup regions.code (case-insensitive),required; one of 7 regions; importer user must have the region,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+F,Identification / Sub Region,sites,sub_region,trim,optional,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+G,Identification / Cluster ID,clusters,cluster_code -> sites.cluster_id,trim; upsert cluster,optional,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+H,Coordinates / Latitude,sites,latitude,decimal,-90..90; Libya bounding box warning,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+I,Coordinates / Longitude,sites,longitude,decimal,-180..180; Libya bounding box warning,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+J,Classification / Site Type,sites,site_type,trim,Setting list SiteType,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+K,Classification / Site Scenario,sites,site_scenario,trim,Setting list Scenario,"RF classification, distinct from Delivery Scenario (Z); Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+L,Classification / Site Uplink,sites,uplink_site,trim,optional; should be an existing site_code,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+M,Tower Information / Tower Owner,sites,tower_owner,trim,Setting list RefRFDesignTowerOwner,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+N,Tower Information / Existing or New,sites,existing_or_new,trim,Setting list ExistNew,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+O,Tower Information / RT or GF,sites,rt_or_gf,trim,Setting list RTGF,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+P,Tower Information / Tower Type,sites,tower_type,trim,Setting list TowerType,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+Q,Tower Information / Tower Height (m),sites,tower_height_m,decimal,>=0,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+R,Configuration (WL/MW/IP/PWR),,,"computed, not imported",,Master formula column; recomputed by PMIS (RF & DESIGN)
+S,RF Survey Date,sites,rf_survey_date,date (Excel serial or ISO),valid date,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+T,Acquisition Date,sites,acquisition_date,date,valid date,"Master cell is a lookup from RF & Design sheet: import value from the RF & Design template, Master cached value used only as cross-check"
+U,Baseline / Site Release Date,baseline_entries,S01.baseline_date (version 1),date,valid date; must follow previous milestone baseline,Baseline sheet is also a template source
+V,Milestone / Site Release Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (RF & DESIGN)
+W,Phase Gate / Pre-CW Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+X,Project Phase,sites,project_phase,trim,Setting list ProjectPhases,
+Y,Delivery Batch,sites,delivery_batch,trim,Setting list DeliveryBatches,
+Z,Delivery Scenario,sites,delivery_scenario,map New Build/Expansion/Hot Swap/Cold Swap/Relocation to enum,required; Setting list DeliveryScenario,
+AA,CW SOW / Tower Erection,sites,scope_tower_erection,"Yes->yes, N/A->na",Yes/N/A (Setting YesNoNA),Scope flags drive task applicability
+AB,CW SOW / Site Adaption,sites,scope_site_adaption,"Yes->yes, N/A->na",Yes/N/A,
+AC,CW SOW / GECOL Power,sites,scope_gecol_power,"Yes->yes, N/A->na",Yes/N/A,
+AD,CW SOW / HLC Fiber,sites,scope_hlc_fiber,"Yes->yes, N/A->na",Yes/N/A,
+AE,TE SOW / Full Scope,sites,scope_te_full,"Yes->yes, N/A->na",Yes/N/A,
+AF,TE SOW / IP Router Only,sites,scope_te_ip_router_only,"Yes->yes, N/A->na",Yes/N/A,
+AG,CW PROCUREMENT / CW Delivery Model,sites,cw_delivery_model,trim,Setting list DeliveryModel (outsourced/internal),
+AH,CW PROCUREMENT / PR Status,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AI,CW PROCUREMENT / PO / WO Status,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AJ,CW PROCUREMENT / Contractor Name,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AK,CW PROCUREMENT / Contractor Team,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AL,CW Access / CW Access Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AM,CW Survey & Analysis Report / AAT SE Name,task_instances,CW_STA.values.aat_se_name,trim,optional,AAT SE supervises only
+AN,CW Survey & Analysis Report / Planned Date,task_instances,CW_STA.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+AO,CW Survey & Analysis Report / Actual Date,task_instances,CW_STA.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+AP,CW Survey & Analysis Report / Analysis Type,task_instances,CW_STA.values.analysis_type,trim,Setting list AnalysisType,
+AQ,CW Survey & Analysis Report / Analysis Result,task_instances,CW_STA.values.analysis_result,trim,Setting list AnalysisResult,
+AR,CW Survey & Analysis Report / Submitted Date,task_instances,CW_STA.submitted_date,date (Excel serial or ISO),valid date; not before Site Release,
+AS,CW Survey & Analysis Report / Approved Date,task_instances,CW_STA.approved_date,date (Excel serial or ISO),valid date; not before Site Release,
+AT,CW DN / Submitted Date,task_instances,CW_DN.submitted_date,date (Excel serial or ISO),valid date; not before Site Release,
+AU,CW DN / Approved Date,task_instances,CW_DN.approved_date,date (Excel serial or ISO),valid date; not before Site Release,
+AV,Baseline / PRE-CW Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AW,Milestone / PRE-CW Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (PRE-CW)
+AX,Phase Gate / CW Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+AY,CW MOS / Planned Date,task_instances,CW_MOS.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+AZ,CW MOS / Actual Date,task_instances,CW_MOS.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+BA,TOWER ERECTION / Tower Foundation,task_instances,CW_TOWER.tower_foundation.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BB,TOWER ERECTION / Tower Steel Erection,task_instances,CW_TOWER.tower_steel_erection.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BC,TOWER ERECTION / Tower Lightning & Grounding,task_instances,CW_TOWER.tower_lightning_grounding.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BD,SITE ADAPTION / Cabinet Foundation,task_instances,CW_ADAPT.cabinet_foundation.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BE,SITE ADAPTION / Mounting Pole,task_instances,CW_ADAPT.mounting_pole.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BF,SITE ADAPTION / Cable Tray,task_instances,CW_ADAPT.cable_tray.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BG,SITE ADAPTION / Indoor Rack,task_instances,CW_ADAPT.indoor_rack.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BH,SITE ADAPTION / Site Optical Fiber,task_instances,CW_ADAPT.site_optical_fiber.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BI,SITE ADAPTION / AC / DC Box,task_instances,CW_ADAPT.ac_dc_box.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BJ,SITE ADAPTION / Site GND,task_instances,CW_ADAPT.site_gnd.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+BK,CW Installation Status / Planned Start Date,task_instances,CW_INSTALL.planned_start,date (Excel serial or ISO),valid date; not before Site Release,
+BL,CW Installation Status / Actual Start Date,task_instances,CW_INSTALL.actual_start,date (Excel serial or ISO),valid date; not before Site Release,
+BM,CW Installation Status / Planned End Date,task_instances,CW_INSTALL.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+BN,CW Installation Status / Actual End Date,task_instances,CW_INSTALL.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+BO,Baseline / CW Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (ACTUAL CW)
+BP,Milestone / CW Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (ACTUAL CW)
+BQ,Phase Gate / RFI Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+BR,CW Preliminary Acceptance / CW PAC Planned Date,task_instances,CW_PAC.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+BS,CW Preliminary Acceptance / Snags Found,task_instances,CW_PAC.values.snags_found,int,>=0,Import creates a summary only; individual snags live in snags table
+BT,CW Preliminary Acceptance / Snags Cleared,task_instances,CW_PAC.values.snags_cleared,int,0..snags_found,
+BU,CW Preliminary Acceptance / CW As-Built Submitted,task_instances,CW_PAC.values.as_built_submitted,date,valid date,
+BV,CW Preliminary Acceptance / CW PAC Actual Date,task_instances,CW_PAC.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+BW,GECOL Status,,,"computed, not imported",,Master formula column; recomputed by PMIS (RFI)
+BX,HLC Fiber Status,,,"computed, not imported",,Master formula column; recomputed by PMIS (RFI)
+BY,Baseline / Site RFI Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (RFI)
+BZ,Milestone / Site RFI Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (RFI)
+CA,Phase Gate / TE Installation Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+CB,TE Access / TE Access Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE INSTALLATION)
+CC,TE Survey / Survey Date,task_instances,TE_SURVEY.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+CD,TE Survey / Vendor Name,task_instances,TE_SURVEY.external_party_id,"lookup external_parties.name (type te_vendor), create if absent",optional,Vendor e.g. A&T Global for delay attribution
+CE,TE Survey / Vendor Team,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE INSTALLATION)
+CF,TE Survey / AAT SE Name,task_instances,TE_SURVEY.values.aat_se_name,trim,optional,
+CG,TE DN / Submitted Date,task_instances,TE_DN.submitted_date,date (Excel serial or ISO),valid date; not before Site Release,
+CH,TE DN / Approved Date,task_instances,TE_DN.approved_date,date (Excel serial or ISO),valid date; not before Site Release,
+CI,TE MOS / Planned Date,task_instances,TE_MOS.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+CJ,TE MOS / Actual Date,task_instances,TE_MOS.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+CK,TE Installation Items / MTS Cabinet,task_instances,TE_ITEMS.mts_cabinet.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+CL,TE Installation Items / Indoor IP Router,task_instances,TE_ITEMS.indoor_ip_router.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+CM,TE Installation Items / RF Antenna,task_instances,TE_ITEMS.rf_antenna.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+CN,TE Installation Items / MW Antenna,task_instances,TE_ITEMS.mw_antenna.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+CO,TE Installation Items / DC / OF Cable,task_instances,TE_ITEMS.dc_of_cable.actual_date,date; if text status keep in values.status,valid date or status text,Item completion; sub-task per item (assumption)
+CP,TE Installation Status / Planned Start Date,task_instances,TE_INSTALL.planned_start,date (Excel serial or ISO),valid date; not before Site Release,
+CQ,TE Installation Status / Actual Start Date,task_instances,TE_INSTALL.actual_start,date (Excel serial or ISO),valid date; not before Site Release,
+CR,TE Installation Status / Planned End Date,task_instances,TE_INSTALL.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+CS,TE Installation Status / Actual End Date,task_instances,TE_INSTALL.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+CT,Baseline / TE Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE INSTALLATION)
+CU,Milestone / TE Completion Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE INSTALLATION)
+CV,Phase Gate / On-Air Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+CW,Commissioning & Integration / Commissioning Date,task_instances,COMM_INTEG.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+CX,Commissioning & Integration / MW Alignment Date,task_instances,COMM_INTEG.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+CY,Commissioning & Integration / MW Measured RSL (dBm),task_instances,COMM_INTEG.values.mw_rsl_dbm,decimal,-110..-20 dBm,
+CZ,Commissioning & Integration / RSL Deviation (dB),,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DA,Commissioning & Integration / Integration Date,task_instances,COMM_INTEG.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DB,Cutover / MOP Submitted Date,task_instances,CUTOVER.submitted_date,date (Excel serial or ISO),valid date; not before Site Release,
+DC,Cutover / MOP Approved Date,task_instances,CUTOVER.approved_date,date (Excel serial or ISO),valid date; not before Site Release,
+DD,Cutover / Window Start,task_instances,CUTOVER.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DE,Cutover / Window End,task_instances,CUTOVER.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DF,Cutover / Cutover Result,task_instances,CUTOVER.values.result,trim,Setting list CutoverResult,
+DG,Cutover / Outage Duration (wd),,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DH,Cutover / Legacy Dismantle Due,,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DI,Cutover / Rollback Count,,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DJ,Cutover / Pre-Swap KPI Baseline Date,task_instances,CUTOVER.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DK,Cutover / Post-Swap KPI Check Date,task_instances,CUTOVER.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DL,Cutover / Post-Swap KPI Result,task_instances,CUTOVER.values.post_swap_kpi_result,trim,Setting list KPIResult,
+DM,On-Air / On-Air Planned Date,task_instances,ON_AIR.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+DN,On-Air / On-Air Actual Date,task_instances,ON_AIR.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DO,Baseline / On-Air Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DP,Milestone / On-Air Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (ON-AIR)
+DQ,Phase Gate / TE PAC Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+DR,SSV / SSV Date,task_instances,SSV.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DS,SSV / SSV Result,task_instances,SSV.values.result,trim,Setting list SSVResult,
+DT,HWID Date,task_instances,HWID.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DU,Site Standalone (EIR) / PWR,task_instances,EIR.values.pwr,trim,Setting list PassFail,
+DV,Site Standalone (EIR) / WL,task_instances,EIR.values.wl,trim,PassFail,
+DW,Site Standalone (EIR) / MW,task_instances,EIR.values.mw,trim,PassFail,
+DX,Site Standalone (EIR) / IP,task_instances,EIR.values.ip,trim,PassFail,
+DY,Site Standalone (EIR) / EIR Date,task_instances,EIR.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+DZ,Network Test (PAT) / PWR,task_instances,PAT.values.pwr,trim,PassFail,
+EA,Network Test (PAT) / WL,task_instances,PAT.values.wl,trim,PassFail,
+EB,Network Test (PAT) / MW,task_instances,PAT.values.mw,trim,PassFail,
+EC,Network Test (PAT) / IP,task_instances,PAT.values.ip,trim,PassFail,
+ED,Network Test (PAT) / NOC Alarm Verification,task_instances,PAT.values.noc_alarm_verification,trim,PassFail,
+EE,Network Test (PAT) / PAT Date,task_instances,PAT.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+EF,As-Built Date,task_instances,TE_ASBUILT.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+EG,TE Snags / Snags Found,task_instances,TE_PAC.values.snags_found,int,>=0,Summary only; snags table holds the records
+EH,TE Snags / Snags Cleared,task_instances,TE_PAC.values.snags_cleared,int,0..snags_found,
+EI,TE PAC / TE PAC Planned Date,task_instances,TE_PAC.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+EJ,TE PAC / TE PAC Actual Date,task_instances,TE_PAC.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+EK,Baseline / TE PAC Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE PAC)
+EL,Milestone / TE PAC Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (TE PAC)
+EM,Phase Gate / Cluster Optimization Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+EN,Cluster ID,,,"computed, not imported",,Master formula column; recomputed by PMIS (CLUSTER OPTIMIZATION)
+EO,Cluster Optimization Date,task_instances,CLUSTER_OPT.actual_date,date,valid date,
+EP,KPI Acceptance Source Date,clusters,kpi_source_date,date (once per cluster; conflicting values within a cluster = row error),valid date,
+EQ,KPI Source Validation,,,"computed, not imported",,Master formula column; recomputed by PMIS (CLUSTER OPTIMIZATION)
+ER,Baseline / KPI Acceptance Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (CLUSTER OPTIMIZATION)
+ES,Milestone / KPI Acceptance Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (CLUSTER OPTIMIZATION)
+ET,Phase Gate / HOTO Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+EU,Launch Date,task_instances,LAUNCH.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+EV,Material Reconciliation Date,task_instances,MAT_RECON.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+EW,HOTO Package Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (SOFT / COMMERCIAL LAUNCH & HOTO)
+EX,Baseline / HOTO Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (SOFT / COMMERCIAL LAUNCH & HOTO)
+EY,Milestone / HOTO Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (SOFT / COMMERCIAL LAUNCH & HOTO)
+EZ,Phase Gate / Final Closure Readiness,,,"computed, not imported",,Master formula column; recomputed by PMIS (Phase Gate)
+FA,CW DLP / FAC / CW DLP Start Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FB,CW DLP / FAC / CW DLP End Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FC,CW DLP / FAC / Snags Found,task_instances,CW_FAC.values.snags_found,int,>=0,
+FD,CW DLP / FAC / Snags Cleared,task_instances,CW_FAC.values.snags_cleared,int,0..snags_found,
+FE,CW DLP / FAC / CW FAC Date,task_instances,CW_FAC.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FF,TE DLP / FAC / TE DLP Start Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FG,TE DLP / FAC / TE DLP End Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FH,TE DLP / FAC / Snags Found,task_instances,TE_FAC.values.snags_found,int,>=0,
+FI,TE DLP / FAC / Snags Cleared,task_instances,TE_FAC.values.snags_cleared,int,0..snags_found,
+FJ,TE DLP / FAC / TE FAC Date,task_instances,TE_FAC.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FK,Contractual Obligations Closure Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FL,Baseline / Final Closure Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FM,Milestone / Final Closure Date,,,"computed, not imported",,Master formula column; recomputed by PMIS (FINAL CLOSURE)
+FN,CW Dismantle (RN) / Site CW RFD,task_instances,CW_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FO,CW Dismantle (RN) / Contractor / Vendor,task_instances,CW_DISMANTLE.external_party_id,lookup external_parties.name,optional,
+FP,CW Dismantle (RN) / Planned Date,task_instances,CW_DISMANTLE.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+FQ,CW Dismantle (RN) / Actual Date,task_instances,CW_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FR,CW Dismantle (RN) / CW RN Date,task_instances,CW_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FS,TE Dismantle (RN) / Site TE RFD,task_instances,TE_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FT,TE Dismantle (RN) / Contractor / Vendor,task_instances,TE_DISMANTLE.external_party_id,lookup external_parties.name,optional,
+FU,TE Dismantle (RN) / Planned Date,task_instances,TE_DISMANTLE.planned_date,date (Excel serial or ISO),valid date; not before Site Release,
+FV,TE Dismantle (RN) / Actual Date,task_instances,TE_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FW,TE Dismantle (RN) / TE RN Date,task_instances,TE_DISMANTLE.actual_date,date (Excel serial or ISO),valid date; not before Site Release,
+FX,Progress / Current Milestone,,,"computed, not imported",,Master formula column; recomputed by PMIS (STATUS)
+FY,Progress / Next Milestone,,,"computed, not imported",,Master formula column; recomputed by PMIS (STATUS)
+FZ,Progress / Overall Status,,,"computed, not imported",,Master formula column; recomputed by PMIS (STATUS)
+GA,Issue & Remark / Pending Issue,issues,title,trim; one issue row per site with a pending issue,optional,Master holds one issue per site; Issue Log allows many
+GB,Issue & Remark / Issue Owner,issues,owner_text,trim; Setting IssueOwners,optional,
+GC,Issue & Remark / Issue Raised Date,issues,raised_date,date,valid date; required if GA set,
+GD,Issue & Remark / Issue Status,issues,status,map Setting IssueStatus to register_status,Setting list IssueStatus,
+GE,Issue & Remark / Remark,issues,detail,trim,optional,Remark
