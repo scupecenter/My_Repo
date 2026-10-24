@@ -1,17 +1,17 @@
 # GSDN PMIS - Entity Relationship Diagram
 
-Source of truth: `apps/api/prisma/schema.prisma` (57 models, PostgreSQL 16). Field names are snake_case and shared with the importer mapping (`tools/master-import/mapping.csv`). Task codes (`task_definitions.code`, for example `CW_STA`, `TE_PAC`) must be aligned with the domain-analyst task catalogue once it exists in `docs/spec/`.
+Source of truth: `apps/api/prisma/schema.prisma` (63 models, PostgreSQL 16). Field names are snake_case and shared with the importer mapping (`tools/master-import/mapping.csv`). Task codes (`task_definitions.code`, for example `CW_STA`, `TE_PAC`) must be aligned with the domain-analyst task catalogue once it exists in `docs/spec/`.
 
 ```mermaid
 erDiagram
   REGIONS ||--o{ SITES : has
-  REGIONS ||--o{ USER_REGIONS : limits
-  USERS ||--o{ USER_REGIONS : has
-  USERS ||--o{ USER_MODULES : sees
-  USERS ||--o{ USER_SUB_ROLES : holds
+  USERS ||--o{ USER_ROLE_ASSIGNMENTS : holds
+  ROLES ||--o{ USER_ROLE_ASSIGNMENTS : by_role
+  SUB_ROLES ||--o{ USER_ROLE_ASSIGNMENTS : by_sub_role
+  USER_ROLE_ASSIGNMENTS ||--o{ USER_ROLE_ASSIGNMENT_REGIONS : limits
+  REGIONS ||--o{ USER_ROLE_ASSIGNMENT_REGIONS : in
+  USER_ROLE_ASSIGNMENTS ||--o{ USER_ROLE_ASSIGNMENT_MODULES : sees
   ROLES ||--o{ SUB_ROLES : contains
-  ROLES ||--o{ USERS : main_role
-  SUB_ROLES ||--o{ USER_SUB_ROLES : assigned
   GROUPS ||--o{ GROUP_MEMBERS : has
   USERS ||--o{ GROUP_MEMBERS : joins
   USERS ||--o{ DELEGATIONS : from_to
@@ -61,13 +61,21 @@ erDiagram
   WAREHOUSE_ITEMS ||--o{ WAREHOUSE_SERIALS : serials
   WAREHOUSE_ITEMS ||--o{ WAREHOUSE_SITE_QTY : qty
   MEETINGS ||--o{ MEETING_ACTIONS : actions
+  WORK_CALENDARS ||--o{ HOLIDAYS : has
+  WORK_CALENDARS ||--o{ SLA_RULES : counts_in
+  TASK_DEFINITIONS ||--o{ SLA_RULES : versions
+  REGIONS ||--o{ SLA_RULES : override
+  SLA_RULES ||--o{ TASK_INSTANCES : snapshot
+  WEIGHT_SETS ||--o{ WEIGHT_ACTIVITIES : has
+  WEIGHT_ACTIVITIES ||--o{ WEIGHT_ITEMS : has
+  WEIGHT_SETS ||--o{ PROGRESS_SNAPSHOTS : used_by
 ```
 
 Not drawn (no foreign keys by design): `audit_log`, `system_log`, `settings`, `holidays`, `notifications`, `phase_gate_rules`, `risks`. Audit and system logs hold ids as plain values so that deleting or deactivating a row can never touch history.
 
 ## Aggregates
 
-**Identity and access.** `users` are created at first Microsoft 365 sign-in (`m365_object_id`, `email`) and stay `pending_assignment` with no role until an admin assigns main role, sub-roles (`user_sub_roles`), team, permission level, regions (`user_regions`) and modules (`user_modules`). The 4-digit `employee_id` is unique. Empty region or module sets mean everything is visible, matching the agreed default. `groups` and `group_members` are named sets of users; the System Admins group is flagged. `delegations` record scope (full or partial), valid_from/valid_to (null = until revoked) and a revoked flag. The "at least one active admin" and "no re-delegation" rules are enforced in the service layer and verified by tests.
+**Identity and access.** `users` are created at first Microsoft 365 sign-in (`m365_object_id`, `email`) and stay `pending_assignment`, seeing nothing, until an admin assigns roles. The 4-digit `employee_id` is unique. Role assignment is many-to-many: each `user_role_assignments` row links one user to exactly one role or one sub-role (CHECK) with its own `permission_level`, `team`, `valid_from`/`valid_to` (null = until removed), `is_primary` (at most one per user), `assigned_by` and `assigned_at`. Scopes are children of the assignment: `user_role_assignment_regions` and `user_role_assignment_modules`; scope is an explicit opt-in: `all_regions` / `all_modules` flags (default false) or child rows; no rows and flag false means no access, enforced by a deferred constraint trigger. There is deliberately no user-level default for role, level, region or module, because it would conflict with the union rule and create two places to edit. Effective access is the union of the user's active assignments (user active, valid dates current): `app_resolve_region_ids(user_id)` returns `*` only if an active assignment has `all_regions = true`, else the union list, else an empty string (no access); `app_resolve_modules(user_id)` does the same for modules. The API puts the first into `app.region_ids` for RLS. `groups` and `group_members` are named sets of users; the System Admins group is flagged. `delegations` record scope (full or partial), valid_from/valid_to and a revoked flag. The "at least one active admin" and "no re-delegation" rules are enforced in the service layer and verified by tests.
 
 **Sites and clusters.** `sites` carries the Master identity block (site code, owner id, name, region, sub region, coordinates, type, RF scenario, uplink, tower data), the delivery scenario, batch, phase, the six scope flags (Master AA:AF) and the current/next milestone and overall status. `clusters` hold the KPI acceptance date once, applied to all member sites. Extra RF data lives in `rf_design_records`; acquisition candidates in `acquisition_candidates`.
 
@@ -83,7 +91,11 @@ Not drawn (no foreign keys by design): `audit_log`, `system_log`, `settings`, `h
 
 **Baseline, calendar and change control.** `baseline_versions` and `baseline_entries` hold one date per site per milestone per version; `phase_gate_rules` hold min/max working days per link. `holidays` feed working-day math (weekend Friday/Saturday is code, not data). `change_requests` cover scope and date changes and Suspension/Resumption pairs; on resumption `shift_working_days` is computed and applied to the gates.
 
-**Registers.** Lean tables, each its own module: `procurement_records` (PR/PO/WO), `external_parties` and `external_teams` (contractors, vendors, GECOL, HLC), `gecol_records`, `hlc_records`, `permit_records` (permits and HSE checks as JSON), `warehouse_items`/`warehouse_serials`/`warehouse_site_qty`, `quality_inspections`, `issues` (many per site), `risks`, `readiness_handover`, `as_built_records` (quantities JSON), `meetings`/`meeting_actions`. Region-bearing registers carry `region_id` for RLS.
+**Registers.** Lean tables, each its own module: `procurement_records` (PR/PO/WO), `external_parties` and `external_teams` (contractors, vendors, GECOL, HLC), `gecol_records`, `hlc_records`, `permit_records` (permits and HSE checks as JSON), `warehouse_items`/`warehouse_serials`/`warehouse_site_qty`, `quality_inspections`, `issues` (many per site), `risks`, `readiness_handover`, `as_built_records` (quantities JSON), `meetings`/`meeting_actions`. Region-bearing registers carry `region_id` for RLS. Global rows (risks, meetings, clusters, default matrix cells, project-wide change requests, unallocated warehouse serials) are marked by an explicit `is_global` flag with CHECK constraints; a NULL region alone never makes a row global, and only `*` sessions may write global rows. Site-bound children use composite FKs `(site_id, region_id)` to `sites`, RESTRICT on delete so a deleted site cannot orphan or expose rows. `comments.region_id` is NOT NULL, tied to the task by composite FK with ON DELETE CASCADE.
+
+**SLA and calendar.** `work_calendars` hold the weekend days (default Friday and Saturday) and own their `holidays`. `sla_rules` are versioned per task: min (target) and max (limit) working days, `start_event` (task code, milestone or gate code), optional scenario and region overrides, calendar, effective_from/to, reason, changed_by/at. An exclusion constraint forbids overlapping ranges for the same task and scope. A rule used by tasks is frozen (only `effective_to` may change; edits create a new version). `task_instances.sla_rule_id` is the snapshot taken when the task opens; `sla_rule_for()` picks the most specific rule, and re-pointing open tasks is an admin-only path (`app.allow_sla_repoint`, never for approved tasks).
+
+**Weights and progress.** `weight_sets` (project_status, health_index, delay_attribution) are versioned with effective dates, a reason, author and draft/published status. `weight_activities` and `weight_items` carry the weights, unit, measure rule and source. Publishing is enforced in the database by a deferred constraint trigger: activities of a set total 100 and the items of each activity total 100 (tolerance 0.001). Published sets are immutable and cannot overlap in time. `progress_snapshots` (weekly, project-wide or per region) store `weight_set_id` and the computed values, so old reports keep their numbers and can be re-run with another set.
 
 **Logs, notifications and settings.** `audit_log` is append-only (BEFORE UPDATE/DELETE/TRUNCATE triggers plus REVOKE on the app role, `db/sql/001`) with actor, on-behalf-of, before/after JSON, reason and override flag. `system_log` is separate, with a 12-month purge by a job role that cannot touch the audit log. `notifications` are in-app and email. `settings` is a key/value table for admin toggles such as `require_mfa`, `geofence_radius_m`, default approval levels.
 
