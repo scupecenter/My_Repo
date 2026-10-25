@@ -16,6 +16,7 @@ Read before any work:
 - Default workflow (seed version 1; milestones and gates are admin-configurable, see Configuration): 10 milestones in this order: Site Release, PRE-CW Completion, CW Completion, Site RFI, TE Completion, On-Air, TE PAC, KPI Acceptance, HOTO, Final Closure.
 - 9 phase gates between them. A gate date equals the previous milestone date. A Suspension→Resumption in Change Control shifts it.
 - SLA counts working days. The weekend is Friday and Saturday (NETWORKDAYS.INTL code 7). Holidays come from a table.
+- **Holidays are managed in Settings → Work calendar (decision B12).** The System Admin, or a delegate, can add, edit, delete and import holidays (date, name EN/AR, kind national/religious, "tentative" flag) and the weekend days, without code. Seed: `db/seed/holidays-2026-2027.csv`; religious dates are tentative until the admin confirms them on the official announcement, and the screen reminds the admin of tentative dates 14 days ahead. Every change is audited with before/after values and a reason. A change recalculates SLA due dates of open tasks; closed tasks keep their computed values. A banner shows while the table for the coming year is empty.
 - Delivery Scenario: New Build, Expansion, Hot Swap, Cold Swap, Relocation. Overall Status: Not Started, In Progress, On Hold, Completed, Cancelled.
 - Regions: Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha.
 - Roles: 6 main roles (Project Manager, RF & Design / Acquisition Team Lead, CW Team Lead, TE Team Lead, Inventory Supervisor, Project Support) and 9 sub-roles.
