@@ -61,7 +61,7 @@ sequenceDiagram
   U->>W: يكتب البريد أو الرقم الوظيفي أو الهاتف
   W->>A: GET /auth/login?identifier=...
   A->>S: بحث (استجابة متطابقة سواء وُجد أم لا)
-  A-->>U: إعادة توجيه إلى Entra (login_hint إن وُجد)
+  A-->>U: إعادة توجيه إلى Entra (login_hint فقط إن كتب الموظف بريده)
   U->>E: كلمة المرور + MFA + الوصول المشروط
   E-->>A: /auth/callback (رمز التفويض)
   A->>A: فحص iss/aud/التوقيع/الانتهاء + tid + oid (+ amr=mfa إن فُعّل)
@@ -216,7 +216,7 @@ sequenceDiagram
   U->>W: types email, employee ID or phone
   W->>A: GET /auth/login?identifier=...
   A->>S: lookup (identical response whether found or not)
-  A-->>U: redirect to Entra (login_hint if found)
+  A-->>U: redirect to Entra (login_hint only if the user typed an email)
   U->>E: password + MFA + Conditional Access
   E-->>A: /auth/callback (authorization code)
   A->>A: check iss/aud/signature/expiry + tid + oid (+ amr=mfa if enabled)

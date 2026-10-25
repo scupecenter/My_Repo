@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.1.0
-  summary: Contract for phase P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read).
+  version: 0.2.0
+  summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
     The web app generates its types and MSW mocks from it (`packages/contracts`, ADR 0001).
@@ -28,7 +28,19 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.1.0 (2026-10-25): first contract for P1. No breaking-change history yet. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
+    - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
+    - 0.1.0 (2026-10-25): first contract for P1. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
+
+    ## Changes since 0.1
+    - **Auth**: `GET /auth/login` accepts `identifier` (email, 4-digit employee ID or E.164 phone) and answers 302 the same way whether or not it matches; rate limited (ADR 0002 §9b). Local password sign-in stays deferred and is not in the contract.
+    - **Staff registry** (`staff-registry`): search, hover card with visibility applied, create, update, deactivate, reactivate, template import, field-visibility settings.
+    - **Absence and reassignment** (`absences`, `reassignment`, B12b): absences CRUD, `POST /tasks/reassign` (task, site or person; reassign, act on behalf or keep), eligible users, lead alerts, idle-task alert setting.
+    - **MFA exemption** (`mfa-exemption`): per user, with end date, reason and step-up; nobody exempts themselves.
+    - **Calendar** (`calendar`, B12): holidays CRUD, import, confirm tentative, weekend days. **Settings**: structural freeze (B9), DLP months (versioned), idle-task alert.
+    - **Registers and Dismantle** (`registers`, B11): catalogue, records CRUD and submit, review, approve, reject, void. The Matrix gains a `kind` per row.
+    - **Document Library** (`document-library`), **templates and import batches** (`templates`), **generated forms and number sequences** (`forms`), **warehouse** (`warehouse`), **QC snags and photos** (`qc`), **custom fields** (`custom-fields`).
+    - **Notifications** (`notifications`), **System Log** (`system-log`), **Dashboard KPIs** (`dashboard`) and **Project Status** with the weight-set version (`project-status`).
+    - Small additive changes to 0.1 shapes: `User.mfa_exempt`, `TaskSummary.holder_absent` and `idle_working_days`, `Matrix` stage `kind` and `register_key`, `Problem.reason`, new error codes `freeze_active`, `insufficient_stock`, `role_in_use`, new job kinds, `updateRole` also answers 409 and 422.
   license:
     name: Proprietary, Aljeel internal use
     url: https://pmis.aljeel.internal/license
@@ -72,9 +84,41 @@ tags:
   - name: audit
     description: Read-only Audit Log (ADR 0006).
   - name: settings
-    description: Read access to settings, SLA rules, weight sets, calendars and task definitions.
+    description: Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert.
   - name: system
     description: Jobs and client error reporting.
+  - name: staff-registry
+    description: "Registry of Aljeel staff: search, hover card with visibility, maintenance, import, field visibility."
+  - name: absences
+    description: "Informational absence records (B12b)."
+  - name: reassignment
+    description: "Lead decisions on tasks of absent or idle people: reassign, act on behalf, keep (B12b)."
+  - name: mfa-exemption
+    description: "Per-user removal of the PMIS MFA requirement (ADR 0002)."
+  - name: calendar
+    description: "Work calendar: holidays and weekend days (B12)."
+  - name: registers
+    description: "Registers and Dismantle with their own menus and Matrix rows (B11)."
+  - name: document-library
+    description: "Document definitions kept as data (ADR 0007 §4)."
+  - name: templates
+    description: "Approved templates, download with embedded ID and version, upload batches, row-wise approval (ADR 0005)."
+  - name: forms
+    description: "Generated forms DN, RN, PAC, FAC and snag list: template versions, numbering, PDFs."
+  - name: warehouse
+    description: "Item master, stock levels and pending or reserved movements."
+  - name: qc
+    description: "Snag types, snags and QC photos."
+  - name: custom-fields
+    description: "Admin-defined fields on sites, tasks, milestones, gates and registers (ADR 0009)."
+  - name: notifications
+    description: "In-app notifications and channel preferences."
+  - name: system-log
+    description: "Read-only System/Error Log, separate from the Audit Log."
+  - name: dashboard
+    description: "Dashboard KPIs (P3 shapes, refined against the legacy dashboard)."
+  - name: project-status
+    description: "Project Status with the weight-set version, and weekly snapshots."
 
 paths:
   # ------------------------------------------------------------------ auth
@@ -82,9 +126,22 @@ paths:
     get:
       tags: [auth]
       operationId: authLogin
-      summary: Start the Entra ID sign-in (redirect)
+      summary: Start the Entra ID sign-in (redirect), optionally from an identifier
+      description: |
+        With `identifier` (email, 4-digit employee ID or E.164 phone) the API resolves it in the staff registry and keeps the
+        resolved registry email **server-side only**, in the OIDC `state`/session record. The registry email never appears in
+        the redirect: `login_hint` is sent to Entra only when the caller typed an email themselves (they already know it), and
+        that value is passed as typed, whether or not it matches. An employee ID or phone never becomes a `login_hint`, so an
+        unauthenticated caller cannot learn anyone's email. Status, headers and timing are the same whether or not the identifier
+        matches. The lookup is rate limited per IP and per identifier (429 `rate_limited`). On the callback, when the identifier
+        resolved to a registry row, the token account must equal that row's email or sign-in is refused and logged (ADR 0002 §9b).
+        PMIS never stores passwords; local sign-in is deferred.
       security: []
       parameters:
+        - name: identifier
+          in: query
+          description: 'Email, 4-digit employee ID, or phone in E.164 (`+2189...`). Anything else is treated as no match.'
+          schema: { type: string, maxLength: 254 }
         - name: return_to
           in: query
           description: 'App-relative path to open after sign-in. The server decodes it, rejects any scheme, host, `//`, backslash or encoded slash, matches it against the app route allowlist, falls back to `/` on failure, and stores the validated value in the server-side OIDC state; the callback never reads it from the URL again.'
@@ -95,6 +152,7 @@ paths:
           headers:
             Location: { schema: { type: string, format: uri } }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/callback:
     get:
       tags: [auth]
@@ -683,7 +741,9 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
 
   # ------------------------------------------------------------------ permissions
@@ -1723,6 +1783,7 @@ paths:
       summary: Publish a draft (structural change); new sites use it
       description: |
         Runs the ADR 0010 §2 validation. Returns 422 `workflow_invalid` with the list of problems.
+        Answers 409 `freeze_active` during the structural freeze (`GET /settings/structural-freeze`, B9).
         During the parallel run, a change that affects Master export columns needs `confirm_master_impact` equal to the
         phrase in `master_impact.confirmation_phrase` of the validation result.
       x-step-up: true
@@ -2144,6 +2205,2922 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  # ================================================================ v0.2 additions
+  /staff-registry:
+    get:
+      tags: [staff-registry]
+      operationId: listStaffRegistry
+      summary: List and search the staff registry (admin view, full rows)
+      description: Needs `view` on `admin.staff_registry`. Personal data is returned in full to the people allowed to administer the registry. Everyone else uses the card endpoint.
+      parameters:
+      - name: q
+        in: query
+        schema: {type: string}
+        description: Name EN/AR, employee ID, email or phone.
+      - name: team
+        in: query
+        schema: {$ref: '#/components/schemas/TeamKind'}
+      - name: region
+        in: query
+        schema: {$ref: '#/components/schemas/StaffRegion'}
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [active, inactive]
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Rows.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/StaffMember'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [staff-registry]
+      operationId: createStaffMember
+      x-step-up: true
+      summary: Add a staff member (admin or delegate)
+      description: Employee ID must be 4 digits and unique across all rows. Duplicate ID, email or phone gives 409 `duplicate`.
+      x-db-path: people_save_staff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffMemberInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffMember'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /staff-registry/{employee_id}:
+    parameters:
+    - {$ref: '#/components/parameters/EmployeeIdPath'}
+    get:
+      tags: [staff-registry]
+      operationId: getStaffMember
+      summary: Hover-card payload for one person
+      description: Any signed-in employee may read a card. The server applies the field-visibility settings and the per-employee hide; hidden fields come back null and are named in `hidden_fields`. An inactive person is still returned, with status
+        `inactive`.
+      responses:
+        '200':
+          description: Card.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffCard'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [staff-registry]
+      operationId: updateStaffMember
+      x-step-up: true
+      summary: Edit a row or hide fields for this employee
+      description: Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee.
+      x-db-path: people_save_staff
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffMemberPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffMember'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /staff-registry/{employee_id}/deactivate:
+    parameters:
+    - {$ref: '#/components/parameters/EmployeeIdPath'}
+    post:
+      tags: [staff-registry]
+      operationId: deactivateStaffMember
+      x-step-up: true
+      summary: Deactivate (never deleted)
+      description: The person keeps their ID and history and cannot sign in. Refused with `last_admin` when the linked account is the last active System Admin.
+      x-db-path: people_set_staff_status
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Deactivated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffMember'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /staff-registry/{employee_id}/reactivate:
+    parameters:
+    - {$ref: '#/components/parameters/EmployeeIdPath'}
+    post:
+      tags: [staff-registry]
+      operationId: reactivateStaffMember
+      x-step-up: true
+      summary: Reactivate a row
+      x-db-path: people_set_staff_status
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Reactivated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffMember'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /staff-registry/import:
+    post:
+      tags: [staff-registry]
+      operationId: importStaffRegistry
+      x-step-up: true
+      summary: Upload the TPL-STAFF template (creates an import batch)
+      description: Same rules as every template upload (ADR 0005 §4). Rows absent from the file are untouched. The valid rows can be approved while error rows stay listed. Follow with `/import-batches/{batch_id}`.
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202':
+          description: Batch accepted; parsing runs as a job.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /staff-registry/visibility:
+    get:
+      tags: [staff-registry]
+      operationId: getStaffVisibility
+      summary: Field-visibility settings for email and phone
+      responses:
+        '200':
+          description: Settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffVisibility'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [staff-registry]
+      operationId: setStaffVisibility
+      x-step-up: true
+      summary: Set who sees email and phone
+      description: 'Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values.'
+      x-db-path: people_save_staff_visibility
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StaffVisibilityInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StaffVisibility'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /absences:
+    get:
+      tags: [absences]
+      operationId: listAbsences
+      summary: Absence records
+      description: An employee sees their own. A Team Lead (or anyone with `reassign` for the module and region) sees their people. A System Admin sees all.
+      parameters:
+      - name: user_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: active_on
+        in: query
+        schema: {type: string, format: date}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum: [annual, sick, emergency, other]
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Absences.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/Absence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [absences]
+      operationId: createAbsence
+      summary: Record an absence (informational; nothing moves automatically)
+      x-db-path: ops_save_absence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AbsenceInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Absence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /absences/{absence_id}:
+    parameters:
+    - {$ref: '#/components/parameters/AbsenceId'}
+    get:
+      tags: [absences]
+      operationId: getAbsence
+      summary: One absence
+      responses:
+        '200':
+          description: Absence.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Absence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [absences]
+      operationId: updateAbsence
+      summary: Change dates, kind or note
+      x-db-path: ops_save_absence
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AbsencePatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Absence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [absences]
+      operationId: deleteAbsence
+      summary: Remove an absence record (audited)
+      description: Absence records are informational, so they can be removed; the audit row keeps the values.
+      x-db-path: ops_delete_absence
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '204': {description: Removed.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /tasks/reassign:
+    post:
+      tags: [reassignment]
+      operationId: reassignTasks
+      summary: Decide for one task, one site, or all open tasks of a person (B12b)
+      description: Needs the `reassign` grant for the module and region, or admin. Keeps all entered data, documents and comments. It does not reset or pause the SLA (its start date and version stay) or stage progress. The Matrix is not changed.
+        If the caller takes over a level and also holds the next one, the skip rule and the self-approval rule apply (a final approval then needs step-up on the transition itself). `dry_run` previews. One request is one audit group (`bulk_action_id`).
+      x-db-path: ops_reassign_tasks
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReassignRequest'}
+      responses:
+        '200':
+          description: Per-task result. Failures use `not_eligible_holder` or `note_required`.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BulkResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /reassignments/eligible-users:
+    get:
+      tags: [reassignment]
+      operationId: listEligibleReassignees
+      summary: People who may receive the task(s)
+      description: Eligible = would be a valid holder of the level in the Responsibility Matrix, region and module. Pass `task_id`, or `site_id` with `from_user_id`, or `from_user_id` alone.
+      parameters:
+      - name: task_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: from_user_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: q
+        in: query
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Eligible people.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/UserPickerItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reassignments/alerts:
+    get:
+      tags: [reassignment]
+      operationId: listReassignmentAlerts
+      summary: Tasks that need a lead decision (absent holder or idle)
+      description: A task shows when its holder has an active absence, or when it has had no activity for `working_days` (setting). Scoped to the caller's modules and regions.
+      parameters:
+      - name: cause
+        in: query
+        schema:
+          type: string
+          enum: [absent, idle]
+      - name: user_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Alerts.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/ReassignmentAlert'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/idle-task-alert:
+    get:
+      tags: [settings]
+      operationId: getIdleTaskAlertSetting
+      summary: Idle-task alert setting
+      responses:
+        '200':
+          description: Setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setIdleTaskAlertSetting
+      summary: Set the idle days that alert the lead (default 2 working days)
+      x-db-path: admin_set_setting
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [enabled, working_days]
+                properties:
+                  enabled: {type: boolean}
+                  working_days: {type: integer, minimum: 1, maximum: 30}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /users/{user_id}/mfa-exemption:
+    parameters:
+    - {$ref: '#/components/parameters/UserId'}
+    get:
+      tags: [mfa-exemption]
+      operationId: getMfaExemption
+      summary: MFA exemption of a user
+      responses:
+        '200':
+          description: State.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MfaExemption'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      tags: [mfa-exemption]
+      operationId: setMfaExemption
+      summary: Exempt a user from the PMIS MFA requirement
+      description: Removes only the PMIS `amr = mfa` check for sign-in and step-up of that user. MFA enforced by Entra Conditional Access is not affected. Needs a reason and the acting admin's own step-up. Nobody can exempt themselves (403 `self_beneficiary`).
+        The user is emailed and sees an "MFA exempt" badge on Users & Roles.
+      x-step-up: true
+      x-db-path: idm_set_mfa_exempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                properties:
+                  until:
+                    type: [string, 'null']
+                    format: date-time
+                    description: null = until revoked.
+      responses:
+        '200':
+          description: Exempt.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MfaExemption'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /users/{user_id}/mfa-exemption/revoke:
+    post:
+      tags: [mfa-exemption]
+      operationId: revokeMfaExemption
+      summary: Clear the exemption
+      x-step-up: true
+      x-db-path: idm_set_mfa_exempt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Cleared.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MfaExemption'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    parameters:
+    - {$ref: '#/components/parameters/UserId'}
+  /settings/holidays:
+    get:
+      tags: [calendar]
+      operationId: listHolidays
+      summary: Holidays with the reminder summary
+      description: Small bounded catalogue, so no cursor. `summary` drives the empty-table banner and the 14-day tentative reminder.
+      parameters:
+      - name: year
+        in: query
+        schema: {type: integer, minimum: 2020, maximum: 2035}
+      - name: calendar_code
+        in: query
+        schema: {type: string}
+      - name: tentative
+        in: query
+        schema: {type: boolean}
+      responses:
+        '200':
+          description: Holidays.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Holiday'}
+                  summary: {$ref: '#/components/schemas/HolidaySummary'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      tags: [calendar]
+      operationId: createHoliday
+      summary: Add a holiday (System Admin or delegate)
+      description: Recalculates the SLA due dates of open tasks. Closed tasks and saved snapshots keep their values.
+      x-db-path: admin_save_holiday
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/HolidayInput'}
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HolidayChangeResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/holidays/import:
+    post:
+      tags: [calendar]
+      operationId: importHolidays
+      summary: Upload the TPL-HOLIDAYS template (creates an import batch)
+      description: 'Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011).'
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '202':
+          description: Batch accepted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/holidays/{holiday_id}:
+    parameters:
+    - {$ref: '#/components/parameters/HolidayId'}
+    patch:
+      tags: [calendar]
+      operationId: updateHoliday
+      summary: Edit a holiday
+      x-db-path: admin_save_holiday
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/HolidayPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HolidayChangeResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [calendar]
+      operationId: deleteHoliday
+      summary: Delete a holiday (audited; recalculates open tasks)
+      description: The reason is a query parameter because DELETE has no body here.
+      x-step-up: true
+      x-db-path: admin_delete_holiday
+      parameters:
+      - name: reason
+        in: query
+        schema: {$ref: '#/components/schemas/Reason'}
+        required: true
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HolidayChangeResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/holidays/{holiday_id}/confirm:
+    parameters:
+    - {$ref: '#/components/parameters/HolidayId'}
+    post:
+      tags: [calendar]
+      operationId: confirmHoliday
+      summary: Confirm a tentative date on the official announcement
+      description: Clears `tentative`. `date` moves the holiday to the announced day first.
+      x-db-path: admin_save_holiday
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                properties:
+                  date: {type: string, format: date}
+      responses:
+        '200':
+          description: Confirmed.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HolidayChangeResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/weekend-days:
+    put:
+      tags: [calendar]
+      operationId: setWeekendDays
+      summary: Set the weekend days of a calendar (default Friday and Saturday)
+      description: Recalculates open tasks. The Friday/Saturday default is data here, not code.
+      x-step-up: true
+      x-db-path: admin_save_weekend_days
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WeekendDaysRequest'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WeekendDaysResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/structural-freeze:
+    get:
+      tags: [settings]
+      operationId: getStructuralFreeze
+      summary: Structural-change freeze (B9)
+      responses:
+        '200':
+          description: State.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StructuralFreeze'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setStructuralFreeze
+      summary: Set the freeze window (pilot start to end of the parallel-run month)
+      description: While active, adding, removing or reordering a milestone or gate and moving tasks between stages answer 409 `freeze_active`. Light changes and new tasks inside an existing stage stay allowed.
+      x-step-up: when the new window starts later or ends earlier than the current one (it shortens the freeze)
+      x-db-path: admin_set_structural_freeze
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StructuralFreezeInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StructuralFreeze'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/structural-freeze/lift:
+    post:
+      tags: [settings]
+      operationId: liftStructuralFreeze
+      summary: Lift the freeze (System Admin only)
+      description: Needs a written reason and step-up. The lift is audited.
+      x-step-up: true
+      x-db-path: admin_lift_structural_freeze
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Lifted.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StructuralFreeze'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dlp:
+    get:
+      tags: [settings]
+      operationId: getDlpSettings
+      summary: Defects Liability Period months (CW and TE) with history
+      responses:
+        '200':
+          description: Current and history.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DlpSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /settings/dlp/versions:
+    post:
+      tags: [settings]
+      operationId: publishDlpVersion
+      summary: Publish a new DLP version (`dlp.months.cw`, `dlp.months.te`)
+      description: Counted from the PAC date. A PAC keeps the version in force on its issue date.
+      x-step-up: true
+      x-db-path: admin_publish_dlp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DlpVersionInput'}
+      responses:
+        '201':
+          description: Published.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DlpVersion'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers:
+    get:
+      tags: [registers]
+      operationId: listRegisters
+      summary: Register catalogue (13 registers and Dismantle) with fields the caller may see
+      description: The Responsibility Matrix has one row per entry here (`GET /matrix` kind `register` or `dismantle`).
+      responses:
+        '200':
+          description: Registers the caller may use.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/RegisterDefinition'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /registers/{register_key}/records:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    get:
+      tags: [registers]
+      operationId: listRegisterRecords
+      summary: Records of a register
+      description: 'Same visibility as sites: outside the caller''s regions answers 404 for a row, and an empty list for a list.'
+      parameters:
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: state
+        in: query
+        schema: {$ref: '#/components/schemas/RegisterRecordState'}
+      - name: record_type
+        in: query
+        schema: {type: string}
+      - name: q
+        in: query
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Records.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: createRegisterRecord
+      summary: Create a record (state `entry`)
+      x-db-path: reg_save_record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRecordInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{register_key}/records/{record_id}:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: getRegisterRecord
+      summary: One record
+      responses:
+        '200':
+          description: Record.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [registers]
+      operationId: updateRegisterRecord
+      summary: Edit while in `entry`
+      x-db-path: reg_save_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterRecordPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/submit:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: submitRegisterRecord
+      summary: Submit for review (Entry holder)
+      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      x-db-path: reg_transition_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/review:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: reviewRegisterRecord
+      summary: Review (level 2 holder); moves to approval, or finishes at a 2-level register
+      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      x-db-path: reg_transition_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/approve:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: approveRegisterRecord
+      summary: Approve (final level)
+      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      x-step-up: when the caller holds every level (self-approval, B5)
+      x-db-path: reg_transition_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/reject:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: rejectRegisterRecord
+      summary: Reject one level back with a note
+      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      x-db-path: reg_transition_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RejectRequest'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/void:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: voidRegisterRecord
+      summary: Void a record (never hard-deleted)
+      x-step-up: true
+      x-db-path: reg_void_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Voided.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /document-library:
+    get:
+      tags: [document-library]
+      operationId: listDocumentTypes
+      summary: Document Library definitions
+      description: Data, never code (CLAUDE.md "Document Library").
+      parameters:
+      - name: placement_ref
+        in: query
+        schema: {type: string}
+        description: Task code, snag type code or register key.
+      - name: kind
+        in: query
+        schema: {type: string}
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Document types.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/DocumentType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [document-library]
+      operationId: createDocumentType
+      summary: Define a document (saved as a draft until published)
+      x-db-path: admin_save_document_type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DocumentTypeInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /document-library/{doc_type_id}:
+    parameters:
+    - {$ref: '#/components/parameters/DocTypeId'}
+    get:
+      tags: [document-library]
+      operationId: getDocumentType
+      summary: One definition
+      responses:
+        '200':
+          description: Document type.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [document-library]
+      operationId: updateDocumentType
+      summary: Edit or deactivate (never deleted)
+      description: Saves to the draft. `is_active=false` deactivates. Nothing reaches tasks until `publish`.
+      x-db-path: admin_save_document_type
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DocumentTypePatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /document-library/{doc_type_id}/publish:
+    parameters:
+    - {$ref: '#/components/parameters/DocTypeId'}
+    post:
+      tags: [document-library]
+      operationId: publishDocumentType
+      summary: 'Publish: new tasks only, or open tasks too (ADR 0007 §4)'
+      description: Approved tasks never change. Tasks in review or approval keep their slots until returned or approved.
+      x-step-up: true
+      x-db-path: admin_publish_document_type
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/PublishRequest'}
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/PublishResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /document-library/{doc_type_id}/blank-form:
+    parameters:
+    - {$ref: '#/components/parameters/DocTypeId'}
+    post:
+      tags: [document-library]
+      operationId: uploadBlankForm
+      summary: Upload the optional blank form to download
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '200':
+          description: Attached to the draft.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /templates:
+    get:
+      tags: [templates]
+      operationId: listTemplates
+      summary: Approved templates the caller may download or use
+      responses:
+        '200':
+          description: Templates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/Template'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /templates/{template_id}/download:
+    parameters:
+    - {$ref: '#/components/parameters/TemplateId'}
+    get:
+      tags: [templates]
+      operationId: downloadTemplate
+      summary: Download the current version (hidden `_tpl` sheet holds template_id and version)
+      description: Audited. For a pre-filled copy pass `task_id` or `site_ids`. Only the current version can be downloaded, and only the current version is accepted on upload.
+      parameters:
+      - name: task_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: site_ids
+        in: query
+        schema:
+          type: array
+          items: {type: string, format: uuid}
+      responses:
+        '200':
+          description: The xlsx file.
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, contentMediaType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches:
+    get:
+      tags: [templates]
+      operationId: listImportBatches
+      summary: Upload batches visible to the caller
+      parameters:
+      - name: status
+        in: query
+        schema: {type: string}
+      - name: template_id
+        in: query
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Batches.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [templates]
+      operationId: uploadImportBatch
+      summary: 'Upload a filled template: validate and create a batch'
+      description: 'Checks in order: size and rows, `_tpl` present, known and active template, current version, the template selected, header checksum, `import` right (ADR 0005 §4). The first failure answers 422 `template_rejected` with `reason`
+        = TemplateRejectReason and a System Log row. A file that passes returns 202 and parses as a job. Nothing reaches target tables until rows are approved.'
+      x-db-path: imp_create_batch
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                template_id: {type: string, description: The template the user selected.}
+                task_id: {type: string, format: uuid}
+      responses:
+        '202':
+          description: Accepted; poll the job or the batch.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /import-batches/{batch_id}:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: getImportBatch
+      summary: One batch
+      responses:
+        '200':
+          description: Batch.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/rows:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: listImportBatchRows
+      summary: 'Preview: rows with action, diff and errors'
+      parameters:
+      - name: action
+        in: query
+        schema:
+          type: string
+          enum: [create, update, unchanged, error]
+      - name: decision
+        in: query
+        schema:
+          type: string
+          enum: [pending, approved, rejected, pending_previous_approval]
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Rows.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/ImportRow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/submit:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    post:
+      tags: [templates]
+      operationId: submitImportBatch
+      summary: Send the validated batch to review
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Submitted.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /import-batches/{batch_id}/decisions:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    post:
+      tags: [templates]
+      operationId: decideImportBatch
+      summary: 'Review, approve or reject: row by row, or all at once'
+      description: Follows the batch's own 3-level path and the self-skip rule. `scope=all` decides every undecided valid row. Approving the last level applies the rows. A final approval by someone who holds every level needs step-up (B5).
+      x-step-up: when the caller holds every level (self-approval, B5)
+      x-db-path: imp_decide_batch
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ImportDecisionRequest'}
+      responses:
+        '200':
+          description: Decision recorded.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /import-batches/{batch_id}/undo:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    post:
+      tags: [templates]
+      operationId: undoImportBatch
+      summary: Undo an applied batch (admin override, reversible)
+      x-step-up: true
+      x-db-path: imp_undo_batch
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Undone from the stored before values.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /generated-forms:
+    get:
+      tags: [forms]
+      operationId: listGeneratedForms
+      summary: Forms issued by the system
+      parameters:
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: form_kind
+        in: query
+        schema: {$ref: '#/components/schemas/FormKind'}
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [prepared, generated, voided]
+      - name: number
+        in: query
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Forms.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/GeneratedForm'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [forms]
+      operationId: prepareGeneratedForm
+      summary: Prepare the record for a DN, RN, PAC, FAC or snag list
+      description: DN and RN lines come from the warehouse (stock is reserved as "pending issue" or "pending return"). PAC computes the BoQ (DN minus RN) and attaches the site snags. FAC references its PAC. No number is consumed yet.
+      x-db-path: forms_prepare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GeneratedFormInput'}
+      responses:
+        '201':
+          description: Prepared.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneratedForm'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /generated-forms/{form_id}:
+    parameters:
+    - {$ref: '#/components/parameters/FormId'}
+    get:
+      tags: [forms]
+      operationId: getGeneratedForm
+      summary: One form
+      responses:
+        '200':
+          description: Form.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneratedForm'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [forms]
+      operationId: updateGeneratedForm
+      summary: Edit a prepared form (before generation)
+      x-db-path: forms_prepare
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GeneratedFormPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneratedForm'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /generated-forms/{form_id}/generate:
+    parameters:
+    - {$ref: '#/components/parameters/FormId'}
+    post:
+      tags: [forms]
+      operationId: generateFormPdf
+      summary: Generate the numbered PDF (template version recorded)
+      description: Takes the next number from the form's sequence. Refused with 422 `open_snags` for a PAC while any snag on the site is open. The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
+      x-db-path: forms_generate
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses:
+        '200':
+          description: Generated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GeneratedForm'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /generated-forms/{form_id}/void:
+    parameters:
+    - {$ref: '#/components/parameters/FormId'}
+    post:
+      tags: [forms]
+      operationId: voidGeneratedForm
+      summary: Void a wrong form with a reason, optionally reissue
+      description: The number is never reused. With `reissue` a replacement is generated with a new number.
+      x-step-up: true
+      x-db-path: forms_void
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/VoidFormRequest'}
+      responses:
+        '200':
+          description: Voided.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/VoidFormResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /generated-forms/{form_id}/download:
+    parameters:
+    - {$ref: '#/components/parameters/FormId'}
+    get:
+      tags: [forms]
+      operationId: downloadGeneratedForm
+      summary: Download the PDF (audited)
+      responses:
+        '200':
+          description: The PDF.
+          headers:
+            Content-Disposition:
+              schema: {type: string}
+          content:
+            application/pdf:
+              schema: {type: string, contentMediaType: application/pdf}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /form-templates:
+    get:
+      tags: [forms]
+      operationId: listFormTemplates
+      summary: HTML form templates and their versions
+      responses:
+        '200':
+          description: Templates.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/FormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /form-templates/{form_kind}/versions:
+    parameters:
+    - {$ref: '#/components/parameters/FormKindPath'}
+    post:
+      tags: [forms]
+      operationId: uploadFormTemplateVersion
+      summary: Upload a new HTML template version
+      description: The server checks the placeholders against `FormTemplate.placeholders`. Each generated PDF records the version it used; earlier PDFs are not regenerated.
+      x-step-up: true
+      x-db-path: forms_publish_template
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, reason]
+              properties:
+                file: {type: string, format: binary}
+                reason: {type: string}
+      responses:
+        '201':
+          description: New current version.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FormTemplate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /number-sequences:
+    get:
+      tags: [forms]
+      operationId: listNumberSequences
+      summary: Numbering sequences
+      responses:
+        '200':
+          description: Sequences.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/NumberSequence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [forms]
+      operationId: createNumberSequence
+      summary: Create a sequence
+      x-db-path: forms_save_sequence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/NumberSequenceFields'}
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [key, form_kind, pattern]
+                properties:
+                  key: {type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,40}$'}
+                  form_kind: {$ref: '#/components/schemas/FormKind'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NumberSequence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /number-sequences/{sequence_key}:
+    parameters:
+    - {$ref: '#/components/parameters/SequenceKey'}
+    patch:
+      tags: [forms]
+      operationId: updateNumberSequence
+      summary: Change pattern, reset rule or deactivate
+      description: '`next_value` can only go up (422 `validation_failed` otherwise): numbers are never reused.'
+      x-db-path: forms_save_sequence
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/NumberSequenceFields'}
+              - {$ref: '#/components/schemas/WithReason'}
+              - {type: object, minProperties: 2}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NumberSequence'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /warehouse/items:
+    get:
+      tags: [warehouse]
+      operationId: listWarehouseItems
+      summary: Item master
+      parameters:
+      - name: q
+        in: query
+        schema: {type: string}
+      - name: category
+        in: query
+        schema: {type: string}
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Items.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/WarehouseItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [warehouse]
+      operationId: createWarehouseItem
+      summary: Add an item (System Admin, or the Inventory Supervisor by delegation `warehouse.items.edit`)
+      x-db-path: admin_save_warehouse_item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WarehouseItemInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/items/{item_id}:
+    parameters:
+    - {$ref: '#/components/parameters/WarehouseItemId'}
+    get:
+      tags: [warehouse]
+      operationId: getWarehouseItem
+      summary: One item with need rules
+      responses:
+        '200':
+          description: Item.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [warehouse]
+      operationId: updateWarehouseItem
+      summary: Edit or deactivate (never deleted)
+      x-db-path: admin_save_warehouse_item
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WarehouseItemPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /warehouse/stock:
+    get:
+      tags: [warehouse]
+      operationId: listStockLevels
+      summary: On hand, reserved and pending quantities
+      parameters:
+      - name: item_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+        description: Net quantity on a site (DN minus RN).
+      - name: q
+        in: query
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Levels.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/StockLevel'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /warehouse/movements:
+    get:
+      tags: [warehouse]
+      operationId: listStockMovements
+      summary: Stock movements
+      parameters:
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum: [issue, return]
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, posted, cancelled]
+      - name: item_id
+        in: query
+        schema: {type: string, format: uuid}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Movements.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/StockMovement'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [warehouse]
+      operationId: createStockMovement
+      summary: Create a pending issue or return and reserve the stock
+      description: Reserved stock cannot be issued twice (422 `insufficient_stock`). It posts to the site when the DN or RN is approved.
+      x-db-path: wh_create_movement
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StockMovementInput'}
+      responses:
+        '201':
+          description: Pending.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StockMovement'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/movements/{movement_id}:
+    parameters:
+    - {$ref: '#/components/parameters/MovementId'}
+    get:
+      tags: [warehouse]
+      operationId: getStockMovement
+      summary: One movement
+      responses:
+        '200':
+          description: Movement.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StockMovement'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /warehouse/movements/{movement_id}/cancel:
+    parameters:
+    - {$ref: '#/components/parameters/MovementId'}
+    post:
+      tags: [warehouse]
+      operationId: cancelStockMovement
+      summary: Cancel a pending movement and release the reservation
+      x-db-path: wh_cancel_movement
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Cancelled.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StockMovement'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snag-types:
+    get:
+      tags: [qc]
+      operationId: listSnagTypes
+      summary: Snag types with photo requirements
+      parameters:
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Types.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/SnagType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      tags: [qc]
+      operationId: createSnagType
+      summary: Define a snag type
+      x-db-path: admin_save_snag_type
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/SnagTypeFields'}
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [code, name_en, photo_rules]
+                properties:
+                  code: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnagType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /snag-types/{snag_type_id}:
+    parameters:
+    - {$ref: '#/components/parameters/SnagTypeId'}
+    patch:
+      tags: [qc]
+      operationId: updateSnagType
+      summary: Change photo rules or deactivate
+      x-db-path: admin_save_snag_type
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/SnagTypeFields'}
+              - {$ref: '#/components/schemas/WithReason'}
+              - {type: object, minProperties: 2}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnagType'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /sites/{site_id}/snags:
+    parameters:
+    - {$ref: '#/components/parameters/SiteId'}
+    get:
+      tags: [qc]
+      operationId: listSiteSnags
+      summary: Snags of a site (the open count drives the PAC lock)
+      parameters:
+      - name: state
+        in: query
+        schema:
+          type: string
+          enum: [open, fix_submitted, in_review, closed]
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Snags.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - allOf:
+                  - {$ref: '#/components/schemas/PageEnvelope'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Snag'}
+                - type: object
+                  properties:
+                    open_count: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [qc]
+      operationId: createSnag
+      summary: Raise a snag
+      x-db-path: qc_raise_snag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SnagInput'}
+      responses:
+        '201':
+          description: Raised.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /snags/{snag_id}:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    get:
+      tags: [qc]
+      operationId: getSnag
+      summary: One snag with photos
+      responses:
+        '200':
+          description: Snag.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [qc]
+      operationId: updateSnag
+      summary: Edit title or description
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SnagPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snags/{snag_id}/photos:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    post:
+      tags: [qc]
+      operationId: uploadSnagPhoto
+      summary: Upload a fresh photo of the fix
+      description: Rejected with 422 `file_rejected` when the EXIF date is before the snag was raised, or the format or size breaks the snag type rules. A missing EXIF date is accepted with `unknown_capture_date`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+                shot_type: {type: string}
+                device_lat: {type: number}
+                device_lon: {type: number}
+                in_app_camera: {type: boolean}
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnagPhoto'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /snags/{snag_id}/submit:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    post:
+      tags: [qc]
+      operationId: submitSnag
+      summary: Submit the fix photos for review (site engineer)
+      description: Same 3-level path, skip and rejection rules as tasks.
+      x-db-path: qc_transition_snag
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snags/{snag_id}/review:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    post:
+      tags: [qc]
+      operationId: reviewSnag
+      summary: Review
+      description: Same 3-level path, skip and rejection rules as tasks.
+      x-db-path: qc_transition_snag
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snags/{snag_id}/approve:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    post:
+      tags: [qc]
+      operationId: approveSnag
+      summary: 'Approve: closes the snag'
+      description: Same 3-level path, skip and rejection rules as tasks.
+      x-step-up: when the caller holds every level (self-approval, B5)
+      x-db-path: qc_transition_snag
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snags/{snag_id}/reject:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    post:
+      tags: [qc]
+      operationId: rejectSnag
+      summary: Reject one level back with a note
+      description: Same 3-level path, skip and rejection rules as tasks.
+      x-db-path: qc_transition_snag
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RejectRequest'}
+      responses:
+        '200':
+          description: Transition applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /custom-fields:
+    get:
+      tags: [custom-fields]
+      operationId: listCustomFields
+      summary: Custom field definitions
+      parameters:
+      - name: entity_type
+        in: query
+        schema: {$ref: '#/components/schemas/CustomFieldEntity'}
+      - name: task_code
+        in: query
+        schema: {type: string}
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Fields.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/CustomFieldDefinition'}
+                  field_set_version: {type: integer, description: Bumps on every change; templates regenerate (ADR 0009 §4).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [custom-fields]
+      operationId: createCustomField
+      summary: Add a field to a site, task, milestone, gate or register
+      description: A change regenerates the affected templates; old versions are then rejected on upload.
+      x-db-path: admin_save_field
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomFieldInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomFieldDefinition'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /custom-fields/{field_id}:
+    parameters:
+    - {$ref: '#/components/parameters/FieldId'}
+    get:
+      tags: [custom-fields]
+      operationId: getCustomField
+      summary: One field
+      responses:
+        '200':
+          description: Field.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomFieldDefinition'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [custom-fields]
+      operationId: updateCustomField
+      summary: Edit or deactivate (never deleted)
+      x-db-path: admin_save_field
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomFieldPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CustomFieldDefinition'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /notifications:
+    get:
+      tags: [notifications]
+      operationId: listNotifications
+      summary: My in-app notifications
+      parameters:
+      - name: unread_only
+        in: query
+        schema: {type: boolean, default: false}
+      - name: kind
+        in: query
+        schema: {$ref: '#/components/schemas/NotificationKind'}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Notifications.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - allOf:
+                  - {$ref: '#/components/schemas/PageEnvelope'}
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: {$ref: '#/components/schemas/Notification'}
+                - type: object
+                  properties:
+                    unread_count: {type: integer}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /notifications/{notification_id}/read:
+    parameters:
+    - {$ref: '#/components/parameters/NotificationId'}
+    post:
+      tags: [notifications]
+      operationId: markNotificationRead
+      summary: Mark one as read
+      responses:
+        '200':
+          description: Read.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /notifications/read-all:
+    post:
+      tags: [notifications]
+      operationId: markAllNotificationsRead
+      summary: Mark all as read
+      responses:
+        '204': {description: Done.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/notification-preferences:
+    get:
+      tags: [notifications]
+      operationId: getNotificationPreferences
+      summary: My channel preferences per kind
+      responses:
+        '200':
+          description: Preferences.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/NotificationPreference'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [notifications]
+      operationId: setNotificationPreferences
+      summary: Replace my preferences
+      description: Last write wins (personal setting, no ETag). A `locked` kind cannot be switched off (422 `validation_failed`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items: {$ref: '#/components/schemas/NotificationPreference'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/NotificationPreference'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /system-log:
+    get:
+      tags: [system-log]
+      operationId: listSystemLog
+      summary: System/Error Log (12 months, then purged)
+      description: Needs `view` on `admin.system_log` (System Admin). Separate from the Audit Log. Template rejections appear here (`source = template-check`).
+      parameters:
+      - name: level
+        in: query
+        schema:
+          type: string
+          enum: [info, warn, error]
+      - name: source
+        in: query
+        schema: {type: string}
+      - name: request_id
+        in: query
+        schema: {type: string}
+      - name: q
+        in: query
+        schema: {type: string}
+      - name: from
+        in: query
+        schema: {type: string, format: date-time}
+      - name: to
+        in: query
+        schema: {type: string, format: date-time}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/SystemLogEntry'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/milestone-pipeline:
+    get:
+      tags: [dashboard]
+      operationId: getMilestonePipeline
+      summary: Milestone pipeline (counts per milestone, active workflow version per site)
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: scenario
+        in: query
+        schema: {type: string}
+        description: Delivery scenario.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+        description: Exclude admin-override tasks. They are flagged in `meta` either way.
+      responses:
+        '200':
+          description: Pipeline.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MilestonePipeline'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/by-region:
+    get:
+      tags: [dashboard]
+      operationId: getKpiByRegion
+      summary: Progress by region
+      parameters:
+      - name: scenario
+        in: query
+        schema: {type: string}
+        description: Delivery scenario.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+        description: Exclude admin-override tasks. They are flagged in `meta` either way.
+      responses:
+        '200':
+          description: Per region.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KpiByRegion'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/delay-attribution:
+    get:
+      tags: [dashboard]
+      operationId: getDelayAttribution
+      summary: Delay attribution by responsible party (weight set `delay_attribution`)
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: scenario
+        in: query
+        schema: {type: string}
+        description: Delivery scenario.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+        description: Exclude admin-override tasks. They are flagged in `meta` either way.
+      responses:
+        '200':
+          description: Attribution.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DelayAttribution'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/health-index:
+    get:
+      tags: [dashboard]
+      operationId: getHealthIndex
+      summary: Project health index (weight set `health_index`)
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: scenario
+        in: query
+        schema: {type: string}
+        description: Delivery scenario.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+        description: Exclude admin-override tasks. They are flagged in `meta` either way.
+      responses:
+        '200':
+          description: Index.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HealthIndex'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/final-closure:
+    get:
+      tags: [dashboard]
+      operationId: getFinalClosureKpi
+      summary: 'Final Closure KPI: sites closed, % closed, pending CW FAC and TE FAC with age'
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: scenario
+        in: query
+        schema: {type: string}
+        description: Delivery scenario.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+        description: Exclude admin-override tasks. They are flagged in `meta` either way.
+      responses:
+        '200':
+          description: KPI.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FinalClosureKpi'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /project-status:
+    get:
+      tags: [project-status]
+      operationId: getProjectStatus
+      summary: Project Status (ends at HOTO) with the weight-set version used
+      description: Uses the active weight set, or `weight_set_version` to re-run with an older set for comparison. Weekly snapshots are never recomputed.
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: site_id
+        in: query
+        schema: {type: string, format: uuid}
+      - name: group_by
+        in: query
+        schema:
+          type: string
+          enum: [none, region, site]
+          default: none
+      - name: weight_set_version
+        in: query
+        schema: {type: integer, minimum: 1}
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Status.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ProjectStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /project-status/snapshots:
+    get:
+      tags: [project-status]
+      operationId: listProjectStatusSnapshots
+      summary: Saved weekly snapshots (values frozen at the time)
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: from
+        in: query
+        schema: {type: string, format: date}
+      - name: to
+        in: query
+        schema: {type: string, format: date}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Snapshots.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/ProjectStatusSnapshot'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+
 components:
   securitySchemes:
     cookieAuth:
@@ -2219,6 +5196,109 @@ components:
       description: Stable milestone or gate code (for example MS4, G5).
       schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
 
+    EmployeeIdPath:
+      name: employee_id
+      in: path
+      required: true
+      description: Four-digit employee ID.
+      schema: {$ref: '#/components/schemas/EmployeeId'}
+    AbsenceId:
+      name: absence_id
+      in: path
+      required: true
+      description: Absence record.
+      schema: {type: string, format: uuid}
+    HolidayId:
+      name: holiday_id
+      in: path
+      required: true
+      description: Holiday.
+      schema: {type: string, format: uuid}
+    RegisterKeyPath:
+      name: register_key
+      in: path
+      required: true
+      description: Register key.
+      schema: {$ref: '#/components/schemas/RegisterKey'}
+    RegisterRecordId:
+      name: record_id
+      in: path
+      required: true
+      description: Register record.
+      schema: {type: string, format: uuid}
+    DocTypeId:
+      name: doc_type_id
+      in: path
+      required: true
+      description: Document Library definition.
+      schema: {type: string, format: uuid}
+    TemplateId:
+      name: template_id
+      in: path
+      required: true
+      description: Template ID such as TPL-SITE.
+      schema: {type: string, pattern: '^TPL-[A-Z0-9_-]{2,40}$'}
+    BatchId:
+      name: batch_id
+      in: path
+      required: true
+      description: Import batch.
+      schema: {type: string, format: uuid}
+    FormId:
+      name: form_id
+      in: path
+      required: true
+      description: Generated form.
+      schema: {type: string, format: uuid}
+    FormKindPath:
+      name: form_kind
+      in: path
+      required: true
+      description: Form kind.
+      schema: {$ref: '#/components/schemas/FormKind'}
+    SequenceKey:
+      name: sequence_key
+      in: path
+      required: true
+      description: Numbering sequence key.
+      schema: {type: string}
+    WarehouseItemId:
+      name: item_id
+      in: path
+      required: true
+      description: Warehouse item.
+      schema: {type: string, format: uuid}
+    MovementId:
+      name: movement_id
+      in: path
+      required: true
+      description: Stock movement.
+      schema: {type: string, format: uuid}
+    SnagTypeId:
+      name: snag_type_id
+      in: path
+      required: true
+      description: Snag type.
+      schema: {type: string, format: uuid}
+    SnagId:
+      name: snag_id
+      in: path
+      required: true
+      description: Snag.
+      schema: {type: string, format: uuid}
+    FieldId:
+      name: field_id
+      in: path
+      required: true
+      description: Custom field definition.
+      schema: {type: string, format: uuid}
+    NotificationId:
+      name: notification_id
+      in: path
+      required: true
+      description: Notification.
+      schema: {type: string, format: uuid}
+
   responses:
     BadRequest:
       description: Malformed request.
@@ -2241,7 +5321,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Conflict:
-      description: State conflict (`already_claimed`, `invalid_transition`, `last_admin`, `already_assigned`, `override_not_revertible`, `migration_not_revertible`, `stale_preview`, `duplicate`).
+      description: State conflict (`already_claimed`, `invalid_transition`, `last_admin`, `already_assigned`, `override_not_revertible`, `migration_not_revertible`, `stale_preview`, `duplicate`, `freeze_active`, `role_in_use`).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -2261,7 +5341,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Unprocessable:
-      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`).
+      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -2311,6 +5391,7 @@ components:
               code: { type: string }
               message: { type: string }
         step_up_url: { type: string, description: 'Present with `step_up_required`.' }
+        reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
     ErrorCode:
@@ -2350,6 +5431,9 @@ components:
         - duplicate
         - rate_limited
         - account_locked
+        - freeze_active
+        - insufficient_stock
+        - role_in_use
         - internal_error
     PageEnvelope:
       type: object
@@ -2407,7 +5491,7 @@ components:
       required: [id, kind, status]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse] }
+        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse, import_apply, sla_recalculation, pdf_generate] }
         status: { type: string, enum: [queued, running, done, failed] }
         progress: { type: number, minimum: 0, maximum: 1 }
         result_file_id: { type: [string, 'null'], format: uuid }
@@ -2540,6 +5624,8 @@ components:
             locale: { type: string, enum: [en, ar] }
             theme: { type: string, enum: [light, dark] }
             is_break_glass: { type: boolean }
+            mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
+            mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
             created_at: { type: string, format: date-time }
             version: { type: integer }
@@ -3003,6 +6089,8 @@ components:
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
         admin_override: { type: boolean }
+        holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
+        idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
         version: { type: integer }
     DocumentFile:
       type: object
@@ -3198,6 +6286,8 @@ components:
             type: object
             required: [code, name_en, approval_levels, cells]
             properties:
+              kind: { type: string, enum: [stage, register, dismantle], default: stage, description: 'Register and Dismantle rows (B11); `code` is then the register key.' }
+              register_key: { oneOf: [{ $ref: '#/components/schemas/RegisterKey' }, { type: 'null' }] }
               code: { type: string }
               name_en: { type: string }
               name_ar: { type: [string, 'null'] }
@@ -3550,3 +6640,1150 @@ components:
             is_na: { type: string }
             count: { type: object, additionalProperties: true }
             lookup: { type: object, additionalProperties: true }
+
+    # ================================================================ v0.2 additions
+    WithReason:
+      type: object
+      required: [reason]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+    # ---------------------------------------------------------- staff registry
+    StaffField:
+      type: string
+      enum: [email, phone]
+      description: Personal-data fields that follow visibility settings.
+    StaffRegion:
+      type: string
+      enum: [Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha, All]
+    StaffMemberFields:
+      type: object
+      properties:
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: string, minLength: 2 }
+        email: { type: string, format: email }
+        phone: { type: string, description: 'Registry format `+218 9X XXX XXXX`. Unique.' }
+        position: { type: string }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        main_role: { type: [string, 'null'], description: 'Starting value only; real roles come from assignments.' }
+        region: { $ref: '#/components/schemas/StaffRegion' }
+        notes: { type: [string, 'null'] }
+        hidden_fields:
+          type: array
+          items: { $ref: '#/components/schemas/StaffField' }
+          description: Fields hidden for this one employee from everyone except admins.
+    StaffMember:
+      description: Full registry row. Returned only to callers allowed to administer the registry.
+      allOf:
+        - $ref: '#/components/schemas/StaffMemberFields'
+        - type: object
+          required: [employee_id, name_en, name_ar, email, phone, position, team, region, status, version]
+          properties:
+            employee_id: { $ref: '#/components/schemas/EmployeeId' }
+            status: { type: string, enum: [active, inactive] }
+            linked_user: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+            version: { type: integer }
+            updated_at: { type: string, format: date-time }
+            updated_by: { $ref: '#/components/schemas/UserRef' }
+    StaffMemberInput:
+      allOf:
+        - $ref: '#/components/schemas/StaffMemberFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [employee_id, name_en, name_ar, email, phone, position, team, region]
+          properties:
+            employee_id: { $ref: '#/components/schemas/EmployeeId' }
+    StaffMemberPatch:
+      description: '`employee_id` cannot change; deactivate and add a new row instead.'
+      allOf:
+        - $ref: '#/components/schemas/StaffMemberFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
+    StaffCard:
+      description: Hover-card payload. The server applies field visibility; a hidden field is null and named in `hidden_fields`, and the UI shows "Not visible to you".
+      type: object
+      required: [employee_id, name_en, name_ar, position, team, region, status, hidden_fields, version]
+      properties:
+        employee_id: { $ref: '#/components/schemas/EmployeeId' }
+        name_en: { type: string }
+        name_ar: { type: string }
+        position: { type: string }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        region: { $ref: '#/components/schemas/StaffRegion' }
+        status: { type: string, enum: [active, inactive], description: 'inactive shows an "Inactive" badge.' }
+        email: { type: [string, 'null'], format: email }
+        phone: { type: [string, 'null'] }
+        hidden_fields: { type: array, items: { $ref: '#/components/schemas/StaffField' } }
+        version: { type: integer, description: 'Row version for If-Match (admins).' }
+    StaffFieldVisibility:
+      type: object
+      required: [default_visible, allow, deny]
+      properties:
+        default_visible: { type: boolean, description: 'true = every signed-in Aljeel employee sees the field (default).' }
+        allow: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' }, description: 'Roles, groups or persons who see it when `default_visible` is false.' }
+        deny: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' }, description: 'Roles, groups or persons who never see it. Deny wins over allow and default.' }
+    StaffVisibility:
+      type: object
+      required: [fields, version]
+      properties:
+        fields:
+          type: object
+          required: [email, phone]
+          properties:
+            email: { $ref: '#/components/schemas/StaffFieldVisibility' }
+            phone: { $ref: '#/components/schemas/StaffFieldVisibility' }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+    StaffVisibilityInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [fields]
+          properties:
+            fields:
+              type: object
+              minProperties: 1
+              properties:
+                email: { $ref: '#/components/schemas/StaffFieldVisibility' }
+                phone: { $ref: '#/components/schemas/StaffFieldVisibility' }
+    # ---------------------------------------------------------- templates and import batches
+    Template:
+      type: object
+      required: [template_id, name_en, kind, current_version, is_active]
+      properties:
+        template_id: { type: string, examples: [TPL-SITE, TPL-STAFF, TPL-HOLIDAYS, TPL-ROLES] }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
+        module_key: { $ref: '#/components/schemas/ModuleKey' }
+        current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload.' }
+        field_set_version: { type: [integer, 'null'], description: 'Custom-field set the current version was built from (ADR 0009 §4).' }
+        issued_at: { type: string, format: date-time }
+        is_active: { type: boolean }
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, issued_at]
+            properties:
+              version: { type: integer }
+              issued_at: { type: string, format: date-time }
+              reason: { type: [string, 'null'], description: 'For example "custom field added".' }
+    TemplateRejectReason:
+      type: string
+      description: Closed list returned as `reason` on 422 `template_rejected`. Each rejection is also written to the System Log (`source = template-check`).
+      enum: [size_or_rows_exceeded, tpl_missing, template_unknown_or_inactive, outdated_version, wrong_template, checksum_mismatch, import_not_allowed]
+    ImportBatch:
+      type: object
+      required: [id, template_id, template_version, status, counts, version]
+      properties:
+        id: { type: string, format: uuid }
+        template_id: { type: string }
+        template_version: { type: integer }
+        source: { type: string, enum: [template, master_import, legacy_master] }
+        file_name: { type: string }
+        status: { type: string, enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed] }
+        current_level: { type: integer }
+        levels_required: { type: integer }
+        counts:
+          type: object
+          properties:
+            create: { type: integer }
+            update: { type: integer }
+            unchanged: { type: integer }
+            error: { type: integer }
+            pending: { type: integer }
+            approved: { type: integer }
+            rejected: { type: integer }
+        job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
+        task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
+        uploaded_by: { $ref: '#/components/schemas/UserRef' }
+        uploaded_at: { type: string, format: date-time }
+        version: { type: integer }
+    ImportRow:
+      type: object
+      required: [id, row_no, action, decision]
+      properties:
+        id: { type: string, format: uuid }
+        sheet: { type: string }
+        row_no: { type: integer }
+        key: { type: [string, 'null'], description: 'Human key (site code, employee ID, date).' }
+        action: { type: string, enum: [create, update, unchanged, error] }
+        diff:
+          type: object
+          description: Field to old/new values.
+          additionalProperties:
+            type: object
+            properties:
+              old: {}
+              new: {}
+        errors:
+          type: array
+          items:
+            type: object
+            required: [code]
+            properties:
+              column: { type: string }
+              code: { type: string }
+              message: { type: string }
+        decision: { type: string, enum: [pending, approved, rejected, pending_previous_approval] }
+        decided_by: { $ref: '#/components/schemas/UserRef' }
+        note: { type: [string, 'null'] }
+    ImportDecisionRequest:
+      type: object
+      required: [action, scope]
+      properties:
+        action: { type: string, enum: [review, approve, reject], description: 'The level action of the caller on the batch.' }
+        scope: { type: string, enum: [all, rows], description: '`all` decides every undecided valid row at once; `rows` uses `rows[]`.' }
+        rows:
+          type: array
+          items:
+            type: object
+            required: [row_id, decision]
+            properties:
+              row_id: { type: string, format: uuid }
+              decision: { type: string, enum: [approved, rejected] }
+              note: { type: string, maxLength: 1000 }
+        note: { type: string, maxLength: 2000, description: 'Required when `action` is reject.' }
+    # ---------------------------------------------------------- absences and reassignment
+    Absence:
+      type: object
+      required: [id, user, kind, from_date, to_date, version]
+      properties:
+        id: { type: string, format: uuid }
+        user: { $ref: '#/components/schemas/UserRef' }
+        kind: { type: string, enum: [annual, sick, emergency, other] }
+        from_date: { type: string, format: date }
+        to_date: { type: string, format: date }
+        note: { type: [string, 'null'], maxLength: 500 }
+        recorded_by: { $ref: '#/components/schemas/UserRef' }
+        self_recorded: { type: boolean }
+        open_task_count: { type: integer, description: 'Tasks the person holds now; drives the lead alert.' }
+        version: { type: integer }
+    AbsenceInput:
+      type: object
+      required: [kind, from_date, to_date]
+      properties:
+        user_id: { type: string, format: uuid, description: 'Omit for the caller. An employee records only their own `annual` leave; sick or emergency leave of others needs `reassign` for the module and region, or admin.' }
+        kind: { type: string, enum: [annual, sick, emergency, other] }
+        from_date: { type: string, format: date }
+        to_date: { type: string, format: date }
+        note: { type: string, maxLength: 500 }
+    AbsencePatch:
+      type: object
+      minProperties: 1
+      properties:
+        kind: { type: string, enum: [annual, sick, emergency, other] }
+        from_date: { type: string, format: date }
+        to_date: { type: string, format: date }
+        note: { type: [string, 'null'], maxLength: 500 }
+    ReassignRequest:
+      type: object
+      required: [scope, decision, reason]
+      properties:
+        scope:
+          type: string
+          enum: [task, site, person]
+          description: '`task` needs `task_id`; `site` needs `site_id` and `from_user_id`; `person` needs `from_user_id` (all that person''s open tasks inside the caller''s scope).'
+        task_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        from_user_id: { type: string, format: uuid }
+        decision:
+          type: string
+          enum: [reassign, act_on_behalf, keep]
+          description: |
+            `reassign` changes the task-level holder to `to_user_id` (the Matrix is not changed).
+            `act_on_behalf` lets the caller act at the person's level; later actions are logged "lead on behalf of the assignee".
+            `keep` records that the lead looked and left the person on it; it silences the alert for the idle window.
+            None of them resets or pauses the SLA or stage progress (B12b).
+        to_user_id: { type: string, format: uuid, description: 'Required for `reassign`; must be an eligible holder, else `not_eligible_holder`.' }
+        reason: { $ref: '#/components/schemas/Reason' }
+        dry_run: { type: boolean, default: false, description: 'Returns the BulkResult without writing.' }
+    ReassignmentAlert:
+      type: object
+      required: [task, cause]
+      properties:
+        task: { $ref: '#/components/schemas/TaskSummary' }
+        cause: { type: string, enum: [absent, idle] }
+        holder: { $ref: '#/components/schemas/UserRef' }
+        absence: { oneOf: [{ $ref: '#/components/schemas/Absence' }, { type: 'null' }] }
+        idle_working_days: { type: [integer, 'null'] }
+    IdleTaskAlertSetting:
+      type: object
+      required: [enabled, working_days, version]
+      properties:
+        enabled: { type: boolean }
+        working_days: { type: integer, minimum: 1, maximum: 30, description: 'Default 2.' }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+    # ---------------------------------------------------------- MFA exemption
+    MfaExemption:
+      type: object
+      required: [user, exempt]
+      properties:
+        user: { $ref: '#/components/schemas/UserRef' }
+        exempt: { type: boolean }
+        until: { type: [string, 'null'], format: date-time, description: 'null while exempt = until revoked.' }
+        reason: { type: [string, 'null'] }
+        granted_by: { $ref: '#/components/schemas/UserRef' }
+        granted_at: { type: [string, 'null'], format: date-time }
+    # ---------------------------------------------------------- calendar
+    Holiday:
+      type: object
+      required: [id, date, name_en, kind, tentative, version]
+      properties:
+        id: { type: string, format: uuid }
+        calendar_code: { type: string }
+        date: { type: string, format: date }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        kind: { type: string, enum: [national, religious] }
+        tentative: { type: boolean, description: 'Religious dates stay tentative until the admin confirms the official announcement.' }
+        confirmed_at: { type: [string, 'null'], format: date-time }
+        confirmed_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer }
+    HolidayInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [date, name_en, kind]
+          properties:
+            calendar_code: { type: string, description: 'Default calendar when omitted.' }
+            date: { type: string, format: date }
+            name_en: { type: string, minLength: 2 }
+            name_ar: { type: string }
+            kind: { type: string, enum: [national, religious] }
+            tentative: { type: boolean, default: false }
+    HolidayPatch:
+      type: object
+      required: [reason]
+      minProperties: 2
+      properties:
+        date: { type: string, format: date }
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: string }
+        kind: { type: string, enum: [national, religious] }
+        reason: { $ref: '#/components/schemas/Reason' }
+    HolidayChangeResult:
+      type: object
+      required: [holiday, affected_open_tasks]
+      properties:
+        holiday: { $ref: '#/components/schemas/Holiday' }
+        affected_open_tasks: { type: integer, description: 'Open tasks whose SLA due dates were recalculated. Closed tasks keep their values (ADR 0007 §6).' }
+        recalculation_job_id: { type: [string, 'null'] }
+    HolidaySummary:
+      type: object
+      required: [tentative_count, next_year, next_year_table_empty]
+      properties:
+        tentative_count: { type: integer }
+        next_tentative_date: { type: [string, 'null'], format: date }
+        tentative_reminder_due: { type: boolean, description: 'A tentative date falls within 14 days.' }
+        next_year: { type: integer }
+        next_year_table_empty: { type: boolean, description: 'Drives the empty-table banner.' }
+    WeekendDaysRequest:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [weekend_days]
+          properties:
+            calendar_code: { type: string }
+            weekend_days: { type: array, minItems: 1, maxItems: 6, uniqueItems: true, items: { type: integer, minimum: 0, maximum: 6 }, description: '0 = Sunday. Default [5, 6].' }
+    WeekendDaysResult:
+      type: object
+      required: [calendar_code, weekend_days, affected_open_tasks, version]
+      properties:
+        calendar_code: { type: string }
+        weekend_days: { type: array, items: { type: integer, minimum: 0, maximum: 6 } }
+        affected_open_tasks: { type: integer }
+        version: { type: integer }
+    # ---------------------------------------------------------- freeze and DLP
+    StructuralFreeze:
+      type: object
+      required: [active, version]
+      properties:
+        active: { type: boolean, description: 'true while today is inside the window and the freeze is not lifted. Structural workflow changes then answer 409 `freeze_active`.' }
+        starts_on: { type: [string, 'null'], format: date, description: 'Pilot start.' }
+        ends_on: { type: [string, 'null'], format: date, description: 'End of the parallel-run month.' }
+        lifted: { type: boolean }
+        lifted_at: { type: [string, 'null'], format: date-time }
+        lifted_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        lift_reason: { type: [string, 'null'] }
+        blocked_operations: { type: array, items: { type: string }, description: 'operationIds refused while active.' }
+        version: { type: integer }
+    StructuralFreezeInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [starts_on, ends_on]
+          properties:
+            starts_on: { type: string, format: date }
+            ends_on: { type: string, format: date }
+    DlpVersion:
+      type: object
+      required: [version, cw_months, te_months, effective_from]
+      properties:
+        version: { type: integer }
+        cw_months: { type: integer, minimum: 0, maximum: 120, description: 'Setting `dlp.months.cw`, default 3.' }
+        te_months: { type: integer, minimum: 0, maximum: 120, description: 'Setting `dlp.months.te`, default 12.' }
+        effective_from: { type: string, format: date }
+        reason: { type: [string, 'null'] }
+        changed_by: { $ref: '#/components/schemas/UserRef' }
+        changed_at: { type: string, format: date-time }
+    DlpSettings:
+      type: object
+      required: [current, history]
+      properties:
+        current: { $ref: '#/components/schemas/DlpVersion' }
+        history: { type: array, items: { $ref: '#/components/schemas/DlpVersion' }, description: 'A PAC keeps the version in force on its issue date.' }
+    DlpVersionInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [cw_months, te_months, effective_from]
+          properties:
+            cw_months: { type: integer, minimum: 0, maximum: 120 }
+            te_months: { type: integer, minimum: 0, maximum: 120 }
+            effective_from: { type: string, format: date }
+    # ---------------------------------------------------------- registers (B11) and Dismantle
+    RegisterKey:
+      type: string
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle]
+    RegisterField:
+      type: object
+      required: [code, label_en, type]
+      properties:
+        code: { type: string }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file] }
+        required: { type: boolean }
+        read_only: { type: boolean, description: 'Field-level rule for the caller.' }
+        in_list: { type: boolean }
+        is_custom: { type: boolean }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label_en]
+            properties:
+              value: { type: string }
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+    RegisterDefinition:
+      type: object
+      required: [register_key, name_en, module_key, site_scoped, approval_levels, fields]
+      properties:
+        register_key: { $ref: '#/components/schemas/RegisterKey' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        module_key: { $ref: '#/components/schemas/ModuleKey' }
+        site_scoped: { type: boolean, description: 'false = global rows (risks, meetings, project-wide change requests).' }
+        multiple_per_site: { type: boolean }
+        record_types: { type: array, items: { type: string }, description: 'For example pr, po, wo for procurement.' }
+        approval_levels: { type: integer, minimum: 1, maximum: 3, description: 'From the register row of the Responsibility Matrix.' }
+        fields: { type: array, items: { $ref: '#/components/schemas/RegisterField' }, description: 'Base fields plus active custom fields visible to the caller.' }
+        record_count: { type: integer }
+    RegisterRecordState:
+      type: string
+      enum: [entry, in_review, in_approval, approved, voided]
+    RegisterRecord:
+      type: object
+      required: [id, register_key, state, data, version]
+      properties:
+        id: { type: string, format: uuid }
+        register_key: { $ref: '#/components/schemas/RegisterKey' }
+        record_type: { type: [string, 'null'] }
+        site_id: { type: [string, 'null'], format: uuid }
+        site_code: { type: [string, 'null'] }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+        state: { $ref: '#/components/schemas/RegisterRecordState' }
+        current_level: { type: integer }
+        levels_required: { type: integer }
+        ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
+        data: { type: object, additionalProperties: true, description: 'Base fields keyed by `RegisterField.code`.' }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+        external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+        return_count: { type: integer }
+        last_return_note: { type: [string, 'null'] }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void] } }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        version: { type: integer }
+    RegisterRecordInput:
+      type: object
+      required: [data]
+      properties:
+        site_id: { type: string, format: uuid, description: 'Required when the register is site scoped.' }
+        record_type: { type: string }
+        data: { type: object, additionalProperties: true }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+        external_party_id: { type: [string, 'null'], format: uuid }
+    RegisterRecordPatch:
+      type: object
+      minProperties: 1
+      properties:
+        data: { type: object, additionalProperties: true }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+        external_party_id: { type: [string, 'null'], format: uuid }
+    # ---------------------------------------------------------- Document Library
+    PhotoRules:
+      type: object
+      properties:
+        min_count: { type: integer, minimum: 0 }
+        shot_types: { type: array, items: { type: string } }
+        formats: { type: array, items: { type: string, enum: [JPG, PNG, HEIC] } }
+        max_size_mb: { type: integer }
+    DocumentPlacement:
+      type: object
+      required: [target, ref]
+      properties:
+        target: { type: string, enum: [task, qc, register] }
+        ref: { type: string, description: 'Task code, snag type code or register key.' }
+    FormKind:
+      type: string
+      enum: [dn, rn, pac, fac, snag_list]
+      description: CW forms issued by the system. TE forms are deferred (classification pending).
+    DocumentTypeFields:
+      type: object
+      properties:
+        kind: { type: string, enum: [scanned_document, photo, email, report, excel_template, generated_form] }
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: [string, 'null'] }
+        placements: { type: array, items: { $ref: '#/components/schemas/DocumentPlacement' } }
+        mandatory: { type: boolean }
+        condition_rule: { $ref: '#/components/schemas/ConditionRule' }
+        formats: { type: array, items: { type: string } }
+        max_size_mb: { type: integer, default: 20 }
+        min_files: { type: integer, default: 1 }
+        max_files: { type: [integer, 'null'] }
+        photo_rules: { oneOf: [{ $ref: '#/components/schemas/PhotoRules' }, { type: 'null' }] }
+        expiry_tracked: { type: boolean, description: 'The slot asks for a `valid_to` date.' }
+        blank_form_file_id: { type: [string, 'null'], format: uuid }
+        form_kind: { oneOf: [{ $ref: '#/components/schemas/FormKind' }, { type: 'null' }], description: 'Set when kind = generated_form.' }
+        is_active: { type: boolean, description: 'Deactivate instead of delete.' }
+    DocumentType:
+      allOf:
+        - $ref: '#/components/schemas/DocumentTypeFields'
+        - type: object
+          required: [id, code, kind, name_en, is_active, version]
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string, description: 'Stable, for example A2, B7, CW_PAC.' }
+            version: { type: integer, description: 'Row version (ETag).' }
+            published_version: { type: integer, description: 'Library version tasks snapshot on open (ADR 0007 §4).' }
+            has_unpublished_changes: { type: boolean }
+            updated_at: { type: string, format: date-time }
+            updated_by: { $ref: '#/components/schemas/UserRef' }
+    DocumentTypeInput:
+      allOf:
+        - $ref: '#/components/schemas/DocumentTypeFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [code, kind, name_en, placements]
+          properties:
+            code: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,30}$' }
+    DocumentTypePatch:
+      allOf:
+        - $ref: '#/components/schemas/DocumentTypeFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
+    PublishRequest:
+      description: Common publish body (ADR 0007 §1).
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [effective_from, apply_to]
+          properties:
+            effective_from: { type: string, format: date }
+            apply_to: { type: string, enum: [new_only, open_too] }
+    PublishResult:
+      type: object
+      required: [affected_open_tasks]
+      properties:
+        published_version: { type: integer }
+        affected_open_tasks: { type: integer, description: 'For the confirmation dialog; approved tasks are never touched.' }
+    # ---------------------------------------------------------- generated forms
+    FormLine:
+      type: object
+      required: [item_id, qty]
+      properties:
+        item_id: { type: string, format: uuid }
+        description: { type: string }
+        uom: { type: string }
+        qty_approved: { type: [number, 'null'] }
+        qty: { type: number, description: 'Dispatched (DN) or returned (RN) quantity.' }
+        serials: { type: array, items: { type: string } }
+        remarks: { type: [string, 'null'] }
+    GeneratedFormFields:
+      type: object
+      properties:
+        contractor_id: { type: [string, 'null'], format: uuid }
+        po_wo_ref: { type: [string, 'null'] }
+        warehouse: { type: [string, 'null'] }
+        lines: { type: array, items: { $ref: '#/components/schemas/FormLine' }, description: 'DN and RN. Only lines with a quantity are printed.' }
+        blank_rows: { type: integer, minimum: 0, description: 'Defaults to the form template setting.' }
+        reference_form_id: { type: [string, 'null'], format: uuid, description: 'FAC references its PAC; filled automatically when omitted.' }
+        notes: { type: [string, 'null'] }
+    GeneratedFormInput:
+      allOf:
+        - $ref: '#/components/schemas/GeneratedFormFields'
+        - type: object
+          required: [form_kind, site_id]
+          properties:
+            form_kind: { $ref: '#/components/schemas/FormKind' }
+            site_id: { type: string, format: uuid }
+    GeneratedFormPatch:
+      allOf:
+        - $ref: '#/components/schemas/GeneratedFormFields'
+        - type: object
+          minProperties: 1
+    GeneratedForm:
+      allOf:
+        - $ref: '#/components/schemas/GeneratedFormFields'
+        - type: object
+          required: [id, form_kind, site_id, site_code, status, version]
+          properties:
+            id: { type: string, format: uuid }
+            form_kind: { $ref: '#/components/schemas/FormKind' }
+            site_id: { type: string, format: uuid }
+            site_code: { type: string }
+            region_id: { $ref: '#/components/schemas/RegionId' }
+            status: { type: string, enum: [prepared, generated, voided] }
+            number: { type: [string, 'null'], examples: ['DN-CW-TR-2026-0001'] }
+            template_version: { type: [integer, 'null'] }
+            contractor: { $ref: '#/components/schemas/ExternalPartyRef' }
+            boq_lines: { type: array, items: { $ref: '#/components/schemas/FormLine' }, description: 'PAC only: net quantities on site (DN minus RN).' }
+            snags: { type: array, items: { $ref: '#/components/schemas/Snag' }, description: 'PAC and snag list.' }
+            signatories:
+              type: array
+              description: Names and positions from the Responsibility Matrix. Signatures stay blank.
+              items:
+                type: object
+                properties:
+                  label: { type: string }
+                  user: { $ref: '#/components/schemas/UserRef' }
+                  position: { type: [string, 'null'] }
+            guard:
+              type: object
+              description: Why generation is blocked, if it is.
+              properties:
+                can_generate: { type: boolean }
+                open_snag_count: { type: integer }
+                code: { oneOf: [{ $ref: '#/components/schemas/ErrorCode' }, { type: 'null' }] }
+            qr_url: { type: [string, 'null'] }
+            pdf_file_id: { type: [string, 'null'], format: uuid }
+            slot_id: { type: [string, 'null'], format: uuid, description: 'Slot that receives the signed scan.' }
+            generated_at: { type: [string, 'null'], format: date-time }
+            generated_by: { $ref: '#/components/schemas/UserRef' }
+            voided_at: { type: [string, 'null'], format: date-time }
+            void_reason: { type: [string, 'null'] }
+            replaced_by_id: { type: [string, 'null'], format: uuid }
+            replaces_id: { type: [string, 'null'], format: uuid }
+            stock_movement_id: { type: [string, 'null'], format: uuid }
+            version: { type: integer }
+    VoidFormRequest:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          properties:
+            reissue: { type: boolean, default: false, description: 'Also generate a replacement with a new number from the same data.' }
+    VoidFormResult:
+      type: object
+      required: [voided]
+      properties:
+        voided: { $ref: '#/components/schemas/GeneratedForm' }
+        reissued: { oneOf: [{ $ref: '#/components/schemas/GeneratedForm' }, { type: 'null' }] }
+    FormTemplate:
+      type: object
+      required: [form_kind, current_version, versions]
+      properties:
+        form_kind: { $ref: '#/components/schemas/FormKind' }
+        name_en: { type: string }
+        current_version: { type: integer }
+        blank_rows_default: { type: integer }
+        placeholders: { type: array, items: { type: string }, description: 'Bindings the HTML template may use.' }
+        versions:
+          type: array
+          items:
+            type: object
+            required: [version, uploaded_at]
+            properties:
+              version: { type: integer }
+              uploaded_at: { type: string, format: date-time }
+              uploaded_by: { $ref: '#/components/schemas/UserRef' }
+              reason: { type: [string, 'null'] }
+              file_id: { type: string, format: uuid }
+    NumberSequence:
+      type: object
+      required: [key, form_kind, pattern, reset, next_value, version]
+      properties:
+        key: { type: string, examples: [DN-CW-TR] }
+        form_kind: { $ref: '#/components/schemas/FormKind' }
+        pattern: { type: string, examples: ['DN-CW-{REGION}-{YYYY}-{SEQ:4}'] }
+        reset: { type: string, enum: [never, yearly] }
+        next_value: { type: integer, minimum: 1, description: 'Never decreases. Numbers are never reused or deleted.' }
+        last_issued: { type: [string, 'null'] }
+        next_preview: { type: string }
+        is_active: { type: boolean }
+        version: { type: integer }
+    NumberSequenceFields:
+      type: object
+      properties:
+        pattern: { type: string }
+        reset: { type: string, enum: [never, yearly] }
+        next_value: { type: integer, minimum: 1 }
+        is_active: { type: boolean }
+    # ---------------------------------------------------------- warehouse
+    NeedRule:
+      type: object
+      required: [need_unit]
+      properties:
+        id: { type: string, format: uuid }
+        need_unit: { type: string, description: 'For example per site, per sector, per tower.' }
+        quantity: { type: [number, 'null'] }
+        quantity_rule: { $ref: '#/components/schemas/ConditionRule' }
+        applies_when: { $ref: '#/components/schemas/ConditionRule' }
+    WarehouseItemFields:
+      type: object
+      properties:
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: [string, 'null'] }
+        uom: { type: string }
+        category: { type: [string, 'null'] }
+        serial_tracked: { type: boolean }
+        need_rules: { type: array, items: { $ref: '#/components/schemas/NeedRule' } }
+        is_active: { type: boolean }
+    WarehouseItem:
+      allOf:
+        - $ref: '#/components/schemas/WarehouseItemFields'
+        - type: object
+          required: [id, code, name_en, uom, is_active, version]
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string }
+            version: { type: integer }
+    WarehouseItemInput:
+      allOf:
+        - $ref: '#/components/schemas/WarehouseItemFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [code, name_en, uom]
+          properties:
+            code: { type: string, pattern: '^[A-Z0-9][A-Z0-9_\-]{1,40}$' }
+    WarehouseItemPatch:
+      allOf:
+        - $ref: '#/components/schemas/WarehouseItemFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
+    StockLevel:
+      type: object
+      required: [item_id, on_hand, reserved, pending_issue, pending_return, available]
+      properties:
+        item_id: { type: string, format: uuid }
+        item_code: { type: string }
+        item_name: { type: string }
+        uom: { type: string }
+        site_id: { type: [string, 'null'], format: uuid, description: 'null = central warehouse; set = net quantity on that site.' }
+        on_hand: { type: number }
+        reserved: { type: number, description: 'Held by pending issues; cannot be issued twice.' }
+        pending_issue: { type: number }
+        pending_return: { type: number }
+        available: { type: number, description: 'on_hand minus reserved.' }
+    StockMovementLine:
+      type: object
+      required: [item_id, qty]
+      properties:
+        item_id: { type: string, format: uuid }
+        description: { type: string }
+        uom: { type: string }
+        qty: { type: number, exclusiveMinimum: 0 }
+        serials: { type: array, items: { type: string } }
+    StockMovement:
+      type: object
+      required: [id, kind, status, site_id, lines, version]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [issue, return] }
+        status: { type: string, enum: [pending, posted, cancelled], description: 'pending = shown as "pending issue" or "pending return"; posted when the DN or RN is approved.' }
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        form_id: { type: [string, 'null'], format: uuid }
+        lines: { type: array, items: { $ref: '#/components/schemas/StockMovementLine' } }
+        reserved: { type: boolean }
+        cancel_reason: { type: [string, 'null'] }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        posted_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+    StockMovementInput:
+      type: object
+      required: [kind, site_id, lines]
+      properties:
+        kind: { type: string, enum: [issue, return] }
+        site_id: { type: string, format: uuid }
+        lines: { type: array, minItems: 1, items: { $ref: '#/components/schemas/StockMovementLine' } }
+    # ---------------------------------------------------------- QC snags
+    SnagType:
+      type: object
+      required: [id, code, name_en, photo_rules, blocks_preliminary_acceptance, is_active, version]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        photo_rules: { $ref: '#/components/schemas/PhotoRules' }
+        blocks_preliminary_acceptance: { type: boolean }
+        is_active: { type: boolean }
+        version: { type: integer }
+    SnagTypeFields:
+      type: object
+      properties:
+        name_en: { type: string }
+        name_ar: { type: string }
+        photo_rules: { $ref: '#/components/schemas/PhotoRules' }
+        blocks_preliminary_acceptance: { type: boolean }
+        is_active: { type: boolean }
+    SnagPhoto:
+      type: object
+      required: [id, file_id, status]
+      properties:
+        id: { type: string, format: uuid }
+        file_id: { type: string, format: uuid }
+        shot_type: { type: [string, 'null'] }
+        status: { type: string, enum: [accepted, rejected], description: 'rejected when the EXIF date is before the snag was raised, or the format or size is wrong.' }
+        reject_reason: { type: [string, 'null'] }
+        captured_at: { type: [string, 'null'], format: date-time }
+        unknown_capture_date: { type: boolean, description: 'No EXIF date: accepted with a flag for the reviewer.' }
+        in_app_camera: { type: boolean }
+        distance_m: { type: [number, 'null'] }
+        geofence_ok: { type: [boolean, 'null'] }
+        uploaded_by: { $ref: '#/components/schemas/UserRef' }
+        uploaded_at: { type: string, format: date-time }
+    Snag:
+      type: object
+      required: [id, site_id, site_code, snag_type, state, version]
+      properties:
+        id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        task_id: { type: [string, 'null'], format: uuid }
+        snag_type: { $ref: '#/components/schemas/SnagType' }
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        state: { type: string, enum: [open, fix_submitted, in_review, closed] }
+        ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
+        photos: { type: array, items: { $ref: '#/components/schemas/SnagPhoto' } }
+        photos_required: { type: integer }
+        return_count: { type: integer }
+        last_return_note: { type: [string, 'null'] }
+        raised_by: { $ref: '#/components/schemas/UserRef' }
+        raised_at: { type: string, format: date-time }
+        closed_at: { type: [string, 'null'], format: date-time }
+        version: { type: integer }
+    SnagInput:
+      type: object
+      required: [snag_type_id, title]
+      properties:
+        snag_type_id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+    SnagPatch:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 3, maxLength: 200 }
+        description: { type: string, maxLength: 2000 }
+    # ---------------------------------------------------------- custom fields
+    CustomFieldEntity:
+      type: string
+      enum: [site, milestone, gate, task, rf_design, acquisition, procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle]
+    CustomFieldFields:
+      type: object
+      properties:
+        label_en: { type: string, minLength: 1 }
+        label_ar: { type: [string, 'null'] }
+        required: { type: boolean }
+        validation:
+          type: object
+          properties:
+            min: { type: number }
+            max: { type: number }
+            min_length: { type: integer }
+            max_length: { type: integer }
+            pattern:
+              type: string
+              maxLength: 200
+              description: 'Validated as a safe regular expression and matched with a linear-time engine (RE2) with a time limit, in the API and in the import parser (no ReDoS).'
+        default_value: {}
+        section: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        list_values:
+          type: array
+          items:
+            type: object
+            required: [value, label_en]
+            properties:
+              value: { type: string }
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+              is_active: { type: boolean, default: true }
+        visible_to_role_ids: { type: array, items: { type: string, format: uuid }, description: 'Empty = everyone who can see the entity.' }
+        editable_by_role_ids: { type: array, items: { type: string, format: uuid } }
+        in_templates: { type: boolean }
+        in_exports: { type: boolean }
+        in_list_filters: { type: boolean }
+        in_lists: { type: boolean }
+        master_export_column: { type: [string, 'null'], description: 'Must not collide with the 187 Master columns (422 `validation_failed`).' }
+        is_active: { type: boolean }
+    CustomFieldDefinition:
+      allOf:
+        - $ref: '#/components/schemas/CustomFieldFields'
+        - type: object
+          required: [id, entity_type, code, label_en, data_type, is_active, version]
+          properties:
+            id: { type: string, format: uuid }
+            entity_type: { $ref: '#/components/schemas/CustomFieldEntity' }
+            task_code: { type: [string, 'null'], description: 'Set for task-scoped fields.' }
+            code: { type: string }
+            data_type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file] }
+            has_values: { type: boolean, description: 'A field holding values cannot be re-typed or re-keyed.' }
+            version: { type: integer }
+    CustomFieldInput:
+      allOf:
+        - $ref: '#/components/schemas/CustomFieldFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [entity_type, code, label_en, data_type]
+          properties:
+            entity_type: { $ref: '#/components/schemas/CustomFieldEntity' }
+            task_code: { type: string }
+            code: { type: string, pattern: '^[a-z][a-z0-9_]{1,40}$' }
+            data_type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file] }
+    CustomFieldPatch:
+      allOf:
+        - $ref: '#/components/schemas/CustomFieldFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
+    # ---------------------------------------------------------- notifications and logs
+    NotificationKind:
+      type: string
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system]
+    Notification:
+      type: object
+      required: [id, kind, title, created_at, read_at]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { $ref: '#/components/schemas/NotificationKind' }
+        title: { type: string }
+        body: { type: [string, 'null'] }
+        entity_type: { type: [string, 'null'] }
+        entity_id: { type: [string, 'null'] }
+        link: { type: [string, 'null'], description: 'App-relative path.' }
+        created_at: { type: string, format: date-time }
+        read_at: { type: [string, 'null'], format: date-time }
+    NotificationPreference:
+      type: object
+      required: [kind, in_app, email]
+      properties:
+        kind: { $ref: '#/components/schemas/NotificationKind' }
+        in_app: { type: boolean }
+        email: { type: boolean }
+        locked: { type: boolean, description: 'true = mandatory for security or workflow; cannot be switched off.' }
+    SystemLogEntry:
+      type: object
+      required: [id, at, level, source, message]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, format: date-time }
+        level: { type: string, enum: [info, warn, error] }
+        source: { type: string, enum: [api, web, worker, auth, template-check, import, pdf, job] }
+        code: { type: [string, 'null'] }
+        message: { type: string }
+        request_id: { type: [string, 'null'] }
+        user: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        route: { type: [string, 'null'] }
+        details: { type: [object, 'null'], additionalProperties: true }
+    # ---------------------------------------------------------- dashboard and Project Status
+    WeightSetRef:
+      type: object
+      required: [id, code, version]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, enum: [project_status, health_index, delay_attribution] }
+        version: { type: integer }
+        effective_from: { type: string, format: date }
+        is_active: { type: boolean }
+    KpiMeta:
+      type: object
+      required: [as_of]
+      properties:
+        as_of: { type: string, format: date-time }
+        workflow_versions: { type: array, items: { type: integer }, description: 'Active versions read (per site).' }
+        override_flagged_count: { type: integer, description: 'Admin overrides flagged in, or excluded from, this KPI.' }
+        overrides_excluded: { type: boolean }
+        weight_set: { $ref: '#/components/schemas/WeightSetRef' }
+    MilestonePipelineNode:
+      type: object
+      required: [code, name_en, order, sites_total, completed, in_progress, late, not_started]
+      properties:
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        order: { type: integer }
+        counts_in_project_status: { type: boolean }
+        sites_total: { type: integer }
+        completed: { type: integer }
+        in_progress: { type: integer }
+        late: { type: integer }
+        not_started: { type: integer }
+        not_applicable: { type: integer }
+        completed_pct: { type: number }
+        avg_working_days: { type: [number, 'null'] }
+    MilestonePipeline:
+      type: object
+      required: [meta, nodes]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        nodes: { type: array, items: { $ref: '#/components/schemas/MilestonePipelineNode' } }
+    RegionKpi:
+      type: object
+      required: [region_id, sites_total, completed, in_progress, late, progress_pct]
+      properties:
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        region_name: { type: string }
+        sites_total: { type: integer }
+        completed: { type: integer }
+        in_progress: { type: integer }
+        late: { type: integer }
+        no_holder: { type: integer, description: 'Tasks with no eligible holder.' }
+        progress_pct: { type: number }
+        health_score: { type: [number, 'null'] }
+        by_milestone: { type: object, additionalProperties: { type: integer }, description: 'Sites that reached each milestone, by code.' }
+    KpiByRegion:
+      type: object
+      required: [meta, items]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        items: { type: array, items: { $ref: '#/components/schemas/RegionKpi' } }
+    DelayAttributionRow:
+      type: object
+      required: [party, late_tasks, late_working_days, share_pct]
+      properties:
+        party: { type: string, description: 'Responsible party (for example A&T Global, GECOL, HLC, Aljeel CW).' }
+        external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+        late_tasks: { type: integer }
+        late_working_days: { type: integer }
+        share_pct: { type: number }
+    DelayAttribution:
+      type: object
+      required: [meta, items]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        items: { type: array, items: { $ref: '#/components/schemas/DelayAttributionRow' } }
+    HealthIndex:
+      type: object
+      required: [meta, score, band, components]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        score: { type: number, minimum: 0, maximum: 100 }
+        band: { type: string, enum: [green, amber, red] }
+        components:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, weight, value, contribution]
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              weight: { type: number }
+              value: { type: number }
+              contribution: { type: number }
+        by_region: { type: array, items: { type: object, properties: { region_id: { $ref: '#/components/schemas/RegionId' }, score: { type: number }, band: { type: string, enum: [green, amber, red] } } } }
+    FinalClosureAging:
+      type: object
+      required: [count]
+      properties:
+        count: { type: integer }
+        avg_age_days: { type: [number, 'null'] }
+        oldest_age_days: { type: [integer, 'null'] }
+        sites:
+          type: array
+          items:
+            type: object
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              age_days: { type: integer }
+    FinalClosureKpi:
+      type: object
+      required: [meta, sites_total, sites_closed, closed_pct, pending_cw_fac, pending_te_fac]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        sites_total: { type: integer }
+        sites_closed: { type: integer }
+        closed_pct: { type: number }
+        pending_cw_fac: { $ref: '#/components/schemas/FinalClosureAging' }
+        pending_te_fac: { $ref: '#/components/schemas/FinalClosureAging' }
+    ProjectStatusActivity:
+      type: object
+      required: [code, name_en, weight, progress_pct]
+      properties:
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        weight: { type: number }
+        progress_pct: { type: number }
+        items:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, weight, progress_pct]
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              weight: { type: number }
+              progress_pct: { type: number }
+    ProjectStatus:
+      description: Ends at HOTO. Final Closure has its own KPI.
+      type: object
+      required: [meta, scope, weight_set, progress_pct, activities]
+      properties:
+        meta: { $ref: '#/components/schemas/KpiMeta' }
+        scope:
+          type: object
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [project, region, site] }
+            region_id: { $ref: '#/components/schemas/RegionId' }
+            site_id: { type: string, format: uuid }
+        weight_set: { $ref: '#/components/schemas/WeightSetRef' }
+        progress_pct: { type: number }
+        activities: { type: array, items: { $ref: '#/components/schemas/ProjectStatusActivity' } }
+        rows:
+          type: array
+          description: Present when `group_by` is region or site.
+          items:
+            type: object
+            required: [key, label, progress_pct]
+            properties:
+              key: { type: string }
+              label: { type: string }
+              progress_pct: { type: number }
+              activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
+    ProjectStatusSnapshot:
+      type: object
+      required: [id, taken_on, progress_pct, weight_set]
+      properties:
+        id: { type: string, format: uuid }
+        taken_on: { type: string, format: date }
+        scope: { type: string, enum: [project, region] }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+        progress_pct: { type: number, description: 'Value computed at the time; never recomputed.' }
+        weight_set: { $ref: '#/components/schemas/WeightSetRef' }

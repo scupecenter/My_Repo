@@ -1,0 +1,40 @@
+# ADR 0011: Contract v0.2 (additive extension for the web mock phase)
+
+- Status: Proposed. Needs a read-through by the developer and the product owner's answers to the open points below.
+- Related: `contracts/openapi.yaml` 0.2.0; ADR 0001 §6 (contract versioning), 0002 §9b, 0003, 0004, 0005, 0007, 0009, 0010; `docs/spec/staff-registry.md`; CLAUDE.md decisions B9, B11, B12, B12b.
+
+## Context
+Contract 0.1 covered phase P1 only. The web app (React, MSW mocks generated from the contract) must show every UI decision in CLAUDE.md before the API exists. Without endpoints for the staff registry, absence and reassignment, registers, templates, generated forms, warehouse, snags, custom fields, notifications, System Log and the dashboard, the mocks would be invented by the web agent, which breaks "contract first".
+
+## Decision
+1. Extend the contract to 0.2.0, **additively**: 109 new operations (84 to 193) in 16 new tags, no removed or renamed operation or schema, no new required request field on an existing operation. The "Changes since 0.1" list is in `info.description`.
+2. Shapes follow the 0.1 conventions: problem+json, cursor pages (small bounded catalogues return `{ items }`), ETag with `If-Match` on versioned rows, `x-step-up`, `Idempotency-Key` on bulk and job-starting posts, `x-db-path` for the writing function.
+3. Small additive edits to 0.1 shapes: `GET /auth/login?identifier=` (ADR 0002 §9b, same 302 either way, 429 when rate limited); `User.mfa_exempt`; `TaskSummary.holder_absent` and `idle_working_days`; `Matrix` stage `kind` and `register_key` (register and Dismantle rows, B11); `Problem.reason`; error codes `freeze_active`, `insufficient_stock`, `role_in_use`; job kinds; `updateRole` also lists 409 and 422.
+4. One import-batch resource (`/import-batches`) serves every template (staff registry, holidays, Master, others): upload, row preview with diff, row-wise or all-at-once decisions, undo. `POST /staff-registry/import` and `POST /settings/holidays/import` are entry points that create the same batch.
+5. Registers and snags reuse the task transition vocabulary (submit, review, approve, reject) as separate operations, so mocks and permissions map one to one.
+6. Local password sign-in is **not** in the contract (deferred, ADR 0002 §10).
+
+## What the developer must review
+- **Invented `x-db-path` names** (`people_*`, `ops_*`, `reg_*`, `forms_*`, `wh_*`, `qc_*`, `imp_*`, `admin_*`): proposals for database-engineer, not existing functions.
+- **Register field set**: the catalogue returns `fields[]` per register; `data` is an open object. Exact base fields per register come from the Master and the registers spec, still to be written.
+- **Dashboard shapes** (`/dashboard/*`) are first drafts built from CLAUDE.md wording. They must be checked against `docs/reference/legacy-dashboard/` in P3 before the API is built.
+- **Reassignment**: `act_on_behalf` is modelled as a recorded decision that lets the lead act at the holder's level, logged "lead on behalf of the assignee". The task transitions themselves are unchanged. Reassignment changes the holder of the task's **current level** only.
+- **Generated forms**: `snag_list` is included as a `FormKind` because CLAUDE.md lists it among the CW forms. TE forms are not modelled (deferred).
+- **Step-up assignment**: required on MFA exemption, freeze lift, holiday delete, weekend days, DLP publish, Document Library publish, form void, form template upload, register void, import undo, and (conditionally) final approval by someone who holds every level. Not required on staff registry edits or holiday create and confirm. Confirm that split.
+- **DELETE with a query `reason`** on holidays (no body on DELETE). Alternative: `POST .../delete`.
+
+## Open points (product owner or other agents)
+1. ~~Staff registry maintenance: step-up?~~ **Decided 2026-10-25 (owner): yes**, every registry write (create, update, deactivate, reactivate, import, visibility) needs step-up.
+2. ~~Holiday import format?~~ **Decided (owner): approved xlsx template only** (`TPL-HOLIDAYS`). The seed CSV is loaded by the seed script, not through the UI.
+3. `reassign` of a task with several levels held by the person: only the current level moves in 0.2. Confirm.
+4. ~~Idle alert definition?~~ **Decided (owner): any state change or comment counts as activity.**
+5. `POST /templates/TPL-MASTER/stamp` and the legacy Master path (ADR 0005 §6) are **not** in 0.2 because Q1 is unanswered.
+6. Roles admin needed no new operation: 0.1 already carries `can_hold_matrix_levels`; only error responses were added.
+7. Warehouse stock posting happens on DN or RN approval inside the server, so there is no "post movement" operation. Stock adjustments (counts, receipts) are out of scope until the warehouse spec exists.
+
+   - The step-up list in this contract is **approved by the owner** as written.
+
+## Consequences
+- The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
+- The contract is large (193 operations). Each API PR must name the tag it implements, and conformance tests are generated per operation.
+- Shapes marked as drafts above may change in 0.3. Those changes are breaking only for operations already implemented; none is implemented yet, so they are recorded in the changelog, not as new ADRs, until the first implementation merges.
