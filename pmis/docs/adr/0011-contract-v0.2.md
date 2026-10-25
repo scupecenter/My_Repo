@@ -1,7 +1,7 @@
 # ADR 0011: Contract v0.2 (additive extension for the web mock phase)
 
 - Status: Proposed. Needs a read-through by the developer and the product owner's answers to the open points below.
-- Related: `contracts/openapi.yaml` 0.2.0; ADR 0001 §6 (contract versioning), 0002 §9b, 0003, 0004, 0005, 0007, 0009, 0010; `docs/spec/staff-registry.md`; CLAUDE.md decisions B9, B11, B12, B12b.
+- Related: `contracts/openapi.yaml` 0.2.1; ADR 0001 §6 (contract versioning), 0002 §9b, 0003, 0004, 0005, 0007, 0009, 0010; `docs/spec/staff-registry.md`; CLAUDE.md decisions B9, B11, B12, B12b.
 
 ## Context
 Contract 0.1 covered phase P1 only. The web app (React, MSW mocks generated from the contract) must show every UI decision in CLAUDE.md before the API exists. Without endpoints for the staff registry, absence and reassignment, registers, templates, generated forms, warehouse, snags, custom fields, notifications, System Log and the dashboard, the mocks would be invented by the web agent, which breaks "contract first".
@@ -33,6 +33,12 @@ Contract 0.1 covered phase P1 only. The web app (React, MSW mocks generated from
 7. Warehouse stock posting happens on DN or RN approval inside the server, so there is no "post movement" operation. Stock adjustments (counts, receipts) are out of scope until the warehouse spec exists.
 
    - The step-up list in this contract is **approved by the owner** as written.
+
+## Amendment 0.2.1 (2026-10-25, additive)
+Three gaps raised by frontend-engineer are resolved:
+1. `MatrixAssignee` gains optional `employee_id` (null for role and group holders) and `user_id` (person holders only).
+2. The `return_to` allowlist is stated in both `return_to` parameters: `/my-work` (default after login and fallback), `/step-up-done` (step-up popup), plus any same-origin route matching the pattern. A 401 `step_up_url` already includes `return_to`.
+3. `ApprovalItem.documents_summary` (`slot_id`, `name`, `status`, `file_count`) removes the extra `GET /tasks/{id}` in Approvals detail.
 
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
