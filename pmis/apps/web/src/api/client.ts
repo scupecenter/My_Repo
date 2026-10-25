@@ -30,7 +30,15 @@ let pendingStepUp: Promise<boolean> | null = null;
 export const setCsrfToken = (t: string) => { csrf = t; };
 export const setStepUpHandler = (h: StepUpHandler | null) => { stepUpHandler = h; };
 
+// IDs from the URL or the server are interpolated into paths: refuse anything that could walk to another endpoint.
+const SAFE_SEGMENT = /^[A-Za-z0-9_~-][A-Za-z0-9._~-]*$/;
+export function assertSafePath(path: string) {
+  if (!path.startsWith('/') || !path.slice(1).split('/').every((seg) => SAFE_SEGMENT.test(seg) && seg !== '..'))
+    throw new ApiError(400, { type: 'about:blank', status: 400, code: 'validation_failed', title: 'Unsafe request path' });
+}
+
 function buildUrl(path: string, query: RequestOptions['query']) {
+  assertSafePath(path);
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v === undefined || v === null || v === '') continue;
