@@ -1,0 +1,3522 @@
+openapi: 3.1.0
+info:
+  title: GSDN PMIS API
+  version: 0.1.0
+  summary: Contract for phase P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read).
+  description: |
+    Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
+    The web app generates its types and MSW mocks from it (`packages/contracts`, ADR 0001).
+
+    ## Conventions
+    - **Base path** `/api/v1`. JSON property names are snake_case (ADR 0001).
+    - **Auth**: session cookie `pmis_session` created by the Entra OIDC flow (ADR 0002). Unsafe methods (POST, PUT, PATCH, DELETE)
+      also need the header `X-CSRF-Token` with the value from `GET /auth/session`. A future mobile client will use `bearerAuth`.
+    - **Errors**: RFC 9457 `application/problem+json` (schema `Problem`). `code` is machine-readable and stable; `errors[]` lists
+      field problems. Every response carries `X-Request-Id`, which is also written to the System Log.
+    - **Visibility**: a row outside the caller's regions for the module answers **404**, never 403 (VI-02). A module the caller
+      cannot use answers 403 `module_forbidden`. A pending user gets 403 `pending_assignment` everywhere except `/auth/*` and `/me`.
+    - **Pagination**: cursor based on every list. Query `limit` (1..200, default 50) and `cursor` (opaque). Response envelope
+      `{ items: [...], page: { limit, next_cursor, total? } }`. `next_cursor` is null on the last page. `total` is given where cheap.
+    - **Concurrency**: single resources return `ETag: "<version>"`. Every mutation of a versioned resource needs
+      `If-Match` (missing = 428 `precondition_required`, stale = 412 `precondition_failed`). Bulk bodies carry a `version` per item.
+    - **Step-up**: `x-step-up` is `true` (always) or a string naming the condition (for example when self-skip reaches final approval). Such operations need a re-authentication no older than the setting `stepup_max_age_seconds`
+      (default 300). Otherwise 401 `step_up_required` with `step_up_url` (ADR 0002 §6). One step-up covers a whole bulk request.
+    - **Idempotency**: bulk and job-starting POSTs accept `Idempotency-Key`; a replay within 24 h returns the first response.
+    - **Long jobs** answer 202 with a `Job`; poll `GET /jobs/{job_id}`.
+    - **Database paths**: `x-db-path` names the SECURITY DEFINER function that performs the write (ADR 0003 §7). The API never writes
+      identity or permission tables directly.
+    - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
+
+    ## Versions
+    - 0.1.0 (2026-10-25): first contract for P1. No breaking-change history yet. Breaking changes are recorded in `docs/adr/` (ADR 0001 §6).
+  license:
+    name: Proprietary, Aljeel internal use
+    url: https://pmis.aljeel.internal/license
+  contact:
+    name: GSDN PMIS tech-lead
+servers:
+  - url: https://pmis.aljeel.internal/api/v1
+    description: Internal server (TLS from the internal CA)
+security:
+  - cookieAuth: []
+    csrfHeader: []
+tags:
+  - name: auth
+    description: Sign-in, session, employee-ID link, step-up and break-glass (ADR 0002).
+  - name: me
+    description: The caller's profile, effective permissions and My Work.
+  - name: users
+    description: Registered employees and their status.
+  - name: assignments
+    description: Many-to-many role assignments, by role or by person, in bulk (AU-10..AU-13).
+  - name: roles
+    description: Admin-defined roles and sub-roles.
+  - name: permissions
+    description: Permission grid, profiles and field-level rules (ADR 0003).
+  - name: groups
+    description: Named sets of users used in matrix cells.
+  - name: delegations
+    description: Delegation of System Admin rights.
+  - name: regions
+    description: The 7 regions.
+  - name: sites
+    description: Site list with filters and mini rail, site detail and task grid.
+  - name: tasks
+    description: Task detail, data entry, workflow actions, comments, files (ADR 0004).
+  - name: approvals
+    description: Approvals inbox and bulk actions.
+  - name: matrix
+    description: Responsibility Matrix.
+  - name: workflow
+    description: Versioned workflow definition and site migration (ADR 0010).
+  - name: audit
+    description: Read-only Audit Log (ADR 0006).
+  - name: settings
+    description: Read access to settings, SLA rules, weight sets, calendars and task definitions.
+  - name: system
+    description: Jobs and client error reporting.
+
+paths:
+  # ------------------------------------------------------------------ auth
+  /auth/login:
+    get:
+      tags: [auth]
+      operationId: authLogin
+      summary: Start the Entra ID sign-in (redirect)
+      security: []
+      parameters:
+        - name: return_to
+          in: query
+          description: Relative path to open after sign-in.
+          schema: { type: string, pattern: '^/' }
+      responses:
+        '302':
+          description: Redirect to the Entra authorize endpoint.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /auth/callback:
+    get:
+      tags: [auth]
+      operationId: authCallback
+      summary: OIDC redirect URI (server side)
+      description: Validates `iss`, `aud`, `tid`, signature and, when `require_mfa` is on, `amr` contains `mfa`. Creates the user on first sign-in with status `pending_assignment`.
+      security: []
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '302':
+          description: Session cookie set; redirect to the app (or to the employee-ID page on first sign-in).
+          headers:
+            Set-Cookie: { schema: { type: string } }
+            Location: { schema: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/session:
+    get:
+      tags: [auth]
+      operationId: getSession
+      summary: Current session state and CSRF token
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Session.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post:
+      tags: [auth]
+      operationId: logout
+      summary: End the session
+      responses:
+        '204': { description: 'Signed out.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/employee-id:
+    post:
+      tags: [auth]
+      operationId: linkEmployeeId
+      summary: Link the 4-digit employee ID (once, first sign-in)
+      x-db-path: idm_link_employee_id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id: { $ref: '#/components/schemas/EmployeeId' }
+      responses:
+        '200':
+          description: Linked. The account stays `pending_assignment` until an admin assigns it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /auth/step-up:
+    get:
+      tags: [auth]
+      operationId: startStepUp
+      summary: Start a step-up re-authentication (redirect)
+      description: Redirects to Entra with `prompt=login` and `max_age=0` (break-glass sessions get a TOTP page instead).
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: return_to
+          in: query
+          required: true
+          schema: { type: string, pattern: '^/' }
+      responses:
+        '302':
+          description: Redirect to Entra.
+          headers:
+            Location: { schema: { type: string, format: uri } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/step-up/callback:
+    get:
+      tags: [auth]
+      operationId: stepUpCallback
+      summary: Step-up redirect URI (server side)
+      security:
+        - cookieAuth: []
+      parameters:
+        - { name: code, in: query, required: true, schema: { type: string } }
+        - { name: state, in: query, required: true, schema: { type: string } }
+      responses:
+        '302':
+          description: Step-up recorded (`stepup_at`), redirect to `return_to`.
+          headers:
+            Location: { schema: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/break-glass:
+    post:
+      tags: [auth]
+      operationId: breakGlassLogin
+      summary: Break-glass local admin sign-in (internal network only)
+      description: Accepted only from `internal_cidrs`. Every attempt is written to the System Log; success is audited as privileged and emailed to all System Admins. Locked 15 min after 5 failures.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password, totp]
+              properties:
+                username: { type: string }
+                password: { type: string, format: password }
+                totp: { type: string, pattern: '^[0-9]{6}$' }
+      responses:
+        '200':
+          description: Signed in (session cookie set, max 60 minutes).
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ------------------------------------------------------------------ me
+  /me:
+    get:
+      tags: [me]
+      operationId: getMe
+      summary: My profile, assignments and effective permissions (drives navigation)
+      responses:
+        '200':
+          description: Me.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/preferences:
+    patch:
+      tags: [me]
+      operationId: updateMyPreferences
+      summary: Change language and theme
+      x-db-path: idm_set_preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                locale: { type: string, enum: [en, ar] }
+                theme: { type: string, enum: [light, dark] }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Me' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /me/notify-admins:
+    post:
+      tags: [me]
+      operationId: notifyAdmins
+      summary: Pending user asks the System Admins for an assignment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message: { type: string, maxLength: 500 }
+      responses:
+        '202': { description: 'Notification queued (in-app and email).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/tasks:
+    get:
+      tags: [me]
+      operationId: listMyTasks
+      summary: My Work (tasks where I am an eligible holder or the claimant)
+      parameters:
+        - name: bucket
+          in: query
+          description: late = over SLA max; do_now = at my level; waiting = submitted by me, at a later level.
+          schema: { type: string, enum: [late, do_now, waiting] }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Tasks.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------ users
+  /users:
+    get:
+      tags: [users]
+      operationId: listUsers
+      summary: Registered employees (everyone who signed in with M365)
+      description: Needs `view` on `admin.users`, except `fields=picker`, which any active user may call to pick names (id, display name and employee ID only).
+      parameters:
+        - { name: q, in: query, description: 'Search name, email or employee ID.', schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
+        - { name: role_id, in: query, description: 'Users holding this role or sub-role (active rows).', schema: { type: string, format: uuid } }
+        - { name: region_id, in: query, schema: { $ref: '#/components/schemas/RegionId' } }
+        - { name: group_id, in: query, schema: { type: string, format: uuid } }
+        - { name: fields, in: query, schema: { type: string, enum: [full, picker], default: full } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/User' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /users/{user_id}:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [users]
+      operationId: getUser
+      summary: One user with assignments and groups
+      responses:
+        '200':
+          description: User.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [users]
+      operationId: updateUser
+      summary: Change status or employee ID (admin)
+      description: Deactivating a user releases their claimed tasks back to the cell (AU-09). Refused with `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
+      x-step-up: true
+      x-db-path: idm_set_user_status / idm_link_employee_id
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                status: { $ref: '#/components/schemas/UserStatus' }
+                employee_id: { $ref: '#/components/schemas/EmployeeId' }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/assignments:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    get:
+      tags: [assignments]
+      operationId: listUserAssignments
+      summary: Assignment rows of one person (by-person view)
+      parameters:
+        - { name: include_ended, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Assignments.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ assignments
+  /assignments:
+    get:
+      tags: [assignments]
+      operationId: listAssignments
+      summary: Assignment rows (by-role view)
+      parameters:
+        - { name: role_id, in: query, schema: { type: string, format: uuid } }
+        - { name: user_id, in: query, schema: { type: string, format: uuid } }
+        - { name: profile_id, in: query, schema: { type: string, format: uuid } }
+        - { name: active_on, in: query, description: 'Rows active on this date (default today).', schema: { type: string, format: date } }
+        - { name: include_ended, in: query, schema: { type: boolean, default: false } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Assignments.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /assignments/bulk-assign:
+    post:
+      tags: [assignments]
+      operationId: bulkAssign
+      summary: Assign one role to many people, or many roles to one person
+      description: |
+        Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11).
+        Rows whose beneficiary is the caller are refused with `self_beneficiary` unless the caller is a System Admin without delegation.
+        All rows share one `bulk_action_id` in the audit log. `dry_run=true` returns the same result without writing.
+      x-step-up: true
+      x-db-path: idm_assign
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BulkAssignRequest' }
+      responses:
+        '200':
+          description: Per-row result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /assignments/bulk-update:
+    post:
+      tags: [assignments]
+      operationId: bulkUpdateAssignments
+      summary: Edit level, regions, modules, profiles or dates of many rows
+      x-step-up: true
+      x-db-path: idm_update_assignment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items, patch, reason]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/VersionedRef' }
+                patch: { $ref: '#/components/schemas/AssignmentPatch' }
+                reason: { $ref: '#/components/schemas/Reason' }
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Per-row result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /assignments/bulk-end:
+    post:
+      tags: [assignments]
+      operationId: bulkEndAssignments
+      summary: Remove (end) assignment rows
+      description: Sets `valid_to` (default now); rows are never deleted (AU-13). Claimed tasks of the ended role return to their cell.
+      x-step-up: true
+      x-db-path: idm_end_assignment
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items, reason]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items: { $ref: '#/components/schemas/VersionedRef' }
+                valid_to: { type: string, format: date-time }
+                reason: { $ref: '#/components/schemas/Reason' }
+                dry_run: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Per-row result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /assignments/copy:
+    post:
+      tags: [assignments]
+      operationId: copyAssignments
+      summary: Copy the active rows of one person to others (add or replace)
+      description: Use `dry_run=true` for the preview shown before confirming (AU-13).
+      x-step-up: true
+      x-db-path: idm_copy_assignments
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from_user_id, to_user_ids, mode, reason]
+              properties:
+                from_user_id: { type: string, format: uuid }
+                to_user_ids:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { type: string, format: uuid }
+                mode: { type: string, enum: [add, replace] }
+                reason: { $ref: '#/components/schemas/Reason' }
+                dry_run: { type: boolean, default: true }
+      responses:
+        '200':
+          description: Per-row result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ------------------------------------------------------------------ roles
+  /roles:
+    get:
+      tags: [roles]
+      operationId: listRoles
+      summary: Roles and sub-roles (tree)
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Roles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Role' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [roles]
+      operationId: createRole
+      summary: Create a role or sub-role (admin)
+      x-step-up: true
+      x-db-path: idm_save_role
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RoleInput' }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /roles/{role_id}:
+    parameters:
+      - name: role_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [roles]
+      operationId: getRole
+      summary: One role
+      responses:
+        '200':
+          description: Role.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [roles]
+      operationId: updateRole
+      summary: Rename, change defaults, or deactivate a role (never deleted while assigned)
+      x-step-up: true
+      x-db-path: idm_save_role
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/RolePatch'
+                - type: object
+                  required: [reason]
+                  properties:
+                    reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ------------------------------------------------------------------ permissions
+  /permissions/catalogue:
+    get:
+      tags: [permissions]
+      operationId: getPermissionCatalogue
+      summary: Modules, screens, actions and delegable rights (for the grid editor)
+      responses:
+        '200':
+          description: Catalogue.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermissionCatalogue' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /permission-profiles:
+    get:
+      tags: [permissions]
+      operationId: listPermissionProfiles
+      summary: Named permission profiles
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Profiles.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PermissionProfile' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [permissions]
+      operationId: createPermissionProfile
+      summary: Create a profile with its grid and field rules
+      x-step-up: true
+      x-db-path: idm_save_profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PermissionProfileInput' }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermissionProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /permission-profiles/{profile_id}:
+    parameters:
+      - name: profile_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [permissions]
+      operationId: getPermissionProfile
+      summary: One profile
+      responses:
+        '200':
+          description: Profile.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermissionProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [permissions]
+      operationId: replacePermissionProfile
+      summary: Replace the grid and field rules of a profile (or deactivate it)
+      description: A caller linked to this profile through an active assignment is refused with `self_beneficiary`, unless they are a System Admin acting without delegation.
+      x-step-up: true
+      x-db-path: idm_save_profile
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PermissionProfileInput' }
+      responses:
+        '200':
+          description: Saved (new version).
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermissionProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ------------------------------------------------------------------ groups
+  /groups:
+    get:
+      tags: [groups]
+      operationId: listGroups
+      summary: Groups with member counts and matrix usage
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Group' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [groups]
+      operationId: createGroup
+      summary: Create a group
+      x-step-up: true
+      x-db-path: idm_group_create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, reason]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 120 }
+                description: { type: string, maxLength: 500 }
+                member_ids: { type: array, items: { type: string, format: uuid }, maxItems: 500 }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /groups/{group_id}:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    get:
+      tags: [groups]
+      operationId: getGroup
+      summary: One group with members
+      responses:
+        '200':
+          description: Group.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [groups]
+      operationId: updateGroup
+      summary: Rename, describe or deactivate a group
+      x-step-up: true
+      x-db-path: idm_group_update
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                name: { type: string, minLength: 2, maxLength: 120 }
+                description: { type: string, maxLength: 500 }
+                is_active: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GroupDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /groups/{group_id}/members:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+    post:
+      tags: [groups]
+      operationId: addGroupMembers
+      summary: Add members
+      description: Only a System Admin acting without delegation may change the System Admins group. Pending users are refused.
+      x-step-up: true
+      x-db-path: idm_group_add_member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_ids, reason]
+              properties:
+                user_ids: { type: array, minItems: 1, maxItems: 500, items: { type: string, format: uuid } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Per-user result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /groups/{group_id}/members/{user_id}:
+    parameters:
+      - $ref: '#/components/parameters/GroupId'
+      - $ref: '#/components/parameters/UserId'
+    delete:
+      tags: [groups]
+      operationId: removeGroupMember
+      summary: Remove a member
+      description: Refused with `last_admin` when it would leave the System Admins group without an active member. Claimed tasks of the member under this group return to the group.
+      x-step-up: true
+      x-db-path: idm_group_remove_member
+      parameters:
+        - name: reason
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '204': { description: 'Removed.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ------------------------------------------------------------------ delegations
+  /delegations:
+    get:
+      tags: [delegations]
+      operationId: listDelegations
+      summary: Delegations (timeline)
+      parameters:
+        - { name: state, in: query, schema: { type: string, enum: [active, scheduled, expired, revoked, all], default: active } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Delegations.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Delegation' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [delegations]
+      operationId: createDelegation
+      summary: Delegate full or partial admin rights (System Admin only, never by a delegate)
+      x-step-up: true
+      x-db-path: idm_delegate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DelegationInput' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delegation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /delegations/{delegation_id}/revoke:
+    post:
+      tags: [delegations]
+      operationId: revokeDelegation
+      summary: Revoke a delegation
+      x-step-up: true
+      x-db-path: idm_revoke_delegation
+      parameters:
+        - name: delegation_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Delegation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ------------------------------------------------------------------ regions
+  /regions:
+    get:
+      tags: [regions]
+      operationId: listRegions
+      summary: The 7 regions (with the caller's visibility flag)
+      responses:
+        '200':
+          description: Regions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Region' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ------------------------------------------------------------------ sites
+  /sites:
+    get:
+      tags: [sites]
+      operationId: listSites
+      summary: Sites with filters and the mini rail
+      description: Only sites in the caller's regions for the `sites` module are returned (RLS).
+      parameters:
+        - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: stage_code, in: query, description: 'Current milestone/stage code (stable code, ADR 0010).', schema: { type: string } }
+        - { name: scenario, in: query, schema: { $ref: '#/components/schemas/DeliveryScenario' } }
+        - { name: overall_status, in: query, schema: { $ref: '#/components/schemas/OverallStatus' } }
+        - { name: bucket, in: query, schema: { type: string, enum: [all, mine, late, waiting_approval, closed], default: all } }
+        - { name: cluster_code, in: query, schema: { type: string } }
+        - { name: delivery_batch, in: query, schema: { type: string } }
+        - { name: workflow_version, in: query, schema: { type: integer, minimum: 1 } }
+        - name: custom
+          in: query
+          description: Filter on custom fields shown in filters, as `code:value` pairs (repeatable).
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string, pattern: '^[a-z0-9_]+:.+$' } }
+        - { name: sort, in: query, schema: { type: string, enum: [site_code, -site_code, region, -region, stage, -stage, due_date, -due_date], default: site_code } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Sites.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/SiteListItem' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /sites/{site_id}:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: getSite
+      summary: Site detail with pipeline, gates and cluster progress
+      responses:
+        '200':
+          description: Site.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /sites/{site_id}/tasks:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: listSiteTasks
+      summary: Task grid of a site, grouped by stage (site's workflow version)
+      responses:
+        '200':
+          description: Stages with their tasks.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow_version, stages]
+                properties:
+                  workflow_version: { type: integer }
+                  stages:
+                    type: array
+                    items:
+                      type: object
+                      required: [code, name_en, tasks]
+                      properties:
+                        code: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        tasks: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ tasks
+  /tasks/{task_id}:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      operationId: getTask
+      summary: Task detail (drawer)
+      responses:
+        '200':
+          description: Task.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [tasks]
+      operationId: updateTaskEntry
+      summary: Save entry data (dates, values, custom fields) at level 1
+      description: Allowed in states `open` and `entry` to an eligible entry holder. Read-only and hidden fields are refused with `field_read_only`.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskEntryPatch' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/start:
+    post:
+      tags: [tasks]
+      operationId: startTask
+      summary: Move a Pending task to Ongoing with a start date
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actual_start: { type: string, format: date, description: 'Default today (TE MOS date for D6).' }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/submit:
+    post:
+      tags: [tasks]
+      operationId: submitTask
+      summary: Submit for review (level 1 done)
+      description: |
+        Refused with 422 `mandatory_slots_missing` or `mandatory_fields_missing` (listing them). Freezes `levels_required`.
+        Self-skip may carry the task further (`skipped_levels` in the result). If the chain reaches final approval, step-up is required.
+      x-step-up: conditional (only when self-skip reaches final approval, or levels_required = 1)
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/review:
+    post:
+      tags: [tasks]
+      operationId: reviewTask
+      summary: Pass a review level (levels 2..N-1)
+      x-step-up: conditional (only when self-skip reaches final approval)
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/approve:
+    post:
+      tags: [tasks]
+      operationId: approveTask
+      summary: Final approval (level N)
+      description: Refused with 422 `open_snags` for preliminary acceptances while snags are open. Under `all_members` the result shows the votes still missing.
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/reject:
+    post:
+      tags: [tasks]
+      operationId: rejectTask
+      summary: Return the task one level back, with a note
+      description: Allowed at level >= 2. `note` is mandatory (422 `note_required`). Target level follows ADR 0004 §6.
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/claim:
+    post:
+      tags: [tasks]
+      operationId: claimTask
+      summary: Claim a group-assigned level (any one member)
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/release:
+    post:
+      tags: [tasks]
+      operationId: releaseTask
+      summary: Release my claim back to the group
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /tasks/{task_id}/history:
+    get:
+      tags: [tasks]
+      operationId: getTaskHistory
+      summary: Workflow steps (timeline), including auto-skips and overrides
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Steps, oldest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/WorkflowStep' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /tasks/{task_id}/comments:
+    parameters:
+      - $ref: '#/components/parameters/TaskId'
+    get:
+      tags: [tasks]
+      operationId: listTaskComments
+      summary: Comment thread
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Comments, oldest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/Comment' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [tasks]
+      operationId: addTaskComment
+      summary: Add a comment (with optional mentions)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 4000 }
+                mention_user_ids: { type: array, maxItems: 20, items: { type: string, format: uuid } }
+      responses:
+        '201':
+          description: Added.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Comment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /tasks/{task_id}/slots/{slot_id}/files:
+    post:
+      tags: [tasks]
+      operationId: uploadSlotFile
+      summary: Upload a file into a document slot (new version if the slot has files)
+      description: Streams through the API; format by magic bytes, size and file count from the slot's document-type version (ADR 0008).
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - name: slot_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, contentMediaType: application/octet-stream }
+                replaces_file_group_id: { type: string, format: uuid, description: 'Set to upload a new version of an existing file.' }
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DocumentFile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /tasks/{task_id}/overrides:
+    post:
+      tags: [tasks]
+      operationId: createOverride
+      summary: Admin override on a task (reason and step-up)
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OverrideRequest' }
+      responses:
+        '201':
+          description: Applied.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Override' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /overrides/{override_id}/revert:
+    post:
+      tags: [tasks]
+      operationId: revertOverride
+      summary: Revert an admin override
+      description: 409 `override_not_revertible` if the task has moved on since.
+      x-step-up: true
+      parameters:
+        - name: override_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Reverted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Override' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /files/{file_id}/download:
+    get:
+      tags: [tasks]
+      operationId: downloadFile
+      summary: Download a file (audited before streaming)
+      parameters:
+        - name: file_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The file, named `SITE_TASK_DOC_APPROVEDDATE.ext` (ADR 0008 §3).
+          headers:
+            Content-Disposition: { schema: { type: string } }
+          content:
+            application/octet-stream:
+              schema: { type: string, contentMediaType: application/octet-stream }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ approvals
+  /approvals:
+    get:
+      tags: [approvals]
+      operationId: listApprovals
+      summary: Approvals inbox (items where I can act at review or approve level)
+      parameters:
+        - { name: tab, in: query, schema: { type: string, enum: [all, review, approve], default: all } }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: stage_code, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: group_only, in: query, schema: { type: boolean } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Inbox.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/ApprovalItem' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /approvals/bulk:
+    post:
+      tags: [approvals]
+      operationId: bulkApprovals
+      summary: Pass or approve many tasks at once (one step-up)
+      description: Each item is processed in its own transaction; the result lists done, skipped (with reason) and failed items. Rejection is never bulk because each needs its own note.
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, items]
+              properties:
+                action: { type: string, enum: [pass, approve], description: 'pass = review level, approve = final level.' }
+                items:
+                  type: array
+                  minItems: 1
+                  maxItems: 200
+                  items: { $ref: '#/components/schemas/VersionedRef' }
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Per-item result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BulkResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ------------------------------------------------------------------ matrix
+  /matrix:
+    get:
+      tags: [matrix]
+      operationId: getMatrix
+      summary: Responsibility Matrix for a workflow version, with self-skip preview
+      parameters:
+        - { name: workflow_version, in: query, description: 'Default = current published version.', schema: { type: integer, minimum: 1 } }
+        - { name: region_id, in: query, description: 'Show region-specific cells for this region.', schema: { $ref: '#/components/schemas/RegionId' } }
+      responses:
+        '200':
+          description: Matrix.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Matrix' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [matrix]
+      operationId: updateMatrix
+      summary: Save changed cells and stage level counts in one step
+      description: |
+        All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
+        `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatrixPatch' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Matrix' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  # ------------------------------------------------------------------ workflow (ADR 0010)
+  /workflow/versions:
+    get:
+      tags: [workflow]
+      operationId: listWorkflowVersions
+      summary: Workflow definition versions with site counts
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/WorkflowVersionSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [workflow]
+      operationId: createWorkflowDraft
+      summary: Create a draft (copy of a published version) for structural changes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [parent_version, reason]
+              properties:
+                parent_version: { type: integer, minimum: 1 }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '201':
+          description: Draft created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /workflow/versions/{version}:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    get:
+      tags: [workflow]
+      operationId: getWorkflowVersion
+      summary: Full definition of a version (milestones, gates, task placements)
+      responses:
+        '200':
+          description: Version.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [workflow]
+      operationId: replaceWorkflowDraft
+      summary: Replace the structure of a draft (add, remove, reorder milestones and gates; move tasks)
+      description: Only for `status = draft`. Codes of existing nodes are kept; new nodes get new codes that are never reused.
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkflowStructure' }
+      responses:
+        '200':
+          description: Saved, with validation warnings.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/publish:
+    post:
+      tags: [workflow]
+      operationId: publishWorkflowVersion
+      summary: Publish a draft (structural change); new sites use it
+      description: |
+        Runs the ADR 0010 §2 validation. Returns 422 `workflow_invalid` with the list of problems.
+        During the parallel run, a change that affects Master export columns needs `confirm_master_impact` equal to the
+        phrase in `master_impact.confirmation_phrase` of the validation result.
+      x-step-up: true
+      x-db-path: admin_publish_workflow_version (app_actor_is_admin('workflow.publish'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/milestones/{code}:
+    patch:
+      tags: [workflow]
+      operationId: updateMilestoneLight
+      summary: Light change to a milestone (names, custom fields, counts in Project Status); applies at once
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/NodeCode'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                name_en: { type: string }
+                name_ar: { type: string }
+                counts_in_project_status: { type: boolean }
+                custom: { $ref: '#/components/schemas/CustomValues' }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '200':
+          description: Saved (light revision + 1).
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowMilestone' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/gates/{code}:
+    patch:
+      tags: [workflow]
+      operationId: updateGateLight
+      summary: Light change to a gate (names, conditions, SLA, custom fields); applies to gates not yet open
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/NodeCode'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                name_en: { type: string }
+                name_ar: { type: string }
+                conditions: { type: array, items: { $ref: '#/components/schemas/GateCondition' } }
+                sla_min_wd: { type: integer, minimum: 0 }
+                sla_max_wd: { type: integer, minimum: 0 }
+                custom: { $ref: '#/components/schemas/CustomValues' }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '200':
+          description: Saved (light revision + 1).
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowGate' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/migration-preview:
+    post:
+      tags: [workflow]
+      operationId: previewSiteMigration
+      summary: Preview migrating sites to this version (tasks kept, added, retired; date changes; blockers)
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteSelection' }
+      responses:
+        '200':
+          description: Preview with a hash to confirm.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MigrationPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /workflow/versions/{version}/migrations:
+    post:
+      tags: [workflow]
+      operationId: migrateSites
+      summary: Migrate the previewed sites (job, one transaction per site)
+      x-step-up: true
+      x-db-path: admin_migrate_site_workflow (app_actor_is_admin('workflow.migrate'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [preview_hash, selection, reason]
+              properties:
+                preview_hash: { type: string }
+                selection: { $ref: '#/components/schemas/SiteSelection' }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '202':
+          description: Job started.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /workflow/site-migrations:
+    get:
+      tags: [workflow]
+      operationId: listSiteMigrations
+      summary: Site migration log
+      parameters:
+        - { name: site_id, in: query, schema: { type: string, format: uuid } }
+        - { name: to_version, in: query, schema: { type: integer } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Migrations.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/SiteMigration' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /workflow/site-migrations/{migration_id}/revert:
+    post:
+      tags: [workflow]
+      operationId: revertSiteMigration
+      summary: Move a site back to its previous version (only if nothing was approved since)
+      x-step-up: true
+      x-db-path: admin_migrate_site_workflow (revert)
+      parameters:
+        - name: migration_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Reverted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteMigration' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ------------------------------------------------------------------ audit
+  /audit-log:
+    get:
+      tags: [audit]
+      operationId: listAuditLog
+      summary: Read the Audit Log (append-only; no write endpoint exists)
+      description: Needs `view_audit`. Rows are limited to the reader's regions; rows without a region need all regions. Newest first.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: actor_id, in: query, schema: { type: string, format: uuid } }
+        - { name: site_id, in: query, schema: { type: string, format: uuid } }
+        - { name: entity_type, in: query, schema: { type: string } }
+        - { name: entity_id, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: bulk_action_id, in: query, schema: { type: string, format: uuid } }
+        - { name: admin_override, in: query, schema: { type: boolean } }
+        - { name: privileged, in: query, schema: { type: boolean } }
+        - { name: q, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/AuditEntry' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /audit-log/exports:
+    post:
+      tags: [audit]
+      operationId: exportAuditLog
+      summary: Export the filtered Audit Log as CSV (job; the export is itself audited)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+                actor_id: { type: string, format: uuid }
+                site_id: { type: string, format: uuid }
+                entity_type: { type: string }
+                action: { type: string }
+                q: { type: string }
+      responses:
+        '202':
+          description: Job started.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------ settings (read)
+  /settings:
+    get:
+      tags: [settings]
+      operationId: listSettings
+      summary: Settings visible to the caller (admin sees all keys)
+      responses:
+        '200':
+          description: Settings.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Setting' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/sla-rules:
+    get:
+      tags: [settings]
+      operationId: listSlaRules
+      summary: SLA rules with version history
+      parameters:
+        - { name: task_code, in: query, schema: { type: string } }
+        - { name: active_on, in: query, schema: { type: string, format: date } }
+        - { name: include_history, in: query, schema: { type: boolean, default: false } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: SLA rules.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/SlaRule' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/weight-sets:
+    get:
+      tags: [settings]
+      operationId: listWeightSets
+      summary: Weight sets (Project Status, health index, delay attribution)
+      parameters:
+        - { name: code, in: query, schema: { type: string, enum: [project_status, health_index, delay_attribution] } }
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+      responses:
+        '200':
+          description: Weight sets with activities and items.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/WeightSet' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/calendars:
+    get:
+      tags: [settings]
+      operationId: listCalendars
+      summary: Work calendars with weekend days and holidays
+      parameters:
+        - { name: year, in: query, schema: { type: integer, minimum: 2020, maximum: 2035 } }
+      responses:
+        '200':
+          description: Calendars.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Calendar' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/task-definitions:
+    get:
+      tags: [settings]
+      operationId: listTaskDefinitions
+      summary: Task definitions (catalogue) with placement in a workflow version
+      parameters:
+        - { name: workflow_version, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Task definitions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/TaskDefinition' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  # ------------------------------------------------------------------ system
+  /jobs/{job_id}:
+    get:
+      tags: [system]
+      operationId: getJob
+      summary: Status of a background job (exports, migrations)
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Job.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /client-errors:
+    post:
+      tags: [system]
+      operationId: reportClientError
+      summary: Report a caught UI error to the System Log (rate-limited)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string, maxLength: 2000 }
+                route: { type: string, maxLength: 500 }
+                stack: { type: string, maxLength: 8000 }
+                request_id: { type: string }
+      responses:
+        '202': { description: 'Logged.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: pmis_session
+      description: Server-side session created by the Entra OIDC flow (ADR 0002).
+    csrfHeader:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Required on unsafe methods; value from `GET /auth/session`. Ignored on GET.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Reserved for the future mobile app (Entra access token for the PMIS API scope). Not enabled in v0.1.
+
+  headers:
+    ETag:
+      description: Version of the resource, to send back as `If-Match`.
+      schema: { type: string, examples: ['"7"'] }
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    Cursor:
+      name: cursor
+      in: query
+      description: Opaque cursor from `page.next_cursor`.
+      schema: { type: string }
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: The ETag last read.
+      schema: { type: string }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      schema: { type: string, maxLength: 100 }
+    UserId:
+      name: user_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    GroupId:
+      name: group_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    SiteId:
+      name: site_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WorkflowVersionNo:
+      name: version
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    NodeCode:
+      name: code
+      in: path
+      required: true
+      description: Stable milestone or gate code (for example MS4, G5).
+      schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
+
+  responses:
+    BadRequest:
+      description: Malformed request.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Not signed in, session expired, `mfa_required`, or `step_up_required` (with `step_up_url`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Signed in but not allowed (`pending_assignment`, `module_forbidden`, `action_forbidden`, `field_read_only`, `self_beneficiary`, `delegate_forbidden`, `not_eligible_holder`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Not found, or outside the caller's visibility.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: State conflict (`already_claimed`, `invalid_transition`, `last_admin`, `already_assigned`, `override_not_revertible`, `migration_not_revertible`, `stale_preview`, `duplicate`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionFailed:
+      description: '`If-Match` does not match the current version (`precondition_failed`). Re-read and retry.'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PreconditionRequired:
+      description: '`If-Match` is missing (`precondition_required`).'
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    PayloadTooLarge:
+      description: File larger than the slot allows (`file_too_large`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unprocessable:
+      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Rate limited or account locked (`rate_limited`, `account_locked`).
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TaskTransition:
+      description: Transition applied; the task after the transition and what happened.
+      headers:
+        ETag: { $ref: '#/components/headers/ETag' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/TransitionResult' }
+
+  schemas:
+    # ---------------------------------------------------------- common
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type: { type: string, format: uri-reference, examples: ['https://pmis.aljeel.internal/problems/note_required'] }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        request_id: { type: string }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [path, code]
+            properties:
+              path: { type: string, description: 'JSON pointer or "slot:<id>" / "field:<code>".' }
+              code: { type: string }
+              message: { type: string }
+        step_up_url: { type: string, description: 'Present with `step_up_required`.' }
+        claimed_by: { $ref: '#/components/schemas/UserRef' }
+        missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
+    ErrorCode:
+      type: string
+      enum:
+        - validation_failed
+        - unauthenticated
+        - mfa_required
+        - step_up_required
+        - pending_assignment
+        - module_forbidden
+        - action_forbidden
+        - field_read_only
+        - not_eligible_holder
+        - self_beneficiary
+        - delegate_forbidden
+        - last_admin
+        - not_found
+        - already_claimed
+        - already_assigned
+        - invalid_transition
+        - note_required
+        - mandatory_slots_missing
+        - mandatory_fields_missing
+        - open_snags
+        - empty_cell
+        - override_not_revertible
+        - workflow_invalid
+        - master_impact_unconfirmed
+        - stale_preview
+        - migration_not_revertible
+        - precondition_failed
+        - precondition_required
+        - file_too_large
+        - file_rejected
+        - template_rejected
+        - duplicate
+        - rate_limited
+        - account_locked
+        - internal_error
+    PageEnvelope:
+      type: object
+      required: [items, page]
+      properties:
+        items: { type: array, items: {} }
+        page: { $ref: '#/components/schemas/PageInfo' }
+    PageInfo:
+      type: object
+      required: [limit, next_cursor]
+      properties:
+        limit: { type: integer }
+        next_cursor: { type: [string, 'null'] }
+        total: { type: integer }
+    VersionedRef:
+      type: object
+      required: [id, version]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+    BulkResult:
+      type: object
+      required: [bulk_action_id, done, skipped, failed]
+      properties:
+        bulk_action_id: { type: string, format: uuid }
+        dry_run: { type: boolean }
+        done:
+          type: array
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: string, format: uuid }
+              created_id: { type: string, format: uuid }
+              skipped_levels: { type: array, items: { type: integer } }
+        skipped:
+          type: array
+          items: { $ref: '#/components/schemas/BulkItemIssue' }
+        failed:
+          type: array
+          items: { $ref: '#/components/schemas/BulkItemIssue' }
+    BulkItemIssue:
+      type: object
+      required: [ref, code]
+      properties:
+        ref: { type: string, description: 'The item id, or `user_id:role_id` for assign rows.' }
+        code: { $ref: '#/components/schemas/ErrorCode' }
+        message: { type: string }
+    Reason:
+      type: string
+      minLength: 3
+      maxLength: 1000
+    Job:
+      type: object
+      required: [id, kind, status]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse] }
+        status: { type: string, enum: [queued, running, done, failed] }
+        progress: { type: number, minimum: 0, maximum: 1 }
+        result_file_id: { type: [string, 'null'], format: uuid }
+        result: { type: object, additionalProperties: true }
+        error: { $ref: '#/components/schemas/Problem' }
+        created_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+    CustomValues:
+      type: object
+      description: Custom field values keyed by field code (ADR 0009). Hidden fields are omitted.
+      additionalProperties: true
+    ModuleKey:
+      type: string
+      description: Module or `module.screen` key. The list is served by `GET /permissions/catalogue`; values below are the seed.
+      examples: [sites, sites.documents, approvals, my_work, dashboard, procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports, admin.users, admin.matrix, admin.workflow, admin.settings, audit]
+    PermissionAction:
+      type: string
+      enum: [view, create, edit, delete, approve, export, import, download_documents, view_audit, administer]
+    PermissionLevel:
+      type: string
+      enum: [view, entry, review, approve, admin]
+      description: Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2).
+    DelegableRight:
+      type: string
+      description: Closed list for partial delegation (ADR 0003 §5).
+      enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign, users.edit, assignments.edit, groups.edit, matrix.edit, roles.edit, profiles.edit, settings.edit, documents.edit, templates.edit, fields.edit, workflow.edit, workflow.publish, workflow.migrate, warehouse.items.edit]
+    RegionId:
+      type: integer
+      minimum: 1
+      maximum: 7
+      description: 1 Tripoli, 2 Middle, 3 WM, 4 Zawia, 5 Benghazi, 6 GM, 7 Sebha.
+    EmployeeId:
+      type: string
+      pattern: '^[0-9]{4}$'
+    UserStatus:
+      type: string
+      enum: [pending_assignment, active, suspended, disabled]
+    TeamKind:
+      type: string
+      enum: [cw, te, both, none]
+    DeliveryScenario:
+      type: string
+      enum: [new_build, expansion, hot_swap, cold_swap, relocation]
+    OverallStatus:
+      type: string
+      enum: [not_started, in_progress, on_hold, completed, cancelled]
+    ScopeFlag:
+      type: [string, 'null']
+      enum: [yes, na, null]
+
+    # ---------------------------------------------------------- auth / me
+    Session:
+      type: object
+      required: [authenticated, csrf_token]
+      properties:
+        authenticated: { type: boolean }
+        csrf_token: { type: string }
+        user: { $ref: '#/components/schemas/UserRef' }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        needs_employee_id: { type: boolean }
+        mfa: { type: boolean, description: 'The sign-in token carried `amr` = mfa.' }
+        break_glass: { type: boolean }
+        stepup_valid_until: { type: [string, 'null'], format: date-time }
+        expires_at: { type: string, format: date-time }
+    Me:
+      type: object
+      required: [user, assignments, effective]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        assignments: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
+        groups: { type: array, items: { $ref: '#/components/schemas/GroupRef' } }
+        is_system_admin: { type: boolean }
+        acting_delegations:
+          type: array
+          description: Delegations I hold now (banner "X on behalf of System Admin").
+          items: { $ref: '#/components/schemas/Delegation' }
+        effective: { $ref: '#/components/schemas/EffectivePermissions' }
+    EffectivePermissions:
+      type: object
+      required: [grants, nav]
+      properties:
+        grants:
+          type: array
+          description: Union over active assignments (app_resolve_permissions), each with the regions where it applies.
+          items:
+            type: object
+            required: [module_key, action, region_ids]
+            properties:
+              module_key: { $ref: '#/components/schemas/ModuleKey' }
+              action: { $ref: '#/components/schemas/PermissionAction' }
+              region_ids:
+                description: Regions where the grant applies; "all" for every region.
+                oneOf:
+                  - type: string
+                    const: all
+                  - type: array
+                    items: { $ref: '#/components/schemas/RegionId' }
+        matrix_levels:
+          type: array
+          description: Highest permission level per module and region set (for matrix eligibility hints).
+          items:
+            type: object
+            properties:
+              module_key: { $ref: '#/components/schemas/ModuleKey' }
+              level: { $ref: '#/components/schemas/PermissionLevel' }
+              region_ids:
+                oneOf:
+                  - type: string
+                    const: all
+                  - type: array
+                    items: { $ref: '#/components/schemas/RegionId' }
+        nav: { type: array, items: { $ref: '#/components/schemas/ModuleKey' } }
+
+    # ---------------------------------------------------------- users, roles, permissions
+    UserRef:
+      type: object
+      required: [id, display_name]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        employee_id: { type: [string, 'null'] }
+    User:
+      allOf:
+        - $ref: '#/components/schemas/UserRef'
+        - type: object
+          required: [email, status]
+          properties:
+            email: { type: string, format: email }
+            status: { $ref: '#/components/schemas/UserStatus' }
+            locale: { type: string, enum: [en, ar] }
+            theme: { type: string, enum: [light, dark] }
+            is_break_glass: { type: boolean }
+            last_login_at: { type: [string, 'null'], format: date-time }
+            created_at: { type: string, format: date-time }
+            version: { type: integer }
+    UserDetail:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            assignments: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
+            groups: { type: array, items: { $ref: '#/components/schemas/GroupRef' } }
+            teams: { type: array, items: { $ref: '#/components/schemas/TeamKind' }, description: 'Union of the active rows.' }
+    RoleRef:
+      type: object
+      required: [id, code, name_en]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        parent_role_id: { type: [string, 'null'], format: uuid }
+    Role:
+      allOf:
+        - $ref: '#/components/schemas/RoleRef'
+        - type: object
+          required: [is_active, can_hold_matrix_levels]
+          properties:
+            description_en: { type: [string, 'null'] }
+            description_ar: { type: [string, 'null'] }
+            default_profile_id: { type: [string, 'null'], format: uuid }
+            default_region_ids:
+              oneOf:
+                - type: string
+                  const: all
+                - type: array
+                  items: { $ref: '#/components/schemas/RegionId' }
+            default_module_keys:
+              oneOf:
+                - type: string
+                  const: all
+                - type: array
+                  items: { $ref: '#/components/schemas/ModuleKey' }
+            can_hold_matrix_levels: { type: boolean }
+            is_active: { type: boolean }
+            active_assignment_count: { type: integer }
+            sub_roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
+            version: { type: integer }
+    RoleInput:
+      type: object
+      required: [code, name_en, can_hold_matrix_levels, reason]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,40}$' }
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: string }
+        description_en: { type: string }
+        description_ar: { type: string }
+        parent_role_id: { type: [string, 'null'], format: uuid }
+        default_profile_id: { type: [string, 'null'], format: uuid }
+        default_region_ids:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/RegionId' }
+        default_module_keys:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/ModuleKey' }
+        can_hold_matrix_levels: { type: boolean }
+        reason: { $ref: '#/components/schemas/Reason' }
+    RolePatch:
+      type: object
+      minProperties: 1
+      properties:
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: string }
+        description_en: { type: string }
+        description_ar: { type: string }
+        default_profile_id: { type: [string, 'null'], format: uuid }
+        default_region_ids:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/RegionId' }
+        default_module_keys:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/ModuleKey' }
+        can_hold_matrix_levels: { type: boolean }
+        is_active: { type: boolean }
+    Assignment:
+      type: object
+      required: [id, user, role, permission_level, region_ids, module_keys, profile_ids, valid_from, version]
+      properties:
+        id: { type: string, format: uuid }
+        user: { $ref: '#/components/schemas/UserRef' }
+        role: { $ref: '#/components/schemas/RoleRef' }
+        permission_level: { $ref: '#/components/schemas/PermissionLevel' }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        region_ids:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/RegionId' }
+        module_keys:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { $ref: '#/components/schemas/ModuleKey' }
+        profile_ids: { type: array, items: { type: string, format: uuid } }
+        is_primary: { type: boolean }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time }
+        is_active_now: { type: boolean }
+        assigned_by: { $ref: '#/components/schemas/UserRef' }
+        assigned_at: { type: string, format: date-time }
+        version: { type: integer }
+    AssignmentPatch:
+      type: object
+      minProperties: 1
+      properties:
+        permission_level: { $ref: '#/components/schemas/PermissionLevel' }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        region_ids:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              minItems: 1
+              items: { $ref: '#/components/schemas/RegionId' }
+        module_keys:
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              minItems: 1
+              items: { $ref: '#/components/schemas/ModuleKey' }
+        profile_ids: { type: array, minItems: 1, items: { type: string, format: uuid } }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time }
+    BulkAssignRequest:
+      type: object
+      required: [user_ids, role_ids, defaults, reason]
+      description: Cartesian product of users and roles. By role = 1 role, N users. By person = N roles, 1 user. Missing defaults come from the role definition.
+      properties:
+        user_ids: { type: array, minItems: 1, maxItems: 500, items: { type: string, format: uuid } }
+        role_ids: { type: array, minItems: 1, maxItems: 50, items: { type: string, format: uuid } }
+        defaults:
+          allOf:
+            - $ref: '#/components/schemas/AssignmentPatch'
+            - type: object
+              required: [permission_level]
+        reason: { $ref: '#/components/schemas/Reason' }
+        dry_run: { type: boolean, default: false }
+    PermissionCatalogue:
+      type: object
+      required: [modules, actions, delegable_rights]
+      properties:
+        modules:
+          type: array
+          items:
+            type: object
+            required: [key, name_en]
+            properties:
+              key: { $ref: '#/components/schemas/ModuleKey' }
+              name_en: { type: string }
+              name_ar: { type: string }
+              screens:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    key: { $ref: '#/components/schemas/ModuleKey' }
+                    name_en: { type: string }
+                    name_ar: { type: string }
+              actions: { type: array, items: { $ref: '#/components/schemas/PermissionAction' } }
+        actions: { type: array, items: { $ref: '#/components/schemas/PermissionAction' } }
+        delegable_rights: { type: array, items: { $ref: '#/components/schemas/DelegableRight' } }
+    PermissionGrant:
+      type: object
+      required: [module_key, action]
+      properties:
+        module_key: { $ref: '#/components/schemas/ModuleKey' }
+        action: { $ref: '#/components/schemas/PermissionAction' }
+    FieldRule:
+      type: object
+      required: [field_id, access]
+      properties:
+        field_id: { type: string, format: uuid }
+        field_code: { type: string }
+        entity_type: { type: string }
+        access: { type: string, enum: [hidden, read, edit] }
+    PermissionProfile:
+      type: object
+      required: [id, code, name_en, is_active, grants, version]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        grants: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' } }
+        field_rules: { type: array, items: { $ref: '#/components/schemas/FieldRule' } }
+        assignment_count: { type: integer }
+        version: { type: integer }
+        changed_by: { $ref: '#/components/schemas/UserRef' }
+        changed_at: { type: string, format: date-time }
+    PermissionProfileInput:
+      type: object
+      required: [code, name_en, grants, reason]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,40}$' }
+        name_en: { type: string }
+        name_ar: { type: string }
+        description: { type: string }
+        is_active: { type: boolean, default: true }
+        grants: { type: array, items: { $ref: '#/components/schemas/PermissionGrant' } }
+        field_rules: { type: array, items: { $ref: '#/components/schemas/FieldRule' } }
+        reason: { $ref: '#/components/schemas/Reason' }
+
+    # ---------------------------------------------------------- groups, delegations, regions
+    GroupRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        is_system_admins: { type: boolean }
+    Group:
+      allOf:
+        - $ref: '#/components/schemas/GroupRef'
+        - type: object
+          properties:
+            description: { type: [string, 'null'] }
+            is_active: { type: boolean }
+            member_count: { type: integer }
+            matrix_cell_count: { type: integer }
+            version: { type: integer }
+    GroupDetail:
+      allOf:
+        - $ref: '#/components/schemas/Group'
+        - type: object
+          properties:
+            members:
+              type: array
+              items:
+                type: object
+                required: [user, added_at]
+                properties:
+                  user: { $ref: '#/components/schemas/UserRef' }
+                  status: { $ref: '#/components/schemas/UserStatus' }
+                  added_at: { type: string, format: date-time }
+    Delegation:
+      type: object
+      required: [id, from_user, to_user, scope, valid_from, state]
+      properties:
+        id: { type: string, format: uuid }
+        from_user: { $ref: '#/components/schemas/UserRef' }
+        to_user: { $ref: '#/components/schemas/UserRef' }
+        scope: { type: string, enum: [full, partial] }
+        rights: { type: array, items: { $ref: '#/components/schemas/DelegableRight' } }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time }
+        state: { type: string, enum: [active, scheduled, expired, revoked] }
+        reason: { type: [string, 'null'] }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        revoked_by: { $ref: '#/components/schemas/UserRef' }
+    DelegationInput:
+      type: object
+      required: [to_user_id, scope, valid_from, reason]
+      properties:
+        to_user_id: { type: string, format: uuid }
+        scope: { type: string, enum: [full, partial] }
+        rights: { type: array, minItems: 1, items: { $ref: '#/components/schemas/DelegableRight' }, description: 'Required when scope = partial.' }
+        valid_from: { type: string, format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time, description: 'null = until revoked.' }
+        reason: { $ref: '#/components/schemas/Reason' }
+    Region:
+      type: object
+      required: [id, code, name_en, visible]
+      properties:
+        id: { $ref: '#/components/schemas/RegionId' }
+        code: { type: string, enum: [Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha] }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        visible: { type: boolean, description: 'The caller can see sites of this region in at least one module.' }
+
+    # ---------------------------------------------------------- sites
+    RailNode:
+      type: object
+      required: [code, state]
+      properties:
+        code: { type: string, description: 'Stable milestone code.' }
+        state: { type: string, enum: [done, current, late, na, planned, not_in_workflow] }
+    SiteListItem:
+      type: object
+      required: [id, site_code, name, region_id, overall_status, rail]
+      properties:
+        id: { type: string, format: uuid }
+        site_code: { type: string }
+        name: { type: string }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        cluster_code: { type: [string, 'null'] }
+        delivery_scenario: { $ref: '#/components/schemas/DeliveryScenario' }
+        overall_status: { $ref: '#/components/schemas/OverallStatus' }
+        current_milestone: { type: [string, 'null'] }
+        next_milestone: { type: [string, 'null'] }
+        workflow_version: { type: integer }
+        late_task_count: { type: integer }
+        waiting_approval_count: { type: integer }
+        rail: { type: array, items: { $ref: '#/components/schemas/RailNode' } }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+    PipelineNode:
+      type: object
+      required: [code, kind, name_en, state]
+      properties:
+        code: { type: string }
+        kind: { type: string, enum: [milestone, gate] }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        state: { type: string, enum: [done, current, late, na, planned, locked, awaiting_confirmation] }
+        progress: { type: number, minimum: 0, maximum: 1, description: 'Share of counting tasks approved (ring).' }
+        actual_date: { type: [string, 'null'], format: date }
+        baseline_date: { type: [string, 'null'], format: date }
+        planned_date: { type: [string, 'null'], format: date }
+        variance_wd: { type: [integer, 'null'], description: 'Working days actual (or forecast) minus baseline.' }
+        lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' } }
+        shifted_by_suspension: { type: boolean }
+    SiteDetail:
+      allOf:
+        - $ref: '#/components/schemas/SiteListItem'
+        - type: object
+          required: [pipeline, version]
+          properties:
+            owner_site_id: { type: [string, 'null'] }
+            sub_region: { type: [string, 'null'] }
+            latitude: { type: [number, 'null'] }
+            longitude: { type: [number, 'null'] }
+            address: { type: [string, 'null'] }
+            site_type: { type: [string, 'null'] }
+            project_phase: { type: [string, 'null'] }
+            delivery_batch: { type: [string, 'null'] }
+            cw_delivery_model: { type: [string, 'null'] }
+            scope_flags:
+              type: object
+              properties:
+                tower_erection: { $ref: '#/components/schemas/ScopeFlag' }
+                site_adaption: { $ref: '#/components/schemas/ScopeFlag' }
+                gecol_power: { $ref: '#/components/schemas/ScopeFlag' }
+                hlc_fiber: { $ref: '#/components/schemas/ScopeFlag' }
+                te_full: { $ref: '#/components/schemas/ScopeFlag' }
+                te_ip_router_only: { $ref: '#/components/schemas/ScopeFlag' }
+            cluster_progress:
+              type: [object, 'null']
+              description: Information only ("6 of 9 sites at TE PAC").
+              properties:
+                cluster_code: { type: string }
+                sites_total: { type: integer }
+                sites_at_te_pac: { type: integer }
+                kpi_acceptance_date: { type: [string, 'null'], format: date }
+            pipeline: { type: array, items: { $ref: '#/components/schemas/PipelineNode' } }
+            counts:
+              type: object
+              properties:
+                open_snags: { type: integer }
+                open_issues: { type: integer }
+                documents_missing: { type: integer }
+            version: { type: integer }
+
+    # ---------------------------------------------------------- tasks
+    TaskState:
+      type: string
+      enum: [locked, open, entry, in_review, in_approval, approved, awaiting_confirmation, na, skipped, suspended, retired]
+      description: ADR 0004 §2. `awaiting_confirmation` and `retired` need schema changes (gate report).
+    LockReason:
+      type: object
+      required: [kind, message]
+      properties:
+        kind: { type: string, enum: [predecessor_not_approved, gate_closed, stop_work, suspension, open_snags, condition_not_met, admin_lock] }
+        ref_code: { type: [string, 'null'] }
+        message: { type: string }
+        count: { type: [integer, 'null'] }
+    MatrixAssignee:
+      type: object
+      required: [kind, ref_id, label]
+      properties:
+        kind: { type: string, enum: [user, role, group] }
+        ref_id: { type: string, format: uuid }
+        label: { type: string }
+    BallInCourt:
+      type: object
+      required: [level, holders]
+      properties:
+        level: { type: integer, minimum: 1 }
+        level_kind: { type: string, enum: [entry, review, approve] }
+        holders: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' } }
+        rule: { type: string, enum: [any_one, all_members] }
+        claimed_by: { $ref: '#/components/schemas/UserRef' }
+        votes_done: { type: integer }
+        votes_needed: { type: integer }
+        external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+        no_eligible_holder: { type: boolean }
+    ExternalPartyRef:
+      type: [object, 'null']
+      required: [id, name, type]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        type: { type: string, enum: [cw_contractor, te_vendor, gecol, hlc, supplier, landlord, other] }
+    ApprovalPathLevel:
+      type: object
+      required: [level, kind, status]
+      properties:
+        level: { type: integer }
+        kind: { type: string, enum: [entry, review, approve] }
+        status: { type: string, enum: [pending, current, done, skipped, returned] }
+        acted_by: { $ref: '#/components/schemas/UserRef' }
+        acted_at: { type: [string, 'null'], format: date-time }
+        will_skip: { type: boolean, description: 'Self-skip preview (MX-06).' }
+    SlaInfo:
+      type: object
+      properties:
+        code: { type: [string, 'null'] }
+        min_wd: { type: [integer, 'null'] }
+        max_wd: { type: [integer, 'null'] }
+        start_event: { type: [string, 'null'] }
+        start_date: { type: [string, 'null'], format: date }
+        elapsed_wd: { type: [integer, 'null'] }
+        due_date: { type: [string, 'null'], format: date }
+        colour: { type: string, enum: [green, amber, red, none] }
+        rule_id: { type: [string, 'null'], format: uuid }
+    TaskSummary:
+      type: object
+      required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
+      properties:
+        id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        task_code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        stage_code: { type: string }
+        state: { $ref: '#/components/schemas/TaskState' }
+        current_level: { type: integer }
+        levels_required: { type: integer }
+        ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
+        planned_date: { type: [string, 'null'], format: date }
+        actual_date: { type: [string, 'null'], format: date }
+        sla: { $ref: '#/components/schemas/SlaInfo' }
+        slots_filled: { type: integer }
+        slots_required: { type: integer }
+        template_id: { type: [string, 'null'] }
+        return_count: { type: integer }
+        last_return_note: { type: [string, 'null'] }
+        admin_override: { type: boolean }
+        version: { type: integer }
+    DocumentFile:
+      type: object
+      required: [id, file_group_id, version, is_current, original_name, download_name, size_bytes, uploaded_at]
+      properties:
+        id: { type: string, format: uuid }
+        file_group_id: { type: string, format: uuid }
+        version: { type: integer }
+        is_current: { type: boolean }
+        original_name: { type: string }
+        download_name: { type: string, description: 'Computed `SITE_TASK_DOC_APPROVEDDATE.ext` (ADR 0008 §3).' }
+        mime_type: { type: string }
+        size_bytes: { type: integer }
+        sha256: { type: string }
+        uploaded_by: { $ref: '#/components/schemas/UserRef' }
+        uploaded_at: { type: string, format: date-time }
+        approved_date: { type: [string, 'null'], format: date }
+    DocumentSlot:
+      type: object
+      required: [id, doc_code, name_en, status, mandatory, files]
+      properties:
+        id: { type: string, format: uuid }
+        doc_code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        kind: { type: string, enum: [scanned_document, photo, email, report, excel_template] }
+        mandatory: { type: boolean }
+        status: { type: string, enum: [missing, uploaded, in_review, approved, rejected, not_required] }
+        reject_reason: { type: [string, 'null'] }
+        candidate_label: { type: [string, 'null'] }
+        formats: { type: array, items: { type: string } }
+        max_size_mb: { type: integer }
+        min_files: { type: integer }
+        max_files: { type: [integer, 'null'] }
+        camera_only: { type: boolean }
+        blank_form_file_id: { type: [string, 'null'], format: uuid }
+        valid_to: { type: [string, 'null'], format: date }
+        files: { type: array, items: { $ref: '#/components/schemas/DocumentFile' } }
+    AllowedAction:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [edit, start, submit, review, approve, reject, claim, release, comment, override] }
+        step_up: { type: boolean }
+        will_skip_to: { type: [integer, 'null'], description: 'Level the task lands on after self-skip.' }
+        final: { type: boolean, description: 'This action completes final approval (after self-skip).' }
+        disabled_reason: { type: [string, 'null'] }
+    TaskDetail:
+      allOf:
+        - $ref: '#/components/schemas/TaskSummary'
+        - type: object
+          required: [approval_path, slots, allowed_actions]
+          properties:
+            baseline_date: { type: [string, 'null'], format: date }
+            planned_start: { type: [string, 'null'], format: date }
+            actual_start: { type: [string, 'null'], format: date }
+            submitted_date: { type: [string, 'null'], format: date }
+            approved_date: { type: [string, 'null'], format: date }
+            prefill_date: { type: [string, 'null'], format: date, description: 'Site RFI pre-fill (latest condition date).' }
+            values: { type: object, additionalProperties: true }
+            custom: { $ref: '#/components/schemas/CustomValues' }
+            field_access:
+              type: object
+              description: Field code -> access for the caller (hidden fields are absent).
+              additionalProperties: { type: string, enum: [read, edit] }
+            lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' } }
+            approval_path: { type: array, items: { $ref: '#/components/schemas/ApprovalPathLevel' } }
+            slots: { type: array, items: { $ref: '#/components/schemas/DocumentSlot' } }
+            missing_for_submit: { type: array, items: { type: string } }
+            allowed_actions: { type: array, items: { $ref: '#/components/schemas/AllowedAction' } }
+            is_na: { type: boolean }
+            na_reason: { type: [string, 'null'] }
+            workflow_version: { type: integer }
+    TaskEntryPatch:
+      type: object
+      minProperties: 1
+      properties:
+        actual_start: { type: [string, 'null'], format: date }
+        actual_date: { type: [string, 'null'], format: date }
+        planned_date: { type: [string, 'null'], format: date }
+        values: { type: object, additionalProperties: true }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+    RejectRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 2000 }
+        rejected_slots:
+          type: array
+          items:
+            type: object
+            required: [slot_id, reason]
+            properties:
+              slot_id: { type: string, format: uuid }
+              reason: { type: string, minLength: 1, maxLength: 500 }
+    TransitionResult:
+      type: object
+      required: [task, step_ids]
+      properties:
+        task: { $ref: '#/components/schemas/TaskDetail' }
+        step_ids: { type: array, items: { type: string, format: uuid } }
+        skipped_levels: { type: array, items: { type: integer }, description: 'Levels auto-skipped (same holder).' }
+        unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+    WorkflowStep:
+      type: object
+      required: [id, level, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        level: { type: integer }
+        action: { type: string, enum: [start, submit, review, approve, reject, auto_skip, claim, release, reassign, admin_override, override_revert, reopen, migrate] }
+        acted_by: { $ref: '#/components/schemas/UserRef' }
+        on_behalf_of: { $ref: '#/components/schemas/UserRef' }
+        note: { type: [string, 'null'] }
+        before_state: { $ref: '#/components/schemas/TaskState' }
+        after_state: { $ref: '#/components/schemas/TaskState' }
+        self_approval: { type: boolean }
+        admin_override: { type: boolean }
+        stepup_verified: { type: boolean }
+        batch_row_id: { type: [string, 'null'], format: uuid }
+        created_at: { type: string, format: date-time }
+    Comment:
+      type: object
+      required: [id, author, body, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/UserRef' }
+        body: { type: string }
+        is_rejection_note: { type: boolean }
+        mentions: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        created_at: { type: string, format: date-time }
+    OverrideRequest:
+      type: object
+      required: [kind, reason]
+      properties:
+        kind: { type: string, enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign] }
+        reason: { $ref: '#/components/schemas/Reason' }
+        date_field: { type: string, enum: [actual_start, actual_date, planned_date, baseline_date], description: 'For edit_date.' }
+        new_date: { type: [string, 'null'], format: date }
+        reassign_to_user_id: { type: string, format: uuid, description: 'For reassign.' }
+    Override:
+      type: object
+      required: [id, task_id, kind, reason, created_at, revertible]
+      properties:
+        id: { type: string, format: uuid }
+        task_id: { type: string, format: uuid }
+        kind: { type: string }
+        reason: { type: string }
+        before: { type: object, additionalProperties: true }
+        after: { type: object, additionalProperties: true }
+        acted_by: { $ref: '#/components/schemas/UserRef' }
+        on_behalf_of: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        reverted_at: { type: [string, 'null'], format: date-time }
+        revertible: { type: boolean }
+
+    # ---------------------------------------------------------- approvals
+    ApprovalItem:
+      type: object
+      required: [task, level_kind, waiting_since]
+      properties:
+        task: { $ref: '#/components/schemas/TaskSummary' }
+        level_kind: { type: string, enum: [review, approve] }
+        via_group: { $ref: '#/components/schemas/GroupRef' }
+        waiting_since: { type: string, format: date-time }
+        submitted_by: { $ref: '#/components/schemas/UserRef' }
+        will_self_skip: { type: boolean }
+
+    # ---------------------------------------------------------- matrix
+    MatrixCell:
+      type: object
+      required: [id, stage_code, level, rule, assignees]
+      properties:
+        id: { type: string, format: uuid }
+        stage_code: { type: string }
+        task_code: { type: [string, 'null'], description: 'null = stage default.' }
+        level: { type: integer, minimum: 1 }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+        rule: { type: string, enum: [any_one, all_members] }
+        assignees: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' } }
+        skip_preview:
+          type: array
+          description: People who also hold the next level (level will be skipped for them).
+          items: { $ref: '#/components/schemas/UserRef' }
+    Matrix:
+      type: object
+      required: [workflow_version, stages, version]
+      properties:
+        workflow_version: { type: integer }
+        version: { type: integer, description: 'Matrix revision (ETag).' }
+        stages:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, approval_levels, cells]
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              approval_levels: { type: integer, minimum: 1, maximum: 3 }
+              cells: { type: array, items: { $ref: '#/components/schemas/MatrixCell' } }
+    MatrixPatch:
+      type: object
+      required: [reason]
+      minProperties: 2
+      properties:
+        workflow_version: { type: integer }
+        stage_levels:
+          type: array
+          items:
+            type: object
+            required: [stage_code, approval_levels]
+            properties:
+              stage_code: { type: string }
+              approval_levels: { type: integer, minimum: 1, maximum: 3 }
+        cells:
+          type: array
+          items:
+            type: object
+            required: [stage_code, level, rule, assignees]
+            properties:
+              stage_code: { type: string }
+              task_code: { type: [string, 'null'] }
+              level: { type: integer, minimum: 1, maximum: 3 }
+              region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+              rule: { type: string, enum: [any_one, all_members] }
+              assignees:
+                type: array
+                items:
+                  type: object
+                  required: [kind, ref_id]
+                  properties:
+                    kind: { type: string, enum: [user, role, group] }
+                    ref_id: { type: string, format: uuid }
+        reason: { $ref: '#/components/schemas/Reason' }
+
+    # ---------------------------------------------------------- workflow (ADR 0010)
+    WorkflowVersionSummary:
+      type: object
+      required: [version, status, light_revision]
+      properties:
+        version: { type: integer }
+        status: { type: string, enum: [draft, published, retired] }
+        is_current: { type: boolean, description: 'New sites use this version.' }
+        light_revision: { type: integer }
+        parent_version: { type: [integer, 'null'] }
+        site_count: { type: integer }
+        reason: { type: [string, 'null'] }
+        published_by: { $ref: '#/components/schemas/UserRef' }
+        published_at: { type: [string, 'null'], format: date-time }
+    WorkflowMilestone:
+      type: object
+      required: [code, seq, name_en, formula_kind, counts_in_project_status]
+      properties:
+        code: { type: string }
+        seq: { type: integer }
+        canonical_seq: { type: integer }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        formula_kind: { type: string, enum: [master, generic] }
+        counts_in_project_status: { type: boolean }
+        master_export_column: { type: [string, 'null'] }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+    GateCondition:
+      type: object
+      required: [type]
+      properties:
+        type: { type: string, enum: [milestone, task, permit, date_field, stop_work_blocks] }
+        ref: { type: string, description: 'Milestone code, task code, permit type, or date field key.' }
+        accept_na: { type: boolean, description: 'For permits, an approved N/A satisfies (D36).' }
+    WorkflowGate:
+      type: object
+      required: [code, from_milestone, to_milestone, name_en, conditions]
+      properties:
+        code: { type: string }
+        from_milestone: { type: string }
+        to_milestone: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        conditions: { type: array, items: { $ref: '#/components/schemas/GateCondition' } }
+        sla_min_wd: { type: [integer, 'null'] }
+        sla_max_wd: { type: [integer, 'null'] }
+        master_export_column: { type: [string, 'null'] }
+        custom: { $ref: '#/components/schemas/CustomValues' }
+    TaskPlacement:
+      type: object
+      required: [task_code, stage_code, sort_order]
+      properties:
+        task_code: { type: string }
+        stage_code: { type: string, description: 'Code of the milestone this task belongs to.' }
+        sort_order: { type: integer }
+        predecessors: { type: array, items: { type: string } }
+        counts_toward_milestone: { type: boolean }
+    WorkflowStructure:
+      type: object
+      required: [milestones, gates, placements]
+      properties:
+        milestones:
+          type: array
+          items:
+            type: object
+            required: [name_en]
+            properties:
+              code: { type: string, description: 'Omit for a new milestone; a new code is assigned.' }
+              name_en: { type: string }
+              name_ar: { type: string }
+              master_export_column: { type: [string, 'null'] }
+              counts_in_project_status: { type: boolean }
+        gates:
+          type: array
+          items:
+            type: object
+            required: [from_milestone, to_milestone, name_en]
+            properties:
+              code: { type: string }
+              from_milestone: { type: string }
+              to_milestone: { type: string }
+              name_en: { type: string }
+              name_ar: { type: string }
+              conditions: { type: array, items: { $ref: '#/components/schemas/GateCondition' } }
+              master_export_column: { type: [string, 'null'] }
+        placements: { type: array, items: { $ref: '#/components/schemas/TaskPlacement' } }
+    WorkflowVersion:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowVersionSummary'
+        - type: object
+          required: [milestones, gates, placements]
+          properties:
+            milestones: { type: array, items: { $ref: '#/components/schemas/WorkflowMilestone' } }
+            gates: { type: array, items: { $ref: '#/components/schemas/WorkflowGate' } }
+            placements: { type: array, items: { $ref: '#/components/schemas/TaskPlacement' } }
+            validation:
+              type: object
+              properties:
+                valid: { type: boolean }
+                problems: { type: array, items: { type: string } }
+                warnings: { type: array, items: { type: string } }
+                master_impact:
+                  type: object
+                  properties:
+                    affected_columns: { type: array, items: { type: string } }
+                    parallel_run_active: { type: boolean }
+                    confirmation_phrase: { type: [string, 'null'] }
+            version_etag: { type: integer, description: 'Draft revision for If-Match.' }
+    SiteSelection:
+      type: object
+      description: Either explicit site ids or a filter. Only sites on another version are considered.
+      properties:
+        site_ids: { type: array, maxItems: 1000, items: { type: string, format: uuid } }
+        filter:
+          type: object
+          properties:
+            region_id: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+            from_version: { type: integer }
+            overall_status: { type: array, items: { $ref: '#/components/schemas/OverallStatus' } }
+    DateChange:
+      type: object
+      required: [code, before, after]
+      properties:
+        code: { type: string }
+        before: { type: [string, 'null'], format: date }
+        after: { type: [string, 'null'], format: date }
+    MigrationPreview:
+      type: object
+      required: [preview_hash, to_version, sites]
+      properties:
+        preview_hash: { type: string }
+        to_version: { type: integer }
+        master_impact:
+          type: object
+          properties:
+            affected_columns: { type: array, items: { type: string } }
+            parallel_run_active: { type: boolean }
+            confirmation_phrase: { type: [string, 'null'] }
+        sites:
+          type: array
+          items:
+            type: object
+            required: [site_id, site_code, from_version, migratable]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              from_version: { type: integer }
+              migratable: { type: boolean }
+              blockers: { type: array, items: { type: string } }
+              tasks_kept: { type: array, items: { type: string } }
+              tasks_moved: { type: array, items: { type: string } }
+              tasks_added: { type: array, items: { type: string } }
+              tasks_retired: { type: array, items: { type: string } }
+              date_changes: { type: array, items: { $ref: '#/components/schemas/DateChange' } }
+    SiteMigration:
+      type: object
+      required: [id, site_id, from_version, to_version, migrated_at]
+      properties:
+        id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        from_version: { type: integer }
+        to_version: { type: integer }
+        reason: { type: string }
+        migrated_by: { $ref: '#/components/schemas/UserRef' }
+        migrated_at: { type: string, format: date-time }
+        date_changes: { type: array, items: { $ref: '#/components/schemas/DateChange' } }
+        reverted_at: { type: [string, 'null'], format: date-time }
+        revertible: { type: boolean }
+
+    # ---------------------------------------------------------- audit
+    AuditEntry:
+      type: object
+      required: [id, at, action, entity_type]
+      properties:
+        id: { type: integer, format: int64 }
+        at: { type: string, format: date-time }
+        actor: { $ref: '#/components/schemas/UserRef' }
+        on_behalf_of: { $ref: '#/components/schemas/UserRef' }
+        action: { type: string }
+        entity_type: { type: string }
+        entity_id: { type: [string, 'null'] }
+        site_id: { type: [string, 'null'], format: uuid }
+        site_code: { type: [string, 'null'] }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+        module_key: { type: [string, 'null'] }
+        before: { type: [object, 'null'], additionalProperties: true }
+        after: { type: [object, 'null'], additionalProperties: true }
+        reason: { type: [string, 'null'] }
+        bulk_action_id: { type: [string, 'null'], format: uuid }
+        batch_id: { type: [string, 'null'], format: uuid }
+        is_admin_override: { type: boolean }
+        privileged: { type: boolean }
+        stepup_verified: { type: boolean }
+        mfa: { type: boolean }
+        self_approval: { type: boolean }
+        ip: { type: [string, 'null'] }
+        request_id: { type: [string, 'null'] }
+
+    # ---------------------------------------------------------- settings
+    Setting:
+      type: object
+      required: [key, value]
+      properties:
+        key: { type: string, examples: [require_mfa, stepup_max_age_seconds, geofence_radius_m, parallel_run_start, legacy_master_import_until] }
+        value: {}
+        description: { type: [string, 'null'] }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+        updated_at: { type: string, format: date-time }
+    SlaRule:
+      type: object
+      required: [id, task_code, min_working_days, max_working_days, start_event, calendar_code, effective_from]
+      properties:
+        id: { type: string, format: uuid }
+        task_code: { type: string }
+        min_working_days: { type: integer }
+        max_working_days: { type: integer }
+        start_event: { type: string }
+        scenario: { oneOf: [{ $ref: '#/components/schemas/DeliveryScenario' }, { type: 'null' }] }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
+        calendar_code: { type: string }
+        effective_from: { type: string, format: date }
+        effective_to: { type: [string, 'null'], format: date }
+        reason: { type: string }
+        changed_by: { $ref: '#/components/schemas/UserRef' }
+        changed_at: { type: string, format: date-time }
+        open_task_count: { type: integer }
+    WeightItem:
+      type: object
+      required: [code, name_en, weight]
+      properties:
+        code: { type: string }
+        name_en: { type: string }
+        weight: { type: number }
+        unit: { type: [string, 'null'] }
+        measure_rule: { type: [string, 'null'] }
+        source: { type: [string, 'null'] }
+    WeightSet:
+      type: object
+      required: [id, code, version, status, effective_from, activities]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, enum: [project_status, health_index, delay_attribution] }
+        version: { type: integer }
+        status: { type: string, enum: [draft, published] }
+        effective_from: { type: string, format: date }
+        effective_to: { type: [string, 'null'], format: date }
+        reason: { type: [string, 'null'] }
+        activities:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, weight, items]
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              weight: { type: number }
+              items: { type: array, items: { $ref: '#/components/schemas/WeightItem' } }
+    Calendar:
+      type: object
+      required: [id, code, weekend_days, is_default, holidays]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        weekend_days: { type: array, items: { type: integer, minimum: 0, maximum: 6 }, description: '0 = Sunday. Default [5, 6].' }
+        is_default: { type: boolean }
+        holidays:
+          type: array
+          items:
+            type: object
+            required: [date, name]
+            properties:
+              date: { type: string, format: date }
+              name: { type: string }
+        holiday_table_empty: { type: boolean, description: 'Drives the "holiday table empty" banner (Q4).' }
+    TaskDefinition:
+      type: object
+      required: [id, code, name_en, is_active]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        stage_code: { type: [string, 'null'], description: 'Placement in the requested workflow version.' }
+        sort_order: { type: [integer, 'null'] }
+        predecessors: { type: array, items: { type: string } }
+        has_documents: { type: boolean }
+        is_milestone_task: { type: boolean }
+        counts_toward_milestone: { type: boolean }
+        approval_levels: { type: [integer, 'null'] }
+        condition_rule: { $ref: '#/components/schemas/ConditionRule' }
+        default_external_party: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        version: { type: integer }
+    ConditionRule:
+      description: Shared JSON rule language (ADR 0009 §7). Null = always applies.
+      oneOf:
+        - type: 'null'
+        - type: object
+          minProperties: 1
+          maxProperties: 1
+          properties:
+            all: { type: array, items: { $ref: '#/components/schemas/ConditionRule' } }
+            any: { type: array, items: { $ref: '#/components/schemas/ConditionRule' } }
+            not: { $ref: '#/components/schemas/ConditionRule' }
+            eq: { type: array, minItems: 2, maxItems: 2, items: {} }
+            in: { type: array, minItems: 2, maxItems: 2, items: {} }
+            is_yes: { type: string, description: 'Operand path, e.g. site.scope_tower_erection.' }
+            is_na: { type: string }
+            count: { type: object, additionalProperties: true }
+            lookup: { type: object, additionalProperties: true }

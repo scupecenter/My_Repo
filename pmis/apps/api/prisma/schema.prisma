@@ -38,9 +38,10 @@ enum TeamKind {
   none
 }
 
-enum DelegationScope {
-  full
-  partial
+enum DelegationTarget {
+  user
+  role
+  group
 }
 
 enum DeliveryScenario {
@@ -97,7 +98,6 @@ enum MatrixRule {
 enum AssigneeKind {
   user
   role
-  sub_role
   group
 }
 
@@ -194,6 +194,8 @@ enum WeightSetStatus {
 
 enum FieldEntityType {
   site
+  milestone
+  gate
   task_instance
   rf_design
   acquisition
@@ -211,6 +213,11 @@ enum FieldEntityType {
   as_built
   meeting
   external_party
+}
+
+enum WorkflowStatus {
+  draft
+  published
 }
 
 enum FieldDataType {
@@ -287,39 +294,59 @@ model Region {
   UserRoleAssignmentRegion UserRoleAssignmentRegion[]
   SlaRule                  SlaRule[]
   ProgressSnapshot         ProgressSnapshot[]
+  RoleDefaultRegion        RoleDefaultRegion[]
+  DelegationRegion         DelegationRegion[]
 
   @@map("regions")
 }
 
+// Fully admin-defined. A role with parent_role_id is a sub-role (two levels only). Never deleted while assigned (FK + trigger).
 model Role {
-  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code      String  @unique
-  name_en   String
-  name_ar   String?
-  sort      Int     @default(0)
-  is_active Boolean @default(true)
+  id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                   String   @unique
+  name_en                String
+  name_ar                String?
+  description_en         String? // the duties of the role
+  description_ar         String?
+  parent_role_id         String?  @db.Uuid
+  team                   TeamKind @default(none)
+  default_profile_id     String?  @db.Uuid
+  default_all_regions    Boolean  @default(false) // prefill for new assignments
+  default_all_modules    Boolean  @default(false)
+  can_hold_matrix_levels Boolean  @default(true) // false = may not be a matrix assignee (e.g. Management)
+  sort                   Int      @default(0)
+  is_active              Boolean  @default(true)
 
-  sub_roles          SubRole[]
-  UserRoleAssignment UserRoleAssignment[]
-  FieldPermission    FieldPermission[]
+  parent          Role?                @relation("RoleParent", fields: [parent_role_id], references: [id])
+  children        Role[]               @relation("RoleParent")
+  default_profile PermissionProfile?   @relation(fields: [default_profile_id], references: [id])
+  default_regions RoleDefaultRegion[]
+  default_modules RoleDefaultModule[]
+  assignments     UserRoleAssignment[]
+  field_perms     FieldPermission[]
+  delegations     Delegation[]
 
+  @@index([parent_role_id])
   @@map("roles")
 }
 
-model SubRole {
-  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  role_id   String   @db.Uuid
-  code      String   @unique
-  name_en   String
-  name_ar   String?
-  team      TeamKind @default(none)
-  is_active Boolean  @default(true)
+model RoleDefaultRegion {
+  role_id   String @db.Uuid
+  region_id Int
+  role      Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+  region    Region @relation(fields: [region_id], references: [id])
 
-  role               Role                 @relation(fields: [role_id], references: [id])
-  UserRoleAssignment UserRoleAssignment[]
+  @@id([role_id, region_id])
+  @@map("role_default_regions")
+}
 
-  @@index([role_id])
-  @@map("sub_roles")
+model RoleDefaultModule {
+  role_id    String @db.Uuid
+  module_key String
+  role       Role   @relation(fields: [role_id], references: [id], onDelete: Cascade)
+
+  @@id([role_id, module_key])
+  @@map("role_default_modules")
 }
 
 model User {
@@ -349,13 +376,11 @@ model User {
   @@map("users")
 }
 
-// One row = one person holding one role OR one sub-role, with its own level, scope and validity.
-// Exactly one of role_id / sub_role_id is set (CHECK in migration 0004). A person can hold many rows.
+// One row = one person holding one role (main or sub-role), with its own level, scope and validity. A person can hold many rows.
 model UserRoleAssignment {
   id               String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   user_id          String          @db.Uuid
-  role_id          String?         @db.Uuid
-  sub_role_id      String?         @db.Uuid
+  role_id          String          @db.Uuid
   permission_level PermissionLevel @default(view)
   team             TeamKind        @default(none)
   valid_from       DateTime        @default(now()) @db.Timestamptz(6)
@@ -367,8 +392,7 @@ model UserRoleAssignment {
   assigned_at      DateTime        @default(now()) @db.Timestamptz(6)
 
   user                      User                        @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  role                      Role?                       @relation(fields: [role_id], references: [id])
-  sub_role                  SubRole?                    @relation(fields: [sub_role_id], references: [id])
+  role                      Role                        @relation(fields: [role_id], references: [id])
   assigner                  User?                       @relation("AssignmentAssignedBy", fields: [assigned_by], references: [id])
   regions                   UserRoleAssignmentRegion[]
   modules                   UserRoleAssignmentModule[]
@@ -376,7 +400,6 @@ model UserRoleAssignment {
 
   @@index([user_id, valid_to])
   @@index([role_id])
-  @@index([sub_role_id])
   @@map("user_role_assignments")
 }
 
@@ -411,7 +434,8 @@ model Group {
   is_active        Boolean  @default(true)
   created_at       DateTime @default(now()) @db.Timestamptz(6)
 
-  members GroupMember[]
+  members    GroupMember[]
+  Delegation Delegation[]
 
   @@map("groups")
 }
@@ -428,25 +452,59 @@ model GroupMember {
   @@map("group_members")
 }
 
+// Delegation of any set of (module/screen, action) grants, to a user, a role or a group. Written only by idm_delegate().
 model Delegation {
-  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  from_user_id String          @db.Uuid
-  to_user_id   String          @db.Uuid
-  scope        DelegationScope
-  permissions  Json? // for partial: list of rights, e.g. ["approve","matrix.edit"]
-  valid_from   DateTime        @db.Timestamptz(6)
-  valid_to     DateTime?       @db.Timestamptz(6) // null = until revoked
-  revoked      Boolean         @default(false)
-  revoked_at   DateTime?       @db.Timestamptz(6)
-  revoked_by   String?         @db.Uuid
-  reason       String?
-  created_at   DateTime        @default(now()) @db.Timestamptz(6)
+  id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  from_user_id         String           @db.Uuid
+  target_kind          DelegationTarget
+  target_user_id       String?          @db.Uuid
+  target_role_id       String?          @db.Uuid
+  target_group_id      String?          @db.Uuid
+  parent_delegation_id String?          @db.Uuid // set when a delegate re-delegates (needs the parent's allow_redelegate)
+  is_full              Boolean          @default(false) // every module and action; otherwise the rows in delegation_grants
+  all_regions          Boolean          @default(false)
+  allow_redelegate     Boolean          @default(false)
+  valid_from           DateTime         @db.Timestamptz(6)
+  valid_to             DateTime?        @db.Timestamptz(6) // null = until revoked
+  revoked              Boolean          @default(false)
+  revoked_at           DateTime?        @db.Timestamptz(6)
+  revoked_by           String?          @db.Uuid
+  reason               String?
+  created_at           DateTime         @default(now()) @db.Timestamptz(6)
 
-  from_user User @relation("DelegationFrom", fields: [from_user_id], references: [id])
-  to_user   User @relation("DelegationTo", fields: [to_user_id], references: [id])
+  from_user    User               @relation("DelegationFrom", fields: [from_user_id], references: [id])
+  target_user  User?              @relation("DelegationTo", fields: [target_user_id], references: [id])
+  target_role  Role?              @relation(fields: [target_role_id], references: [id])
+  target_group Group?             @relation(fields: [target_group_id], references: [id])
+  parent       Delegation?        @relation("DelegationChain", fields: [parent_delegation_id], references: [id])
+  children     Delegation[]       @relation("DelegationChain")
+  grants       DelegationGrant[]
+  regions      DelegationRegion[]
 
-  @@index([to_user_id, revoked])
+  @@index([target_user_id, revoked])
+  @@index([target_role_id, revoked])
+  @@index([target_group_id, revoked])
   @@map("delegations")
+}
+
+model DelegationGrant {
+  delegation_id String           @db.Uuid
+  module_key    String
+  action        PermissionAction
+  delegation    Delegation       @relation(fields: [delegation_id], references: [id], onDelete: Cascade)
+
+  @@id([delegation_id, module_key, action])
+  @@map("delegation_grants")
+}
+
+model DelegationRegion {
+  delegation_id String     @db.Uuid
+  region_id     Int
+  delegation    Delegation @relation(fields: [delegation_id], references: [id], onDelete: Cascade)
+  region        Region     @relation(fields: [region_id], references: [id])
+
+  @@id([delegation_id, region_id])
+  @@map("delegation_regions")
 }
 
 // ============================================================================
@@ -474,6 +532,7 @@ model Site {
   owner_site_id           String? // Master C
   name                    String
   region_id               Int
+  workflow_version_id     String            @db.Uuid // the workflow version this site runs on; changed only by migration
   sub_region              String?
   cluster_id              String?           @db.Uuid
   latitude                Decimal?          @db.Decimal(9, 6)
@@ -509,6 +568,7 @@ model Site {
   updated_at              DateTime          @updatedAt @db.Timestamptz(6)
 
   region               Region                 @relation(fields: [region_id], references: [id])
+  workflow             WorkflowDefinition     @relation(fields: [workflow_version_id], references: [id])
   cluster              Cluster?               @relation(fields: [cluster_id], references: [id])
   tasks                TaskInstance[]
   Snag                 Snag[]
@@ -542,33 +602,67 @@ model Site {
 // 3. STAGES, TASKS, WORKFLOW, MATRIX
 // ============================================================================
 
-model StageDefinition {
-  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code            String  @unique // S01..S10 (10 milestones)
-  seq             Int     @unique
-  name_en         String
-  name_ar         String?
-  milestone_name  String // Site Release, PRE-CW Completion, ...
-  approval_levels Int     @default(3) // configurable per stage
-  is_protected    Boolean @default(true) // milestones are code-defined: no insert/delete/rename (trigger, migration 0007)
-  is_active       Boolean @default(true)
+// ============================================================================
+// 3a. WORKFLOW DEFINITION (versioned: stages/milestones, gates, tasks)
+// ============================================================================
 
+// A published version cannot be changed structurally (add/remove/reorder milestone or gate, move a task between stages);
+// light edits (names, gate conditions and SLA, counts-in-status, custom fields) are allowed and audited. Structural change =
+// clone to a draft, edit, publish. Sites are on one version and are migrated explicitly (admin_migrate_sites_to_workflow).
+model WorkflowDefinition {
+  id             String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version        Int            @unique
+  status         WorkflowStatus @default(draft)
+  effective_from DateTime       @db.Date
+  reason         String
+  changed_by     String?        @db.Uuid
+  created_at     DateTime       @default(now()) @db.Timestamptz(6)
+  published_at   DateTime?      @db.Timestamptz(6)
+
+  stages StageDefinition[]
+  gates  PhaseGateRule[]
+  tasks  TaskDefinition[]
+  sites  Site[]
+
+  @@index([status, effective_from])
+  @@map("workflow_definitions")
+}
+
+// A stage is a milestone (10 in v1). code is stable and immutable (history, KPIs and reports key on it).
+model StageDefinition {
+  id                       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id              String  @db.Uuid
+  code                     String // S01..S10 in v1; stable
+  seq                      Int // unique per workflow (deferrable constraint, migration 0008)
+  name_en                  String
+  name_ar                  String?
+  milestone_name           String
+  master_export_column     String? // column in the Master-format export
+  counts_in_project_status Boolean @default(true)
+  approval_levels          Int     @default(3)
+  is_active                Boolean @default(true)
+
+  workflow     WorkflowDefinition @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
   tasks        TaskDefinition[]
   matrix_cells MatrixCell[]
+  custom       Json               @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
+  @@unique([workflow_id, code])
+  @@unique([id, workflow_id])
+  @@index([custom], type: Gin)
   @@map("stage_definitions")
 }
 
 model TaskDefinition {
   id                      String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  code                    String             @unique // immutable; shared with the task catalogue
-  stage_id                String             @db.Uuid // a task belongs to a fixed stage and never moves
+  workflow_id             String             @db.Uuid
+  code                    String // immutable; unique per workflow; shared with the task catalogue
+  stage_id                String             @db.Uuid // moves between stages only in a draft version
   sort_order              Int
   name_en                 String
   name_ar                 String?
   has_documents           Boolean            @default(true)
   is_milestone_task       Boolean            @default(false)
-  is_protected            Boolean            @default(false) // milestone/gate rows: cannot be deleted, renamed or deactivated
   counts_toward_milestone Boolean            @default(true) // false = does not block the stage milestone
   approval_levels         Int? // null = inherit stage
   condition_rule          Json? // scope-flag / scenario applicability rule
@@ -581,15 +675,16 @@ model TaskDefinition {
   changed_by              String?            @db.Uuid
   changed_at              DateTime           @default(now()) @db.Timestamptz(6)
 
-  stage          StageDefinition         @relation(fields: [stage_id], references: [id])
+  workflow       WorkflowDefinition      @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  stage          StageDefinition         @relation(fields: [stage_id, workflow_id], references: [id, workflow_id], onDelete: Cascade)
   instances      TaskInstance[]
   matrix_cells   MatrixCell[]
   doc_placements DocumentTypePlacement[]
   SlaRule        SlaRule[]
   predecessors   TaskPredecessor[]       @relation("TaskHasPredecessors")
   successors     TaskPredecessor[]       @relation("TaskIsPredecessorOf")
-  field_defs     FieldDefinition[]
 
+  @@unique([workflow_id, code])
   @@index([stage_id, sort_order])
   @@map("task_definitions")
 }
@@ -710,7 +805,7 @@ model MatrixCellAssignee {
   id      String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   cell_id String       @db.Uuid
   kind    AssigneeKind
-  ref_id  String       @db.Uuid // user / role / sub_role / group id according to kind
+  ref_id  String       @db.Uuid // user / role / group id according to kind
   cell    MatrixCell   @relation(fields: [cell_id], references: [id], onDelete: Cascade)
 
   @@unique([cell_id, kind, ref_id])
@@ -1139,15 +1234,27 @@ model BaselineEntry {
 }
 
 // Min/max working-day gap between consecutive milestones (Baseline sheet Link/From/To/Min/Max).
+// Phase gate between two milestones (by stable code). Conditions and SLA are light-editable on a published version.
 model PhaseGateRule {
-  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  link_code      String  @unique // B01..B09
-  is_protected   Boolean @default(true) // fixed: no insert/delete/rename
-  from_milestone String
-  to_milestone   String
-  min_wd         Int
-  max_wd         Int
+  id                   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id          String  @db.Uuid
+  link_code            String // B01..B09 in v1; stable
+  seq                  Int
+  name_en              String
+  name_ar              String?
+  from_code            String // stage code
+  to_code              String // stage code
+  conditions           Json? // which tasks, permits or dates the gate waits for
+  min_wd               Int // gate SLA
+  max_wd               Int
+  master_export_column String?
+  is_active            Boolean @default(true)
 
+  workflow WorkflowDefinition @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  custom   Json               @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+
+  @@unique([workflow_id, link_code])
+  @@index([custom], type: Gin)
   @@map("phase_gate_rules")
 }
 
@@ -1277,7 +1384,7 @@ model ProgressSnapshot {
 model FieldDefinition {
   id                   String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   entity_type          FieldEntityType
-  task_def_id          String?         @db.Uuid // only for entity_type = task_instance: field of one task type
+  task_code            String? // only for entity_type = task_instance: field of one task type (by stable task code)
   code                 String
   label_en             String
   label_ar             String?
@@ -1298,7 +1405,6 @@ model FieldDefinition {
   changed_by           String?         @db.Uuid
   changed_at           DateTime        @default(now()) @db.Timestamptz(6)
 
-  task_def    TaskDefinition?   @relation(fields: [task_def_id], references: [id])
   list_values FieldListValue[]
   permissions FieldPermission[]
 
@@ -1365,6 +1471,7 @@ model PermissionProfile {
   grants      PermissionGrant[]
   assignments UserRoleAssignmentProfile[]
   field_perms FieldPermission[]
+  Role        Role[]
 
   @@map("permission_profiles")
 }

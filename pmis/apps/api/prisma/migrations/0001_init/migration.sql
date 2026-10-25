@@ -8,7 +8,7 @@ CREATE TYPE "PermissionLevel" AS ENUM ('view', 'entry', 'review', 'approve', 'ad
 CREATE TYPE "TeamKind" AS ENUM ('cw', 'te', 'both', 'none');
 
 -- CreateEnum
-CREATE TYPE "DelegationScope" AS ENUM ('full', 'partial');
+CREATE TYPE "DelegationTarget" AS ENUM ('user', 'role', 'group');
 
 -- CreateEnum
 CREATE TYPE "DeliveryScenario" AS ENUM ('new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation');
@@ -29,7 +29,7 @@ CREATE TYPE "WorkflowAction" AS ENUM ('submit', 'approve', 'reject', 'auto_skip'
 CREATE TYPE "MatrixRule" AS ENUM ('any_one', 'all_members');
 
 -- CreateEnum
-CREATE TYPE "AssigneeKind" AS ENUM ('user', 'role', 'sub_role', 'group');
+CREATE TYPE "AssigneeKind" AS ENUM ('user', 'role', 'group');
 
 -- CreateEnum
 CREATE TYPE "DocKind" AS ENUM ('scanned_document', 'photo', 'email', 'report', 'excel_template');
@@ -71,7 +71,10 @@ CREATE TYPE "WeightSetCode" AS ENUM ('project_status', 'health_index', 'delay_at
 CREATE TYPE "WeightSetStatus" AS ENUM ('draft', 'published');
 
 -- CreateEnum
-CREATE TYPE "FieldEntityType" AS ENUM ('site', 'task_instance', 'rf_design', 'acquisition', 'procurement', 'gecol', 'hlc', 'permit', 'warehouse_item', 'warehouse_serial', 'quality', 'issue', 'risk', 'change_request', 'readiness', 'as_built', 'meeting', 'external_party');
+CREATE TYPE "FieldEntityType" AS ENUM ('site', 'milestone', 'gate', 'task_instance', 'rf_design', 'acquisition', 'procurement', 'gecol', 'hlc', 'permit', 'warehouse_item', 'warehouse_serial', 'quality', 'issue', 'risk', 'change_request', 'readiness', 'as_built', 'meeting', 'external_party');
+
+-- CreateEnum
+CREATE TYPE "WorkflowStatus" AS ENUM ('draft', 'published');
 
 -- CreateEnum
 CREATE TYPE "FieldDataType" AS ENUM ('text', 'number', 'date', 'list', 'multi_list', 'bool', 'user', 'external_party', 'file');
@@ -110,6 +113,14 @@ CREATE TABLE "roles" (
     "code" TEXT NOT NULL,
     "name_en" TEXT NOT NULL,
     "name_ar" TEXT,
+    "description_en" TEXT,
+    "description_ar" TEXT,
+    "parent_role_id" UUID,
+    "team" "TeamKind" NOT NULL DEFAULT 'none',
+    "default_profile_id" UUID,
+    "default_all_regions" BOOLEAN NOT NULL DEFAULT false,
+    "default_all_modules" BOOLEAN NOT NULL DEFAULT false,
+    "can_hold_matrix_levels" BOOLEAN NOT NULL DEFAULT true,
     "sort" INTEGER NOT NULL DEFAULT 0,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
 
@@ -117,16 +128,19 @@ CREATE TABLE "roles" (
 );
 
 -- CreateTable
-CREATE TABLE "sub_roles" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+CREATE TABLE "role_default_regions" (
     "role_id" UUID NOT NULL,
-    "code" TEXT NOT NULL,
-    "name_en" TEXT NOT NULL,
-    "name_ar" TEXT,
-    "team" "TeamKind" NOT NULL DEFAULT 'none',
-    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "region_id" INTEGER NOT NULL,
 
-    CONSTRAINT "sub_roles_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "role_default_regions_pkey" PRIMARY KEY ("role_id","region_id")
+);
+
+-- CreateTable
+CREATE TABLE "role_default_modules" (
+    "role_id" UUID NOT NULL,
+    "module_key" TEXT NOT NULL,
+
+    CONSTRAINT "role_default_modules_pkey" PRIMARY KEY ("role_id","module_key")
 );
 
 -- CreateTable
@@ -152,8 +166,7 @@ CREATE TABLE "users" (
 CREATE TABLE "user_role_assignments" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "user_id" UUID NOT NULL,
-    "role_id" UUID,
-    "sub_role_id" UUID,
+    "role_id" UUID NOT NULL,
     "permission_level" "PermissionLevel" NOT NULL DEFAULT 'view',
     "team" "TeamKind" NOT NULL DEFAULT 'none',
     "valid_from" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -208,9 +221,14 @@ CREATE TABLE "group_members" (
 CREATE TABLE "delegations" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "from_user_id" UUID NOT NULL,
-    "to_user_id" UUID NOT NULL,
-    "scope" "DelegationScope" NOT NULL,
-    "permissions" JSONB,
+    "target_kind" "DelegationTarget" NOT NULL,
+    "target_user_id" UUID,
+    "target_role_id" UUID,
+    "target_group_id" UUID,
+    "parent_delegation_id" UUID,
+    "is_full" BOOLEAN NOT NULL DEFAULT false,
+    "all_regions" BOOLEAN NOT NULL DEFAULT false,
+    "allow_redelegate" BOOLEAN NOT NULL DEFAULT false,
     "valid_from" TIMESTAMPTZ(6) NOT NULL,
     "valid_to" TIMESTAMPTZ(6),
     "revoked" BOOLEAN NOT NULL DEFAULT false,
@@ -220,6 +238,23 @@ CREATE TABLE "delegations" (
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "delegations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "delegation_grants" (
+    "delegation_id" UUID NOT NULL,
+    "module_key" TEXT NOT NULL,
+    "action" "PermissionAction" NOT NULL,
+
+    CONSTRAINT "delegation_grants_pkey" PRIMARY KEY ("delegation_id","module_key","action")
+);
+
+-- CreateTable
+CREATE TABLE "delegation_regions" (
+    "delegation_id" UUID NOT NULL,
+    "region_id" INTEGER NOT NULL,
+
+    CONSTRAINT "delegation_regions_pkey" PRIMARY KEY ("delegation_id","region_id")
 );
 
 -- CreateTable
@@ -243,6 +278,7 @@ CREATE TABLE "sites" (
     "owner_site_id" TEXT,
     "name" TEXT NOT NULL,
     "region_id" INTEGER NOT NULL,
+    "workflow_version_id" UUID NOT NULL,
     "sub_region" TEXT,
     "cluster_id" UUID,
     "latitude" DECIMAL(9,6),
@@ -281,16 +317,33 @@ CREATE TABLE "sites" (
 );
 
 -- CreateTable
+CREATE TABLE "workflow_definitions" (
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "version" INTEGER NOT NULL,
+    "status" "WorkflowStatus" NOT NULL DEFAULT 'draft',
+    "effective_from" DATE NOT NULL,
+    "reason" TEXT NOT NULL,
+    "changed_by" UUID,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "published_at" TIMESTAMPTZ(6),
+
+    CONSTRAINT "workflow_definitions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "stage_definitions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "workflow_id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "seq" INTEGER NOT NULL,
     "name_en" TEXT NOT NULL,
     "name_ar" TEXT,
     "milestone_name" TEXT NOT NULL,
+    "master_export_column" TEXT,
+    "counts_in_project_status" BOOLEAN NOT NULL DEFAULT true,
     "approval_levels" INTEGER NOT NULL DEFAULT 3,
-    "is_protected" BOOLEAN NOT NULL DEFAULT true,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "stage_definitions_pkey" PRIMARY KEY ("id")
 );
@@ -298,6 +351,7 @@ CREATE TABLE "stage_definitions" (
 -- CreateTable
 CREATE TABLE "task_definitions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "workflow_id" UUID NOT NULL,
     "code" TEXT NOT NULL,
     "stage_id" UUID NOT NULL,
     "sort_order" INTEGER NOT NULL,
@@ -305,7 +359,6 @@ CREATE TABLE "task_definitions" (
     "name_ar" TEXT,
     "has_documents" BOOLEAN NOT NULL DEFAULT true,
     "is_milestone_task" BOOLEAN NOT NULL DEFAULT false,
-    "is_protected" BOOLEAN NOT NULL DEFAULT false,
     "counts_toward_milestone" BOOLEAN NOT NULL DEFAULT true,
     "approval_levels" INTEGER,
     "condition_rule" JSONB,
@@ -747,12 +800,19 @@ CREATE TABLE "baseline_entries" (
 -- CreateTable
 CREATE TABLE "phase_gate_rules" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+    "workflow_id" UUID NOT NULL,
     "link_code" TEXT NOT NULL,
-    "is_protected" BOOLEAN NOT NULL DEFAULT true,
-    "from_milestone" TEXT NOT NULL,
-    "to_milestone" TEXT NOT NULL,
+    "seq" INTEGER NOT NULL,
+    "name_en" TEXT NOT NULL,
+    "name_ar" TEXT,
+    "from_code" TEXT NOT NULL,
+    "to_code" TEXT NOT NULL,
+    "conditions" JSONB,
     "min_wd" INTEGER NOT NULL,
     "max_wd" INTEGER NOT NULL,
+    "master_export_column" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "custom" JSONB NOT NULL DEFAULT '{}',
 
     CONSTRAINT "phase_gate_rules_pkey" PRIMARY KEY ("id")
 );
@@ -851,7 +911,7 @@ CREATE TABLE "progress_snapshots" (
 CREATE TABLE "field_definitions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "entity_type" "FieldEntityType" NOT NULL,
-    "task_def_id" UUID,
+    "task_code" TEXT,
     "code" TEXT NOT NULL,
     "label_en" TEXT NOT NULL,
     "label_ar" TEXT,
@@ -1318,10 +1378,7 @@ CREATE UNIQUE INDEX "regions_code_key" ON "regions"("code");
 CREATE UNIQUE INDEX "roles_code_key" ON "roles"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "sub_roles_code_key" ON "sub_roles"("code");
-
--- CreateIndex
-CREATE INDEX "sub_roles_role_id_idx" ON "sub_roles"("role_id");
+CREATE INDEX "roles_parent_role_id_idx" ON "roles"("parent_role_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_m365_object_id_key" ON "users"("m365_object_id");
@@ -1342,9 +1399,6 @@ CREATE INDEX "user_role_assignments_user_id_valid_to_idx" ON "user_role_assignme
 CREATE INDEX "user_role_assignments_role_id_idx" ON "user_role_assignments"("role_id");
 
 -- CreateIndex
-CREATE INDEX "user_role_assignments_sub_role_id_idx" ON "user_role_assignments"("sub_role_id");
-
--- CreateIndex
 CREATE INDEX "user_role_assignment_regions_region_id_idx" ON "user_role_assignment_regions"("region_id");
 
 -- CreateIndex
@@ -1354,7 +1408,13 @@ CREATE UNIQUE INDEX "groups_name_key" ON "groups"("name");
 CREATE INDEX "group_members_user_id_idx" ON "group_members"("user_id");
 
 -- CreateIndex
-CREATE INDEX "delegations_to_user_id_revoked_idx" ON "delegations"("to_user_id", "revoked");
+CREATE INDEX "delegations_target_user_id_revoked_idx" ON "delegations"("target_user_id", "revoked");
+
+-- CreateIndex
+CREATE INDEX "delegations_target_role_id_revoked_idx" ON "delegations"("target_role_id", "revoked");
+
+-- CreateIndex
+CREATE INDEX "delegations_target_group_id_revoked_idx" ON "delegations"("target_group_id", "revoked");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "clusters_cluster_code_key" ON "clusters"("cluster_code");
@@ -1381,16 +1441,25 @@ CREATE INDEX "sites_custom_idx" ON "sites" USING GIN ("custom");
 CREATE UNIQUE INDEX "sites_id_region_id_key" ON "sites"("id", "region_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "stage_definitions_code_key" ON "stage_definitions"("code");
+CREATE UNIQUE INDEX "workflow_definitions_version_key" ON "workflow_definitions"("version");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "stage_definitions_seq_key" ON "stage_definitions"("seq");
+CREATE INDEX "workflow_definitions_status_effective_from_idx" ON "workflow_definitions"("status", "effective_from");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "task_definitions_code_key" ON "task_definitions"("code");
+CREATE INDEX "stage_definitions_custom_idx" ON "stage_definitions" USING GIN ("custom");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "stage_definitions_workflow_id_code_key" ON "stage_definitions"("workflow_id", "code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "stage_definitions_id_workflow_id_key" ON "stage_definitions"("id", "workflow_id");
 
 -- CreateIndex
 CREATE INDEX "task_definitions_stage_id_sort_order_idx" ON "task_definitions"("stage_id", "sort_order");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "task_definitions_workflow_id_code_key" ON "task_definitions"("workflow_id", "code");
 
 -- CreateIndex
 CREATE INDEX "task_predecessors_predecessor_id_idx" ON "task_predecessors"("predecessor_id");
@@ -1555,7 +1624,10 @@ CREATE INDEX "baseline_entries_region_id_idx" ON "baseline_entries"("region_id")
 CREATE UNIQUE INDEX "baseline_entries_version_id_site_id_milestone_code_key" ON "baseline_entries"("version_id", "site_id", "milestone_code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "phase_gate_rules_link_code_key" ON "phase_gate_rules"("link_code");
+CREATE INDEX "phase_gate_rules_custom_idx" ON "phase_gate_rules" USING GIN ("custom");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "phase_gate_rules_workflow_id_link_code_key" ON "phase_gate_rules"("workflow_id", "link_code");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "change_requests_change_code_key" ON "change_requests"("change_code");
@@ -1774,16 +1846,25 @@ CREATE INDEX "system_log_level_at_idx" ON "system_log"("level", "at");
 CREATE INDEX "system_log_source_at_idx" ON "system_log"("source", "at");
 
 -- AddForeignKey
-ALTER TABLE "sub_roles" ADD CONSTRAINT "sub_roles_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "roles" ADD CONSTRAINT "roles_parent_role_id_fkey" FOREIGN KEY ("parent_role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "roles" ADD CONSTRAINT "roles_default_profile_id_fkey" FOREIGN KEY ("default_profile_id") REFERENCES "permission_profiles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "role_default_regions" ADD CONSTRAINT "role_default_regions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "role_default_regions" ADD CONSTRAINT "role_default_regions_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "role_default_modules" ADD CONSTRAINT "role_default_modules_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_sub_role_id_fkey" FOREIGN KEY ("sub_role_id") REFERENCES "sub_roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_role_assignments" ADD CONSTRAINT "user_role_assignments_assigned_by_fkey" FOREIGN KEY ("assigned_by") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1807,16 +1888,43 @@ ALTER TABLE "group_members" ADD CONSTRAINT "group_members_user_id_fkey" FOREIGN 
 ALTER TABLE "delegations" ADD CONSTRAINT "delegations_from_user_id_fkey" FOREIGN KEY ("from_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "delegations" ADD CONSTRAINT "delegations_to_user_id_fkey" FOREIGN KEY ("to_user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "delegations" ADD CONSTRAINT "delegations_target_user_id_fkey" FOREIGN KEY ("target_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegations" ADD CONSTRAINT "delegations_target_role_id_fkey" FOREIGN KEY ("target_role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegations" ADD CONSTRAINT "delegations_target_group_id_fkey" FOREIGN KEY ("target_group_id") REFERENCES "groups"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegations" ADD CONSTRAINT "delegations_parent_delegation_id_fkey" FOREIGN KEY ("parent_delegation_id") REFERENCES "delegations"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegation_grants" ADD CONSTRAINT "delegation_grants_delegation_id_fkey" FOREIGN KEY ("delegation_id") REFERENCES "delegations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegation_regions" ADD CONSTRAINT "delegation_regions_delegation_id_fkey" FOREIGN KEY ("delegation_id") REFERENCES "delegations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "delegation_regions" ADD CONSTRAINT "delegation_regions_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sites" ADD CONSTRAINT "sites_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "sites" ADD CONSTRAINT "sites_workflow_version_id_fkey" FOREIGN KEY ("workflow_version_id") REFERENCES "workflow_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "sites" ADD CONSTRAINT "sites_cluster_id_fkey" FOREIGN KEY ("cluster_id") REFERENCES "clusters"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_stage_id_fkey" FOREIGN KEY ("stage_id") REFERENCES "stage_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "stage_definitions" ADD CONSTRAINT "stage_definitions_workflow_id_fkey" FOREIGN KEY ("workflow_id") REFERENCES "workflow_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_workflow_id_fkey" FOREIGN KEY ("workflow_id") REFERENCES "workflow_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "task_definitions" ADD CONSTRAINT "task_definitions_stage_id_workflow_id_fkey" FOREIGN KEY ("stage_id", "workflow_id") REFERENCES "stage_definitions"("id", "workflow_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "task_predecessors" ADD CONSTRAINT "task_predecessors_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -1915,6 +2023,9 @@ ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_site_id_region_i
 ALTER TABLE "baseline_entries" ADD CONSTRAINT "baseline_entries_version_id_fkey" FOREIGN KEY ("version_id") REFERENCES "baseline_versions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "phase_gate_rules" ADD CONSTRAINT "phase_gate_rules_workflow_id_fkey" FOREIGN KEY ("workflow_id") REFERENCES "workflow_definitions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "change_requests" ADD CONSTRAINT "change_requests_site_id_region_id_fkey" FOREIGN KEY ("site_id", "region_id") REFERENCES "sites"("id", "region_id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1928,9 +2039,6 @@ ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_weight_set_i
 
 -- AddForeignKey
 ALTER TABLE "progress_snapshots" ADD CONSTRAINT "progress_snapshots_region_id_fkey" FOREIGN KEY ("region_id") REFERENCES "regions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "field_definitions" ADD CONSTRAINT "field_definitions_task_def_id_fkey" FOREIGN KEY ("task_def_id") REFERENCES "task_definitions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "field_list_values" ADD CONSTRAINT "field_list_values_field_id_fkey" FOREIGN KEY ("field_id") REFERENCES "field_definitions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
