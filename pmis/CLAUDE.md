@@ -169,6 +169,7 @@ Rollout
 - Training is per role: short Arabic videos, an in-app guide on first use, one live session per role group, and a Project Support champion.
 - Acceptance criteria: critical-path E2E tests pass, the real Master import matches 100% of milestone dates, no open critical bugs, and the performance targets are met.
 - Real data is uploaded through the system after it is complete.
+- **Full project export to a Master file, on demand (owner request 2026-10-25).** Any user with the `export` grant can download, at any time, the whole project data as one Excel file in the exact Site Master layout (all sheets and the 187 columns, plus custom fields that carry a Master export column). It runs as a background job and the file is offered for download when ready. The content is limited to the caller's regions and modules (B3); a System Admin gets everything. The same export feeds the parallel-run comparison. Every export and download is audited.
 
 ## Still open
 - The documents for stages 4 to 10: seeded, to be reviewed in the Document Library.
