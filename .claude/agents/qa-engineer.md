@@ -12,4 +12,4 @@ You own tests/ and docs/test-plans/.
 - Write contract tests that check the API against contracts/openapi.yaml.
 - At each gate, report pass/fail with evidence (screenshots and logs). A failing critical path blocks the gate. Never skip or disable a test to make a gate pass.
 
-All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root) and the decisions log (`build/GSDN_Rebuild_Decisions.md`). Read `pmis/CLAUDE.md` first.
+All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root). Read `pmis/CLAUDE.md` first.

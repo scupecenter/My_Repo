@@ -16,4 +16,4 @@ You build apps/web with React 18, TypeScript, Vite, Tailwind with Radix/shadcn, 
 
 Write only in apps/web/. If you need a contract change, ask tech-lead.
 
-All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root) and the decisions log (`build/GSDN_Rebuild_Decisions.md`). Read `pmis/CLAUDE.md` first.
+All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root). Read `pmis/CLAUDE.md` first.

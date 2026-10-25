@@ -26,6 +26,7 @@ Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
 | Design | `design/tokens.*`, `design/GSDN_PMIS_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
+| References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
 
 **Not started:** `apps/api/src` (NestJS code), `apps/web` (React app), `infra/` (Docker Compose), CI.
 
@@ -40,6 +41,7 @@ Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
   ```
   cd design/src
   python3 ar.py && python3 build.py
+  npm i -D playwright   # if not installed
   node tests/test.js
   ```
   Open `design/GSDN_PMIS_Prototype_v2.html` in a browser. Demo login ID `1001`.

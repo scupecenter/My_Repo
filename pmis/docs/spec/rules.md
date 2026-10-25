@@ -1,6 +1,6 @@
 # GSDN PMIS: business rules (P0)
 
-Sources: Blueprint v1.1 (`docs/reference/GSDN_PMIS_Blueprint_v1.1.html`, cited as "BP §nn"), the decisions log (`build/GSDN_Rebuild_Decisions.md`, cited as Dnn), the Master (`GSDN_Site_Master.xlsx`, cited by sheet and column), and `pmis/CLAUDE.md` (cited as "CLAUDE.md", binding product-owner decisions of 2026-10-24).
+Sources: Blueprint v1.1 (`docs/reference/GSDN_PMIS_Blueprint_v1.1.html`, cited as "BP §nn"), the decisions log (`docs/reference/GSDN_Rebuild_Decisions.md`, cited as Dnn), the Master (`GSDN_Site_Master.xlsx`, cited by sheet and column), and `pmis/CLAUDE.md` (cited as "CLAUDE.md", binding product-owner decisions of 2026-10-24).
 Anything not stated in a source is marked **ASSUMPTION** and is listed in `open-questions.md` when it matters.
 Task codes are those in `task-catalogue.csv` (BP §03 step table).
 

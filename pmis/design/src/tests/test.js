@@ -117,7 +117,7 @@ console.log(out.join('\n'));
 // screenshots
 await p.setViewportSize({width:1360,height:860});await p.evaluate(()=>PMIS.signIn('1001'));
 const sid=await p.evaluate(()=>{const s=PMIS.SITES.find(s=>s.stage>=3&&s.stage<6&&s.cur>=0&&s.tasks[s.cur].state==='review'&&s.snags.length)||PMIS.SITES.find(s=>s.stage>=2&&s.snags.length&&s.cur>=0);return s.id+'|'+PMIS.STEPS[s.cur].code});
-const[ss,cc]=sid.split('|');await p.evaluate(({ss,cc})=>PMIS.go('site/'+ss+'?task='+cc),{ss,cc});await p.waitForTimeout(400);await p.screenshot({path:'/home/user/my_repo/pmis/design/screens/site-page-drawer.png'});
-await p.evaluate(()=>{PMIS.setLang('ar');PMIS.setTheme('dark');PMIS.go('approvals')});await p.waitForTimeout(300);await p.screenshot({path:'/home/user/my_repo/pmis/design/screens/approvals-ar-dark.png'});
-await p.evaluate(()=>{PMIS.setLang('en');PMIS.setTheme('light');PMIS.go('users')});await p.waitForTimeout(300);await p.click('[data-act=uview][data-a=person]');await p.waitForTimeout(200);await p.screenshot({path:'/home/user/my_repo/pmis/design/screens/users-by-person.png'});
+const[ss,cc]=sid.split('|');await p.evaluate(({ss,cc})=>PMIS.go('site/'+ss+'?task='+cc),{ss,cc});await p.waitForTimeout(400);await p.screenshot({path:require('path').join(__dirname,'../../screens/latest/11-site-drawer.png')});
+await p.evaluate(()=>{PMIS.setLang('ar');PMIS.setTheme('dark');PMIS.go('approvals')});await p.waitForTimeout(300);await p.screenshot({path:require('path').join(__dirname,'../../screens/latest/12-approvals-ar-dark.png')});
+await p.evaluate(()=>{PMIS.setLang('en');PMIS.setTheme('light');PMIS.go('users')});await p.waitForTimeout(300);await p.click('[data-act=uview][data-a=person]');await p.waitForTimeout(200);await p.screenshot({path:require('path').join(__dirname,'../../screens/latest/13-users-by-person.png')});
 await b.close()})();

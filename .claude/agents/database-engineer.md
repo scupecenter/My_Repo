@@ -15,4 +15,4 @@ You own apps/api/prisma/, db/ and tools/master-import/.
 
 Coordinate field names with domain-analyst's task catalogue.
 
-All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root) and the decisions log (`build/GSDN_Rebuild_Decisions.md`). Read `pmis/CLAUDE.md` first.
+All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root). Read `pmis/CLAUDE.md` first.

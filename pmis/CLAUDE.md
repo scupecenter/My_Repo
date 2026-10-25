@@ -4,11 +4,11 @@ GSDN PMIS is a project management information system for the GSDN site-delivery
 project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master
 as the system of record, with a 3-level approval workflow on every task.
 
-All paths below are relative to `pmis/` unless marked as repository root. The dashboard in `dashboard/` is a separate product: do not modify it.
+All paths below are relative to `pmis/` unless marked as repository root. The previous standalone dashboard is kept read-only in `docs/reference/legacy-dashboard/` as the reference for dashboard KPIs (P3) and the pipeline style: do not modify it.
 
 Read before any work:
 1. `docs/reference/GSDN_PMIS_Blueprint_v1.1.html`: the functional blueprint (sections 03, 06, 14, 17, 21).
-2. `build/GSDN_Rebuild_Decisions.md` (repository root): decisions D1–D88 that define the Master logic.
+2. `docs/reference/GSDN_Rebuild_Decisions.md`: decisions D1–D88 that define the Master logic.
 3. `GSDN_Site_Master.xlsx` (repository root): the Master structure (23 sheets, 187 columns). It is the source for field names and calculations.
 4. `docs/spec/` (written by domain-analyst) and `contracts/openapi.yaml` (owned by tech-lead).
 
@@ -162,7 +162,7 @@ Non-functional requirements
 
 Brand and UI
 - Colors and styling follow ERPNext. Tokens are taken from the official frappe-ui design tokens (`frappe-ui/tailwind/tokens`, MIT, version 1.0.2), never from memory. We take the tokens and layout patterns, not the Vue components, the ERPNext logo or the ERPNext name. The font is Cairo. All tokens live in one file so a later Aljeel brand changes nothing in the screens.
-- The pipeline component reuses the style and motion of the dashboard pipeline in `dashboard/GSDN_Dashboard.html` (CSS "pipeline (signature)" and `function pipeline`): progress rings on nodes, a gradient fill track, and hover lift. It replaces the earlier site-page pipeline concept.
+- The pipeline component reuses the style and motion of the dashboard pipeline in `docs/reference/legacy-dashboard/GSDN_Dashboard.html` (CSS "pipeline (signature)" and `function pipeline`): progress rings on nodes, a gradient fill track, and hover lift. It replaces the earlier site-page pipeline concept.
 
 Rollout
 - A pilot on one region (Tripoli) runs for 2 weeks. Then the system and the Master run in parallel for 1 month: the PMIS exports a Master-format file and it is compared automatically with the live Master. The Master is retired after one month without material differences.
