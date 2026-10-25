@@ -2248,6 +2248,7 @@ paths:
     post:
       tags: [staff-registry]
       operationId: createStaffMember
+      x-step-up: true
       summary: Add a staff member (admin or delegate)
       description: Employee ID must be 4 digits and unique across all rows. Duplicate ID, email or phone gives 409 `duplicate`.
       x-db-path: people_save_staff
@@ -2291,6 +2292,7 @@ paths:
     patch:
       tags: [staff-registry]
       operationId: updateStaffMember
+      x-step-up: true
       summary: Edit a row or hide fields for this employee
       description: Changing `employee_id` is not possible here (blocked when linked to an account). `hidden_fields` hides email or phone for this one employee.
       x-db-path: people_save_staff
@@ -2322,6 +2324,7 @@ paths:
     post:
       tags: [staff-registry]
       operationId: deactivateStaffMember
+      x-step-up: true
       summary: Deactivate (never deleted)
       description: The person keeps their ID and history and cannot sign in. Refused with `last_admin` when the linked account is the last active System Admin.
       x-db-path: people_set_staff_status
@@ -2353,6 +2356,7 @@ paths:
     post:
       tags: [staff-registry]
       operationId: reactivateStaffMember
+      x-step-up: true
       summary: Reactivate a row
       x-db-path: people_set_staff_status
       parameters:
@@ -2381,6 +2385,7 @@ paths:
     post:
       tags: [staff-registry]
       operationId: importStaffRegistry
+      x-step-up: true
       summary: Upload the TPL-STAFF template (creates an import batch)
       description: Same rules as every template upload (ADR 0005 §4). Rows absent from the file are untouched. The valid rows can be approved while error rows stay listed. Follow with `/import-batches/{batch_id}`.
       parameters:
@@ -2422,6 +2427,7 @@ paths:
     put:
       tags: [staff-registry]
       operationId: setStaffVisibility
+      x-step-up: true
       summary: Set who sees email and phone
       description: 'Per field: default (everyone signed in), roles, groups or persons who see it, and who never do (deny wins). Audited with before/after values.'
       x-db-path: people_save_staff_visibility

@@ -24,13 +24,15 @@ Contract 0.1 covered phase P1 only. The web app (React, MSW mocks generated from
 - **DELETE with a query `reason`** on holidays (no body on DELETE). Alternative: `POST .../delete`.
 
 ## Open points (product owner or other agents)
-1. Staff registry maintenance: step-up or not? Currently not required. It holds personal data.
-2. Holiday import: xlsx template only (`TPL-HOLIDAYS`), or also the seed CSV? Currently template only, in line with "approved templates only".
+1. ~~Staff registry maintenance: step-up?~~ **Decided 2026-10-25 (owner): yes**, every registry write (create, update, deactivate, reactivate, import, visibility) needs step-up.
+2. ~~Holiday import format?~~ **Decided (owner): approved xlsx template only** (`TPL-HOLIDAYS`). The seed CSV is loaded by the seed script, not through the UI.
 3. `reassign` of a task with several levels held by the person: only the current level moves in 0.2. Confirm.
-4. Idle alert: activity means any state change or comment on the task. Confirm the definition.
+4. ~~Idle alert definition?~~ **Decided (owner): any state change or comment counts as activity.**
 5. `POST /templates/TPL-MASTER/stamp` and the legacy Master path (ADR 0005 §6) are **not** in 0.2 because Q1 is unanswered.
 6. Roles admin needed no new operation: 0.1 already carries `can_hold_matrix_levels`; only error responses were added.
 7. Warehouse stock posting happens on DN or RN approval inside the server, so there is no "post movement" operation. Stock adjustments (counts, receipts) are out of scope until the warehouse spec exists.
+
+   - The step-up list in this contract is **approved by the owner** as written.
 
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
