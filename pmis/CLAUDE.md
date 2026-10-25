@@ -34,6 +34,7 @@ Read before any work:
 - **Approved templates only.** The system issues each template with an ID and version embedded in the file (hidden sheet `_tpl` containing `template_id` and `version`). A user downloads the template from beside the task or from the Templates page, fills it, and uploads that same template. Uploads without a valid embedded ID and version are rejected. Each rejection is written to the System Log.
 - Registers are separate modules, each with its own menu: Procurement (PR/PO/WO), Contractors, GECOL power, HLC fiber, Permits & HSE, Warehouse, Quality, Issue Log (several issues per site), Risk Register, Change Control, Readiness & Handover, As-Built, and Meetings.
 - The Audit Log records every user action with before and after values. It is append-only and nobody can edit it. The System/Error Log is kept separately.
+- Audit Log readers (decision B4): System Admins and the Project Manager see all of it. Each Team Lead sees the entries for their own modules and regions only. Anyone else gets it only through the `view_audit` grant in the permission grid, scoped like any other grant (B3). Every read of the Audit Log is itself audited.
 - The UI is in English by default, with Arabic (RTL) available as an instant switch. It has light and dark themes and uses the Cairo font, with ERPNext (frappe-ui) colors.
 
 ## Decisions agreed with the product owner (2026-10-24)
