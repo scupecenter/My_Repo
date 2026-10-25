@@ -155,8 +155,6 @@ export const siteHandlers = [
     save();
     return HttpResponse.json(m, { headers: { ETag: `"${m.version}"` } });
   }),
-  http.get(`${B}/roles`, () => (viewer() ? HttpResponse.json({ items: ROLES }) : problem(401, 'unauthenticated', 'Sign in required'))),
-  http.get(`${B}/groups`, () => (viewer() ? page(GROUPS) : problem(401, 'unauthenticated', 'Sign in required'))),
   http.get(`${B}/users/picker`, ({ request }) => {
     if (!viewer()) return problem(401, 'unauthenticated', 'Sign in required');
     const q = (new URL(request.url).searchParams.get('q') ?? '').toLowerCase();

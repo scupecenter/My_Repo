@@ -83,6 +83,8 @@ export const handlers = [
       return problem(422, 'validation_failed', 'Employee ID not found in the staff registry', { errors: [{ path: '/employee_id', code: 'not_in_registry' }] });
     if (Object.values(ACCOUNTS).some((a) => a.employee_id === employee_id)) return problem(409, 'duplicate', 'This employee ID is already linked to another account');
     Object.assign(db().session!, { linked: true, employee_id });
+    const au = db().admin.users.find((u) => u.employee_id === employee_id);
+    if (au) au.status = 'pending_assignment'; // a newly linked account waits for an assignment
     save();
     return HttpResponse.json(sessionBody());
   }),

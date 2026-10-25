@@ -3,7 +3,6 @@ import { ChevronDown, ChevronRight, Download, FileText, Lock, Upload, UserX } fr
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError, downloadFile } from '@/api/client';
-import { useTask } from '@/api/hooks';
 import { useDatePatch } from '@/api/sites';
 import type { SiteTasks, TaskSummary } from '@/api/types';
 import { Holders } from './HolderChip';
@@ -23,15 +22,13 @@ type Row = { kind: 'stage'; code: string; name: string; done: number; total: num
 
 function WhyLocked({ task }: { task: TaskSummary }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const d = useTask(open ? task.id : null);
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
+    <Popover.Root>
       <Popover.Trigger asChild><button type="button" className="btn px-2 py-0.5 text-xs" data-testid={`why-locked-${task.id}`}><Lock size={12} />{t('grid.why_locked')}</button></Popover.Trigger>
       <Popover.Portal>
         <Popover.Content sideOffset={6} className="card z-50 w-72 p-3 text-sm" data-testid="why-locked-card">
           <b>{t('grid.locked_title')}</b>
-          {d.isLoading ? <p>{t('common.loading')}</p> : (d.data?.lock_reasons?.length ? <ul className="mt-1 list-disc ps-4">{d.data.lock_reasons.map((r, i) => <li key={i}>{r.message}</li>)}</ul> : <p className="text-mute">{t('grid.locked_none')}</p>)}
+          {task.lock_reasons?.length ? <ul className="mt-1 list-disc ps-4">{task.lock_reasons.map((r, i) => <li key={i}>{r.message}</li>)}</ul> : <p className="text-mute">{t('grid.locked_none')}</p>}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>
