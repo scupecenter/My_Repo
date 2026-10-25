@@ -9,7 +9,10 @@ for sc in ['arabic','latin']:
     for w in [400,700]:
         fonts+="@font-face{font-family:'Cairo';font-style:normal;font-weight:%d;font-display:swap;src:url(data:font/woff2;base64,%s) format('woff2');unicode-range:%s}\n"%(w,rd(D+'prototype-v2/f_%s-%d.b64'%(sc,w)),rng[sc])
 data=open(D+'prototype-v2/data.js').read()
-js=''.join(open(P+f).read()+'\n' for f in ['i18n.js','core.js','flow.js','shell.js','views1.js','views2.js','views3.js','views4.js','main.js','views5.js','boot.js'])
+import csv,json
+REG=list(csv.DictReader(open(D+'../db/seed/staff-registry.draft.csv',encoding='utf-8')))
+data+='\nconst REGISTRY='+json.dumps(REG,ensure_ascii=False).replace('<','\\u003c')+';\n'
+js=''.join(open(P+f).read()+'\n' for f in ['i18n.js','core.js','people.js','flow.js','shell.js','views1.js','views2.js','views3.js','views4.js','main.js','views5.js','boot.js'])
 html='''<!doctype html>
 <html lang="en" dir="ltr" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSDN PMIS · Prototype v2</title>
 <!-- GSDN PMIS prototype v2. Single file, offline, vanilla JS, no external requests. Tokens: frappe-ui@1.0.2 (MIT) via tokens.css. All data is synthetic. -->

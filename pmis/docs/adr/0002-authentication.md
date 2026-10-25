@@ -24,6 +24,7 @@
    - `oid` is present.
    The user is matched on `oid` (stored as `users.m365_object_id`) and never on email.
 3. **MFA toggle.** The setting `require_mfa` (default `false`) is checked at login and at step-up. When it is on and `amr` lacks `mfa`, sign-in fails with 401 and `code = mfa_required`. The session stores the `amr` value it was created with, so the audit log can show an "MFA" chip.
+   - **Per-user exemption.** `users.mfa_exempt_until` (null = not exempt; a far date = until revoked) plus `mfa_exempt_reason` and `mfa_exempt_by`. When set and in the future, login and step-up skip the `amr` check for that user only. Set and cleared only through an `idm_*` function that requires the actor's step-up, forbids `actor = target`, and writes the audit row. It has no effect on Entra Conditional Access.
 4. **4-digit employee ID link.**
    - On first sign-in the account is created with `status = pending_assignment` and no assignments.
    - `POST /auth/employee-id` accepts exactly 4 digits, once. The value must be unique, which the database enforces with `users.employee_id` UNIQUE.

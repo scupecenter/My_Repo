@@ -1,4 +1,4 @@
-# Orchestration: 8 agents, 4 phases
+# Orchestration: 9 agents, 4 phases
 
 | # | Agent | Owns (write access) | Model | Effort |
 |---|---|---|---|---|
@@ -10,6 +10,7 @@
 | 6 | database-engineer | `apps/api/prisma/`, `db/`, `tools/master-import/` | sonnet | medium |
 | 7 | qa-engineer | `tests/`, `docs/test-plans/` | haiku | medium |
 | 8 | devops-security | `infra/`, `.github/workflows/`, `Dockerfile*` | haiku | low |
+| 9 | people-registry | `docs/spec/staff-registry.md`, `db/seed/staff-registry*.csv`, `tools/staff-registry/`, the prototype hover card | sonnet | medium |
 
 ## Token budget rules
 - **Opus is reserved for low-volume, high-impact work.** tech-lead plans, reviews, and writes ADRs. domain-analyst extracts business rules in P0, where an error multiplies later. Neither writes bulk code.
