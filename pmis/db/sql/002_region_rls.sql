@@ -51,6 +51,15 @@ DO $$ BEGIN
 END $$;
 GRANT USAGE ON SCHEMA public TO pmis_identity_owner;
 
+-- Functions created by (or later owned by) the definer roles are not executable by PUBLIC unless granted. Functions that the
+-- migration role creates and then hands over (ALTER FUNCTION ... OWNER TO) are covered by the explicit REVOKE loop at the end of
+-- 008_identity_writes.sql. Helper predicates used by RLS policies (app_region_check ...) deliberately stay PUBLIC-executable.
+DO $$ BEGIN
+  ALTER DEFAULT PRIVILEGES FOR ROLE pmis_identity_owner, pmis_definer REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
+EXCEPTION WHEN insufficient_privilege THEN
+  RAISE NOTICE 'could not set default privileges for the definer roles; the explicit REVOKE loop in 008 still applies';
+END $$;
+
 -- The migration/seed role. Protected-row bypass depends on THIS ROLE, never on a session setting (a setting can be set by the
 -- app role or by SQL injection). Deployment: run migrations and the seed as a login role that is pmis_migrator or a member of
 -- it (GRANT pmis_migrator TO <deploy_login>); pmis_app must never be a member. Superusers also qualify.

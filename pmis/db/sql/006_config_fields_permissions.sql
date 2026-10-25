@@ -277,7 +277,7 @@ END $$;
 ALTER FUNCTION admin_add_task_to_open_sites(uuid, uuid[], text) OWNER TO pmis_definer;
 ALTER FUNCTION field_has_values("FieldEntityType", text) OWNER TO pmis_definer;
 ALTER FUNCTION field_set_bump() OWNER TO pmis_definer;
-GRANT INSERT, UPDATE ON field_set_versions TO pmis_definer;
+GRANT SELECT, INSERT, UPDATE ON field_set_versions TO pmis_definer;
 GRANT SELECT ON field_definitions TO pmis_definer;
 GRANT SELECT ON users, stage_definitions, task_definitions, sites, workflow_definitions TO pmis_definer;
 GRANT SELECT ON field_definitions, field_list_values, external_parties, work_calendars, sla_rules TO pmis_definer; -- read by custom_validate / sla_rule_for when the definer inserts tasks
