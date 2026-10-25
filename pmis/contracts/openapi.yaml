@@ -128,11 +128,13 @@ paths:
       operationId: authLogin
       summary: Start the Entra ID sign-in (redirect), optionally from an identifier
       description: |
-        With `identifier` (email, 4-digit employee ID or E.164 phone) the API looks it up in the staff registry and starts the
-        Entra authorization request with `login_hint` = the registry email. With no match, or no identifier, it starts the
-        request without a hint. The response is the same 302 in every case, with no difference in status, headers or timing
-        that reveals who is registered. The lookup is rate limited per IP and per identifier (429 `rate_limited`). On the
-        callback, when a hint was used, the token account must equal that email or sign-in is refused and logged (ADR 0002 §9b).
+        With `identifier` (email, 4-digit employee ID or E.164 phone) the API resolves it in the staff registry and keeps the
+        resolved registry email **server-side only**, in the OIDC `state`/session record. The registry email never appears in
+        the redirect: `login_hint` is sent to Entra only when the caller typed an email themselves (they already know it), and
+        that value is passed as typed, whether or not it matches. An employee ID or phone never becomes a `login_hint`, so an
+        unauthenticated caller cannot learn anyone's email. Status, headers and timing are the same whether or not the identifier
+        matches. The lookup is rate limited per IP and per identifier (429 `rate_limited`). On the callback, when the identifier
+        resolved to a registry row, the token account must equal that row's email or sign-in is refused and logged (ADR 0002 §9b).
         PMIS never stores passwords; local sign-in is deferred.
       security: []
       parameters:
@@ -7508,7 +7510,10 @@ components:
             max: { type: number }
             min_length: { type: integer }
             max_length: { type: integer }
-            pattern: { type: string }
+            pattern:
+              type: string
+              maxLength: 200
+              description: 'Validated as a safe regular expression and matched with a linear-time engine (RE2) with a time limit, in the API and in the import parser (no ReDoS).'
         default_value: {}
         section: { type: [string, 'null'] }
         sort_order: { type: integer }
