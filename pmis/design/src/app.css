@@ -51,7 +51,7 @@ button.chip:hover{background:var(--hover)}
 .chip .x{border:0;background:none;padding:0 2px;color:var(--mute)}
 .av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;font-weight:700;font-size:12px;color:#fff;flex:none}
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius-6);box-shadow:var(--shadow-sm)}
-.ch{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2)}
+.ch{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line2)}
 .ch h3{font-size:var(--text-md)}
 .cb{padding:14px}
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin}
@@ -290,3 +290,10 @@ table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--tex
 .empcard .ec-ar{color:var(--mute);margin-bottom:6px}
 .empcard dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:8px 0 0}
 .empcard dt{color:var(--mute)}.empcard dd{margin:0;overflow-wrap:anywhere}
+/* v6: sub-tabs, matrix divider, absence badge, chip remove, register drawer */
+.tabs.sub{border-bottom:1px solid var(--line2);padding-inline:8px}
+.mxdiv{background:var(--card2);color:var(--mute);font-weight:700;font-size:var(--text-sm);padding:8px;border-bottom:1px solid var(--line)}
+.absb{margin-inline-start:6px;font-size:var(--text-xs);padding:0 6px}
+.ref .chip.x{min-height:0;padding:0 2px;border:0;background:none;color:inherit}
+.ref .emp{text-decoration:none}.ref .emp .eid{color:inherit;opacity:.8}
+#rdrawer,#drawer{overscroll-behavior:contain}

@@ -41,7 +41,7 @@ const ACT={
  sim:el=>{S.sim=el.dataset.a;render()},
  bell:()=>{const m=$('#bellm');if(m.innerHTML){m.innerHTML='';return}const it=inbox(me()).slice(0,5);m.innerHTML=`<div class="menu" role="menu"><div class="mh">${t('Notifications (in-app and email)')}</div>${it.length?it.map(o=>`<a href="#/approvals?sel=${esc(o.key)}">${ic('clock')}<span>${o.kind==='task'?`${o.site.id} ${STEPS[o.i].code} · ${lvName(o.lv)}`:o.kind==='batch'?t('Batch')+' '+o.b.id:t('Snag')+' '+o.sn.id}</span></a>`).join(''):`<div class="mh">${t('Nothing new')}</div>`}</div>`},
  shortcuts:()=>{closeModal();modal(`<h3>${ic('list')} ${t('Keyboard shortcuts')}</h3><div class="cb"><table class="t"><tbody>${[['Ctrl K',t('Command palette')],['/',t('Focus the search box')],['?',t('This help')],['g m / g a / g s / g d',t('Go to My Work / Approvals / Sites / Dashboard')],['j  k',t('Move down / up in lists')],['Enter',t('Open')],['x',t('Tick an approval item')],['a  r',t('Approve / return the current approval')],['Shift A',t('Approve all ticked')],['Esc',t('Close')]].map(([k,d])=>`<tr><td><kbd>${k}</kbd></td><td>${d}</td></tr>`).join('')}</tbody></table></div><div class="ft"><button class="btn pri" data-act="mclose">${t('Close')}</button></div>`)},
- m365:()=>{S.login.step='id';S.login.err='';render();setTimeout(()=>{const e=$('#empid');e&&e.focus()},0)},loginback:()=>{S.login.step='start';render()},demo:el=>signIn(el.dataset.a),
+ m365:()=>{const L=S.login,q=(($('#lookup')||{}).value||'').trim();L.q=q;L.match=staffLookup(q);L.hint=q.includes('@')?q:'';/* registry match stays server-side; login_hint only = the email the user typed (ADR 0002 §9b) */ L.step='id';S.login.err='';render();setTimeout(()=>{const e=$('#empid');e&&e.focus()},0)},loginback:()=>{S.login.step='start';render()},demo:el=>signIn(el.dataset.a),
  /* sites */
  gosite:el=>go('site/'+el.dataset.a),sf:el=>{const f=S.f.sites=S.f.sites||{};f[el.dataset.k]=el.dataset.v;f.n=40;render()},sitesreset:()=>{S.f.sites={q:'',region:'',stage:'',scen:'',status:'',sort:'id',n:40};render()},sitesort:el=>{S.f.sites.sort=el.dataset.a;render()},sitesmore:()=>{S.f.sites.n+=40;render()},
  stab:el=>{const h=location.hash.split('?');const q=new URLSearchParams(h[1]||'');q.set('tab',el.dataset.a);q.delete('task');location.hash=h[0]+'?'+q},
@@ -82,8 +82,8 @@ const ACT={
  mxcell:el=>{const[i,L]=el.dataset.a.split(':');S.mxD=S.mxD||cloneMX();cellModal(+i,L)},mxdiscard:()=>{S.mxD=null;render()},
  mxrm:el=>{const[k,id]=el.dataset.a.split(':');const[i,L]=S.mxCell;const c=S.mxD[i][L];c.m=c.m.filter(r=>!(r.k===k&&r.id===id));cellModal(i,L);render()},
  mxtab:el=>{S.mxq={tab:el.dataset.a,s:''};cellModal(...S.mxCell)},mxrule:el=>{const[i,L]=S.mxCell;S.mxD[i][L].rule=el.dataset.a;cellModal(i,L);render()},
- mxsave:()=>{const ch=mxChanges();const bad=ch.find(([i,L])=>L!=='levels'&&S.mxD[i].levels>(L==='entry'?0:L==='review'?2:1)&&!S.mxD[i][L].m.length);if(bad)return toast(t('Stage {n}: {l} has nobody assigned.',{n:bad[0]+1,l:lvName(bad[1])}),true);
-  stepUp(t('Change responsibility matrix'),()=>{ch.forEach(([i,L])=>{const nm=c=>c.m.map(refName).join(', ')+(c.rule==='all'?' (all)':'');if(L==='levels')audit('Changed responsibility','Stage '+(i+1),'Approval levels','levels '+MX[i].levels,'levels '+S.mxD[i].levels,{mfa:true});else audit('Changed responsibility','Stage '+(i+1)+' · '+L,'',nm(MX[i][L]),nm(S.mxD[i][L]),{mfa:true})});S.mxD.forEach((m,i)=>MX[i]=m);S.mxD=null;toast(t('Matrix saved and logged.'));render()})},
+ mxsave:()=>{const ch=mxChanges();const bad=ch.find(([i,L])=>L!=='levels'&&S.mxD[i].levels>(L==='entry'?0:L==='review'?2:1)&&!S.mxD[i][L].m.length);if(bad)return toast(t('Stage {n}: {l} has nobody assigned.',{n:mxName(bad[0]),l:lvName(bad[1])}),true);
+  stepUp(t('Change responsibility matrix'),()=>{ch.forEach(([i,L])=>{const nm=c=>c.m.map(refName).join(', ')+(c.rule==='all'?' (all)':'');if(L==='levels')audit('Changed responsibility',mxName(i),'Approval levels','levels '+MX[i].levels,'levels '+S.mxD[i].levels,{mfa:true});else audit('Changed responsibility',mxName(i)+' · '+L,'',nm(MX[i][L]),nm(S.mxD[i][L]),{mfa:true})});S.mxD.forEach((m,i)=>MX[i]=m);S.mxD=null;toast(t('Matrix saved and logged.'));render()})},
  /* users */
  uview:el=>{UF().view=el.dataset.a;render()},urole:el=>{const f=UF();f.role=el.dataset.a;f.sel.clear();f.pick.clear();render()},
  uperson:(el,e)=>{e.preventDefault();const f=UF();f.person=el.dataset.a;f.view='person';S.uDraft=null;render()},
@@ -161,7 +161,7 @@ document.addEventListener('change',async e=>{const el=e.target;
  if(el.dataset.snaginput){let sn,site;for(const s of SITES){const q=s.snags.find(z=>z.id===el.dataset.snaginput);if(q){sn=q;site=s}}const shot=($('#shot-'+sn.id)||{}).value;const bad=addSnagPhotos(site,sn,[...el.files],shot);bad.length?toast(bad[0].name+': '+bad[0].reason,true):toast(t('Photos added.'));el.value='';refresh();return}
  if(el.id==='upfile'&&el.files[0]){await handleUpload(el.files[0]);return}
  const n=el.dataset&&el.dataset.ch;if(n&&CH[n])CH[n](el,e)});
-document.addEventListener('submit',e=>{const f=e.target.dataset.form;if(f==='idlogin'){e.preventDefault();const v=$('#empid').value.trim();const L=S.login;L.val=v;if(!/^\d{4}$/.test(v)){L.err='Enter exactly 4 digits.';render();$('#empid').focus();return}if(!U2[v]){L.err='ID not found. Contact a System Admin.';render();$('#empid').focus();return}L.step='start';L.val='';L.err='';signIn(v)}});
+document.addEventListener('submit',e=>{const f=e.target.dataset.form;if(f==='lookup'){e.preventDefault();ACT.m365();return}if(f==='idlogin'){e.preventDefault();const v=$('#empid').value.trim();const L=S.login;L.val=v;if(!/^\d{4}$/.test(v)){L.err='Enter exactly 4 digits.';render();$('#empid').focus();return}if(!U2[v]){L.err='ID not found. Contact a System Admin.';render();$('#empid').focus();return}L.step='start';L.val='';L.err='';signIn(v)}});
 /* drag and drop */
 document.addEventListener('dragover',e=>{const z=e.target.closest('.slot[data-slot],[data-multidrop],#updrop,#updrop *');if(z){e.preventDefault();(e.target.closest('.slot,.drop')||z).classList.add('over')}});
 document.addEventListener('dragleave',e=>{const z=e.target.closest('.slot,.drop');z&&z.classList.remove('over')});
@@ -172,13 +172,13 @@ document.addEventListener('click',e=>{const z=e.target.closest('[data-multidrop]
 let chord=null;
 document.addEventListener('keydown',e=>{const tg=e.target,typing=/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)||tg.isContentEditable;
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('#pal')?closePal():me()&&openPalette();return}
- if(e.key==='Escape'){if($('#pal'))return closePal();if($('#modal'))return closeModal();if(S.drawer)return closeDrawer();const m=$('#umenu');m&&(m.innerHTML='');return}
+ if(e.key==='Escape'){if($('#pal'))return closePal();if($('#modal'))return closeModal();if(S.rg)return rgClose();if(S.drawer)return closeDrawer();const m=$('#umenu');m&&(m.innerHTML='');return}
  if(e.key==='Enter'&&!typing&&tg.dataset&&tg.dataset.act&&!/^(BUTTON|A)$/.test(tg.tagName)){tg.click();return}
  if(typing||e.ctrlKey||e.metaKey||e.altKey||!me())return;const r=parseHash();
  if(e.key==='?'){ACT.shortcuts();return}if(e.key==='/'){const s=$('[data-search]');if(s){e.preventDefault();s.focus()}return}
  if(chord){const c=chord;chord=null;const m={m:'my-work',a:'approvals',s:'sites',d:'dashboard'}[e.key];if(c==='g'&&m&&allowed(m))go(m);return}
  if(e.key==='g'){chord='g';setTimeout(()=>chord=null,900);return}
- const lists={sites:'tr[data-site]',site:'#taskgrid tr[data-row]'};
+ const lists={sites:'tr[data-site]',site:'#taskgrid tr[data-row]',register:'#rglist tr[data-row]',settings:'#stafflist tr[data-row]'};
  if(e.key==='j'||e.key==='k'){const sel=r.name==='approvals'?'#alist .it':lists[r.name];if(!sel)return;const rows=$$(sel);if(!rows.length)return;let i=rows.indexOf(document.activeElement);i=e.key==='j'?Math.min(rows.length-1,i+1):Math.max(0,i<0?0:i-1);rows[i].focus();if(r.name==='approvals'){S.f.appr.sel=rows[i].dataset.key;const d=$('#adetail');const it=apprItems().find(o=>o.key===S.f.appr.sel);d.innerHTML=apprDetail(it);$$('#alist .it').forEach(x=>{x.classList.toggle('sel',x===rows[i]);x.setAttribute('aria-selected',x===rows[i])})}e.preventDefault();return}
  if(r.name==='approvals'){const it=apprItems().find(o=>o.key===S.f.appr.sel);if(!it)return;
   if(e.key==='x'){S.sel.has(it.key)?S.sel.delete(it.key):S.sel.add(it.key);render();return}
