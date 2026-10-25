@@ -1,0 +1,44 @@
+{
+  "app": { "name": "GSDN PMIS" },
+  "nav": {
+    "group_work": "Work", "group_data": "Data entry", "group_admin": "Administration",
+    "my_work": "My Work", "approvals": "Approvals", "sites": "Sites", "dashboard": "Dashboard", "templates": "Templates",
+    "admin.users": "Users & Roles", "admin.matrix": "Responsibility Matrix", "admin.settings": "Settings", "audit": "Audit Log",
+    "open_menu": "Toggle menu"
+  },
+  "top": {
+    "search": "Search or jump to…", "language": "Switch language", "theme": "Switch theme", "notifications": "Notifications",
+    "mark_all_read": "Mark all as read", "no_notifications": "No notifications", "sign_out": "Sign out"
+  },
+  "palette": { "title": "Go to", "placeholder": "Type a page name", "empty": "No match" },
+  "login": {
+    "title": "Sign in to GSDN PMIS",
+    "subtitle": "Enter your company email, 4-digit employee ID or registered phone. Microsoft 365 completes the sign-in.",
+    "label": "Email, employee ID or phone", "placeholder": "name@company.com · 1234 · +218…",
+    "button": "Continue with Microsoft 365", "note": "PMIS never stores passwords.", "error": "We could not sign you in. Try again."
+  },
+  "mock": { "title": "Microsoft 365 (mock)", "pick": "Pick an account", "hint": "Pre-filled account", "pm": "Project Manager (final approver)", "reviewer": "Team Lead (reviewer)", "newbie": "First sign-in (no employee ID yet)", "pending": "Linked, pending assignment", "stepTitle": "Confirm it is you", "stepBody": "Re-authenticate to continue.", "verify": "Verify", "done": "Verified. You can close this window." },
+  "employeeId": {
+    "title": "Link your employee ID", "body": "Enter your 4-digit employee ID once. It must exist in the staff registry.",
+    "label": "Employee ID", "submit": "Link ID", "invalid": "Enter exactly 4 digits.", "not_in_registry": "This ID is not in the staff registry.", "duplicate": "This ID is already linked to another account."
+  },
+  "pending": { "title": "Waiting for assignment", "body": "Your account is linked. A System Admin must assign your role and regions before you can see anything.", "notify": "Ask the admins", "sent": "The admins were notified.", "id": "Employee ID" },
+  "myWork": {
+    "title": "My Work", "hello": "Hello {{name}}. Your tasks, newest first.", "late": "Late", "do_now": "Do now", "waiting": "Waiting on others",
+    "nothing": "Nothing here", "empty_title": "You are all caught up", "empty_body": "No task is assigned to you in your regions.", "go_approvals": "Approvals"
+  },
+  "approvals": {
+    "title": "Approvals", "subtitle": "Everything waiting for you, in one list. Approve one by one or tick several.",
+    "tab_all": "All", "tab_review": "Review", "tab_approve": "Approve", "filter": "Filter…", "select_all": "All",
+    "level_review": "Review", "level_approve": "Approve", "pass": "Pass", "approve": "Approve", "reject": "Return with note",
+    "bulk_pass": "Pass selected ({{count}})", "bulk_approve": "Approve selected ({{count}})", "selected": "{{count}} selected",
+    "entered_by": "Entered by", "actual_date": "Actual date", "plan": "plan", "external": "External party", "sla": "SLA", "documents": "Documents ({{count}})",
+    "awaiting": "Awaiting approval", "in_review": "In review", "note": "Note", "note_required": "A note is required to return a task.",
+    "reject_title": "Return {{site}} with a note", "send": "Return", "empty": "Nothing is waiting for you.", "select_one": "Select an item to see its details.",
+    "done": "Done", "bulk_result": "{{done}} done, {{skipped}} skipped, {{failed}} failed", "returned_note": "Last returned: {{note}}", "wd": "wd"
+  },
+  "stepUp": { "title": "Re-authentication needed", "body": "Final approval needs a fresh sign-in. Verify once and the action continues.", "continue": "Verify with Microsoft 365", "cancel": "Cancel" },
+  "card": { "phone": "Phone", "email": "Email", "position": "Position", "region": "Region", "team": "Team", "hidden": "Not visible to you", "inactive": "Inactive", "loading": "Loading…", "unavailable": "Card unavailable" },
+  "errors": { "generic": "Something went wrong.", "precondition_failed": "Someone changed this task. The list was refreshed; try again.", "forbidden": "You are not allowed to do this.", "retry": "Retry" },
+  "common": { "cancel": "Cancel", "loading": "Loading…", "close": "Close", "soon": "This screen comes in a later phase." }
+}

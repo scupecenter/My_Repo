@@ -4,3 +4,7 @@
 .playwright-cli/
 pmis/design/forms/node_modules/
 __pycache__/
+pmis/apps/web/node_modules/
+pmis/apps/web/dist/
+pmis/apps/web/test-results/
+pmis/apps/web/playwright-report/
