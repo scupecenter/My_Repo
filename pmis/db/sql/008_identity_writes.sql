@@ -185,7 +185,7 @@ $$;
 -- The ceiling rule: a non-System-Admin actor never acts outside, or grants wider than, their own effective scope
 -- (modules x actions x regions x end date). These helpers are used by every idm_* and admin_* function; System Admins are
 -- exempt. Summary of the sweep (function -> ceiling applied):
---   idm_assign / idm_update_assignment : idm_scope_check (regions, all_regions, modules, all_modules, end date, level<>admin),
+--   idm_assign / idm_update_assignment : post-state idm_assert_assignment_within_actor (regions, all_regions, modules, all_modules, end date, level<>admin),
 --                                        profiles within actor, role not privileged (idm_role_privileged); update/end also
 --                                        require the existing assignment to lie in the actor's regions (idm_assignment_in_scope)
 --   idm_end_assignment                 : existing assignment in the actor's regions
@@ -201,6 +201,17 @@ $$;
 --   admin_repoint_sla                  : every affected task in delegated regions
 --   admin_create_workflow_draft        : global scope
 --   config RLS (app_can)               : counts only rights held for all regions
+--
+-- Post-state rule (added in the third review round): for a non-System-Admin actor every idm_* write computes the RESULTING state
+-- and checks it against the ceiling, inside the same function, so a failure rolls the change back:
+--   idm_assert_assignment_within_actor (level, all_regions/modules, regions, modules, profiles, end date, role privilege)
+--   idm_assert_group_within_actor, idm_assert_user_change_allowed, idm_assert_role_within_actor, idm_profile_within_actor.
+-- Privilege tests (admin member, privileged group/role/user, delegation target) ignore every active/revoked/expiry flag, so a
+-- dormant admin, group or delegation cannot be reactivated by a delegate. Sweep changes: idm_set_user_status (post-state user
+-- check, privileged users by any status), idm_assign/idm_update_assignment (post-state; an ended assignment cannot get a new end
+-- date), idm_group_save/add/remove (post-state, privileged groups System-Admin only), idm_field_permission_set (fails closed:
+-- own access = field rule, else entity permission, else hidden; cannot loosen or remove a rule beyond own access),
+-- idm_role_save / idm_profile_save / idm_profile_set_grants (post-state). admin_* functions only use region filters and global scope.
 -- ---------------------------------------------------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION idm_need_global(p_module text, p_action "PermissionAction") RETURNS void
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
@@ -226,6 +237,10 @@ BEGIN
   rf := public.app_actor_region_filter(p_module, p_action);
   IF coalesce(p_all_regions, false) AND rf IS NOT NULL THEN
     RAISE EXCEPTION 'you cannot grant all regions: your own delegation is limited to some regions' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  -- defence in depth (the deferred scope trigger and the resolver already fail closed on an empty region set)
+  IF rf IS NOT NULL AND NOT coalesce(p_all_regions, false) AND cardinality(coalesce(p_regions, ARRAY[]::int[])) = 0 THEN
+    RAISE EXCEPTION 'a regional delegate must name at least one region' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF rf IS NOT NULL THEN
     FOREACH r IN ARRAY coalesce(p_regions, ARRAY[]::int[]) LOOP
@@ -254,7 +269,9 @@ BEGIN
   rf := public.app_actor_region_filter(p_module, p_action);
   IF rf IS NULL THEN RETURN; END IF;
   SELECT * INTO o FROM public.user_role_assignments WHERE id = p_id;
-  IF o.all_regions OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions r WHERE r.assignment_id = p_id AND NOT (r.region_id = ANY (rf))) THEN
+  IF o.all_regions
+     OR NOT EXISTS (SELECT 1 FROM public.user_role_assignment_regions r WHERE r.assignment_id = p_id)
+     OR EXISTS (SELECT 1 FROM public.user_role_assignment_regions r WHERE r.assignment_id = p_id AND NOT (r.region_id = ANY (rf))) THEN
     RAISE EXCEPTION 'this assignment reaches regions outside your delegated regions' USING ERRCODE = 'insufficient_privilege';
   END IF;
 END $$;
@@ -262,14 +279,88 @@ END $$;
 -- Roles and groups that carry delegations (or a default profile wider than the actor) are System-Admin territory.
 CREATE OR REPLACE FUNCTION idm_role_privileged(p_role uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-  SELECT EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_role_id = p_role AND public.deleg_effective(d.id))
+  -- ignores every active/revoked/expiry flag: a dormant delegation or role must not become a way around the test
+  SELECT EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_role_id = p_role)
       OR EXISTS (SELECT 1 FROM public.roles r WHERE r.id = p_role AND r.default_profile_id IS NOT NULL AND NOT public.idm_profile_within_actor(r.default_profile_id))
 $$;
 CREATE OR REPLACE FUNCTION idm_group_privileged(p_group uuid) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  -- ignores groups.is_active and delegation status
   SELECT EXISTS (SELECT 1 FROM public.groups g WHERE g.id = p_group AND g.is_system_admins)
-      OR EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_group_id = p_group AND public.deleg_effective(d.id))
+      OR EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_group_id = p_group)
 $$;
+
+-- A user is privileged when they are, or ever were set up as, an admin or a delegate: member of any System Admins group (whatever
+-- the group or user status), direct delegation target, or holder of an admin-level assignment or a privileged role (any validity).
+CREATE OR REPLACE FUNCTION idm_user_privileged(p_user uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins WHERE gm.user_id = p_user)
+      OR EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_user_id = p_user)
+      OR EXISTS (SELECT 1 FROM public.user_role_assignments a WHERE a.user_id = p_user AND (a.permission_level = 'admin' OR public.idm_role_privileged(a.role_id)))
+$$;
+
+-- ---- post-state helpers: called AFTER the INSERT/UPDATE inside the same function; a failure rolls the change back --------------
+CREATE OR REPLACE FUNCTION idm_assert_assignment_within_actor(p_id uuid, p_action "PermissionAction") RETURNS void
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE a public.user_role_assignments%ROWTYPE; rf int[]; e timestamptz; r int; m text; pr uuid; actor uuid := public.app_actor();
+BEGIN
+  IF public.app_actor_is_system_admin() THEN RETURN; END IF;
+  SELECT * INTO a FROM public.user_role_assignments WHERE id = p_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'assignment not found'; END IF;
+  IF a.permission_level = 'admin' THEN RAISE EXCEPTION 'only a System Admin can hold or grant admin level' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF public.idm_role_privileged(a.role_id) THEN RAISE EXCEPTION 'this role carries delegations or wider rights: System Admin only' USING ERRCODE = 'insufficient_privilege'; END IF;
+  rf := public.app_actor_region_filter('assignments', p_action);
+  IF rf IS NOT NULL THEN
+    IF a.all_regions THEN RAISE EXCEPTION 'resulting assignment has all regions: wider than your delegated regions' USING ERRCODE = 'insufficient_privilege'; END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.user_role_assignment_regions WHERE assignment_id = p_id) THEN
+      RAISE EXCEPTION 'a regional delegate must name at least one region' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    FOR r IN SELECT region_id FROM public.user_role_assignment_regions WHERE assignment_id = p_id LOOP
+      IF NOT (r = ANY (rf)) THEN RAISE EXCEPTION 'region % is outside your delegated regions', r USING ERRCODE = 'insufficient_privilege'; END IF;
+    END LOOP;
+  END IF;
+  IF a.all_modules AND NOT public.idm_actor_all_modules() THEN RAISE EXCEPTION 'resulting assignment has all modules: you do not hold all modules' USING ERRCODE = 'insufficient_privilege'; END IF;
+  FOR m IN SELECT module_key FROM public.user_role_assignment_modules WHERE assignment_id = p_id LOOP
+    IF NOT public.app_has_permission(actor, m, 'view') THEN RAISE EXCEPTION 'module % is outside your own scope', m USING ERRCODE = 'insufficient_privilege'; END IF;
+  END LOOP;
+  FOR pr IN SELECT profile_id FROM public.user_role_assignment_profiles WHERE assignment_id = p_id LOOP
+    IF NOT public.idm_profile_within_actor(pr) THEN RAISE EXCEPTION 'profile % is wider than your own rights', pr USING ERRCODE = 'insufficient_privilege'; END IF;
+  END LOOP;
+  e := public.app_actor_delegation_end('assignments', p_action);
+  IF e IS NOT NULL AND e <> 'infinity' AND (a.valid_to IS NULL OR a.valid_to > e) THEN
+    RAISE EXCEPTION 'resulting end date is beyond your own delegation (ends %)', e USING ERRCODE = 'insufficient_privilege';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION idm_assert_group_within_actor(p_group uuid) RETURNS void
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF public.app_actor_is_system_admin() THEN RETURN; END IF;
+  IF public.idm_group_privileged(p_group) THEN
+    RAISE EXCEPTION 'this group is the admin group or carries delegations: System Admin only' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION idm_assert_user_change_allowed(p_user uuid) RETURNS void
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF public.app_actor_is_system_admin() THEN RETURN; END IF;
+  IF public.idm_user_privileged(p_user) THEN
+    RAISE EXCEPTION 'this user is an admin or a delegate (or was): System Admin only' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION idm_assert_role_within_actor(p_role uuid) RETURNS void
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE r public.roles%ROWTYPE;
+BEGIN
+  IF public.app_actor_is_system_admin() THEN RETURN; END IF;
+  SELECT * INTO r FROM public.roles WHERE id = p_role;
+  IF r.default_all_regions THEN RAISE EXCEPTION 'a role with default_all_regions is System-Admin only' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF r.default_all_modules AND NOT public.idm_actor_all_modules() THEN RAISE EXCEPTION 'a role defaulting to all modules needs you to hold all modules' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF r.default_profile_id IS NOT NULL AND NOT public.idm_profile_within_actor(r.default_profile_id) THEN RAISE EXCEPTION 'default profile is wider than your own rights' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_role_id = p_role) THEN RAISE EXCEPTION 'this role is a delegation target: System Admin only' USING ERRCODE = 'insufficient_privilege'; END IF;
+END $$;
 
 -- First sign-in: a pending user with no rights. Idempotent by Entra object id.
 CREATE OR REPLACE FUNCTION idm_register_self(p_m365 text, p_email text, p_display text) RETURNS uuid
@@ -305,36 +396,29 @@ BEGIN
   PERFORM public.idm_need_reason(p_reason);
   PERFORM public.idm_need_global('users', 'edit');
   IF p_user = a THEN RAISE EXCEPTION 'you cannot change your own status' USING ERRCODE = 'insufficient_privilege'; END IF;
-  IF public.app_user_is_system_admin(p_user) AND NOT public.app_actor_is_system_admin() THEN
-    RAISE EXCEPTION 'only a System Admin can change an admin' USING ERRCODE = 'insufficient_privilege';
-  END IF;
   SELECT status INTO old FROM public.users WHERE id = p_user;
   IF NOT FOUND THEN RAISE EXCEPTION 'user not found'; END IF;
   UPDATE public.users SET status = p_status, updated_at = now() WHERE id = p_user;
+  PERFORM public.idm_assert_user_change_allowed(p_user); -- post-state: privileged users (any status) are System-Admin only
   PERFORM public.idm_audit('user_status', 'user', p_user::text, jsonb_build_object('status', old), jsonb_build_object('status', p_status), p_reason);
 END $$;
 
 CREATE OR REPLACE FUNCTION idm_assign(p_user uuid, p_role uuid, p_level "PermissionLevel", p_team "TeamKind", p_valid_from timestamptz, p_valid_to timestamptz,
   p_is_primary boolean, p_all_regions boolean, p_regions int[], p_all_modules boolean, p_modules text[], p_profiles uuid[], p_reason text) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE a uuid := public.idm_actor('assignments', 'create'); aid uuid; pr uuid;
+DECLARE a uuid := public.idm_actor('assignments', 'create'); aid uuid;
 BEGIN
   PERFORM public.idm_need_reason(p_reason);
   IF p_user = a THEN RAISE EXCEPTION 'you cannot assign roles to yourself' USING ERRCODE = 'insufficient_privilege'; END IF;
-  PERFORM public.idm_scope_check('assignments', 'create', p_all_regions, p_regions, p_all_modules, p_modules, p_valid_to, p_level);
-  IF NOT public.app_actor_is_system_admin() AND public.idm_role_privileged(p_role) THEN
-    RAISE EXCEPTION 'this role carries delegations or wider rights: only a System Admin can assign it' USING ERRCODE = 'insufficient_privilege';
-  END IF;
+  PERFORM public.idm_assert_user_change_allowed(p_user);
   IF NOT EXISTS (SELECT 1 FROM public.roles WHERE id = p_role AND is_active) THEN RAISE EXCEPTION 'role not found or inactive'; END IF;
-  FOREACH pr IN ARRAY coalesce(p_profiles, ARRAY[]::uuid[]) LOOP
-    IF NOT public.idm_profile_within_actor(pr) THEN RAISE EXCEPTION 'profile % is wider than your own rights', pr USING ERRCODE = 'insufficient_privilege'; END IF;
-  END LOOP;
   INSERT INTO public.user_role_assignments (user_id, role_id, permission_level, team, valid_from, valid_to, is_primary, all_regions, all_modules, assigned_by)
   VALUES (p_user, p_role, coalesce(p_level, 'view'), coalesce(p_team, 'none'), coalesce(p_valid_from, now()), p_valid_to, coalesce(p_is_primary, false),
           coalesce(p_all_regions, false), coalesce(p_all_modules, false), a) RETURNING id INTO aid;
   INSERT INTO public.user_role_assignment_regions SELECT aid, r FROM unnest(coalesce(p_regions, ARRAY[]::int[])) r;
   INSERT INTO public.user_role_assignment_modules SELECT aid, m FROM unnest(coalesce(p_modules, ARRAY[]::text[])) m;
   INSERT INTO public.user_role_assignment_profiles SELECT aid, pp FROM unnest(coalesce(p_profiles, ARRAY[]::uuid[])) pp;
+  PERFORM public.idm_assert_assignment_within_actor(aid, 'create'); -- post-state ceiling check; failure rolls everything back
   PERFORM public.idm_audit('assignment_created', 'user_role_assignment', aid::text, NULL,
     jsonb_build_object('user', p_user, 'role', p_role, 'all_regions', p_all_regions, 'regions', p_regions, 'all_modules', p_all_modules, 'modules', p_modules, 'profiles', p_profiles), p_reason);
   RETURN aid;
@@ -343,20 +427,20 @@ END $$;
 CREATE OR REPLACE FUNCTION idm_update_assignment(p_id uuid, p_level "PermissionLevel", p_team "TeamKind", p_valid_to timestamptz, p_all_regions boolean, p_regions int[],
   p_all_modules boolean, p_modules text[], p_profiles uuid[], p_reason text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE a uuid := public.idm_actor('assignments', 'edit'); o public.user_role_assignments%ROWTYPE; pr uuid;
+DECLARE a uuid := public.idm_actor('assignments', 'edit'); o public.user_role_assignments%ROWTYPE;
 BEGIN
   PERFORM public.idm_need_reason(p_reason);
   SELECT * INTO o FROM public.user_role_assignments WHERE id = p_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'assignment not found'; END IF;
   IF o.user_id = a THEN RAISE EXCEPTION 'you cannot change your own assignments' USING ERRCODE = 'insufficient_privilege'; END IF;
-  PERFORM public.idm_assignment_in_scope(p_id, 'assignments', 'edit');
-  PERFORM public.idm_scope_check('assignments', 'edit', p_all_regions, p_regions, p_all_modules, p_modules, p_valid_to, p_level);
-  IF NOT public.app_actor_is_system_admin() AND public.idm_role_privileged(o.role_id) THEN
-    RAISE EXCEPTION 'this role carries delegations or wider rights: only a System Admin can change it' USING ERRCODE = 'insufficient_privilege';
+  IF NOT public.app_actor_is_system_admin() THEN
+    PERFORM public.idm_assert_user_change_allowed(o.user_id);
+    PERFORM public.idm_assignment_in_scope(p_id, 'assignments', 'edit');                -- pre-state: only assignments inside your scope
+    PERFORM public.idm_assert_assignment_within_actor(p_id, 'edit');                    -- pre-state: an admin-level / all_modules / wide assignment is not yours to edit
+    IF o.valid_to IS NOT NULL AND o.valid_to <= now() AND p_valid_to IS DISTINCT FROM o.valid_to THEN
+      RAISE EXCEPTION 'an assignment that has already ended cannot be given a new end date' USING ERRCODE = 'insufficient_privilege';
+    END IF;
   END IF;
-  FOREACH pr IN ARRAY coalesce(p_profiles, ARRAY[]::uuid[]) LOOP
-    IF NOT public.idm_profile_within_actor(pr) THEN RAISE EXCEPTION 'profile % is wider than your own rights', pr USING ERRCODE = 'insufficient_privilege'; END IF;
-  END LOOP;
   UPDATE public.user_role_assignments SET permission_level = coalesce(p_level, permission_level), team = coalesce(p_team, team), valid_to = p_valid_to,
     all_regions = coalesce(p_all_regions, all_regions), all_modules = coalesce(p_all_modules, all_modules) WHERE id = p_id;
   IF p_regions IS NOT NULL THEN
@@ -371,6 +455,7 @@ BEGIN
     DELETE FROM public.user_role_assignment_profiles WHERE assignment_id = p_id;
     INSERT INTO public.user_role_assignment_profiles SELECT p_id, pp FROM unnest(p_profiles) pp;
   END IF;
+  PERFORM public.idm_assert_assignment_within_actor(p_id, 'edit');                      -- post-state
   PERFORM public.idm_audit('assignment_updated', 'user_role_assignment', p_id::text, to_jsonb(o),
     jsonb_build_object('regions', p_regions, 'modules', p_modules, 'profiles', p_profiles, 'all_regions', p_all_regions, 'all_modules', p_all_modules, 'valid_to', p_valid_to), p_reason);
 END $$;
@@ -403,8 +488,9 @@ BEGIN
     a := public.idm_actor('groups', 'edit');
     SELECT * INTO o FROM public.groups WHERE id = p_id;
     IF NOT FOUND THEN RAISE EXCEPTION 'group not found'; END IF;
-    IF o.is_system_admins AND NOT public.app_actor_is_system_admin() THEN RAISE EXCEPTION 'only a System Admin can change the admin group' USING ERRCODE = 'insufficient_privilege'; END IF;
+    PERFORM public.idm_assert_group_within_actor(p_id); -- pre-state: privileged groups (any status) are System-Admin only
     UPDATE public.groups SET name = coalesce(p_name, name), description = p_desc, is_active = coalesce(p_active, is_active) WHERE id = p_id;
+    PERFORM public.idm_assert_group_within_actor(p_id); -- post-state
     PERFORM public.idm_audit('group_updated', 'group', p_id::text, to_jsonb(o), jsonb_build_object('name', p_name, 'is_active', p_active), p_reason);
   END IF;
   RETURN gid;
@@ -412,30 +498,28 @@ END $$;
 
 CREATE OR REPLACE FUNCTION idm_group_add_member(p_group uuid, p_user uuid, p_reason text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE a uuid := public.idm_actor('groups', 'edit'); adm boolean;
+DECLARE a uuid := public.idm_actor('groups', 'edit');
 BEGIN
   PERFORM public.idm_need_reason(p_reason);
   IF p_user = a THEN RAISE EXCEPTION 'you cannot add yourself to a group' USING ERRCODE = 'insufficient_privilege'; END IF;
   PERFORM public.idm_need_global('groups', 'edit');
-  SELECT is_system_admins INTO adm FROM public.groups WHERE id = p_group;
-  IF NOT FOUND THEN RAISE EXCEPTION 'group not found'; END IF;
-  IF adm AND NOT public.app_actor_is_system_admin() THEN RAISE EXCEPTION 'only a System Admin can add an admin' USING ERRCODE = 'insufficient_privilege'; END IF;
-  IF NOT public.app_actor_is_system_admin() AND public.idm_group_privileged(p_group) THEN
-    RAISE EXCEPTION 'this group carries delegations: only a System Admin can add members' USING ERRCODE = 'insufficient_privilege';
-  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group) THEN RAISE EXCEPTION 'group not found'; END IF;
   INSERT INTO public.group_members (group_id, user_id) VALUES (p_group, p_user) ON CONFLICT DO NOTHING;
+  PERFORM public.idm_assert_group_within_actor(p_group); -- post-state: not the admin group, not a delegation target
   PERFORM public.idm_audit('group_member_added', 'group', p_group::text, NULL, jsonb_build_object('user', p_user), p_reason);
 END $$;
 
 CREATE OR REPLACE FUNCTION idm_group_remove_member(p_group uuid, p_user uuid, p_reason text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE a uuid := public.idm_actor('groups', 'edit'); adm boolean;
 BEGIN
+  PERFORM public.idm_actor('groups', 'edit');
   PERFORM public.idm_need_reason(p_reason);
   PERFORM public.idm_need_global('groups', 'edit');
-  SELECT is_system_admins INTO adm FROM public.groups WHERE id = p_group;
-  IF NOT FOUND THEN RAISE EXCEPTION 'group not found'; END IF;
-  IF adm AND NOT public.app_actor_is_system_admin() THEN RAISE EXCEPTION 'a delegate cannot remove an admin' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group) THEN RAISE EXCEPTION 'group not found'; END IF;
+  IF EXISTS (SELECT 1 FROM public.groups WHERE id = p_group AND is_system_admins) AND NOT public.app_actor_is_system_admin() THEN
+    RAISE EXCEPTION 'a delegate cannot remove an admin' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  PERFORM public.idm_assert_group_within_actor(p_group); -- privileged groups are System-Admin only (removing also changes others' rights)
   DELETE FROM public.group_members WHERE group_id = p_group AND user_id = p_user;
   PERFORM public.idm_audit('group_member_removed', 'group', p_group::text, jsonb_build_object('user', p_user), NULL, p_reason);
 END $$;
@@ -518,7 +602,8 @@ BEGIN
     UPDATE public.permission_profiles SET name_en = coalesce(p_name_en, name_en), name_ar = p_name_ar, description = p_desc,
       is_active = coalesce(p_active, is_active), reason = p_reason, changed_by = a WHERE id = p_id;
     IF NOT FOUND THEN RAISE EXCEPTION 'profile not found'; END IF;
-    PERFORM public.idm_audit('profile_updated', 'permission_profile', p_id::text, NULL, jsonb_build_object('name_en', p_name_en, 'is_active', p_active), p_reason);
+    IF NOT public.idm_profile_within_actor(p_id) THEN RAISE EXCEPTION 'this profile is wider than your own rights' USING ERRCODE = 'insufficient_privilege'; END IF; -- post-state
+  PERFORM public.idm_audit('profile_updated', 'permission_profile', p_id::text, NULL, jsonb_build_object('name_en', p_name_en, 'is_active', p_active), p_reason);
   END IF;
   RETURN pid;
 END $$;
@@ -542,22 +627,36 @@ BEGIN
     INSERT INTO public.permission_grants VALUES (p_profile, g->>'module', (g->>'action')::"PermissionAction") ON CONFLICT DO NOTHING;
   END LOOP;
   UPDATE public.permission_profiles SET reason = p_reason, changed_by = a WHERE id = p_profile;
+  IF NOT public.idm_profile_within_actor(p_profile) THEN RAISE EXCEPTION 'resulting profile is wider than your own rights' USING ERRCODE = 'insufficient_privilege'; END IF; -- post-state
   PERFORM public.idm_audit('profile_grants_set', 'permission_profile', p_profile::text, NULL, p_grants, p_reason);
 END $$;
 
 CREATE OR REPLACE FUNCTION idm_field_permission_set(p_field uuid, p_role uuid, p_profile uuid, p_access "FieldAccess", p_reason text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE a uuid := public.idm_actor('fields', 'edit');
+DECLARE a uuid := public.idm_actor('fields', 'edit'); own int; want int; ent "FieldEntityType"; modk text;
 BEGIN
   PERFORM public.idm_need_reason(p_reason);
   PERFORM public.idm_need_global('fields', 'edit');
   IF (p_role IS NULL) = (p_profile IS NULL) THEN RAISE EXCEPTION 'give a role or a profile'; END IF;
-  IF NOT public.app_actor_is_system_admin() THEN
-    IF public.app_resolve_field_access(a, p_field) = 'hidden' THEN RAISE EXCEPTION 'you cannot see this field, so you cannot change who sees it' USING ERRCODE = 'insufficient_privilege'; END IF;
-    IF p_access = 'edit' AND public.app_resolve_field_access(a, p_field) = 'read' THEN RAISE EXCEPTION 'you cannot grant edit on a field you can only read' USING ERRCODE = 'insufficient_privilege'; END IF;
-  END IF;
   IF (p_role IS NOT NULL AND public.idm_actor_holds_role(p_role)) OR (p_profile IS NOT NULL AND public.idm_actor_uses_profile(p_profile)) THEN
     RAISE EXCEPTION 'you cannot change field rules that apply to you' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NOT public.app_actor_is_system_admin() THEN
+    -- the actor's own access: the field rule, else the entity-level permission, else hidden (fail closed when unknown)
+    SELECT entity_type INTO ent FROM public.field_definitions WHERE id = p_field;
+    IF NOT FOUND THEN RAISE EXCEPTION 'field not found'; END IF;
+    modk := CASE ent::text WHEN 'site' THEN 'sites' WHEN 'task_instance' THEN 'sites' WHEN 'milestone' THEN 'workflow_versions' WHEN 'gate' THEN 'workflow_versions'
+      WHEN 'rf_design' THEN 'rf_design' WHEN 'acquisition' THEN 'acquisition' WHEN 'procurement' THEN 'procurement' WHEN 'gecol' THEN 'gecol' WHEN 'hlc' THEN 'hlc'
+      WHEN 'permit' THEN 'permits_hse' WHEN 'warehouse_item' THEN 'warehouse' WHEN 'warehouse_serial' THEN 'warehouse' WHEN 'quality' THEN 'quality'
+      WHEN 'issue' THEN 'issues' WHEN 'risk' THEN 'risks' WHEN 'change_request' THEN 'change_control' WHEN 'readiness' THEN 'readiness'
+      WHEN 'as_built' THEN 'as_built' WHEN 'meeting' THEN 'meetings' WHEN 'external_party' THEN 'contractors' END;
+    own := CASE public.app_resolve_field_access(a, p_field)::text WHEN 'hidden' THEN 0 WHEN 'read' THEN 1 WHEN 'edit' THEN 2 ELSE
+             CASE WHEN modk IS NOT NULL AND public.app_has_permission(a, modk, 'edit') THEN 2
+                  WHEN modk IS NOT NULL AND public.app_has_permission(a, modk, 'view') THEN 1 ELSE 0 END END;
+    IF own = 0 THEN RAISE EXCEPTION 'you cannot see this field, so you cannot change who sees it' USING ERRCODE = 'insufficient_privilege'; END IF;
+    -- resulting access for the subject: the rule, or (rule removed) the entity default, which is edit
+    want := CASE p_access::text WHEN 'hidden' THEN 0 WHEN 'read' THEN 1 ELSE 2 END;
+    IF want > own THEN RAISE EXCEPTION 'you cannot give (or restore by removing a rule) more field access than you have yourself' USING ERRCODE = 'insufficient_privilege'; END IF;
   END IF;
   DELETE FROM public.field_permissions WHERE field_id = p_field AND role_id IS NOT DISTINCT FROM p_role AND profile_id IS NOT DISTINCT FROM p_profile;
   IF p_access IS NOT NULL THEN
@@ -601,6 +700,7 @@ BEGIN
     WHERE id = p_id;
     PERFORM public.idm_audit('role_updated', 'role', p_id::text, to_jsonb(o), jsonb_build_object('name_en', p_name_en, 'is_active', p_active, 'parent', p_parent), p_reason);
   END IF;
+  PERFORM public.idm_assert_role_within_actor(rid); -- post-state
   RETURN rid;
 END $$;
 
@@ -633,7 +733,7 @@ DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
     'idm_actor_holds_role(uuid)','idm_actor_uses_profile(uuid)','idm_actor(text,"PermissionAction")','idm_audit(text,text,text,jsonb,jsonb,text)',
-    'idm_profile_within_actor(uuid)','idm_need_global(text,"PermissionAction")','idm_actor_all_modules()','idm_scope_check(text,"PermissionAction",boolean,int[],boolean,text[],timestamptz,"PermissionLevel")','idm_assignment_in_scope(uuid,text,"PermissionAction")','idm_role_privileged(uuid)','idm_group_privileged(uuid)','idm_register_self(text,text,text)','idm_set_employee_id(uuid,text)','idm_set_user_status(uuid,"UserStatus",text)',
+    'idm_profile_within_actor(uuid)','idm_need_reason(text)','idm_need_global(text,"PermissionAction")','idm_actor_all_modules()','idm_scope_check(text,"PermissionAction",boolean,int[],boolean,text[],timestamptz,"PermissionLevel")','idm_assignment_in_scope(uuid,text,"PermissionAction")','idm_role_privileged(uuid)','idm_group_privileged(uuid)','idm_user_privileged(uuid)','idm_assert_assignment_within_actor(uuid,"PermissionAction")','idm_assert_group_within_actor(uuid)','idm_assert_user_change_allowed(uuid)','idm_assert_role_within_actor(uuid)','idm_register_self(text,text,text)','idm_set_employee_id(uuid,text)','idm_set_user_status(uuid,"UserStatus",text)',
     'idm_assign(uuid,uuid,"PermissionLevel","TeamKind",timestamptz,timestamptz,boolean,boolean,int[],boolean,text[],uuid[],text)',
     'idm_update_assignment(uuid,"PermissionLevel","TeamKind",timestamptz,boolean,int[],boolean,text[],uuid[],text)','idm_end_assignment(uuid,text)',
     'idm_group_save(uuid,text,text,boolean,text)','idm_group_add_member(uuid,uuid,text)','idm_group_remove_member(uuid,uuid,text)',
@@ -645,7 +745,7 @@ BEGIN
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_identity_owner', f);
   END LOOP;
   -- idm_* are callable by the app role only; helpers stay internal
-  FOREACH f IN ARRAY ARRAY['idm_actor(text,"PermissionAction")','idm_audit(text,text,text,jsonb,jsonb,text)','idm_profile_within_actor(uuid)','idm_need_global(text,"PermissionAction")','idm_actor_all_modules()','idm_scope_check(text,"PermissionAction",boolean,int[],boolean,text[],timestamptz,"PermissionLevel")','idm_assignment_in_scope(uuid,text,"PermissionAction")','idm_role_privileged(uuid)','idm_group_privileged(uuid)'] LOOP
+  FOREACH f IN ARRAY ARRAY['idm_actor(text,"PermissionAction")','idm_audit(text,text,text,jsonb,jsonb,text)','idm_profile_within_actor(uuid)','idm_need_global(text,"PermissionAction")','idm_actor_all_modules()','idm_scope_check(text,"PermissionAction",boolean,int[],boolean,text[],timestamptz,"PermissionLevel")','idm_assignment_in_scope(uuid,text,"PermissionAction")','idm_role_privileged(uuid)','idm_group_privileged(uuid)','idm_user_privileged(uuid)','idm_assert_assignment_within_actor(uuid,"PermissionAction")','idm_assert_group_within_actor(uuid)','idm_assert_user_change_allowed(uuid)','idm_assert_role_within_actor(uuid)'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
   END LOOP;
 END $$;
@@ -725,12 +825,31 @@ DO $$ BEGIN
     GRANT EXECUTE ON FUNCTION admin_transfer_site_region(uuid, integer, text) TO pmis_app;
   END IF;
 END $$;
+-- No idm_* / admin_* function is executable by PUBLIC; only pmis_app (below) and the owners.
+DO $$
+DECLARE f record;
+BEGIN
+  FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+           WHERE n.nspname = 'public' AND (p.proname LIKE 'idm\_%' OR p.proname LIKE 'admin\_%')
+  LOOP EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f.sig); END LOOP;
+END $$;
+
 DO $$
 DECLARE f record;
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-             WHERE n.nspname = 'public' AND p.proname LIKE 'idm\_%' AND p.proname NOT IN ('idm_actor','idm_audit','idm_profile_within_actor','idm_need_global','idm_actor_all_modules','idm_scope_check','idm_assignment_in_scope','idm_role_privileged','idm_group_privileged','idm_need_reason','idm_backstop','idm_users_backstop','idm_beneficiary_backstop','idm_last_admin_check','idm_revoke_app_writes')
+             WHERE n.nspname = 'public' AND p.proname LIKE 'admin\_%'
+    LOOP EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_app', f.sig); END LOOP;
+  END IF;
+END $$;
+
+DO $$
+DECLARE f record;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+             WHERE n.nspname = 'public' AND p.proname LIKE 'idm\_%' AND p.proname NOT IN ('idm_actor','idm_audit','idm_profile_within_actor','idm_need_global','idm_actor_all_modules','idm_scope_check','idm_assignment_in_scope','idm_role_privileged','idm_group_privileged','idm_user_privileged','idm_assert_assignment_within_actor','idm_assert_group_within_actor','idm_assert_user_change_allowed','idm_assert_role_within_actor','idm_need_reason','idm_backstop','idm_users_backstop','idm_beneficiary_backstop','idm_last_admin_check','idm_revoke_app_writes')
     LOOP EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_app', f.sig); END LOOP;
   END IF;
 END $$;
