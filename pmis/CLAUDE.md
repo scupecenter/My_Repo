@@ -42,7 +42,7 @@ Read before any work:
 Stack and platform
 - NestJS with PostgreSQL. Hosting is on an internal server, never cloud.
 - Login is Microsoft 365 (Entra ID) for Aljeel employees only. Vendors, contractors, GECOL, HLC and suppliers never log in. Staff enter their data and upload their documents for them, and every task still shows the external party responsible for it (for example A&T Global) so delays are attributed correctly.
-- Two-factor authentication: enforced through Entra Conditional Access. The API checks the token's `amr` claim for `mfa` behind an admin toggle (off until IT enables MFA). Step-up re-authentication is required for final approval, role/matrix/group changes, delegation, deletes and admin overrides. One break-glass local admin account exists, with TOTP, usable from the internal network only, and every use is logged and emailed.
+- Two-factor authentication: enforced through Entra Conditional Access. The API checks the token's `amr` claim for `mfa` behind an admin toggle (off until IT enables MFA). Step-up re-authentication is required for final approval, role/matrix/group changes, delegation, deletes and admin overrides. One break-glass local admin account exists, with TOTP, usable from the internal network only, and every use is logged and emailed. **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or a delegate granted it) can remove the PMIS MFA requirement for any registered user, until revoked or until an end date. The exempted user then signs in and passes step-up without `amr = mfa`. It needs a reason and the acting admin's own step-up MFA, nobody can exempt themselves, it is audited with before/after values, the user is emailed, and the Users & Roles screen shows an "MFA exempt" badge. It removes only the PMIS check; MFA enforced by Entra Conditional Access is changed by IT in Entra, not in the PMIS.
 - Notifications go in-app and by email.
 
 Roles, groups and administration
@@ -72,6 +72,7 @@ Configuration owned by the System Admin (or a delegate)
   - Every milestone and gate keeps a stable internal code, so renames never break history, KPIs or reports. Each one also carries its Master export column.
   - The screen warns when a change affects the Master-format export or the parallel-run comparison. During the parallel-run month the warning requires an explicit confirmation.
   - Project Status and the dashboard read the active workflow version per site.
+  - **Freeze during pilot and parallel run (decision B9):** structural changes are blocked from the pilot start to the end of the parallel-run month. Only a System Admin can lift the freeze, with a written reason and step-up MFA, and the lift is audited. Light changes, and new tasks inside an existing stage (B8), stay allowed.
 - **Roles are fully admin-defined.** The 6 main roles and 9 sub-roles are seed data only. The admin can create a new role with:
   - a name (EN/AR) and a description of its duties
   - a parent role if it is a sub-role
