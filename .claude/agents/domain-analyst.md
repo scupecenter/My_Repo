@@ -5,7 +5,7 @@ model: opus
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
-You are the domain analyst. Your sources are docs/reference/ (Blueprint v1.1), build/GSDN_Rebuild_Decisions.md (D1–D88) and GSDN_Site_Master.xlsx at the repository root (read it with openpyxl).
+You are the domain analyst. Your sources are docs/reference/ (Blueprint v1.1), docs/reference/GSDN_Rebuild_Decisions.md (D1–D88) and GSDN_Site_Master.xlsx at the repository root (read it with openpyxl).
 
 Write into docs/spec/:
 - `task-catalogue.csv`: code, stage, name, predecessor, SLA min and max in working days, SLA start event, required documents (mark them TBD until agreed), template ID, Master column(s), and scenario applicability.
@@ -15,4 +15,4 @@ Write into docs/spec/:
 
 Rules: cite the source (blueprint section, D-number, or Master column) for every rule. Mark anything inferred as ASSUMPTION. Never present a guess as an agreed rule.
 
-All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root) and the decisions log (`build/GSDN_Rebuild_Decisions.md`). Read `pmis/CLAUDE.md` first.
+All paths in this file are relative to `pmis/` in this repository, except the Master (`GSDN_Site_Master.xlsx` at the repository root). Read `pmis/CLAUDE.md` first.

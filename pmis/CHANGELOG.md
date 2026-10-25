@@ -6,6 +6,27 @@
 
 ---
 
+## 2026-10-25 (4) — تنظيف المستودع للتسليم
+
+### حذف
+- `Dashboard.html` (اللوحة القديمة)، و`CHANGELOG.md` و`docs/GSDN_Dashboard_Reference.md` الخاصّان بها في جذر المستودع.
+- تجارب التصميم الأولى: `design/GSDN_PMIS_Site_Page_Concept.html` و`design/GSDN_PMIS_Visual_Directions.html`، وملف الألوان القديم غير المستخدم `design/prototype-v2/app.css`.
+- 3 لقطات قديمة في `design/screens/`؛ الاختبار يكتبها الآن في `design/screens/latest/` (11–13) بمسارات نسبية.
+
+### نقل
+- `dashboard/` ← `docs/reference/legacy-dashboard/` (مرجع للقراءة فقط لمؤشرات لوحة P3 وأسلوب خط الإنجاز).
+- `build/GSDN_Rebuild_Decisions.md` ← `docs/reference/GSDN_Rebuild_Decisions.md`.
+
+### تعديل
+- `README.md` جديد في الجذر خاص بالنظام. تحديث كل المسارات في `CLAUDE.md` و`rules.md` و`HANDOVER.md` و`README_AR.md` وملفات الوكلاء.
+
+### أُبقي عمداً
+- `GSDN_Site_Master.xlsx` و`build/*.py` (مولّد الـMaster).
+- `.claude/skills/`: سكربت `.claude/setup/account-bootstrap.sh` ينسخ هذه المهارات إلى حساب Claude الخاص بالمالك، فحذفها يعطّل إعداده. أدوات تطوير، لا جزء من النظام.
+
+### تحقق
+- النموذج الأولي: 120 اختباراً ناجحاً، 0 فشل. نماذج الطباعة الأربعة: OK. بناء اللوحة المرجعية بعد النقل يعطي الملف نفسه دون تغيير.
+
 ## 2026-10-25 (3)
 
 ### إضافة
