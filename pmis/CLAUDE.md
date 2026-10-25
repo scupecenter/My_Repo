@@ -24,6 +24,7 @@ Read before any work:
 ## Workflow rules (agreed with the product owner)
 - Login uses the company Microsoft 365 account (Entra ID SSO). Each user is linked to a 4-digit employee ID.
 - Every task goes through Entry → Review → Approve. The number of levels can be configured per stage.
+- Changing the number of levels (decision B7): the new level count applies to new tasks and to open tasks not yet submitted. A task snapshots its level path at first submission and finishes on it, including after a rejection sends it back to entry.
 - The Responsibility Matrix (editable in the UI) decides who holds each level, per stage. If one person holds two consecutive levels, the second level is skipped automatically, and the skip is logged.
 - The unit of approval is the whole task: dates plus documents.
 - A rejection goes back one level (approver → reviewer → entry) and must carry a note. Every task has a comment thread.
