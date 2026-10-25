@@ -32,6 +32,12 @@ Read before any work:
 - A rejection goes back one level (approver → reviewer → entry) and must carry a note. Every task has a comment thread.
 - Rejection after an auto-skip (decision B6): when a level was skipped because the same person held it, a rejection returns to the person who actually acted on the previous level. That person sees the rejection note, corrects, and resubmits; the skip is applied again on resubmission and logged again.
 - Batch uploads can be approved row by row or all at once.
+- **Staff absence and reassignment (decision B12b).** Nothing moves automatically when someone is absent. The assigned person stays on the task until their Team Lead (or anyone with the `reassign` grant for that module and region, or a System Admin) decides. The lead has three choices per task, per site, or for all of the person's open tasks:
+  1. keep the person on it;
+  2. reassign it to another eligible person (a task-level holder change; the Responsibility Matrix itself is not changed);
+  3. act on it themselves through the system, logged as "lead on behalf of the assignee".
+  A reassignment needs a short reason and is audited. It keeps all entered data, documents and comments. **It does not reset or pause anything:** the SLA keeps its original start date and its SLA version, and stage progress is unchanged. If the lead takes over a level and also holds the next one, the normal skip rule and the self-approval rule (B5) apply.
+  Absence records are optional and informational: an employee can record annual leave in advance, and the lead or an admin records sick or emergency leave. An absent person's tasks show an "absent" badge, and the lead is alerted. Separately, a task idle for N working days (default 2, a setting) alerts the lead even when no absence was recorded.
 - Visibility defaults to everything. It can be limited per user to one or more of the 7 regions and to selected modules.
 - Data entry works three ways: manual entry, upload of the Master as an approved template, or upload of other approved templates. Every upload goes through batch → review → approve.
 - **Approved templates only.** The system issues each template with an ID and version embedded in the file (hidden sheet `_tpl` containing `template_id` and `version`). A user downloads the template from beside the task or from the Templates page, fills it, and uploads that same template. Uploads without a valid embedded ID and version are rejected. Each rejection is written to the System Log.
