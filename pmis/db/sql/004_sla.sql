@@ -101,15 +101,21 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- Admin re-point: moves OPEN (not approved) tasks from one rule to another version of the same task definition.
--- Full-access session only, reason required, audited.
+-- The actor (app.user_id) must be a System Admin or hold a delegation covering sla_rules.edit. Reason required, audited.
 CREATE OR REPLACE FUNCTION admin_repoint_sla(p_old uuid, p_new uuid, p_reason text) RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE n integer; nt uuid;
 BEGIN
-  IF NOT public.app_is_full_access() THEN
-    RAISE EXCEPTION 'admin path: full-access session required' USING ERRCODE = 'insufficient_privilege';
+  IF NOT public.app_actor_is_admin('sla_rules', 'edit') THEN
+    RAISE EXCEPTION 'admin path: System Admin or a delegation covering sla_rules.edit required' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF coalesce(btrim(p_reason), '') = '' THEN RAISE EXCEPTION 'a reason is required'; END IF;
+  -- ceiling: every affected (open) task must lie in the actor's delegated regions
+  IF EXISTS (SELECT 1 FROM public.task_instances t WHERE t.sla_rule_id = p_old AND t.state <> 'approved'
+             AND public.app_actor_region_filter('sla_rules', 'edit') IS NOT NULL
+             AND NOT (t.region_id = ANY (public.app_actor_region_filter('sla_rules', 'edit')))) THEN
+    RAISE EXCEPTION 'the re-point would affect tasks outside your delegated regions' USING ERRCODE = 'insufficient_privilege';
+  END IF;
   SELECT task_def_id INTO nt FROM public.sla_rules WHERE id = p_new;
   IF nt IS NULL OR nt IS DISTINCT FROM (SELECT task_def_id FROM public.sla_rules WHERE id = p_old) THEN
     RAISE EXCEPTION 'both rules must exist and belong to the same task definition';
