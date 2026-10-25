@@ -26,6 +26,7 @@ Read before any work:
 - Every task goes through Entry → Review → Approve. The number of levels can be configured per stage.
 - Changing the number of levels (decision B7): the new level count applies to new tasks and to open tasks not yet submitted. A task snapshots its level path at first submission and finishes on it, including after a rejection sends it back to entry.
 - The Responsibility Matrix (editable in the UI) decides who holds each level, per stage. If one person holds two consecutive levels, the second level is skipped automatically, and the skip is logged.
+- Matrix rows for registers and Dismantle (decision B11): besides the stage rows, the matrix has one row per register (Procurement PR/PO/WO, GECOL, HLC, Permits & HSE, Warehouse, Quality, Issue, Risk, Change Control, Readiness & Handover, As-Built, Meetings, Contractors) and one row for Dismantle. Each row has its own Entry/Review/Approve holders and its own number of levels (1 to 3), set by the admin.
 - The unit of approval is the whole task: dates plus documents.
 - A rejection goes back one level (approver → reviewer → entry) and must carry a note. Every task has a comment thread.
 - Rejection after an auto-skip (decision B6): when a level was skipped because the same person held it, a rejection returns to the person who actually acted on the previous level. That person sees the rejection note, corrects, and resubmits; the skip is applied again on resubmission and logged again.
