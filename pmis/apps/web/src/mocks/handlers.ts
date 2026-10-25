@@ -1,37 +1,49 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Problem } from '@/api/types';
-import { ACCOUNTS, STAFF, approvalsFor, canAct, db, meBody, save, sessionBody, stepUpValid, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
+import { uid } from './ids';
+import { ACCOUNTS, STAFF, approvalsFor, canAct, db, meBody, save, sessionBody, skipPath, stepUpValid, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
+import { touch } from './sites';
 
 const B = API_BASE;
 const pending = new Map<string, string | null>(); // OIDC state -> matched registry email, kept server-side only
 
-const problem = (status: number, code: string, title: string, extra: Partial<Problem> = {}) =>
+export const problem = (status: number, code: string, title: string, extra: Partial<Problem> = {}) =>
   new HttpResponse(JSON.stringify({ type: `https://pmis.aljeel.internal/problems/${code}`, title, status, code, request_id: 'mock', ...extra }), {
     status, headers: { 'Content-Type': 'application/problem+json' },
   });
-const page = <T,>(items: T[]) => HttpResponse.json({ items, page: { limit: 50, next_cursor: null, total: items.length } });
-const guard = () => {
+export const page = <T,>(items: T[]) => HttpResponse.json({ items, page: { limit: 50, next_cursor: null, total: items.length } });
+export const guard = () => {
   const v = viewer();
   if (!v) return problem(401, 'unauthenticated', 'Sign in required');
   if (v.status !== 'active') return problem(403, 'pending_assignment', 'Your account waits for an assignment');
   return null;
 };
-const stepUp = () => problem(401, 'step_up_required', 'Re-authentication required', { step_up_url: '/mock-m365/step-up?return_to=%2Fstep-up-done' });
+export const stepUp = () => problem(401, 'step_up_required', 'Re-authentication required', { step_up_url: '/mock-m365/step-up?return_to=%2Fstep-up-done' });
 
-function ifMatch(req: Request, t: MockTask) {
+export function ifMatch(req: Request, t: MockTask) {
   const h = req.headers.get('If-Match');
   if (!h) return problem(428, 'precondition_required', 'If-Match is required');
   return Number(h.replace(/"/g, '')) === t.version ? null : problem(412, 'precondition_failed', 'The task changed; reload and retry');
 }
-const find = (id: string) => db().tasks.find((t) => t.id === id) ?? db().extra.find((t) => t.id === id);
+export const find = (id: string) => db().tasks.find((t) => t.id === id) ?? db().extra.find((t) => t.id === id) ?? touch(id);
 
-function transition(t: MockTask, op: 'pass' | 'approve' | 'reject', note?: string) {
+export function transition(t: MockTask, op: 'pass' | 'approve' | 'reject', note?: string) {
   if (op === 'pass') { t.state = 'in_approval'; t.level_kind = 'approve'; t.current_level = 3; }
   else if (op === 'approve') { t.state = 'approved'; t.actual_date = t.actual_date ?? '2026-10-25'; }
   else if (t.level_kind === 'approve') { t.state = 'in_review'; t.level_kind = 'review'; t.current_level = 2; t.return_count = (t.return_count ?? 0) + 1; t.last_return_note = note; }
   else { t.state = 'entry'; t.current_level = 1; t.return_count = (t.return_count ?? 0) + 1; t.last_return_note = note; }
   t.version += 1;
+}
+
+/** Appends a workflow step to a generated task (history) and a rejection note to its comments. */
+export function recordStep(t: MockTask, action: string, note?: string, skipped: number[] = []) {
+  const v = viewer()!, who = { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined };
+  const at = new Date().toISOString();
+  t.steps = [...(t.steps ?? []),
+    { id: crypto.randomUUID(), level: t.current_level ?? 1, action: action as 'submit', acted_by: who, note: note ?? null, created_at: at, self_approval: t.state === 'approved' && skipped.length > 1 },
+    ...skipped.map((l) => ({ id: crypto.randomUUID(), level: l, action: 'auto_skip' as const, acted_by: who, note: `Level ${l} skipped: same person`, created_at: at }))];
+  if (action === 'reject') t.comments = [...(t.comments ?? []), { id: crypto.randomUUID(), author: who, body: note ?? '', is_rejection_note: true, created_at: at }];
 }
 
 export const handlers = [
@@ -134,7 +146,13 @@ export const handlers = [
       if (t.state !== 'in_review' && t.state !== 'in_approval') return problem(409, 'invalid_transition', 'Task is not waiting for review');
       if (!canAct(t.level_kind) || (op === 'review' && t.level_kind !== 'review') || (op === 'approve' && t.level_kind !== 'approve')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
       if (op === 'approve' && !stepUpValid()) return stepUp();
-      transition(t, op === 'review' ? 'pass' : op, body.note);
+      const sp = t.gen && op === 'review' ? skipPath(t, viewer()!.employee_id, t.current_level ?? 2) : null;
+      if (sp?.final && !stepUpValid()) return stepUp();
+      // B6: after an auto-skip a rejection returns to the person who acted on the previous level, i.e. entry.
+      const skippedPrev = t.gen && op === 'reject' && !!t.steps?.some((x) => x.action === 'auto_skip' && x.level === (t.current_level ?? 2) - 1);
+      transition(t, sp?.final ? 'approve' : op === 'review' ? 'pass' : op, body.note);
+      if (skippedPrev) { t.state = 'entry'; t.current_level = 1; }
+      if (t.gen) recordStep(t, op === 'review' && sp?.final ? 'approve' : op, body.note, sp?.skipped);
       save();
       return HttpResponse.json({ task: toDetail(t), step_ids: [] }, { headers: { ETag: `"${t.version}"` } });
     })),

@@ -21,5 +21,23 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('approval-detail').getByText('WM105').waitFor();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/approvals-${locale}-${theme}.png` });
+    await page.getByTestId('nav-sites').click();
+    await page.getByTestId('site-row-TR101').waitFor();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/sites-${locale}-${theme}.png` });
+    await page.getByTestId('site-row-BG105').click(); // a site mid-way, so the pipeline shows rings in several states
+    await page.locator('[data-task]').first().waitFor();
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: `${OUT}/site-page-${locale}-${theme}.png` });
+    await page.getByTestId('pipe-node-te_pac').click();
+    await page.locator('[data-state="entry"] [data-testid^="grid-open-"]').first().click();
+    await page.getByTestId('task-drawer-body').waitFor();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/task-drawer-${locale}-${theme}.png` });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('nav-admin.matrix').click();
+    await page.getByTestId('matrix-row-site_release').waitFor();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${OUT}/matrix-${locale}-${theme}.png` });
   });
 }

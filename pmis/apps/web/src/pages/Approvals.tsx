@@ -1,11 +1,12 @@
-import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Clock, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { useApprovals, useBulk, useDecide, useTask } from '@/api/hooks';
+import { useApprovals, useBulk, useDecide } from '@/api/hooks';
 import type { ApprovalItem } from '@/api/types';
+import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
+import { RejectDialog } from '@/components/RejectDialog';
 import { useToast } from '@/components/Toast';
 
 const TABS = ['all', 'review', 'approve'] as const;
@@ -84,14 +85,13 @@ export function Approvals() {
           {current ? <Detail item={current} onAct={act} onReject={() => setRejecting(current)} busy={decide.isPending} /> : <p className="p-6 text-mute">{t('approvals.select_one')}</p>}
         </section>
       </div>
-      <RejectDialog key={rejecting?.task.id} item={rejecting} onClose={() => setRejecting(null)} onSend={(item, note) => decide.mutate({ item, op: 'reject', note }, { onSuccess: () => { setRejecting(null); toast(t('approvals.done')); }, onError })} />
+      <RejectDialog key={rejecting?.task.id} open={!!rejecting} title={t('approvals.reject_title', { site: rejecting?.task.site_code })} onClose={() => setRejecting(null)} onSend={(note) => rejecting && decide.mutate({ item: rejecting, op: 'reject', note }, { onSuccess: () => { setRejecting(null); toast(t('approvals.done')); }, onError })} />
     </div>
   );
 }
 
 function Detail({ item, onAct, onReject, busy }: { item: ApprovalItem; onAct: (i: ApprovalItem, op: 'review' | 'approve') => void; onReject: () => void; busy: boolean }) {
   const { t } = useTranslation();
-  const task = useTask(item.task.id);
   const tk = item.task;
   const op = item.level_kind === 'approve' ? 'approve' : 'review';
   return (
@@ -103,40 +103,17 @@ function Detail({ item, onAct, onReject, busy }: { item: ApprovalItem; onAct: (i
       <dl className="grid grid-cols-2 gap-4 p-4 text-sm">
         <div><dt className="text-mute">{t('approvals.entered_by')}</dt><dd className="font-semibold">{item.submitted_by && <PersonTag name={item.submitted_by.display_name} employeeId={item.submitted_by.employee_id} />}</dd></div>
         <div><dt className="text-mute">{t('approvals.actual_date')}</dt><dd className="mono font-semibold">{tk.actual_date} <span className="font-normal text-mute">({t('approvals.plan')} {tk.planned_date})</span></dd></div>
+        <div><dt className="text-mute">{t('grid.ball')}</dt><dd data-testid="approval-holders"><Holders holders={tk.ball_in_court?.holders ?? []} /></dd></div>
         <div><dt className="text-mute">{t('approvals.sla')}</dt><dd className="font-semibold">{tk.sla?.min_wd}–{tk.sla?.max_wd} {t('approvals.wd')}</dd></div>
       </dl>
       <div className="px-4 pb-2 text-sm">
-        <div className="font-semibold">{t('approvals.documents', { count: task.data?.slots.length ?? tk.slots_filled ?? 0 })}</div>
-        <ul>{task.data?.slots.map((s) => <li key={s.id} className="mono py-1">{s.name_en} <span className="chip bg-waitBg text-waitInk">{s.status}</span></li>)}</ul>
+        <div className="font-semibold">{t('approvals.documents', { count: item.documents_summary?.length ?? tk.slots_filled ?? 0 })}</div>
+        <ul data-testid="approval-docs">{item.documents_summary?.map((s) => <li key={s.slot_id} className="mono py-1">{s.name} <span className="chip bg-waitBg text-waitInk">{s.status}</span> <span className="text-mute">×{s.file_count}</span></li>)}</ul>
       </div>
       <div className="flex gap-2 p-4">
         <button className="btn btn-danger ms-auto" data-testid="approval-reject" onClick={onReject} disabled={busy}><Undo2 size={16} />{t('approvals.reject')}</button>
         <button className="btn btn-primary" data-testid={op === 'approve' ? 'approval-approve' : 'approval-pass'} onClick={() => onAct(item, op)} disabled={busy}><Check size={16} />{t(op === 'approve' ? 'approvals.approve' : 'approvals.pass')}</button>
       </div>
     </div>
-  );
-}
-
-function RejectDialog({ item, onClose, onSend }: { item: ApprovalItem | null; onClose: () => void; onSend: (i: ApprovalItem, note: string) => void }) {
-  const { t } = useTranslation();
-  const [note, setNote] = useState('');
-  const [err, setErr] = useState(false);
-  return (
-    <Dialog.Root open={!!item} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-scrim/60" />
-        <Dialog.Content data-testid="reject-dialog" className="card fixed inset-x-0 top-1/4 z-50 mx-auto w-[min(460px,92vw)] space-y-3 p-5">
-          <Dialog.Title className="font-bold">{t('approvals.reject_title', { site: item?.task.site_code })}</Dialog.Title>
-          <Dialog.Description className="sr-only">{t('approvals.note_required')}</Dialog.Description>
-          <label htmlFor="reject-note" className="text-sm font-semibold">{t('approvals.note')}</label>
-          <textarea id="reject-note" data-testid="reject-note" className="input min-h-24" value={note} onChange={(e) => { setNote(e.target.value); setErr(false); }} />
-          {err && <p role="alert" data-testid="reject-error" className="text-lateInk">{t('approvals.note_required')}</p>}
-          <div className="flex justify-end gap-2">
-            <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-            <button className="btn btn-danger" data-testid="reject-submit" onClick={() => (note.trim() ? item && onSend(item, note.trim()) : setErr(true))}>{t('approvals.send')}</button>
-          </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
   );
 }

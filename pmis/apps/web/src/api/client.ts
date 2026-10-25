@@ -53,7 +53,8 @@ async function toProblem(res: Response): Promise<Problem> {
 
 export async function request<T>(method: string, path: string, opts: RequestOptions = {}, retried = false): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = typeof FormData !== 'undefined' && opts.body instanceof FormData; // browser sets the multipart boundary
+  if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (opts.version !== undefined) headers['If-Match'] = `"${opts.version}"`;
   if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
   if (method !== 'GET' && csrf) headers['X-CSRF-Token'] = csrf;
@@ -62,7 +63,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
     method,
     headers,
     credentials: 'include',
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    body: opts.body === undefined ? undefined : isForm ? (opts.body as FormData) : JSON.stringify(opts.body),
     signal: opts.signal,
   });
   if (res.ok) {
@@ -84,3 +85,19 @@ export const api = {
   post: <T>(p: string, o?: RequestOptions) => request<T>('POST', p, o),
   patch: <T>(p: string, o?: RequestOptions) => request<T>('PATCH', p, o),
 };
+
+/** Fetch a file with the session cookie and hand it to the browser as a download. Returns the file name. */
+export async function downloadFile(path: string, query?: RequestOptions['query']): Promise<string> {
+  const res = await fetch(buildUrl(path, query), { credentials: 'include' });
+  if (!res.ok) throw new ApiError(res.status, await toProblem(res));
+  const name = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'download';
+  const blob = await res.blob();
+  if (typeof URL.createObjectURL === 'function') {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  }
+  return name;
+}
