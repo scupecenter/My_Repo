@@ -1,0 +1,26 @@
+employee_id,name_en,name_ar,email,phone,position,team,main_role,region,status,notes
+1001,Ahmed Salem,أحمد سالم,ahmed.salem@example.com,+218 91 200 1000,Project Manager,both,Project Manager,All,active,Demo login in the prototype
+1102,Mona Fathi,منى فتحي,mona.fathi@example.com,+218 92 207 1113,RF & Design / Acquisition Team Lead,none,RF & Design / Acquisition Team Lead,All,active,
+1103,Ali Barka,علي بركة,ali.barka@example.com,+218 94 214 1226,RF Engineer,none,RF & Design / Acquisition Team Lead,Tripoli,active,
+1104,Karim Zaroug,كريم زروق,karim.zaroug@example.com,+218 91 221 1339,MW Engineer,none,RF & Design / Acquisition Team Lead,Benghazi,inactive,"Left the company; deactivated, history kept"
+1203,Omar Khaled,عمر خالد,omar.khaled@example.com,+218 92 228 1452,CW Team Lead,CW,CW Team Lead,All,active,
+1204,Sami Nuri,سامي نوري,sami.nuri@example.com,+218 94 235 1565,Site Engineer (CW),CW,CW Team Lead,Tripoli,active,
+1205,Fadi Omran,فادي عمران,fadi.omran@example.com,+218 91 242 1678,Site Engineer (CW),CW,CW Team Lead,Middle,active,
+1206,Khalid Jaber,خالد جابر,khalid.jaber@example.com,+218 92 249 1791,GECOL Power Coordinator,CW,CW Team Lead,Zawia,active,
+1207,Nadia Hamed,نادية حامد,nadia.hamed@example.com,+218 94 256 1904,HLC Fiber Engineer,CW,CW Team Lead,Tripoli,active,
+1208,Marwa Tarhuni,مروة الترهوني,marwa.tarhuni@example.com,+218 91 263 2017,Site Engineer (CW),CW,CW Team Lead,Benghazi,active,
+1209,Idris Mabrouk,إدريس مبروك,idris.mabrouk@example.com,+218 92 270 2130,Site Engineer (CW),CW,CW Team Lead,Sebha,active,
+1210,Hana Zidan,هناء زيدان,hana.zidan@example.com,+218 94 277 2243,Site Engineer (CW),CW,CW Team Lead,Middle,active,Pending assignment in the prototype
+1211,Wael Saadi,وائل السعدي,wael.saadi@example.com,+218 91 284 2356,Site Engineer (CW),CW,CW Team Lead,WM,active,Pending assignment in the prototype
+1305,Hassan Ali,حسن علي,hassan.ali@example.com,+218 92 291 2469,TE Team Lead,TE,TE Team Lead,All,active,
+1306,Tarek Mansour,طارق منصور,tarek.mansour@example.com,+218 94 298 2582,Site Engineer (TE),TE,TE Team Lead,Tripoli,active,
+1307,Rami Saeed,رامي سعيد,rami.saeed@example.com,+218 91 305 2695,HOTO Engineer,TE,TE Team Lead,WM,active,
+1308,Salma Younis,سلمى يونس,salma.younis@example.com,+218 92 312 2808,Site Engineer (TE),TE,TE Team Lead,Zawia,active,
+1309,Jamal Fituri,جمال فيتوري,jamal.fituri@example.com,+218 94 319 2921,Site Engineer (TE),TE,TE Team Lead,GM,active,
+1310,Anis Gharyani,أنيس الغرياني,anis.gharyani@example.com,+218 91 326 3034,Site Engineer (TE),TE,TE Team Lead,Sebha,active,
+1407,Rania Saad,رانيا سعد,rania.saad@example.com,+218 92 333 3147,Inventory Supervisor,none,Inventory Supervisor,All,active,
+1408,Huda Bashir,هدى بشير,huda.bashir@example.com,+218 94 340 3260,Warehouse Keeper,none,Inventory Supervisor,Benghazi,active,
+1508,Laila Omar,ليلى عمر,laila.omar@example.com,+218 91 347 3373,Project Support Lead,none,Project Support,All,active,
+1509,Yousef Adel,يوسف عادل,yousef.adel@example.com,+218 92 354 3486,Procurement Officer,none,Project Support,Tripoli,active,
+1510,Salem Aswad,سالم الأسود,salem.aswad@example.com,+218 94 361 3599,Project Coordinator,none,Project Support,GM,active,
+1999,Noor Hadi,نور هادي,noor.hadi@example.com,+218 91 368 3712,Site Engineer (CW),CW,CW Team Lead,Zawia,active,Pending assignment in the prototype

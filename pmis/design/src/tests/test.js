@@ -82,6 +82,35 @@ for(const lang of ['en','ar']){await p.evaluate(l=>PMIS.setLang(l),lang);
 await p.evaluate(()=>{PMIS.setLang('en')});
 await p.evaluate(()=>PMIS.signIn('1999'));ok('pending user sees pending screen',/Pending assignment/.test(await p.innerText('#app')));
 await p.evaluate(()=>PMIS.signIn('1407'));await p.evaluate(()=>PMIS.go('approvals'));ok('no-permission state for view-only user',/do not have access/.test(await p.innerText('#page')));
+// staff registry: employee ID beside names + hover/focus card
+await p.setViewportSize({width:1360,height:860});await p.evaluate(()=>{PMIS.setLang('en');PMIS.signIn('1001');const s=PMIS.SITES.find(s=>s.cur>=0&&s.tasks[s.cur].state==='open');PMIS.go('site/'+s.id)});await p.waitForTimeout(250);
+const ids=await p.$$eval('#page .emp .eid',e=>e.map(x=>x.textContent));ok('task grid shows employee ID beside assignee',ids.length>0&&ids.every(x=>/^\d{4}$/.test(x)),ids.slice(0,3).join(','));
+const e1=p.locator('#page .emp').first(),tip=p.locator('#emp-tip');
+await e1.hover();await tip.waitFor({state:'visible'});const tx=await tip.innerText();const rid=(await e1.getAttribute('data-emp'));
+ok('hover opens card with registry data',tx.includes(rid)&&/Position/.test(tx)&&/Region/.test(tx)&&/@example\.com/.test(tx)&&/\+218 9/.test(tx),tx.split('\n').slice(0,2).join('|'));
+ok('card is role=tooltip and trigger has aria-describedby',(await tip.getAttribute('role'))==='tooltip'&&(await e1.getAttribute('aria-describedby'))==='emp-tip');
+await p.mouse.move(5,5);await p.waitForTimeout(300);ok('card closes when pointer leaves',await tip.isHidden());
+await e1.focus();await tip.waitFor({state:'visible'});ok('keyboard focus opens card',true);
+await p.keyboard.press('Escape');ok('Escape closes card',await tip.isHidden());
+await p.evaluate(()=>document.activeElement.blur());await e1.focus();await p.evaluate(()=>document.activeElement.blur());ok('blur closes card',await tip.isHidden());
+// escaping: registry data with markup is shown as text
+await p.evaluate(id=>{PMIS.REG[id].name_en='<img src=x onerror="window.__xss=1">'},rid);await e1.focus();await tip.waitFor({state:'visible'});
+ok('card escapes injected data',(await tip.innerText()).includes('<img src=x')&&await p.evaluate(()=>!window.__xss&&!document.querySelector('#emp-tip img')));
+await p.evaluate(()=>document.activeElement.blur());
+// field-level visibility: phone limited to admins
+await p.evaluate(()=>{PMIS.S.regVis.phone='admin';PMIS.signIn('1306');PMIS.go('my-work');PMIS.go('sites')});await p.evaluate(()=>{const s=PMIS.SITES.find(s=>s.cur>=0&&s.tasks[s.cur].state==='open');PMIS.go('site/'+s.id)});await p.waitForTimeout(200);
+await p.locator('#page .emp').first().focus();await tip.waitFor({state:'visible'});const t2=await tip.innerText();ok('phone hidden for non-admin, email still shown',!/\+218/.test(t2)&&/Not visible to you/.test(t2)&&/@example\.com/.test(t2));
+await p.evaluate(()=>{PMIS.S.regVis.phone='staff';PMIS.signIn('1001')});
+// Arabic RTL + dark theme
+await p.evaluate(()=>{PMIS.setLang('ar');PMIS.setTheme('dark')});await p.waitForTimeout(150);await p.locator('#page .emp').first().focus();await tip.waitFor({state:'visible'});
+const g=await p.evaluate(()=>{const d=document.querySelector('#emp-tip'),r=d.getBoundingClientRect(),cs=getComputedStyle(d);const v=document.createElement('i');v.style.background='var(--card)';document.body.appendChild(v);const card=getComputedStyle(v).backgroundColor;v.remove();return{dir:document.documentElement.dir,inView:r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight,bg:cs.backgroundColor===card,ar:d.querySelector('.ec-ar').dir}});
+ok('card works in Arabic RTL and dark theme (inside viewport, token background)',g.dir==='rtl'&&g.inView&&g.bg&&g.ar==='rtl',JSON.stringify(g));
+await p.evaluate(()=>document.activeElement.blur());await p.evaluate(()=>{PMIS.setLang('en');PMIS.setTheme('light')});
+// touch: tap opens, tap elsewhere closes
+const tctx=await b.newContext({viewport:{width:390,height:800},hasTouch:true});const tp=await tctx.newPage();await tp.goto(URL);
+await tp.evaluate(()=>{PMIS.signIn('1001');const s=PMIS.SITES.find(s=>s.cur>=0&&s.tasks[s.cur].state==='open');PMIS.go('site/'+s.id)});await tp.waitForTimeout(250);
+await tp.locator('#page .emp').first().tap();ok('tap opens card on touch',await tp.locator('#emp-tip').isVisible());
+await tp.locator('h1').first().tap();ok('tap elsewhere closes card',await tp.locator('#emp-tip').isHidden());await tctx.close();
 ok('no external requests',req.length===0,req.join(','));
 ok('no console errors',errs.length===0,errs.slice(0,3).join(' | '));
 console.log(out.join('\n'));

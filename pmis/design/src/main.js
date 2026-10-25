@@ -186,4 +186,4 @@ document.addEventListener('keydown',e=>{const tg=e.target,typing=/^(INPUT|TEXTAR
   if(e.key==='a'&&it.kind==='task'&&!it.claimedBy){const dk=it.site.id+':'+it.i;it.lv==='review'?actReview(dk):actApprove(dk);return}
   if(e.key==='r'&&it.kind==='task'){e.preventDefault();actReturn(it.site.id+':'+it.i);return}}});
 window.addEventListener('hashchange',()=>{if(S.drawer){const r=parseHash();if(!(r.name==='site'&&r.q.task!=null)){S.drawer=null;renderDrawer()}}$('#umenu')&&($('#umenu').innerHTML='');render()});
-window.PMIS={holders,USERS,ASSIGN,GROUPS,MX,DOCLIB,BATCHES,S,go,me,signIn,setLang,setTheme,SITES,STEPS,inbox,TEMPLATES,mkTemplate:(id,rows)=>mkXlsx(TEMPLATES.find(q=>q.id===id),rows),sIdx,audit:AUDIT,syslog:SYSLOG,openTask};
+window.PMIS={REG:REGI,holders,USERS,ASSIGN,GROUPS,MX,DOCLIB,BATCHES,S,go,me,signIn,setLang,setTheme,SITES,STEPS,inbox,TEMPLATES,mkTemplate:(id,rows)=>mkXlsx(TEMPLATES.find(q=>q.id===id),rows),sIdx,audit:AUDIT,syslog:SYSLOG,openTask};

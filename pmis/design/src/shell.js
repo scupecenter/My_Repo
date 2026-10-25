@@ -37,7 +37,7 @@ function stateView(kind,r){const m={loading:null,empty:['inbox','Nothing here ye
  if(kind==='loading')return`<div class="ph"><h1>${esc(title(r))}</h1></div><div class="card cb" aria-busy="true" role="status"><span class="sr">${t('Loading')}</span>${'<div class="sk" style="width:60%"></div><div class="sk"></div><div class="sk" style="width:85%"></div>'.repeat(4)}</div>`;
  return`<div class="ph"><h1>${esc(title(r))}</h1></div><div class="card"><div class="state ${kind==='error'?'err':kind==='denied'?'deny':''}" role="${kind==='error'?'alert':'status'}"><div class="big">${ic(m[0])}</div><h3>${t(m[1])}</h3><p>${t(m[2])}</p>${kind==='error'?`<button class="btn pri" data-act="simclear">${ic('undo')}${t('Retry')}</button>`:kind==='empty'?'':`<button class="btn" data-act="home">${t('Back to My Work')}</button>`}</div></div>`}
 function viewFor(r){const V={'my-work':vMyWork,approvals:vApprovals,sites:vSites,site:vSite,dashboard:vDashboard,templates:vTemplates,upload:vUpload,users:vUsers,groups:vGroups,matrix:vMatrix,delegation:vDelegation,library:vLibrary,audit:vAudit,system:vSystem,settings:vSettings,register:vRegister};return V[r.name]}
-function render(){const r=parseHash();const root=$('#app');applyLang();document.documentElement.dataset.theme=S.theme==='dark'?'dark':'light';
+function render(){empHide();const r=parseHash();const root=$('#app');applyLang();document.documentElement.dataset.theme=S.theme==='dark'?'dark':'light';
  if(!me()){if(location.hash!=='#/login')history.replaceState(null,'','#/login');root.innerHTML=vLogin();return}
  if(me().status==='Pending'){root.innerHTML=vPending();return}
  if(!r.name||r.name==='login'||r.name==='pending'){history.replaceState(null,'','#/my-work');return render()}

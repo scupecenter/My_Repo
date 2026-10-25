@@ -280,3 +280,13 @@ table.t{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--tex
 .t td .ibtn{display:inline-grid;vertical-align:middle}
 #page:focus{outline:none}
 .split>*,.lib>*,.bento>*,.g2>*{min-width:0}.inbox .it>div{min-width:0}
+/* ---- staff registry: employee ID + hover card */
+.emp{cursor:help;border-radius:4px;text-decoration:underline dotted var(--mute);text-underline-offset:3px}
+.emp:hover,.emp:focus-visible{background:var(--hover)}
+.emp .eid{color:var(--mute);margin-inline-start:6px;font-size:var(--text-sm)}
+.empcard{position:fixed;z-index:90;inline-size:min(300px,calc(100vw - 16px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:var(--radius-4);box-shadow:var(--shadow-lg);padding:12px 14px;font-size:var(--text-sm);line-height:1.45;font-weight:400}
+.empcard[hidden]{display:none}
+.empcard .ec-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:var(--text-md)}
+.empcard .ec-ar{color:var(--mute);margin-bottom:6px}
+.empcard dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:8px 0 0}
+.empcard dt{color:var(--mute)}.empcard dd{margin:0;overflow-wrap:anywhere}
