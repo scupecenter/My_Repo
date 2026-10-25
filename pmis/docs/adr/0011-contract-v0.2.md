@@ -40,6 +40,14 @@ Three gaps raised by frontend-engineer are resolved:
 2. The `return_to` allowlist is stated in both `return_to` parameters: `/my-work` (default after login and fallback), `/step-up-done` (step-up popup), plus any same-origin route matching the pattern. A 401 `step_up_url` already includes `return_to`.
 3. `ApprovalItem.documents_summary` (`slot_id`, `name`, `status`, `file_count`) removes the extra `GET /tasks/{id}` in Approvals detail.
 
+## Amendment 0.2.2 (2026-10-25, additive)
+Owner request: any user with the `export` grant can download the whole project as one Excel file in the Site Master layout, on demand (CLAUDE.md "Full project export to a Master file, on demand").
+1. `POST /exports/master` answers 202 with a `Job` of the new kind `master_export` (same `/jobs/{job_id}` polling and `Idempotency-Key` as the other jobs). Optional body: `regions` (a subset of the caller's; outside scope is 422) and `as_of` (date, default now). Needs the `export` grant. Content is scoped by B3 (regions and modules); a System Admin gets everything. When the job is done, `result.export_id` names the export.
+2. `GET /exports/master` lists the caller's recent exports: `id`, `created_at`, `status`, `regions`, `row_count`, `expires_at` (plus `job_id` and `as_of`).
+3. `GET /exports/master/{export_id}/download` writes the audit row, then answers 302 to the file `GSDN_Site_Master_<date>.xlsx`. It answers 409 while the export is not done and 410 `export_expired` (new error code) after expiry. Retention is the setting `master_export.retention_days`, default 7.
+4. The workbook has all sheets and the 187 columns, plus custom fields that carry a Master export column. The same export feeds the parallel-run comparison. Starting an export and every download are audited (ADR 0006).
+5. Additive only: a new tag `exports`, three operations, one job kind, one error code, one response (`Gone`). Nothing from 0.2.1 changes. The Master-format sheet builder and the retention purge are API and worker work, not part of this amendment.
+
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
 - The contract is large (193 operations). Each API PR must name the tag it implements, and conformance tests are generated per operation.
