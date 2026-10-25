@@ -53,7 +53,7 @@
    - After 5 failures the account is locked for 15 minutes.
 8. **Future mobile app.** It will use MSAL as a public client and send bearer access tokens for a separate API scope. The contract already declares a `bearerAuth` scheme, which is not enabled in v0.1. The `amr`, tenant and step-up rules are the same.
 9. **Logout.** Logout deletes the Redis session. Single sign-out from Entra is optional: the user can be sent on to the Entra logout URL.
-10. **Local sign-in (amendment 2026-10-25, owner decision).** `POST /auth/local/login` takes `{identifier, password}`, where the identifier is a 4-digit employee ID or a registered phone number (normalised to E.164). Rules:
+10. **Local sign-in — DEFERRED, not in version 1 (owner decision 2026-10-25).** Kept as the proposed design for a later phase; nothing below is built now. `POST /auth/local/login` takes `{identifier, password}`, where the identifier is a 4-digit employee ID or a registered phone number (normalised to E.164). Rules:
    - `local_credentials(user_id, password_hash argon2id, set_at, failed_count, locked_until, totp_secret_enc?)`; a row exists only after the user's first M365 sign-in and while the user is active in the staff registry.
    - The session created is the same server-side session as M365, with `auth_method = local`. Audit rows carry the method.
    - Lockout after 5 failures for 15 minutes, rate limit per IP and per account, generic error text (no hint whether the identifier exists).

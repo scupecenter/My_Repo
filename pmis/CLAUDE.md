@@ -24,13 +24,7 @@ Read before any work:
 
 ## Workflow rules (agreed with the product owner)
 - Login uses the company Microsoft 365 account (Entra ID SSO). Each user is linked to a 4-digit employee ID.
-- **Local sign-in as well (owner decision 2026-10-25, ADR 0002 §10).** Besides M365, an employee can sign in with their employee ID or their registered phone number, plus a PMIS password. Safeguards:
-  - a local password can be set only after the person has signed in once with M365 and is active in the staff registry, so every local account is tied to a real M365 identity;
-  - passwords are hashed with Argon2id, at least 10 characters, checked against a list of common passwords; 5 failed attempts lock the account for 15 minutes; sign-in is rate-limited per IP and per account;
-  - when the person's M365 account is disabled, their registry row is deactivated, or an admin suspends them, local sign-in stops at once;
-  - optional PMIS TOTP for local sign-in, controlled by the same MFA settings and per-user exemption as M365;
-  - step-up for final approval and admin actions re-asks the password (plus TOTP when enabled);
-  - password reset is done by the user after an M365 sign-in, or by a System Admin, never through SMS; every local sign-in, failure, lock and reset is audited.
+- **Local sign-in (employee ID or phone + password) is deferred to a later phase (owner decision 2026-10-25).** Version 1 keeps M365 only. The proposed design is kept in ADR 0002 §10 for when it is taken up.
 - Every task goes through Entry → Review → Approve. The number of levels can be configured per stage.
 - Changing the number of levels (decision B7): the new level count applies to new tasks and to open tasks not yet submitted. A task snapshots its level path at first submission and finishes on it, including after a rejection sends it back to entry.
 - The Responsibility Matrix (editable in the UI) decides who holds each level, per stage. If one person holds two consecutive levels, the second level is skipped automatically, and the skip is logged.
