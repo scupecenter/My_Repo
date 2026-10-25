@@ -1,5 +1,7 @@
 # GSDN Project Dashboard
 
+> This repository also holds **GSDN PMIS** in [`pmis/`](pmis/): start with [`pmis/HANDOVER.md`](pmis/HANDOVER.md), the rules in [`pmis/CLAUDE.md`](pmis/CLAUDE.md) and the history in [`pmis/CHANGELOG.md`](pmis/CHANGELOG.md).
+
 A **single-file, fully offline executive dashboard** for a Libyan telecom
 **civil-works (CW)** and **transmission-equipment (TE)** rollout
 (~259 in-scope sites, Western Area). Everything — the UI, the Arabic font, and

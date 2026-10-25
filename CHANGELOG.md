@@ -1,5 +1,9 @@
 # Changelog
 
+> **GSDN PMIS** (the new project management system in `pmis/`) has its own changelog:
+> **[`pmis/CHANGELOG.md`](pmis/CHANGELOG.md)** — every decision and change since 2026-10-24, newest first.
+> Handover for the developer taking over server, database and API: [`pmis/HANDOVER.md`](pmis/HANDOVER.md).
+
 All notable changes to the GSDN Project Dashboard (`Dashboard.html`) are
 recorded in this file.
 

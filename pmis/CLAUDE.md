@@ -24,7 +24,8 @@ Read before any work:
 
 ## Workflow rules (agreed with the product owner)
 - Login uses the company Microsoft 365 account (Entra ID SSO). Each user is linked to a 4-digit employee ID.
-- **Local sign-in (employee ID or phone + password) is deferred to a later phase (owner decision 2026-10-25).** Version 1 keeps M365 only. The proposed design is kept in ADR 0002 §10 for when it is taken up.
+- **One sign-in box, M365 does the sign-in (owner decision 2026-10-25).** The login screen has one field: the employee types their email, employee ID or registered phone. The PMIS looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; Microsoft performs the actual sign-in (password, MFA, Conditional Access). The PMIS never stores passwords. To avoid revealing who is registered, the screen behaves the same whether or not a match is found (no match = Microsoft sign-in without a hint). After the callback, the token's account must match the registry row that was looked up; otherwise the normal first-sign-in link rules apply.
+- **Local sign-in (employee ID or phone + PMIS password) stays deferred** to a later phase. The staff registry and its data are kept and used now, so that later phase needs no rework. The proposed design is in ADR 0002 §10.
 - Every task goes through Entry → Review → Approve. The number of levels can be configured per stage.
 - Changing the number of levels (decision B7): the new level count applies to new tasks and to open tasks not yet submitted. A task snapshots its level path at first submission and finishes on it, including after a rejection sends it back to entry.
 - The Responsibility Matrix (editable in the UI) decides who holds each level, per stage. If one person holds two consecutive levels, the second level is skipped automatically, and the skip is logged.
