@@ -1,0 +1,374 @@
+{
+  "template": {
+    "code": "GSDN_CW_DN",
+    "version": 3
+  },
+  "doc": {
+    "ref_no": "DN-CW-TR-2026-0001",
+    "date": "2026-10-12",
+    "remarks": "Delivered in two trucks; cable drums sealed. Contractor to confirm drum lengths on receipt.",
+    "qr_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-1 -1 23 23\" shape-rendering=\"crispEdges\"><rect x=\"-1\" y=\"-1\" width=\"23\" height=\"23\" fill=\"#fff\"/><g fill=\"#000\"><rect x=\"0\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"20\" width=\"1\" height=\"1\"/></g></svg>",
+    "dispatch_date": "2026-10-13"
+  },
+  "site": {
+    "id": "TRI-0412",
+    "name": "Souq Al-Juma North",
+    "region_code": "Tripoli",
+    "region_name": "Tripoli",
+    "region_is": {
+      "Tripoli": true
+    },
+    "po_wo": "WO-CW-2026-0187"
+  },
+  "contractor": {
+    "name": "Al-Ufuq Contracting Co. / شركة الأفق للمقاولات"
+  },
+  "warehouse": {
+    "name": "Tripoli Central Warehouse"
+  },
+  "lines": [
+    {
+      "no": 1,
+      "item_code": "CW-001",
+      "description": "Tower",
+      "uom": "m",
+      "qty_approved": "20",
+      "qty_dispatched": "20",
+      "serials": ""
+    },
+    {
+      "no": 2,
+      "item_code": "CW-002",
+      "description": "Mounting Pole",
+      "uom": "m",
+      "qty_approved": "23",
+      "qty_dispatched": "23",
+      "serials": ""
+    },
+    {
+      "no": 3,
+      "item_code": "CW-003",
+      "description": "AC Cable 4x16 mm²",
+      "uom": "m",
+      "qty_approved": "26",
+      "qty_dispatched": "26",
+      "serials": ""
+    },
+    {
+      "no": 4,
+      "item_code": "CW-004",
+      "description": "AC Cable 4x10 mm²",
+      "uom": "m",
+      "qty_approved": "29",
+      "qty_dispatched": "29",
+      "serials": ""
+    },
+    {
+      "no": 5,
+      "item_code": "CW-005",
+      "description": "DC Cable 25 mm²",
+      "uom": "m",
+      "qty_approved": "32",
+      "qty_dispatched": "32",
+      "serials": ""
+    },
+    {
+      "no": 6,
+      "item_code": "CW-006",
+      "description": "DC Cable 35 mm²",
+      "uom": "m",
+      "qty_approved": "35",
+      "qty_dispatched": "35",
+      "serials": ""
+    },
+    {
+      "no": 7,
+      "item_code": "CW-007",
+      "description": "Fiber Cable – Patch Cord",
+      "uom": "m",
+      "qty_approved": "38",
+      "qty_dispatched": "38",
+      "serials": ""
+    },
+    {
+      "no": 8,
+      "item_code": "CW-008",
+      "description": "Fiber Cable – Outdoor Shielded",
+      "uom": "m",
+      "qty_approved": "41",
+      "qty_dispatched": "41",
+      "serials": ""
+    },
+    {
+      "no": 9,
+      "item_code": "CW-009",
+      "description": "Indoor Cable Tray",
+      "uom": "m",
+      "qty_approved": "44",
+      "qty_dispatched": "44",
+      "serials": ""
+    },
+    {
+      "no": 10,
+      "item_code": "CW-010",
+      "description": "Outdoor Cable Tray",
+      "uom": "m",
+      "qty_approved": "47",
+      "qty_dispatched": "47",
+      "serials": ""
+    },
+    {
+      "no": 11,
+      "item_code": "CW-011",
+      "description": "PVC Pipe 1\"",
+      "uom": "m",
+      "qty_approved": "50",
+      "qty_dispatched": "50",
+      "serials": ""
+    },
+    {
+      "no": 12,
+      "item_code": "CW-012",
+      "description": "PVC Pipe 1.5\"",
+      "uom": "m",
+      "qty_approved": "53",
+      "qty_dispatched": "53",
+      "serials": ""
+    },
+    {
+      "no": 13,
+      "item_code": "CW-013",
+      "description": "PVC Pipe 2\"",
+      "uom": "m",
+      "qty_approved": "56",
+      "qty_dispatched": "56",
+      "serials": ""
+    },
+    {
+      "no": 14,
+      "item_code": "CW-014",
+      "description": "GND Cable 16 mm²",
+      "uom": "m",
+      "qty_approved": "59",
+      "qty_dispatched": "59",
+      "serials": ""
+    },
+    {
+      "no": 15,
+      "item_code": "CW-015",
+      "description": "GND Cable 35 mm²",
+      "uom": "m",
+      "qty_approved": "62",
+      "qty_dispatched": "62",
+      "serials": ""
+    },
+    {
+      "no": 16,
+      "item_code": "CW-016",
+      "description": "GND Cable 50 mm²",
+      "uom": "m",
+      "qty_approved": "65",
+      "qty_dispatched": "65",
+      "serials": ""
+    },
+    {
+      "no": 17,
+      "item_code": "CW-017",
+      "description": "Grounding Busbar",
+      "uom": "pcs",
+      "qty_approved": "68",
+      "qty_dispatched": "68",
+      "serials": ""
+    },
+    {
+      "no": 18,
+      "item_code": "CW-018",
+      "description": "Grounding Copper Rod",
+      "uom": "pcs",
+      "qty_approved": "71",
+      "qty_dispatched": "71",
+      "serials": ""
+    },
+    {
+      "no": 19,
+      "item_code": "CW-019",
+      "description": "Grounding Copper-plated Rod",
+      "uom": "pcs",
+      "qty_approved": "74",
+      "qty_dispatched": "74",
+      "serials": ""
+    },
+    {
+      "no": 20,
+      "item_code": "CW-020",
+      "description": "Electrical Switch 63A 3P AC",
+      "uom": "pcs",
+      "qty_approved": "77",
+      "qty_dispatched": "77",
+      "serials": ""
+    },
+    {
+      "no": 21,
+      "item_code": "CW-021",
+      "description": "Electrical Switch 63A 1P DC",
+      "uom": "pcs",
+      "qty_approved": "80",
+      "qty_dispatched": "80",
+      "serials": ""
+    },
+    {
+      "no": 22,
+      "item_code": "CW-022",
+      "description": "Electrical Switch 32A 1P DC",
+      "uom": "pcs",
+      "qty_approved": "83",
+      "qty_dispatched": "83",
+      "serials": ""
+    },
+    {
+      "no": 23,
+      "item_code": "CW-023",
+      "description": "Electrical Switch 16A 1P DC",
+      "uom": "pcs",
+      "qty_approved": "86",
+      "qty_dispatched": "86",
+      "serials": ""
+    },
+    {
+      "no": 24,
+      "item_code": "CW-024",
+      "description": "Electrical Switch 10A 1P DC",
+      "uom": "pcs",
+      "qty_approved": "89",
+      "qty_dispatched": "89",
+      "serials": ""
+    },
+    {
+      "no": 25,
+      "item_code": "CW-025",
+      "description": "AC Box",
+      "uom": "pcs",
+      "qty_approved": "92",
+      "qty_dispatched": "92",
+      "serials": ""
+    },
+    {
+      "no": 26,
+      "item_code": "CW-026",
+      "description": "DC Box",
+      "uom": "pcs",
+      "qty_approved": "95",
+      "qty_dispatched": "95",
+      "serials": ""
+    },
+    {
+      "no": 27,
+      "item_code": "CW-027",
+      "description": "AC Box Stand",
+      "uom": "pcs",
+      "qty_approved": "98",
+      "qty_dispatched": "98",
+      "serials": ""
+    },
+    {
+      "no": 28,
+      "item_code": "CW-028",
+      "description": "Indoor Rack",
+      "uom": "pcs",
+      "qty_approved": "101",
+      "qty_dispatched": "101",
+      "serials": ""
+    },
+    {
+      "no": 29,
+      "item_code": "CW-029",
+      "description": "Anchor Bolt Set",
+      "uom": "pcs",
+      "qty_approved": "104",
+      "qty_dispatched": "104",
+      "serials": ""
+    },
+    {
+      "no": 30,
+      "item_code": "CW-030",
+      "description": "Cable Gland M32",
+      "uom": "pcs",
+      "qty_approved": "107",
+      "qty_dispatched": "107",
+      "serials": ""
+    },
+    {
+      "no": 31,
+      "item_code": "CW-031",
+      "description": "Cable Lug 35 mm²",
+      "uom": "pcs",
+      "qty_approved": "110",
+      "qty_dispatched": "110",
+      "serials": ""
+    },
+    {
+      "no": 32,
+      "item_code": "CW-032",
+      "description": "Earth Pit Cover",
+      "uom": "pcs",
+      "qty_approved": "113",
+      "qty_dispatched": "113",
+      "serials": ""
+    },
+    {
+      "no": 33,
+      "item_code": "CW-033",
+      "description": "Aviation Light",
+      "uom": "pcs",
+      "qty_approved": "116",
+      "qty_dispatched": "116",
+      "serials": "AL-77120, AL-77121"
+    },
+    {
+      "no": 34,
+      "item_code": "CW-034",
+      "description": "Lightning Rod",
+      "uom": "pcs",
+      "qty_approved": "119",
+      "qty_dispatched": "119",
+      "serials": ""
+    },
+    {
+      "no": 35,
+      "item_code": "CW-035",
+      "description": "Cable Ladder 3 m",
+      "uom": "pcs",
+      "qty_approved": "122",
+      "qty_dispatched": "122",
+      "serials": ""
+    }
+  ],
+  "blank_rows": [
+    {
+      "no": 36
+    },
+    {
+      "no": 37
+    },
+    {
+      "no": 38
+    }
+  ],
+  "signatories": {
+    "applicant": {
+      "name": "Ahmed Al-Mabrouk",
+      "position": "Site Engineer",
+      "date": "2026-10-12"
+    },
+    "reviewer_se": {
+      "name": "Salem Ben Omran",
+      "position": "Senior Engineer",
+      "date": "2026-10-12"
+    },
+    "approver_inventory": {
+      "name": "Khaled Al-Sharif",
+      "position": "Inventory Supervisor",
+      "date": "2026-10-12"
+    }
+  }
+}

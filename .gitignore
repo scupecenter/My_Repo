@@ -2,3 +2,4 @@
 .playwright-mcp/
 # Playwright CLI output (may contain credentials)
 .playwright-cli/
+pmis/design/forms/node_modules/
