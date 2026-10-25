@@ -72,7 +72,7 @@ Rule: the RN quantity per item cannot exceed the net on site (DN minus earlier R
 | `site.cw_finish_date` | `task_instances.actual_date` of the CW Completion task | |
 | `site.schedule_is.ahead \| behind \| on` | `actual_date` compared with `baseline_date` / `planned_date` (CW Completion) | Earlier = ahead, later = behind, same = on. |
 | `pac.statement_is.accepted \| with_snags \| not_accepted` | computed | `with_snags` if the site has any closed snag, else `accepted`. `not_accepted` is never set because the form cannot be generated in that state. |
-| `pac.dlp_start` / `pac.dlp_expiry` / `pac.dlp_duration` | `generated_forms.created_at`; start plus `Setting dlp.months`; the setting | The duration default is a configurable ASSUMPTION (12 months) until the contract is checked. See `open-questions.md`. |
+| `pac.dlp_start` / `pac.dlp_expiry` / `pac.dlp_duration` | `generated_forms.created_at`; start plus `Setting dlp.months.cw`; the setting | Owner decision: CW 3 months (TE 12 months, `dlp.months.te`). Configurable; snapshotted on the PAC. |
 | `checks.ground_ohm` | `quality_inspections` (grounding measurement) | Optional. The "____" blank is printed when absent. |
 | `snags[]` | `snags` where `site_id` matches and `scope='CW'` | `no` = S01.. ordered by `raised_at`. `description` = `snags.description`. `raised_date` = `raised_at`. `closed_date` = `closed_at`. `verified_by` = `users.display_name` of `closed_by`. `status` = the `snags.status` label. |
 | `boq[]` | computed from `warehouse_site_qty` or the DN/RN lines | **BoQ qty = net on site = sum(approved DN lines) - sum(approved RN lines), per item.** Items with net qty greater than 0 only. `item_code` = `warehouse_items.item_code`. `remark` is optional. |

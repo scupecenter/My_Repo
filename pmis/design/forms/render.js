@@ -42,12 +42,12 @@ function mini(tpl, ctx) {
 }
 /* Derived fields the engine adds before rendering (the data contract only has doc.qr_svg, doc.ref_no, template.code):
    doc.qr_svg_uri  data: URI of the QR svg, used in the @page margin box
-   doc.ref_no_css / template.code_css  CSS-string-safe copies (margin-box content is a CSS string, not HTML) */
+   doc.ref_no_css / template.code_css / template.version_css  CSS-string-safe copies (margin-box content is a CSS string, not HTML) */
 function prepare(data) {
   const d = JSON.parse(JSON.stringify(data)), cssEsc = v => String(v == null ? '' : v).replace(/[\\"<>&\n\r]/g, '');
   const svg = String((d.doc && d.doc.qr_svg) || '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>').replace('<svg ', '<svg width="40" height="40" ');
   d.doc = Object.assign({}, d.doc, { qr_svg_uri: 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64'), ref_no_css: cssEsc(d.doc && d.doc.ref_no) });
-  d.template = Object.assign({}, d.template, { code_css: cssEsc(d.template && d.template.code) });
+  d.template = Object.assign({}, d.template, { code_css: cssEsc(d.template && d.template.code), version_css: String(parseInt(d.template && d.template.version, 10) || 0) });
   return d;
 }
 const renderHtml = (tpl, data) => { const d = prepare(data); return Handlebars ? Handlebars.compile(tpl)(d) : mini(tpl, d); };
@@ -63,6 +63,8 @@ async function main() {
   if (html.includes('{{')) problems.push('unreplaced "{{" in rendered HTML');
   const browser = await playwright.chromium.launch();
   const page = await browser.newPage();
+  // block every network fetch: templates must be self-contained, and data must not trigger requests
+  await page.route('**', r => r.request().url().startsWith('data:') ? r.continue() : r.abort());
   await page.setContent(html, { waitUntil: 'load' });
   await page.evaluate(() => document.fonts.ready);
   await page.emulateMedia({ media: 'print' });

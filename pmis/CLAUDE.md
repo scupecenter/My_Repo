@@ -24,15 +24,18 @@ Read before any work:
 ## Workflow rules (agreed with the product owner)
 - Login uses the company Microsoft 365 account (Entra ID SSO). Each user is linked to a 4-digit employee ID.
 - Every task goes through Entry → Review → Approve. The number of levels can be configured per stage.
+- Changing the number of levels (decision B7): the new level count applies to new tasks and to open tasks not yet submitted. A task snapshots its level path at first submission and finishes on it, including after a rejection sends it back to entry.
 - The Responsibility Matrix (editable in the UI) decides who holds each level, per stage. If one person holds two consecutive levels, the second level is skipped automatically, and the skip is logged.
 - The unit of approval is the whole task: dates plus documents.
 - A rejection goes back one level (approver → reviewer → entry) and must carry a note. Every task has a comment thread.
+- Rejection after an auto-skip (decision B6): when a level was skipped because the same person held it, a rejection returns to the person who actually acted on the previous level. That person sees the rejection note, corrects, and resubmits; the skip is applied again on resubmission and logged again.
 - Batch uploads can be approved row by row or all at once.
 - Visibility defaults to everything. It can be limited per user to one or more of the 7 regions and to selected modules.
 - Data entry works three ways: manual entry, upload of the Master as an approved template, or upload of other approved templates. Every upload goes through batch → review → approve.
 - **Approved templates only.** The system issues each template with an ID and version embedded in the file (hidden sheet `_tpl` containing `template_id` and `version`). A user downloads the template from beside the task or from the Templates page, fills it, and uploads that same template. Uploads without a valid embedded ID and version are rejected. Each rejection is written to the System Log.
 - Registers are separate modules, each with its own menu: Procurement (PR/PO/WO), Contractors, GECOL power, HLC fiber, Permits & HSE, Warehouse, Quality, Issue Log (several issues per site), Risk Register, Change Control, Readiness & Handover, As-Built, and Meetings.
 - The Audit Log records every user action with before and after values. It is append-only and nobody can edit it. The System/Error Log is kept separately.
+- Audit Log readers (decision B4): System Admins and the Project Manager see all of it. Each Team Lead sees the entries for their own modules and regions only. Anyone else gets it only through the `view_audit` grant in the permission grid, scoped like any other grant (B3). Every read of the Audit Log is itself audited.
 - The UI is in English by default, with Arabic (RTL) available as an instant switch. It has light and dark themes and uses the Cairo font, with ERPNext (frappe-ui) colors.
 
 ## Decisions agreed with the product owner (2026-10-24)
@@ -80,7 +83,7 @@ Configuration owned by the System Admin (or a delegate)
 - **Custom fields (like adding a column to the Master).** The admin can add fields to any register (Procurement PR/PO/WO, GECOL power, HLC fiber, RF survey and design, Acquisition, Permits, Warehouse, Quality, Issue, Risk, Change Control, Readiness & Handover, As-Built, Meetings), to sites and to tasks. Each field has: label EN/AR, type (text, number, date, list, multi-list, yes/no, user, external party, file), required or optional, validation (min/max, pattern), list values (themselves editable), default, order and section, which roles can see and which can edit it, whether it appears in templates, exports and the Master-format export (with its column), and whether it is shown in lists and filters. Fields are versioned and deactivated, never deleted, so their history is kept. Templates regenerate with a new version when fields change, and old template versions are rejected on upload with a clear message.
 
 Permissions (part of Roles & Responsibilities settings)
-- Beyond the matrix (entry/review/approve), each role or assignment has a **permission grid per module and screen**: view, create, edit, delete, approve, export, import, download documents, see the audit log, and administer. Optional **field-level** rules hide or make read-only specific fields, including custom fields. Navigation shows only what the person may use. Permission sets can be saved as named profiles and applied to many assignments. Effective permission = union of the person's active assignments, limited by their regions and modules. All of this is configured in the Roles & Responsibilities settings and audited.
+- Beyond the matrix (entry/review/approve), each role or assignment has a **permission grid per module and screen**: view, create, edit, delete, approve, export, import, download documents, see the audit log, and administer. Optional **field-level** rules hide or make read-only specific fields, including custom fields. Navigation shows only what the person may use. Permission sets can be saved as named profiles and applied to many assignments. Effective permission (decision B3) = union of the person's active assignments, each assignment limited to its own regions and modules. Scopes never cross: a CW role in Tripoli plus a reviewer group in Zawia shows CW in Tripoli and the review work in Zawia, not CW in Zawia. All of this is configured in the Roles & Responsibilities settings and audited.
 
 Business rules
 - SLA for D-1 (TE Access) is measured from TE Installation Readiness (the Site RFI date), not from Site Release.
@@ -122,6 +125,9 @@ Generated documents (forms issued by the system)
   - Numbers are never reused or deleted. A wrong form is voided with a reason and reissued with a new number.
   - Every generation, void and download is audited.
 - **TE forms are deferred.** Each TE document will be classified in the Document Library as one of: issued by Aljeel (generated by the system), issued by the vendor (uploaded only, with its metadata fields), or jointly signed (generated by the system, signed by both parties). The classification is agreed with the owner later and needs no code change.
+
+Defects Liability Period (DLP)
+- Defaults: CW 3 months, TE 12 months, counted from the PAC date. Each is a System Admin setting (`dlp.months.cw`, `dlp.months.te`), versioned; a PAC keeps the value in force when it was issued.
 
 Self-approval (decision B5)
 - If one person holds every level of a task, their submission becomes the final approval. It needs step-up MFA, is flagged "self-approval" in KPIs and the audit log, and the matrix screen shows the case in advance.
@@ -170,3 +176,4 @@ Rollout
 - **Small PRs** to `develop`. Each PR includes tests and a short note covering what changed, how it was tested, and any open questions.
 - Never invent business rules. If the spec is silent, add the question to `docs/spec/open-questions.md` and use a configurable default.
 - Use only synthetic data (fictional names) until the product owner releases real data. Never commit secrets.
+- **Keep `CHANGELOG.md` current.** Every PR that changes a decision, the spec, the schema, the contract, the design or the forms adds a dated entry at the top under the right heading (قرارات, إضافة, تعديل, أمان, مفتوح).

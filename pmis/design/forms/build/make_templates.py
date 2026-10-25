@@ -11,7 +11,7 @@ OVERRIDES = """
 <style id="tpl-overrides">
 /* ===== template overrides (added for auto-fill rendering; everything above is the approved form) ===== */
 @page{ size:A4; margin:9mm 12mm 17mm 12mm;
-  @bottom-left{ content:url("{{{doc.qr_svg_uri}}}") "  %%LABEL%% · {{{doc.ref_no_css}}} · template {{{template.code_css}}} v{{template.version}}";
+  @bottom-left{ content:url("{{{doc.qr_svg_uri}}}") "  %%LABEL%% · {{{doc.ref_no_css}}} · template {{{template.code_css}}} v{{{template.version_css}}}";
     font-family:'Inter','Cairo',sans-serif; font-size:9px; color:#5f6b78; vertical-align:middle; text-align:left; white-space:nowrap; }
   @bottom-right{ content:"Page " counter(page) " of " counter(pages); font-family:'Inter','Cairo',sans-serif; font-size:9.5px; color:#5f6b78; vertical-align:middle; } }
 .sheet{ display:block; height:auto; min-height:0; overflow:visible; }

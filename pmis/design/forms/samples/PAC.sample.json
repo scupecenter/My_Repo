@@ -41,8 +41,8 @@
       "with_snags": true
     },
     "dlp_start": "2026-10-25",
-    "dlp_expiry": "2027-10-25",
-    "dlp_duration": "12 months",
+    "dlp_expiry": "2027-01-25",
+    "dlp_duration": "3 months",
     "final_remarks": "All three snags verified closed on 2026-10-22."
   },
   "checks": {
