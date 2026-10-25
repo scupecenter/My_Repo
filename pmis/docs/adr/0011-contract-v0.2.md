@@ -48,6 +48,16 @@ Owner request: any user with the `export` grant can download the whole project a
 4. The workbook has all sheets and the 187 columns, plus custom fields that carry a Master export column. The same export feeds the parallel-run comparison. Starting an export and every download are audited (ADR 0006).
 5. Additive only: a new tag `exports`, three operations, one job kind, one error code, one response (`Gone`). Nothing from 0.2.1 changes. The Master-format sheet builder and the retention purge are API and worker work, not part of this amendment.
 
+## Amendment 0.2.3 (2026-10-25, additive)
+Owner request: the export can be full or partial, chosen from a list, and every list screen has an Export button for its current view (CLAUDE.md "Full or partial").
+1. `POST /exports/master` gains `parts` (array of part keys; omitted or empty = whole project). Part keys: every register key used by `/registers` (including `dismantle`) plus `sites`, `milestones`, `tasks`, `project_status`. `GET /exports/parts` returns the parts the caller may export (`key`, `label_en`, `label_ar`, `master_sheet`).
+2. `view` (`source`, `filters`, `columns`, optional `sort`) exports exactly the current list view. `parts` and `view` are mutually exclusive: both is 422 `validation_failed`.
+3. `MasterExport` echoes `parts`/`view` and adds `kind` (`full`, `partial`, `view`). File name: `GSDN_Site_Master_<date>.xlsx` for `full`, `GSDN_<part>_<date>.xlsx` otherwise.
+4. Each part keeps the Master sheet and column layout. Content is scoped by B3. The `export` grant is needed for every requested part; the 403 `errors[]` lists the denied parts.
+5. **Security: field-level rules (required server test).** The export applies the same field-level rules as the read paths: custom fields and restricted staff fields (phone and email visibility) the caller cannot read are omitted or nulled. System Admin is the only exception. A server test must export as a user with a hidden custom field and a hidden staff phone/email and assert both are absent (full, partial and view), and that a System Admin export contains them.
+6. **Security: download.** `GET /exports/master/{export_id}/download` now streams the file with 200, `Content-Disposition: attachment` and `Cache-Control: no-store`, like `/files/{file_id}/download`, and replaces the 302 of amendment 0.2.2 (item 3; 409 and 410 `export_expired` are unchanged). The audit row is still written before streaming. The lint-ignore entry for this operation is removed. No client was built on the 302, so this is recorded as a correction of the same-day amendment, not as a breaking change.
+7. Additive otherwise: one operation, three schemas (`ExportPartKey`, `ExportPart`, `ExportView`), optional request fields, one response field. The sheet/column mapping per part is API work.
+
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
 - The contract is large (193 operations). Each API PR must name the tag it implements, and conformance tests are generated per operation.

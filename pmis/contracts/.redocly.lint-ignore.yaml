@@ -1,10 +1,9 @@
 # This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
 # See https://redocly.com/docs/cli/ for more information.
-# Five entries answer 302 by design: the four OIDC redirects (ADR 0002) and the Master export download (ADR 0011 amendment 0.2.2).
+# Four entries answer 302 by design: the four OIDC redirects (ADR 0002).
 openapi.yaml:
   operation-2xx-response:
     - '#/paths/~1auth~1login/get/responses'
     - '#/paths/~1auth~1callback/get/responses'
     - '#/paths/~1auth~1step-up/get/responses'
     - '#/paths/~1auth~1step-up~1callback/get/responses'
-    - '#/paths/~1exports~1master~1{export_id}~1download/get/responses'

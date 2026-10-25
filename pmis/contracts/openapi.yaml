@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.2
+  version: 0.2.3
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -28,6 +28,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.2.3 (2026-10-25): additive. Full, partial and current-view Master export: `parts` and `view` on `POST /exports/master`, `GET /exports/parts`, `MasterExport.kind`; the download streams the file (200) instead of a 302; field-level rules apply to exports (ADR 0011).
     - 0.2.2 (2026-10-25): additive. `POST/GET /exports/master` and `GET /exports/master/{export_id}/download`, job kind `master_export`, error code `export_expired` (ADR 0011).
     - 0.2.1 (2026-10-25): additive. `MatrixAssignee.employee_id` and `user_id`, documented `return_to` allowlist, `ApprovalItem.documents_summary` (ADR 0011).
     - 0.2.0 (2026-10-25): additive. No operation or schema of 0.1 was removed or renamed (ADR 0011).
@@ -44,6 +45,7 @@ info:
     - **Notifications** (`notifications`), **System Log** (`system-log`), **Dashboard KPIs** (`dashboard`) and **Project Status** with the weight-set version (`project-status`).
     - **0.2.1**: `MatrixAssignee` gains `employee_id` and `user_id` (so `ball_in_court.holders` can show the ID beside the name); `return_to` allowlist is documented (`/my-work` default, `/step-up-done` for the step-up popup) and a 401 `step_up_url` already carries `return_to`; `ApprovalItem.documents_summary` removes the extra `GET /tasks/{id}` in Approvals detail.
     - **0.2.2**: on-demand full Master export (`exports`): `POST /exports/master` (202 `Job` of kind `master_export`; optional `regions` and `as_of`; `export` grant; scoped by B3; `Idempotency-Key`), `GET /exports/master` (the caller's recent exports), `GET /exports/master/{export_id}/download` (302 to `GSDN_Site_Master_<date>.xlsx`, audited, 410 `export_expired` after the retention setting `master_export.retention_days`, default 7).
+    - **0.2.3**: partial export. `POST /exports/master` accepts `parts` (omitted or empty = whole project) or `view` (the current list view: source, filters, columns, sort), never both (422). `GET /exports/parts` lists the parts the caller may export. `MasterExport` echoes `parts`/`view` and adds `kind` (`full`, `partial`, `view`). Files are `GSDN_Site_Master_<date>.xlsx` (full) or `GSDN_<part>_<date>.xlsx`. The download of 0.2.2 now answers 200 with the file (`Content-Disposition: attachment`, `Cache-Control: no-store`), as `/files/{file_id}/download` does; it was documented as a 302 for one day and no client was built on it.
     - Small additive changes to 0.1 shapes: `User.mfa_exempt`, `TaskSummary.holder_absent` and `idle_working_days`, `Matrix` stage `kind` and `register_key`, `Problem.reason`, new error codes `freeze_active`, `insufficient_stock`, `role_in_use`, new job kinds, `updateRole` also answers 409 and 422.
   license:
     name: Proprietary, Aljeel internal use
@@ -90,7 +92,7 @@ tags:
   - name: settings
     description: Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert.
   - name: exports
-    description: On-demand full project export in the Site Master layout (owner request 2026-10-25, ADR 0011 amendment 0.2.2).
+    description: On-demand full, partial or current-view export in the Site Master layout (owner request 2026-10-25, ADR 0011 amendments 0.2.2 and 0.2.3).
   - name: system
     description: Jobs and client error reporting.
   - name: staff-registry
@@ -2078,11 +2080,19 @@ paths:
     post:
       tags: [exports]
       operationId: startMasterExport
-      summary: Start a full project export in the Site Master layout (job; needs the `export` grant)
+      summary: Start a full, partial or current-view export in the Site Master layout (job; needs the `export` grant)
       description: |
         All sheets and the 187 columns of `GSDN_Site_Master.xlsx`, plus custom fields that carry a Master export column.
         Content is limited to the caller's regions and modules (B3); a System Admin gets everything. The same export feeds
         the parallel-run comparison. Starting the export is audited.
+
+        **Full, partial or current view (0.2.3).** No `parts` (or an empty array) exports the whole project. `parts` picks parts
+        from `GET /exports/parts`. `view` exports exactly what a list screen shows (its filters, columns and sort). `parts` and
+        `view` together are 422 `validation_failed`. Each part keeps the Master sheet and column layout. The `export` grant is
+        needed for every requested part; otherwise 403 and `errors[]` lists the denied parts.
+
+        **Field-level rules.** The export applies the same field-level rules as the read paths: custom fields and restricted
+        staff fields (phone and email visibility) the caller cannot read are omitted or nulled. System Admin is the only exception.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -2119,21 +2129,43 @@ paths:
                       items: { type: array, items: { $ref: '#/components/schemas/MasterExport' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /exports/parts:
+    get:
+      tags: [exports]
+      operationId: listExportParts
+      summary: The parts the caller may export (the choices of the export dialog)
+      description: Only parts for which the caller holds the `export` grant, in their regions (B3). A System Admin sees all.
+      responses:
+        '200':
+          description: Parts in dialog order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ExportPart' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /exports/master/{export_id}/download:
     get:
       tags: [exports]
       operationId: downloadMasterExport
-      summary: Download a finished Master export (audited before the redirect)
+      summary: Download a finished export (audited before streaming)
       parameters:
         - name: export_id
           in: path
           required: true
           schema: { type: string, format: uuid }
       responses:
-        '302':
-          description: Redirect to a short-lived link to the file `GSDN_Site_Master_<date>.xlsx`.
+        '200':
+          description: The workbook, `GSDN_Site_Master_<date>.xlsx` for a full export, otherwise `GSDN_<part>_<date>.xlsx`. Streamed by the API, as `/files/{file_id}/download`.
           headers:
-            Location: { schema: { type: string, format: uri } }
+            Content-Disposition: { schema: { type: string }, description: 'attachment; filename="..."' }
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, contentMediaType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -5580,8 +5612,19 @@ components:
         finished_at: { type: [string, 'null'], format: date-time }
     MasterExportRequest:
       type: object
-      description: Optional body. An empty body or no body exports all of the caller's regions as of now.
+      description: |
+        Optional body. An empty body or no body exports the whole project for all of the caller's regions as of now.
+        `parts` and `view` are mutually exclusive (both given is 422 `validation_failed`). The export applies the same
+        field-level rules as the read paths: custom fields and restricted staff fields (phone and email visibility) the
+        caller cannot read are omitted or nulled; System Admin is the only exception.
       properties:
+        parts:
+          type: array
+          uniqueItems: true
+          items: { $ref: '#/components/schemas/ExportPartKey' }
+          description: Parts to export. Omitted or empty = whole project (`kind` = `full`). A part the caller may not export is 403 and `errors[]` lists the denied parts.
+        view:
+          $ref: '#/components/schemas/ExportView'
         regions:
           type: array
           minItems: 1
@@ -5589,11 +5632,37 @@ components:
           items: { $ref: '#/components/schemas/RegionId' }
           description: Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions.
         as_of: { type: string, format: date, description: 'Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`.' }
+    ExportPartKey:
+      type: string
+      description: Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, sites, milestones, tasks, project_status]
+    ExportPart:
+      type: object
+      required: [key, label_en, label_ar, master_sheet]
+      properties:
+        key: { $ref: '#/components/schemas/ExportPartKey' }
+        label_en: { type: string }
+        label_ar: { type: string }
+        master_sheet: { type: string, description: 'Master sheet that holds the part.' }
+    ExportView:
+      type: object
+      description: The current view of a list screen. The export has exactly these rows (filters), columns and order, in the Master layout of the source part.
+      required: [source, filters, columns]
+      properties:
+        source: { $ref: '#/components/schemas/ExportPartKey' }
+        filters: { type: object, additionalProperties: true, description: 'The list query parameters of the screen, as sent to its list endpoint. Applied together with B3 scope.' }
+        columns: { type: array, minItems: 1, items: { type: string }, description: 'Master column codes or custom field codes, in screen order.' }
+        sort: { type: string, description: 'Sort expression of the list endpoint.' }
     MasterExport:
       type: object
-      required: [id, created_at, status, regions, row_count, expires_at]
+      description: The export applied the same field-level rules as the read paths (custom fields and restricted staff fields the caller cannot read are omitted or nulled; System Admin is the only exception).
+      required: [id, created_at, status, kind, regions, row_count, expires_at]
       properties:
         id: { type: string, format: uuid }
+        kind: { type: string, enum: [full, partial, view] }
+        parts: { type: array, items: { $ref: '#/components/schemas/ExportPartKey' }, description: 'Echo of the request; empty for `full` and `view`.' }
+        view:
+          $ref: '#/components/schemas/ExportView'
         job_id: { type: string, description: 'The `master_export` job (`GET /jobs/{job_id}`).' }
         created_at: { type: string, format: date-time }
         status: { type: string, enum: [queued, running, done, failed, expired] }
