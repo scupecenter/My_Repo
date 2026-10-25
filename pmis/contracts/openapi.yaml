@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.3
+  version: 0.2.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -28,6 +28,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.2.4 (2026-10-25): additive. `TaskSummary.lock_reasons`, `GET /tasks/{task_id}/slots`, `ImportBatch.site_id` and a described `task_id` on the template upload (ADR 0011).
     - 0.2.3 (2026-10-25): additive. Full, partial and current-view Master export: `parts` and `view` on `POST /exports/master`, `GET /exports/parts`, `MasterExport.kind`; the download streams the file (200) instead of a 302; field-level rules apply to exports (ADR 0011).
     - 0.2.2 (2026-10-25): additive. `POST/GET /exports/master` and `GET /exports/master/{export_id}/download`, job kind `master_export`, error code `export_expired` (ADR 0011).
     - 0.2.1 (2026-10-25): additive. `MatrixAssignee.employee_id` and `user_id`, documented `return_to` allowlist, `ApprovalItem.documents_summary` (ADR 0011).
@@ -46,6 +47,7 @@ info:
     - **0.2.1**: `MatrixAssignee` gains `employee_id` and `user_id` (so `ball_in_court.holders` can show the ID beside the name); `return_to` allowlist is documented (`/my-work` default, `/step-up-done` for the step-up popup) and a 401 `step_up_url` already carries `return_to`; `ApprovalItem.documents_summary` removes the extra `GET /tasks/{id}` in Approvals detail.
     - **0.2.2**: on-demand full Master export (`exports`): `POST /exports/master` (202 `Job` of kind `master_export`; optional `regions` and `as_of`; `export` grant; scoped by B3; `Idempotency-Key`), `GET /exports/master` (the caller's recent exports), `GET /exports/master/{export_id}/download` (302 to `GSDN_Site_Master_<date>.xlsx`, audited, 410 `export_expired` after the retention setting `master_export.retention_days`, default 7).
     - **0.2.3**: partial export. `POST /exports/master` accepts `parts` (omitted or empty = whole project) or `view` (the current list view: source, filters, columns, sort), never both (422). `GET /exports/parts` lists the parts the caller may export. `MasterExport` echoes `parts`/`view` and adds `kind` (`full`, `partial`, `view`). Files are `GSDN_Site_Master_<date>.xlsx` (full) or `GSDN_<part>_<date>.xlsx`. The download of 0.2.2 now answers 200 with the file (`Content-Disposition: attachment`, `Cache-Control: no-store`), as `/files/{file_id}/download` does; it was documented as a 302 for one day and no client was built on it.
+    - **0.2.4**: `TaskSummary.lock_reasons` (optional, same `LockReason` items as `GET /tasks/{task_id}`) so "Why locked?" needs no extra call; `GET /tasks/{task_id}/slots` lists the task's `DocumentSlot`s; the import batch created by a per-task template upload carries `task_id` and `site_id`, and `task_id` is documented on the create request.
     - Small additive changes to 0.1 shapes: `User.mfa_exempt`, `TaskSummary.holder_absent` and `idle_working_days`, `Matrix` stage `kind` and `register_key`, `Problem.reason`, new error codes `freeze_active`, `insufficient_stock`, `role_in_use`, new job kinds, `updateRole` also answers 409 and 422.
   license:
     name: Proprietary, Aljeel internal use
@@ -1470,6 +1472,27 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /tasks/{task_id}/slots:
+    get:
+      tags: [tasks]
+      operationId: listTaskSlots
+      summary: The task's document slots
+      description: Same items as `TaskDetail.slots`, without loading the whole task (for example the per-task template upload and the slot pickers).
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+      responses:
+        '200':
+          description: Slots.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DocumentSlot' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /tasks/{task_id}/slots/{slot_id}/files:
     post:
       tags: [tasks]
@@ -3742,7 +3765,7 @@ paths:
               properties:
                 file: {type: string, format: binary}
                 template_id: {type: string, description: The template the user selected.}
-                task_id: {type: string, format: uuid}
+                task_id: {type: string, format: uuid, description: 'Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.'}
       responses:
         '202':
           description: Accepted; poll the job or the batch.
@@ -6264,6 +6287,7 @@ components:
         admin_override: { type: boolean }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
+        lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' }, description: 'Why the task is locked (empty when it is not), so "Why locked?" needs no extra call.' }
         version: { type: integer }
     DocumentFile:
       type: object
@@ -6329,7 +6353,6 @@ components:
               type: object
               description: Field code -> access for the caller (hidden fields are absent).
               additionalProperties: { type: string, enum: [read, edit] }
-            lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' } }
             approval_path: { type: array, items: { $ref: '#/components/schemas/ApprovalPathLevel' } }
             slots: { type: array, items: { $ref: '#/components/schemas/DocumentSlot' } }
             missing_for_submit: { type: array, items: { type: string } }
@@ -6982,6 +7005,7 @@ components:
             rejected: { type: integer }
         job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
+        site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
         uploaded_by: { $ref: '#/components/schemas/UserRef' }
         uploaded_at: { type: string, format: date-time }
         version: { type: integer }
