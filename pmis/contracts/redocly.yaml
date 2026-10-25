@@ -1,0 +1,8 @@
+# Redocly lint configuration for contracts/openapi.yaml (owner: tech-lead).
+# Run: npx -y @redocly/cli@1 lint contracts/openapi.yaml --config contracts/redocly.yaml
+extends:
+  - recommended
+rules:
+  operation-4xx-response: error
+  operation-operationId: error
+  no-unused-components: warn
