@@ -6,7 +6,10 @@ import { Approvals } from '@/pages/Approvals';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
+import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
+import { Site } from '@/pages/Site';
+import { Sites } from '@/pages/Sites';
 import { Pending } from '@/pages/Pending';
 
 function Soon() {
@@ -27,6 +30,9 @@ function Gate() {
         <Route index element={<Navigate to="/my-work" replace />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="approvals" element={<Approvals />} />
+        <Route path="sites" element={<Sites />} />
+        <Route path="sites/:siteId" element={<Site />} />
+        <Route path="admin/matrix" element={<MatrixPage />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

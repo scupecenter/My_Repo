@@ -1,0 +1,98 @@
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { api, ApiError } from './client';
+import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteListItem, SiteTasks, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+
+export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string };
+
+export const useRegions = () => useQuery({ queryKey: ['regions'], staleTime: Infinity, queryFn: () => api.get<{ items: Region[] }>('/regions').then((r) => r.items) });
+
+export const useSites = (f: SiteFilters) =>
+  useInfiniteQuery({
+    queryKey: ['sites', f], initialPageParam: '' as string, placeholderData: keepPreviousData,
+    queryFn: ({ pageParam }) => api.get<Page<SiteListItem>>('/sites', { query: { ...f, limit: 100, cursor: pageParam } }),
+    getNextPageParam: (last) => last.page.next_cursor ?? undefined,
+  });
+
+export const useSite = (id: string) => useQuery({ queryKey: ['site', id], queryFn: () => api.get<SiteDetail>(`/sites/${id}`) });
+export const useSiteTasks = (id: string) => useQuery({ queryKey: ['site-tasks', id], queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`) });
+export const useHistory = (id: string) => useQuery({ queryKey: ['task-history', id], queryFn: () => api.get<Page<WorkflowStep>>(`/tasks/${id}/history`) });
+export const useComments = (id: string) => useQuery({ queryKey: ['task-comments', id], queryFn: () => api.get<Page<Comment>>(`/tasks/${id}/comments`) });
+
+const settleTask = (qc: QueryClient, siteId?: string) => {
+  for (const k of ['site-tasks', 'site', 'task', 'task-history', 'task-comments', 'approvals', 'my-work', 'sites']) void qc.invalidateQueries({ queryKey: siteId && k === 'site-tasks' ? [k, siteId] : [k] });
+};
+
+/** Replace one task inside the cached grid; returns a rollback. */
+function patchGrid(qc: QueryClient, siteId: string, id: string, fn: (t: TaskSummary) => TaskSummary) {
+  const key = ['site-tasks', siteId];
+  const before = qc.getQueryData<SiteTasks>(key);
+  if (before) qc.setQueryData<SiteTasks>(key, { ...before, stages: before.stages.map((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? fn(t) : t)) })) });
+  return () => qc.setQueryData(key, before);
+}
+
+/** Inline date edit: the grid shows the new date at once and rolls back when the server refuses. */
+export function useDatePatch(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation<TaskDetail, ApiError, { task: TaskSummary; patch: TaskEntryPatch }, { rollback: () => void }>({
+    mutationFn: ({ task, patch }) => api.patch(`/tasks/${task.id}`, { version: task.version, body: patch }),
+    onMutate: async ({ task, patch }) => {
+      await qc.cancelQueries({ queryKey: ['site-tasks', siteId] });
+      return { rollback: patchGrid(qc, siteId, task.id, (t) => ({ ...t, ...(patch as Partial<TaskSummary>) })) };
+    },
+    onError: (_e, _v, ctx) => ctx?.rollback(),
+    onSettled: () => settleTask(qc, siteId),
+  });
+}
+
+export type TaskOp = 'submit' | 'review' | 'approve' | 'reject';
+const NEXT: Record<TaskOp, Partial<TaskSummary>> = { submit: { state: 'in_review' }, review: { state: 'in_approval' }, approve: { state: 'approved' }, reject: { state: 'entry' } };
+
+export function useTaskOp(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation<TransitionResult, ApiError, { task: TaskSummary; op: TaskOp; note?: string }, { rollback: () => void }>({
+    mutationFn: ({ task, op, note }) => api.post(`/tasks/${task.id}/${op}`, { version: task.version, body: { note } }),
+    onMutate: async ({ task, op }) => {
+      await qc.cancelQueries({ queryKey: ['site-tasks', siteId] });
+      return { rollback: patchGrid(qc, siteId, task.id, (t) => ({ ...t, ...NEXT[op] })) };
+    },
+    onError: (_e, _v, ctx) => ctx?.rollback(),
+    onSettled: () => settleTask(qc, siteId),
+  });
+}
+
+export function useUpload(task: TaskDetail) {
+  const qc = useQueryClient();
+  return useMutation<DocumentFile, ApiError, { slotId: string; file: File }, { before?: TaskDetail }>({
+    mutationFn: ({ slotId, file }) => { const f = new FormData(); f.append('file', file); return api.post(`/tasks/${task.id}/slots/${slotId}/files`, { body: f }); },
+    onMutate: async ({ slotId, file }) => {
+      await qc.cancelQueries({ queryKey: ['task', task.id] });
+      const before = qc.getQueryData<TaskDetail>(['task', task.id]);
+      if (before) qc.setQueryData<TaskDetail>(['task', task.id], { ...before, slots: before.slots.map((s) => (s.id === slotId ? { ...s, status: 'uploaded', files: [...s.files, { id: 'pending', file_group_id: 'pending', version: 1, is_current: true, original_name: file.name, download_name: file.name, size_bytes: file.size, uploaded_at: new Date().toISOString() }] } : s)) });
+      return { before };
+    },
+    onError: (_e, _v, ctx) => qc.setQueryData(['task', task.id], ctx?.before),
+    onSettled: () => settleTask(qc, task.site_id),
+  });
+}
+
+export function useAddComment(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (body: string) => api.post<Comment>(`/tasks/${taskId}/comments`, { body: { body } }), onSuccess: () => qc.invalidateQueries({ queryKey: ['task-comments', taskId] }) });
+}
+
+export const useMatrix = () => useQuery({ queryKey: ['matrix'], queryFn: async () => ({ ...(await api.get<Matrix>('/matrix')) }) });
+export const useRoles = () => useQuery({ queryKey: ['roles'], staleTime: 300_000, queryFn: () => api.get<{ items: Role[] }>('/roles').then((r) => r.items) });
+export const useGroups = () => useQuery({ queryKey: ['groups'], staleTime: 300_000, queryFn: () => api.get<Page<Group>>('/groups').then((r) => r.items) });
+export const usePicker = (q: string) => useQuery({ queryKey: ['picker', q], enabled: q.trim().length >= 2, queryFn: () => api.get<Page<UserPickerItem>>('/users/picker', { query: { q: q.trim() } }).then((r) => r.items) });
+
+/** Publish: the screen already shows the draft, so the cache switches at once and returns on failure (If-Match = matrix revision). */
+export function usePublishMatrix() {
+  const qc = useQueryClient();
+  return useMutation<Matrix, ApiError, { matrix: Matrix; patch: MatrixPatch; draft: Matrix }, { before?: Matrix }>({
+    mutationFn: ({ matrix, patch }) => api.patch('/matrix', { version: matrix.version, body: patch }),
+    onMutate: ({ draft }) => { const before = qc.getQueryData<Matrix>(['matrix']); qc.setQueryData(['matrix'], draft); return { before }; },
+    onError: (_e, _v, ctx) => qc.setQueryData(['matrix'], ctx?.before),
+    onSuccess: (m) => qc.setQueryData(['matrix'], m),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['matrix'] }); void qc.invalidateQueries({ queryKey: ['site-tasks'] }); },
+  });
+}

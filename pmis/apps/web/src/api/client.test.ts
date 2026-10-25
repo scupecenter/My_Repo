@@ -73,3 +73,11 @@ describe('api client', () => {
     setStepUpHandler(null);
   });
 });
+
+describe('assertSafePath', () => {
+  it('accepts normal API paths and rejects traversal from interpolated IDs', async () => {
+    const { assertSafePath } = await import('./client');
+    expect(() => assertSafePath('/tasks/3f2b-11/approve')).not.toThrow();
+    for (const bad of ['/tasks/../users', '/tasks/a%2F..%2Fx', '/tasks/a?x=1', '/tasks/', '/tasks/.']) expect(() => assertSafePath(bad)).toThrow();
+  });
+});

@@ -1219,6 +1219,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exports/master": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's recent Master exports (within the retention window) */
+        get: operations["listMasterExports"];
+        put?: never;
+        /**
+         * Start a full, partial or current-view export in the Site Master layout (job; needs the `export` grant)
+         * @description All sheets and the 187 columns of `GSDN_Site_Master.xlsx`, plus custom fields that carry a Master export column.
+         *     Content is limited to the caller's regions and modules (B3); a System Admin gets everything. The same export feeds
+         *     the parallel-run comparison. Starting the export is audited.
+         *
+         *     **Full, partial or current view (0.2.3).** No `parts` (or an empty array) exports the whole project. `parts` picks parts
+         *     from `GET /exports/parts`. `view` exports exactly what a list screen shows (its filters, columns and sort). `parts` and
+         *     `view` together are 422 `validation_failed`. Each part keeps the Master sheet and column layout. The `export` grant is
+         *     needed for every requested part; otherwise 403 and `errors[]` lists the denied parts.
+         *
+         *     **Field-level rules.** The export applies the same field-level rules as the read paths: custom fields and restricted
+         *     staff fields (phone and email visibility) the caller cannot read are omitted or nulled. System Admin is the only exception.
+         */
+        post: operations["startMasterExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/parts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The parts the caller may export (the choices of the export dialog)
+         * @description Only parts for which the caller holds the `export` grant, in their regions (B3). A System Admin sees all.
+         */
+        get: operations["listExportParts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/master/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a finished export (audited before streaming) */
+        get: operations["downloadMasterExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings": {
         parameters: {
             query?: never;
@@ -3065,7 +3133,7 @@ export interface components {
             missing?: string[];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -3104,7 +3172,7 @@ export interface components {
         Job: {
             id: string;
             /** @enum {string} */
-            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate";
+            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate" | "master_export";
             /** @enum {string} */
             status: "queued" | "running" | "done" | "failed";
             progress?: number;
@@ -3118,6 +3186,74 @@ export interface components {
             created_at?: string;
             /** Format: date-time */
             finished_at?: string | null;
+        };
+        /**
+         * @description Optional body. An empty body or no body exports the whole project for all of the caller's regions as of now.
+         *     `parts` and `view` are mutually exclusive (both given is 422 `validation_failed`). The export applies the same
+         *     field-level rules as the read paths: custom fields and restricted staff fields (phone and email visibility) the
+         *     caller cannot read are omitted or nulled; System Admin is the only exception.
+         */
+        MasterExportRequest: {
+            /** @description Parts to export. Omitted or empty = whole project (`kind` = `full`). A part the caller may not export is 403 and `errors[]` lists the denied parts. */
+            parts?: components["schemas"]["ExportPartKey"][];
+            view?: components["schemas"]["ExportView"];
+            /** @description Subset of the caller's regions (B3). A region outside the caller's scope is 422 `validation_failed`. Default is all of the caller's regions. */
+            regions?: components["schemas"]["RegionId"][];
+            /**
+             * Format: date
+             * @description Data as of this date (end of day). Default is now; a future date is 422 `validation_failed`.
+             */
+            as_of?: string;
+        };
+        /**
+         * @description Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
+         * @enum {string}
+         */
+        ExportPartKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "sites" | "milestones" | "tasks" | "project_status";
+        ExportPart: {
+            key: components["schemas"]["ExportPartKey"];
+            label_en: string;
+            label_ar: string;
+            /** @description Master sheet that holds the part. */
+            master_sheet: string;
+        };
+        /** @description The current view of a list screen. The export has exactly these rows (filters), columns and order, in the Master layout of the source part. */
+        ExportView: {
+            source: components["schemas"]["ExportPartKey"];
+            /** @description The list query parameters of the screen, as sent to its list endpoint. Applied together with B3 scope. */
+            filters: {
+                [key: string]: unknown;
+            };
+            /** @description Master column codes or custom field codes, in screen order. */
+            columns: string[];
+            /** @description Sort expression of the list endpoint. */
+            sort?: string;
+        };
+        /** @description The export applied the same field-level rules as the read paths (custom fields and restricted staff fields the caller cannot read are omitted or nulled; System Admin is the only exception). */
+        MasterExport: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "full" | "partial" | "view";
+            /** @description Echo of the request; empty for `full` and `view`. */
+            parts?: components["schemas"]["ExportPartKey"][];
+            view?: components["schemas"]["ExportView"];
+            /** @description The `master_export` job (`GET /jobs/{job_id}`). */
+            job_id?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @enum {string} */
+            status: "queued" | "running" | "done" | "failed" | "expired";
+            regions: components["schemas"]["RegionId"][];
+            /** Format: date */
+            as_of?: string;
+            /** @description Site rows written; null until the job is done. */
+            row_count: number | null;
+            /**
+             * Format: date-time
+             * @description Set when done: created_at plus the setting `master_export.retention_days` (default 7).
+             */
+            expires_at: string | null;
         };
         /** @description Custom field values keyed by field code (ADR 0009). Hidden fields are omitted. */
         CustomValues: {
@@ -3554,6 +3690,13 @@ export interface components {
             /** Format: uuid */
             ref_id: string;
             label: string;
+            /** @description 4-digit employee ID when `kind` is `user`; null for role and group holders. */
+            employee_id?: components["schemas"]["EmployeeId"] | null;
+            /**
+             * Format: uuid
+             * @description Present only when `kind` is `user` (same value as `ref_id`).
+             */
+            user_id?: string;
         };
         BallInCourt: {
             level: number;
@@ -3823,6 +3966,15 @@ export interface components {
             waiting_since: string;
             submitted_by?: components["schemas"]["UserRef"];
             will_self_skip?: boolean;
+            /** @description One entry per document slot of the task, so the Approvals detail needs no extra `GET /tasks/{task_id}`. */
+            documents_summary?: {
+                /** Format: uuid */
+                slot_id: string;
+                name: string;
+                /** @enum {string} */
+                status: "missing" | "uploaded" | "in_review" | "approved" | "rejected" | "not_required";
+                file_count: number;
+            }[];
         };
         MatrixCell: {
             /** Format: uuid */
@@ -5354,6 +5506,15 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
+        /** @description The resource existed but has expired (`export_expired`). */
+        Gone: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/problem+json": components["schemas"]["Problem"];
+            };
+        };
         /** @description `If-Match` does not match the current version (`precondition_failed`). Re-read and retry. */
         PreconditionFailed: {
             headers: {
@@ -5474,7 +5635,7 @@ export interface operations {
             query?: {
                 /** @description Email, 4-digit employee ID, or phone in E.164 (`+2189...`). Anything else is treated as no match. */
                 identifier?: string;
-                /** @description App-relative path to open after sign-in. The server decodes it, rejects any scheme, host, `//`, backslash or encoded slash, matches it against the app route allowlist, falls back to `/` on failure, and stores the validated value in the server-side OIDC state; the callback never reads it from the URL again. */
+                /** @description App-relative path to open after sign-in or step-up. Server allowlist: `/my-work` (default after login, also used when the value is missing or rejected), `/step-up-done` (the step-up popup), and any other same-origin app route that matches the pattern. The server decodes it, rejects any scheme, host, `//`, backslash or encoded slash, matches it against the server allowlist, and stores the validated value in the server-side OIDC state; the callback never reads it from the URL again. The `step_up_url` of a 401 `step_up_required` already includes `return_to`; clients must not append another. */
                 return_to?: string;
             };
             header?: never;
@@ -5591,7 +5752,7 @@ export interface operations {
     startStepUp: {
         parameters: {
             query: {
-                /** @description App-relative path to open after sign-in. The server decodes it, rejects any scheme, host, `//`, backslash or encoded slash, matches it against the app route allowlist, falls back to `/` on failure, and stores the validated value in the server-side OIDC state; the callback never reads it from the URL again. */
+                /** @description App-relative path to open after sign-in or step-up. Server allowlist: `/my-work` (default after login, also used when the value is missing or rejected), `/step-up-done` (the step-up popup), and any other same-origin app route that matches the pattern. The server decodes it, rejects any scheme, host, `//`, backslash or encoded slash, matches it against the server allowlist, and stores the validated value in the server-side OIDC state; the callback never reads it from the URL again. The `step_up_url` of a 401 `step_up_required` already includes `return_to`; clients must not append another. */
                 return_to: string;
             };
             header?: never;
@@ -7830,6 +7991,117 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listMasterExports: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Exports, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MasterExport"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    startMasterExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MasterExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Job started (`kind` = `master_export`). On `done` the job `result` carries `export_id`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listExportParts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Parts in dialog order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ExportPart"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    downloadMasterExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workbook, `GSDN_Site_Master_<date>.xlsx` for a full export, otherwise `GSDN_<part>_<date>.xlsx`. Streamed by the API, as `/files/{file_id}/download`. */
+            200: {
+                headers: {
+                    /** @description attachment; filename="..." */
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
         };
     };
     listSettings: {

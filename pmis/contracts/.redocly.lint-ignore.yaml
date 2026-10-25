@@ -1,6 +1,6 @@
 # This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
 # See https://redocly.com/docs/cli/ for more information.
-# The four entries are the OIDC redirect endpoints, which answer 302 by design (ADR 0002).
+# Four entries answer 302 by design: the four OIDC redirects (ADR 0002).
 openapi.yaml:
   operation-2xx-response:
     - '#/paths/~1auth~1login/get/responses'

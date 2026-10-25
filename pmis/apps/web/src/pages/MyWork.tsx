@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useMe, useMyTasks } from '@/api/hooks';
 import type { TaskSummary } from '@/api/types';
+import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
 
 const SLA_CHIP: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk', none: 'bg-lockBg text-lockInk' };
@@ -18,7 +19,7 @@ export function TaskCard({ task }: { task: TaskSummary }) {
       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute">
         {task.sla?.colour && <span className={`chip ${SLA_CHIP[task.sla.colour]}`}>{t('approvals.sla')} {task.sla.elapsed_wd ?? '–'}/{task.sla.max_wd ?? '–'} {t('approvals.wd')}</span>}
         {claimed ? <PersonTag name={claimed.display_name} employeeId={claimed.employee_id} />
-          : task.ball_in_court?.holders.map((h) => <span key={h.ref_id}>{h.label}</span>)}
+          : <Holders holders={task.ball_in_court?.holders ?? []} />}
       </div>
       {task.last_return_note && <div className="mt-1 text-sm text-lateInk">{t('approvals.returned_note', { note: task.last_return_note })}</div>}
     </li>

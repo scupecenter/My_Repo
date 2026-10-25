@@ -1,9 +1,9 @@
-import type { ApprovalItem, Me, Notification, Session, TaskDetail, TaskSummary } from '@/api/types';
-import { STAFF, type StaffRow } from './staff';
+import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Notification, Session, TaskDetail, TaskSummary, WorkflowStep } from '@/api/types';
+import { byId, staffRef, uid } from './ids';
+import { holdersOf, initialMatrix } from './matrixData';
+import { STAFF } from './staff';
 
-export const uid = (employeeId: string) => `00000000-0000-4000-8000-00000000${employeeId.padStart(4, '0')}`;
-export const staffRef = (s: StaffRow) => ({ id: uid(s.employee_id), display_name: s.name_en, employee_id: s.employee_id });
-const byId = (id: string) => STAFF.find((s) => s.employee_id === id)!;
+export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
@@ -13,7 +13,11 @@ export const ACCOUNTS: Record<string, { employee_id: string | null; name: string
   pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
 };
 
-type MockTask = TaskSummary & { submitted_by: string; waiting_since: string; level_kind: 'review' | 'approve'; docs: string[]; external: string; entered_by: string };
+type MockTask = TaskSummary & {
+  submitted_by: string; waiting_since: string; level_kind: 'review' | 'approve'; docs: string[]; external: string; entered_by: string;
+  /** Generated site-grid tasks (mocks/sites.ts) carry their own slots, steps and comments once touched. */
+  gen?: boolean; slots?: DocumentSlot[]; steps?: WorkflowStep[]; comments?: Comment[]; locks?: { kind: 'predecessor_not_approved' | 'gate_closed'; message: string; ref_code?: string }[];
+};
 
 const mk = (n: number, site: string, region: number, code: string, name: string, kind: 'review' | 'approve', by: string, extra: Partial<TaskSummary> = {}, state?: TaskSummary['state']): MockTask => ({
   id: `10000000-0000-4000-8000-00000000${String(n).padStart(4, '0')}`,
@@ -40,6 +44,9 @@ const fresh = () => ({
   extra: [
     mk(8, 'BG220', 5, 'D5', 'Power-on test', 'approve', '1001', { sla: { colour: 'red', min_wd: 2, max_wd: 4, elapsed_wd: 6, due_date: '2026-10-20' } }, 'entry'),
   ] as MockTask[],
+  /** Generated site tasks changed by the user (full copies, keyed by task id). */
+  ov: {} as Record<string, MockTask>,
+  matrix: initialMatrix() as Matrix,
   notifications: [
     { id: '30000000-0000-4000-8000-000000000001', kind: 'approval_due', title: 'WM105 D14 waits for your approval', created_at: '2026-10-24T08:30:00Z', read_at: null, link: '/approvals' },
     { id: '30000000-0000-4000-8000-000000000002', kind: 'task_returned', title: 'ZW310 B6 was returned with a note', created_at: '2026-10-23T10:00:00Z', read_at: null, link: '/my-work' },
@@ -94,30 +101,78 @@ export function meBody(): Me {
 /** Level the viewer may act at. PM does both, reviewer only review. */
 export const canAct = (kind: 'review' | 'approve') => { const v = viewer(); return !!v && (v.key === 'pm' || (v.key === 'reviewer' && kind === 'review')); };
 
-const inbox = (t: MockTask) => t.state === 'in_review' || t.state === 'in_approval';
-export const approvalsFor = () => db().tasks.filter((t) => inbox(t) && canAct(t.level_kind));
+export const inbox = (t: MockTask) => t.state === 'in_review' || t.state === 'in_approval';
+export const approvalsFor = () => [...db().tasks, ...Object.values(db().ov)].filter((t) => inbox(t) && canAct(t.level_kind));
+
+/** Ball in court from the live matrix: entry holders until submitted, then the holders of the current level. */
+export function ballFor(t: MockTask): BallInCourt {
+  const level = t.state === 'in_review' || t.state === 'in_approval' ? t.current_level ?? 2 : t.state === 'approved' ? t.levels_required ?? 3 : 1;
+  const kind = level === 1 ? 'entry' : level >= (t.levels_required ?? 3) ? 'approve' : 'review';
+  return { level, level_kind: kind, holders: holdersOf(db().matrix, t.stage_code, level) };
+}
+
+/** Levels after `level 1` the submitter's own seats take over (same person on consecutive levels, B5/B6/B7). */
+export function skipPath(t: MockTask, employeeId: string | null | undefined, from = 1) {
+  const L = t.levels_required ?? 3, skipped: number[] = [];
+  let n = from + 1;
+  while (n <= L && employeeId && holdersOf(db().matrix, t.stage_code, n).some((a) => a.kind === 'user' && a.employee_id === employeeId)) skipped.push(n++);
+  return { skipped, to: n > L ? null : n, final: n > L };
+}
+export const canEditTask = (t: MockTask) => {
+  const v = viewer();
+  return !!v && (v.key === 'pm' || holdersOf(db().matrix, t.stage_code, 1).some((a) => a.employee_id === v.employee_id));
+};
 
 export function toSummary(t: MockTask): TaskSummary {
-  const { submitted_by: _s, waiting_since: _w, level_kind: _l, docs: _d, external: _e, entered_by: _b, ...rest } = t;
-  void [_s, _w, _l, _d, _e, _b];
-  return { ...rest, ball_in_court: { level: t.current_level ?? 1, level_kind: t.level_kind, holders: [{ kind: 'role', ref_id: uid('0001'), label: t.level_kind === 'approve' ? 'Project Manager' : 'Team Lead' }] } };
+  const { submitted_by: _s, waiting_since: _w, level_kind: _l, docs: _d, external: _e, entered_by: _b, gen: _g, slots: _sl, steps: _st, comments: _c, locks: _lk, ...rest } = t;
+  void [_s, _w, _l, _d, _e, _b, _g, _sl, _st, _c, _lk];
+  return { ...rest, ball_in_court: ballFor(t) };
 }
 
 export function toApproval(t: MockTask): ApprovalItem {
-  return { task: toSummary(t), level_kind: t.level_kind, waiting_since: t.waiting_since, submitted_by: staffRef(byId(t.submitted_by)) };
+  const slots = slotsOf(t);
+  return {
+    task: toSummary(t), level_kind: t.level_kind, waiting_since: t.waiting_since, submitted_by: staffRef(byId(t.submitted_by)),
+    documents_summary: slots.map((x) => ({ slot_id: x.id, name: x.name_en, status: x.status, file_count: x.files.length })),
+  };
+}
+
+export const slotsOf = (t: MockTask): DocumentSlot[] =>
+  t.slots ?? t.docs.map((d, i) => ({ id: `40000000-0000-4000-8000-00000000000${i}`, doc_code: t.task_code, name_en: d, status: 'in_review' as const, mandatory: true, files: [] }));
+
+function allowed(t: MockTask): TaskDetail['allowed_actions'] {
+  const v = viewer();
+  if (!v) return [];
+  const out: TaskDetail['allowed_actions'] = [{ action: 'comment' }];
+  if ((t.state === 'entry' || t.state === 'open') && canEditTask(t)) {
+    const sp = skipPath(t, v.employee_id);
+    const missing = slotsOf(t).some((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected'));
+    out.push({ action: 'edit' }, { action: 'submit', step_up: sp.final, final: sp.final, will_skip_to: sp.to, disabled_reason: missing ? 'mandatory_slots_missing' : null });
+  }
+  if (inbox(t) && canAct(t.level_kind)) {
+    const sp = t.level_kind === 'review' ? skipPath(t, v.employee_id, t.current_level ?? 2) : null;
+    out.push({ action: t.level_kind === 'approve' ? 'approve' : 'review', step_up: t.level_kind === 'approve' || !!sp?.final, will_skip_to: sp?.to ?? null, final: sp?.final }, { action: 'reject' });
+  }
+  return out;
 }
 
 export function toDetail(t: MockTask): TaskDetail {
+  const L = t.levels_required ?? 3, m = db().matrix;
+  const path = Array.from({ length: L }, (_, k) => {
+    const level = k + 1, cur = t.current_level ?? 1, kind = level === 1 ? 'entry' : level === L ? 'approve' : 'review';
+    const done = t.state === 'approved' || level < cur || (level === 1 && inbox(t));
+    const status = done ? 'done' : level === cur && t.state !== 'locked' ? 'current' : 'pending';
+    const next = holdersOf(m, t.stage_code, level + 1).map((a) => a.ref_id);
+    return {
+      level, kind, status, will_skip: level < L && holdersOf(m, t.stage_code, level).some((a) => a.kind === 'user' && next.includes(a.ref_id)),
+      ...(level === 1 && done ? { acted_by: staffRef(byId(t.entered_by)), acted_at: '2026-10-20T09:00:00Z' } : {}),
+    };
+  });
   return {
-    ...toSummary(t),
-    approval_path: [
-      { level: 1, kind: 'entry', status: 'done', acted_by: staffRef(byId(t.entered_by)), acted_at: '2026-10-20T09:00:00Z' },
-      { level: 2, kind: 'review', status: t.level_kind === 'review' && inbox(t) ? 'current' : 'done' },
-      { level: 3, kind: 'approve', status: t.state === 'approved' ? 'done' : t.level_kind === 'approve' && inbox(t) ? 'current' : 'pending' },
-    ],
-    slots: t.docs.map((d, i) => ({ id: `40000000-0000-4000-8000-00000000000${i}`, doc_code: t.task_code, name_en: d, status: 'in_review', mandatory: true, files: [] })),
-    allowed_actions: inbox(t) && canAct(t.level_kind)
-      ? [{ action: t.level_kind === 'approve' ? 'approve' : 'review', step_up: t.level_kind === 'approve' }, { action: 'reject' }] : [],
+    ...toSummary(t), approval_path: path, slots: slotsOf(t), allowed_actions: allowed(t), workflow_version: 1,
+    lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [],
+    missing_for_submit: slotsOf(t).filter((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected')).map((s) => s.name_en),
+    planned_start: t.planned_date, actual_start: t.actual_date,
   } as TaskDetail;
 }
 
