@@ -1,0 +1,232 @@
+{
+  "template": {
+    "code": "GSDN_CW_PAC",
+    "version": 3
+  },
+  "doc": {
+    "ref_no": "PAC-CW-TR-2026-0001",
+    "date": "2026-10-25",
+    "remarks": "",
+    "qr_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-1 -1 23 23\" shape-rendering=\"crispEdges\"><rect x=\"-1\" y=\"-1\" width=\"23\" height=\"23\" fill=\"#fff\"/><g fill=\"#000\"><rect x=\"0\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"0\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"1\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"2\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"3\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"4\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"5\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"6\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"7\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"8\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"9\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"10\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"11\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"12\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"13\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"14\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"15\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"16\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"7\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"8\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"17\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"19\" y=\"18\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"11\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"16\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"18\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"19\" width=\"1\" height=\"1\"/><rect x=\"0\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"1\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"2\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"3\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"4\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"5\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"6\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"9\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"10\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"12\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"13\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"14\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"15\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"17\" y=\"20\" width=\"1\" height=\"1\"/><rect x=\"20\" y=\"20\" width=\"1\" height=\"1\"/></g></svg>"
+  },
+  "site": {
+    "id": "TRI-0412",
+    "name": "Souq Al-Juma North",
+    "region_code": "Tripoli",
+    "region_name": "Tripoli",
+    "region_is": {
+      "Tripoli": true
+    },
+    "po_wo": "PO-CW-2026-0187",
+    "tower_height_m": "42.0",
+    "latitude": "32.887210",
+    "longitude": "13.191338",
+    "tower_is": {
+      "GF_SST": true
+    },
+    "sow_is": {
+      "both": true
+    },
+    "schedule_is": {
+      "on": true
+    },
+    "cw_start_date": "2026-07-01",
+    "cw_finish_date": "2026-10-05"
+  },
+  "contractor": {
+    "name": "Al-Ufuq Contracting Co. / شركة الأفق للمقاولات"
+  },
+  "pac": {
+    "statement_is": {
+      "with_snags": true
+    },
+    "dlp_start": "2026-10-25",
+    "dlp_expiry": "2027-10-25",
+    "dlp_duration": "12 months",
+    "final_remarks": "All three snags verified closed on 2026-10-22."
+  },
+  "checks": {
+    "ground_ohm": "2.4"
+  },
+  "snags": [
+    {
+      "no": "S01",
+      "description": "Missing bitumen paint on neck column C2",
+      "raised_date": "2026-09-20",
+      "closed_date": "2026-09-28",
+      "verified_by": "Y. Haddad",
+      "status": "Closed"
+    },
+    {
+      "no": "S02",
+      "description": "Cable ladder bracket loose at 18 m level",
+      "raised_date": "2026-09-21",
+      "closed_date": "2026-10-01",
+      "verified_by": "Y. Haddad",
+      "status": "Closed"
+    },
+    {
+      "no": "S03",
+      "description": "Earth bar cover not fitted / غطاء قضيب التأريض غير مثبت",
+      "raised_date": "2026-09-25",
+      "closed_date": "2026-10-02",
+      "verified_by": "Y. Haddad",
+      "status": "Closed"
+    }
+  ],
+  "boq": [
+    {
+      "no": 1,
+      "item_code": "CW-001",
+      "description": "Tower",
+      "uom": "m",
+      "qty": "15",
+      "remark": ""
+    },
+    {
+      "no": 2,
+      "item_code": "CW-002",
+      "description": "Mounting Pole",
+      "uom": "m",
+      "qty": "17",
+      "remark": ""
+    },
+    {
+      "no": 3,
+      "item_code": "CW-003",
+      "description": "AC Cable 4x16 mm²",
+      "uom": "m",
+      "qty": "19",
+      "remark": ""
+    },
+    {
+      "no": 4,
+      "item_code": "CW-004",
+      "description": "AC Cable 4x10 mm²",
+      "uom": "m",
+      "qty": "21",
+      "remark": ""
+    },
+    {
+      "no": 5,
+      "item_code": "CW-005",
+      "description": "DC Cable 25 mm²",
+      "uom": "m",
+      "qty": "23",
+      "remark": "net of RN-0001"
+    },
+    {
+      "no": 6,
+      "item_code": "CW-006",
+      "description": "DC Cable 35 mm²",
+      "uom": "m",
+      "qty": "25",
+      "remark": ""
+    },
+    {
+      "no": 7,
+      "item_code": "CW-007",
+      "description": "Fiber Cable – Patch Cord",
+      "uom": "m",
+      "qty": "27",
+      "remark": ""
+    },
+    {
+      "no": 8,
+      "item_code": "CW-008",
+      "description": "Fiber Cable – Outdoor Shielded",
+      "uom": "m",
+      "qty": "29",
+      "remark": ""
+    },
+    {
+      "no": 9,
+      "item_code": "CW-009",
+      "description": "Indoor Cable Tray",
+      "uom": "m",
+      "qty": "31",
+      "remark": ""
+    },
+    {
+      "no": 10,
+      "item_code": "CW-010",
+      "description": "Outdoor Cable Tray",
+      "uom": "m",
+      "qty": "33",
+      "remark": ""
+    },
+    {
+      "no": 11,
+      "item_code": "CW-011",
+      "description": "PVC Pipe 1\"",
+      "uom": "m",
+      "qty": "35",
+      "remark": ""
+    },
+    {
+      "no": 12,
+      "item_code": "CW-012",
+      "description": "PVC Pipe 1.5\"",
+      "uom": "m",
+      "qty": "37",
+      "remark": ""
+    },
+    {
+      "no": 13,
+      "item_code": "CW-013",
+      "description": "PVC Pipe 2\"",
+      "uom": "m",
+      "qty": "39",
+      "remark": ""
+    },
+    {
+      "no": 14,
+      "item_code": "CW-014",
+      "description": "GND Cable 16 mm²",
+      "uom": "m",
+      "qty": "41",
+      "remark": ""
+    },
+    {
+      "no": 15,
+      "item_code": "CW-015",
+      "description": "GND Cable 35 mm²",
+      "uom": "m",
+      "qty": "43",
+      "remark": ""
+    }
+  ],
+  "blank_rows": [
+    {
+      "no": 16
+    },
+    {
+      "no": 17
+    },
+    {
+      "no": 18
+    }
+  ],
+  "signatories": {
+    "contractor": {
+      "name": "Mustafa Al-Faqi",
+      "position": "Project Manager",
+      "date": "2026-10-25"
+    },
+    "site_engineer": {
+      "name": "Ahmed Al-Mabrouk",
+      "position": "",
+      "date": "2026-10-25"
+    },
+    "cw_team_lead": {
+      "name": "Nadia Al-Ghoul",
+      "position": "",
+      "date": "2026-10-25"
+    },
+    "project_manager": {
+      "name": "Omar Al-Tajouri",
+      "position": "",
+      "date": "2026-10-25"
+    }
+  }
+}

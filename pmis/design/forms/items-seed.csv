@@ -1,0 +1,29 @@
+code,description_en,uom,category,serial_tracked
+CW-001,Tower,m,Tower & Pole,false
+CW-002,Mounting Pole,m,Tower & Pole,false
+CW-003,AC Cable 4x16 mm²,m,Power Cable,false
+CW-004,AC Cable 4x10 mm²,m,Power Cable,false
+CW-005,DC Cable 25 mm²,m,Power Cable,false
+CW-006,DC Cable 35 mm²,m,Power Cable,false
+CW-007,Fiber Cable – Patch Cord,m,Fiber,false
+CW-008,Fiber Cable – Outdoor Shielded,m,Fiber,false
+CW-009,Indoor Cable Tray,m,Cable Tray,false
+CW-010,Outdoor Cable Tray,m,Cable Tray,false
+CW-011,"PVC Pipe 1""",m,Conduit,false
+CW-012,"PVC Pipe 1.5""",m,Conduit,false
+CW-013,"PVC Pipe 2""",m,Conduit,false
+CW-014,GND Cable 16 mm²,m,Grounding,false
+CW-015,GND Cable 35 mm²,m,Grounding,false
+CW-016,GND Cable 50 mm²,m,Grounding,false
+CW-017,Grounding Busbar,pcs,Grounding,false
+CW-018,Grounding Copper Rod,pcs,Grounding,false
+CW-019,Grounding Copper-plated Rod,pcs,Grounding,false
+CW-020,Electrical Switch 63A 3P AC,pcs,Electrical,false
+CW-021,Electrical Switch 63A 1P DC,pcs,Electrical,false
+CW-022,Electrical Switch 32A 1P DC,pcs,Electrical,false
+CW-023,Electrical Switch 16A 1P DC,pcs,Electrical,false
+CW-024,Electrical Switch 10A 1P DC,pcs,Electrical,false
+CW-025,AC Box,pcs,Enclosure,false
+CW-026,DC Box,pcs,Enclosure,false
+CW-027,AC Box Stand,pcs,Enclosure,false
+CW-028,Indoor Rack,pcs,Enclosure,false

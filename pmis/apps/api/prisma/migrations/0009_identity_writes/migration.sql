@@ -297,6 +297,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   SELECT EXISTS (SELECT 1 FROM public.group_members gm JOIN public.groups g ON g.id = gm.group_id AND g.is_system_admins WHERE gm.user_id = p_user)
       OR EXISTS (SELECT 1 FROM public.delegations d WHERE d.target_user_id = p_user)
       OR EXISTS (SELECT 1 FROM public.user_role_assignments a WHERE a.user_id = p_user AND (a.permission_level = 'admin' OR public.idm_role_privileged(a.role_id)))
+      OR EXISTS (SELECT 1 FROM public.group_members gm WHERE gm.user_id = p_user AND public.idm_group_privileged(gm.group_id))
 $$;
 
 -- ---- post-state helpers: called AFTER the INSERT/UPDATE inside the same function; a failure rolls the change back --------------
@@ -470,6 +471,9 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'assignment not found'; END IF;
   IF uid = a THEN RAISE EXCEPTION 'you cannot change your own assignments' USING ERRCODE = 'insufficient_privilege'; END IF;
   PERFORM public.idm_assignment_in_scope(p_id, 'assignments', 'delete');
+  -- same gates as idm_update_assignment: a delegate cannot end a privileged user's or an out-of-ceiling assignment
+  PERFORM public.idm_assert_user_change_allowed(uid);
+  PERFORM public.idm_assert_assignment_within_actor(p_id, 'delete');
   UPDATE public.user_role_assignments SET valid_to = greatest(now(), valid_from + interval '1 millisecond'), is_primary = false WHERE id = p_id AND (valid_to IS NULL OR valid_to > now());
   PERFORM public.idm_audit('assignment_ended', 'user_role_assignment', p_id::text, NULL, jsonb_build_object('user', uid), p_reason);
 END $$;

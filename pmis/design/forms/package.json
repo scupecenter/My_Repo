@@ -1,0 +1,10 @@
+{
+  "name": "gsdn-cw-forms",
+  "private": true,
+  "description": "Auto-fill templates and sample renderer for the GSDN CW forms",
+  "scripts": {
+    "build:templates": "python3 -I build/make_templates.py",
+    "render": "for f in DN RN PAC FAC; do node render.js templates/GSDN_CW_$f.tpl.html samples/$f.sample.json out/GSDN_CW_$f.pdf --png --verify || exit 1; done"
+  },
+  "dependencies": { "handlebars": "^4.7.8" }
+}
