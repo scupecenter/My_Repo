@@ -40,6 +40,7 @@ Read before any work:
   3. act on it themselves through the system, logged as "lead on behalf of the assignee".
   A reassignment needs a short reason and is audited. It keeps all entered data, documents and comments. **It does not reset or pause anything:** the SLA keeps its original start date and its SLA version, and stage progress is unchanged. If the lead takes over a level and also holds the next one, the normal skip rule and the self-approval rule (B5) apply.
   Absence records are optional and informational: an employee can record annual leave in advance, and the lead or an admin records sick or emergency leave. An absent person's tasks show an "absent" badge, and the lead is alerted. Separately, a task idle for N working days (default 2, a setting) alerts the lead even when no absence was recorded.
+- **Deactivated or deleted users (decision B14, 2026-10-26).** Deactivating or soft-deleting an account (reason and step-up MFA required; never a hard delete) ends its sessions but moves nothing: its open tasks stay on the person with a "deactivated" badge, the Team Lead is alerted at once and uses the B12b choices (keep, reassign, act on behalf), and a level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10). The SLA never pauses or resets. A deleted account can be restored with its previous assignments, unless its employee ID or email now belongs to another account. The last-admin guard applies.
 - Visibility defaults to everything. It can be limited per user to one or more of the 7 regions and to selected modules.
 - Data entry works three ways: manual entry, upload of the Master as an approved template, or upload of other approved templates. Every upload goes through batch → review → approve.
 - **Approved templates only.** The system issues each template with an ID and version embedded in the file (hidden sheet `_tpl` containing `template_id` and `version`). A user downloads the template from beside the task or from the Templates page, fills it, and uploads that same template. Uploads without a valid embedded ID and version are rejected. Each rejection is written to the System Log.
@@ -147,6 +148,15 @@ Self-approval (decision B5)
 Mobile app (later, design for it now)
 - A site engineer sees only the tasks assigned to them. The in-app camera stamps every photo, visibly and in metadata, with site ID, name, address, registered coordinates, device GPS, date/time, engineer, and task.
 - The geofence check flags a photo taken more than 300 m (configurable) from the site. Proof tasks (MOS, QC) accept the in-app camera only. Capture works offline and syncs later with the original timestamp.
+
+Administration screens (owner approval 2026-10-26, patterns taken from a reference system; our rules win where they differ)
+- **Notification policy** in Settings: on/off, timezone (Africa/Tripoli), daily digest hour, thresholds with allowed ranges (approval reminder and escalation, SLA warning, rate cap per hour, retention), and a matrix of notification type × role/group with channels (in-app, email). Some types are mandatory and cannot be turned off (audit integrity failure, retention reduced). Security and system types go to System Admins only. Versioned and audited like other settings.
+- **Every settings save rejects unknown keys and returns field-level errors**, including rules across fields (for example, escalation must come after the reminder).
+- **Sign-in and security log**, separate from the Audit Log and the System/Error Log, readable by System Admins or the `view_security_log` grant; every read is audited. An identifier typed in the sign-in box that matches nobody is never stored as typed (it may be a password): only a masked keyed hash is kept, so repeated attempts can still be grouped.
+- **Log integrity check**: the Audit Log and the security log are append-only hash chains; an admin button verifies each chain and lists any break.
+- **Online now**: admins see active sessions (status, last activity, current screen) and can end a user's sessions with a reason and step-up MFA. Background polling never extends the idle timeout.
+- **Log retention**: System Log and security log retention are settings with a minimum (90 and 365 days); reducing one needs a reason and step-up and raises a mandatory alert. The Audit Log stays 10 years and is not settable.
+- **Typed confirmation** (type the target's code or name) is required, in addition to step-up MFA, for lifting the structural freeze, publishing a workflow version and dismantle.
 
 Non-functional requirements
 | Item | Value |
