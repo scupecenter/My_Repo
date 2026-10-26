@@ -735,7 +735,7 @@ paths:
       tags: [assignments]
       operationId: copyAssignments
       summary: Copy the active rows of one person to others (add or replace)
-      description: Use `dry_run=true` for the preview shown before confirming (AU-13).
+      description: Use `dry_run=true` for the preview shown before confirming (AU-13). A `to_user_ids` entry equal to the caller is refused with 403 `self_beneficiary` (also in the dry run) unless the caller is a System Admin acting without delegation, so nobody can copy another person's rights to themselves; `idm_copy_assignments` enforces it like `idm_assign`.
       x-step-up: true
       x-db-path: idm_copy_assignments
       parameters:

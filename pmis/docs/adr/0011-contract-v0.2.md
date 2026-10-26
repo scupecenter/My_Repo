@@ -83,6 +83,7 @@ Closes the phase 3b gaps, adds the admin features approved by the owner on 2026-
 
 ### Security hardening of 0.2.5 (2026-10-26, automated review)
 - A delegation to a role or group must not let a member grant themselves its rights: adding oneself to a target group, or assigning oneself a target role, is refused with `self_beneficiary` unless done by a System Admin without delegation.
+- `copyAssignments` refuses the caller as a target with `self_beneficiary` (unless a System Admin without delegation), closing a self-grant path that predates 0.2.5.
 - Notification policy: all `security` types are mandatory for the System Admins. Changing a `security` or `system` row, or `rate_cap_per_hour`, needs step-up and a System Admin without delegation, and alerts the System Admins.
 
 ## Consequences
