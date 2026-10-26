@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.4
+  version: 0.2.5
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -22,12 +22,14 @@ info:
     - **Step-up**: `x-step-up` is `true` (always) or a string naming the condition (for example when self-skip reaches final approval). Such operations need a re-authentication no older than the setting `stepup_max_age_seconds`
       (default 300). Otherwise 401 `step_up_required` with `step_up_url` (ADR 0002 §6). One step-up covers a whole bulk request.
     - **Idempotency**: bulk and job-starting POSTs accept `Idempotency-Key`; a replay within 24 h returns the first response.
+    - **Live polling (0.2.5)**: requests sent by a timer (notification bell, online-now list) carry the header `X-PMIS-Live: 1`. The server must not extend the idle timeout for them; only real user activity does. They also do not update `last_activity_at`.
     - **Long jobs** answer 202 with a `Job`; poll `GET /jobs/{job_id}`.
     - **Database paths**: `x-db-path` names the SECURITY DEFINER function that performs the write (ADR 0003 §7). The API never writes
       identity or permission tables directly.
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.2.5 (2026-10-26): additive. Phase 3b gaps (delegation to role or group, export column codes, `POST /tasks/{task_id}/act-on-behalf`) and admin additions: notification policy and catalogue, security log, log integrity, active sessions and revoke, log retention, `confirm_text` on dangerous actions, `last_admin` documented, and user soft delete and restore (B14) (ADR 0011).
     - 0.2.4 (2026-10-25): additive. `TaskSummary.lock_reasons`, `GET /tasks/{task_id}/slots`, `ImportBatch.site_id` and a described `task_id` on the template upload (ADR 0011).
     - 0.2.3 (2026-10-25): additive. Full, partial and current-view Master export: `parts` and `view` on `POST /exports/master`, `GET /exports/parts`, `MasterExport.kind`; the download streams the file (200) instead of a 302; field-level rules apply to exports (ADR 0011).
     - 0.2.2 (2026-10-25): additive. `POST/GET /exports/master` and `GET /exports/master/{export_id}/download`, job kind `master_export`, error code `export_expired` (ADR 0011).
@@ -48,6 +50,7 @@ info:
     - **0.2.2**: on-demand full Master export (`exports`): `POST /exports/master` (202 `Job` of kind `master_export`; optional `regions` and `as_of`; `export` grant; scoped by B3; `Idempotency-Key`), `GET /exports/master` (the caller's recent exports), `GET /exports/master/{export_id}/download` (302 to `GSDN_Site_Master_<date>.xlsx`, audited, 410 `export_expired` after the retention setting `master_export.retention_days`, default 7).
     - **0.2.3**: partial export. `POST /exports/master` accepts `parts` (omitted or empty = whole project) or `view` (the current list view: source, filters, columns, sort), never both (422). `GET /exports/parts` lists the parts the caller may export. `MasterExport` echoes `parts`/`view` and adds `kind` (`full`, `partial`, `view`). Files are `GSDN_Site_Master_<date>.xlsx` (full) or `GSDN_<part>_<date>.xlsx`. The download of 0.2.2 now answers 200 with the file (`Content-Disposition: attachment`, `Cache-Control: no-store`), as `/files/{file_id}/download` does; it was documented as a 302 for one day and no client was built on it.
     - **0.2.4**: `TaskSummary.lock_reasons` (optional, same `LockReason` items as `GET /tasks/{task_id}`) so "Why locked?" needs no extra call; `GET /tasks/{task_id}/slots` lists the task's `DocumentSlot`s; the import batch created by a per-task template upload carries `task_id` and `site_id`, and `task_id` is documented on the create request.
+    - **0.2.5**: `DelegationInput` and `Delegation` gain `target_kind` (user, role, group), `target_id`, `region_codes`, `module_codes`, `allow_redelegate` (`to_user_id` becomes optional, `Delegation.to_user` is null for role and group targets); `ExportPart.columns` and `ExportColumnCode` define the stable column codes of `ExportView.columns`; `POST /tasks/{task_id}/act-on-behalf` (B12b choice 3); `GET/PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`; `GET /security-log`, `POST /security-log/exports`; `GET /audit-log/integrity`, `GET /security-log/integrity`; `GET /sessions/active`, `POST /sessions/{session_id}/revoke`, `POST /users/{user_id}/sessions/revoke`; `GET/PUT /settings/log-retention`; required `confirm_text` on freeze lift and workflow publish with error code `confirmation_mismatch`; grants `manage_users` and `view_security_log`; `last_admin` 409 documented on every operation that can remove the last System Admin; user soft delete and restore (B14): `POST /users/{user_id}/delete`, `POST /users/{user_id}/restore`, `GET /users/deleted`, `holder_account_status` on tasks, alert cause `holder_deactivated`.
     - Small additive changes to 0.1 shapes: `User.mfa_exempt`, `TaskSummary.holder_absent` and `idle_working_days`, `Matrix` stage `kind` and `register_key`, `Problem.reason`, new error codes `freeze_active`, `insufficient_stock`, `role_in_use`, new job kinds, `updateRole` also answers 409 and 422.
   license:
     name: Proprietary, Aljeel internal use
@@ -90,9 +93,17 @@ tags:
   - name: workflow
     description: Versioned workflow definition and site migration (ADR 0010).
   - name: audit
-    description: Read-only Audit Log (ADR 0006).
+    description: Read-only Audit Log (ADR 0006). Append-only hash chain; `GET /audit-log/integrity` verifies it.
   - name: settings
-    description: Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert.
+    description: |
+      Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert, notification policy (0.2.5), log retention (0.2.5).
+
+      **Validation convention (0.2.5).** Every settings `PUT` rejects unknown keys (the request schemas are closed) and answers 422 `validation_failed`
+      with field-level `errors[]` (`path` = JSON pointer, `code`, `message`), including cross-field rules (for example
+      `approval_escalate_days * 24 > approval_remind_hours` in the notification policy). Every settings write needs `reason`, `If-Match`
+      for a versioned setting, and writes an audit row with before and after values.
+  - name: security
+    description: "Sign-in and security log, active sessions and revoke (0.2.5). Separate from the Audit Log and the System Log; append-only hash chain."
   - name: exports
     description: On-demand full, partial or current-view export in the Site Master layout (owner request 2026-10-25, ADR 0011 amendments 0.2.2 and 0.2.3).
   - name: system
@@ -185,8 +196,11 @@ paths:
       tags: [auth]
       operationId: getSession
       summary: Current session state and CSRF token
+      description: 'A timer-driven call sends `X-PMIS-Live: 1`; it does not extend the idle timeout.'
       security:
         - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/LivePoll'
       responses:
         '200':
           description: Session.
@@ -379,7 +393,7 @@ paths:
       tags: [users]
       operationId: listUsers
       summary: Registered employees (everyone who signed in with M365)
-      description: Needs `view` on `admin.users`. Name pickers use `GET /users/picker`, which returns a reduced shape.
+      description: Needs `view` on `admin.users`. Name pickers use `GET /users/picker`, which returns a reduced shape. Soft-deleted users (B14) are not listed here; see `GET /users/deleted`.
       parameters:
         - { name: q, in: query, description: 'Search name, email or employee ID.', schema: { type: string } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
@@ -399,6 +413,29 @@ paths:
                   - type: object
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/User' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /users/deleted:
+    get:
+      tags: [users]
+      operationId: listDeletedUsers
+      summary: Soft-deleted users (B14), newest deletion first
+      description: Needs `view` on `admin.users`. Each row says whether it can be restored (`can_restore`) and why not (`restore_blocked_reason`).
+      parameters:
+        - { name: q, in: query, description: 'Search name, email or employee ID.', schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Deleted users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/DeletedUser' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /users/picker:
@@ -445,7 +482,9 @@ paths:
       tags: [users]
       operationId: updateUser
       summary: Change status or employee ID (admin)
-      description: Deactivating a user releases their claimed tasks back to the cell (AU-09). Refused with `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
+      description: |
+        Deactivating a user (`status` suspended or disabled) ends all their sessions at once (security log `session_revoked_by_admin`). Claimed tasks return to the cell (AU-09). Tasks held at a level by the person do **not** move (B14, B12b): they stay on the person with `holder_account_status` = `deactivated`, the Team Lead is alerted at once (`holder_deactivated`, `GET /reassignments/alerts`) and decides with `POST /tasks/reassign` or `POST /tasks/{task_id}/act-on-behalf`. SLA never pauses or resets. A level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10).
+        Refused with 409 `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
       x-step-up: true
       x-db-path: idm_set_user_status / idm_link_employee_id
       parameters:
@@ -475,6 +514,71 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/delete:
+    post:
+      tags: [users]
+      operationId: deleteUser
+      summary: Soft-delete a user (B14); reversible with restore
+      description: |
+        Sets `deleted_at`, `deleted_by` and the reason; the row, its history and its assignments are kept (nothing is hard-deleted). The user is deactivated first if needed, all sessions end, and the account can no longer sign in. Same effect on open tasks as a deactivation: **nothing moves automatically**; tasks stay on the person with `holder_account_status` = `deleted`, the Team Lead is alerted (`holder_deactivated`) and uses reassign, act on behalf or keep (B12b). SLA never pauses or resets.
+        Refused with 409 `last_admin` if it would leave no active System Admin, 403 `self_beneficiary` for the caller's own row, and 409 `invalid_transition` when already deleted.
+      x-step-up: true
+      x-db-path: idm_delete_user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/DeleteReason' }
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeletedUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/restore:
+    post:
+      tags: [users]
+      operationId: restoreUser
+      summary: Restore a soft-deleted user (B14)
+      description: |
+        Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
+      x-step-up: true
+      x-db-path: idm_restore_user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: Restored.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
   /users/{user_id}/assignments:
     parameters:
@@ -558,6 +662,7 @@ paths:
       tags: [assignments]
       operationId: bulkUpdateAssignments
       summary: Edit level, regions, modules, profiles or dates of many rows
+      description: A change (lower level, narrower scope, earlier `valid_to`) that would leave no active System Admin is refused with `last_admin`, per row in `failed`, or 409 when every row is refused.
       x-step-up: true
       x-db-path: idm_update_assignment
       parameters:
@@ -586,13 +691,16 @@ paths:
               schema: { $ref: '#/components/schemas/BulkResult' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   /assignments/bulk-end:
     post:
       tags: [assignments]
       operationId: bulkEndAssignments
       summary: Remove (end) assignment rows
-      description: Sets `valid_to` (default now); rows are never deleted (AU-13). Claimed tasks of the ended role return to their cell.
+      description: |
+        Sets `valid_to` (default now); rows are never deleted (AU-13). Claimed tasks of the ended role return to their cell.
+        A row whose end would leave no active System Admin is refused with `last_admin`: reported in `failed` of the result, and the whole request answers 409 `last_admin` when every row is refused.
       x-step-up: true
       x-db-path: idm_end_assignment
       parameters:
@@ -725,6 +833,7 @@ paths:
       tags: [roles]
       operationId: updateRole
       summary: Rename, change defaults, or deactivate a role (never deleted while assigned)
+      description: Deactivating the role that gives the System Admin rights, or removing those rights from it, is refused with 409 `last_admin` when it would leave no active System Admin. A role with active assignments is refused with 409 `role_in_use`.
       x-step-up: true
       x-db-path: idm_save_role
       parameters:
@@ -933,6 +1042,7 @@ paths:
       tags: [groups]
       operationId: updateGroup
       summary: Rename, describe or deactivate a group
+      description: Deactivating the System Admins group is refused with 409 `last_admin`.
       x-step-up: true
       x-db-path: idm_group_update
       parameters:
@@ -1001,7 +1111,7 @@ paths:
       tags: [groups]
       operationId: removeGroupMember
       summary: Remove a member
-      description: Refused with `last_admin` when it would leave the System Admins group without an active member. Claimed tasks of the member under this group return to the group.
+      description: Refused with 409 `last_admin` when it would leave the System Admins group without an active member. Claimed tasks of the member under this group return to the group.
       x-step-up: true
       x-db-path: idm_group_remove_member
       parameters:
@@ -1817,6 +1927,7 @@ paths:
         Answers 409 `freeze_active` during the structural freeze (`GET /settings/structural-freeze`, B9).
         During the parallel run, a change that affects Master export columns needs `confirm_master_impact` equal to the
         phrase in `master_impact.confirmation_phrase` of the validation result.
+        Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `v<version>` (for example `v4`), else 422 `confirmation_mismatch`.
       x-step-up: true
       x-db-path: admin_publish_workflow_version (app_actor_is_admin('workflow.publish'))
       parameters:
@@ -1828,10 +1939,11 @@ paths:
           application/json:
             schema:
               type: object
-              required: [reason]
+              required: [reason, confirm_text]
               properties:
                 reason: { $ref: '#/components/schemas/Reason' }
                 confirm_master_impact: { type: string }
+                confirm_text: { $ref: '#/components/schemas/ConfirmText' }
       responses:
         '200':
           description: Published.
@@ -2098,6 +2210,179 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /audit-log/integrity:
+    get:
+      tags: [audit]
+      operationId: getAuditLogIntegrity
+      summary: Verify the hash chain of the Audit Log (System Admins only)
+      description: |
+        The Audit Log is an append-only hash chain: each row stores the hash of the previous row, and the database refuses update and delete. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+      parameters:
+        - { name: from_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: to_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200':
+          description: Result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogIntegrity' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ------------------------------------------------------------------ security log and sessions
+  /security-log:
+    get:
+      tags: [security]
+      operationId: listSecurityLog
+      summary: Sign-in and security log (append-only; no write endpoint exists)
+      description: |
+        Needs a System Admin or the grant `view_security_log`. Newest first. Reading is itself audited (Audit Log action `security_log.read`, with the filters used). Separate from the Audit Log and the System Log; kept for `security_log_days` (`GET /settings/log-retention`).
+        An identifier typed in the one-box sign-in that matches no registry row is never stored raw (see `identifier_masked`). `ip` is shown to System Admins only.
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to, in: query, schema: { type: string, format: date-time } }
+        - { name: event, in: query, description: 'One or more events, comma separated.', style: form, explode: false, schema: { type: array, items: { $ref: '#/components/schemas/SecurityEvent' } } }
+        - { name: outcome, in: query, schema: { $ref: '#/components/schemas/SecurityOutcome' } }
+        - { name: q, in: query, description: 'Free text over name, employee ID, `identifier_masked` and `request_id`.', schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/SecurityLogEntry' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /security-log/exports:
+    post:
+      tags: [security]
+      operationId: exportSecurityLog
+      summary: Export the filtered security log as CSV (job; the export is itself audited)
+      description: Goes through the existing export service (job kind `security_export`). Needs the `export` grant and `view_security_log` (or System Admin). `ip` follows the same rule as the list.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+                event: { type: array, items: { $ref: '#/components/schemas/SecurityEvent' } }
+                outcome: { $ref: '#/components/schemas/SecurityOutcome' }
+                q: { type: string }
+      responses:
+        '202':
+          description: Job started.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Job' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /security-log/integrity:
+    get:
+      tags: [security]
+      operationId: getSecurityLogIntegrity
+      summary: Verify the hash chain of the security log (System Admins only)
+      description: Same contract as `GET /audit-log/integrity` for the security log, which is also an append-only hash chain. The check is audited. A break raises the mandatory alert `audit_integrity_failure`.
+      parameters:
+        - { name: from_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+        - { name: to_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
+      responses:
+        '200':
+          description: Result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogIntegrity' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sessions/active:
+    get:
+      tags: [security]
+      operationId: listActiveSessions
+      summary: Who is online now
+      description: |
+        Needs a System Admin or the grant `manage_users`. The screen polls this with `X-PMIS-Live: 1`; polling never counts as user activity, so it cannot keep a session alive. `status` is `online` when the person had real activity inside the presence window (server setting, default 5 minutes), otherwise `idle`. The raw `ip` is returned to System Admins only; for everyone else it is null.
+      parameters:
+        - $ref: '#/components/parameters/LivePoll'
+        - { name: status, in: query, schema: { type: string, enum: [online, idle] } }
+        - { name: q, in: query, description: 'Search name or employee ID.', schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Sessions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/ActiveSession' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /sessions/{session_id}/revoke:
+    post:
+      tags: [security]
+      operationId: revokeSession
+      summary: End one session
+      description: Needs a System Admin or the grant `manage_users`. The person's next request answers 401. Security log `session_revoked_by_admin`; audited with the reason. The caller's own session is refused (use `POST /auth/logout`).
+      x-step-up: true
+      x-db-path: idm_revoke_session
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionRevokeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/sessions/revoke:
+    post:
+      tags: [security]
+      operationId: revokeUserSessions
+      summary: End all sessions of a user
+      description: Same rules as `POST /sessions/{session_id}/revoke`, for every session of the user. Deactivating or deleting a user does this automatically. A caller's own sessions are not touched.
+      x-step-up: true
+      x-db-path: idm_revoke_session
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionRevokeResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
   # ------------------------------------------------------------------ master export
   /exports/master:
     post:
@@ -2158,6 +2443,8 @@ paths:
       operationId: listExportParts
       summary: The parts the caller may export (the choices of the export dialog)
       description: Only parts for which the caller holds the `export` grant, in their regions (B3). A System Admin sees all.
+      parameters:
+        - { name: include_columns, in: query, description: 'Add `columns` (the stable column codes of each part) to every item. Columns the caller cannot read (field-level rules) are left out.', schema: { type: boolean, default: false } }
       responses:
         '200':
           description: Parts in dialog order.
@@ -2730,6 +3017,35 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /tasks/{task_id}/act-on-behalf:
+    post:
+      tags: [reassignment]
+      operationId: actOnBehalf
+      summary: Act on the task's current level on behalf of its assignee (B12b choice 3)
+      description: |
+        For a Team Lead (the `reassign` grant for the module and region) or a System Admin. Performs `action` at the current level instead of its holder.
+        `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
+        The normal rules apply unchanged: a level the caller also holds next is skipped and logged (`skipped_levels`), and if the caller ends up holding every level the result is a self-approval (B5, flagged in KPIs and the Audit Log, step-up needed). `reject` needs `note` (422 `note_required`).
+        Audit and `WorkflowStep` record the step as "lead on behalf of the assignee": `acted_by` = caller, `on_behalf_of` = the person who held the level, `on_behalf_kind` = `assignee`.
+      x-step-up: when `action` = `approve`, or when the skip chain reaches final approval
+      x-db-path: ops_act_on_behalf
+      parameters:
+        - $ref: '#/components/parameters/TaskId'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActOnBehalfRequest' }
+      responses:
+        '200': { $ref: '#/components/responses/TaskTransition' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /reassignments/eligible-users:
     get:
       tags: [reassignment]
@@ -2772,13 +3088,13 @@ paths:
       tags: [reassignment]
       operationId: listReassignmentAlerts
       summary: Tasks that need a lead decision (absent holder or idle)
-      description: A task shows when its holder has an active absence, or when it has had no activity for `working_days` (setting). Scoped to the caller's modules and regions.
+      description: A task shows when its holder has an active absence, when it has had no activity for `working_days` (setting), or when its holder's account is deactivated or deleted (`holder_deactivated`, B14). Scoped to the caller's modules and regions.
       parameters:
       - name: cause
         in: query
         schema:
           type: string
-          enum: [absent, idle]
+          enum: [absent, idle, holder_deactivated]
       - name: user_id
         in: query
         schema: {type: string, format: uuid}
@@ -2844,6 +3160,127 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/IdleTaskAlertSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/notification-policy:
+    get:
+      tags: [settings]
+      operationId: getNotificationPolicy
+      summary: Notification policy (switch, timezone, digest, thresholds, type by recipient matrix)
+      description: Needs `view` on `admin.settings` (System Admin or a delegate holding `settings.edit`). The personal channel preferences stay in `/me/notification-preferences`; the policy is the system-wide frame they work inside (a type switched off here, or a mandatory type, cannot be changed per person).
+      responses:
+        '200':
+          description: Policy.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setNotificationPolicy
+      summary: Replace the notification policy
+      description: |
+        Needs the `settings` permission or a delegation of it. Versioned, audited with before and after values and a reason, like the other settings.
+        **Closed schema:** an unknown key anywhere in the body is 422 `validation_failed`. Field-level errors list `path` and `code`.
+        **Cross-field rule:** `thresholds.approval_escalate_days * 24` must be greater than `thresholds.approval_remind_hours`, else 422 `validation_failed` with errors on both paths (`code` = `must_exceed_remind_hours`).
+        **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
+        Rows left out of `matrix` keep the catalogue defaults.
+      x-db-path: admin_set_setting
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NotificationPolicyInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NotificationPolicy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/notification-policy/catalogue:
+    get:
+      tags: [settings]
+      operationId: listNotificationTypes
+      summary: Notification types the policy matrix can govern (system-defined, read-only)
+      description: |
+        Small bounded catalogue, so no cursor. Security and system types go to System Admins only (`system_admins_only`).
+        Seed: **approvals** `task_submitted_review`, `task_submitted_approval`, `approval_overdue_reminder`, `approval_overdue_escalation`, `no_holder` (B10, immediate, mandatory);
+        **tasks** `task_rejected` (with note), `task_idle` (N days from `/settings/idle-task-alert`), `assignee_absent`, `holder_deactivated` (B14, immediate, to the Team Lead);
+        **sla** `sla_near_max`, `sla_exceeded`;
+        **registers** `batch_upload_pending`, `batch_upload_result`, `snag_opened`, `snag_closed`, `pac_blocked_by_snags`;
+        **system** `holiday_tentative_reminder` (14 days ahead), `structural_freeze_lifted`;
+        **security** `repeated_failed_sign_in`, `callback_account_mismatch`, `audit_integrity_failure` (mandatory), `retention_reduced` (mandatory), `mfa_exemption_granted` (mandatory), `mfa_exemption_revoked` (mandatory), `admin_override_used`.
+      responses:
+        '200':
+          description: Types.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/NotificationTypeDef'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /settings/log-retention:
+    get:
+      tags: [settings]
+      operationId: getLogRetention
+      summary: Retention of the System Log and the security log
+      description: The Audit Log is kept 10 years, is never purged and is **not settable** (`audit_log_years` is read-only).
+      responses:
+        '200':
+          description: Retention.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LogRetention'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setLogRetention
+      summary: Set the retention days of the System Log and the security log
+      description: |
+        Closed schema: `audit_log_years` or any other key is 422 `validation_failed`; a value below its minimum is 422 with the field error.
+        **Reducing** any value needs step-up and emits the mandatory alert `retention_reduced` to the System Admins (in-app and email); raising a value needs no step-up. Every change is audited with before and after values and the reason. The purge job applies the new value on its next run.
+      x-step-up: when any value is smaller than the current one (retention reduced)
+      x-db-path: admin_set_setting
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LogRetentionInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LogRetention'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -3167,7 +3604,7 @@ paths:
       tags: [settings]
       operationId: liftStructuralFreeze
       summary: Lift the freeze (System Admin only)
-      description: Needs a written reason and step-up. The lift is audited.
+      description: Needs a written reason and step-up. The lift is audited. Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `structural-freeze`, else 422 `confirmation_mismatch`.
       x-step-up: true
       x-db-path: admin_lift_structural_freeze
       parameters:
@@ -3176,7 +3613,13 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/WithReason'}
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [confirm_text]
+                properties:
+                  confirm_text: {$ref: '#/components/schemas/ConfirmText'}
       responses:
         '200':
           description: Lifted.
@@ -4918,7 +5361,9 @@ paths:
       tags: [notifications]
       operationId: listNotifications
       summary: My in-app notifications
+      description: 'The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout.'
       parameters:
+      - {$ref: '#/components/parameters/LivePoll'}
       - name: unread_only
         in: query
         schema: {type: boolean, default: false}
@@ -5292,6 +5737,16 @@ components:
       name: Idempotency-Key
       in: header
       schema: { type: string, maxLength: 100 }
+    LivePoll:
+      name: X-PMIS-Live
+      in: header
+      description: 'Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does.'
+      schema: { type: string, enum: ['1'] }
+    SessionId:
+      name: session_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     UserId:
       name: user_id
       in: path
@@ -5474,7 +5929,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     Unprocessable:
-      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`).
+      description: Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -5568,6 +6023,7 @@ components:
         - insufficient_stock
         - role_in_use
         - export_expired
+        - confirmation_mismatch
         - internal_error
     PageEnvelope:
       type: object
@@ -5620,12 +6076,16 @@ components:
       type: string
       minLength: 3
       maxLength: 1000
+    ConfirmText:
+      type: string
+      maxLength: 200
+      description: 'Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check.'
     Job:
       type: object
       required: [id, kind, status]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse, import_apply, sla_recalculation, pdf_generate, master_export] }
+        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse, import_apply, sla_recalculation, pdf_generate, master_export, security_export] }
         status: { type: string, enum: [queued, running, done, failed] }
         progress: { type: number, minimum: 0, maximum: 1 }
         result_file_id: { type: [string, 'null'], format: uuid }
@@ -5667,6 +6127,21 @@ components:
         label_en: { type: string }
         label_ar: { type: string }
         master_sheet: { type: string, description: 'Master sheet that holds the part.' }
+        columns: { type: array, items: { $ref: '#/components/schemas/ExportColumn' }, description: 'Present with `include_columns=true`. The columns a list screen may send in `ExportView.columns` (0.2.5).' }
+    ExportColumnCode:
+      type: string
+      pattern: '^(cf:)?[a-z][a-z0-9_]{1,60}$'
+      description: 'Stable, language-independent column code of a part, for example `site_code`, `region`, `ms_site_release_actual`. A custom field is `cf:<field code>`. Codes never change when a label is renamed.'
+    ExportColumn:
+      type: object
+      required: [code, label_en, label_ar]
+      properties:
+        code: { $ref: '#/components/schemas/ExportColumnCode' }
+        label_en: { type: string }
+        label_ar: { type: string }
+        master_column: { type: [string, 'null'], description: 'Master column letters (for example `AB`); null for a custom field without a Master export column.' }
+        custom: { type: boolean, description: 'true for a custom field.' }
+        default_visible: { type: boolean, description: 'Shown by default on the list screen.' }
     ExportView:
       type: object
       description: The current view of a list screen. The export has exactly these rows (filters), columns and order, in the Master layout of the source part.
@@ -5674,7 +6149,7 @@ components:
       properties:
         source: { $ref: '#/components/schemas/ExportPartKey' }
         filters: { type: object, additionalProperties: true, description: 'The list query parameters of the screen, as sent to its list endpoint. Applied together with B3 scope.' }
-        columns: { type: array, minItems: 1, items: { type: string }, description: 'Master column codes or custom field codes, in screen order.' }
+        columns: { type: array, minItems: 1, uniqueItems: true, items: { $ref: '#/components/schemas/ExportColumnCode' }, description: 'Column codes of `source` from `GET /exports/parts?include_columns=true`, in screen order (the visible columns of the screen). A code that does not belong to `source` is 422 `validation_failed` with the path of the item; a column the caller cannot read is omitted.' }
         sort: { type: string, description: 'Sort expression of the list endpoint.' }
     MasterExport:
       type: object
@@ -5703,7 +6178,8 @@ components:
       examples: [sites, sites.documents, approvals, my_work, dashboard, procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports, admin.users, admin.matrix, admin.workflow, admin.settings, audit]
     PermissionAction:
       type: string
-      enum: [view, create, edit, delete, approve, export, import, download_documents, view_audit, administer]
+      enum: [view, create, edit, delete, approve, export, import, download_documents, view_audit, administer, manage_users, view_security_log]
+      description: '`manage_users` (module `admin.users`) opens the active-sessions list and session revoke; `view_security_log` (module `admin.security_log`) opens the security log (0.2.5).'
     PermissionLevel:
       type: string
       enum: [view, entry, review, approve, admin]
@@ -5821,8 +6297,27 @@ components:
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
+            deleted_at: { type: [string, 'null'], format: date-time, description: 'Soft delete (B14); null while the user is not deleted.' }
+            deleted_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+            delete_reason: { type: [string, 'null'], minLength: 3, maxLength: 500 }
             created_at: { type: string, format: date-time }
             version: { type: integer }
+    UserAccountStatus:
+      type: string
+      enum: [active, deactivated, deleted]
+      description: 'Badge on a person who holds a task (B14): `deactivated` = status suspended or disabled, `deleted` = soft-deleted. The task stays on the person; the Team Lead decides (B12b).'
+    DeleteReason:
+      type: string
+      minLength: 3
+      maxLength: 500
+    DeletedUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          required: [deleted_at]
+          properties:
+            can_restore: { type: boolean, description: 'false when the employee ID or the email is now owned by another account.' }
+            restore_blocked_reason: { type: [string, 'null'] }
     UserDetail:
       allOf:
         - $ref: '#/components/schemas/User'
@@ -6081,26 +6576,48 @@ components:
                   added_at: { type: string, format: date-time }
     Delegation:
       type: object
-      required: [id, from_user, to_user, scope, valid_from, state]
+      required: [id, from_user, target_kind, scope, valid_from, state]
       properties:
         id: { type: string, format: uuid }
         from_user: { $ref: '#/components/schemas/UserRef' }
-        to_user: { $ref: '#/components/schemas/UserRef' }
+        to_user: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'The delegate when `target_kind` is `user`; null for a role or group target (0.2.5).' }
+        target_kind: { $ref: '#/components/schemas/DelegationTargetKind' }
+        target: { $ref: '#/components/schemas/DelegationTarget' }
         scope: { type: string, enum: [full, partial] }
         rights: { type: array, items: { $ref: '#/components/schemas/DelegableRight' } }
+        region_codes: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/RegionId' }, description: 'Regions where the delegation applies; empty = all regions.' }
+        module_codes: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/ModuleKey' }, description: 'Modules where the delegation applies; empty = all modules.' }
+        allow_redelegate: { type: boolean, default: false, description: 'The delegate may delegate further. Default false (a delegate cannot re-delegate unless the admin allows it here).' }
         valid_from: { type: string, format: date-time }
         valid_to: { type: [string, 'null'], format: date-time }
         state: { type: string, enum: [active, scheduled, expired, revoked] }
         reason: { type: [string, 'null'] }
         revoked_at: { type: [string, 'null'], format: date-time }
         revoked_by: { $ref: '#/components/schemas/UserRef' }
+    DelegationTargetKind:
+      type: string
+      enum: [user, role, group]
+      description: Delegation goes to anyone (CLAUDE.md "Delegation covers anything, to anyone"). Every active member of a role or group holds the delegated rights while they are members; each action is logged "X on behalf of System Admin".
+    DelegationTarget:
+      type: object
+      required: [kind, id, label]
+      properties:
+        kind: { $ref: '#/components/schemas/DelegationTargetKind' }
+        id: { type: string, format: uuid }
+        label: { type: string, description: 'Display name of the person, role or group.' }
     DelegationInput:
       type: object
-      required: [to_user_id, scope, valid_from, reason]
+      description: Name the target either with `to_user_id` (a person, as in 0.2.4) or with `target_kind` and `target_id`. Giving both, or neither, is 422 `validation_failed`.
+      required: [scope, valid_from, reason]
       properties:
-        to_user_id: { type: string, format: uuid }
+        to_user_id: { type: string, format: uuid, description: 'Shorthand for `target_kind` = `user`. Kept from 0.2.4.' }
+        target_kind: { $ref: '#/components/schemas/DelegationTargetKind' }
+        target_id: { type: string, format: uuid, description: 'Required with `target_kind`: the user, role or group.' }
         scope: { type: string, enum: [full, partial] }
         rights: { type: array, minItems: 1, items: { $ref: '#/components/schemas/DelegableRight' }, description: 'Required when scope = partial.' }
+        region_codes: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/RegionId' }, default: [], description: 'Regions where the delegation applies; empty = all regions.' }
+        module_codes: { type: array, uniqueItems: true, items: { $ref: '#/components/schemas/ModuleKey' }, default: [], description: 'Modules where the delegation applies; empty = all modules.' }
+        allow_redelegate: { type: boolean, default: false, description: 'Lets the delegate delegate further. Off unless the admin sets it.' }
         valid_from: { type: string, format: date-time }
         valid_to: { type: [string, 'null'], format: date-time, description: 'null = until revoked.' }
         reason: { $ref: '#/components/schemas/Reason' }
@@ -6218,6 +6735,7 @@ components:
         label: { type: string }
         employee_id: { oneOf: [{ $ref: '#/components/schemas/EmployeeId' }, { type: 'null' }], description: '4-digit employee ID when `kind` is `user`; null for role and group holders.' }
         user_id: { type: string, format: uuid, description: 'Present only when `kind` is `user` (same value as `ref_id`).' }
+        account_status: { $ref: '#/components/schemas/UserAccountStatus' }
     BallInCourt:
       type: object
       required: [level, holders]
@@ -6286,6 +6804,7 @@ components:
         last_return_note: { type: [string, 'null'] }
         admin_override: { type: boolean }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
+        holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
         lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' }, description: 'Why the task is locked (empty when it is not), so "Why locked?" needs no extra call.' }
         version: { type: integer }
@@ -6330,7 +6849,7 @@ components:
       type: object
       required: [action]
       properties:
-        action: { type: string, enum: [edit, start, submit, review, approve, reject, claim, release, comment, override] }
+        action: { type: string, enum: [edit, start, submit, review, approve, reject, claim, release, comment, override, act_on_behalf] }
         step_up: { type: boolean }
         will_skip_to: { type: [integer, 'null'], description: 'Level the task lands on after self-skip.' }
         final: { type: boolean, description: 'This action completes final approval (after self-skip).' }
@@ -6390,6 +6909,10 @@ components:
         step_ids: { type: array, items: { type: string, format: uuid } }
         skipped_levels: { type: array, items: { type: integer }, description: 'Levels auto-skipped (same holder).' }
         unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+    OnBehalfKind:
+      type: [string, 'null']
+      enum: [system_admin, assignee, null]
+      description: '`system_admin`: a delegate acting for the System Admin. `assignee`: a lead acting for the assignee of a level (B12b). Null when `on_behalf_of` is absent.'
     WorkflowStep:
       type: object
       required: [id, level, action, created_at]
@@ -6399,6 +6922,7 @@ components:
         action: { type: string, enum: [start, submit, review, approve, reject, auto_skip, claim, release, reassign, admin_override, override_revert, reopen, migrate] }
         acted_by: { $ref: '#/components/schemas/UserRef' }
         on_behalf_of: { $ref: '#/components/schemas/UserRef' }
+        on_behalf_kind: { $ref: '#/components/schemas/OnBehalfKind' }
         note: { type: [string, 'null'] }
         before_state: { $ref: '#/components/schemas/TaskState' }
         after_state: { $ref: '#/components/schemas/TaskState' }
@@ -6714,6 +7238,7 @@ components:
         at: { type: string, format: date-time }
         actor: { $ref: '#/components/schemas/UserRef' }
         on_behalf_of: { $ref: '#/components/schemas/UserRef' }
+        on_behalf_kind: { $ref: '#/components/schemas/OnBehalfKind' }
         action: { type: string }
         entity_type: { type: string }
         entity_id: { type: [string, 'null'] }
@@ -7108,12 +7633,21 @@ components:
         to_user_id: { type: string, format: uuid, description: 'Required for `reassign`; must be an eligible holder, else `not_eligible_holder`.' }
         reason: { $ref: '#/components/schemas/Reason' }
         dry_run: { type: boolean, default: false, description: 'Returns the BulkResult without writing.' }
+    ActOnBehalfRequest:
+      type: object
+      required: [action, level, reason]
+      properties:
+        action: { type: string, enum: [submit, review, approve, reject], description: 'The transition to perform, with the semantics of `POST /tasks/{task_id}/{action}`.' }
+        level: { type: integer, minimum: 1, description: 'The current level (guards against a stale screen).' }
+        reason: { $ref: '#/components/schemas/Reason' }
+        note: { type: string, maxLength: 2000, description: 'Transition note; mandatory for `reject`.' }
     ReassignmentAlert:
       type: object
       required: [task, cause]
       properties:
         task: { $ref: '#/components/schemas/TaskSummary' }
-        cause: { type: string, enum: [absent, idle] }
+        cause: { type: string, enum: [absent, idle, holder_deactivated], description: '`holder_deactivated` (B14): the holder''s account is deactivated or deleted; see `holder_account_status`.' }
+        holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         holder: { $ref: '#/components/schemas/UserRef' }
         absence: { oneOf: [{ $ref: '#/components/schemas/Absence' }, { type: 'null' }] }
         idle_working_days: { type: [integer, 'null'] }
@@ -7779,6 +8313,199 @@ components:
         - $ref: '#/components/schemas/WithReason'
         - type: object
           minProperties: 2
+    # ---------------------------------------------------------- 0.2.5: notification policy, security log, sessions, retention
+    NotificationTypeCode:
+      type: string
+      enum: [task_submitted_review, task_submitted_approval, task_rejected, approval_overdue_reminder, approval_overdue_escalation, task_idle, assignee_absent, holder_deactivated, sla_near_max, sla_exceeded, no_holder, batch_upload_pending, batch_upload_result, snag_opened, snag_closed, pac_blocked_by_snags, holiday_tentative_reminder, structural_freeze_lifted, mfa_exemption_granted, mfa_exemption_revoked, admin_override_used, repeated_failed_sign_in, callback_account_mismatch, audit_integrity_failure, retention_reduced]
+    NotificationCategory:
+      type: string
+      enum: [approvals, tasks, sla, registers, security, system]
+    NotificationRecipientKind:
+      type: string
+      enum: [holder, previous_holder, team_lead, project_manager, system_admins, affected_user, actor]
+      description: 'Default recipient of a type. `holder` = the person (or group) holding the level; `team_lead` = the Team Lead of the task''s module and region.'
+    NotificationChannels:
+      type: object
+      additionalProperties: false
+      required: [in_app, email]
+      properties:
+        in_app: { type: boolean }
+        email: { type: boolean }
+    NotificationTypeDef:
+      type: object
+      required: [code, category, label_en, label_ar, kind, default_recipients, eligible_roles, system_admins_only, mandatory, default_channels]
+      properties:
+        code: { $ref: '#/components/schemas/NotificationTypeCode' }
+        category: { $ref: '#/components/schemas/NotificationCategory' }
+        label_en: { type: string }
+        label_ar: { type: string }
+        kind: { $ref: '#/components/schemas/NotificationKind' }
+        default_recipients: { type: array, items: { $ref: '#/components/schemas/NotificationRecipientKind' } }
+        eligible_roles:
+          description: Role codes (`Role.code`) that may get a column for this type; `all` = any role or group. Empty when `system_admins_only`.
+          oneOf:
+            - type: string
+              const: all
+            - type: array
+              items: { type: string }
+        system_admins_only: { type: boolean, description: 'Security and system types: the recipients are System Admins only.' }
+        mandatory: { type: boolean, description: 'Locked: the policy cannot switch it off (422 `mandatory_locked`) and a person cannot switch it off.' }
+        immediate: { type: boolean, description: 'Sent at once, never held for the daily digest.' }
+        default_channels: { $ref: '#/components/schemas/NotificationChannels' }
+    NotificationThresholds:
+      type: object
+      additionalProperties: false
+      description: |
+        Limits are enforced on write (422 `validation_failed`). `no_holder` (B10) is always immediate and has no threshold. The idle-task days stay in `/settings/idle-task-alert`.
+        Rule: `approval_escalate_days * 24 > approval_remind_hours`.
+      required: [approval_remind_hours, approval_escalate_days, sla_warning_days_before_max, rate_cap_per_hour, retention_days]
+      properties:
+        approval_remind_hours: { type: integer, minimum: 4, maximum: 168, default: 48, description: 'Hours a task waits at a level before the holder is reminded.' }
+        approval_escalate_days: { type: integer, minimum: 1, maximum: 30, default: 5, description: 'Days a task waits before the Team Lead is alerted (escalation).' }
+        sla_warning_days_before_max: { type: integer, minimum: 0, maximum: 30, default: 2, description: 'Working days before the SLA maximum at which `sla_near_max` is sent; 0 = no early warning.' }
+        rate_cap_per_hour: { type: integer, minimum: 5, maximum: 500, default: 50, description: 'Notifications one person can receive per hour; the rest wait for the digest. Mandatory types are not capped.' }
+        retention_days: { type: integer, minimum: 30, maximum: 730, default: 180, description: 'Days notifications are kept before they are purged.' }
+    NotificationPolicyColumn:
+      type: object
+      additionalProperties: false
+      required: [kind, id]
+      properties:
+        kind: { type: string, enum: [role, group] }
+        id: { type: string, format: uuid }
+        name: { type: string, readOnly: true }
+    NotificationPolicyCell:
+      type: object
+      additionalProperties: false
+      required: [kind, id, on]
+      properties:
+        kind: { type: string, enum: [role, group] }
+        id: { type: string, format: uuid, description: 'Must be one of the `columns`.' }
+        on: { type: boolean }
+    NotificationPolicyRow:
+      type: object
+      additionalProperties: false
+      required: [type_code, channels, cells]
+      properties:
+        type_code: { $ref: '#/components/schemas/NotificationTypeCode' }
+        channels: { $ref: '#/components/schemas/NotificationChannels' }
+        mandatory: { type: boolean, readOnly: true, description: 'From the catalogue; a mandatory type cannot be switched off.' }
+        cells: { type: array, items: { $ref: '#/components/schemas/NotificationPolicyCell' }, description: 'On or off per column. A column without a cell uses the catalogue default recipients.' }
+    NotificationPolicy:
+      type: object
+      required: [enabled, timezone, digest_hour, work_days_follow_calendar, work_days, thresholds, columns, matrix, version]
+      properties:
+        enabled: { type: boolean, description: 'Master switch. Mandatory types are still sent when false.' }
+        timezone: { type: string, default: Africa/Tripoli, description: 'IANA time zone used for the digest hour and working days.' }
+        digest_hour: { type: integer, minimum: 0, maximum: 23, default: 8, description: 'Hour (0-23, in `timezone`) at which the daily digest is sent.' }
+        work_days_follow_calendar: { type: boolean, default: true, description: 'true = working days come from the work calendar (weekend Friday and Saturday by default, `/settings/weekend-days`) and `work_days` is derived.' }
+        work_days: { type: array, uniqueItems: true, minItems: 1, maxItems: 7, items: { type: integer, minimum: 0, maximum: 6 }, default: [0, 1, 2, 3, 4], description: '0 = Sunday. Derived from the calendar when `work_days_follow_calendar`; otherwise this list is used.' }
+        thresholds: { $ref: '#/components/schemas/NotificationThresholds' }
+        columns: { type: array, items: { $ref: '#/components/schemas/NotificationPolicyColumn' }, description: 'The roles and groups shown as matrix columns.' }
+        matrix: { type: array, items: { $ref: '#/components/schemas/NotificationPolicyRow' } }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+    NotificationPolicyInput:
+      type: object
+      additionalProperties: false
+      description: Closed schema. `work_days` is needed only when `work_days_follow_calendar` is false; `columns` may be omitted to keep the current ones. Read-only fields (`name`, `mandatory`) are ignored if echoed back.
+      required: [reason, enabled, timezone, digest_hour, work_days_follow_calendar, thresholds, matrix]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        enabled: { type: boolean }
+        timezone: { type: string }
+        digest_hour: { type: integer, minimum: 0, maximum: 23 }
+        work_days_follow_calendar: { type: boolean }
+        work_days: { type: array, uniqueItems: true, minItems: 1, maxItems: 7, items: { type: integer, minimum: 0, maximum: 6 } }
+        thresholds: { $ref: '#/components/schemas/NotificationThresholds' }
+        columns: { type: array, items: { $ref: '#/components/schemas/NotificationPolicyColumn' } }
+        matrix: { type: array, items: { $ref: '#/components/schemas/NotificationPolicyRow' } }
+    LogRetention:
+      type: object
+      required: [system_log_days, security_log_days, audit_log_years, version]
+      properties:
+        system_log_days: { type: integer, minimum: 90, maximum: 3650, default: 365 }
+        security_log_days: { type: integer, minimum: 365, maximum: 3650, default: 730 }
+        audit_log_years: { type: integer, const: 10, readOnly: true, description: 'Fixed at 10 years; the Audit Log is never purged and this is not settable.' }
+        version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        updated_by: { $ref: '#/components/schemas/UserRef' }
+    LogRetentionInput:
+      type: object
+      additionalProperties: false
+      required: [reason, system_log_days, security_log_days]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        system_log_days: { type: integer, minimum: 90, maximum: 3650 }
+        security_log_days: { type: integer, minimum: 365, maximum: 3650 }
+    SecurityEvent:
+      type: string
+      enum: [sign_in_started, sign_in_succeeded, callback_account_mismatch, sign_in_failed, signed_out, session_expired, session_revoked_by_admin, mfa_exemption_granted, mfa_exemption_revoked, step_up_passed, step_up_failed, break_glass_used]
+    SecurityOutcome:
+      type: string
+      enum: [success, failure, info]
+    SecurityLogEntry:
+      type: object
+      required: [id, at, event, outcome]
+      properties:
+        id: { type: integer, format: int64, description: 'Position in the hash chain.' }
+        at: { type: string, format: date-time }
+        event: { $ref: '#/components/schemas/SecurityEvent' }
+        outcome: { $ref: '#/components/schemas/SecurityOutcome' }
+        user: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'The matched person; null when the identifier matched no registry row.' }
+        actor: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'The admin, for admin-caused events (revoke, MFA exemption).' }
+        identifier_masked:
+          type: [string, 'null']
+          pattern: '^\?[A-Za-z0-9+]?\*\*\*#[0-9a-f]{12}$'
+          description: |
+            Set only when the identifier typed in the one-box sign-in matches no registry row. The raw text is NEVER stored or logged.
+            Format: `?` + the first character only if the input looks like an email, employee ID or phone (otherwise nothing) + `***#` + the first 12 hex digits of HMAC-SHA-256 of the normalised input (trimmed, lower case) with a server-side key. Examples: `?a***#3f9c01d2ab47`, `?***#3f9c01d2ab47`. The same input gives the same suffix, so repeated attempts can be grouped without revealing the text.
+        client_type: { type: string, enum: [web, mobile, break_glass] }
+        ip: { type: [string, 'null'], description: 'Raw IP, System Admins only; null for a reader with `view_security_log`.' }
+        user_agent: { type: [string, 'null'] }
+        session_id: { type: [string, 'null'], format: uuid }
+        request_id: { type: [string, 'null'] }
+        details: { type: [object, 'null'], additionalProperties: true }
+    LogIntegrity:
+      type: object
+      required: [log, status, row_count, first_seq, last_seq, head_hash, checked_at, breaks]
+      properties:
+        log: { type: string, enum: [audit, security] }
+        status: { type: string, enum: [ok, broken] }
+        row_count: { type: integer, format: int64 }
+        first_seq: { type: [integer, 'null'], format: int64 }
+        last_seq: { type: [integer, 'null'], format: int64 }
+        head_hash: { type: [string, 'null'], pattern: '^[0-9a-f]{64}$', description: 'SHA-256 hash of the last row checked (chain head).' }
+        checked_at: { type: string, format: date-time }
+        breaks:
+          type: array
+          items:
+            type: object
+            required: [seq, kind]
+            properties:
+              seq: { type: integer, format: int64, description: 'First row at which the chain no longer holds.' }
+              kind: { type: string, enum: [hash_mismatch, sequence_gap, previous_hash_mismatch] }
+              expected_hash: { type: [string, 'null'] }
+              found_hash: { type: [string, 'null'] }
+    ActiveSession:
+      type: object
+      required: [session_id, user, status, last_activity_at, signed_in_at, client_type]
+      properties:
+        session_id: { type: string, format: uuid }
+        user: { $ref: '#/components/schemas/UserRef' }
+        status: { type: string, enum: [online, idle] }
+        last_activity_at: { type: string, format: date-time }
+        current_screen: { type: [string, 'null'], description: 'App route of the screen the person is on, reported by real activity.' }
+        signed_in_at: { type: string, format: date-time }
+        client_type: { type: string, enum: [web, mobile, break_glass] }
+        ip: { type: [string, 'null'], description: 'Raw IP, System Admins only; null for a `manage_users` holder who is not a System Admin.' }
+        is_current: { type: boolean, description: 'The caller''s own session.' }
+    SessionRevokeResult:
+      type: object
+      required: [revoked_count]
+      properties:
+        user: { $ref: '#/components/schemas/UserRef' }
+        revoked_count: { type: integer, minimum: 0 }
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
@@ -7793,6 +8520,7 @@ components:
         body: { type: [string, 'null'] }
         entity_type: { type: [string, 'null'] }
         entity_id: { type: [string, 'null'] }
+        type_code: { oneOf: [{ $ref: '#/components/schemas/NotificationTypeCode' }, { type: 'null' }], description: 'Catalogue type (0.2.5); `kind` stays the coarse category used by personal preferences.' }
         link: { type: [string, 'null'], description: 'App-relative path.' }
         created_at: { type: string, format: date-time }
         read_at: { type: [string, 'null'], format: date-time }
