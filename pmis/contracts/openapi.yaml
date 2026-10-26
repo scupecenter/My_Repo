@@ -735,7 +735,7 @@ paths:
       tags: [assignments]
       operationId: copyAssignments
       summary: Copy the active rows of one person to others (add or replace)
-      description: Use `dry_run=true` for the preview shown before confirming (AU-13).
+      description: Use `dry_run=true` for the preview shown before confirming (AU-13). A `to_user_ids` entry equal to the caller is refused with 403 `self_beneficiary` (also in the dry run) unless the caller is a System Admin acting without delegation, so nobody can copy another person's rights to themselves; `idm_copy_assignments` enforces it like `idm_assign`.
       x-step-up: true
       x-db-path: idm_copy_assignments
       parameters:
@@ -1081,7 +1081,7 @@ paths:
       tags: [groups]
       operationId: addGroupMembers
       summary: Add members
-      description: Only a System Admin acting without delegation may change the System Admins group. Pending users are refused.
+      description: Only a System Admin acting without delegation may change the System Admins group. Pending users are refused. When the group is the target of an active delegation (0.2.5), the caller cannot add themselves (403 `self_beneficiary`) unless they are a System Admin acting without delegation, so group membership cannot be used to grant oneself delegated rights.
       x-step-up: true
       x-db-path: idm_group_add_member
       requestBody:
@@ -3193,6 +3193,8 @@ paths:
         **Cross-field rule:** `thresholds.approval_escalate_days * 24` must be greater than `thresholds.approval_remind_hours`, else 422 `validation_failed` with errors on both paths (`code` = `must_exceed_remind_hours`).
         **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
         Rows left out of `matrix` keep the catalogue defaults.
+        **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
+      x-step-up: when the body changes a security or system row or a threshold that feeds one
       x-db-path: admin_set_setting
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -3228,7 +3230,7 @@ paths:
         **sla** `sla_near_max`, `sla_exceeded`;
         **registers** `batch_upload_pending`, `batch_upload_result`, `snag_opened`, `snag_closed`, `pac_blocked_by_snags`;
         **system** `holiday_tentative_reminder` (14 days ahead), `structural_freeze_lifted`;
-        **security** `repeated_failed_sign_in`, `callback_account_mismatch`, `audit_integrity_failure` (mandatory), `retention_reduced` (mandatory), `mfa_exemption_granted` (mandatory), `mfa_exemption_revoked` (mandatory), `admin_override_used`.
+        **security** (all mandatory for the System Admins, in-app and email) `repeated_failed_sign_in`, `callback_account_mismatch`, `audit_integrity_failure`, `retention_reduced`, `mfa_exemption_granted`, `mfa_exemption_revoked`, `admin_override_used`.
       responses:
         '200':
           description: Types.
@@ -6597,7 +6599,7 @@ components:
     DelegationTargetKind:
       type: string
       enum: [user, role, group]
-      description: Delegation goes to anyone (CLAUDE.md "Delegation covers anything, to anyone"). Every active member of a role or group holds the delegated rights while they are members; each action is logged "X on behalf of System Admin".
+      description: Delegation goes to anyone (CLAUDE.md "Delegation covers anything, to anyone"). Every active member of a role or group holds the delegated rights while they are members; each action is logged "X on behalf of System Admin". Joining the target cannot be used to grant oneself the rights; adding oneself to a target group, or assigning oneself a target role, is refused with `self_beneficiary` unless done by a System Admin acting without delegation.
     DelegationTarget:
       type: object
       required: [kind, id, label]
