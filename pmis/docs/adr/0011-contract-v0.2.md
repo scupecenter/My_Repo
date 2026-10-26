@@ -81,6 +81,10 @@ Closes the phase 3b gaps, adds the admin features approved by the owner on 2026-
 12. **User deactivate, soft delete and restore (B14).** `POST /users/{user_id}/delete` (reason 3-500 characters, step-up, sets `deleted_at/by/reason`), `POST /users/{user_id}/restore` (re-enables previous assignments; 409 `duplicate` when the registry ID or email is now owned by another account), `GET /users/deleted` (with `can_restore`). Deactivating or deleting ends the person's sessions. **Nothing moves automatically:** open tasks stay on the person with `holder_account_status` (`active`, `deactivated`, `deleted`; also on `MatrixAssignee.account_status`), the Team Lead is alerted at once (notification type `holder_deactivated`; `GET /reassignments/alerts` cause `holder_deactivated`) and uses reassign, act on behalf or keep (B12b). A level with no eligible active holder goes to the System Admins' inbox as "no holder" (B10). SLA never pauses or resets.
 13. New grants `manage_users` and `view_security_log` extend `PermissionAction`; new tag `security`; new job kind `security_export`. Invented `x-db-path` names (`idm_delete_user`, `idm_restore_user`, `idm_revoke_session`, `ops_act_on_behalf`) are proposals for database-engineer.
 
+### Security hardening of 0.2.5 (2026-10-26, automated review)
+- A delegation to a role or group must not let a member grant themselves its rights: adding oneself to a target group, or assigning oneself a target role, is refused with `self_beneficiary` unless done by a System Admin without delegation.
+- Notification policy: all `security` types are mandatory for the System Admins. Changing a `security` or `system` row, or `rate_cap_per_hour`, needs step-up and a System Admin without delegation, and alerts the System Admins.
+
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
 - The contract is large (193 operations at 0.2.0; later amendments add more). Each API PR must name the tag it implements, and conformance tests are generated per operation.
