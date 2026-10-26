@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>حاسبة سعة البنية التحتية — PMIS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" media="print" onload="this.media='all'">
+<style>
+:root{--bg:#f6f7f9;--surface:#fff;--ink:#1a2230;--muted:#5b6678;--line:#dde2ea;--accent:#0b5fa5;--accent-ink:#fff;--soft:#e8f1fa;--warn:#9a5b00;--warn-bg:#fff4dc;--bad:#a6252b;--bad-bg:#fde8e9;--ok:#1d6b3a;--ok-bg:#e4f4ea;--info-bg:#e8f1fa;--font:'Cairo',system-ui,-apple-system,'Segoe UI',Tahoma,Arial,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151d;--surface:#18202b;--ink:#e6ebf2;--muted:#9aa6b8;--line:#2b3646;--accent:#5aa9ee;--accent-ink:#0a1420;--soft:#1c2a3b;--warn:#f0b957;--warn-bg:#35290f;--bad:#ff8a90;--bad-bg:#3a1a1d;--ok:#6fd194;--ok-bg:#15301f;--info-bg:#1c2a3b}}
+:root[data-theme="dark"]{--bg:#10151d;--surface:#18202b;--ink:#e6ebf2;--muted:#9aa6b8;--line:#2b3646;--accent:#5aa9ee;--accent-ink:#0a1420;--soft:#1c2a3b;--warn:#f0b957;--warn-bg:#35290f;--bad:#ff8a90;--bad-bg:#3a1a1d;--ok:#6fd194;--ok-bg:#15301f;--info-bg:#1c2a3b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.6;font-size:16px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:20px 0 8px}
+h1{font-size:1.5rem;margin:0}
+h2{font-size:1.2rem;margin:28px 0 10px}
+h3{font-size:1rem;margin:0 0 10px;color:var(--accent)}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.9rem}
+button,select{font:inherit}
+.btn{background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.assump{background:var(--warn-bg);color:var(--ink);border:1px solid var(--warn);border-radius:10px;padding:12px 16px;margin:12px 0}
+.assump b{color:var(--warn)}
+.card,.group{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px}
+.presets .btn{flex:1 1 180px;text-align:start}
+.presets small{display:block;color:var(--muted)}
+.groups{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.field{padding:8px 0;border-top:1px solid var(--line)}
+.field:first-of-type{border-top:0}
+.field label{display:block;font-weight:600;font-size:.92rem}
+.inl{display:flex;align-items:center;gap:8px;margin-top:2px}
+.inl input[type=number]{width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;direction:ltr;text-align:end}
+.inl input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
+.unit{color:var(--muted);font-size:.85rem}
+.hint{color:var(--muted);font-size:.8rem;margin-top:2px}
+details.adv{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 16px}
+details.adv summary{cursor:pointer;font-weight:600;padding:8px 0}
+details.adv .groups{padding-bottom:12px}
+.cards{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.kpi .l{color:var(--muted);font-size:.82rem}
+.kpi .v{font-size:1.45rem;font-weight:700;direction:ltr;unicode-bidi:plaintext}
+.kpi .s{color:var(--muted);font-size:.8rem}
+.kpi.ok{border-color:var(--ok)}.kpi.bad{border-color:var(--bad)}
+.tw{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;font-size:.9rem}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:start;white-space:nowrap}
+td.n,th.n{text-align:end;direction:ltr}
+td.note{white-space:normal;min-width:220px;color:var(--muted)}
+tr.sec td{background:var(--soft);font-weight:700}
+tr.tot td{font-weight:700}
+ul.warns{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+ul.warns li{border-radius:8px;padding:8px 12px;border:1px solid var(--line);background:var(--info-bg)}
+ul.warns li.warn{background:var(--warn-bg);border-color:var(--warn)}
+ul.warns li.high{background:var(--bad-bg);border-color:var(--bad)}
+.advice{margin-top:12px}
+#report{display:none}
+footer{color:var(--muted);font-size:.8rem;margin-top:32px}
+@page{size:A4;margin:14mm}
+.hdrgrid{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.hdrgrid label{display:block;font-weight:600;font-size:.9rem}
+.hdrgrid input,.hdrgrid textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+.hdrgrid .wide{grid-column:1/-1}
+#msg{margin-top:8px;font-weight:600}
+#msg.err{color:var(--bad)}#msg.okm{color:var(--ok)}
+.slist{list-style:none;padding:0;margin:8px 0;display:grid;gap:6px}
+.slist li{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+.slist li b{flex:1 1 140px}
+.hf{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin:18px 0}
+.hf div{border-bottom:1px solid var(--line);padding:4px 0}
+.hf span{color:var(--muted);font-size:.85rem;display:block}
+.hf b{white-space:pre-wrap;font-weight:600}
+.pi{columns:2;column-gap:20px}
+.pi div{break-inside:avoid;font-size:.85rem;border-bottom:1px dotted var(--line);display:flex;justify-content:space-between;gap:8px}
+@media print{
+ body{background:#fff;color:#000;font-size:10.5pt}
+ :root,:root[data-theme],:root:not([data-theme="light"]){--bg:#fff;--surface:#fff;--ink:#000;--muted:#333;--line:#999;--soft:#eee;--warn-bg:#fff;--bad-bg:#fff;--info-bg:#fff;--ok-bg:#fff;--accent:#000;--warn:#000;--bad:#000;--ok:#000}
+ .wrap>*:not(#report){display:none!important}
+ #report{display:block}
+ .wrap{max-width:none;padding:0}
+ .rsec{break-before:page}
+ .rsec:first-child{break-before:auto}
+ #report .card,#report .tw{border:1px solid #999;break-inside:avoid}
+ #report .tw{overflow:visible}
+ #report th,#report td{white-space:normal;padding:4px 6px}
+ #report tr{break-inside:avoid}
+ #report .assump{border:1px solid #000}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <div><h1 id="title"></h1><p class="sub" id="subtitle"></p></div>
+ <div class="row noprint"><button class="btn" id="langBtn" type="button"></button><button class="btn" id="themeBtn" type="button"></button></div>
+</header>
+<div class="assump" id="assump"></div>
+<section class="noprint"><h2 id="hdrH"></h2><div class="card hdrgrid" id="hdrBody"></div></section>
+
+<section class="presets noprint"><h2 id="h-presets"></h2><div class="row" id="presets"></div></section>
+
+<section class="inputs"><h2 id="h-inputs"></h2><div class="groups" id="groups"></div>
+ <details class="adv" id="adv"><summary id="advSum"></summary><p class="hint" id="advNote"></p><div class="groups" id="advGroups"></div></details>
+</section>
+
+<section id="results">
+ <h2 id="h-results"></h2>
+ <div class="row noprint" style="margin-bottom:12px"><button class="btn primary" id="bCopy" type="button"></button><button class="btn" id="bCsv" type="button"></button><button class="btn" id="bPrint" type="button"></button><button class="btn" id="bSave" type="button"></button><button class="btn" id="bLoad" type="button"></button><input type="file" id="fLoad" accept=".json,application/json" hidden><span class="unit" id="copied" role="status"></span></div>
+ <div id="msg" role="alert"></div>
+ <div class="cards" id="kpis"></div>
+ <div class="advice card" id="advice"></div>
+ <h3 style="margin-top:20px" id="h-comp"></h3><div class="tw"><table id="compTbl"></table></div>
+ <h3 style="margin-top:20px" id="h-grow"></h3><div class="tw"><table id="growTbl"></table></div>
+ <h3 style="margin-top:20px" id="h-warn"></h3><ul class="warns" id="warnings"></ul>
+ <div class="noprint"><h3 style="margin-top:20px" id="h-scen"></h3><div class="row"><button class="btn" id="bScen" type="button"></button></div><ul class="slist" id="slist"></ul><div class="tw" id="cmpWrap"><table id="cmpTbl"></table></div></div>
+</section>
+<section id="report"></section>
+<footer id="foot"></footer>
+</div>
+
+<script>
+'use strict';
+/* ===== Model (pure; no DOM) ===== */
+var DEFAULTS={
+ S:1000,g:20,H:3,D:2,T:69,A:6,R:40,Dn:60,DnMB:1.5,P:40,PMB:3,G:10,GMB:0.3,sup:1.25,
+ U:250,C:100,r:10,burst:2,exports:20,exportSec:60,pdf:200,pdfSec:3,imports:30,
+ rpo:15,rto:4,standby:1,staging:1,stgCpu:25,stgDisk:10,offsite:1,retD:14,retW:8,retM:12,auditYears:10,sysDays:365,secDays:730,headroom:40,util:70,
+ taskKB:2,auditKB:1.5,aPA:1.5,regKB:2,sysEvt:200,sysKB:0.5,secEvt:20,secKB:0.5,idx:1.6,rpsVcpu:40,qpr:8,qpsVcpu:400,hot:30,walAmp:3,comp:0.3,restoreMBs:150,workDays:250,upPct:10,upSec:10,fbk:1.1,workHours:8,peakF:5
+};
+var PRESETS={pilot:{S:150,U:40,C:20},full:{},growth:{S:2000,U:400,C:200}};
+var SANE={S:[10,10000],g:[0,100],H:[1,10],D:[0.5,10],U:[5,5000],C:[1,1000],r:[1,60],burst:[1,5],headroom:[20,100],util:[40,85]};
+
+function computeSizing(inputs){
+ var d=Object.assign({},DEFAULTS,inputs||{});
+ function n(k){var v=Number(d[k]);if(!isFinite(v))v=DEFAULTS[k];return Math.max(0,v);}
+ function pos(k){return Math.max(n(k),1e-6);}
+ function b(k){return !!Number(d[k]);}
+ var KB=1/1024/1024;
+ var ceil=Math.ceil, ram1=function(x){return Math.max(1,ceil(x-1e-9));}, disk10=function(x){return Math.max(10,ceil(x/10-1e-9)*10);};
+ var H=Math.max(1,n('H')), g=n('g')/100, hr=n('headroom')/100, util=Math.min(1,Math.max(0.01,n('util')/100));
+ var S=n('S'), U=n('U'), C=n('C');
+ var sitesAt=function(y){return ceil(S*Math.pow(1+g,y-1)-1e-9);};
+ var SH=sitesAt(H);
+
+ function model(sites,yrs){
+  var tasks=sites*n('T')*n('taskKB')*KB;
+  var audit=sites*n('T')*n('A')*n('aPA')*n('auditKB')*KB;
+  var reg=sites*n('R')*n('regKB')*KB;
+  var coreGB=(tasks+audit+reg)*n('idx'), auditGB=audit*n('idx');
+  var sysGB=U*n('sysEvt')*n('sysKB')*Math.min(n('sysDays'),365*yrs)*KB;
+  var secGB=U*n('secEvt')*n('secKB')*Math.min(n('secDays'),365*yrs)*KB;
+  var dbGB=coreGB+sysGB+secGB;
+  var filesGB=sites*(n('Dn')*n('DnMB')+n('P')*n('PMB')+n('G')*n('GMB'))*n('sup')/1024;
+  var dailyLogGB=U*(n('sysEvt')*n('sysKB')+n('secEvt')*n('secKB'))*KB;
+  var dailyChangeGB=coreGB/(pos('D')*pos('workDays'))+dailyLogGB;
+  var walDayGB=dailyChangeGB*n('walAmp');
+  var walArchGB=walDayGB*n('retD');
+  var backupLocalGB=dbGB*n('comp')*(n('retD')+n('retW')+n('retM'))+filesGB*n('fbk')+walArchGB;
+  return {sites:sites,coreGB:coreGB,auditGB:auditGB,sysGB:sysGB,secGB:secGB,dbGB:dbGB,filesGB:filesGB,dailyChangeGB:dailyChangeGB,walDayGB:walDayGB,walArchGB:walArchGB,backupLocalGB:backupLocalGB};
+ }
+ var m=model(SH,H);
+
+ var rps=C*n('r')/60*n('burst');
+ var apiV=Math.max(2,ceil(rps/pos('rpsVcpu')*(1+hr)-1e-9));
+ var apiInst=Math.max(2,apiV); // one Node process per vCPU (single-threaded event loop)
+ var apiR=Math.max(2,apiInst*1+1);
+ var wh=pos('workHours')*3600, pk=n('peakF');
+ var renders=Math.max(1,ceil(n('pdf')*n('pdfSec')/wh*pk-1e-9));
+ var exps=Math.max(1,ceil(n('exports')*n('exportSec')/wh*pk-1e-9));
+ var wV=renders+exps+1, wR=ram1(renders*1.5+exps*2+1);
+ var hotGB=m.dbGB*n('hot')/100;
+ var dbV=Math.max(4,ceil(rps*n('qpr')/pos('qpsVcpu')*(1+hr)-1e-9));
+ var dbR=Math.max(8,ceil((hotGB*2+4)/4-1e-9)*4);
+ var dbDisk=disk10((m.dbGB+m.walArchGB)/util);
+ var minioDisk=disk10(m.filesGB/util);
+
+ var prod=[
+  {key:'proxy',vcpu:1,ram:1,disk:10},
+  {key:'api',vcpu:apiV,ram:apiR,disk:20},
+  {key:'workers',vcpu:wV,ram:wR,disk:30},
+  {key:'db',vcpu:dbV,ram:dbR,disk:dbDisk},
+  {key:'redis',vcpu:1,ram:2,disk:10},
+  {key:'minio',vcpu:2,ram:4,disk:minioDisk}
+ ];
+ var sum=function(rows){return rows.reduce(function(a,r){return {vcpu:a.vcpu+r.vcpu,ram:a.ram+r.ram,disk:a.disk+r.disk};},{vcpu:0,ram:0,disk:0});};
+ var tProd=sum(prod);
+ var standby=b('standby')?prod.map(function(r){return Object.assign({},r);}):[];
+ var tStandby=sum(standby);
+ var staging=[],tStaging={vcpu:0,ram:0,disk:0};
+ if(b('staging')){
+  var row={key:'staging',vcpu:Math.max(2,ceil(tProd.vcpu*n('stgCpu')/100-1e-9)),ram:Math.max(4,ram1(tProd.ram*n('stgCpu')/100)),disk:disk10(tProd.disk*n('stgDisk')/100)};
+  staging=[row];tStaging=sum(staging);
+ }
+ var tAll=sum([tProd,tStandby,tStaging]);
+ var backupDisk=disk10(m.backupLocalGB/util);
+ var offsiteGB=b('offsite')?m.backupLocalGB:0;
+
+ var restoreH=(m.dbGB+m.filesGB)*1024/pos('restoreMBs')/3600;
+ var uploaders=Math.max(1,ceil(C*n('upPct')/100-1e-9));
+ var uploadMbps=uploaders*n('PMB')*8/pos('upSec');
+ var single=tProd.vcpu<=16&&tProd.ram<=64;
+
+ var yearly=[];
+ for(var y=1;y<=H;y++){var s=sitesAt(y),q=model(s,y);yearly.push({year:y,sites:s,dbGB:q.dbGB,filesGB:q.filesGB,auditGB:q.auditGB,backupGB:q.backupLocalGB});}
+ var AY=n('auditYears'), sitesAY=sitesAt(Math.max(1,AY)), mAY=model(sitesAY,Math.max(1,AY));
+
+ var w=[];
+ if(C>100)w.push({code:'load',sev:'warn',p:{C:C}});
+ if(restoreH>n('rto'))w.push({code:b('standby')?'restore_standby':'restore_nostandby',sev:b('standby')?'warn':'high',p:{h:restoreH,rto:n('rto')}});
+ if(!b('standby')&&n('rto')<=4)w.push({code:'nostandby',sev:'high',p:{rto:n('rto')}});
+ w.push({code:n('rpo')<15?'rpo_low':'rpo',sev:n('rpo')<15?'warn':'info',p:{rpo:n('rpo'),s:n('rpo')*60,wal:m.walArchGB}});
+ w.push({code:'audit',sev:'info',p:{a:m.auditGB,y:AY,b:mAY.auditGB,n:sitesAY,H:H}});
+ if(!b('offsite'))w.push({code:'nooffsite',sev:'warn',p:{}});
+ if(n('retD')<14||n('retW')<8||n('retM')<12)w.push({code:'ret',sev:'warn',p:{}});
+ if(AY<10)w.push({code:'auditshort',sev:'warn',p:{y:AY}});
+ if(n('sysDays')<365)w.push({code:'syslogshort',sev:'warn',p:{d:n('sysDays')}});
+ if(C>U&&U>0)w.push({code:'c_gt_u',sev:'warn',p:{C:C,U:U}});
+ Object.keys(SANE).forEach(function(k){var v=n(k),r=SANE[k];if(v<r[0]||v>r[1])w.push({code:'range',sev:'warn',p:{f:k,v:v,lo:r[0],hi:r[1]}});});
+
+ return {
+  inputs:d,SH:SH,
+  db:{coreGB:m.coreGB,auditGB:m.auditGB,sysLogGB:m.sysGB,secLogGB:m.secGB,totalGB:m.dbGB,hotGB:hotGB,auditAtYearsGB:mAY.auditGB,auditYears:AY,auditYearsSites:sitesAY},
+  filesGB:m.filesGB,dailyChangeGB:m.dailyChangeGB,walPerDayGB:m.walDayGB,walArchiveGB:m.walArchGB,
+  backupLocalGB:m.backupLocalGB,backupOffsiteGB:offsiteGB,backupServerDiskGB:backupDisk,
+  storageHorizonGB:m.dbGB+m.filesGB,
+  rps:rps,restoreH:restoreH,uploadMbps:uploadMbps,uploaders:uploaders,
+  meta:{apiInstances:apiInst,renders:renders,exports:exps},
+  comps:{prod:prod,standby:standby,staging:staging},
+  totals:{prod:tProd,standby:tStandby,staging:tStaging,all:tAll},
+  advice:single?'single':'split',
+  yearly:yearly,warnings:w
+ };
+}
+var LIM={util:[1,100],hot:[0,100],comp:[0,1],H:[1,50],stgCpu:[0,100],stgDisk:[0,100],upPct:[0,100],g:[0,1000],headroom:[0,1000],standby:[0,1],staging:[0,1],offsite:[0,1]};
+var HKEYS=['org','by','contact','date','scen','notes'];
+function validateScenario(o){
+ var bad=function(e,d){return {ok:false,error:e,detail:d||''};};
+ if(!o||typeof o!=='object'||Array.isArray(o))return bad('errFormat');
+ if(o.tool!=='gsdn-pmis-sizing')return bad('errTool');
+ if(o.version!==1)return bad('errVersion');
+ if(!o.inputs||typeof o.inputs!=='object'||Array.isArray(o.inputs))return bad('errInputs');
+ var inp={},k;
+ for(k in o.inputs){
+  if(!Object.prototype.hasOwnProperty.call(DEFAULTS,k))return bad('errKey',k);
+  var v=o.inputs[k];if(typeof v==='boolean')v=v?1:0;
+  if(typeof v!=='number'||!isFinite(v))return bad('errNum',k);
+  var lim=LIM[k]||[0,1e7];if(v<lim[0]||v>lim[1])return bad('errRange',k);
+  inp[k]=v;
+ }
+ var h={};
+ if(o.header!=null){
+  if(typeof o.header!=='object'||Array.isArray(o.header))return bad('errHeader','header');
+  for(k in o.header){if(HKEYS.indexOf(k)<0||typeof o.header[k]!=='string'||o.header[k].length>5000)return bad('errHeader',k);h[k]=o.header[k];}
+ }
+ return {ok:true,inputs:inp,header:h};
+}
+window.validateScenario=validateScenario;
+window.computeSizing=computeSizing;window.SIZER_DEFAULTS=DEFAULTS;window.SIZER_PRESETS=PRESETS;
+
+/* ===== UI ===== */
+var IN=[ // id, group, [label ar,en], [unit ar,en], [hint ar,en], opts
+ ['S','w',['عدد المواقع','Sites'],['موقع','sites'],['عدد المواقع التي ينفذها المشروع اليوم.','Number of sites the programme covers today.']],
+ ['g','w',['النمو السنوي','Annual growth'],['٪ / سنة','% / year'],['نمو عدد المواقع سنوياً بعد السنة الأولى.','Yearly growth in sites after year 1.']],
+ ['H','w',['أفق التخطيط','Planning horizon'],['سنة','years'],['السنة التي يُحسب عندها حجم البيانات والتخزين.','Year at which data and storage are sized.']],
+ ['D','w',['مدة التنفيذ','Delivery duration'],['سنة','years'],['الفترة التي تُنفَّذ خلالها المواقع (تحدد معدل التغيير اليومي).','Period over which sites are executed (drives daily change).']],
+ ['T','w',['المهام لكل موقع','Tasks per site'],['مهمة','tasks'],['عدد صفوف المهام لكل موقع.','Task rows per site.']],
+ ['A','w',['إجراءات سير العمل لكل مهمة','Workflow actions per task'],['إجراء','actions'],['متوسط الإجراءات (اعتماد/رفض/تعليق…) لكل مهمة.','Average actions (approve/reject/hold…) per task.']],
+ ['R','w',['صفوف السجل لكل موقع','Register rows per site'],['صف','rows'],['صفوف السجلات (Registers) لكل موقع.','Register rows per site.']],
+ ['Dn','w',['المستندات لكل موقع','Documents per site'],['ملف','files'],['عدد المستندات لكل موقع.','Documents per site.']],
+ ['DnMB','w',['متوسط حجم المستند','Avg document size'],['MB','MB'],['متوسط حجم الملف الواحد.','Average size of one document.']],
+ ['P','w',['صور ضبط الجودة لكل موقع','QC photos per site'],['صورة','photos'],['عدد صور الجودة لكل موقع.','QC photos per site.']],
+ ['PMB','w',['متوسط حجم الصورة','Avg photo size'],['MB','MB'],['يُستخدم أيضاً في حساب عرض نطاق الرفع.','Also used for the upload bandwidth estimate.']],
+ ['G','w',['ملفات PDF المولّدة لكل موقع','Generated PDFs per site'],['ملف','files'],['نماذج PDF التي يولّدها النظام لكل موقع.','Forms rendered to PDF per site.']],
+ ['GMB','w',['متوسط حجم PDF المولّد','Avg generated PDF size'],['MB','MB'],['متوسط حجم الملف المولّد.','Average generated PDF size.']],
+ ['sup','w',['معامل النسخ المستبدلة','Superseded-version factor'],['×','×'],['زيادة التخزين بسبب الإصدارات القديمة للملفات.','Extra storage for older file versions.']],
+
+ ['U','u',['المستخدمون المسمّون','Named users'],['مستخدم','users'],['إجمالي الحسابات المسجلة.','Total registered accounts.']],
+ ['C','u',['الذروة المتزامنة','Peak concurrent users'],['مستخدم','users'],['هدف المتطلبات غير الوظيفية: 100 مستخدم متزامن.','NFR target: 100 concurrent users.']],
+ ['r','u',['الطلبات لكل مستخدم نشط','Requests per active user'],['طلب / دقيقة','req / min'],['معدل الطلبات من مستخدم نشط واحد.','Request rate of one active user.']],
+ ['burst','u',['معامل الذروة اللحظية','Burst factor'],['×','×'],['نسبة الذروة اللحظية إلى المتوسط.','Instant peak relative to the average.']],
+ ['exports','u',['مهام تصدير Master يومياً','Master export jobs per day'],['مهمة / يوم','jobs / day'],['مهام BullMQ الثقيلة لتصدير Master.','Heavy BullMQ jobs exporting the Master.']],
+ ['exportSec','u',['متوسط زمن التصدير','Avg export duration'],['ثانية','s'],['زمن المهمة الواحدة.','Duration of one export job.']],
+ ['pdf','u',['توليد PDF يومياً','PDF renders per day'],['ملف / يوم','renders / day'],['نماذج تُولَّد بمتصفح Chromium بدون واجهة.','Forms rendered with headless Chromium.']],
+ ['pdfSec','u',['متوسط زمن توليد PDF','Avg PDF render time'],['ثانية','s'],['زمن التوليد للملف الواحد.','Time to render one PDF.']],
+ ['imports','u',['مهام الاستيراد يومياً','Imports per day'],['مهمة / يوم','jobs / day'],['للمعلومة فقط: لا تدخل في المعادلات (خفيفة وتعمل على نفس العمّال).','Informational only: not in the formulas (light, same workers).']],
+
+ ['rpo','o',['هدف نقطة الاسترداد RPO','RPO'],['دقيقة','min'],['أقصى فقدان بيانات مقبول (الهدف 15).','Maximum acceptable data loss (target 15).']],
+ ['rto','o',['هدف زمن الاسترداد RTO','RTO'],['ساعة','h'],['أقصى زمن لعودة الخدمة (الهدف 4).','Maximum time to restore service (target 4).']],
+ ['standby','o',['خادم احتياطي','Standby server'],['نعم/لا','yes/no'],['خادم جاهز للترقية عند العطل.','Server ready to be promoted on failure.'],'b'],
+ ['staging','o',['بيئة اختبار (Staging)','Staging environment'],['نعم/لا','yes/no'],['بيئة اختبار منفصلة عن الإنتاج.','Test environment separate from production.'],'b'],
+ ['stgCpu','o',['حوسبة Staging','Staging compute'],['٪ من الإنتاج','% of prod'],['نسبة vCPU وRAM من الإنتاج.','vCPU and RAM as a share of prod.']],
+ ['stgDisk','o',['تخزين Staging','Staging storage'],['٪ من الإنتاج','% of prod'],['نسبة القرص من الإنتاج.','Disk as a share of prod.']],
+ ['offsite','o',['نسخة احتياطية خارج الموقع','Off-site backup copy'],['نعم/لا','yes/no'],['نسخة واحدة على الأقل خارج الموقع.','At least one copy outside the site.'],'b'],
+ ['retD','o',['الاحتفاظ اليومي','Daily retention'],['نسخة','copies'],['عدد النسخ اليومية المحفوظة (14).','Daily copies kept (14).']],
+ ['retW','o',['الاحتفاظ الأسبوعي','Weekly retention'],['نسخة','copies'],['عدد النسخ الأسبوعية (8).','Weekly copies kept (8).']],
+ ['retM','o',['الاحتفاظ الشهري','Monthly retention'],['نسخة','copies'],['عدد النسخ الشهرية (12).','Monthly copies kept (12).']],
+ ['auditYears','o',['مدة حفظ سجل التدقيق','Audit log retention'],['سنة','years'],['يُحفظ 10 سنوات حسب المتطلبات.','Kept 10 years per the NFR.']],
+ ['sysDays','o',['مدة حفظ سجل النظام','System log retention'],['يوم','days'],['12 شهراً حسب المتطلبات.','12 months per the NFR.']],
+ ['secDays','o',['مدة حفظ سجل الأمان','Security log retention'],['يوم','days'],['افتراضي 730 يوماً.','Default 730 days.']],
+ ['headroom','o',['هامش الأمان','Headroom'],['٪','%'],['زيادة على الحمل المحسوب لـ API وقاعدة البيانات.','Margin added to computed API and DB load.']],
+ ['util','o',['نسبة استخدام القرص المستهدفة','Disk target utilization'],['٪','%'],['لا يُملأ القرص أكثر من هذه النسبة.','Disks are not filled beyond this share.']],
+
+ ['taskKB','a',['حجم صف المهمة','Task row size'],['KB','KB'],['حجم الصف في قاعدة البيانات.','Row size in the database.']],
+ ['auditKB','a',['حجم صف التدقيق','Audit row size'],['KB','KB'],['حجم صف سجل التدقيق.','Size of one audit row.']],
+ ['aPA','a',['صفوف التدقيق لكل إجراء','Audit rows per action'],['صف','rows'],['متوسط صفوف التدقيق الناتجة عن إجراء واحد.','Audit rows produced per action.']],
+ ['regKB','a',['حجم صف السجل','Register row size'],['KB','KB'],['حجم صف السجل.','Register row size.']],
+ ['sysEvt','a',['أحداث سجل النظام','System log events'],['حدث / مستخدم / يوم','events / user / day'],['عدد الأحداث لكل مستخدم يومياً.','Events per user per day.']],
+ ['sysKB','a',['حجم حدث سجل النظام','System log event size'],['KB','KB'],['حجم الحدث الواحد.','Size of one event.']],
+ ['secEvt','a',['أحداث سجل الأمان','Security log events'],['حدث / مستخدم / يوم','events / user / day'],['تسجيل الدخول والصلاحيات.','Sign-ins and permission events.']],
+ ['secKB','a',['حجم حدث سجل الأمان','Security log event size'],['KB','KB'],['حجم الحدث الواحد.','Size of one event.']],
+ ['idx','a',['معامل الفهارس والتضخم','Index / bloat factor'],['×','×'],['حجم الفهارس وتضخم PostgreSQL فوق البيانات الخام.','Indexes and PostgreSQL bloat over raw data.']],
+ ['rpsVcpu','a',['طلبات لكل vCPU لـ API','RPS per API vCPU'],['طلب / ث','req / s'],['قدرة نواة واحدة (تُؤكَّد باختبار حمل).','One core capacity (confirm by load test).']],
+ ['qpr','a',['استعلامات قاعدة البيانات لكل طلب','DB queries per request'],['استعلام','queries'],['متوسط الاستعلامات لكل طلب API.','Average queries per API request.']],
+ ['qpsVcpu','a',['استعلامات لكل vCPU لقاعدة البيانات','DB QPS per vCPU'],['استعلام / ث','q / s'],['قدرة نواة PostgreSQL.','PostgreSQL per-core throughput.']],
+ ['hot','a',['المجموعة الساخنة','Hot working set'],['٪ من القاعدة','% of DB'],['الجزء الذي يجب أن يبقى في الذاكرة.','Share of the DB that must stay in RAM.']],
+ ['walAmp','a',['تضخيم كتابة WAL','WAL write amplification'],['×','×'],['حجم WAL مقابل التغيير الفعلي.','WAL volume relative to real change.']],
+ ['comp','a',['معامل ضغط النسخ الاحتياطي','Backup compression'],['×','×'],['حجم النسخة المضغوطة ÷ الأصل.','Compressed size ÷ original.']],
+ ['restoreMBs','a',['سرعة الاستعادة','Restore throughput'],['MB/ث','MB/s'],['سرعة الاستعادة من النسخة الاحتياطية.','Throughput when restoring from backup.']],
+ ['workDays','a',['أيام العمل في السنة','Working days per year'],['يوم','days'],['لحساب التغيير اليومي لقاعدة البيانات.','Used for the daily DB change rate.']],
+ ['upPct','a',['الرافعون وقت الذروة','Uploaders at peak'],['٪ من المتزامنين','% of concurrent'],['نسبة من يرفعون صوراً في نفس اللحظة.','Share uploading photos at the same time.']],
+ ['upSec','a',['زمن الرفع المستهدف','Upload target time'],['ثانية','s'],['الزمن المقبول لرفع صورة.','Acceptable time to upload one photo.']],
+ ['fbk','a',['معامل نسخ الملفات','Files backup factor'],['×','×'],['الملفات تُنسخ دون ضغط تقريباً.','Files barely compress.']],
+ ['workHours','a',['ساعات ذروة العمل','Peak working hours'],['ساعة','h'],['نافذة توزيع المهام الخلفية.','Window over which background jobs spread.']],
+ ['peakF','a',['معامل ذروة المهام الخلفية','Background peak factor'],['×','×'],['الذروة مقابل المتوسط للمهام الخلفية.','Peak vs average for background jobs.']]
+];
+var GROUPS={w:['حجم العمل','Workload'],u:['المستخدمون والحمل','Users & load'],o:['التشغيل والنسخ الاحتياطي','Operations & backup'],a:['المعاملات المتقدمة','Advanced coefficients']};
+var COMP={proxy:['Reverse proxy + Web (nginx)','الوكيل العكسي + الويب (nginx)'],api:['API (NestJS)','واجهة API (NestJS)'],workers:['Workers (BullMQ + Chromium)','العمّال (BullMQ + Chromium)'],db:['PostgreSQL 16','PostgreSQL 16'],redis:['Redis','Redis'],minio:['MinIO (files)','MinIO (الملفات)'],staging:['Staging (single VM)','Staging (خادم واحد)']};
+COMP.proxy=['الوكيل العكسي + الويب (nginx)','Reverse proxy + Web (nginx)'];COMP.api=['واجهة API (NestJS)','API (NestJS)'];COMP.workers=['العمّال (BullMQ + Chromium)','Workers (BullMQ + Chromium)'];COMP.minio=['MinIO (الملفات)','MinIO (files)'];COMP.staging=['Staging (خادم واحد)','Staging (single VM)'];
+
+var TX={
+ title:['أداة تقدير البنية التحتية لنظام GSDN PMIS','GSDN PMIS — Infrastructure Sizing Tool'],
+ sub:['أداة مستقلة تعمل دون اتصال بالشبكة — خادم داخلي، Docker Compose.','Standalone offline tool — on-prem server, Docker Compose.'],
+ assump:['<b>افتراضات:</b> هذه تقديرات تخطيطية مبنية على معاملات قابلة للتعديل، وليست ضماناً. يجب تأكيدها باختبار حمل (100 مستخدم متزامن و1000 موقع، الصفحات أقل من ثانيتين) قبل الشراء.','<b>Assumptions:</b> these are planning estimates built on editable coefficients, not a guarantee. Confirm them with a load test (100 concurrent users, 1000 sites, pages under 2 s) before purchasing hardware.'],
+ presets:['إعدادات جاهزة','Presets'],inputs:['المدخلات','Inputs'],adv:['المعاملات المتقدمة (اضغط للفتح)','Advanced coefficients (click to expand)'],advNote:['قيم افتراضية معقولة؛ عدّلها فقط عند توفر قياسات فعلية.','Sensible defaults; change only when you have measurements.'],
+ results:['النتائج','Results'],copy:['نسخ الملخص','Copy summary'],csv:['تنزيل CSV','Download CSV'],print:['طباعة / PDF','Print / PDF'],copied:['تم النسخ','Copied'],
+ pilot:['تجريبي طرابلس','Pilot Tripoli'],full:['الإطلاق الكامل','Full rollout'],growth:['النمو','Growth'],
+ kRps:['ذروة الطلبات','Peak RPS'],kRpsS:['طلب/ثانية (مع الذروة اللحظية)','req/s (incl. burst)'],kProd:['الإنتاج (المجموع)','Production total'],kStore:['التخزين عند الأفق','Storage at horizon'],kBackup:['التخزين الاحتياطي','Backup storage'],kRestore:['زمن الاستعادة مقابل RTO','Restore time vs RTO'],
+ hComp:['الموارد لكل مكوّن','Resources per component'],hGrow:['نمو التخزين سنوياً','Storage growth per year'],hWarn:['تحذيرات وملاحظات','Warnings & notes'],
+ cName:['المكوّن','Component'],cNote:['ملاحظات','Notes'],ram:['RAM (GB)','RAM (GB)'],disk:['القرص (GB)','Disk (GB)'],
+ prod:['الإنتاج','Production'],standby:['الخادم الاحتياطي','Standby'],staging:['بيئة الاختبار','Staging'],totalProd:['مجموع الإنتاج','Production total'],totalAll:['المجموع الكلي (إنتاج + احتياطي + اختبار)','Grand total (prod + standby + staging)'],backupSrv:['خادم/NAS النسخ الاحتياطي (قرص فقط)','Backup server / NAS (disk only)'],
+ yr:['السنة','Year'],sites:['المواقع','Sites'],gDb:['قاعدة البيانات GB','Database GB'],gFiles:['الملفات GB','Files GB'],gAudit:['التدقيق GB','Audit GB'],gBackup:['النسخ الاحتياطية GB','Backups GB'],
+ advSingle:['<b>النشر المقترح:</b> خادم تطبيقات واحد (proxy + API + workers + Redis + MinIO) + خادم قاعدة بيانات منفصل. الاحتياطي نسخة مطابقة (DB + التطبيق).','<b>Suggested deployment:</b> one application VM (proxy + API + workers + Redis + MinIO) + one separate DB VM. Standby mirrors prod (DB + app).'],
+ advSplit:['<b>النشر المقترح:</b> فصل API/العمّال عن قاعدة البيانات، وفكّر في عقدتي API خلف الوكيل العكسي. الاحتياطي نسخة مطابقة.','<b>Suggested deployment:</b> split API/workers and DB; consider 2 API nodes behind the proxy. Standby mirrors prod.'],
+ up:['عرض نطاق الرفع وقت الذروة','Peak upload bandwidth'],
+ foot:['تقديرات تخطيطية فقط — تُؤكَّد باختبار حمل قبل الشراء. المدخلات محفوظة في رابط الصفحة (#).','Planning estimates only — confirm with a load test before purchase. Inputs are stored in the page URL (#).'],
+ piH:['المدخلات والافتراضات','Inputs & assumptions'],
+ hdrH:['بيانات التقرير','Report details'],bSave:['حفظ السيناريو (JSON)','Save scenario (JSON)'],bLoad:['تحميل سيناريو (JSON)','Load scenario (JSON)'],bScen:['حفظ للمقارنة','Keep for comparison'],hScen:['مقارنة السيناريوهات (حتى 3)','Scenario comparison (up to 3)'],
+ scenNone:['لا توجد سيناريوهات محفوظة للمقارنة.','No saved scenarios to compare.'],scenFull:['الحد الأقصى 3 سيناريوهات؛ احذف واحداً أولاً.','Maximum 3 scenarios; delete one first.'],loaded:['تم تحميل السيناريو.','Scenario loaded.'],cur:['الحالي','Current'],ld:['تحميل','Load'],del:['حذف','Delete'],
+ rExec:['الملخص التنفيذي','Executive summary'],rInputs:['المدخلات والمعاملات المستخدمة','Inputs and coefficients used'],rCmp:['مقارنة السيناريوهات','Scenario comparison'],ver:['الإصدار','Version'],
+ errParse:['ملف غير صالح: JSON تالف.','Invalid file: malformed JSON.'],errFormat:['ملف غير صالح: ليس كائن JSON.','Invalid file: not a JSON object.'],errTool:['ملف غير صالح: ليس سيناريو لهذه الأداة.','Invalid file: not a scenario of this tool.'],errVersion:['إصدار الملف غير مدعوم.','Unsupported file version.'],errInputs:['ملف غير صالح: قسم المدخلات مفقود.','Invalid file: inputs section missing.'],errKey:['مفتاح غير معروف: {d}','Unknown key: {d}'],errNum:['قيمة غير رقمية: {d}','Non-numeric value: {d}'],errRange:['قيمة خارج النطاق: {d}','Value out of range: {d}'],errHeader:['حقل ترويسة غير صالح: {d}','Invalid header field: {d}'],
+ cSites:['المواقع عند الأفق','Sites at horizon'],cRps:['ذروة الطلبات (طلب/ث)','Peak RPS'],cProd:['الإنتاج: vCPU / RAM / قرص','Prod: vCPU / RAM / disk'],cAll:['الكل: vCPU / RAM / قرص','All envs: vCPU / RAM / disk'],cStore:['التخزين عند الأفق (GB)','Storage at horizon (GB)'],cBackup:['النسخ الاحتياطي المحلي (GB)','Local backup (GB)'],cRestore:['زمن الاستعادة (ساعة)','Restore time (h)'],cDeploy:['النشر','Deployment'],dSingle:['خادم تطبيقات + خادم DB','1 app VM + 1 DB VM'],dSplit:['فصل API/العمّال/DB','Split API/workers/DB'],
+ ok:['ضمن RTO','within RTO'],over:['يتجاوز RTO','exceeds RTO'],
+ nApi:['{i} نسخة NestJS (≈1 GB لكل نسخة) + 1 GB للنظام','{i} NestJS instances (~1 GB each) + 1 GB OS'],
+ nProxy:['nginx + ملفات الويب الثابتة','nginx + static web files'],
+ nWorkers:['{r} توليد PDF + {e} تصدير متزامن + 1 للاستيراد/الإدارة','{r} PDF render + {e} export concurrent + 1 for imports/admin'],
+ nDb:['بيانات {d} GB + أرشيف WAL {w} GB؛ مجموعة ساخنة ≈ {h} GB','data {d} GB + WAL archive {w} GB; hot set ≈ {h} GB'],
+ nRedis:['طوابير BullMQ والجلسات','BullMQ queues and sessions'],
+ nMinio:['ملفات {f} GB عند الأفق','files {f} GB at horizon'],
+ nStaging:['{c}٪ من حوسبة الإنتاج و{s}٪ من تخزينه','{c}% of prod compute and {s}% of its storage'],
+ nStandby:['نسخة مطابقة من الإنتاج (ترقية دون استعادة)','Mirror of prod (promote, no restore)']
+};
+var WM={
+ load:['الذروة المتزامنة ({C}) أعلى من هدف 100 في المتطلبات غير الوظيفية: النتيجة استقراء خارج الحمل المستهدف، ويلزم اختبار حمل.','Peak concurrent users ({C}) is above the 100-user NFR target: the result extrapolates beyond it; a load test is required.'],
+ restore_standby:['الاستعادة من النسخة الاحتياطية تستغرق {h} ساعة وهي أطول من RTO ({rto} ساعة). ترقية الخادم الاحتياطي تتجنب الاستعادة (دقائق).','Restoring from backup takes {h} h, longer than the RTO ({rto} h). Promoting the standby avoids the restore (minutes).'],
+ restore_nostandby:['الاستعادة من النسخة الاحتياطية تستغرق {h} ساعة وهي أطول من RTO ({rto} ساعة، ولا يوجد خادم احتياطي). فعّل الخادم الاحتياطي أو ارفع سرعة التخزين.','Restoring from backup takes {h} h, longer than the RTO ({rto} h) and there is no standby. Add a standby or faster storage.'],
+ nostandby:['RTO ({rto} ساعة) يعتمد عملياً على خادم احتياطي؛ بدونه لا يُضمن.','An RTO of {rto} h in practice relies on a standby server; without one it is not assured.'],
+ rpo:['RPO {rpo} دقيقة يتطلب أرشفة WAL كل {rpo} دقيقة على الأكثر (archive_timeout={s}ث) مع نسخة كاملة ليلية. أرشيف WAL ≈ {wal} GB.','An RPO of {rpo} min needs WAL archiving at least every {rpo} min (archive_timeout={s}s) plus a nightly full backup. WAL archive ≈ {wal} GB.'],
+ rpo_low:['RPO {rpo} دقيقة أقل من 15: أرشفة WAL وحدها لا تكفي غالباً؛ استخدم النسخ المتدفق (streaming replication) إلى الخادم الاحتياطي.','An RPO of {rpo} min is below 15: WAL archiving alone is usually not enough; use streaming replication to the standby.'],
+ audit:['سجل التدقيق عند الأفق (سنة {H}): {a} GB. بعد {y} سنة لو استمر النمو: {b} GB ({n} موقع). يُحفظ {y} سنة، فخطط للتقسيم (partitioning) والأرشفة.','Audit log at horizon (year {H}): {a} GB. After {y} years if growth continues: {b} GB ({n} sites). It is kept {y} years, so plan partitioning and archiving.'],
+ nooffsite:['المتطلبات تفرض نسخة واحدة خارج الموقع، وهي معطّلة هنا.','The NFR requires one off-site copy; it is disabled here.'],
+ ret:['الاحتفاظ بالنسخ أقل من 14 يومي / 8 أسبوعي / 12 شهري المطلوبة.','Backup retention is below the required 14 daily / 8 weekly / 12 monthly.'],
+ auditshort:['مدة حفظ التدقيق ({y} سنة) أقل من 10 سنوات المطلوبة.','Audit retention ({y} years) is below the required 10 years.'],
+ syslogshort:['مدة حفظ سجل النظام ({d} يوم) أقل من 12 شهراً.','System log retention ({d} days) is below 12 months.'],
+ c_gt_u:['المتزامنون ({C}) أكثر من المستخدمين المسمّين ({U}).','Concurrent users ({C}) exceed named users ({U}).'],
+ range:['«{f}» = {v} خارج النطاق المعتاد ({lo}–{hi}).','"{f}" = {v} is outside the usual range ({lo}–{hi}).']
+};
+
+var VER='1.0',VDATE='2026-10-26',SKEY='gsdn-pmis-sizing-scenarios-v1';
+var HF=[['org',['الجهة','Organization']],['by',['أعدّه','Prepared by']],['contact',['جهة الاتصال','Contact']],['date',['التاريخ','Date']],['scen',['اسم السيناريو','Scenario name']],['notes',['ملاحظات','Notes']]];
+function today(){var d=new Date(),z=function(n){return (n<10?'0':'')+n;};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+var HDR={org:'',by:'',contact:'',date:today(),scen:'',notes:''},scen=[];
+var lang='ar',theme=null,state=Object.assign({},DEFAULTS);
+var $=function(id){return document.getElementById(id);};
+var L=function(a){return a[lang==='ar'?0:1];};
+var tx=function(k,p){return fill(L(TX[k]),p);};
+function fill(s,p){return s.replace(/\{(\w+)\}/g,function(_,k){return p&&p[k]!=null?p[k]:'';});}
+var f0=function(x){return Number(x).toLocaleString('en-US',{maximumFractionDigits:0});};
+var f1=function(x){return Number(x).toLocaleString('en-US',{maximumFractionDigits:1,minimumFractionDigits:1});};
+var f2=function(x){return Number(x).toLocaleString('en-US',{maximumFractionDigits:2});};
+var esc=function(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});};
+var label=function(id){var r=IN.filter(function(x){return x[0]===id;})[0];return r?L(r[2]):id;};
+var isBool=function(r){return r[5]==='b';};
+
+function readHash(){
+ var p=new URLSearchParams(location.hash.replace(/^#/,''));
+ state=Object.assign({},DEFAULTS);
+ IN.forEach(function(r){if(p.has(r[0])){var v=parseFloat(p.get(r[0]));if(isFinite(v))state[r[0]]=v;}});
+ lang=p.get('lang')==='en'?'en':'ar';
+ theme=(p.get('theme')==='dark'||p.get('theme')==='light')?p.get('theme'):null;
+}
+function writeHash(){
+ var p=new URLSearchParams();
+ IN.forEach(function(r){if(Number(state[r[0]])!==DEFAULTS[r[0]])p.set(r[0],state[r[0]]);});
+ if(lang==='en')p.set('lang','en');
+ if(theme)p.set('theme',theme);
+ var s=p.toString();
+ try{history.replaceState(null,'',location.pathname+location.search+(s?'#'+s:''));}catch(e){}
+}
+function applyTheme(){if(theme)document.documentElement.setAttribute('data-theme',theme);else document.documentElement.removeAttribute('data-theme');}
+
+function buildInputs(){
+ ['w','u','o'].forEach(function(g){}); 
+ function group(g){
+  var h='<div class="group"><h3>'+esc(L(GROUPS[g]))+'</h3>';
+  IN.filter(function(r){return r[1]===g;}).forEach(function(r){
+   var id=r[0],v=state[id];
+   h+='<div class="field"><label for="in-'+id+'">'+esc(L(r[2]))+'</label><div class="inl">'+
+    (isBool(r)?'<input type="checkbox" id="in-'+id+'" data-id="'+id+'"'+(Number(v)?' checked':'')+'>':
+     '<input type="number" id="in-'+id+'" data-id="'+id+'" inputmode="decimal" step="any" min="0" value="'+esc(v)+'">')+
+    '<span class="unit">'+esc(L(r[3]))+'</span></div><div class="hint">'+esc(L(r[4]))+'</div></div>';
+  });
+  return h+'</div>';
+ }
+ $('groups').innerHTML=['w','u','o'].map(group).join('');
+ $('advGroups').innerHTML=group('a');
+}
+function buildStatic(){
+ document.documentElement.lang=lang;document.documentElement.dir=lang==='ar'?'rtl':'ltr';
+ document.title=tx('title');buildHdr();
+ $('title').textContent=tx('title');$('subtitle').textContent='v'+VER+' · '+VDATE+' — '+tx('sub');$('hdrH').textContent=tx('hdrH');$('bSave').textContent=tx('bSave');$('bLoad').textContent=tx('bLoad');$('bScen').textContent=tx('bScen');$('h-scen').textContent=tx('hScen');$('assump').innerHTML=tx('assump');
+ $('h-presets').textContent=tx('presets');$('h-inputs').textContent=tx('inputs');$('advSum').textContent=tx('adv');$('advNote').textContent=tx('advNote');
+ $('h-results').textContent=tx('results');$('bCopy').textContent=tx('copy');$('bCsv').textContent=tx('csv');$('bPrint').textContent=tx('print');
+ $('h-comp').textContent=tx('hComp');$('h-grow').textContent=tx('hGrow');$('h-warn').textContent=tx('hWarn');$('foot').textContent=tx('foot');
+ $('langBtn').textContent=lang==='ar'?'English':'العربية';
+ $('themeBtn').textContent=lang==='ar'?'☾ / ☀ المظهر':'☾ / ☀ Theme';
+ $('presets').innerHTML=[['pilot','Pilot Tripoli: 150 / 40 / 20'],['full','Full rollout: 1000 / 250 / 100'],['growth','Growth: 2000 / 400 / 200']].map(function(p){
+  return '<button class="btn" type="button" data-preset="'+p[0]+'">'+esc(tx(p[0]))+'<small dir="ltr">'+esc(p[1].split(': ')[1])+' ('+(lang==='ar'?'مواقع / مستخدمون / متزامنون':'sites / users / concurrent')+')</small></button>';
+ }).join('');
+ buildInputs();
+}
+
+function noteFor(k,R,env){
+ var P=R.comps.prod.filter(function(x){return x.key==='db'||x.key==='minio';});
+ if(k==='proxy')return tx('nProxy');
+ if(k==='api')return tx('nApi',{i:R.meta.apiInstances});
+ if(k==='workers')return tx('nWorkers',{r:R.meta.renders,e:R.meta.exports});
+ if(k==='db')return tx('nDb',{d:f1(R.db.totalGB),w:f1(R.walArchiveGB),h:f1(R.db.hotGB)});
+ if(k==='redis')return tx('nRedis');
+ if(k==='minio')return tx('nMinio',{f:f1(R.filesGB)});
+ if(k==='staging')return tx('nStaging',{c:state.stgCpu,s:state.stgDisk});
+ return '';
+}
+var R=null;
+function warnText(w){var p=Object.assign({},w.p);['h','a','b','wal'].forEach(function(k){if(p[k]!=null)p[k]=f2(p[k]);});if(p.f)p.f=label(p.f);return fill(L(WM[w.code]),p);}
+function buildHdr(){
+ $('hdrBody').innerHTML=HF.map(function(f){var k=f[0];
+  return k==='notes'?'<div class="wide"><label for="h-'+k+'">'+esc(L(f[1]))+'</label><textarea id="h-'+k+'" data-h="'+k+'" rows="2">'+esc(HDR[k])+'</textarea></div>':
+   '<div><label for="h-'+k+'">'+esc(L(f[1]))+'</label><input id="h-'+k+'" data-h="'+k+'" type="'+(k==='date'?'date':'text')+'" value="'+esc(HDR[k])+'"></div>';}).join('');
+}
+function loadScen(){try{var a=JSON.parse(localStorage.getItem(SKEY)||'[]');if(Array.isArray(a))scen=a.slice(0,3).map(function(x){var v=x&&typeof x.name==='string'&&validateScenario({tool:'gsdn-pmis-sizing',version:1,inputs:x.inputs});return v&&v.ok?{name:x.name.slice(0,60),inputs:v.inputs}:null;}).filter(Boolean);}catch(e){}}
+function saveScen(){try{localStorage.setItem(SKEY,JSON.stringify(scen));}catch(e){}}
+function setMsg(t,ok){var m=$('msg');m.textContent=t||'';m.className=t?(ok?'okm':'err'):'';}
+function cmpHtml(){
+ var cols=[{name:tx('cur'),r:R}].concat(scen.map(function(x){return {name:x.name,r:computeSizing(Object.assign({},DEFAULTS,x.inputs))};}));
+ var rows=[
+  ['cSites',function(r){return f0(r.SH);}],['cRps',function(r){return f1(r.rps);}],
+  ['cProd',function(r){var t=r.totals.prod;return t.vcpu+' / '+t.ram+' / '+t.disk;}],
+  ['cAll',function(r){var t=r.totals.all;return t.vcpu+' / '+t.ram+' / '+t.disk;}],
+  ['cStore',function(r){return f1(r.storageHorizonGB);}],['cBackup',function(r){return f1(r.backupLocalGB);}],
+  ['cRestore',function(r){return f2(r.restoreH);}],['cDeploy',function(r){return tx(r.advice==='single'?'dSingle':'dSplit');}]];
+ return '<thead><tr><th></th>'+cols.map(function(c){return '<th class="n">'+esc(c.name)+'</th>';}).join('')+'</tr></thead><tbody>'+
+  rows.map(function(x){return '<tr><td>'+esc(tx(x[0]))+'</td>'+cols.map(function(c){return '<td class="n">'+esc(x[1](c.r))+'</td>';}).join('')+'</tr>';}).join('')+'</tbody>';
+}
+function render(){
+ R=computeSizing(state);writeHash();
+ var T=R.totals,rok=R.restoreH<=R.inputs.rto;
+ function kpi(l,v,s,cls){return '<div class="card kpi '+(cls||'')+'"><div class="l">'+esc(l)+'</div><div class="v">'+v+'</div><div class="s">'+s+'</div></div>';}
+ var kp=
+  kpi(tx('kRps'),f1(R.rps),esc(tx('kRpsS')))+
+  kpi(tx('kProd'),f0(T.prod.vcpu)+' vCPU · '+f0(T.prod.ram)+' GB RAM','<span dir="ltr">'+f0(T.prod.disk)+' GB '+(lang==='ar'?'قرص':'disk')+'</span>')+
+  kpi(tx('kStore'),f1(R.storageHorizonGB)+' GB','<bdi>DB '+f1(R.db.totalGB)+' GB</bdi> + '+(lang==='ar'?'ملفات ':'files ')+'<bdi>'+f1(R.filesGB)+' GB</bdi> ('+(lang==='ar'?'السنة ':'year ')+R.inputs.H+(lang==='ar'?'، ':', ')+f0(R.SH)+' '+(lang==='ar'?'موقع':'sites')+')')+
+  kpi(tx('kBackup'),f1(R.backupLocalGB)+' GB',(lang==='ar'?'خارج الموقع: ':'off-site: ')+'<bdi>'+f1(R.backupOffsiteGB)+' GB</bdi> · '+(lang==='ar'?'قرص NAS: ':'NAS disk: ')+'<bdi>'+f0(R.backupServerDiskGB)+' GB</bdi>')+
+  kpi(tx('kRestore'),'<bdi>'+f2(R.restoreH)+' h / '+f2(R.inputs.rto)+' h</bdi>',esc(tx(rok?'ok':'over'))+' · '+esc(tx('up'))+': <bdi>'+f1(R.uploadMbps)+' Mbps</bdi>',rok?'ok':'bad');
+ $('kpis').innerHTML=kp;
+ var adv=tx(R.advice==='single'?'advSingle':'advSplit');$('advice').innerHTML=adv;
+
+ var hd='<thead><tr><th>'+esc(tx('cName'))+'</th><th class="n">vCPU</th><th class="n">'+esc(tx('ram'))+'</th><th class="n">'+esc(tx('disk'))+'</th><th>'+esc(tx('cNote'))+'</th></tr></thead>';
+ function rows(list,env){return list.map(function(c){return '<tr><td>'+esc(L(COMP[c.key]))+'</td><td class="n">'+f0(c.vcpu)+'</td><td class="n">'+f0(c.ram)+'</td><td class="n">'+f0(c.disk)+'</td><td class="note">'+esc(env==='standby'?tx('nStandby'):noteFor(c.key,R))+'</td></tr>';}).join('');}
+ function tot(label,t){return '<tr class="tot"><td>'+esc(label)+'</td><td class="n">'+f0(t.vcpu)+'</td><td class="n">'+f0(t.ram)+'</td><td class="n">'+f0(t.disk)+'</td><td></td></tr>';}
+ var b='<tbody><tr class="sec"><td colspan="5">'+esc(tx('prod'))+'</td></tr>'+rows(R.comps.prod,'prod')+tot(tx('totalProd'),T.prod);
+ if(R.comps.standby.length)b+='<tr class="sec"><td colspan="5">'+esc(tx('standby'))+'</td></tr>'+rows(R.comps.standby,'standby')+tot(tx('standby'),T.standby);
+ if(R.comps.staging.length)b+='<tr class="sec"><td colspan="5">'+esc(tx('staging'))+'</td></tr>'+rows(R.comps.staging,'staging');
+ b+='<tr class="sec"><td colspan="5">'+esc(tx('totalAll'))+'</td></tr>'+tot(tx('totalAll'),T.all);
+ b+='<tr><td>'+esc(tx('backupSrv'))+'</td><td class="n">—</td><td class="n">—</td><td class="n">'+f0(R.backupServerDiskGB)+'</td><td class="note"></td></tr></tbody>';
+ var comp=hd+b;$('compTbl').innerHTML=comp;
+
+ var grow='<thead><tr><th>'+esc(tx('yr'))+'</th><th class="n">'+esc(tx('sites'))+'</th><th class="n">'+esc(tx('gDb'))+'</th><th class="n">'+esc(tx('gFiles'))+'</th><th class="n">'+esc(tx('gAudit'))+'</th><th class="n">'+esc(tx('gBackup'))+'</th></tr></thead><tbody>'+
+  R.yearly.map(function(y){return '<tr><td>'+y.year+'</td><td class="n">'+f0(y.sites)+'</td><td class="n">'+f1(y.dbGB)+'</td><td class="n">'+f1(y.filesGB)+'</td><td class="n">'+f1(y.auditGB)+'</td><td class="n">'+f1(y.backupGB)+'</td></tr>';}).join('')+'</tbody>';
+ $('growTbl').innerHTML=grow;
+
+ var wl=R.warnings.map(function(w){return '<li class="'+w.sev+'" data-code="'+w.code+'">'+esc(warnText(w))+'</li>';}).join('');
+ $('warnings').innerHTML=wl;
+
+ $('slist').innerHTML=scen.length?scen.map(function(x,i){return '<li><b>'+esc(x.name)+'</b><button class="btn" type="button" data-sload="'+i+'">'+esc(tx('ld'))+'</button><button class="btn" type="button" data-sdel="'+i+'">'+esc(tx('del'))+'</button></li>';}).join(''):'<li><span class="unit">'+esc(tx('scenNone'))+'</span></li>';
+ var cmp=scen.length?cmpHtml():'';
+ $('cmpWrap').style.display=scen.length?'':'none';$('cmpTbl').innerHTML=cmp;
+
+ var hf=HF.map(function(f){return '<div><span>'+esc(L(f[1]))+'</span><b>'+esc(HDR[f[0]]||'—')+'</b></div>';}).join('');
+ var pi=IN.map(function(r){return '<div><span>'+esc(L(r[2]))+'</span><b dir="ltr">'+(isBool(r)?(Number(state[r[0]])?(lang==='ar'?'نعم':'yes'):(lang==='ar'?'لا':'no')):f2(state[r[0]]))+' '+esc(L(r[3]))+'</b></div>';}).join('');
+ $('report').innerHTML=
+  '<div class="rsec"><h1>'+esc(tx('title'))+'</h1><p class="sub">'+esc(tx('ver'))+' '+VER+' · '+VDATE+'</p><div class="hf">'+hf+'</div><div class="assump">'+tx('assump')+'</div></div>'+
+  '<div class="rsec"><h2>'+esc(tx('rExec'))+'</h2><div class="cards">'+kp+'</div><div class="advice card">'+adv+'</div></div>'+
+  '<div class="rsec"><h2>'+esc(tx('hComp'))+'</h2><div class="tw"><table>'+comp+'</table></div></div>'+
+  '<div class="rsec"><h2>'+esc(tx('hGrow'))+'</h2><div class="tw"><table>'+grow+'</table></div>'+(scen.length?'<h2>'+esc(tx('rCmp'))+'</h2><div class="tw"><table>'+cmp+'</table></div>':'')+'</div>'+
+  '<div class="rsec"><h2>'+esc(tx('hWarn'))+'</h2><ul class="warns">'+wl+'</ul></div>'+
+  '<div class="rsec"><h2>'+esc(tx('rInputs'))+'</h2><div class="pi">'+pi+'</div><div class="assump" style="margin-top:16px">'+tx('assump')+'</div></div>';
+}
+function exportScenario(){var inp={};IN.forEach(function(r){inp[r[0]]=Number(state[r[0]]);});return {tool:'gsdn-pmis-sizing',version:1,toolVersion:VER,saved:today(),header:Object.assign({},HDR),inputs:inp};}
+function importScenarioText(text){
+ var o,v;
+ try{o=JSON.parse(text);}catch(e){setMsg(tx('errParse'),false);return false;}
+ v=validateScenario(o);
+ if(!v.ok){setMsg(fill(L(TX[v.error]),{d:v.detail}),false);return false;}
+ state=Object.assign({},DEFAULTS,v.inputs);HDR=Object.assign({org:'',by:'',contact:'',date:today(),scen:'',notes:''},v.header);
+ buildHdr();buildInputs();render();setMsg(tx('loaded'),true);return true;
+}
+window.exportScenario=exportScenario;window.importScenarioText=importScenarioText;
+
+function summaryText(){
+ var T=R.totals,i=R.inputs,o=[];
+ o.push(tx('title')+' v'+VER+' ('+VDATE+')');HF.forEach(function(f){if(HDR[f[0]])o.push(L(f[1])+': '+HDR[f[0]]);});
+ o.push((lang==='ar'?'المواقع ':'Sites ')+i.S+' → '+R.SH+' ('+(lang==='ar'?'سنة ':'year ')+i.H+'), '+(lang==='ar'?'مستخدمون ':'users ')+i.U+', '+(lang==='ar'?'متزامنون ':'concurrent ')+i.C);
+ o.push('Peak RPS: '+f1(R.rps));
+ o.push(tx('prod')+': '+T.prod.vcpu+' vCPU, '+T.prod.ram+' GB RAM, '+T.prod.disk+' GB disk');
+ R.comps.prod.forEach(function(c){o.push('  - '+L(COMP[c.key])+': '+c.vcpu+' vCPU / '+c.ram+' GB / '+c.disk+' GB');});
+ if(R.comps.standby.length)o.push(tx('standby')+': '+T.standby.vcpu+' vCPU, '+T.standby.ram+' GB RAM, '+T.standby.disk+' GB disk');
+ if(R.comps.staging.length)o.push(tx('staging')+': '+T.staging.vcpu+' vCPU, '+T.staging.ram+' GB RAM, '+T.staging.disk+' GB disk');
+ o.push(tx('totalAll')+': '+T.all.vcpu+' vCPU, '+T.all.ram+' GB RAM, '+T.all.disk+' GB disk');
+ o.push(tx('kStore')+': '+f1(R.storageHorizonGB)+' GB (DB '+f1(R.db.totalGB)+', files '+f1(R.filesGB)+', audit '+f1(R.db.auditGB)+')');
+ o.push(tx('kBackup')+': '+f1(R.backupLocalGB)+' GB local, '+f1(R.backupOffsiteGB)+' GB off-site, NAS disk '+R.backupServerDiskGB+' GB');
+ o.push(tx('kRestore')+': '+f2(R.restoreH)+' h / RTO '+i.rto+' h');
+ o.push('');
+ R.warnings.forEach(function(w){var p=Object.assign({},w.p);['h','a','b','wal'].forEach(function(k){if(p[k]!=null)p[k]=f2(p[k]);});if(p.f)p.f=label(p.f);o.push('- '+fill(L(WM[w.code]),p));});
+ if(scen.length){o.push('');o.push(tx('rCmp')+':');scen.forEach(function(x){var r=computeSizing(x.inputs),t=r.totals.prod;o.push('  - '+x.name+': '+t.vcpu+' vCPU, '+t.ram+' GB RAM, '+t.disk+' GB disk; '+f1(r.storageHorizonGB)+' GB storage');});}
+ o.push('');o.push(L(TX.foot));
+ return o.join('\n');
+}
+function csvText(){
+ var rows=[['section','key','value','unit']],i=R.inputs;rows.push(['meta','tool_version',VER+' ('+VDATE+')','']);HF.forEach(function(f){rows.push(['header',f[0],HDR[f[0]],'']);});
+ IN.forEach(function(r){rows.push(['input',r[0]+' ('+r[2][1]+')',state[r[0]],r[3][1]]);});
+ var sc=[['sites_at_horizon',R.SH,'sites'],['peak_rps',R.rps,'req/s'],['db_total',R.db.totalGB,'GB'],['db_core',R.db.coreGB,'GB'],['audit_at_horizon',R.db.auditGB,'GB'],['audit_after_'+R.db.auditYears+'y_if_growth_continues',R.db.auditAtYearsGB,'GB'],['system_log',R.db.sysLogGB,'GB'],['security_log',R.db.secLogGB,'GB'],['db_hot_set',R.db.hotGB,'GB'],['files',R.filesGB,'GB'],['daily_db_change',R.dailyChangeGB,'GB/day'],['wal_per_day',R.walPerDayGB,'GB/day'],['wal_archive',R.walArchiveGB,'GB'],['backup_local',R.backupLocalGB,'GB'],['backup_offsite',R.backupOffsiteGB,'GB'],['backup_server_disk',R.backupServerDiskGB,'GB'],['restore_time',R.restoreH,'h'],['peak_upload',R.uploadMbps,'Mbps'],['deployment',R.advice,'']];
+ sc.forEach(function(s){rows.push(['result',s[0],s[1],s[2]]);});
+ ['prod','standby','staging'].forEach(function(e){R.comps[e].forEach(function(c){rows.push(['component',e+'.'+c.key,c.vcpu+' vCPU / '+c.ram+' GB RAM / '+c.disk+' GB disk','']);});});
+ ['prod','standby','staging','all'].forEach(function(e){var t=R.totals[e];rows.push(['total',e,t.vcpu+' vCPU / '+t.ram+' GB RAM / '+t.disk+' GB disk','']);});
+ R.yearly.forEach(function(y){rows.push(['growth','year'+y.year,'sites '+y.sites+'; db '+y.dbGB.toFixed(2)+'; files '+y.filesGB.toFixed(2)+'; audit '+y.auditGB.toFixed(2)+'; backups '+y.backupGB.toFixed(2),'GB']);});
+ R.warnings.forEach(function(w){rows.push(['warning',w.code,w.sev,'']);});
+ scen.forEach(function(x){var r=computeSizing(x.inputs),t=r.totals.prod;rows.push(['scenario',x.name,'prod '+t.vcpu+' vCPU / '+t.ram+' GB / '+t.disk+' GB; storage '+r.storageHorizonGB.toFixed(1)+' GB; backup '+r.backupLocalGB.toFixed(1)+' GB; restore '+r.restoreH.toFixed(2)+' h','']);});
+ return rows.map(function(r){return r.map(function(c){c=String(c);return /[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c;}).join(',');}).join('\r\n');
+}
+function copyText(s){
+ var done=function(){$('copied').textContent=tx('copied');setTimeout(function(){$('copied').textContent='';},1800);};
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(s).then(done,fallback);}else fallback();
+ function fallback(){var t=document.createElement('textarea');t.value=s;document.body.appendChild(t);t.select();try{document.execCommand('copy');done();}catch(e){}t.remove();}
+}
+
+document.addEventListener('input',function(e){
+ var hk=e.target.getAttribute&&e.target.getAttribute('data-h');
+ if(hk){HDR[hk]=e.target.value;render();return;}
+ var id=e.target.getAttribute&&e.target.getAttribute('data-id');if(!id)return;
+ if(e.target.type==='checkbox')state[id]=e.target.checked?1:0;else{var v=parseFloat(e.target.value);state[id]=isFinite(v)?v:0;}
+ render();
+});
+document.addEventListener('click',function(e){
+ var p=e.target.closest&&e.target.closest('[data-preset]');
+ var sl=e.target.closest&&e.target.closest('[data-sload]'),sd=e.target.closest&&e.target.closest('[data-sdel]');
+ if(sl){state=Object.assign({},DEFAULTS,scen[+sl.getAttribute('data-sload')].inputs);buildInputs();render();return;}
+ if(sd){scen.splice(+sd.getAttribute('data-sdel'),1);saveScen();render();return;}
+ if(p){state=Object.assign({},DEFAULTS,PRESETS[p.getAttribute('data-preset')]);buildInputs();render();}
+});
+$('langBtn').onclick=function(){lang=lang==='ar'?'en':'ar';buildStatic();render();};
+$('themeBtn').onclick=function(){var dark=theme?theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;theme=dark?'light':'dark';applyTheme();writeHash();};
+$('bCopy').onclick=function(){copyText(summaryText());};
+$('bCsv').onclick=function(){
+ var a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csvText()],{type:'text/csv;charset=utf-8'}));a.download='pmis-capacity-sizing.csv';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+};
+$('bScen').onclick=function(){
+ var name=(HDR.scen||'').trim()||('Scenario '+(scen.length+1)),i=scen.map(function(x){return x.name;}).indexOf(name);
+ var snap={name:name.slice(0,60),inputs:exportScenario().inputs};
+ if(i>=0)scen[i]=snap;else if(scen.length>=3){setMsg(tx('scenFull'),false);return;}else scen.push(snap);
+ saveScen();setMsg('',true);render();
+};
+$('bSave').onclick=function(){
+ var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(exportScenario(),null,2)],{type:'application/json'}));
+ a.download='gsdn-pmis-sizing-'+((HDR.scen||'scenario').replace(/[^\w\u0600-\u06FF-]+/g,'_'))+'.json';document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+};
+$('bLoad').onclick=function(){$('fLoad').click();};
+$('fLoad').onchange=function(){var f=this.files&&this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){importScenarioText(String(rd.result));};rd.readAsText(f);this.value='';};
+$('bPrint').onclick=function(){window.print();};
+window.addEventListener('hashchange',function(){readHash();applyTheme();buildStatic();render();});
+
+readHash();applyTheme();loadScen();buildStatic();render();
+</script>
+</body>
+</html>
