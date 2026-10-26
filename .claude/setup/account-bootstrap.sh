@@ -154,4 +154,13 @@ if git clone --depth 1 --filter=blob:none --sparse https://github.com/stablyai/o
   [ -d "$TMP/orca/skills/orca-cli" ] && { rm -rf "$SK/orca-cli"; cp -R "$TMP/orca/skills/orca-cli" "$SK/orca-cli"; }
 fi
 
+# --- 16) Agent Reach: read-only social/web reach (skill + CLI) -------------
+#     Reddit, X/Twitter, YouTube, Instagram, GitHub, LinkedIn jobs, etc.
+#     Read-only: no posting, no logging in on your behalf.
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/Panniantong/Agent-Reach.git "$TMP/ar" >/dev/null 2>&1; then
+  git -C "$TMP/ar" sparse-checkout set agent_reach/skill >/dev/null 2>&1 || true
+  [ -d "$TMP/ar/agent_reach/skill" ] && { rm -rf "$SK/agent-reach"; cp -R "$TMP/ar/agent_reach/skill" "$SK/agent-reach"; }
+fi
+command -v uv >/dev/null 2>&1 && uv tool install "git+https://github.com/Panniantong/Agent-Reach" >/dev/null 2>&1 || true
+
 echo "[account-bootstrap] done: $(ls "$SK" | wc -l) skills, $(ls "$AG" 2>/dev/null | wc -l) agents"
