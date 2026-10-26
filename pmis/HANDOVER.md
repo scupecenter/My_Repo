@@ -1,8 +1,8 @@
-# GSDN PMIS — Handover to the implementation developer
+# GSDN PMIS: Handover to the implementation developer
 
-> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس): القرارات، والمواصفات، ونموذج البيانات، وعقد الـAPI، والتصميم، ونماذج الطباعة. هذا الملف يشرح للمطوّر ما الموجود وأين، وكيف يشغّله، وما المطلوب منه في P1. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
+> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس): القرارات، والمواصفات، ونموذج البيانات، وعقد الـAPI (الإصدار 0.2.6)، والتصميم، ونماذج الطباعة. تطبيق الويب مبني على بيانات وهمية (MSW) حتى المرحلة 3b، ونشر إعدادات SLA والأوزان قيد التنفيذ. الفجوات بين العقد وقاعدة البيانات في `docs/handover/db-gaps.md`. هذا الملف يشرح للمطوّر ما الموجود وأين، وكيف يشغّله، وما المطلوب منه في P1. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
 
-Status on 2026-10-25: **phase P0 (Foundations) is complete.** Everything below is on `main` of this repository.
+Status on 2026-10-26: **phase P0 (Foundations) is complete.** The web app (`apps/web`) is built on MSW mocks through phase 3b; SLA and weights publish is in progress. Everything below is on `main` of this repository.
 Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
 
 ## 1. Read in this order
@@ -11,6 +11,7 @@ Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
 3. `docs/adr/0001`–`0010`: the architecture decisions (stack, auth, authorization and RLS, workflow engine, templates, logs, configuration versioning, files, metadata, versioned workflows).
 4. `docs/adr/P0-gate-report.md`: inconsistencies found, the security limits, and the **P1 breakdown** (§7, with order of work).
 5. `docs/spec/`: the task catalogue (`task-catalogue.csv`, 69 tasks), the business rules (`rules.md`), the user stories with acceptance criteria (`stories-*.md`), the staff registry spec, and `open-questions.md`.
+6. `docs/handover/db-gaps.md`: schema and SQL work that contract 0.2.5 and 0.2.6 need and the database does not have yet, as a checklist for database-engineer.
 
 ## 2. What exists
 
@@ -22,13 +23,15 @@ Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
 | ERD, seed plan | `db/erd.md`, `db/seed-plan.md` | |
 | Seeds | `db/seed/holidays-2026-2027.csv`, `db/seed/staff-registry.draft.csv` | Synthetic or tentative data. Real data comes from the owner later. |
 | Master import mapping | `tools/master-import/mapping.csv` | 187 Master columns mapped to fields |
-| API contract | `contracts/openapi.yaml` | OpenAPI 3.1 v0.1, 84 operations, lints clean with redocly. **Contract first:** no endpoint without it. |
+| API contract | `contracts/openapi.yaml` | OpenAPI 3.1 v0.2.6, 225 operations (`grep -c "operationId:" contracts/openapi.yaml`). Amendments 0.2.1 to 0.2.6 are in `docs/adr/0011-contract-v0.2.md`. **Contract first:** no endpoint without it. |
+| Web app | `apps/web` | React app on MSW mocks generated from the contract. Run: `cd apps/web && npm install && npm run dev`. Tests: `npm test`, `npm run e2e`. Scripts in `apps/web/package.json`. |
+| Capacity sizer | `tools/capacity-sizer/index.html` | Customer sizing tool, a single HTML page (Arabic, RTL). |
 | Design | `design/tokens.*`, `design/GSDN_PMIS_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
 | References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
 
-**Not started:** `apps/api/src` (NestJS code), `apps/web` (React app), `infra/` (Docker Compose), CI.
+**Not started:** `apps/api/src` (NestJS code), `infra/` (Docker Compose), CI.
 
 ## 3. How to run what exists
 - **Database:**
@@ -65,6 +68,14 @@ Next phase: **P1 (Core)**. Its task list is in `docs/adr/P0-gate-report.md` §7.
   - Reassignment by the lead never resets or pauses the SLA (B12b).
 - **Everything configurable is versioned and audited:** SLA, weights, workflow versions, fields, documents, templates, holidays. The structural freeze during the pilot and parallel run (B9).
 - **Audit log:** append-only, enforced in the database. Read access per B4.
+- **Deactivated or deleted users (B14):** open tasks stay on the person with a "deactivated" badge; the Team Lead is alerted at once and uses keep, reassign or act on behalf (B12b). A level with no eligible active holder goes to the System Admins' inbox as "no holder" (B10). The SLA never pauses or resets. A deleted account can be restored unless its employee ID or email now belongs to another account.
+- **Notification policy:** a matrix of notification type × role/group × channel, with thresholds in allowed ranges. Mandatory types (audit integrity failure, retention reduced) cannot be turned off; security and system types go to System Admins only.
+- **Security log:** separate from the Audit Log and the System Log, readable by System Admins or the `view_security_log` grant, and every read is audited. An identifier typed at sign-in that matches nobody is never stored as typed: only a masked keyed hash is kept.
+- **Log integrity:** the Audit Log and the security log are append-only hash chains; an admin check verifies each chain and lists any break.
+- **Online now:** admins see active sessions (status, last activity, current screen) and can end a user's sessions with a reason and step-up MFA. Background polling never extends the idle timeout.
+- **Log retention:** System Log and security log minimums are 90 and 365 days; reducing one needs a reason and step-up and raises a mandatory alert. The Audit Log stays 10 years and is not settable.
+- **Typed confirmation:** type the target's code or name, in addition to step-up MFA, to lift the structural freeze, publish a workflow version, or dismantle.
+- **No self-grant:** nobody can grant rights to themselves, by a delegation to a role or group they belong to, or by copying assignments to themselves (only a System Admin acting without delegation may do so).
 - **Synthetic data only** until the owner releases real data. Never commit secrets.
 
 ## 5. Needs people, not code

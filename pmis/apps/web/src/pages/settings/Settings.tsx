@@ -3,7 +3,9 @@ import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { Calendar } from './Calendar';
 import { Notifications } from './Notifications';
 import { Retention } from './Retention';
-import { Dlp, Freeze, Idle, SlaRules, WeightSets } from './Rules';
+import { Dlp, Freeze, Idle } from './Rules';
+import { SlaRules } from './SlaRules';
+import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
 
 export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility'] as const;

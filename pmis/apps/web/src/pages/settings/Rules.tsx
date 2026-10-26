@@ -1,68 +1,13 @@
 import { Lock, Unlock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDlp, useFreeze, useIdle, useLiftFreeze, usePublishDlp, useSetIdle, useSlaRules, useWeightSets } from '@/api/settings';
+import { useDlp, useFreeze, useIdle, useLiftFreeze, usePublishDlp, useSetIdle } from '@/api/settings';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
-import { weightIssues } from '@/lib/weights';
 import { FieldErr } from './Calendar';
 
 export const FREEZE_CONFIRM = 'structural-freeze';
-
-export function SlaRules() {
-  const { t } = useTranslation();
-  const q = useSlaRules();
-  return (
-    <section className="card overflow-x-auto p-4" data-testid="page-sla">
-      <h2 className="mb-1 font-bold">{t('rules.sla')}</h2>
-      <p className="mb-3 text-sm text-mute">{t('rules.sla_note')}</p>
-      <table className="w-full text-sm">
-        <thead className="text-mute"><tr>{['task', 'min', 'max', 'start', 'effective', 'open'].map((k) => <th key={k} className="p-2 text-start">{t(`rules.col_${k}`)}</th>)}</tr></thead>
-        <tbody data-testid="sla-list">
-          {(q.data ?? []).map((r) => (
-            <tr key={r.id} className="border-t border-line" data-testid={`sla-${r.task_code}`}>
-              <td className="mono p-2">{r.task_code}</td><td className="p-2">{r.min_working_days}</td><td className="p-2">{r.max_working_days}</td><td className="p-2">{r.start_event}</td><td className="mono p-2 text-xs">{r.effective_from}</td><td className="p-2">{r.open_task_count ?? 0}</td>
-            </tr>))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-export function WeightSets() {
-  const { t } = useTranslation();
-  const q = useWeightSets();
-  return (
-    <div className="space-y-4" data-testid="page-weights">
-      <p className="text-sm text-mute">{t('rules.weights_note')}</p>
-      {(q.data ?? []).map((w) => {
-        const issues = weightIssues(w), top = issues.find((i) => i.level === 'activities');
-        return (
-          <section key={w.id} className="card p-4" data-testid={`weights-${w.code}`}>
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <h2 className="me-auto font-bold">{t(`rules.set_${w.code}`)} <span className="mono text-xs text-mute">v{w.version}</span></h2>
-              <span className={`chip ${w.status === 'published' ? 'bg-doneBg text-doneInk' : 'bg-waitBg text-waitInk'}`}>{t(`rules.status_${w.status}`)}</span>
-              <span className={`chip ${issues.length ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`} data-testid={`weights-valid-${w.code}`}>{issues.length ? t('rules.invalid') : t('rules.valid')}</span>
-              <button className="btn" data-testid={`weights-publish-${w.code}`} disabled title={issues.length ? t('rules.publish_blocked') : t('rules.publish_pending')}>{t('rules.publish')}</button>
-            </div>
-            <ul className="space-y-1 text-sm">
-              {w.activities.map((a) => {
-                const bad = issues.find((i) => i.activity === a.code);
-                return (
-                  <li key={a.code} data-testid={`weights-activity-${w.code}-${a.code}`}>
-                    <div className="flex gap-2"><span className="flex-1">{a.name_en}</span><span className="mono">{a.weight}%</span></div>
-                    {a.items.length > 0 && <ul className="ms-4 text-mute">{a.items.map((i) => <li key={i.code} className="flex gap-2"><span className="flex-1">{i.name_en}</span><span className="mono">{i.weight}%</span></li>)}</ul>}
-                    {bad && <p role="alert" className="ms-4 text-xs text-lateInk" data-testid={`weights-error-${w.code}-${a.code}`}>{t('rules.sum_items', { sum: bad.sum })}</p>}
-                  </li>);
-              })}
-            </ul>
-            {top && <p role="alert" className="mt-2 text-sm font-semibold text-lateInk" data-testid={`weights-error-${w.code}`}>{t('rules.sum_activities', { sum: top.sum })}</p>}
-          </section>);
-      })}
-    </div>
-  );
-}
 
 export function Freeze() {
   const { t } = useTranslation();

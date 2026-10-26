@@ -72,16 +72,6 @@ describe('work calendar', () => {
 });
 
 describe('rules screens', () => {
-  it('weight sets show the sum error per level and block publishing', async () => {
-    await signIn('pm');
-    settings('weights');
-    expect(await screen.findByTestId('weights-valid-project_status')).toHaveTextContent('100%');
-    expect(screen.getByTestId('weights-error-health_index')).toHaveTextContent('90%');
-    expect(screen.getByTestId('weights-error-health_index-h1')).toHaveTextContent('90%');
-    expect(screen.queryByTestId('weights-error-project_status')).toBeNull();
-    expect(screen.getByTestId('weights-publish-health_index')).toBeDisabled();
-  });
-
   it('lifting the freeze needs the typed confirmation, a reason and step-up', async () => {
     await signIn('pm');
     const u = userEvent.setup();
@@ -435,5 +425,158 @@ describe('staff field visibility', () => {
     const card = await api.get<{ email: string | null; hidden_fields: string[] }>('/staff-registry/1103');
     expect(card.email).toBeNull();
     expect(card.hidden_fields).toContain('email');
+  });
+});
+
+const setNum = async (u: ReturnType<typeof userEvent.setup>, testid: string, v: string) => { const el = await screen.findByTestId(testid); await u.clear(el); await u.type(el, v); };
+const today = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Tripoli' }).format(new Date());
+
+describe('SLA rule sets', () => {
+  it('draft, inline min>max, save, preview, publish with apply off by default and step-up', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    settings('sla');
+    await screen.findByTestId('sla-version-2');
+    await u.click(screen.getByTestId('sla-create-draft'));
+    await reasonAndSave(u, 'sla-create-dialog', 'Tighten A2');
+    expect(await screen.findByTestId('sla-editor-status')).toHaveTextContent('Draft');
+    // The start event is a picker of the workflow's task, milestone and gate codes.
+    const start = (await screen.findByTestId('sla-start-A2')) as HTMLSelectElement;
+    await waitFor(() => expect(within(start).getAllByRole('group').map((g) => g.getAttribute('label'))).toEqual(['Tasks', 'Milestones', 'Gates']));
+    await setNum(u, 'sla-min-D14', '9');
+    expect(screen.getByTestId('sla-err-D14')).toHaveTextContent('minimum must not exceed');
+    expect(screen.getByTestId('sla-save')).toBeDisabled();
+    await setNum(u, 'sla-min-D14', '2');
+    await waitFor(() => expect(screen.queryByTestId('sla-err-D14')).toBeNull());
+    await u.click(screen.getByTestId('sla-ovr-add-A2'));
+    await setNum(u, 'sla-ovr-max-A2-0', '1');
+    expect(screen.getByTestId('sla-err-A2-o0')).toBeInTheDocument();
+    await u.click(screen.getByTestId('sla-ovr-remove-A2-0'));
+    await setNum(u, 'sla-max-A2', '6');
+    await u.click(screen.getByTestId('sla-save'));
+    await reasonAndSave(u, 'sla-save-dialog', 'A2 gets one more day');
+    await waitFor(() => expect(screen.queryByTestId('sla-dirty')).toBeNull());
+    await u.click(screen.getByTestId('sla-preview'));
+    expect(await screen.findByTestId('sla-preview-changed')).toHaveTextContent('14');
+    await u.click(screen.getByTestId('sla-preview-dialog-submit'));
+    await u.click(screen.getByTestId('sla-publish'));
+    expect(screen.getByTestId('sla-publish-apply')).not.toBeChecked();
+    expect(screen.getByTestId('sla-publish-warning')).toHaveTextContent('Closed tasks never change');
+    expect(screen.getByTestId('sla-publish-date')).toHaveValue(today());
+    await reasonAndSave(u, 'sla-publish-dialog', 'Approved by the PM');
+    await waitFor(() => expect(screen.getByTestId('sla-version-3')).toHaveTextContent('Published'));
+    expect(screen.getByTestId('sla-version-3')).toHaveTextContent('Not applied');
+    expect(screen.getAllByTestId('toast').at(-1)).toHaveTextContent('0 open tasks');
+  });
+
+  it('server rules: 409 on a second draft, min>max, unknown start event, past date, same date twice, delegate restriction', async () => {
+    await signIn('pm'); await stepUpDone();
+    const d = await api.post<{ id: string }>('/settings/sla-rule-sets', { body: { reason: 'because' } });
+    expect(await errCode(api.post('/settings/sla-rule-sets', { body: { reason: 'because' } }))).toBe('409:duplicate');
+    const rule = { task_code: 'A2', min_working_days: 5, max_working_days: 3, start_event: 'site_release', calendar_code: 'LY' };
+    const err = (e: ApiError) => (e.problem as unknown as { errors: { path: string; code: string }[] }).errors;
+    const e1 = await api.patch(`/settings/sla-rule-sets/${d.id}`, { version: 1, body: { reason: 'because', rules: [rule] } }).catch((e: ApiError) => err(e));
+    expect(e1).toEqual([{ path: '/rules/0/max_working_days', code: 'min_exceeds_max' }]);
+    const e2 = await api.patch(`/settings/sla-rule-sets/${d.id}`, { version: 1, body: { reason: 'because', rules: [{ ...rule, min_working_days: 1, start_event: 'nope' }] } }).catch((e: ApiError) => err(e));
+    expect(e2).toEqual([{ path: '/rules/0/start_event', code: 'unknown_start_event' }]);
+    expect(await errCode(api.patch(`/settings/sla-rule-sets/${d.id}`, { body: { reason: 'because', rules: [rule] } }))).toBe('428:precondition_required');
+    await api.patch(`/settings/sla-rule-sets/${d.id}`, { version: 1, body: { reason: 'because', rules: [{ ...rule, min_working_days: 1, max_working_days: 6 }] } });
+    const pub = (body: object) => api.post(`/settings/sla-rule-sets/${d.id}/publish`, { version: 2, body });
+    expect(await errCode(pub({ effective_date: '2020-01-01', reason: 'because' }))).toBe('422:validation_failed');
+    await api.post('/__mock/acting-delegate', { body: { on: true } });
+    expect(await errCode(pub({ effective_date: today(), reason: 'because', apply_to_open_tasks: true }))).toBe('403:action_forbidden');
+    await api.post('/__mock/acting-delegate', { body: { on: false } });
+    const done = await pub({ effective_date: today(), reason: 'because', apply_to_open_tasks: true }) as { affected_open_tasks: number };
+    expect(done.affected_open_tasks).toBe(14);
+  });
+});
+
+describe('weight sets', () => {
+  it('the draft shows live sums per level and the publish refuses with the paths of the contract', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    settings('weights');
+    await u.selectOptions(await screen.findByTestId('weights-code'), 'health_index');
+    expect(await screen.findByTestId('weights-sum-activities')).toHaveTextContent('90%');
+    expect(screen.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'false');
+    expect(screen.getByTestId('weights-error-health_index')).toHaveTextContent('90%');
+    expect(screen.getByTestId('weights-sum-items-h1')).toHaveTextContent('90%');
+    await u.click(screen.getByTestId('weights-preview'));
+    expect(await screen.findByTestId('weights-preview-valid')).toHaveAttribute('data-valid', 'false');
+    expect(screen.getByTestId('weights-preview-error--activities')).toHaveAttribute('data-code', 'weights_must_total_100');
+    expect(screen.getByTestId('weights-preview-error--activities-0-items')).toBeInTheDocument();
+    await u.click(screen.getByTestId('weights-preview-dialog-submit'));
+    await u.click(screen.getByTestId('weights-publish-health_index'));
+    await reasonAndSave(u, 'weights-publish-dialog');
+    expect(await screen.findByTestId('weights-publish-error--activities')).toHaveAttribute('data-code', 'weights_must_total_100');
+    expect(screen.getByTestId('weights-publish-error--activities-0-items')).toBeInTheDocument();
+    // Fix both levels: the sums turn to 100% before anything is saved.
+    await u.click(within(screen.getByTestId('weights-publish-dialog')).getByRole('button', { name: 'Cancel' }));
+    await setNum(u, 'weights-weight-h2', '50');
+    await setNum(u, 'weights-item-weight-h1_2', '30');
+    expect(screen.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'true');
+    expect(screen.getByTestId('weights-sum-items-h1')).toHaveAttribute('data-ok', 'true');
+    expect(screen.queryByTestId('weights-error-health_index')).toBeNull();
+  });
+
+  it('draft from the set in force, edit weights and an item, save, preview, publish, and a new version appears', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    settings('weights');
+    await u.click(await screen.findByTestId('weights-create-draft'));
+    expect(within(screen.getByTestId('weights-base')).getByText(/v2/)).toBeInTheDocument();
+    await reasonAndSave(u, 'weights-create-dialog', 'Shift 1 point to CW');
+    await setNum(u, 'weights-weight-a3', '6');
+    expect(await screen.findByTestId('weights-sum-activities')).toHaveTextContent('101%');
+    await setNum(u, 'weights-weight-a1', '11');
+    expect(screen.getByTestId('weights-sum-activities')).toHaveTextContent('100%');
+    await u.clear(screen.getByTestId('weights-item-unit-a3_1')); await u.type(screen.getByTestId('weights-item-unit-a3_1'), 'm2');
+    await u.click(screen.getByTestId('weights-save'));
+    await reasonAndSave(u, 'weights-save-dialog', 'Saving the draft');
+    await waitFor(() => expect(screen.getByTestId('weights-publish-project_status')).toBeEnabled());
+    await u.click(screen.getByTestId('weights-preview'));
+    expect(await screen.findByTestId('weights-preview-valid')).toHaveAttribute('data-valid', 'true');
+    expect(screen.getByTestId('weights-preview-progress')).toBeInTheDocument();
+    await u.click(screen.getByTestId('weights-preview-dialog-submit'));
+    await u.click(screen.getByTestId('weights-publish-project_status'));
+    await reasonAndSave(u, 'weights-publish-dialog', 'Owner approved');
+    await waitFor(() => expect(screen.getByTestId('weights-version-project_status-4')).toHaveTextContent('Current'));
+    expect(screen.getByTestId('weights-version-project_status-3')).not.toHaveTextContent('Current');
+  });
+
+  it('a draft can start from an older set and the API refuses a second draft, a bad weight and an unknown key', async () => {
+    await signIn('pm'); await stepUpDone();
+    const old = (await api.get<{ items: { id: string; version: number }[] }>('/settings/weight-sets', { query: { code: 'project_status' } })).items.find((x) => x.version === 2)!;
+    const d = await api.post<{ id: string; activities: { weight: number }[] }>('/settings/weight-sets', { body: { code: 'project_status', base_set_id: old.id, reason: 'go back' } });
+    expect(d.activities.map((a) => a.weight)).toEqual([10, 10, 10, 20, 20, 10, 15, 5]);
+    expect(await errCode(api.post('/settings/weight-sets', { body: { code: 'project_status', reason: 'again' } }))).toBe('409:duplicate');
+    const act = (w: number) => ({ code: 'x', name_en: 'X', weight: w });
+    expect(await errCode(api.put(`/settings/weight-sets/${d.id}`, { version: 1, body: { reason: 'because', activities: [act(100.0001)] } }))).toBe('422:validation_failed');
+    expect(await errCode(api.put(`/settings/weight-sets/${d.id}`, { version: 1, body: { reason: 'because', extra: 1, activities: [act(50)] } }))).toBe('422:validation_failed');
+    await api.put(`/settings/weight-sets/${d.id}`, { version: 1, body: { reason: 'because', activities: [act(50)] } }); // saved although the total is not 100
+  });
+});
+
+describe('holiday import needs a reason', () => {
+  it('the API answers 422 without a reason and accepts the file with one', async () => {
+    await signIn('pm');
+    const file = () => new File(['date,name\n2026-12-30,Test\n'], 'h.csv', { type: 'text/csv' });
+    const fd = new FormData(); fd.append('file', file());
+    expect(await errCode(api.post('/settings/holidays/import', { body: fd }))).toBe('422:validation_failed');
+    const ok = new FormData(); ok.append('file', file()); ok.append('reason', 'Official list 2026');
+    await expect(api.post('/settings/holidays/import', { body: ok })).resolves.toBeTruthy();
+  });
+
+  it('the dialog asks for the reason before it uploads', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    settings('calendar');
+    await u.upload(await screen.findByTestId('cal-import-file'), new File(['date,name_en\n2026-12-30,Test\n'], 'h.csv', { type: 'text/csv' }));
+    expect(await screen.findByTestId('holiday-import-name')).toHaveTextContent('h.csv');
+    await u.click(screen.getByTestId('holiday-import-dialog-submit'));
+    expect(await screen.findByTestId('holiday-import-dialog-reason-error')).toBeInTheDocument();
+    await reasonAndSave(u, 'holiday-import-dialog', 'Official list 2026');
+    await waitFor(() => expect(screen.queryByTestId('holiday-import-dialog')).toBeNull());
+    expect(screen.getByTestId('toast')).toHaveTextContent('imported');
   });
 });

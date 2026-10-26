@@ -496,8 +496,8 @@ const PARTS = ([
   ['sites', 'Sites and milestones', 'المواقع والمعالم', 'Sites'], ['milestones', 'Milestones', 'المعالم', 'Milestones'], ['tasks', 'Tasks by stage', 'المهام حسب المرحلة', 'Tasks'], ['project_status', 'Project Status', 'حالة المشروع', 'Project Status'],
 ] as const).map(([key, label_en, label_ar, master_sheet]) => ({ key, label_en, label_ar, master_sheet }));
 const COLUMNS: Record<string, string[]> = {
-  sites: ['site_code', 'site_name', 'region', 'delivery_scenario', 'overall_status', 'current_milestone'],
-  tasks: ['site_code', 'task_code', 'task_name', 'task_state', 'planned_date', 'actual_date', 'sla_due_date'],
+  sites: ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage', 'progress_pct', 'health_index'],
+  tasks: ['site_code', 'task_code', 'task_name', 'stage', 'task_state', 'holder', 'due_date', 'sla_status', 'approved_at'],
 };
 // A reviewer lacks the export grant for the commercial registers.
 const denied = (): string[] => (viewer()?.key === 'pm' ? [] : ['procurement', 'contractors', 'warehouse']);

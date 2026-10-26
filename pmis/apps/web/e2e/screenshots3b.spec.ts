@@ -16,8 +16,10 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('nav-admin.settings').click();
     await page.getByTestId('holiday-2026-11-03').waitFor();
     await shot('settings-calendar');
-    await page.getByTestId('settings-tab-sla').click(); await page.getByTestId('sla-A2').waitFor(); await shot('settings-sla');
-    await page.getByTestId('settings-tab-weights').click(); await page.getByTestId('weights-error-health_index').waitFor(); await shot('settings-weights');
+    await page.getByTestId('settings-tab-sla').click(); await page.getByTestId('sla-create-draft').click();
+    await page.getByTestId('sla-create-dialog-reason').fill('Tighten A2'); await page.getByTestId('sla-create-dialog-submit').click();
+    await page.getByTestId('sla-ovr-add-A2').click(); await page.getByTestId('sla-max-A2').fill('6'); await page.getByTestId('sla-A2').waitFor(); await shot('settings-sla');
+    await page.getByTestId('settings-tab-weights').click(); await page.getByTestId('weights-code').selectOption('health_index'); await page.getByTestId('weights-error-health_index').waitFor(); await shot('settings-weights');
     await page.getByTestId('settings-tab-freeze').click(); await page.getByTestId('freeze-lift').waitFor(); await shot('settings-freeze');
     await page.getByTestId('settings-tab-dlp').click(); await page.getByTestId('dlp-version-2').waitFor(); await shot('settings-dlp');
     await page.getByTestId('settings-tab-idle').click(); await page.getByTestId('idle-days').waitFor(); await shot('settings-idle');

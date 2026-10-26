@@ -1,3 +1,4 @@
+import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
@@ -10,7 +11,7 @@ import { TaskGrid } from '@/components/TaskGrid';
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
 
 // ExportColumnCode values (stable codes of the `tasks` part).
-const TASK_COLUMNS = ['site_code', 'task_code', 'task_name', 'task_state', 'planned_date', 'actual_date', 'sla_due_date'];
+const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
   const { t, i18n } = useTranslation();
