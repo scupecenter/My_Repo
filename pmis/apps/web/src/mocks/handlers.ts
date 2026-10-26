@@ -164,10 +164,11 @@ export const handlers = [
     if (!viewer()) return problem(401, 'unauthenticated', 'Sign in required');
     const s = STAFF.find((x) => x.employee_id === params.id);
     if (!s) return problem(404, 'not_found', 'Not in the registry');
-    const hidden = s.employee_id === '1104' ? (['phone'] as const) : [];
+    const vis = db().cfg.visibility.fields, admin = viewer()?.key === 'pm';
+    const hidden = [...new Set([...(s.employee_id === '1104' ? ['phone'] : []), ...(db().cfg.hidden[s.employee_id] ?? []), ...(['email', 'phone'] as const).filter((f) => !vis[f].default_visible && !admin)])] as ('phone' | 'email')[];
     return HttpResponse.json({
       employee_id: s.employee_id, name_en: s.name_en, name_ar: s.name_ar, position: s.position, team: s.team, region: s.region,
-      status: s.status === 'active' ? 'active' : 'inactive', email: s.email, phone: hidden.length ? null : s.phone, hidden_fields: hidden, version: 1,
+      status: s.status === 'active' ? 'active' : 'inactive', email: hidden.includes('email') ? null : s.email, phone: hidden.includes('phone') ? null : s.phone, hidden_fields: hidden, version: 1,
     });
   }),
 

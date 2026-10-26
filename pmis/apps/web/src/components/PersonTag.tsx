@@ -2,16 +2,25 @@ import * as HoverCard from '@radix-ui/react-hover-card';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStaffCard } from '@/api/hooks';
+import type { UserAccountStatus } from '@/api/types';
 
 /** Name with the 4-digit employee ID beside it; hover or focus the ID for the registry card (visibility applied server-side). */
-export function PersonTag({ name, employeeId }: { name: string; employeeId?: string | null }) {
+export function PersonTag({ name, employeeId, status }: { name: string; employeeId?: string | null; status?: UserAccountStatus }) {
   if (!employeeId) return <span>{name}</span>;
   return (
     <span className="inline-flex items-baseline gap-1">
       <span>{name}</span>
       <IdBadge employeeId={employeeId} />
+      <AccountBadge status={status} employeeId={employeeId} />
     </span>
   );
+}
+
+/** B14: "deactivated" / "deleted" beside a person who still holds a task. Nothing for active accounts. */
+export function AccountBadge({ status, employeeId }: { status?: UserAccountStatus; employeeId: string }) {
+  const { t } = useTranslation();
+  if (!status || status === 'active') return null;
+  return <span className="chip bg-lockBg text-lockInk" data-testid={`holder-status-${employeeId}`}>{t(`holderStatus.${status}`)}</span>;
 }
 
 export function IdBadge({ employeeId }: { employeeId: string }) {

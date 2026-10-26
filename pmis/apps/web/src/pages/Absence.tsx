@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAbsences, useAlerts, useCreateAbsence, useDeleteAbsence, useReassign } from '@/api/admin';
 import { useMe } from '@/api/hooks';
+import { useActOnBehalf } from '@/api/settings';
 import type { Absence as AbsenceT, ReassignmentAlert, UserPickerItem } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
@@ -12,6 +13,27 @@ import { useToast } from '@/components/Toast';
 const KINDS = ['annual', 'sick', 'emergency', 'other'] as const;
 type Decision = 'reassign' | 'act_on_behalf' | 'keep';
 type Scope = 'task' | 'site' | 'person';
+
+/** B12b choice 3: the lead performs the current level through POST /tasks/{id}/act-on-behalf (reason mandatory). */
+function ActDialog({ alert, onClose }: { alert: ReassignmentAlert; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const m = useActOnBehalf();
+  const st = alert.task.state;
+  const [action, setAction] = useState<'submit' | 'review' | 'approve' | 'reject'>(st === 'in_approval' ? 'approve' : st === 'in_review' ? 'review' : 'submit');
+  const [note, setNote] = useState('');
+  return (
+    <FormDialog open onClose={onClose} testid="cover-dialog" title={t('cover.decision_act_on_behalf')} disabled={action === 'reject' && !note.trim()} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
+      submitLabel={t('cover.do_act_on_behalf')}
+      onSubmit={(reason) => m.mutate({ taskId: alert.task.id, version: alert.task.version, body: { action, level: alert.task.current_level ?? 1, reason, ...(action === 'reject' ? { note: note.trim() } : {}) } }, { onSuccess: () => { toast(t('cover.done', { count: 1 })); onClose(); } })}>
+      <label className="block text-sm font-semibold">{t('cover.action')}
+        <select className="input mt-1 font-normal" data-testid="cover-action" value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
+          {(['submit', 'review', 'approve', 'reject'] as const).map((a) => <option key={a} value={a}>{t(`cover.action_${a}`)}</option>)}</select></label>
+      {action === 'reject' && <label className="block text-sm font-semibold">{t('cover.note')}<input className="input mt-1 font-normal" data-testid="cover-note" value={note} onChange={(e) => setNote(e.target.value)} /></label>}
+      <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="cover-sla-note">{t('cover.on_behalf_note')}</p>
+    </FormDialog>
+  );
+}
 
 function CoverDialog({ alert, decision, onClose }: { alert: ReassignmentAlert; decision: Decision; onClose: () => void }) {
   const { t } = useTranslation();
@@ -34,7 +56,7 @@ function CoverDialog({ alert, decision, onClose }: { alert: ReassignmentAlert; d
   );
 }
 
-function AlertList({ cause }: { cause: 'absent' | 'idle' }) {
+function AlertList({ cause }: { cause: 'absent' | 'idle' | 'holder_deactivated' }) {
   const { t, i18n } = useTranslation();
   const q = useAlerts(cause);
   const [act, setAct] = useState<null | { alert: ReassignmentAlert; decision: Decision }>(null);
@@ -47,13 +69,13 @@ function AlertList({ cause }: { cause: 'absent' | 'idle' }) {
           <li key={a.task.id} className="flex flex-wrap items-center gap-2 py-2 text-sm" data-testid={`alert-${a.task.id}`}>
             <span className="min-w-48 flex-1"><b className="mono">{a.task.site_code}</b> {a.task.task_code} · {(i18n.language === 'ar' && a.task.name_ar) || a.task.name_en}</span>
             {a.holder && <PersonTag name={a.holder.display_name} employeeId={a.holder.employee_id} />}
-            {a.cause === 'absent' ? <span className="chip bg-lateBg text-lateInk">{t('cover.absent')}</span> : <span className="chip bg-waitBg text-waitInk">{t('cover.idle_days', { count: a.idle_working_days ?? 0 })}</span>}
+            {a.cause === 'absent' ? <span className="chip bg-lateBg text-lateInk">{t('cover.absent')}</span> : a.cause === 'holder_deactivated' ? <span className="chip bg-lockBg text-lockInk" data-testid={`alert-status-${a.task.id}`}>{t(`holderStatus.${a.holder_account_status ?? 'deactivated'}`)}</span> : <span className="chip bg-waitBg text-waitInk">{t('cover.idle_days', { count: a.idle_working_days ?? 0 })}</span>}
             {(['keep', 'reassign', 'act_on_behalf'] as const).map((d) => <button key={d} className="btn" data-testid={`alert-${d}-${a.task.id}`} onClick={() => setAct({ alert: a, decision: d })}>{t(`cover.decision_${d}`)}</button>)}
           </li>
         ))}
         {q.isSuccess && !items.length && <li className="py-3 text-mute" data-testid={`alerts-empty-${cause}`}>{t('cover.none')}</li>}
       </ul>
-      {act && <CoverDialog {...act} onClose={() => setAct(null)} />}
+      {act && (act.decision === 'act_on_behalf' ? <ActDialog alert={act.alert} onClose={() => setAct(null)} /> : <CoverDialog {...act} onClose={() => setAct(null)} />)}
     </section>
   );
 }
@@ -105,7 +127,7 @@ export function Absence() {
           </ul>
         </section>
       </div>
-      {lead && <><AlertList cause="absent" /><AlertList cause="idle" /></>}
+      {lead && <><AlertList cause="holder_deactivated" /><AlertList cause="absent" /><AlertList cause="idle" /></>}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { Download } from 'lucide-react';
 import { useState } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { downloadExport, useExportParts, useExports, useStartExport } from '@/api/admin';
+import { downloadExport, useExportColumns, useExportParts, useExports, useStartExport } from '@/api/admin';
 import { ApiError } from '@/api/client';
 import type { ExportPartKey, MasterExport, MasterExportRequest } from '@/api/types';
 import { useRegions } from '@/api/sites';
@@ -89,8 +89,10 @@ export function ExportViewButton({ source, filters, columns, sort, testid }: { s
   const toast = useToast();
   const start = useStartExport();
   const label = (k: string) => k;
+  // Send only column codes the part really offers (GET /exports/parts?include_columns=true); a code outside it would be a 422.
+  const offered = useExportColumns(source);
   return (
-    <button className="btn" data-testid={testid} disabled={start.isPending} onClick={() => start.mutate({ view: { source, filters, columns, ...(sort ? { sort } : {}) } }, {
+    <button className="btn" data-testid={testid} disabled={start.isPending} onClick={() => start.mutate({ view: { source, filters, columns: offered ? columns.filter((c) => offered.includes(c)) : columns, ...(sort ? { sort } : {}) } }, {
       onSuccess: () => toast(t('export.view_started')), onError: (e) => toast(exportError(e, t, label), 'err'),
     })}><Download size={16} />{t('export.view')}</button>
   );
