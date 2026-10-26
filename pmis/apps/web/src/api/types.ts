@@ -91,3 +91,24 @@ export type MatrixAssigneeT = S['MatrixAssignee'];
 export type Job = S['Job'];
 export type ExportColumnCode = S['ExportColumnCode'];
 export type TransitionResultT = S['TransitionResult'];
+
+// ---- contract 0.2.6
+export type SlaRuleSetSummary = S['SlaRuleSetSummary'];
+// openapi-typescript turns the anyOf of SlaRuleOverride into `unknown`, so the override shape is written out here.
+export type SlaRuleOverride = { scenario?: S['DeliveryScenario']; region_id?: S['RegionId']; min_working_days: number; max_working_days: number };
+export type SlaTaskRule = Omit<S['SlaTaskRule'], 'overrides'> & { overrides?: SlaRuleOverride[] };
+export type SlaRuleSet = Omit<S['SlaRuleSet'], 'rules'> & { rules: SlaTaskRule[] };
+export type SlaPublishPreview = S['SlaPublishPreview'];
+export type SlaRuleSetPublishResult = S['SlaRuleSetPublishResult'];
+export type WeightSetCode = S['WeightSetCode'];
+export type WeightSetInput = S['WeightSetInput'];
+export type WeightSetPreview = S['WeightSetPreview'];
+export type WeightSetPublishResult = S['WeightSetPublishResult'];
+export type WorkflowVersionSummary = S['WorkflowVersionSummary'];
+export type WorkflowVersion = S['WorkflowVersion'];
+export type TaskDefinition = S['TaskDefinition'];
+export type DeliveryScenario = S['DeliveryScenario'];
+export type SitesExportColumnCode = S['SitesExportColumnCode'];
+export type TasksExportColumnCode = S['TasksExportColumnCode'];
+export type WorkflowMilestone = S['WorkflowMilestone'];
+export type WorkflowGate = S['WorkflowGate'];

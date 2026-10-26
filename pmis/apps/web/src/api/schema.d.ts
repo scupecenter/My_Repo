@@ -1558,6 +1558,104 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/sla-rule-sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SLA rule set versions with who, when and why (newest first)
+         * @description One item per version of the whole SLA rule set (a draft, the version in force, earlier and future-dated versions). The per-task rows stay in `GET /settings/sla-rules`.
+         *     Needs `view` on `admin.settings` (System Admin or a delegate holding `settings.edit`).
+         */
+        get: operations["listSlaRuleSets"];
+        put?: never;
+        /**
+         * Create the draft rule set (a copy of the version in force)
+         * @description Needs the `settings` permission or a delegation of it (`settings.edit`). Only one draft exists at a time, a second one is 409 `duplicate`.
+         *     A light change (B9): allowed during the structural freeze.
+         */
+        post: operations["createSlaRuleSetDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-rule-sets/{set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["SlaRuleSetId"];
+            };
+            cookie?: never;
+        };
+        /** One version with its rules (per task, with overrides) */
+        get: operations["getSlaRuleSet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change rules in the draft
+         * @description Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+         *     Each item of `rules` replaces the whole rule of its `task_code` (the base min and max, the start event, the calendar and all its overrides). Tasks not listed keep the rule copied from the version in force.
+         *     **Validation (422 `validation_failed`, closed schema, `errors[].path` is a JSON pointer into the body):** `min_working_days` must not exceed `max_working_days`, in the base rule and in every override (`code` = `min_exceeds_max`, path of `max_working_days`); `unknown_task_code`; `unknown_start_event`; `unknown_calendar`; `duplicate_task_code`; `duplicate_override` (same scenario and region twice).
+         *     Rule found for a task: most specific override wins (scenario and region, then region, then scenario, then the base rule).
+         *     Audited with before and after values and the reason.
+         */
+        patch: operations["updateSlaRuleSetDraft"];
+        trace?: never;
+    };
+    "/settings/sla-rule-sets/{set_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry run, how many open tasks would change due date if the draft were applied to them
+         * @description Changes nothing and is not audited as a change. Runs the same validation as the publish (422 with the same `errors[]`). The result assumes `apply_to_open_tasks = true`, which is the only case where open tasks change; with `false`, the publish changes none.
+         *     Closed (approved) tasks are never counted. Needs `settings.edit`.
+         */
+        post: operations["previewSlaRuleSetPublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-rule-sets/{set_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish the draft as a new SLA version
+         * @description Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+         *     Tasks opened on or after `effective_date` use the new version. **A task keeps the SLA version in force when it opened**, so past KPIs and closed tasks never change. Only when `apply_to_open_tasks` is true are the SLA rule and due date of the open (not approved) tasks switched to the new version, by a `sla_recalculation` job that runs at once when `effective_date` is today and on that date otherwise; the start date of each task is not changed.
+         *     A regional delegate can apply it only to open tasks in their delegated regions (403 `action_forbidden` otherwise).
+         *     **Validation (422 `validation_failed`):** the same as the draft; `effective_date_in_past` (path `/effective_date`, earlier than today in Africa/Tripoli); `effective_date_not_after_current` (not later than the `effective_from` of the latest published version); a draft equal to the version in force is `no_changes`.
+         *     Audited with before and after values (rules, effective date, `apply_to_open_tasks`, number of tasks affected, `bulk_action_id` of the re-pointing).
+         */
+        post: operations["publishSlaRuleSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/weight-sets": {
         parameters: {
             query?: never;
@@ -1565,10 +1663,88 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Weight sets (Project Status, health index, delay attribution) */
+        /**
+         * Weight sets (Project Status, health index, delay attribution), also the version history
+         * @description All versions of each set, newest first, each with who changed it, when and why (`changed_by`, `created_at`, `published_at`, `reason`). Without `status` the drafts are included.
+         */
         get: operations["listWeightSets"];
         put?: never;
+        /**
+         * Create a draft weight set (a copy of the set in force, or of an older one)
+         * @description Needs the `settings` permission or a delegation of it (`settings.edit`). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
+         *     `base_set_id` copies another set of the same `code` (for example an older set to go back to it); omitted means the set in force.
+         */
+        post: operations["createWeightSetDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/weight-sets/{set_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["WeightSetId"];
+            };
+            cookie?: never;
+        };
+        /** One weight set version with its activities and items */
+        get: operations["getWeightSet"];
+        /**
+         * Replace the activities and items of a draft
+         * @description Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+         *     Closed schema (an unknown key is 422 `validation_failed`). Each weight is 0 to 100 with at most 3 decimals; an item with weight 0 is not weighted. **A draft may be saved while its totals are not 100**, because the screen shows the live sum while the admin works; the 100% rule is enforced by the preview (reports it) and by the publish (refuses it).
+         *     Audited with before and after values and the reason.
+         */
+        put: operations["replaceWeightSetDraft"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/weight-sets/{set_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check the 100% rule and show the effect of the draft on current progress
+         * @description Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `settings.edit`.
+         *     `progress_current_pct` is the project progress with the set in force and `progress_new_pct` with the draft. Saved weekly snapshots are not part of the preview and never change.
+         */
+        post: operations["previewWeightSetPublish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/weight-sets/{set_id}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Publish the draft as a new weight set version
+         * @description Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+         *     **100% rule, per level (422 `validation_failed`):** the activity weights of the set must total 100, and the items of every activity that has items must total 100 (tolerance 0.001). Each level that fails gives one `errors[]` entry with `code` = `weights_must_total_100`, `path` = `/activities` for the set level or `/activities/<index>/items` for the items of one activity, and the actual total in `message`.
+         *     Other 422 codes in `errors[].code`: `effective_date_in_past` (earlier than today in Africa/Tripoli), `effective_date_not_after_current` (not later than the `effective_from` of the latest published set of the same `code`), `no_changes`.
+         *     The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Current progress is recalculated with the new set by a `progress_recalculation` job (at once when the date is today, otherwise on that date). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
+         *     Audited with before and after values, the effective date and the reason.
+         */
+        post: operations["publishWeightSet"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2082,7 +2258,7 @@ export interface paths {
         put?: never;
         /**
          * Upload the TPL-HOLIDAYS template (creates an import batch)
-         * @description Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011).
+         * @description Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011). Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the batch changes. A missing or too short reason is 422 `validation_failed`.
          */
         post: operations["importHolidays"];
         delete?: never;
@@ -3411,7 +3587,7 @@ export interface paths {
         };
         /**
          * Project Status (ends at HOTO) with the weight-set version used
-         * @description Uses the active weight set, or `weight_set_version` to re-run with an older set for comparison. Weekly snapshots are never recomputed.
+         * @description Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed.
          */
         get: operations["getProjectStatus"];
         put?: never;
@@ -3517,7 +3693,7 @@ export interface components {
         Job: {
             id: string;
             /** @enum {string} */
-            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate" | "master_export" | "security_export";
+            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate" | "master_export" | "security_export" | "progress_recalculation";
             /** @enum {string} */
             status: "queued" | "running" | "done" | "failed";
             progress?: number;
@@ -3564,8 +3740,22 @@ export interface components {
             /** @description Present with `include_columns=true`. The columns a list screen may send in `ExportView.columns` (0.2.5). */
             columns?: components["schemas"]["ExportColumn"][];
         };
-        /** @description Stable, language-independent column code of a part, for example `site_code`, `region`, `ms_site_release_actual`. A custom field is `cf:<field code>`. Codes never change when a label is renamed. */
-        ExportColumnCode: string;
+        /**
+         * @description Column codes of the `sites` part that exist in every installation (0.2.6). Other columns of the part (milestone dates, scope flags) and custom fields have codes served by `GET /exports/parts?include_columns=true`.
+         * @enum {string}
+         */
+        SitesExportColumnCode: "site_code" | "site_name" | "region" | "scenario" | "overall_status" | "current_stage" | "progress_pct" | "health_index";
+        /**
+         * @description Column codes of the `tasks` part that exist in every installation (0.2.6). Custom fields on tasks are `cf:<field code>`.
+         * @enum {string}
+         */
+        TasksExportColumnCode: "site_code" | "task_code" | "task_name" | "stage" | "task_state" | "holder" | "due_date" | "sla_status" | "approved_at";
+        /**
+         * @description Stable, language-independent column code of a part. Codes never change when a label is renamed. A custom field is `cf:<field code>`.
+         *     Known codes (0.2.6): `sites` has `SitesExportColumnCode`, `tasks` has `TasksExportColumnCode`. The other parts (registers, `milestones`, `project_status`, `dismantle`) and the milestone and scope columns of `sites` use the same pattern, for example `ms_site_release_actual`; their codes are listed by `GET /exports/parts?include_columns=true`, so a client never guesses them.
+         *     A code is valid only for the part named in `ExportView.source` (the same `site_code` appears in `sites` and `tasks`).
+         */
+        ExportColumnCode: components["schemas"]["SitesExportColumnCode"] | components["schemas"]["TasksExportColumnCode"] | string;
         ExportColumn: {
             code: components["schemas"]["ExportColumnCode"];
             label_en: string;
@@ -4175,6 +4365,8 @@ export interface components {
             colour?: "green" | "amber" | "red" | "none";
             /** Format: uuid */
             rule_id?: string | null;
+            /** @description SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6). */
+            rule_set_version?: number | null;
         };
         TaskSummary: {
             /** Format: uuid */
@@ -4666,6 +4858,178 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        SlaStartEvent: string;
+        /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
+        SlaRuleOverride: {
+            scenario?: components["schemas"]["DeliveryScenario"];
+            region_id?: components["schemas"]["RegionId"];
+            /** @description Target (green). Must not exceed `max_working_days`, else 422 `min_exceeds_max`. */
+            min_working_days: number;
+            /** @description Limit. Above it the task is late. */
+            max_working_days: number;
+        } | unknown | unknown;
+        /** @description The SLA rule of one task in a rule set: base minimum and maximum in working days, the start event, the calendar and optional overrides. */
+        SlaTaskRule: {
+            task_code: string;
+            /** @description Target (green). Must not exceed `max_working_days`, else 422 `min_exceeds_max`. */
+            min_working_days: number;
+            /** @description Limit. Above it the task is late. */
+            max_working_days: number;
+            start_event: components["schemas"]["SlaStartEvent"];
+            /** @description A calendar of `GET /settings/calendars` (weekend days and holidays). */
+            calendar_code: string;
+            overrides?: components["schemas"]["SlaRuleOverride"][];
+        };
+        /** @description One version of the whole SLA rule set. Versions are numbered 1, 2, 3 and so on; the seed is version 1. */
+        SlaRuleSetSummary: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** @enum {string} */
+            status: "draft" | "published";
+            /** @description true for the published version in force today. */
+            is_active: boolean;
+            /**
+             * Format: date
+             * @description Null while a draft.
+             */
+            effective_from: string | null;
+            /** Format: date */
+            effective_to?: string | null;
+            /** @description The version the draft was copied from. */
+            base_version?: number | null;
+            /** @description The reason of the last change; for a published version, the reason given at publish. */
+            reason: string;
+            created_by: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            created_at: string;
+            published_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            published_at?: string | null;
+            /** @description The choice made at publish; null for a draft. */
+            apply_to_open_tasks?: boolean | null;
+            /** @description Open tasks switched to this version at publish; null for a draft. */
+            affected_open_tasks?: number | null;
+            rule_count: number;
+        };
+        SlaRuleSet: components["schemas"]["SlaRuleSetSummary"] & {
+            rules: components["schemas"]["SlaTaskRule"][];
+        };
+        SlaRuleSetPatch: {
+            reason: components["schemas"]["Reason"];
+            /** @description Each item replaces the whole rule of its `task_code`. */
+            rules: components["schemas"]["SlaTaskRule"][];
+        };
+        SlaRuleSetPublish: {
+            /**
+             * Format: date
+             * @description Today or later (Africa/Tripoli).
+             */
+            effective_date: string;
+            reason: components["schemas"]["Reason"];
+            /**
+             * @description false keeps every open task on the version it opened with; true switches them to the new version (preview first).
+             * @default false
+             */
+            apply_to_open_tasks: boolean;
+        };
+        SlaRuleSetPublishResult: {
+            rule_set: components["schemas"]["SlaRuleSetSummary"];
+            /** @description 0 when `apply_to_open_tasks` is false. Closed tasks keep their values. */
+            affected_open_tasks: number;
+            /** @description The `sla_recalculation` job (`GET /jobs/{job_id}`); null when no task is affected. */
+            recalculation_job_id?: string | null;
+        };
+        SlaPublishPreview: {
+            /** Format: uuid */
+            set_id: string;
+            /** Format: date */
+            effective_date: string;
+            /** @description Open (not approved) tasks in the caller's scope. */
+            open_tasks_total: number;
+            /** @description Open tasks whose due date would change. */
+            changed_due_date_count: number;
+            /** @description Of those, tasks not late today that would be late. */
+            became_late_count: number;
+            /** @description Of those, tasks late today that would no longer be late. */
+            no_longer_late_count: number;
+            by_task: {
+                task_code: string;
+                open_tasks: number;
+                changed: number;
+            }[];
+            samples: {
+                /** Format: uuid */
+                task_id: string;
+                site_code: string;
+                task_code: string;
+                /** Format: date */
+                due_date_before: string | null;
+                /** Format: date */
+                due_date_after: string | null;
+            }[];
+        };
+        /** @enum {string} */
+        WeightSetCode: "project_status" | "health_index" | "delay_attribution";
+        WeightItemInput: {
+            /** @description Stable code, for example `1.1`. Never reused for another item of the activity. */
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description Percent inside the activity, at most 3 decimals. 0 means not weighted. */
+            weight: number;
+            unit?: string | null;
+            /** @description How the item is measured (method and source columns). */
+            measure_rule?: string | null;
+            source?: string | null;
+        };
+        WeightActivityInput: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description Percent of the whole set, at most 3 decimals. Default for Project Status: 12, 8, 5, 25, 20, 12, 13, 5. */
+            weight: number;
+            /** @description Optional. When present and not empty they must total 100 to be published. */
+            items?: components["schemas"]["WeightItemInput"][];
+        };
+        WeightSetInput: {
+            reason: components["schemas"]["Reason"];
+            activities: components["schemas"]["WeightActivityInput"][];
+        };
+        WeightSetPublish: {
+            /**
+             * Format: date
+             * @description Today or later (Africa/Tripoli).
+             */
+            effective_date: string;
+            reason: components["schemas"]["Reason"];
+        };
+        WeightSetPublishResult: {
+            weight_set: components["schemas"]["WeightSet"];
+            /** Format: uuid */
+            previous_set_id?: string | null;
+            /** @description The `progress_recalculation` job (`GET /jobs/{job_id}`). */
+            recalculation_job_id?: string | null;
+        };
+        WeightSetPreview: {
+            valid: boolean;
+            /** @description Same entries as the 422 of the publish (`weights_must_total_100` per level and the others). */
+            errors: {
+                path: string;
+                code: string;
+                message?: string;
+            }[];
+            /** @description Project progress with the set in force. Null for a code that has no progress (health index, delay attribution). */
+            progress_current_pct: number | null;
+            /** @description Project progress with the draft. Null when `valid` is false. */
+            progress_new_pct: number | null;
+            activities?: {
+                code: string;
+                current_pct: number;
+                new_pct: number | null;
+            }[];
+        };
         SlaRule: {
             /** Format: uuid */
             id: string;
@@ -4685,10 +5049,13 @@ export interface components {
             /** Format: date-time */
             changed_at?: string;
             open_task_count?: number;
+            /** @description The SLA rule set version this row belongs to (0.2.6). */
+            set_version?: number;
         };
         WeightItem: {
             code: string;
             name_en: string;
+            name_ar?: string | null;
             weight: number;
             unit?: string | null;
             measure_rule?: string | null;
@@ -4707,9 +5074,17 @@ export interface components {
             /** Format: date */
             effective_to?: string | null;
             reason?: string | null;
+            /** @description true for the published set in force today (0.2.6). */
+            is_active?: boolean;
+            changed_by?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            created_at?: string;
+            /** Format: date-time */
+            published_at?: string | null;
             activities: {
                 code: string;
                 name_en: string;
+                name_ar?: string | null;
                 weight: number;
                 items: components["schemas"]["WeightItem"][];
             }[];
@@ -6285,6 +6660,8 @@ export interface components {
         IdempotencyKey: string;
         /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
         LivePoll: "1";
+        SlaRuleSetId: string;
+        WeightSetId: string;
         SessionId: string;
         UserId: string;
         GroupId: string;
@@ -9220,6 +9597,200 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    listSlaRuleSets: {
+        parameters: {
+            query?: {
+                status?: "draft" | "published";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SlaRuleSetSummary"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createSlaRuleSetDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Draft created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaRuleSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSlaRuleSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["SlaRuleSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rule set. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaRuleSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSlaRuleSetDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                set_id: components["parameters"]["SlaRuleSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlaRuleSetPatch"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaRuleSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    previewSlaRuleSetPublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["SlaRuleSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    effective_date: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaPublishPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    publishSlaRuleSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                set_id: components["parameters"]["SlaRuleSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SlaRuleSetPublish"];
+            };
+        };
+        responses: {
+            /** @description Published. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SlaRuleSetPublishResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listWeightSets: {
         parameters: {
             query?: {
@@ -9244,6 +9815,167 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    createWeightSetDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: components["schemas"]["WeightSetCode"];
+                    /** Format: uuid */
+                    base_set_id?: string;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Draft created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getWeightSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["WeightSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Weight set. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replaceWeightSetDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                set_id: components["parameters"]["WeightSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeightSetInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    previewWeightSetPublish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                set_id: components["parameters"]["WeightSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightSetPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    publishWeightSet: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path: {
+                set_id: components["parameters"]["WeightSetId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeightSetPublish"];
+            };
+        };
+        responses: {
+            /** @description Published. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeightSetPublishResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listCalendars: {
@@ -10288,6 +11020,7 @@ export interface operations {
                 "multipart/form-data": {
                     /** Format: binary */
                     file: string;
+                    reason: components["schemas"]["Reason"];
                 };
             };
         };
@@ -12955,6 +13688,8 @@ export interface operations {
                 site_id?: string;
                 group_by?: "none" | "region" | "site";
                 weight_set_version?: number;
+                /** @description Re-run with this weight set (any published or older set of code `project_status`) instead of the one in force, for comparison (0.2.6). Not together with `weight_set_version` (422). The response `weight_set.is_active` is false. Nothing is saved and snapshots are not touched. */
+                weight_set_id?: string;
                 exclude_overrides?: boolean;
             };
             header?: never;
@@ -12975,6 +13710,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listProjectStatusSnapshots: {

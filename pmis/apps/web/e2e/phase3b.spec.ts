@@ -52,6 +52,81 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('freeze-status')).toHaveText(locale === 'ar' ? 'تم رفع التجميد.' : 'The freeze was lifted.');
     });
 
+    test('SLA rule set: draft, min over max, preview, publish with step-up', async ({ page }) => {
+      await signIn(page, locale, 'pm');
+      await page.getByTestId('nav-admin.settings').click();
+      await page.getByTestId('settings-tab-sla').click();
+      await page.getByTestId('sla-create-draft').click();
+      await page.getByTestId('sla-create-dialog-reason').fill('Tighten A2');
+      await page.getByTestId('sla-create-dialog-submit').click();
+      await expect(page.getByTestId('sla-editor-status')).toBeVisible();
+      await page.getByTestId('sla-min-D14').fill('9');
+      await expect(page.getByTestId('sla-err-D14')).toBeVisible();
+      await expect(page.getByTestId('sla-save')).toBeDisabled();
+      await page.getByTestId('sla-min-D14').fill('2');
+      await expect(page.getByTestId('sla-err-D14')).toHaveCount(0);
+      await page.getByTestId('sla-max-A2').fill('6');
+      await page.getByTestId('sla-save').click();
+      await page.getByTestId('sla-save-dialog-reason').fill('A2 gets one more day');
+      await page.getByTestId('sla-save-dialog-submit').click();
+      await expect(page.getByTestId('sla-dirty')).toHaveCount(0);
+      await page.getByTestId('sla-preview').click();
+      await expect(page.getByTestId('sla-preview-changed')).toHaveText('14');
+      await page.getByTestId('sla-preview-dialog-submit').click();
+      await page.getByTestId('sla-publish').click();
+      await expect(page.getByTestId('sla-publish-apply')).not.toBeChecked();
+      await expect(page.getByTestId('sla-publish-warning')).toBeVisible();
+      await page.getByTestId('sla-publish-dialog-reason').fill('Approved by the PM');
+      await withStepUp(page, () => page.getByTestId('sla-publish-dialog-submit').click());
+      await expect(page.getByTestId('sla-publish')).toHaveCount(0);
+      await expect(page.getByTestId('sla-version-3')).toBeVisible();
+    });
+
+    test('weight sets: the 100% rule per level, then draft, save, publish', async ({ page }) => {
+      await signIn(page, locale, 'pm');
+      await page.getByTestId('nav-admin.settings').click();
+      await page.getByTestId('settings-tab-weights').click();
+      await page.getByTestId('weights-code').selectOption('health_index');
+      await expect(page.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'false');
+      await page.getByTestId('weights-publish-health_index').click();
+      await page.getByTestId('weights-publish-dialog-reason').fill('Try to publish');
+      await withStepUp(page, () => page.getByTestId('weights-publish-dialog-submit').click());
+      await expect(page.getByTestId('weights-publish-error--activities')).toBeVisible();
+      await expect(page.getByTestId('weights-publish-error--activities-0-items')).toBeVisible();
+      await page.keyboard.press('Escape');
+
+      await page.getByTestId('weights-code').selectOption('project_status');
+      await page.getByTestId('weights-create-draft').click();
+      await page.getByTestId('weights-create-dialog-reason').fill('Shift one point to CW');
+      await page.getByTestId('weights-create-dialog-submit').click();
+      await page.getByTestId('weights-weight-a3').fill('6');
+      await expect(page.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'false');
+      await page.getByTestId('weights-weight-a1').fill('11');
+      await expect(page.getByTestId('weights-sum-activities')).toHaveAttribute('data-ok', 'true');
+      await page.getByTestId('weights-save').click();
+      await page.getByTestId('weights-save-dialog-reason').fill('Saving the draft');
+      await page.getByTestId('weights-save-dialog-submit').click();
+      await page.getByTestId('weights-preview').click();
+      await expect(page.getByTestId('weights-preview-valid')).toHaveAttribute('data-valid', 'true');
+      await page.getByTestId('weights-preview-dialog-submit').click();
+      await page.getByTestId('weights-publish-project_status').click();
+      await page.getByTestId('weights-publish-dialog-reason').fill('Owner approved');
+      await page.getByTestId('weights-publish-dialog-submit').click(); // step-up from the first publish try is still valid
+      await expect(page.getByTestId('weights-publish-project_status')).toHaveCount(0);
+      await expect(page.getByTestId('weights-version-project_status-4')).toBeVisible();
+    });
+
+    test('holiday import asks for a reason', async ({ page }) => {
+      await signIn(page, locale, 'pm');
+      await page.getByTestId('nav-admin.settings').click();
+      await page.getByTestId('cal-import-file').setInputFiles({ name: 'holidays.csv', mimeType: 'text/csv', buffer: Buffer.from('date,name_en\n2026-12-30,Test day\n') });
+      await page.getByTestId('holiday-import-dialog-submit').click();
+      await expect(page.getByTestId('holiday-import-dialog-reason-error')).toBeVisible();
+      await page.getByTestId('holiday-import-dialog-reason').fill('Official list 2026');
+      await page.getByTestId('holiday-import-dialog-submit').click();
+      await expect(page.getByTestId('holiday-2026-12-30')).toBeVisible();
+    });
+
     test('security log, integrity check and online now', async ({ page }) => {
       await signIn(page, locale, 'pm');
       await page.getByTestId('nav-admin.security_log').click();

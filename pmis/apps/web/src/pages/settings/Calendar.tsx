@@ -50,6 +50,7 @@ export function Calendar() {
   const [dlg, setDlg] = useState<null | { kind: 'edit'; h: Holiday | null } | { kind: 'delete' | 'confirm'; h: Holiday } | { kind: 'weekend' }>(null);
   const [days, setDays] = useState<number[] | null>(null);
   const [confirmDate, setConfirmDate] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const ar = i18n.language === 'ar';
   const sum = list.data?.summary;
@@ -72,7 +73,7 @@ export function Calendar() {
           <h2 className="me-auto font-bold">{t('cal.holidays')}</h2>
           <select className="input w-auto" aria-label={t('cal.year')} data-testid="cal-year" value={year} onChange={(e) => setYear(Number(e.target.value))}>{[2026, 2027, 2028].map((y) => <option key={y}>{y}</option>)}</select>
           <input ref={file} type="file" accept=".csv,.xlsx" className="sr-only" data-testid="cal-import-file" aria-label={t('cal.import')}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) imp.mutate(f, { onSuccess: () => toast(t('cal.imported')), onError: (er) => toast(errText(er, t), 'err') }); e.target.value = ''; }} />
+            onChange={(e) => { setImportFile(e.target.files?.[0] ?? null); imp.reset(); e.target.value = ''; }} />
           <button className="btn" data-testid="cal-import" onClick={() => file.current?.click()}><Upload size={14} />{t('cal.import')}</button>
           <button className="btn btn-accent" data-testid="cal-add" onClick={() => setDlg({ kind: 'edit', h: null })}><Plus size={14} />{t('cal.add')}</button>
         </div>
@@ -93,6 +94,13 @@ export function Calendar() {
           </tbody>
         </table></div>
       </section>
+      {importFile && (
+        <FormDialog open onClose={() => setImportFile(null)} testid="holiday-import-dialog" title={t('cal.import')} busy={imp.isPending} error={imp.isError ? errText(imp.error, t) : null}
+          onSubmit={(reason) => imp.mutate({ file: importFile, reason }, { onSuccess: () => { toast(`${t('cal.imported')} ${t('settings.audited')}`); setImportFile(null); } })}>
+          <p className="mono text-sm" dir="ltr" data-testid="holiday-import-name">{importFile.name}</p>
+          <p className="text-xs text-mute">{t('cal.recalc_note')}</p>
+        </FormDialog>
+      )}
       {dlg?.kind === 'edit' && <HolidayDialog h={dlg.h} onClose={() => setDlg(null)} />}
       {dlg?.kind === 'delete' && (
         <FormDialog open onClose={() => setDlg(null)} testid="holiday-delete-dialog" title={t('cal.delete_title', { date: dlg.h.date })} busy={del.isPending} error={del.isError ? errText(del.error, t) : null}

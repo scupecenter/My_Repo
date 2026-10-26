@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.5
+  version: 0.2.6
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.2.6 (2026-10-26): SLA rule sets and weight sets can be written and published (draft, preview, publish with effective date, reason and step-up, versions list); re-run of Project Status with an older weight set by id; enumerated export column codes for sites and tasks; required `reason` on `POST /settings/holidays/import` (not additive, see ADR 0011 amendment 0.2.6).
     - 0.2.5 (2026-10-26): additive. Phase 3b gaps (delegation to role or group, export column codes, `POST /tasks/{task_id}/act-on-behalf`) and admin additions: notification policy and catalogue, security log, log integrity, active sessions and revoke, log retention, `confirm_text` on dangerous actions, `last_admin` documented, and user soft delete and restore (B14) (ADR 0011).
     - 0.2.4 (2026-10-25): additive. `TaskSummary.lock_reasons`, `GET /tasks/{task_id}/slots`, `ImportBatch.site_id` and a described `task_id` on the template upload (ADR 0011).
     - 0.2.3 (2026-10-25): additive. Full, partial and current-view Master export: `parts` and `view` on `POST /exports/master`, `GET /exports/parts`, `MasterExport.kind`; the download streams the file (200) instead of a 302; field-level rules apply to exports (ADR 0011).
@@ -51,6 +52,7 @@ info:
     - **0.2.3**: partial export. `POST /exports/master` accepts `parts` (omitted or empty = whole project) or `view` (the current list view: source, filters, columns, sort), never both (422). `GET /exports/parts` lists the parts the caller may export. `MasterExport` echoes `parts`/`view` and adds `kind` (`full`, `partial`, `view`). Files are `GSDN_Site_Master_<date>.xlsx` (full) or `GSDN_<part>_<date>.xlsx`. The download of 0.2.2 now answers 200 with the file (`Content-Disposition: attachment`, `Cache-Control: no-store`), as `/files/{file_id}/download` does; it was documented as a 302 for one day and no client was built on it.
     - **0.2.4**: `TaskSummary.lock_reasons` (optional, same `LockReason` items as `GET /tasks/{task_id}`) so "Why locked?" needs no extra call; `GET /tasks/{task_id}/slots` lists the task's `DocumentSlot`s; the import batch created by a per-task template upload carries `task_id` and `site_id`, and `task_id` is documented on the create request.
     - **0.2.5**: `DelegationInput` and `Delegation` gain `target_kind` (user, role, group), `target_id`, `region_codes`, `module_codes`, `allow_redelegate` (`to_user_id` becomes optional, `Delegation.to_user` is null for role and group targets); `ExportPart.columns` and `ExportColumnCode` define the stable column codes of `ExportView.columns`; `POST /tasks/{task_id}/act-on-behalf` (B12b choice 3); `GET/PUT /settings/notification-policy` and `GET /settings/notification-policy/catalogue`; `GET /security-log`, `POST /security-log/exports`; `GET /audit-log/integrity`, `GET /security-log/integrity`; `GET /sessions/active`, `POST /sessions/{session_id}/revoke`, `POST /users/{user_id}/sessions/revoke`; `GET/PUT /settings/log-retention`; required `confirm_text` on freeze lift and workflow publish with error code `confirmation_mismatch`; grants `manage_users` and `view_security_log`; `last_admin` 409 documented on every operation that can remove the last System Admin; user soft delete and restore (B14): `POST /users/{user_id}/delete`, `POST /users/{user_id}/restore`, `GET /users/deleted`, `holder_account_status` on tasks, alert cause `holder_deactivated`.
+    - **0.2.6**: `GET/POST /settings/sla-rule-sets`, `GET/PATCH /settings/sla-rule-sets/{set_id}`, `POST .../preview`, `POST .../publish` (SLA, draft then publish, `apply_to_open_tasks`); `POST /settings/weight-sets`, `GET/PUT /settings/weight-sets/{set_id}`, `POST .../preview`, `POST .../publish` (weights, 100% per level, error `weights_must_total_100`); `weight_set_id` on `GET /project-status`; `SitesExportColumnCode` and `TasksExportColumnCode` inside `ExportColumnCode`; `reason` required on the holidays import. Both write sets need `settings.edit` or a delegation of it, publish needs step-up, and both stay allowed during the structural freeze (B9, light changes).
     - Small additive changes to 0.1 shapes: `User.mfa_exempt`, `TaskSummary.holder_absent` and `idle_working_days`, `Matrix` stage `kind` and `register_key`, `Problem.reason`, new error codes `freeze_active`, `insufficient_stock`, `role_in_use`, new job kinds, `updateRole` also answers 409 and 422.
   license:
     name: Proprietary, Aljeel internal use
@@ -96,7 +98,9 @@ tags:
     description: Read-only Audit Log (ADR 0006). Append-only hash chain; `GET /audit-log/integrity` verifies it.
   - name: settings
     description: |
-      Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert, notification policy (0.2.5), log retention (0.2.5).
+      Read access to settings, SLA rules, weight sets, calendars and task definitions. Writes in 0.2, structural freeze, DLP months, idle-task alert, notification policy (0.2.5), log retention (0.2.5), SLA rule sets and weight sets (0.2.6, draft then publish).
+
+      **Freeze (0.2.6).** SLA rule sets and weight sets are light changes under decision B9. They stay allowed during the structural freeze, and none of their operations answers 409 `freeze_active`.
 
       **Validation convention (0.2.5).** Every settings `PUT` rejects unknown keys (the request schemas are closed) and answers 422 `validation_failed`
       with field-level `errors[]` (`path` = JSON pointer, `code`, `message`), including cross-field rules (for example
@@ -2522,11 +2526,184 @@ paths:
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/SlaRule' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /settings/sla-rule-sets:
+    get:
+      tags: [settings]
+      operationId: listSlaRuleSets
+      summary: SLA rule set versions with who, when and why (newest first)
+      description: |
+        One item per version of the whole SLA rule set (a draft, the version in force, earlier and future-dated versions). The per-task rows stay in `GET /settings/sla-rules`.
+        Needs `view` on `admin.settings` (System Admin or a delegate holding `settings.edit`).
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/SlaRuleSetSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [settings]
+      operationId: createSlaRuleSetDraft
+      summary: Create the draft rule set (a copy of the version in force)
+      description: |
+        Needs the `settings` permission or a delegation of it (`settings.edit`). Only one draft exists at a time, a second one is 409 `duplicate`.
+        A light change (B9): allowed during the structural freeze.
+      x-db-path: admin_save_sla_rule_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '201':
+          description: Draft created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaRuleSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /settings/sla-rule-sets/{set_id}:
+    parameters:
+      - $ref: '#/components/parameters/SlaRuleSetId'
+    get:
+      tags: [settings]
+      operationId: getSlaRuleSet
+      summary: One version with its rules (per task, with overrides)
+      responses:
+        '200':
+          description: Rule set.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaRuleSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [settings]
+      operationId: updateSlaRuleSetDraft
+      summary: Change rules in the draft
+      description: |
+        Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+        Each item of `rules` replaces the whole rule of its `task_code` (the base min and max, the start event, the calendar and all its overrides). Tasks not listed keep the rule copied from the version in force.
+        **Validation (422 `validation_failed`, closed schema, `errors[].path` is a JSON pointer into the body):** `min_working_days` must not exceed `max_working_days`, in the base rule and in every override (`code` = `min_exceeds_max`, path of `max_working_days`); `unknown_task_code`; `unknown_start_event`; `unknown_calendar`; `duplicate_task_code`; `duplicate_override` (same scenario and region twice).
+        Rule found for a task: most specific override wins (scenario and region, then region, then scenario, then the base rule).
+        Audited with before and after values and the reason.
+      x-db-path: admin_save_sla_rule_set
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SlaRuleSetPatch' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaRuleSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /settings/sla-rule-sets/{set_id}/preview:
+    post:
+      tags: [settings]
+      operationId: previewSlaRuleSetPublish
+      summary: Dry run, how many open tasks would change due date if the draft were applied to them
+      description: |
+        Changes nothing and is not audited as a change. Runs the same validation as the publish (422 with the same `errors[]`). The result assumes `apply_to_open_tasks = true`, which is the only case where open tasks change; with `false`, the publish changes none.
+        Closed (approved) tasks are never counted. Needs `settings.edit`.
+      parameters:
+        - $ref: '#/components/parameters/SlaRuleSetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [effective_date]
+              properties:
+                effective_date: { type: string, format: date }
+      responses:
+        '200':
+          description: Preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaPublishPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /settings/sla-rule-sets/{set_id}/publish:
+    post:
+      tags: [settings]
+      operationId: publishSlaRuleSet
+      summary: Publish the draft as a new SLA version
+      description: |
+        Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+        Tasks opened on or after `effective_date` use the new version. **A task keeps the SLA version in force when it opened**, so past KPIs and closed tasks never change. Only when `apply_to_open_tasks` is true are the SLA rule and due date of the open (not approved) tasks switched to the new version, by a `sla_recalculation` job that runs at once when `effective_date` is today and on that date otherwise; the start date of each task is not changed.
+        A regional delegate can apply it only to open tasks in their delegated regions (403 `action_forbidden` otherwise).
+        **Validation (422 `validation_failed`):** the same as the draft; `effective_date_in_past` (path `/effective_date`, earlier than today in Africa/Tripoli); `effective_date_not_after_current` (not later than the `effective_from` of the latest published version); a draft equal to the version in force is `no_changes`.
+        Audited with before and after values (rules, effective date, `apply_to_open_tasks`, number of tasks affected, `bulk_action_id` of the re-pointing).
+      x-step-up: true
+      x-db-path: admin_publish_sla_rule_set (app_actor_is_admin('settings.edit'))
+      parameters:
+        - $ref: '#/components/parameters/SlaRuleSetId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SlaRuleSetPublish' }
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SlaRuleSetPublishResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /settings/weight-sets:
     get:
       tags: [settings]
       operationId: listWeightSets
-      summary: Weight sets (Project Status, health index, delay attribution)
+      summary: Weight sets (Project Status, health index, delay attribution), also the version history
+      description: All versions of each set, newest first, each with who changed it, when and why (`changed_by`, `created_at`, `published_at`, `reason`). Without `status` the drafts are included.
       parameters:
         - { name: code, in: query, schema: { type: string, enum: [project_status, health_index, delay_attribution] } }
         - { name: status, in: query, schema: { type: string, enum: [draft, published] } }
@@ -2541,6 +2718,143 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WeightSet' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [settings]
+      operationId: createWeightSetDraft
+      summary: Create a draft weight set (a copy of the set in force, or of an older one)
+      description: |
+        Needs the `settings` permission or a delegation of it (`settings.edit`). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
+        `base_set_id` copies another set of the same `code` (for example an older set to go back to it); omitted means the set in force.
+      x-db-path: admin_save_weight_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code, reason]
+              properties:
+                code: { $ref: '#/components/schemas/WeightSetCode' }
+                base_set_id: { type: string, format: uuid }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '201':
+          description: Draft created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeightSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /settings/weight-sets/{set_id}:
+    parameters:
+      - $ref: '#/components/parameters/WeightSetId'
+    get:
+      tags: [settings]
+      operationId: getWeightSet
+      summary: One weight set version with its activities and items
+      responses:
+        '200':
+          description: Weight set.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeightSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [settings]
+      operationId: replaceWeightSetDraft
+      summary: Replace the activities and items of a draft
+      description: |
+        Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+        Closed schema (an unknown key is 422 `validation_failed`). Each weight is 0 to 100 with at most 3 decimals; an item with weight 0 is not weighted. **A draft may be saved while its totals are not 100**, because the screen shows the live sum while the admin works; the 100% rule is enforced by the preview (reports it) and by the publish (refuses it).
+        Audited with before and after values and the reason.
+      x-db-path: admin_save_weight_set
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WeightSetInput' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeightSet' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /settings/weight-sets/{set_id}/preview:
+    post:
+      tags: [settings]
+      operationId: previewWeightSetPublish
+      summary: Check the 100% rule and show the effect of the draft on current progress
+      description: |
+        Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `settings.edit`.
+        `progress_current_pct` is the project progress with the set in force and `progress_new_pct` with the draft. Saved weekly snapshots are not part of the preview and never change.
+      parameters:
+        - $ref: '#/components/parameters/WeightSetId'
+      responses:
+        '200':
+          description: Preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeightSetPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /settings/weight-sets/{set_id}/publish:
+    post:
+      tags: [settings]
+      operationId: publishWeightSet
+      summary: Publish the draft as a new weight set version
+      description: |
+        Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+        **100% rule, per level (422 `validation_failed`):** the activity weights of the set must total 100, and the items of every activity that has items must total 100 (tolerance 0.001). Each level that fails gives one `errors[]` entry with `code` = `weights_must_total_100`, `path` = `/activities` for the set level or `/activities/<index>/items` for the items of one activity, and the actual total in `message`.
+        Other 422 codes in `errors[].code`: `effective_date_in_past` (earlier than today in Africa/Tripoli), `effective_date_not_after_current` (not later than the `effective_from` of the latest published set of the same `code`), `no_changes`.
+        The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Current progress is recalculated with the new set by a `progress_recalculation` job (at once when the date is today, otherwise on that date). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
+        Audited with before and after values, the effective date and the reason.
+      x-step-up: true
+      x-db-path: admin_publish_weight_set (app_actor_is_admin('settings.edit'))
+      parameters:
+        - $ref: '#/components/parameters/WeightSetId'
+        - $ref: '#/components/parameters/IfMatch'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WeightSetPublish' }
+      responses:
+        '200':
+          description: Published.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WeightSetPublishResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /settings/calendars:
     get:
       tags: [settings]
@@ -3420,7 +3734,7 @@ paths:
       tags: [calendar]
       operationId: importHolidays
       summary: Upload the TPL-HOLIDAYS template (creates an import batch)
-      description: 'Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011).'
+      description: 'Seed file: `db/seed/holidays-2026-2027.csv`. Whether the CSV is accepted besides the xlsx template is an open point (ADR 0011). Needs a `reason` (0.2.6), like every other holiday change; it is written to the audit row of each holiday the batch changes. A missing or too short reason is 422 `validation_failed`.'
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -3429,9 +3743,10 @@ paths:
           multipart/form-data:
             schema:
               type: object
-              required: [file]
+              required: [file, reason]
               properties:
                 file: {type: string, format: binary}
+                reason: {$ref: '#/components/schemas/Reason'}
       responses:
         '202':
           description: Batch accepted.
@@ -5634,7 +5949,7 @@ paths:
       tags: [project-status]
       operationId: getProjectStatus
       summary: Project Status (ends at HOTO) with the weight-set version used
-      description: Uses the active weight set, or `weight_set_version` to re-run with an older set for comparison. Weekly snapshots are never recomputed.
+      description: Uses the active weight set, or `weight_set_version` / `weight_set_id` (0.2.6) to re-run with an older set for comparison. Both together, a set of another code, or an unknown `weight_set_version` is 422. Weekly snapshots are never recomputed.
       parameters:
       - name: region_id
         in: query
@@ -5651,6 +5966,10 @@ paths:
       - name: weight_set_version
         in: query
         schema: {type: integer, minimum: 1}
+      - name: weight_set_id
+        in: query
+        description: 'Re-run with this weight set (any published or older set of code `project_status`) instead of the one in force, for comparison (0.2.6). Not together with `weight_set_version` (422). The response `weight_set.is_active` is false. Nothing is saved and snapshots are not touched.'
+        schema: {type: string, format: uuid}
       - name: exclude_overrides
         in: query
         schema: {type: boolean, default: false}
@@ -5663,6 +5982,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /project-status/snapshots:
     get:
       tags: [project-status]
@@ -5744,6 +6064,16 @@ components:
       in: header
       description: 'Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does.'
       schema: { type: string, enum: ['1'] }
+    SlaRuleSetId:
+      name: set_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    WeightSetId:
+      name: set_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     SessionId:
       name: session_id
       in: path
@@ -6087,7 +6417,7 @@ components:
       required: [id, kind, status]
       properties:
         id: { type: string }
-        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse, import_apply, sla_recalculation, pdf_generate, master_export, security_export] }
+        kind: { type: string, enum: [zip_export, audit_export, workflow_migration, import_parse, import_apply, sla_recalculation, pdf_generate, master_export, security_export, progress_recalculation] }
         status: { type: string, enum: [queued, running, done, failed] }
         progress: { type: number, minimum: 0, maximum: 1 }
         result_file_id: { type: [string, 'null'], format: uuid }
@@ -6130,10 +6460,24 @@ components:
         label_ar: { type: string }
         master_sheet: { type: string, description: 'Master sheet that holds the part.' }
         columns: { type: array, items: { $ref: '#/components/schemas/ExportColumn' }, description: 'Present with `include_columns=true`. The columns a list screen may send in `ExportView.columns` (0.2.5).' }
-    ExportColumnCode:
+    SitesExportColumnCode:
       type: string
-      pattern: '^(cf:)?[a-z][a-z0-9_]{1,60}$'
-      description: 'Stable, language-independent column code of a part, for example `site_code`, `region`, `ms_site_release_actual`. A custom field is `cf:<field code>`. Codes never change when a label is renamed.'
+      description: 'Column codes of the `sites` part that exist in every installation (0.2.6). Other columns of the part (milestone dates, scope flags) and custom fields have codes served by `GET /exports/parts?include_columns=true`.'
+      enum: [site_code, site_name, region, scenario, overall_status, current_stage, progress_pct, health_index]
+    TasksExportColumnCode:
+      type: string
+      description: 'Column codes of the `tasks` part that exist in every installation (0.2.6). Custom fields on tasks are `cf:<field code>`.'
+      enum: [site_code, task_code, task_name, stage, task_state, holder, due_date, sla_status, approved_at]
+    ExportColumnCode:
+      description: |
+        Stable, language-independent column code of a part. Codes never change when a label is renamed. A custom field is `cf:<field code>`.
+        Known codes (0.2.6): `sites` has `SitesExportColumnCode`, `tasks` has `TasksExportColumnCode`. The other parts (registers, `milestones`, `project_status`, `dismantle`) and the milestone and scope columns of `sites` use the same pattern, for example `ms_site_release_actual`; their codes are listed by `GET /exports/parts?include_columns=true`, so a client never guesses them.
+        A code is valid only for the part named in `ExportView.source` (the same `site_code` appears in `sites` and `tasks`).
+      anyOf:
+        - $ref: '#/components/schemas/SitesExportColumnCode'
+        - $ref: '#/components/schemas/TasksExportColumnCode'
+        - type: string
+          pattern: '^(cf:)?[a-z][a-z0-9_]{1,60}$'
     ExportColumn:
       type: object
       required: [code, label_en, label_ar]
@@ -6780,6 +7124,7 @@ components:
         due_date: { type: [string, 'null'], format: date }
         colour: { type: string, enum: [green, amber, red, none] }
         rule_id: { type: [string, 'null'], format: uuid }
+        rule_set_version: { type: [integer, 'null'], minimum: 1, description: 'SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6).' }
     TaskSummary:
       type: object
       required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
@@ -7271,6 +7616,188 @@ components:
         description: { type: [string, 'null'] }
         updated_by: { $ref: '#/components/schemas/UserRef' }
         updated_at: { type: string, format: date-time }
+    SlaStartEvent:
+      type: string
+      minLength: 1
+      maxLength: 60
+      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
+    SlaRuleOverride:
+      type: object
+      description: 'A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule).'
+      additionalProperties: false
+      required: [min_working_days, max_working_days]
+      anyOf:
+        - { required: [scenario] }
+        - { required: [region_id] }
+      properties:
+        scenario: { $ref: '#/components/schemas/DeliveryScenario' }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        min_working_days: { type: integer, minimum: 0, maximum: 365, description: 'Target (green). Must not exceed `max_working_days`, else 422 `min_exceeds_max`.' }
+        max_working_days: { type: integer, minimum: 0, maximum: 365, description: 'Limit. Above it the task is late.' }
+    SlaTaskRule:
+      type: object
+      description: 'The SLA rule of one task in a rule set: base minimum and maximum in working days, the start event, the calendar and optional overrides.'
+      additionalProperties: false
+      required: [task_code, min_working_days, max_working_days, start_event, calendar_code]
+      properties:
+        task_code: { type: string, maxLength: 40 }
+        min_working_days: { type: integer, minimum: 0, maximum: 365, description: 'Target (green). Must not exceed `max_working_days`, else 422 `min_exceeds_max`.' }
+        max_working_days: { type: integer, minimum: 0, maximum: 365, description: 'Limit. Above it the task is late.' }
+        start_event: { $ref: '#/components/schemas/SlaStartEvent' }
+        calendar_code: { type: string, description: 'A calendar of `GET /settings/calendars` (weekend days and holidays).' }
+        overrides: { type: array, maxItems: 47, items: { $ref: '#/components/schemas/SlaRuleOverride' } }
+    SlaRuleSetSummary:
+      type: object
+      description: 'One version of the whole SLA rule set. Versions are numbered 1, 2, 3 and so on; the seed is version 1.'
+      required: [id, version, status, is_active, effective_from, reason, created_by, created_at, rule_count]
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        status: { type: string, enum: [draft, published] }
+        is_active: { type: boolean, description: 'true for the published version in force today.' }
+        effective_from: { type: [string, 'null'], format: date, description: 'Null while a draft.' }
+        effective_to: { type: [string, 'null'], format: date }
+        base_version: { type: [integer, 'null'], description: 'The version the draft was copied from.' }
+        reason: { type: string, description: 'The reason of the last change; for a published version, the reason given at publish.' }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        published_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        published_at: { type: [string, 'null'], format: date-time }
+        apply_to_open_tasks: { type: [boolean, 'null'], description: 'The choice made at publish; null for a draft.' }
+        affected_open_tasks: { type: [integer, 'null'], description: 'Open tasks switched to this version at publish; null for a draft.' }
+        rule_count: { type: integer }
+    SlaRuleSet:
+      allOf:
+        - $ref: '#/components/schemas/SlaRuleSetSummary'
+        - type: object
+          required: [rules]
+          properties:
+            rules: { type: array, items: { $ref: '#/components/schemas/SlaTaskRule' } }
+    SlaRuleSetPatch:
+      type: object
+      additionalProperties: false
+      required: [reason, rules]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        rules: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/SlaTaskRule' }, description: 'Each item replaces the whole rule of its `task_code`.' }
+    SlaRuleSetPublish:
+      type: object
+      additionalProperties: false
+      required: [effective_date, reason]
+      properties:
+        effective_date: { type: string, format: date, description: 'Today or later (Africa/Tripoli).' }
+        reason: { $ref: '#/components/schemas/Reason' }
+        apply_to_open_tasks: { type: boolean, default: false, description: 'false keeps every open task on the version it opened with; true switches them to the new version (preview first).' }
+    SlaRuleSetPublishResult:
+      type: object
+      required: [rule_set, affected_open_tasks]
+      properties:
+        rule_set: { $ref: '#/components/schemas/SlaRuleSetSummary' }
+        affected_open_tasks: { type: integer, description: '0 when `apply_to_open_tasks` is false. Closed tasks keep their values.' }
+        recalculation_job_id: { type: [string, 'null'], description: 'The `sla_recalculation` job (`GET /jobs/{job_id}`); null when no task is affected.' }
+    SlaPublishPreview:
+      type: object
+      required: [set_id, effective_date, open_tasks_total, changed_due_date_count, became_late_count, no_longer_late_count, by_task, samples]
+      properties:
+        set_id: { type: string, format: uuid }
+        effective_date: { type: string, format: date }
+        open_tasks_total: { type: integer, description: 'Open (not approved) tasks in the caller''s scope.' }
+        changed_due_date_count: { type: integer, description: 'Open tasks whose due date would change.' }
+        became_late_count: { type: integer, description: 'Of those, tasks not late today that would be late.' }
+        no_longer_late_count: { type: integer, description: 'Of those, tasks late today that would no longer be late.' }
+        by_task:
+          type: array
+          items:
+            type: object
+            required: [task_code, open_tasks, changed]
+            properties:
+              task_code: { type: string }
+              open_tasks: { type: integer }
+              changed: { type: integer }
+        samples:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [task_id, site_code, task_code, due_date_before, due_date_after]
+            properties:
+              task_id: { type: string, format: uuid }
+              site_code: { type: string }
+              task_code: { type: string }
+              due_date_before: { type: [string, 'null'], format: date }
+              due_date_after: { type: [string, 'null'], format: date }
+    WeightSetCode:
+      type: string
+      enum: [project_status, health_index, delay_attribution]
+    WeightItemInput:
+      type: object
+      additionalProperties: false
+      required: [code, name_en, weight]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9._-]{1,20}$', description: 'Stable code, for example `1.1`. Never reused for another item of the activity.' }
+        name_en: { type: string, minLength: 1, maxLength: 200 }
+        name_ar: { type: [string, 'null'], maxLength: 200 }
+        weight: { type: number, minimum: 0, maximum: 100, description: 'Percent inside the activity, at most 3 decimals. 0 means not weighted.' }
+        unit: { type: [string, 'null'], maxLength: 40 }
+        measure_rule: { type: [string, 'null'], maxLength: 500, description: 'How the item is measured (method and source columns).' }
+        source: { type: [string, 'null'], maxLength: 200 }
+    WeightActivityInput:
+      type: object
+      additionalProperties: false
+      required: [code, name_en, weight]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9._-]{1,20}$' }
+        name_en: { type: string, minLength: 1, maxLength: 200 }
+        name_ar: { type: [string, 'null'], maxLength: 200 }
+        weight: { type: number, minimum: 0, maximum: 100, description: 'Percent of the whole set, at most 3 decimals. Default for Project Status: 12, 8, 5, 25, 20, 12, 13, 5.' }
+        items: { type: array, items: { $ref: '#/components/schemas/WeightItemInput' }, description: 'Optional. When present and not empty they must total 100 to be published.' }
+    WeightSetInput:
+      type: object
+      additionalProperties: false
+      required: [reason, activities]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        activities: { type: array, minItems: 1, maxItems: 50, items: { $ref: '#/components/schemas/WeightActivityInput' } }
+    WeightSetPublish:
+      type: object
+      additionalProperties: false
+      required: [effective_date, reason]
+      properties:
+        effective_date: { type: string, format: date, description: 'Today or later (Africa/Tripoli).' }
+        reason: { $ref: '#/components/schemas/Reason' }
+    WeightSetPublishResult:
+      type: object
+      required: [weight_set]
+      properties:
+        weight_set: { $ref: '#/components/schemas/WeightSet' }
+        previous_set_id: { type: [string, 'null'], format: uuid }
+        recalculation_job_id: { type: [string, 'null'], description: 'The `progress_recalculation` job (`GET /jobs/{job_id}`).' }
+    WeightSetPreview:
+      type: object
+      required: [valid, errors, progress_current_pct, progress_new_pct]
+      properties:
+        valid: { type: boolean }
+        errors:
+          type: array
+          description: 'Same entries as the 422 of the publish (`weights_must_total_100` per level and the others).'
+          items:
+            type: object
+            required: [path, code]
+            properties:
+              path: { type: string }
+              code: { type: string }
+              message: { type: string }
+        progress_current_pct: { type: [number, 'null'], description: 'Project progress with the set in force. Null for a code that has no progress (health index, delay attribution).' }
+        progress_new_pct: { type: [number, 'null'], description: 'Project progress with the draft. Null when `valid` is false.' }
+        activities:
+          type: array
+          items:
+            type: object
+            required: [code, current_pct, new_pct]
+            properties:
+              code: { type: string }
+              current_pct: { type: number }
+              new_pct: { type: [number, 'null'] }
     SlaRule:
       type: object
       required: [id, task_code, min_working_days, max_working_days, start_event, calendar_code, effective_from]
@@ -7289,12 +7816,14 @@ components:
         changed_by: { $ref: '#/components/schemas/UserRef' }
         changed_at: { type: string, format: date-time }
         open_task_count: { type: integer }
+        set_version: { type: integer, minimum: 1, description: 'The SLA rule set version this row belongs to (0.2.6).' }
     WeightItem:
       type: object
       required: [code, name_en, weight]
       properties:
         code: { type: string }
         name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
         weight: { type: number }
         unit: { type: [string, 'null'] }
         measure_rule: { type: [string, 'null'] }
@@ -7310,6 +7839,10 @@ components:
         effective_from: { type: string, format: date }
         effective_to: { type: [string, 'null'], format: date }
         reason: { type: [string, 'null'] }
+        is_active: { type: boolean, description: 'true for the published set in force today (0.2.6).' }
+        changed_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
         activities:
           type: array
           items:
@@ -7318,6 +7851,7 @@ components:
             properties:
               code: { type: string }
               name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
               weight: { type: number }
               items: { type: array, items: { $ref: '#/components/schemas/WeightItem' } }
     Calendar:

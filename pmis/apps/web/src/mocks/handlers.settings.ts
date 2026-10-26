@@ -2,11 +2,13 @@
 // staff visibility, security log, integrity, online now. Synthetic data; validation mirrors the contract.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { Holiday, NotificationPolicyInput, SecurityLogEntry } from '@/api/types';
+import type { Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, WeightSet } from '@/api/types';
+import { tripoliToday } from '@/lib/today';
+import { weightIssues } from '@/lib/weights';
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
-import { CATALOGUE, SLA, WEIGHTS } from './settingsData';
+import { CALENDAR_CODES, CATALOGUE, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
@@ -22,6 +24,106 @@ const me = () => ref(viewer()!.employee_id!);
 const day = (d: string) => Date.parse(`${d}T00:00:00Z`);
 const int = (v: unknown, min: number, max: number) => typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max;
 const body = async <T,>(r: Request) => ((await r.json().catch(() => ({}))) ?? {}) as T;
+
+// ---- 0.2.6 helpers: rule sets and weight sets
+const slaOut = ({ _rev, ...x }: SlaSetRec): SlaRuleSet => (void _rev, x);
+const slaSummary = ({ rules, ...x }: SlaRuleSet) => (void rules, ((s) => { delete (s as { _rev?: number })._rev; return s; })({ ...x }));
+const wOut = ({ _rev, ...x }: WeightRec): WeightSet => (void _rev, x);
+const canon = (rules: SlaTaskRule[]) => [...rules].sort((a, b) => a.task_code.localeCompare(b.task_code)).map((r) => ({ ...r, overrides: r.overrides ?? [] }));
+const wCanon = (w: WeightSet) => w.activities.map((a) => ({ c: a.code, w: a.weight, n: a.name_en, na: a.name_ar ?? null, i: a.items.map((i) => [i.code, i.weight, i.name_en, i.name_ar ?? null, i.unit ?? null, i.measure_rule ?? null]) }));
+
+/** Effective date rules shared by the previews and the publishes: required, not in the past (Africa/Tripoli), after the latest published version. */
+function dateErrs(d: string | undefined, kind: 'sla' | 'weights', code?: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d ?? '')) return [{ path: '/effective_date', code: 'required' }];
+  if (d! < tripoliToday()) return [{ path: '/effective_date', code: 'effective_date_in_past' }];
+  const last = (kind === 'sla' ? C().slaSets : C().weightSets.filter((w) => w.code === code)).filter((s) => s.status === 'published').map((s) => s.effective_from!).sort().pop();
+  return last && d! <= last ? [{ path: '/effective_date', code: 'effective_date_not_after_current' }] : [];
+}
+
+/** Closed-schema validation of SLA rule items; `min_exceeds_max` sits on the max_working_days path. Exported for unit tests. */
+export function validateSlaRules(rules: (SlaTaskRule & { __i?: number })[]) {
+  const errs: { path: string; code: string }[] = [], seen = new Set<string>();
+  const KEYS = ['task_code', 'min_working_days', 'max_working_days', 'start_event', 'calendar_code', 'overrides'], OKEYS = ['scenario', 'region_id', 'min_working_days', 'max_working_days'];
+  rules.forEach((r, n) => {
+    const i = r.__i ?? n, P = `/rules/${i}`;
+    for (const k of Object.keys(r)) if (k !== '__i' && !KEYS.includes(k)) errs.push({ path: `${P}/${k}`, code: 'unknown_key' });
+    if (!TASK_DEFS.some((t) => t.code === r.task_code)) errs.push({ path: `${P}/task_code`, code: 'unknown_task_code' });
+    else if (seen.has(r.task_code)) errs.push({ path: `${P}/task_code`, code: 'duplicate_task_code' });
+    seen.add(r.task_code);
+    for (const k of ['min_working_days', 'max_working_days'] as const) if (!int(r[k], 0, 365)) errs.push({ path: `${P}/${k}`, code: 'out_of_range' });
+    if (int(r.min_working_days, 0, 365) && int(r.max_working_days, 0, 365) && r.min_working_days > r.max_working_days) errs.push({ path: `${P}/max_working_days`, code: 'min_exceeds_max' });
+    if (!START_EVENT_CODES.has(r.start_event)) errs.push({ path: `${P}/start_event`, code: 'unknown_start_event' });
+    if (!CALENDAR_CODES.includes(r.calendar_code)) errs.push({ path: `${P}/calendar_code`, code: 'unknown_calendar' });
+    const keys = new Set<string>();
+    (r.overrides ?? []).forEach((o, j) => {
+      const O = `${P}/overrides/${j}`;
+      for (const k of Object.keys(o)) if (!OKEYS.includes(k)) errs.push({ path: `${O}/${k}`, code: 'unknown_key' });
+      if (o.scenario === undefined && o.region_id === undefined) errs.push({ path: `${O}/scenario`, code: 'required' });
+      if (o.scenario !== undefined && !SCENARIOS.includes(o.scenario)) errs.push({ path: `${O}/scenario`, code: 'invalid' });
+      if (o.region_id !== undefined && !int(o.region_id, 1, 7)) errs.push({ path: `${O}/region_id`, code: 'invalid' });
+      for (const k of ['min_working_days', 'max_working_days'] as const) if (!int(o[k], 0, 365)) errs.push({ path: `${O}/${k}`, code: 'out_of_range' });
+      if (int(o.min_working_days, 0, 365) && int(o.max_working_days, 0, 365) && o.min_working_days > o.max_working_days) errs.push({ path: `${O}/max_working_days`, code: 'min_exceeds_max' });
+      const key = `${o.scenario ?? ''}|${o.region_id ?? ''}`;
+      if (keys.has(key)) errs.push({ path: `${O}/scenario`, code: 'duplicate_override' });
+      keys.add(key);
+    });
+  });
+  return errs;
+}
+
+/** Counts how many open tasks change when the draft is applied to them (rules that differ from the version in force). */
+function slaPreview(x: SlaRuleSet, effective_date: string): SlaPublishPreview {
+  const cur = C().slaSets.find((s) => s.is_active)!, SITES = ['TR204', 'MI129', 'WM105', 'ZW310', 'BG220', 'SB121'];
+  const by = x.rules.map((r) => {
+    const o = cur.rules.find((c) => c.task_code === r.task_code), open = OPEN_TASKS[r.task_code] ?? 0;
+    const diff = JSON.stringify(canon(o ? [o] : [])) !== JSON.stringify(canon([r]));
+    return { r, o, open, changed: diff ? open : 0 };
+  });
+  const samples: SlaPublishPreview['samples'] = [];
+  by.forEach(({ r, o, changed }) => { for (let k = 0; k < changed && samples.length < 20; k++) { const delta = r.max_working_days - (o?.max_working_days ?? r.max_working_days); samples.push({ task_id: crypto.randomUUID(), site_code: SITES[(samples.length) % SITES.length], task_code: r.task_code, due_date_before: `2026-11-${String(2 + k).padStart(2, '0')}`, due_date_after: `2026-11-${String(Math.max(1, 2 + k + delta)).padStart(2, '0')}` }); } });
+  const late = (f: (d: number) => boolean) => by.reduce((n, { r, o, changed }) => n + (o && f(r.max_working_days - o.max_working_days) ? Math.ceil(changed * 0.3) : 0), 0);
+  return {
+    set_id: x.id, effective_date, open_tasks_total: Object.values(OPEN_TASKS).reduce((a, b) => a + b, 0), changed_due_date_count: by.reduce((n, b) => n + b.changed, 0),
+    became_late_count: late((d) => d < 0), no_longer_late_count: late((d) => d > 0), by_task: by.map(({ r, open, changed }) => ({ task_code: r.task_code, open_tasks: open, changed })), samples,
+  };
+}
+
+type WeightInput = { reason: string; activities: { code: string; name_en: string; name_ar?: string | null; weight: number; items?: { code: string; name_en: string; name_ar?: string | null; weight: number; unit?: string | null; measure_rule?: string | null; source?: string | null }[] }[] } & Record<string, unknown>;
+const w3 = (n: unknown) => typeof n === 'number' && n >= 0 && n <= 100 && Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6;
+const CODE = /^[A-Za-z0-9._-]{1,20}$/;
+/** Closed-schema checks of a weight set body (not the 100% rule, which the preview and publish apply). */
+export function validateWeightInput(b: WeightInput) {
+  const errs: { path: string; code: string }[] = [];
+  for (const k of Object.keys(b)) if (!['reason', 'activities'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+  if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+  if (!Array.isArray(b.activities) || !b.activities.length || b.activities.length > 50) return [...errs, { path: '/activities', code: 'required' }];
+  const AK = ['code', 'name_en', 'name_ar', 'weight', 'items'], IK = ['code', 'name_en', 'name_ar', 'weight', 'unit', 'measure_rule', 'source'], codes = new Set<string>();
+  b.activities.forEach((a, i) => {
+    const P = `/activities/${i}`;
+    for (const k of Object.keys(a)) if (!AK.includes(k)) errs.push({ path: `${P}/${k}`, code: 'unknown_key' });
+    if (!CODE.test(a.code ?? '')) errs.push({ path: `${P}/code`, code: 'invalid' }); else if (codes.has(a.code)) errs.push({ path: `${P}/code`, code: 'duplicate' });
+    codes.add(a.code);
+    if (!(a.name_en ?? '').trim()) errs.push({ path: `${P}/name_en`, code: 'required' });
+    if (!w3(a.weight)) errs.push({ path: `${P}/weight`, code: 'out_of_range' });
+    const ic = new Set<string>();
+    (a.items ?? []).forEach((it, j) => {
+      const Q = `${P}/items/${j}`;
+      for (const k of Object.keys(it)) if (!IK.includes(k)) errs.push({ path: `${Q}/${k}`, code: 'unknown_key' });
+      if (!CODE.test(it.code ?? '')) errs.push({ path: `${Q}/code`, code: 'invalid' }); else if (ic.has(it.code)) errs.push({ path: `${Q}/code`, code: 'duplicate' });
+      ic.add(it.code);
+      if (!(it.name_en ?? '').trim()) errs.push({ path: `${Q}/name_en`, code: 'required' });
+      if (!w3(it.weight)) errs.push({ path: `${Q}/weight`, code: 'out_of_range' });
+    });
+  });
+  return errs;
+}
+/** The 100% rule per level, with the paths of the contract. Reuses the screen's weightIssues. */
+export function weightErrors(set: Pick<WeightSet, 'activities'>) {
+  return weightIssues(set).map((i) => ({ path: i.level === 'activities' ? '/activities' : `/activities/${set.activities.findIndex((a) => a.code === i.activity)}/items`, code: 'weights_must_total_100', message: `Total is ${i.sum}, not 100` }));
+}
+const DONE: Record<string, number> = { a1: 100, a2: 90, a3: 70, a4: 55, a5: 40, a6: 20, a7: 10, a8: 0 };
+const contrib = (a?: { code: string; weight: number }) => (a ? Math.round(a.weight * (DONE[a.code] ?? 50)) / 100 : 0);
+const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.reduce((n, a) => n + contrib(a), 0) * 10) / 10;
 
 const summary = () => {
   const h = C().holidays, tent = h.filter((x) => x.tentative && x.date >= TODAY).sort((a, b) => a.date.localeCompare(b.date));
@@ -80,8 +182,10 @@ export const settingsHandlers = [
   }),
   http.post(`${B}/settings/holidays/import`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
-    const f = (await request.formData().catch(() => null))?.get('file');
-    if (!(f instanceof File) || !/\.(csv|xlsx)$/i.test(f.name)) return problem(422, 'template_rejected', 'Not an approved template', { reason: 'tpl_missing' } as never);
+    const form = await request.formData().catch(() => null);
+    if (String(form?.get('reason') ?? '').trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    const f = form?.get('file'); // checked by size, not name: jsdom files lose their name through undici
+    if (!f || typeof f === 'string' || !f.size) return problem(422, 'template_rejected', 'Not an approved template', { reason: 'tpl_missing' } as never);
     const rows = (await f.text()).split(/\r?\n/).slice(1).map((l) => l.split(',')).filter((c) => /^\d{4}-\d{2}-\d{2}$/.test(c[0]) && !C().holidays.some((h) => h.date === c[0]));
     rows.forEach((c, i) => C().holidays.push({ id: crypto.randomUUID(), calendar_code: 'LY', date: c[0], name_en: c[1] ?? `Imported ${i}`, name_ar: c[2] ?? null, kind: c[3] === 'religious' ? 'religious' : 'national', tentative: c[4] === 'yes', confirmed_at: null, confirmed_by: null, version: 1 } as Holiday));
     save();
@@ -131,12 +235,153 @@ export const settingsHandlers = [
     return HttpResponse.json({ calendar_code: 'LY', weekend_days: C().weekend.days, affected_open_tasks: 12, version: C().weekend.version });
   }),
 
-  // ------------------------------------------------------------------ rules (read-only in the contract)
-  http.get(`${B}/settings/sla-rules`, () => { const g = guard(); if (g) return g; return page(SLA); }),
+  // ------------------------------------------------------------------ SLA rule sets (0.2.6)
+  http.get(`${B}/settings/sla-rules`, () => {
+    const g = guard(); if (g) return g;
+    const act = C().slaSets.find((x) => x.is_active)!;
+    return page(act.rules.map((r, i) => ({ id: `99100000-0000-4000-8000-0000000000${10 + i}`, ...r, effective_from: act.effective_from!, reason: act.reason, open_task_count: OPEN_TASKS[r.task_code] ?? 0, set_version: act.version })));
+  }),
+  http.get(`${B}/workflow/versions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: [{ version: 1, status: 'published', is_current: true, light_revision: 1, parent_version: null, site_count: 150 }] }); }),
+  http.get(`${B}/workflow/versions/:v`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (params.v !== '1') return problem(404, 'not_found', 'Version not found');
+    return HttpResponse.json({ version: 1, status: 'published', is_current: true, light_revision: 1, milestones: MILESTONES, gates: GATES, placements: TASK_DEFS.map((t) => ({ task_code: t.code, stage_code: t.stage_code, sort_order: t.sort_order })) });
+  }),
+  http.get(`${B}/settings/task-definitions`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ items: TASK_DEFS }); }),
+  http.get(`${B}/settings/sla-rule-sets`, ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const st = new URL(request.url).searchParams.get('status');
+    return page(C().slaSets.filter((x) => !st || x.status === st).sort((a, b) => b.version - a.version).map(slaSummary));
+  }),
+  http.post(`${B}/settings/sla-rule-sets`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ reason?: string }>(request);
+    const unk = Object.keys(b).filter((k) => k !== 'reason').map((k) => ({ path: `/${k}`, code: 'unknown_key' }));
+    if (unk.length) return fields(...unk);
+    const r = reasonErr(b.reason); if (r) return r;
+    if (C().slaSets.some((x) => x.status === 'draft')) return problem(409, 'duplicate', 'A draft already exists', { errors: [{ path: '/', code: 'duplicate' }] });
+    const base = C().slaSets.find((x) => x.is_active)!;
+    const d: SlaSetRec = { ...base, id: crypto.randomUUID(), version: Math.max(...C().slaSets.map((x) => x.version)) + 1, status: 'draft', is_active: false, effective_from: null, effective_to: null, base_version: base.version, reason: b.reason!.trim(), created_by: me(), created_at: new Date().toISOString(), published_by: null, published_at: null, apply_to_open_tasks: null, affected_open_tasks: null, rules: structuredClone(base.rules), _rev: 1 };
+    C().slaSets.push(d); save();
+    return HttpResponse.json(slaOut(d), { status: 201, ...tag(d._rev) });
+  }),
+  http.get(`${B}/settings/sla-rule-sets/:id`, ({ params }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().slaSets.find((s) => s.id === params.id); if (!x) return problem(404, 'not_found', 'Rule set not found');
+    return HttpResponse.json(slaOut(x), tag(x._rev));
+  }),
+  http.patch(`${B}/settings/sla-rule-sets/:id`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().slaSets.find((s) => s.id === params.id); if (!x) return problem(404, 'not_found', 'Rule set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be changed');
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, x._rev); if (p) return p;
+    const b = await body<{ reason?: string; rules?: SlaTaskRule[] } & Record<string, unknown>>(request);
+    const unk = Object.keys(b).filter((k) => !['reason', 'rules'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_key' }));
+    if (unk.length) return fields(...unk);
+    const r = reasonErr(b.reason); if (r) return r;
+    if (!Array.isArray(b.rules) || !b.rules.length) return fields({ path: '/rules', code: 'required' });
+    const errs = validateSlaRules(b.rules); if (errs.length) return fields(...errs);
+    for (const nr of b.rules) { const i = x.rules.findIndex((o) => o.task_code === nr.task_code); if (i < 0) x.rules.push(nr); else x.rules[i] = nr; }
+    Object.assign(x, { reason: b.reason!.trim(), rule_count: x.rules.length, _rev: x._rev + 1 }); save();
+    return HttpResponse.json(slaOut(x), tag(x._rev));
+  }),
+  http.post(`${B}/settings/sla-rule-sets/:id/preview`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().slaSets.find((s) => s.id === params.id); if (!x) return problem(404, 'not_found', 'Rule set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be previewed');
+    const b = await body<{ effective_date?: string }>(request);
+    const e = dateErrs(b.effective_date, 'sla'); if (e.length) return fields(...e);
+    return HttpResponse.json(slaPreview(x, b.effective_date!));
+  }),
+  http.post(`${B}/settings/sla-rule-sets/:id/publish`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().slaSets.find((s) => s.id === params.id); if (!x) return problem(404, 'not_found', 'Rule set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be published');
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, x._rev); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const b = await body<{ effective_date?: string; reason?: string; apply_to_open_tasks?: unknown } & Record<string, unknown>>(request);
+    const unk = Object.keys(b).filter((k) => !['effective_date', 'reason', 'apply_to_open_tasks'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_key' }));
+    const errs = [...unk, ...((b.reason ?? '').trim().length < 3 ? [{ path: '/reason', code: 'required' }] : []), ...dateErrs(b.effective_date, 'sla'), ...validateSlaRules(x.rules.map((r, i) => ({ ...r, __i: i })))];
+    if (b.apply_to_open_tasks !== undefined && typeof b.apply_to_open_tasks !== 'boolean') errs.push({ path: '/apply_to_open_tasks', code: 'invalid' });
+    if (!errs.length && JSON.stringify(canon(x.rules)) === JSON.stringify(canon(C().slaSets.find((s) => s.is_active)!.rules))) errs.push({ path: '/', code: 'no_changes' });
+    if (errs.length) return fields(...errs);
+    // A regional delegate may re-point open tasks only in their own regions; the mock treats any delegate as regional.
+    if (b.apply_to_open_tasks && C().actingDelegate) return problem(403, 'action_forbidden', 'A regional delegate can apply a rule only to open tasks in their regions');
+    const apply = b.apply_to_open_tasks === true, n = apply ? slaPreview(x, b.effective_date!).changed_due_date_count : 0;
+    const today = tripoliToday(), prev = C().slaSets.find((s) => s.is_active)!;
+    prev.effective_to = b.effective_date!;
+    if (b.effective_date! <= today) { prev.is_active = false; x.is_active = true; }
+    Object.assign(x, { status: 'published', effective_from: b.effective_date!, reason: b.reason!.trim(), published_by: me(), published_at: new Date().toISOString(), apply_to_open_tasks: apply, affected_open_tasks: n, _rev: x._rev + 1 }); save();
+    return HttpResponse.json({ rule_set: slaSummary(x), affected_open_tasks: n, recalculation_job_id: n ? `job-${crypto.randomUUID().slice(0, 8)}` : null });
+  }),
+
+  // ------------------------------------------------------------------ weight sets (0.2.6)
   http.get(`${B}/settings/weight-sets`, ({ request }) => {
     const g = guard(); if (g) return g;
-    const code = new URL(request.url).searchParams.get('code');
-    return HttpResponse.json({ items: WEIGHTS.filter((w) => !code || w.code === code) });
+    const u = new URL(request.url).searchParams, code = u.get('code'), st = u.get('status');
+    return HttpResponse.json({ items: C().weightSets.filter((w) => (!code || w.code === code) && (!st || w.status === st)).sort((a, b) => a.code.localeCompare(b.code) || b.version - a.version).map(wOut) });
+  }),
+  http.post(`${B}/settings/weight-sets`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = await body<{ code?: string; base_set_id?: string; reason?: string } & Record<string, unknown>>(request);
+    const errs = [...Object.keys(b).filter((k) => !['code', 'base_set_id', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_key' })), ...(['project_status', 'health_index', 'delay_attribution'].includes(b.code ?? '') ? [] : [{ path: '/code', code: 'required' }]), ...((b.reason ?? '').trim().length < 3 ? [{ path: '/reason', code: 'required' }] : [])];
+    if (errs.length) return fields(...errs);
+    if (C().weightSets.some((w) => w.code === b.code && w.status === 'draft')) return problem(409, 'duplicate', 'A draft of this set already exists', { errors: [{ path: '/code', code: 'duplicate' }] });
+    const base = b.base_set_id ? C().weightSets.find((w) => w.id === b.base_set_id) : C().weightSets.find((w) => w.code === b.code && w.is_active);
+    if (!base) return problem(404, 'not_found', 'No set to copy');
+    if (base.code !== b.code) return fields({ path: '/base_set_id', code: 'invalid' });
+    const d: WeightRec = { ...structuredClone(base), id: crypto.randomUUID(), version: Math.max(...C().weightSets.filter((w) => w.code === b.code).map((w) => w.version)) + 1, status: 'draft', is_active: false, effective_from: tripoliToday(), effective_to: null, reason: b.reason!.trim(), changed_by: me(), created_at: new Date().toISOString(), published_at: null, _rev: 1 };
+    C().weightSets.push(d); save();
+    return HttpResponse.json(wOut(d), { status: 201, ...tag(d._rev) });
+  }),
+  http.get(`${B}/settings/weight-sets/:id`, ({ params }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().weightSets.find((w) => w.id === params.id); if (!x) return problem(404, 'not_found', 'Weight set not found');
+    return HttpResponse.json(wOut(x), tag(x._rev));
+  }),
+  http.put(`${B}/settings/weight-sets/:id`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().weightSets.find((w) => w.id === params.id); if (!x) return problem(404, 'not_found', 'Weight set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be changed');
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, x._rev); if (p) return p;
+    const b = await body<WeightInput>(request);
+    const errs = validateWeightInput(b); if (errs.length) return fields(...errs);
+    // A draft may be saved while the totals are not 100; the preview reports it and the publish refuses it.
+    x.activities = b.activities.map((a) => ({ code: a.code, name_en: a.name_en, name_ar: a.name_ar ?? null, weight: a.weight, items: (a.items ?? []).map((i) => ({ code: i.code, name_en: i.name_en, name_ar: i.name_ar ?? null, weight: i.weight, unit: i.unit ?? null, measure_rule: i.measure_rule ?? null, source: i.source ?? null })) }));
+    Object.assign(x, { reason: b.reason.trim(), changed_by: me(), _rev: x._rev + 1 }); save();
+    return HttpResponse.json(wOut(x), tag(x._rev));
+  }),
+  http.post(`${B}/settings/weight-sets/:id/preview`, ({ params }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().weightSets.find((w) => w.id === params.id); if (!x) return problem(404, 'not_found', 'Weight set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be previewed');
+    const errors = weightErrors(x), cur = C().weightSets.find((w) => w.code === x.code && w.is_active);
+    const prog = x.code === 'project_status';
+    return HttpResponse.json({
+      valid: !errors.length, errors, progress_current_pct: prog && cur ? progress(cur) : null, progress_new_pct: prog && !errors.length ? progress(x) : null,
+      ...(prog && cur ? { activities: x.activities.map((a) => ({ code: a.code, current_pct: contrib(cur.activities.find((c) => c.code === a.code)), new_pct: errors.length ? null : contrib(a) })) } : {}),
+    });
+  }),
+  http.post(`${B}/settings/weight-sets/:id/publish`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const x = C().weightSets.find((w) => w.id === params.id); if (!x) return problem(404, 'not_found', 'Weight set not found');
+    if (x.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be published');
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, x._rev); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const b = await body<{ effective_date?: string; reason?: string } & Record<string, unknown>>(request);
+    const prev = C().weightSets.find((w) => w.code === x.code && w.is_active);
+    const errs = [...Object.keys(b).filter((k) => !['effective_date', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_key' })), ...((b.reason ?? '').trim().length < 3 ? [{ path: '/reason', code: 'required' }] : []),
+      ...dateErrs(b.effective_date, 'weights', x.code), ...weightErrors(x).map(({ path, code, message }) => ({ path, code, message }))] as { path: string; code: string; message?: string }[];
+    if (!errs.length && prev && JSON.stringify(wCanon(prev)) === JSON.stringify(wCanon(x))) errs.push({ path: '/', code: 'no_changes' });
+    if (errs.length) return fields(...errs);
+    const today = tripoliToday();
+    if (prev) { prev.effective_to = b.effective_date!; if (b.effective_date! <= today) prev.is_active = false; }
+    Object.assign(x, { status: 'published', is_active: b.effective_date! <= today, effective_from: b.effective_date!, reason: b.reason!.trim(), changed_by: me(), published_at: new Date().toISOString(), _rev: x._rev + 1 }); save();
+    return HttpResponse.json({ weight_set: wOut(x), previous_set_id: prev?.id ?? null, recalculation_job_id: x.code === 'project_status' ? `job-${crypto.randomUUID().slice(0, 8)}` : null });
   }),
 
   // ------------------------------------------------------------------ freeze

@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { api, ApiError, downloadFile } from './client';
+import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
   ActiveSession, ActOnBehalfRequest, Calendar, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
-  NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaRule, StaffVisibility, StructuralFreeze, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet,
+  NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
+  TaskDefinition, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
 
 const refresh = (qc: QueryClient, ...ks: string[]) => ks.forEach((k) => void qc.invalidateQueries({ queryKey: [k] }));
@@ -51,8 +52,8 @@ export function useDeleteHoliday() {
 }
 export const useImportHolidays = () => {
   const qc = useQueryClient();
-  return useMutation<unknown, ApiError, File>({
-    mutationFn: (file) => { const fd = new FormData(); fd.append('file', file); return api.post('/settings/holidays/import', { idempotencyKey: crypto.randomUUID(), body: fd }); },
+  return useMutation<unknown, ApiError, { file: File; reason: string }>({
+    mutationFn: ({ file, reason }) => { const fd = new FormData(); fd.append('file', file); fd.append('reason', reason); return api.post('/settings/holidays/import', { idempotencyKey: crypto.randomUUID(), body: fd }); },
     onSettled: () => refresh(qc, 'holidays', 'calendars'),
   });
 };
@@ -62,8 +63,6 @@ export const useSetWeekend = () => {
 };
 
 // ---------------------------------------------------------------- rules
-export const useSlaRules = () => useQuery({ queryKey: ['sla-rules'], queryFn: () => api.get<Page<SlaRule>>('/settings/sla-rules').then((r) => r.items) });
-export const useWeightSets = () => useQuery({ queryKey: ['weight-sets'], queryFn: () => api.get<{ items: WeightSet[] }>('/settings/weight-sets').then((r) => r.items) });
 export const useFreeze = () => useQuery({ queryKey: ['freeze'], queryFn: () => api.get<StructuralFreeze>('/settings/structural-freeze') });
 export const useLiftFreeze = () => {
   const qc = useQueryClient();
@@ -223,5 +222,87 @@ export function useActOnBehalf() {
     },
     onError: (_e, _v, c) => c?.rollback(),
     onSettled: () => refresh(qc, 'alerts', 'my-work', 'approvals', 'site-tasks', 'task'),
+  });
+}
+
+// ---------------------------------------------------------------- SLA rule sets and weight sets (contract 0.2.6)
+/** A body with the ETag it came with; the ETag goes back as If-Match on the next write. */
+export type Tagged<T> = { data: T; etag: number };
+const tag = async <T,>(call: (o: RequestOptions) => Promise<T>, o: RequestOptions = {}): Promise<Tagged<T>> => {
+  let etag = 0;
+  const data = await call({ ...o, onHeaders: (h) => { etag = Number((h.get('ETag') ?? '').replace(/\D/g, '')); } });
+  return { data, etag };
+};
+
+export const useSlaSets = () => useQuery({ queryKey: ['sla-sets'], queryFn: () => api.get<Page<SlaRuleSetSummary>>('/settings/sla-rule-sets').then((r) => r.items) });
+export const useSlaSet = (id?: string) => useQuery({ queryKey: ['sla-set', id], enabled: !!id, queryFn: () => tag((o) => api.get<SlaRuleSet>(`/settings/sla-rule-sets/${id}`, o)) });
+export const useCreateSlaDraft = () => {
+  const qc = useQueryClient();
+  return useMutation<SlaRuleSet, ApiError, { reason: string }>({ mutationFn: (body) => api.post('/settings/sla-rule-sets', { body }), onSettled: () => refresh(qc, 'sla-sets', 'sla-set') });
+};
+/** Saves changed rules; the rows change on screen at once and go back if the server refuses. */
+export function useSaveSlaDraft(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Tagged<SlaRuleSet>, ApiError, { etag: number; reason: string; rules: SlaTaskRule[] }, Snap>({
+    mutationFn: ({ etag, reason, rules }) => tag((o) => api.patch<SlaRuleSet>(`/settings/sla-rule-sets/${id}`, { ...o, version: etag, body: { reason, rules } })),
+    onMutate: async ({ rules }) => {
+      await qc.cancelQueries({ queryKey: ['sla-set', id] });
+      const before = qc.getQueryData<Tagged<SlaRuleSet>>(['sla-set', id]);
+      if (before) qc.setQueryData(['sla-set', id], { ...before, data: { ...before.data, rules: before.data.rules.map((r) => rules.find((x) => x.task_code === r.task_code) ?? r) } });
+      return { rollback: () => qc.setQueryData(['sla-set', id], before) };
+    },
+    onError: (_e, _v, c) => c?.rollback(),
+    onSuccess: (res) => qc.setQueryData(['sla-set', id], res),
+    onSettled: () => refresh(qc, 'sla-sets'),
+  });
+}
+export const usePreviewSla = (id: string) => useMutation<SlaPublishPreview, ApiError, { effective_date: string }>({ mutationFn: (body) => api.post(`/settings/sla-rule-sets/${id}/preview`, { body }) });
+// No optimistic flip here: the publish needs step-up and can be refused, and the dialog must stay open while it runs.
+export function usePublishSla(id: string) {
+  const qc = useQueryClient();
+  return useMutation<SlaRuleSetPublishResult, ApiError, { etag: number; effective_date: string; reason: string; apply_to_open_tasks: boolean }>({
+    mutationFn: ({ etag, ...body }) => api.post(`/settings/sla-rule-sets/${id}/publish`, { version: etag, idempotencyKey: crypto.randomUUID(), body }),
+    onSettled: () => refresh(qc, 'sla-sets', 'sla-set', 'sla-rules'),
+  });
+}
+/** Codes the start-event picker offers: tasks, milestones and gates of the workflow version in force. */
+export const useStartEvents = () => useQuery({
+  queryKey: ['start-events'], staleTime: Infinity,
+  queryFn: async () => {
+    const vs = (await api.get<{ items: WorkflowVersionSummary[] }>('/workflow/versions')).items;
+    const cur = vs.find((v) => v.is_current) ?? vs[0];
+    const [wf, td] = await Promise.all([api.get<WorkflowVersion>(`/workflow/versions/${cur.version}`), api.get<{ items: TaskDefinition[] }>('/settings/task-definitions', { query: { workflow_version: cur.version } })]);
+    return { tasks: td.items, milestones: wf.milestones, gates: wf.gates };
+  },
+});
+
+export const useWeightSetList = () => useQuery({ queryKey: ['weight-sets'], queryFn: () => api.get<{ items: WeightSet[] }>('/settings/weight-sets').then((r) => r.items) });
+export const useWeightSet = (id?: string) => useQuery({ queryKey: ['weight-set', id], enabled: !!id, queryFn: () => tag((o) => api.get<WeightSet>(`/settings/weight-sets/${id}`, o)) });
+export const useCreateWeightDraft = () => {
+  const qc = useQueryClient();
+  return useMutation<WeightSet, ApiError, { code: WeightSetCode; base_set_id?: string; reason: string }>({ mutationFn: (body) => api.post('/settings/weight-sets', { body }), onSettled: () => refresh(qc, 'weight-sets', 'weight-set') });
+};
+/** Saves the draft; the sets list shows the new weights at once and goes back if the server refuses. */
+export function useSaveWeightDraft(id: string) {
+  const qc = useQueryClient();
+  return useMutation<Tagged<WeightSet>, ApiError, { etag: number; body: WeightSetInput }, Snap>({
+    mutationFn: ({ etag, body }) => tag((o) => api.put<WeightSet>(`/settings/weight-sets/${id}`, { ...o, version: etag, body })),
+    onMutate: async ({ body }) => {
+      await qc.cancelQueries({ queryKey: ['weight-set', id] });
+      const before = qc.getQueryData<Tagged<WeightSet>>(['weight-set', id]);
+      if (before) qc.setQueryData(['weight-set', id], { ...before, data: { ...before.data, reason: body.reason, activities: body.activities.map((a) => ({ ...a, items: a.items ?? [] })) } });
+      return { rollback: () => qc.setQueryData(['weight-set', id], before) };
+    },
+    onError: (_e, _v, c) => c?.rollback(),
+    onSuccess: (res) => qc.setQueryData(['weight-set', id], res),
+    onSettled: () => refresh(qc, 'weight-sets'),
+  });
+}
+export const usePreviewWeights = (id: string) => useMutation<WeightSetPreview, ApiError, void>({ mutationFn: () => api.post(`/settings/weight-sets/${id}/preview`) });
+export function usePublishWeights(id: string) {
+  const qc = useQueryClient();
+  return useMutation<WeightSetPublishResult, ApiError, { etag: number; effective_date: string; reason: string }>({
+    mutationFn: ({ etag, ...body }) => api.post(`/settings/weight-sets/${id}/publish`, { version: etag, idempotencyKey: crypto.randomUUID(), body }),
+    onSettled: () => refresh(qc, 'weight-sets', 'weight-set'),
   });
 }

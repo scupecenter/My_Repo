@@ -20,6 +20,8 @@ export interface RequestOptions {
   /** Extra request headers, for example `X-PMIS-Live: 1` on timer-driven polling. */
   headers?: Record<string, string>;
   signal?: AbortSignal;
+  /** Called with the response headers of a successful call (for example to read the ETag). */
+  onHeaders?: (h: Headers) => void;
 }
 
 /** Resolves true once the user re-authenticated; false = cancelled. */
@@ -78,6 +80,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
     signal: opts.signal,
   });
   if (res.ok) {
+    opts.onHeaders?.(res.headers);
     const text = res.status === 204 ? '' : await res.text();
     return (text ? JSON.parse(text) : undefined) as T;
   }
