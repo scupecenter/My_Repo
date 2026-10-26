@@ -883,6 +883,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{task_id}/slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The task's document slots
+         * @description Same items as `TaskDetail.slots`, without loading the whole task (for example the per-task template upload and the slot pickers).
+         */
+        get: operations["listTaskSlots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/slots/{slot_id}/files": {
         parameters: {
             query?: never;
@@ -3775,6 +3795,8 @@ export interface components {
             holder_absent?: boolean;
             /** @description Working days without activity; alerts the lead at the idle-task setting. */
             idle_working_days?: number | null;
+            /** @description Why the task is locked (empty when it is not), so "Why locked?" needs no extra call. */
+            lock_reasons?: components["schemas"]["LockReason"][];
             version: number;
         };
         DocumentFile: {
@@ -3854,7 +3876,6 @@ export interface components {
             field_access?: {
                 [key: string]: "read" | "edit";
             };
-            lock_reasons?: components["schemas"]["LockReason"][];
             approval_path: components["schemas"]["ApprovalPathLevel"][];
             slots: components["schemas"]["DocumentSlot"][];
             missing_for_submit?: string[];
@@ -4473,6 +4494,11 @@ export interface components {
              * @description Set when the file was uploaded from beside a task.
              */
             task_id?: string | null;
+            /**
+             * Format: uuid
+             * @description The task's site when `task_id` is set.
+             */
+            site_id?: string | null;
             uploaded_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             uploaded_at?: string;
@@ -7273,6 +7299,33 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listTaskSlots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Slots. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DocumentSlot"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     uploadSlotFile: {
         parameters: {
             query?: never;
@@ -10014,7 +10067,10 @@ export interface operations {
                     file: string;
                     /** @description The template the user selected. */
                     template_id?: string;
-                    /** Format: uuid */
+                    /**
+                     * Format: uuid
+                     * @description Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.
+                     */
                     task_id?: string;
                 };
             };

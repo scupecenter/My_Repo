@@ -1,4 +1,5 @@
 import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Notification, Session, TaskDetail, TaskSummary, WorkflowStep } from '@/api/types';
+import { initAdmin } from './adminData';
 import { byId, staffRef, uid } from './ids';
 import { holdersOf, initialMatrix } from './matrixData';
 import { STAFF } from './staff';
@@ -7,8 +8,8 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Ahmed Salem', email: 'ahmed.salem@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.matrix', 'admin.settings', 'audit'] },
-  reviewer: { employee_id: '1102', name: 'Mona Fathi', email: 'mona.fathi@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'templates'] },
+  pm: { employee_id: '1001', name: 'Ahmed Salem', email: 'ahmed.salem@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'audit'] },
+  reviewer: { employee_id: '1102', name: 'Mona Fathi', email: 'mona.fathi@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'templates', 'absence'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
   pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
 };
@@ -42,7 +43,7 @@ const fresh = () => ({
   ] as MockTask[],
   /** Tasks the viewer submitted and is waiting on, and one overdue. */
   extra: [
-    mk(8, 'BG220', 5, 'D5', 'Power-on test', 'approve', '1001', { sla: { colour: 'red', min_wd: 2, max_wd: 4, elapsed_wd: 6, due_date: '2026-10-20' } }, 'entry'),
+    mk(8, 'BG220', 5, 'D5', 'Power-on test', 'approve', '1001', { sla: { colour: 'red', min_wd: 2, max_wd: 4, elapsed_wd: 6, due_date: '2026-10-20' }, idle_working_days: 3 }, 'entry'),
   ] as MockTask[],
   /** Generated site tasks changed by the user (full copies, keyed by task id). */
   ov: {} as Record<string, MockTask>,
@@ -51,6 +52,7 @@ const fresh = () => ({
     { id: '30000000-0000-4000-8000-000000000001', kind: 'approval_due', title: 'WM105 D14 waits for your approval', created_at: '2026-10-24T08:30:00Z', read_at: null, link: '/approvals' },
     { id: '30000000-0000-4000-8000-000000000002', kind: 'task_returned', title: 'ZW310 B6 was returned with a note', created_at: '2026-10-23T10:00:00Z', read_at: null, link: '/my-work' },
   ] as Notification[],
+  admin: initAdmin(),
   session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string },
 });
 
@@ -74,7 +76,12 @@ export const stepUpValid = () => { const t = db().session?.stepupAt; return !!t 
 
 export function viewer() {
   const s = db().session;
-  return s ? { ...ACCOUNTS[s.account], employee_id: s.employee_id ?? ACCOUNTS[s.account].employee_id, key: s.account, linked: s.linked } : null;
+  if (!s) return null;
+  const a = ACCOUNTS[s.account], employee_id = s.employee_id ?? a.employee_id;
+  // An admin assignment (Users & Roles) activates a pending account and opens the basic navigation.
+  const u = db().admin.users.find((x) => x.employee_id === employee_id);
+  const active = s.linked && u?.status === 'active';
+  return { ...a, employee_id, key: s.account, linked: s.linked, status: active ? ('active' as const) : a.status, nav: active && !a.nav.length ? ['my_work', 'approvals', 'sites', 'absence'] : a.nav };
 }
 
 export function sessionBody(): Session {
@@ -108,7 +115,9 @@ export const approvalsFor = () => [...db().tasks, ...Object.values(db().ov)].fil
 export function ballFor(t: MockTask): BallInCourt {
   const level = t.state === 'in_review' || t.state === 'in_approval' ? t.current_level ?? 2 : t.state === 'approved' ? t.levels_required ?? 3 : 1;
   const kind = level === 1 ? 'entry' : level >= (t.levels_required ?? 3) ? 'approve' : 'review';
-  return { level, level_kind: kind, holders: holdersOf(db().matrix, t.stage_code, level) };
+  const to = db().admin.reassigned[t.id];
+  const holders = to ? [{ kind: 'user' as const, ref_id: uid(to), user_id: uid(to), label: byId(to).name_en, employee_id: to }] : holdersOf(db().matrix, t.stage_code, level);
+  return { level, level_kind: kind, holders };
 }
 
 /** Levels after `level 1` the submitter's own seats take over (same person on consecutive levels, B5/B6/B7). */
@@ -123,10 +132,14 @@ export const canEditTask = (t: MockTask) => {
   return !!v && (v.key === 'pm' || holdersOf(db().matrix, t.stage_code, 1).some((a) => a.employee_id === v.employee_id));
 };
 
+/** Employee IDs with an absence that covers `day`. */
+export const absentOn = (day: string) => new Set(db().admin.absences.filter((a) => a.from_date <= day && day <= a.to_date).map((a) => a.employee_id));
+
 export function toSummary(t: MockTask): TaskSummary {
   const { submitted_by: _s, waiting_since: _w, level_kind: _l, docs: _d, external: _e, entered_by: _b, gen: _g, slots: _sl, steps: _st, comments: _c, locks: _lk, ...rest } = t;
   void [_s, _w, _l, _d, _e, _b, _g, _sl, _st, _c, _lk];
-  return { ...rest, ball_in_court: ballFor(t) };
+  const ball = ballFor(t), away = absentOn('2026-10-25');
+  return { ...rest, ball_in_court: ball, lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [], holder_absent: rest.holder_absent || (ball.holders.some((h) => !!h.employee_id && away.has(h.employee_id))) };
 }
 
 export function toApproval(t: MockTask): ApprovalItem {

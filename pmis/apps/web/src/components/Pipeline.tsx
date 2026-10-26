@@ -35,7 +35,7 @@ export function Pipeline({ nodes, selected, onSelect }: { nodes: PipelineNode[];
                 aria-pressed={selected === m.code} aria-label={`${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
                 <div className="node">
                   {m.state !== 'planned' && m.state !== 'na' && <Ring p={p} color={COLOR[m.state] ?? 'var(--lock)'} />}
-                  <b>{m.state === 'na' ? '—' : `${Math.round(p * 100)}%`}</b>
+                  <b style={p >= 1 ? { fontSize: 15 } : undefined}>{m.state === 'na' ? '—' : `${Math.round(p * 100)}%`}</b>
                   <small>{t(`pipe.${m.state}`)}</small>
                 </div>
                 <div className="nm">{name}</div>

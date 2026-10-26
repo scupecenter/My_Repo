@@ -10,6 +10,12 @@ import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
+import { Absence } from '@/pages/Absence';
+import { Delegation } from '@/pages/Delegation';
+import { Groups } from '@/pages/Groups';
+import { Roles } from '@/pages/Roles';
+import { UserDetailPage } from '@/pages/UserDetail';
+import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
 
 function Soon() {
@@ -32,6 +38,12 @@ function Gate() {
         <Route path="approvals" element={<Approvals />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
+        <Route path="admin/users" element={<Users />} />
+        <Route path="admin/users/:userId" element={<UserDetailPage />} />
+        <Route path="admin/roles" element={<Roles />} />
+        <Route path="admin/groups" element={<Groups />} />
+        <Route path="admin/delegation" element={<Delegation />} />
+        <Route path="absence" element={<Absence />} />
         <Route path="admin/matrix" element={<MatrixPage />} />
         <Route path="*" element={<Soon />} />
       </Route>

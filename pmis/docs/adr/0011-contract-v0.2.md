@@ -58,7 +58,14 @@ Owner request: the export can be full or partial, chosen from a list, and every 
 6. **Security: download.** `GET /exports/master/{export_id}/download` now streams the file with 200, `Content-Disposition: attachment` and `Cache-Control: no-store`, like `/files/{file_id}/download`, and replaces the 302 of amendment 0.2.2 (item 3; 409 and 410 `export_expired` are unchanged). The audit row is still written before streaming. The lint-ignore entry for this operation is removed. No client was built on the 302, so this is recorded as a correction of the same-day amendment, not as a breaking change.
 7. Additive otherwise: one operation, three schemas (`ExportPartKey`, `ExportPart`, `ExportView`), optional request fields, one response field. The sheet/column mapping per part is API work.
 
+## Amendment 0.2.4 (2026-10-25, additive)
+Gaps raised by frontend-engineer:
+1. `TaskSummary.lock_reasons` (optional array of `LockReason`, the same items `GET /tasks/{task_id}` returns) so "Why locked?" in the task grid needs no extra call. `TaskDetail` inherits it from `TaskSummary`; the shape is unchanged.
+2. `GET /tasks/{task_id}/slots` (`listTaskSlots`) returns `{ items: DocumentSlot[] }` for the task, with the same visibility as `GET /tasks/{task_id}`.
+3. The import batch created by a per-task template upload carries `task_id` and the new optional `site_id` in `ImportBatch`. `task_id` is documented on the `POST /import-batches` request (optional; a template the task does not use is 422).
+4. Additive only: one operation, one optional field on each of two schemas. The query that fills `lock_reasons` in lists is API work.
+
 ## Consequences
 - The web agent can build every screen against generated mocks; the API is built per tag in later PRs with the same contract.
-- The contract is large (193 operations). Each API PR must name the tag it implements, and conformance tests are generated per operation.
+- The contract is large (193 operations at 0.2.0; later amendments add more). Each API PR must name the tag it implements, and conformance tests are generated per operation.
 - Shapes marked as drafts above may change in 0.3. Those changes are breaking only for operations already implemented; none is implemented yet, so they are recorded in the changelog, not as new ADRs, until the first implementation merges.

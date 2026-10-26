@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it, vi } from 'vitest';
 import { server } from '@/mocks/server';
-import { api, ApiError, API_BASE, setCsrfToken, setStepUpHandler } from './client';
+import { api, ApiError, parseFilename, API_BASE, setCsrfToken, setStepUpHandler } from './client';
 import type { Problem } from './types';
 import { signIn } from '@/test/utils';
 
@@ -71,6 +71,20 @@ describe('api client', () => {
     await Promise.all([bulk(['10000000-0000-4000-8000-000000000001']), bulk(['10000000-0000-4000-8000-000000000002'])]);
     expect(handler).toHaveBeenCalledOnce();
     setStepUpHandler(null);
+  });
+});
+
+describe('parseFilename', () => {
+  it('prefers filename* with Arabic UTF-8', () => {
+    const n = encodeURIComponent('تصدير_المشروع.xlsx');
+    expect(parseFilename(`attachment; filename="export.xlsx"; filename*=UTF-8''${n}`)).toBe('تصدير_المشروع.xlsx');
+  });
+  it('falls back to quoted/plain filename and default', () => {
+    expect(parseFilename('attachment; filename="a b.xlsx"')).toBe('a b.xlsx');
+    expect(parseFilename('attachment; filename=a.xlsx')).toBe('a.xlsx');
+    expect(parseFilename(null)).toBe('download');
+    expect(parseFilename("attachment; filename*=UTF-8''%E0%A4%A")).toBe('download');
+    expect(parseFilename('attachment; filename="../x.xlsx"')).toBe('.._x.xlsx');
   });
 });
 

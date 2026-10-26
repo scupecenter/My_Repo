@@ -4,9 +4,12 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useRegions, useSite, useSiteTasks } from '@/api/sites';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
+import { ExportViewButton } from '@/components/ExportDialog';
 import { TaskGrid } from '@/components/TaskGrid';
 
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
+
+const TASK_COLUMNS = ['site_code', 'task_code', 'name_en', 'state', 'planned_date', 'actual_date', 'sla_due_date'];
 
 export function Site() {
   const { t, i18n } = useTranslation();
@@ -38,7 +41,8 @@ export function Site() {
           <div className="card mb-4 p-3"><Pipeline nodes={s.pipeline} selected={stage} onSelect={(c) => setParam('stage', stage === c ? null : c)} /></div>
         </>
       )}
-      <h2 className="mb-2 font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2>
+      <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2>
+        <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}) }} columns={TASK_COLUMNS} /></div>
       {grid.isLoading ? <p className="text-mute">{t('common.loading')}</p> : <TaskGrid key={stage ?? 'all'} siteId={siteId} stages={stages} onOpen={(id) => setParam('task', id)} />}
       <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>
       <TaskDrawer taskId={taskId} onClose={() => setParam('task', null)} />

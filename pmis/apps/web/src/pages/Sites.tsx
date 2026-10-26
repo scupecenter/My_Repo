@@ -1,11 +1,14 @@
+import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useRegions, useSites, type SiteFilters } from '@/api/sites';
+import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
 
 const ROW = 52;
+const SITE_COLUMNS = ['site_code', 'name', 'region', 'delivery_scenario', 'overall_status', 'current_milestone'];
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const STAGES = ['site_release', 'pre_cw', 'cw', 'site_rfi', 'te_installation', 'on_air', 'te_pac', 'kpi_acceptance', 'hoto', 'final_closure'];
@@ -23,6 +26,7 @@ function Select({ id, value, onChange, all, options }: { id: string; value: stri
 export function Sites() {
   const { t, i18n } = useTranslation();
   const [f, setF] = useState<SiteFilters>({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' });
+  const [exp, setExp] = useState(false);
   const set = (k: keyof SiteFilters) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const regions = useRegions();
   const q = useSites(f);
@@ -46,6 +50,8 @@ export function Sites() {
         <Select id="status" value={f.overall_status} onChange={set('overall_status')} all={t('sites.all_statuses')} options={STATUSES.map((s) => [s, t(`status.${s}`)])} />
         <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={STAGES.map((s) => [s, t(`stage.${s}`)])} />
         <span className="ms-auto text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>
+        <button className="btn" data-testid="sites-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
+        <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={SITE_COLUMNS} />
       </div>
       <div className="card overflow-hidden">
         <div className={`${ncols} border-b border-line bg-card2 py-2 text-sm font-semibold text-mute`} role="row">
@@ -68,6 +74,7 @@ export function Sites() {
           {q.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="sites-empty">{t('sites.empty')}</p>}
         </div>
       </div>
+      <ExportDialog open={exp} onClose={() => setExp(false)} />
     </div>
   );
 }

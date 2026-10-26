@@ -1,12 +1,13 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Eye, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications } from '@/api/hooks';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
+import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 
 export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'data' | 'admin' }[] = [
@@ -16,6 +17,10 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'd
   { key: 'dashboard', to: '/dashboard', icon: <BarChart3 size={18} />, group: 'work' },
   { key: 'templates', to: '/templates', icon: <FileText size={18} />, group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: <Users size={18} />, group: 'admin' },
+  { key: 'admin.roles', to: '/admin/roles', icon: <KeyRound size={18} />, group: 'admin' },
+  { key: 'admin.groups', to: '/admin/groups', icon: <UsersRound size={18} />, group: 'admin' },
+  { key: 'admin.delegation', to: '/admin/delegation', icon: <ShieldCheck size={18} />, group: 'admin' },
+  { key: 'absence', to: '/absence', icon: <UserX size={18} />, group: 'work' },
   { key: 'admin.matrix', to: '/admin/matrix', icon: <Table2 size={18} />, group: 'admin' },
   { key: 'admin.settings', to: '/admin/settings', icon: <Settings size={18} />, group: 'admin' },
   { key: 'audit', to: '/audit', icon: <Eye size={18} />, group: 'admin' },
@@ -31,6 +36,7 @@ export function Shell() {
   const logout = useLogout();
   const [side, setSide] = useState(true);
   const [palette, setPalette] = useState(false);
+  const [exp, setExp] = useState(false);
   const [theme, setTheme] = useState(currentTheme());
   const [lang, setLang] = useState(currentLocale());
 
@@ -84,6 +90,7 @@ export function Shell() {
           <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>
           </button>
+          <button className="btn" data-testid="topbar-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
           <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <NotificationBell count={pending} />
@@ -95,6 +102,7 @@ export function Shell() {
         </header>
         <main className="p-6"><Outlet /></main>
       </div>
+      <ExportDialog open={exp} onClose={() => setExp(false)} />
       <CommandPalette open={palette} onOpenChange={setPalette} items={items.map((i) => ({ key: i.key, to: i.to }))} />
     </div>
   );

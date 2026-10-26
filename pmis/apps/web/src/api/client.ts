@@ -92,19 +92,39 @@ export const api = {
   get: <T>(p: string, o?: RequestOptions) => request<T>('GET', p, o),
   post: <T>(p: string, o?: RequestOptions) => request<T>('POST', p, o),
   patch: <T>(p: string, o?: RequestOptions) => request<T>('PATCH', p, o),
+  put: <T>(p: string, o?: RequestOptions) => request<T>('PUT', p, o),
+  del: <T>(p: string, o?: RequestOptions) => request<T>('DELETE', p, o),
 };
+
+/** RFC 6266: prefer filename*=UTF-8''..., then filename=, else a safe default. Path separators are stripped. */
+export function parseFilename(cd: string | null): string {
+  let name: string | undefined;
+  const star = /filename\*\s*=\s*(?:UTF-8|utf-8)'[^']*'([^;]+)/.exec(cd ?? '')?.[1];
+  if (star) {
+    try {
+      name = decodeURIComponent(star.trim().replace(/^"|"$/g, ''));
+    } catch {
+      name = undefined;
+    }
+  }
+  name ??= /filename\s*=\s*("([^"]*)"|[^;]+)/.exec(cd ?? '')?.[1]?.trim().replace(/^"|"$/g, '');
+  name = name?.replace(/[\\/\0]/g, '_').trim();
+  return name || 'download';
+}
 
 /** Fetch a file with the session cookie and hand it to the browser as a download. Returns the file name. */
 export async function downloadFile(path: string, query?: RequestOptions['query']): Promise<string> {
   const res = await fetch(buildUrl(path, query), { credentials: 'include' });
   if (!res.ok) throw new ApiError(res.status, await toProblem(res));
-  const name = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? 'download';
+  const name = parseFilename(res.headers.get('Content-Disposition'));
   const blob = await res.blob();
   if (typeof URL.createObjectURL === 'function') {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
+    document.body.append(a);
     a.click();
+    a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
   }
   return name;

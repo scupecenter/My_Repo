@@ -38,8 +38,8 @@ export function StepUpProvider({ children }: { children: ReactNode }) {
       {children}
       <Dialog.Root open={!!problem} onOpenChange={(o) => { if (!o) finish(false); }}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-scrim/60" />
-          <Dialog.Content data-testid="stepup-dialog" className="card fixed inset-x-0 top-1/3 z-50 mx-auto w-[min(420px,92vw)] p-5">
+          <Dialog.Overlay className="fixed inset-0 z-[90] bg-scrim/60" />
+          <Dialog.Content data-testid="stepup-dialog" className="card fixed inset-x-0 top-1/3 z-[90] mx-auto w-[min(420px,92vw)] p-5">
             <Dialog.Title className="text-lg font-bold">{t('stepUp.title')}</Dialog.Title>
             <Dialog.Description className="mt-1 text-mute">{t('stepUp.body')}</Dialog.Description>
             <div className="mt-4 flex justify-end gap-2">
