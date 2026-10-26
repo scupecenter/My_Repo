@@ -9,7 +9,8 @@ import { TaskGrid } from '@/components/TaskGrid';
 
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
 
-const TASK_COLUMNS = ['site_code', 'task_code', 'name_en', 'state', 'planned_date', 'actual_date', 'sla_due_date'];
+// ExportColumnCode values (stable codes of the `tasks` part).
+const TASK_COLUMNS = ['site_code', 'task_code', 'task_name', 'task_state', 'planned_date', 'actual_date', 'sla_due_date'];
 
 export function Site() {
   const { t, i18n } = useTranslation();

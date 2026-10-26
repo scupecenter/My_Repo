@@ -17,6 +17,9 @@ import { Roles } from '@/pages/Roles';
 import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
+import { OnlineNow } from '@/pages/OnlineNow';
+import { SecurityLog } from '@/pages/SecurityLog';
+import { SettingsRoutes } from '@/pages/settings/Settings';
 
 function Soon() {
   const { t } = useTranslation();
@@ -45,6 +48,9 @@ function Gate() {
         <Route path="admin/delegation" element={<Delegation />} />
         <Route path="absence" element={<Absence />} />
         <Route path="admin/matrix" element={<MatrixPage />} />
+        <Route path="admin/settings/*" element={<SettingsRoutes />} />
+        <Route path="admin/security-log" element={<SecurityLog />} />
+        <Route path="admin/online" element={<OnlineNow />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

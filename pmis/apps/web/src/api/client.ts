@@ -17,6 +17,8 @@ export interface RequestOptions {
   /** Resource version; sent as `If-Match: "<version>"`. */
   version?: number;
   idempotencyKey?: string;
+  /** Extra request headers, for example `X-PMIS-Live: 1` on timer-driven polling. */
+  headers?: Record<string, string>;
   signal?: AbortSignal;
 }
 
@@ -65,6 +67,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
   if (opts.body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   if (opts.version !== undefined) headers['If-Match'] = `"${opts.version}"`;
   if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
+  Object.assign(headers, opts.headers);
   if (method !== 'GET' && csrf) headers['X-CSRF-Token'] = csrf;
 
   const res = await fetch(buildUrl(path, opts.query), {

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile } from './client';
 import type {
-  Absence, AbsenceInput, Assignment, AssignmentPatch, BulkAssignRequest, BulkResult, Delegation, DelegationInput, ExportPart, GroupDetail, Group, MasterExport, MasterExportRequest, MfaExemption,
+  Absence, AbsenceInput, Assignment, AssignmentPatch, BulkAssignRequest, BulkResult, Delegation, DelegationInput, ExportPart, ExportPartKey, GroupDetail, Group, MasterExport, MasterExportRequest, MfaExemption,
   Page, PermissionProfile, ReassignRequest, ReassignmentAlert, Role, User, UserDetail, UserPickerItem,
 } from './types';
 
@@ -187,3 +187,11 @@ export const useStartExport = () => {
   return useMutation<unknown, ApiError, MasterExportRequest>({ mutationFn: (body) => api.post('/exports/master', { idempotencyKey: crypto.randomUUID(), body }), onSettled: () => refresh(qc, 'exports') });
 };
 export const downloadExport = (id: string) => downloadFile(`/exports/master/${id}/download`);
+
+/** Column codes a list screen may send in `ExportView.columns` for one part. */
+export const useExportColumns = (source: ExportPartKey) =>
+  useQuery({
+    queryKey: ['export-columns'], staleTime: Infinity,
+    queryFn: () => api.get<{ items: ExportPart[] }>('/exports/parts', { query: { include_columns: true } }).then((r) => r.items),
+    select: (items) => items.find((p) => p.key === source)?.columns?.map((c) => c.code),
+  }).data;

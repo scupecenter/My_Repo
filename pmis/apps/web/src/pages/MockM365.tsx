@@ -37,7 +37,7 @@ export function MockM365() {
         <h1 className="text-xl font-bold">{t('mock.title')}</h1>
         {hint && <p className="text-sm text-mute" data-testid="mock-hint">{t('mock.hint')}: <span dir="ltr">{hint}</span></p>}
         <p className="font-semibold">{t('mock.pick')}</p>
-        {(['pm', 'reviewer', 'newbie', 'pending'] as const).map((a) => (
+        {(['pm', 'reviewer', 'auditor', 'newbie', 'pending'] as const).map((a) => (
           <button key={a} className="btn w-full justify-start" data-testid={`mock-account-${a}`} onClick={() => void pick(a)}>{t(`mock.${a}`)}</button>
         ))}
         {err && <p role="alert" className="text-lateInk">{t('login.error')}</p>}

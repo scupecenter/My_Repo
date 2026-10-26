@@ -5,6 +5,7 @@ import { GROUPS, ROLES } from './matrixData';
 import { STAFF } from './staff';
 
 export type MockUser = { employee_id: string; status: 'pending_assignment' | 'active' | 'suspended' | 'disabled'; version: number; mfa: { exempt: boolean; until: string | null; reason: string | null; by: string | null } };
+export type MockDeleted = { employee_id: string; name_en: string; email: string; status: MockUser['status']; deleted_at: string; deleted_by: string; reason: string; version: number };
 export type MockProfile = { id: string; code: string; name_en: string; name_ar: string; is_active: true; grants: []; version: 1; assignment_count: number };
 export type MockExport = MasterExport & { polls: number; size: number };
 
@@ -34,11 +35,16 @@ export function initAdmin() {
   const groups = GROUPS.map((g, i) => ({ ...g, members: (i === 0 ? ['1001', '1102', '1203'] : i === 1 ? ['1204', '1205', '1206', '1207'] : ['1305', '1306', '1307']).map((e) => e) })) as (Group & { members: string[] })[];
   return {
     users, assignments, roles: ROLES.map((r) => ({ ...r, version: 1 })) as Role[], groups,
-    delegations: [] as { id: string; from: string; to: string; scope: 'full' | 'partial'; rights: string[]; valid_from: string; valid_to: string | null; revoked_at: string | null; reason: string; group_id?: string; role_id?: string }[],
+    delegations: [] as { id: string; from: string; to: string | null; target_kind: 'user' | 'role' | 'group'; target_id: string; label: string; region_codes: number[]; module_codes: string[]; allow_redelegate: boolean; scope: 'full' | 'partial'; rights: string[]; valid_from: string; valid_to: string | null; revoked_at: string | null; reason: string; group_id?: string; role_id?: string }[],
     absences: [{ id: '95000000-0000-4000-8000-000000000001', employee_id: '1102', kind: 'sick' as const, from_date: '2026-10-24', to_date: '2026-10-29', note: 'Sick leave', recorded_by: '1001', version: 1 }] as { id: string; employee_id: string; kind: 'annual' | 'sick' | 'emergency' | 'other'; from_date: string; to_date: string; note: string | null; recorded_by: string; version: number }[],
     reassigned: {} as Record<string, string>, kept: {} as Record<string, string>, onBehalf: {} as Record<string, string>,
     idleDays: 2,
     exports: [] as MockExport[],
+    /** Soft-deleted accounts (B14). 9001 is synthetic: its email now belongs to another account, so it cannot be restored. */
+    deleted: [
+      { employee_id: '1104', name_en: byId('1104').name_en, email: byId('1104').email, status: 'disabled', deleted_at: '2026-10-10T09:00:00Z', deleted_by: '1001', reason: 'Left the company', version: 3 },
+      { employee_id: '9001', name_en: 'Rami Tester', email: 'ahmed.salem@example.com', status: 'disabled', deleted_at: '2026-10-12T09:00:00Z', deleted_by: '1001', reason: 'Duplicate account', version: 2 },
+    ] as MockDeleted[],
   };
 }
 export type AdminDb = ReturnType<typeof initAdmin>;

@@ -4,6 +4,7 @@ import type { Matrix, MatrixPatch } from '@/api/types';
 import { canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
 import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handlers';
 import { uid } from './ids';
+import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
 import { detail, gridOf, listItem, siteIndex, SITE_COUNT, siteMeta, TODAY } from './sites';
 
@@ -129,7 +130,10 @@ export const siteHandlers = [
   http.get(`${B}/matrix`, () => {
     const g = guard(); if (g) return g;
     const m = db().matrix;
-    return HttpResponse.json(m, { headers: { ETag: `"${m.version}"` } });
+    // B14: a deactivated or deleted holder keeps the seat and shows the badge.
+    const tag = (x: unknown): unknown => Array.isArray(x) ? x.map(tag) : x && typeof x === 'object'
+      ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, tag(v)]).concat((x as { kind?: string }).kind === 'user' && (x as { employee_id?: string }).employee_id ? [['account_status', accountStatus((x as { employee_id: string }).employee_id)]] : [])) : x;
+    return HttpResponse.json(tag(m) as never, { headers: { ETag: `"${m.version}"` } });
   }),
   http.patch(`${B}/matrix`, async ({ request }) => {
     const g = guard(); if (g) return g;

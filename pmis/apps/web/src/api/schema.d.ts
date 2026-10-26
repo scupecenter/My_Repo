@@ -58,7 +58,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Current session state and CSRF token */
+        /**
+         * Current session state and CSRF token
+         * @description A timer-driven call sends `X-PMIS-Live: 1`; it does not extend the idle timeout.
+         */
         get: operations["getSession"];
         put?: never;
         post?: never;
@@ -236,9 +239,29 @@ export interface paths {
         };
         /**
          * Registered employees (everyone who signed in with M365)
-         * @description Needs `view` on `admin.users`. Name pickers use `GET /users/picker`, which returns a reduced shape.
+         * @description Needs `view` on `admin.users`. Name pickers use `GET /users/picker`, which returns a reduced shape. Soft-deleted users (B14) are not listed here; see `GET /users/deleted`.
          */
         get: operations["listUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/deleted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Soft-deleted users (B14), newest deletion first
+         * @description Needs `view` on `admin.users`. Each row says whether it can be restored (`can_restore`) and why not (`restore_blocked_reason`).
+         */
+        get: operations["listDeletedUsers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -285,9 +308,51 @@ export interface paths {
         head?: never;
         /**
          * Change status or employee ID (admin)
-         * @description Deactivating a user releases their claimed tasks back to the cell (AU-09). Refused with `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
+         * @description Deactivating a user (`status` suspended or disabled) ends all their sessions at once (security log `session_revoked_by_admin`). Claimed tasks return to the cell (AU-09). Tasks held at a level by the person do **not** move (B14, B12b): they stay on the person with `holder_account_status` = `deactivated`, the Team Lead is alerted at once (`holder_deactivated`, `GET /reassignments/alerts`) and decides with `POST /tasks/reassign` or `POST /tasks/{task_id}/act-on-behalf`. SLA never pauses or resets. A level left with no eligible active holder goes to the System Admins' inbox as "no holder" (B10).
+         *     Refused with 409 `last_admin` if it would leave no active System Admin, and with `self_beneficiary` for the caller's own row.
          */
         patch: operations["updateUser"];
+        trace?: never;
+    };
+    "/users/{user_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Soft-delete a user (B14); reversible with restore
+         * @description Sets `deleted_at`, `deleted_by` and the reason; the row, its history and its assignments are kept (nothing is hard-deleted). The user is deactivated first if needed, all sessions end, and the account can no longer sign in. Same effect on open tasks as a deactivation: **nothing moves automatically**; tasks stay on the person with `holder_account_status` = `deleted`, the Team Lead is alerted (`holder_deactivated`) and uses reassign, act on behalf or keep (B12b). SLA never pauses or resets.
+         *     Refused with 409 `last_admin` if it would leave no active System Admin, 403 `self_beneficiary` for the caller's own row, and 409 `invalid_transition` when already deleted.
+         */
+        post: operations["deleteUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a soft-deleted user (B14)
+         * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
+         */
+        post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/users/{user_id}/assignments": {
@@ -357,7 +422,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Edit level, regions, modules, profiles or dates of many rows */
+        /**
+         * Edit level, regions, modules, profiles or dates of many rows
+         * @description A change (lower level, narrower scope, earlier `valid_to`) that would leave no active System Admin is refused with `last_admin`, per row in `failed`, or 409 when every row is refused.
+         */
         post: operations["bulkUpdateAssignments"];
         delete?: never;
         options?: never;
@@ -377,6 +445,7 @@ export interface paths {
         /**
          * Remove (end) assignment rows
          * @description Sets `valid_to` (default now); rows are never deleted (AU-13). Claimed tasks of the ended role return to their cell.
+         *     A row whose end would leave no active System Admin is refused with `last_admin`: reported in `failed` of the result, and the whole request answers 409 `last_admin` when every row is refused.
          */
         post: operations["bulkEndAssignments"];
         delete?: never;
@@ -396,7 +465,7 @@ export interface paths {
         put?: never;
         /**
          * Copy the active rows of one person to others (add or replace)
-         * @description Use `dry_run=true` for the preview shown before confirming (AU-13).
+         * @description Use `dry_run=true` for the preview shown before confirming (AU-13). A `to_user_ids` entry equal to the caller is refused with 403 `self_beneficiary` (also in the dry run) unless the caller is a System Admin acting without delegation, so nobody can copy another person's rights to themselves; `idm_copy_assignments` enforces it like `idm_assign`.
          */
         post: operations["copyAssignments"];
         delete?: never;
@@ -439,7 +508,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rename, change defaults, or deactivate a role (never deleted while assigned) */
+        /**
+         * Rename, change defaults, or deactivate a role (never deleted while assigned)
+         * @description Deactivating the role that gives the System Admin rights, or removing those rights from it, is refused with 409 `last_admin` when it would leave no active System Admin. A role with active assignments is refused with 409 `role_in_use`.
+         */
         patch: operations["updateRole"];
         trace?: never;
     };
@@ -535,7 +607,10 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Rename, describe or deactivate a group */
+        /**
+         * Rename, describe or deactivate a group
+         * @description Deactivating the System Admins group is refused with 409 `last_admin`.
+         */
         patch: operations["updateGroup"];
         trace?: never;
     };
@@ -552,7 +627,7 @@ export interface paths {
         put?: never;
         /**
          * Add members
-         * @description Only a System Admin acting without delegation may change the System Admins group. Pending users are refused.
+         * @description Only a System Admin acting without delegation may change the System Admins group. Pending users are refused. When the group is the target of an active delegation (0.2.5), the caller cannot add themselves (403 `self_beneficiary`) unless they are a System Admin acting without delegation, so group membership cannot be used to grant oneself delegated rights.
          */
         post: operations["addGroupMembers"];
         delete?: never;
@@ -576,7 +651,7 @@ export interface paths {
         post?: never;
         /**
          * Remove a member
-         * @description Refused with `last_admin` when it would leave the System Admins group without an active member. Claimed tasks of the member under this group return to the group.
+         * @description Refused with 409 `last_admin` when it would leave the System Admins group without an active member. Claimed tasks of the member under this group return to the group.
          */
         delete: operations["removeGroupMember"];
         options?: never;
@@ -1092,6 +1167,7 @@ export interface paths {
          *     Answers 409 `freeze_active` during the structural freeze (`GET /settings/structural-freeze`, B9).
          *     During the parallel run, a change that affects Master export columns needs `confirm_master_impact` equal to the
          *     phrase in `master_impact.confirmation_phrase` of the validation result.
+         *     Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `v<version>` (for example `v4`), else 422 `confirmation_mismatch`.
          */
         post: operations["publishWorkflowVersion"];
         delete?: never;
@@ -1233,6 +1309,147 @@ export interface paths {
         put?: never;
         /** Export the filtered Audit Log as CSV (job; the export is itself audited) */
         post: operations["exportAuditLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit-log/integrity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify the hash chain of the Audit Log (System Admins only)
+         * @description The Audit Log is an append-only hash chain: each row stores the hash of the previous row, and the database refuses update and delete. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+         */
+        get: operations["getAuditLogIntegrity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign-in and security log (append-only; no write endpoint exists)
+         * @description Needs a System Admin or the grant `view_security_log`. Newest first. Reading is itself audited (Audit Log action `security_log.read`, with the filters used). Separate from the Audit Log and the System Log; kept for `security_log_days` (`GET /settings/log-retention`).
+         *     An identifier typed in the one-box sign-in that matches no registry row is never stored raw (see `identifier_masked`). `ip` is shown to System Admins only.
+         */
+        get: operations["listSecurityLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security-log/exports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export the filtered security log as CSV (job; the export is itself audited)
+         * @description Goes through the existing export service (job kind `security_export`). Needs the `export` grant and `view_security_log` (or System Admin). `ip` follows the same rule as the list.
+         */
+        post: operations["exportSecurityLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security-log/integrity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify the hash chain of the security log (System Admins only)
+         * @description Same contract as `GET /audit-log/integrity` for the security log, which is also an append-only hash chain. The check is audited. A break raises the mandatory alert `audit_integrity_failure`.
+         */
+        get: operations["getSecurityLogIntegrity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/active": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who is online now
+         * @description Needs a System Admin or the grant `manage_users`. The screen polls this with `X-PMIS-Live: 1`; polling never counts as user activity, so it cannot keep a session alive. `status` is `online` when the person had real activity inside the presence window (server setting, default 5 minutes), otherwise `idle`. The raw `ip` is returned to System Admins only; for everyone else it is null.
+         */
+        get: operations["listActiveSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{session_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End one session
+         * @description Needs a System Admin or the grant `manage_users`. The person's next request answers 401. Security log `session_revoked_by_admin`; audited with the reason. The caller's own session is refused (use `POST /auth/logout`).
+         */
+        post: operations["revokeSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/sessions/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End all sessions of a user
+         * @description Same rules as `POST /sessions/{session_id}/revoke`, for every session of the user. Deactivating or deleting a user does this automatically. A caller's own sessions are not touched.
+         */
+        post: operations["revokeUserSessions"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1627,6 +1844,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/tasks/{task_id}/act-on-behalf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Act on the task's current level on behalf of its assignee (B12b choice 3)
+         * @description For a Team Lead (the `reassign` grant for the module and region) or a System Admin. Performs `action` at the current level instead of its holder.
+         *     `reason` is mandatory. `level` must equal the task's current level, else 409 `invalid_transition`. Nothing is reset: SLA start and version, stage progress, entered data and documents stay (B12b).
+         *     The normal rules apply unchanged: a level the caller also holds next is skipped and logged (`skipped_levels`), and if the caller ends up holding every level the result is a self-approval (B5, flagged in KPIs and the Audit Log, step-up needed). `reject` needs `note` (422 `note_required`).
+         *     Audit and `WorkflowStep` record the step as "lead on behalf of the assignee": `acted_by` = caller, `on_behalf_of` = the person who held the level, `on_behalf_kind` = `assignee`.
+         */
+        post: operations["actOnBehalf"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/reassignments/eligible-users": {
         parameters: {
             query?: never;
@@ -1656,7 +1896,7 @@ export interface paths {
         };
         /**
          * Tasks that need a lead decision (absent holder or idle)
-         * @description A task shows when its holder has an active absence, or when it has had no activity for `working_days` (setting). Scoped to the caller's modules and regions.
+         * @description A task shows when its holder has an active absence, when it has had no activity for `working_days` (setting), or when its holder's account is deactivated or deleted (`holder_deactivated`, B14). Scoped to the caller's modules and regions.
          */
         get: operations["listReassignmentAlerts"];
         put?: never;
@@ -1678,6 +1918,86 @@ export interface paths {
         get: operations["getIdleTaskAlertSetting"];
         /** Set the idle days that alert the lead (default 2 working days) */
         put: operations["setIdleTaskAlertSetting"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/notification-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notification policy (switch, timezone, digest, thresholds, type by recipient matrix)
+         * @description Needs `view` on `admin.settings` (System Admin or a delegate holding `settings.edit`). The personal channel preferences stay in `/me/notification-preferences`; the policy is the system-wide frame they work inside (a type switched off here, or a mandatory type, cannot be changed per person).
+         */
+        get: operations["getNotificationPolicy"];
+        /**
+         * Replace the notification policy
+         * @description Needs the `settings` permission or a delegation of it. Versioned, audited with before and after values and a reason, like the other settings.
+         *     **Closed schema:** an unknown key anywhere in the body is 422 `validation_failed`. Field-level errors list `path` and `code`.
+         *     **Cross-field rule:** `thresholds.approval_escalate_days * 24` must be greater than `thresholds.approval_remind_hours`, else 422 `validation_failed` with errors on both paths (`code` = `must_exceed_remind_hours`).
+         *     **Mandatory types** (`mandatory` in the catalogue) cannot be switched off: a channel that is on by default stays on and the cells of the default recipients stay on, else 422 with `code` = `mandatory_locked`. A cell for a role or group that the catalogue does not make eligible for the type is `not_eligible_recipient`. A `timezone` that is not an IANA zone is `invalid_timezone`.
+         *     Rows left out of `matrix` keep the catalogue defaults.
+         *     **Security and system types (0.2.5 hardening):** every `security` type is mandatory for the System Admins. A body that changes any `security` or `system` row, or a threshold that feeds one (`rate_cap_per_hour`), needs step-up and a System Admin acting without delegation (403 `delegate_forbidden`); the change sends the System Admins an in-app alert naming the actor.
+         */
+        put: operations["setNotificationPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/notification-policy/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Notification types the policy matrix can govern (system-defined, read-only)
+         * @description Small bounded catalogue, so no cursor. Security and system types go to System Admins only (`system_admins_only`).
+         *     Seed: **approvals** `task_submitted_review`, `task_submitted_approval`, `approval_overdue_reminder`, `approval_overdue_escalation`, `no_holder` (B10, immediate, mandatory);
+         *     **tasks** `task_rejected` (with note), `task_idle` (N days from `/settings/idle-task-alert`), `assignee_absent`, `holder_deactivated` (B14, immediate, to the Team Lead);
+         *     **sla** `sla_near_max`, `sla_exceeded`;
+         *     **registers** `batch_upload_pending`, `batch_upload_result`, `snag_opened`, `snag_closed`, `pac_blocked_by_snags`;
+         *     **system** `holiday_tentative_reminder` (14 days ahead), `structural_freeze_lifted`;
+         *     **security** (all mandatory for the System Admins, in-app and email) `repeated_failed_sign_in`, `callback_account_mismatch`, `audit_integrity_failure`, `retention_reduced`, `mfa_exemption_granted`, `mfa_exemption_revoked`, `admin_override_used`.
+         */
+        get: operations["listNotificationTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/log-retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retention of the System Log and the security log
+         * @description The Audit Log is kept 10 years, is never purged and is **not settable** (`audit_log_years` is read-only).
+         */
+        get: operations["getLogRetention"];
+        /**
+         * Set the retention days of the System Log and the security log
+         * @description Closed schema: `audit_log_years` or any other key is 422 `validation_failed`; a value below its minimum is 422 with the field error.
+         *     **Reducing** any value needs step-up and emits the mandatory alert `retention_reduced` to the System Admins (in-app and email); raising a value needs no step-up. Every change is audited with before and after values and the reason. The purge job applies the new value on its next run.
+         */
+        put: operations["setLogRetention"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1870,7 +2190,7 @@ export interface paths {
         put?: never;
         /**
          * Lift the freeze (System Admin only)
-         * @description Needs a written reason and step-up. The lift is audited.
+         * @description Needs a written reason and step-up. The lift is audited. Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `structural-freeze`, else 422 `confirmation_mismatch`.
          */
         post: operations["liftStructuralFreeze"];
         delete?: never;
@@ -2906,7 +3226,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** My in-app notifications */
+        /**
+         * My in-app notifications
+         * @description The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout.
+         */
         get: operations["listNotifications"];
         put?: never;
         post?: never;
@@ -3153,7 +3476,7 @@ export interface components {
             missing?: string[];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -3189,10 +3512,12 @@ export interface components {
             message?: string;
         };
         Reason: string;
+        /** @description Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check. */
+        ConfirmText: string;
         Job: {
             id: string;
             /** @enum {string} */
-            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate" | "master_export";
+            kind: "zip_export" | "audit_export" | "workflow_migration" | "import_parse" | "import_apply" | "sla_recalculation" | "pdf_generate" | "master_export" | "security_export";
             /** @enum {string} */
             status: "queued" | "running" | "done" | "failed";
             progress?: number;
@@ -3236,6 +3561,21 @@ export interface components {
             label_ar: string;
             /** @description Master sheet that holds the part. */
             master_sheet: string;
+            /** @description Present with `include_columns=true`. The columns a list screen may send in `ExportView.columns` (0.2.5). */
+            columns?: components["schemas"]["ExportColumn"][];
+        };
+        /** @description Stable, language-independent column code of a part, for example `site_code`, `region`, `ms_site_release_actual`. A custom field is `cf:<field code>`. Codes never change when a label is renamed. */
+        ExportColumnCode: string;
+        ExportColumn: {
+            code: components["schemas"]["ExportColumnCode"];
+            label_en: string;
+            label_ar: string;
+            /** @description Master column letters (for example `AB`); null for a custom field without a Master export column. */
+            master_column?: string | null;
+            /** @description true for a custom field. */
+            custom?: boolean;
+            /** @description Shown by default on the list screen. */
+            default_visible?: boolean;
         };
         /** @description The current view of a list screen. The export has exactly these rows (filters), columns and order, in the Master layout of the source part. */
         ExportView: {
@@ -3244,8 +3584,8 @@ export interface components {
             filters: {
                 [key: string]: unknown;
             };
-            /** @description Master column codes or custom field codes, in screen order. */
-            columns: string[];
+            /** @description Column codes of `source` from `GET /exports/parts?include_columns=true`, in screen order (the visible columns of the screen). A code that does not belong to `source` is 422 `validation_failed` with the path of the item; a column the caller cannot read is omitted. */
+            columns: components["schemas"]["ExportColumnCode"][];
             /** @description Sort expression of the list endpoint. */
             sort?: string;
         };
@@ -3310,8 +3650,11 @@ export interface components {
          * @example audit
          */
         ModuleKey: string;
-        /** @enum {string} */
-        PermissionAction: "view" | "create" | "edit" | "delete" | "approve" | "export" | "import" | "download_documents" | "view_audit" | "administer";
+        /**
+         * @description `manage_users` (module `admin.users`) opens the active-sessions list and session revoke; `view_security_log` (module `admin.security_log`) opens the security log (0.2.5).
+         * @enum {string}
+         */
+        PermissionAction: "view" | "create" | "edit" | "delete" | "approve" | "export" | "import" | "download_documents" | "view_audit" | "administer" | "manage_users" | "view_security_log";
         /**
          * @description Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2).
          * @enum {string}
@@ -3395,9 +3738,27 @@ export interface components {
             mfa_exempt_until?: string | null;
             /** Format: date-time */
             last_login_at?: string | null;
+            /**
+             * Format: date-time
+             * @description Soft delete (B14); null while the user is not deleted.
+             */
+            deleted_at?: string | null;
+            deleted_by?: components["schemas"]["UserRef"] | null;
+            delete_reason?: string | null;
             /** Format: date-time */
             created_at?: string;
             version?: number;
+        };
+        /**
+         * @description Badge on a person who holds a task (B14): `deactivated` = status suspended or disabled, `deleted` = soft-deleted. The task stays on the person; the Team Lead decides (B12b).
+         * @enum {string}
+         */
+        UserAccountStatus: "active" | "deactivated" | "deleted";
+        DeleteReason: string;
+        DeletedUser: components["schemas"]["User"] & {
+            /** @description false when the employee ID or the email is now owned by another account. */
+            can_restore?: boolean;
+            restore_blocked_reason?: string | null;
         };
         UserDetail: components["schemas"]["User"] & {
             assignments?: components["schemas"]["Assignment"][];
@@ -3574,10 +3935,22 @@ export interface components {
             /** Format: uuid */
             id: string;
             from_user: components["schemas"]["UserRef"];
-            to_user: components["schemas"]["UserRef"];
+            /** @description The delegate when `target_kind` is `user`; null for a role or group target (0.2.5). */
+            to_user?: components["schemas"]["UserRef"] | null;
+            target_kind: components["schemas"]["DelegationTargetKind"];
+            target?: components["schemas"]["DelegationTarget"];
             /** @enum {string} */
             scope: "full" | "partial";
             rights?: components["schemas"]["DelegableRight"][];
+            /** @description Regions where the delegation applies; empty = all regions. */
+            region_codes?: components["schemas"]["RegionId"][];
+            /** @description Modules where the delegation applies; empty = all modules. */
+            module_codes?: components["schemas"]["ModuleKey"][];
+            /**
+             * @description The delegate may delegate further. Default false (a delegate cannot re-delegate unless the admin allows it here).
+             * @default false
+             */
+            allow_redelegate: boolean;
             /** Format: date-time */
             valid_from: string;
             /** Format: date-time */
@@ -3589,13 +3962,50 @@ export interface components {
             revoked_at?: string | null;
             revoked_by?: components["schemas"]["UserRef"];
         };
-        DelegationInput: {
+        /**
+         * @description Delegation goes to anyone (CLAUDE.md "Delegation covers anything, to anyone"). Every active member of a role or group holds the delegated rights while they are members; each action is logged "X on behalf of System Admin". Joining the target cannot be used to grant oneself the rights; adding oneself to a target group, or assigning oneself a target role, is refused with `self_beneficiary` unless done by a System Admin acting without delegation.
+         * @enum {string}
+         */
+        DelegationTargetKind: "user" | "role" | "group";
+        DelegationTarget: {
+            kind: components["schemas"]["DelegationTargetKind"];
             /** Format: uuid */
-            to_user_id: string;
+            id: string;
+            /** @description Display name of the person, role or group. */
+            label: string;
+        };
+        /** @description Name the target either with `to_user_id` (a person, as in 0.2.4) or with `target_kind` and `target_id`. Giving both, or neither, is 422 `validation_failed`. */
+        DelegationInput: {
+            /**
+             * Format: uuid
+             * @description Shorthand for `target_kind` = `user`. Kept from 0.2.4.
+             */
+            to_user_id?: string;
+            target_kind?: components["schemas"]["DelegationTargetKind"];
+            /**
+             * Format: uuid
+             * @description Required with `target_kind`: the user, role or group.
+             */
+            target_id?: string;
             /** @enum {string} */
             scope: "full" | "partial";
             /** @description Required when scope = partial. */
             rights?: components["schemas"]["DelegableRight"][];
+            /**
+             * @description Regions where the delegation applies; empty = all regions.
+             * @default []
+             */
+            region_codes: components["schemas"]["RegionId"][];
+            /**
+             * @description Modules where the delegation applies; empty = all modules.
+             * @default []
+             */
+            module_codes: components["schemas"]["ModuleKey"][];
+            /**
+             * @description Lets the delegate delegate further. Off unless the admin sets it.
+             * @default false
+             */
+            allow_redelegate: boolean;
             /** Format: date-time */
             valid_from: string;
             /**
@@ -3717,6 +4127,7 @@ export interface components {
              * @description Present only when `kind` is `user` (same value as `ref_id`).
              */
             user_id?: string;
+            account_status?: components["schemas"]["UserAccountStatus"];
         };
         BallInCourt: {
             level: number;
@@ -3793,6 +4204,7 @@ export interface components {
             admin_override?: boolean;
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
+            holder_account_status?: components["schemas"]["UserAccountStatus"];
             /** @description Working days without activity; alerts the lead at the idle-task setting. */
             idle_working_days?: number | null;
             /** @description Why the task is locked (empty when it is not), so "Why locked?" needs no extra call. */
@@ -3844,7 +4256,7 @@ export interface components {
         };
         AllowedAction: {
             /** @enum {string} */
-            action: "edit" | "start" | "submit" | "review" | "approve" | "reject" | "claim" | "release" | "comment" | "override";
+            action: "edit" | "start" | "submit" | "review" | "approve" | "reject" | "claim" | "release" | "comment" | "override" | "act_on_behalf";
             step_up?: boolean;
             /** @description Level the task lands on after self-skip. */
             will_skip_to?: number | null;
@@ -3911,6 +4323,11 @@ export interface components {
             skipped_levels?: number[];
             unlocked_task_ids?: string[];
         };
+        /**
+         * @description `system_admin`: a delegate acting for the System Admin. `assignee`: a lead acting for the assignee of a level (B12b). Null when `on_behalf_of` is absent.
+         * @enum {string|null}
+         */
+        OnBehalfKind: "system_admin" | "assignee" | null;
         WorkflowStep: {
             /** Format: uuid */
             id: string;
@@ -3919,6 +4336,7 @@ export interface components {
             action: "start" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "reassign" | "admin_override" | "override_revert" | "reopen" | "migrate";
             acted_by?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
+            on_behalf_kind?: components["schemas"]["OnBehalfKind"];
             note?: string | null;
             before_state?: components["schemas"]["TaskState"];
             after_state?: components["schemas"]["TaskState"];
@@ -4205,6 +4623,7 @@ export interface components {
             at: string;
             actor?: components["schemas"]["UserRef"];
             on_behalf_of?: components["schemas"]["UserRef"];
+            on_behalf_kind?: components["schemas"]["OnBehalfKind"];
             action: string;
             entity_type: string;
             entity_id?: string | null;
@@ -4623,10 +5042,26 @@ export interface components {
              */
             dry_run: boolean;
         };
+        ActOnBehalfRequest: {
+            /**
+             * @description The transition to perform, with the semantics of `POST /tasks/{task_id}/{action}`.
+             * @enum {string}
+             */
+            action: "submit" | "review" | "approve" | "reject";
+            /** @description The current level (guards against a stale screen). */
+            level: number;
+            reason: components["schemas"]["Reason"];
+            /** @description Transition note; mandatory for `reject`. */
+            note?: string;
+        };
         ReassignmentAlert: {
             task: components["schemas"]["TaskSummary"];
-            /** @enum {string} */
-            cause: "absent" | "idle";
+            /**
+             * @description `holder_deactivated` (B14): the holder's account is deactivated or deleted; see `holder_account_status`.
+             * @enum {string}
+             */
+            cause: "absent" | "idle" | "holder_deactivated";
+            holder_account_status?: components["schemas"]["UserAccountStatus"];
             holder?: components["schemas"]["UserRef"];
             absence?: components["schemas"]["Absence"] | null;
             idle_working_days?: number | null;
@@ -5286,6 +5721,247 @@ export interface components {
         };
         CustomFieldPatch: components["schemas"]["CustomFieldFields"] & components["schemas"]["WithReason"] & Record<string, never>;
         /** @enum {string} */
+        NotificationTypeCode: "task_submitted_review" | "task_submitted_approval" | "task_rejected" | "approval_overdue_reminder" | "approval_overdue_escalation" | "task_idle" | "assignee_absent" | "holder_deactivated" | "sla_near_max" | "sla_exceeded" | "no_holder" | "batch_upload_pending" | "batch_upload_result" | "snag_opened" | "snag_closed" | "pac_blocked_by_snags" | "holiday_tentative_reminder" | "structural_freeze_lifted" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "admin_override_used" | "repeated_failed_sign_in" | "callback_account_mismatch" | "audit_integrity_failure" | "retention_reduced";
+        /** @enum {string} */
+        NotificationCategory: "approvals" | "tasks" | "sla" | "registers" | "security" | "system";
+        /**
+         * @description Default recipient of a type. `holder` = the person (or group) holding the level; `team_lead` = the Team Lead of the task's module and region.
+         * @enum {string}
+         */
+        NotificationRecipientKind: "holder" | "previous_holder" | "team_lead" | "project_manager" | "system_admins" | "affected_user" | "actor";
+        NotificationChannels: {
+            in_app: boolean;
+            email: boolean;
+        };
+        NotificationTypeDef: {
+            code: components["schemas"]["NotificationTypeCode"];
+            category: components["schemas"]["NotificationCategory"];
+            label_en: string;
+            label_ar: string;
+            kind: components["schemas"]["NotificationKind"];
+            default_recipients: components["schemas"]["NotificationRecipientKind"][];
+            /** @description Role codes (`Role.code`) that may get a column for this type; `all` = any role or group. Empty when `system_admins_only`. */
+            eligible_roles: "all" | string[];
+            /** @description Security and system types: the recipients are System Admins only. */
+            system_admins_only: boolean;
+            /** @description Locked: the policy cannot switch it off (422 `mandatory_locked`) and a person cannot switch it off. */
+            mandatory: boolean;
+            /** @description Sent at once, never held for the daily digest. */
+            immediate?: boolean;
+            default_channels: components["schemas"]["NotificationChannels"];
+        };
+        /**
+         * @description Limits are enforced on write (422 `validation_failed`). `no_holder` (B10) is always immediate and has no threshold. The idle-task days stay in `/settings/idle-task-alert`.
+         *     Rule: `approval_escalate_days * 24 > approval_remind_hours`.
+         */
+        NotificationThresholds: {
+            /**
+             * @description Hours a task waits at a level before the holder is reminded.
+             * @default 48
+             */
+            approval_remind_hours: number;
+            /**
+             * @description Days a task waits before the Team Lead is alerted (escalation).
+             * @default 5
+             */
+            approval_escalate_days: number;
+            /**
+             * @description Working days before the SLA maximum at which `sla_near_max` is sent; 0 = no early warning.
+             * @default 2
+             */
+            sla_warning_days_before_max: number;
+            /**
+             * @description Notifications one person can receive per hour; the rest wait for the digest. Mandatory types are not capped.
+             * @default 50
+             */
+            rate_cap_per_hour: number;
+            /**
+             * @description Days notifications are kept before they are purged.
+             * @default 180
+             */
+            retention_days: number;
+        };
+        NotificationPolicyColumn: {
+            /** @enum {string} */
+            kind: "role" | "group";
+            /** Format: uuid */
+            id: string;
+            readonly name?: string;
+        };
+        NotificationPolicyCell: {
+            /** @enum {string} */
+            kind: "role" | "group";
+            /**
+             * Format: uuid
+             * @description Must be one of the `columns`.
+             */
+            id: string;
+            on: boolean;
+        };
+        NotificationPolicyRow: {
+            type_code: components["schemas"]["NotificationTypeCode"];
+            channels: components["schemas"]["NotificationChannels"];
+            /** @description From the catalogue; a mandatory type cannot be switched off. */
+            readonly mandatory?: boolean;
+            /** @description On or off per column. A column without a cell uses the catalogue default recipients. */
+            cells: components["schemas"]["NotificationPolicyCell"][];
+        };
+        NotificationPolicy: {
+            /** @description Master switch. Mandatory types are still sent when false. */
+            enabled: boolean;
+            /**
+             * @description IANA time zone used for the digest hour and working days.
+             * @default Africa/Tripoli
+             */
+            timezone: string;
+            /**
+             * @description Hour (0-23, in `timezone`) at which the daily digest is sent.
+             * @default 8
+             */
+            digest_hour: number;
+            /**
+             * @description true = working days come from the work calendar (weekend Friday and Saturday by default, `/settings/weekend-days`) and `work_days` is derived.
+             * @default true
+             */
+            work_days_follow_calendar: boolean;
+            /**
+             * @description 0 = Sunday. Derived from the calendar when `work_days_follow_calendar`; otherwise this list is used.
+             * @default [
+             *       0,
+             *       1,
+             *       2,
+             *       3,
+             *       4
+             *     ]
+             */
+            work_days: number[];
+            thresholds: components["schemas"]["NotificationThresholds"];
+            /** @description The roles and groups shown as matrix columns. */
+            columns: components["schemas"]["NotificationPolicyColumn"][];
+            matrix: components["schemas"]["NotificationPolicyRow"][];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        /** @description Closed schema. `work_days` is needed only when `work_days_follow_calendar` is false; `columns` may be omitted to keep the current ones. Read-only fields (`name`, `mandatory`) are ignored if echoed back. */
+        NotificationPolicyInput: {
+            reason: components["schemas"]["Reason"];
+            enabled: boolean;
+            timezone: string;
+            digest_hour: number;
+            work_days_follow_calendar: boolean;
+            work_days?: number[];
+            thresholds: components["schemas"]["NotificationThresholds"];
+            columns?: components["schemas"]["NotificationPolicyColumn"][];
+            matrix: components["schemas"]["NotificationPolicyRow"][];
+        };
+        LogRetention: {
+            /** @default 365 */
+            system_log_days: number;
+            /** @default 730 */
+            security_log_days: number;
+            /**
+             * @description Fixed at 10 years; the Audit Log is never purged and this is not settable.
+             * @constant
+             */
+            readonly audit_log_years: 10;
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"];
+        };
+        LogRetentionInput: {
+            reason: components["schemas"]["Reason"];
+            system_log_days: number;
+            security_log_days: number;
+        };
+        /** @enum {string} */
+        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "signed_out" | "session_expired" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used";
+        /** @enum {string} */
+        SecurityOutcome: "success" | "failure" | "info";
+        SecurityLogEntry: {
+            /**
+             * Format: int64
+             * @description Position in the hash chain.
+             */
+            id: number;
+            /** Format: date-time */
+            at: string;
+            event: components["schemas"]["SecurityEvent"];
+            outcome: components["schemas"]["SecurityOutcome"];
+            /** @description The matched person; null when the identifier matched no registry row. */
+            user?: components["schemas"]["UserRef"] | null;
+            /** @description The admin, for admin-caused events (revoke, MFA exemption). */
+            actor?: components["schemas"]["UserRef"] | null;
+            /**
+             * @description Set only when the identifier typed in the one-box sign-in matches no registry row. The raw text is NEVER stored or logged.
+             *     Format: `?` + the first character only if the input looks like an email, employee ID or phone (otherwise nothing) + `***#` + the first 12 hex digits of HMAC-SHA-256 of the normalised input (trimmed, lower case) with a server-side key. Examples: `?a***#3f9c01d2ab47`, `?***#3f9c01d2ab47`. The same input gives the same suffix, so repeated attempts can be grouped without revealing the text.
+             */
+            identifier_masked?: string | null;
+            /** @enum {string} */
+            client_type?: "web" | "mobile" | "break_glass";
+            /** @description Raw IP, System Admins only; null for a reader with `view_security_log`. */
+            ip?: string | null;
+            user_agent?: string | null;
+            /** Format: uuid */
+            session_id?: string | null;
+            request_id?: string | null;
+            details?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        LogIntegrity: {
+            /** @enum {string} */
+            log: "audit" | "security";
+            /** @enum {string} */
+            status: "ok" | "broken";
+            /** Format: int64 */
+            row_count: number;
+            /** Format: int64 */
+            first_seq: number | null;
+            /** Format: int64 */
+            last_seq: number | null;
+            /** @description SHA-256 hash of the last row checked (chain head). */
+            head_hash: string | null;
+            /** Format: date-time */
+            checked_at: string;
+            breaks: {
+                /**
+                 * Format: int64
+                 * @description First row at which the chain no longer holds.
+                 */
+                seq: number;
+                /** @enum {string} */
+                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch";
+                expected_hash?: string | null;
+                found_hash?: string | null;
+            }[];
+        };
+        ActiveSession: {
+            /** Format: uuid */
+            session_id: string;
+            user: components["schemas"]["UserRef"];
+            /** @enum {string} */
+            status: "online" | "idle";
+            /** Format: date-time */
+            last_activity_at: string;
+            /** @description App route of the screen the person is on, reported by real activity. */
+            current_screen?: string | null;
+            /** Format: date-time */
+            signed_in_at: string;
+            /** @enum {string} */
+            client_type: "web" | "mobile" | "break_glass";
+            /** @description Raw IP, System Admins only; null for a `manage_users` holder who is not a System Admin. */
+            ip?: string | null;
+            /** @description The caller's own session. */
+            is_current?: boolean;
+        };
+        SessionRevokeResult: {
+            user?: components["schemas"]["UserRef"];
+            revoked_count: number;
+        };
+        /** @enum {string} */
         NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system";
         Notification: {
             /** Format: uuid */
@@ -5295,6 +5971,8 @@ export interface components {
             body?: string | null;
             entity_type?: string | null;
             entity_id?: string | null;
+            /** @description Catalogue type (0.2.5); `kind` stays the coarse category used by personal preferences. */
+            type_code?: components["schemas"]["NotificationTypeCode"] | null;
             /** @description App-relative path. */
             link?: string | null;
             /** Format: date-time */
@@ -5568,7 +6246,7 @@ export interface components {
                 "application/problem+json": components["schemas"]["Problem"];
             };
         };
-        /** @description Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`). */
+        /** @description Validation failed (`validation_failed`, `note_required`, `mandatory_slots_missing`, `mandatory_fields_missing`, `open_snags`, `empty_cell`, `workflow_invalid`, `master_impact_unconfirmed`, `file_rejected`, `template_rejected`, `insufficient_stock`, `confirmation_mismatch`). */
         Unprocessable: {
             headers: {
                 [name: string]: unknown;
@@ -5605,6 +6283,9 @@ export interface components {
         /** @description The ETag last read. */
         IfMatch: string;
         IdempotencyKey: string;
+        /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+        LivePoll: "1";
+        SessionId: string;
         UserId: string;
         GroupId: string;
         SiteId: string;
@@ -5709,7 +6390,10 @@ export interface operations {
     getSession: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
             path?: never;
             cookie?: never;
         };
@@ -5998,6 +6682,36 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    listDeletedUsers: {
+        parameters: {
+            query?: {
+                /** @description Search name, email or employee ID. */
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted users. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["DeletedUser"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     pickUsers: {
         parameters: {
             query: {
@@ -6089,6 +6803,80 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    deleteUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["DeleteReason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedUser"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    restoreUser: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Restored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
         };
     };
@@ -6216,6 +7004,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -7724,6 +8513,7 @@ export interface operations {
                 "application/json": {
                     reason: components["schemas"]["Reason"];
                     confirm_master_impact?: string;
+                    confirm_text: components["schemas"]["ConfirmText"];
                 };
             };
         };
@@ -8046,6 +8836,223 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getAuditLogIntegrity: {
+        parameters: {
+            query?: {
+                from_seq?: number;
+                to_seq?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrity"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSecurityLog: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                /** @description One or more events, comma separated. */
+                event?: components["schemas"]["SecurityEvent"][];
+                outcome?: components["schemas"]["SecurityOutcome"];
+                /** @description Free text over name, employee ID, `identifier_masked` and `request_id`. */
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SecurityLogEntry"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    exportSecurityLog: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date-time */
+                    from?: string;
+                    /** Format: date-time */
+                    to?: string;
+                    event?: components["schemas"]["SecurityEvent"][];
+                    outcome?: components["schemas"]["SecurityOutcome"];
+                    q?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Job started. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getSecurityLogIntegrity: {
+        parameters: {
+            query?: {
+                from_seq?: number;
+                to_seq?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrity"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listActiveSessions: {
+        parameters: {
+            query?: {
+                status?: "online" | "idle";
+                /** @description Search name or employee ID. */
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["ActiveSession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    revokeSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeUserSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listMasterExports: {
         parameters: {
             query?: {
@@ -8105,7 +9112,10 @@ export interface operations {
     };
     listExportParts: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Add `columns` (the stable column codes of each part) to every item. Columns the caller cannot read (field-level rules) are left out. */
+                include_columns?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8821,6 +9831,34 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    actOnBehalf: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActOnBehalfRequest"];
+            };
+        };
+        responses: {
+            200: components["responses"]["TaskTransition"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listEligibleReassignees: {
         parameters: {
             query?: {
@@ -8857,7 +9895,7 @@ export interface operations {
     listReassignmentAlerts: {
         parameters: {
             query?: {
-                cause?: "absent" | "idle";
+                cause?: "absent" | "idle" | "holder_deactivated";
                 user_id?: string;
                 region_id?: components["schemas"]["RegionId"];
                 limit?: components["parameters"]["Limit"];
@@ -8935,6 +9973,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdleTaskAlertSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getNotificationPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Policy. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setNotificationPolicy: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationPolicyInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listNotificationTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Types. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["NotificationTypeDef"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getLogRetention: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Retention. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogRetention"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setLogRetention: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LogRetentionInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogRetention"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -9340,7 +10518,9 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WithReason"];
+                "application/json": components["schemas"]["WithReason"] & {
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
             };
         };
         responses: {
@@ -11473,7 +12653,10 @@ export interface operations {
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
             };
-            header?: never;
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
             path?: never;
             cookie?: never;
         };

@@ -1,11 +1,12 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications } from '@/api/hooks';
+import { hasGrant } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
@@ -23,8 +24,13 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'd
   { key: 'absence', to: '/absence', icon: <UserX size={18} />, group: 'work' },
   { key: 'admin.matrix', to: '/admin/matrix', icon: <Table2 size={18} />, group: 'admin' },
   { key: 'admin.settings', to: '/admin/settings', icon: <Settings size={18} />, group: 'admin' },
+  { key: 'admin.security_log', to: '/admin/security-log', icon: <ScrollText size={18} />, group: 'admin' },
+  { key: 'admin.online', to: '/admin/online', icon: <Activity size={18} />, group: 'admin' },
   { key: 'audit', to: '/audit', icon: <Eye size={18} />, group: 'admin' },
 ];
+
+/** Entries opened by a grant rather than by the server's module list (security log, online now). */
+const BY_GRANT: Record<string, string> = { 'admin.security_log': 'view_security_log', 'admin.online': 'manage_users' };
 
 export function Shell() {
   const { t } = useTranslation();
@@ -47,7 +53,7 @@ export function Shell() {
   }, []);
 
   const allowed = new Set(me.data?.effective.nav ?? []);
-  const items = NAV.filter((n) => allowed.has(n.key));
+  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : allowed.has(n.key)));
   const pending = notes.data?.unread_count ?? 0;
   const current = NAV.find((n) => loc.pathname.startsWith(n.to));
   const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => void api.patch('/me/preferences', { body: p }).catch(() => {});

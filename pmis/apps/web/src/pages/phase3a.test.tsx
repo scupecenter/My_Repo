@@ -206,9 +206,9 @@ describe('export', () => {
       body = (await request.json()) as Record<string, unknown>;
       return HttpResponse.json({ id: 'job-1', kind: 'master_export', status: 'queued' }, { status: 202 });
     }));
-    renderApp(<ExportViewButton testid="ev" source="sites" filters={{ region_id: '1' }} columns={['site_code', 'name']} />);
+    renderApp(<ExportViewButton testid="ev" source="sites" filters={{ region_id: '1' }} columns={['site_code', 'site_name']} />);
     await u.click(screen.getByTestId('ev'));
-    await waitFor(() => expect(body.view).toEqual({ source: 'sites', filters: { region_id: '1' }, columns: ['site_code', 'name'] }));
+    await waitFor(() => expect(body.view).toEqual({ source: 'sites', filters: { region_id: '1' }, columns: ['site_code', 'site_name'] }));
     expect(body.parts).toBeUndefined();
     // and the dialog surfaces a 422
     server.use(http.post(`${API_BASE}/exports/master`, () => HttpResponse.json({ type: 'x', title: 'Bad', status: 422, code: 'validation_failed', errors: [{ path: '/as_of', code: 'future_date' }] }, { status: 422 })));

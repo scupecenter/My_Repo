@@ -8,7 +8,8 @@ import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
 
 const ROW = 52;
-const SITE_COLUMNS = ['site_code', 'name', 'region', 'delivery_scenario', 'overall_status', 'current_milestone'];
+// ExportColumnCode values (stable codes of the `sites` part).
+const SITE_COLUMNS = ['site_code', 'site_name', 'region', 'delivery_scenario', 'overall_status', 'current_milestone'];
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const STAGES = ['site_release', 'pre_cw', 'cw', 'site_rfi', 'te_installation', 'on_air', 'te_pac', 'kpi_acceptance', 'hoto', 'final_closure'];
