@@ -356,22 +356,26 @@ model RoleDefaultModule {
 }
 
 model User {
-  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  m365_object_id  String?    @unique // Entra ID oid claim; null for an account created in the PMIS (local sign-in, migration 0010)
-  email           String     @unique // lower case (check constraint)
-  phone           String?    @unique // E.164, a local sign-in identifier
-  manager_id      String?    @db.Uuid // direct manager (migration 0011); set only through idm_set_user_org
-  department_id   String?    @db.Uuid
-  display_name    String
-  employee_id     String?    @unique @db.Char(4) // 4-digit, entered at first sign-in
-  status          UserStatus @default(pending_assignment)
-  locale          String     @default("en")
-  theme           String     @default("light")
-  is_break_glass  Boolean    @default(false)
-  totp_secret_enc String? // break-glass admin only, encrypted
-  last_login_at   DateTime?  @db.Timestamptz(6)
-  created_at      DateTime   @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime   @updatedAt @db.Timestamptz(6)
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  m365_object_id       String?     @unique // Entra ID oid claim; null for an account created in the PMIS (local sign-in, migration 0010)
+  email                String      @unique // lower case (check constraint)
+  phone                String?     @unique // E.164, a local sign-in identifier
+  manager_id           String?     @db.Uuid // direct manager (migration 0011); set only through idm_set_user_org
+  department_id        String?     @db.Uuid
+  deleted_at           DateTime?   @db.Timestamptz(6) // soft delete (B14, migration 0012); status is 'disabled' while set
+  deleted_by           String?     @db.Uuid
+  delete_reason        String?
+  status_before_delete UserStatus?
+  display_name         String
+  employee_id          String?     @unique @db.Char(4) // 4-digit, entered at first sign-in
+  status               UserStatus  @default(pending_assignment)
+  locale               String      @default("en")
+  theme                String      @default("light")
+  is_break_glass       Boolean     @default(false)
+  totp_secret_enc      String? // break-glass admin only, encrypted
+  last_login_at        DateTime?   @db.Timestamptz(6)
+  created_at           DateTime    @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime    @updatedAt @db.Timestamptz(6)
 
   // Role, sub-role, permission level, team, regions and modules live on the assignments (many-to-many).
   // There is deliberately no user-level default: effective access is the union of the active assignments.
@@ -392,6 +396,8 @@ model User {
   messages_written Message[]
   announcements    Announcement[]
   announcements_in AnnouncementRecipient[]
+  deleter          User?                   @relation("UserDeletedBy", fields: [deleted_by], references: [id], onDelete: SetNull)
+  deleted_users    User[]                  @relation("UserDeletedBy")
 
   @@index([status])
   @@index([manager_id], map: "users_manager_idx")

@@ -235,7 +235,7 @@ describe('hybrid mode list', () => {
   it('passes exactly the agreed method + path patterns through, and nothing without the switch', () => {
     expect(REAL_API_AUTH_USERS.map(([m, p]) => `${m.toUpperCase()} ${p}`)).toEqual([
       'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/step-up', 'GET /auth/session', 'POST /auth/logout', 'GET /me',
-      'GET /users', 'GET /users/picker', 'POST /users', 'GET /users/:id', 'PATCH /users/:id', 'POST /users/:id/password-reset', 'GET /groups', 'GET /groups/:id',
+      'GET /users', 'GET /users/picker', 'GET /users/deleted', 'POST /users', 'GET /users/:id', 'PATCH /users/:id', 'POST /users/:id/password-reset', 'POST /users/:id/delete', 'POST /users/:id/restore', 'GET /groups', 'GET /groups/:id',
       'POST /groups/:id/members', 'DELETE /groups/:id/members/:userId',
       // contract 0.4.0
       'GET /departments', 'POST /departments', 'PATCH /departments/:id', 'PUT /users/:id/org',

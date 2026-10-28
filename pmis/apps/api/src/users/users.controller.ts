@@ -15,6 +15,29 @@ export class UsersController {
     return this.users.list(auth, query);
   }
 
+  @Get('deleted')
+  listDeleted(@Auth() auth: AuthContext, @Query() query: Record<string, unknown>) {
+    return this.users.listDeleted(auth, query);
+  }
+
+  @Post(':id/delete')
+  @HttpCode(200)
+  async softDelete(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined,
+    @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const d = await this.users.softDelete(auth, id, ifMatch, body);
+    res.setHeader('ETag', etagHeader(d.version));
+    return d;
+  }
+
+  @Post(':id/restore')
+  @HttpCode(200)
+  async restore(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined,
+    @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<UserDetailDto> {
+    const d = await this.users.restore(auth, id, ifMatch, body);
+    res.setHeader('ETag', etagHeader(d.version));
+    return d;
+  }
+
   @Get('picker')
   picker(@Query() query: Record<string, unknown>) {
     return this.users.picker(query);

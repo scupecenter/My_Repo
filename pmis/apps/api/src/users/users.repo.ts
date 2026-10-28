@@ -26,6 +26,9 @@ export interface UserDto extends UserRef {
   last_login_at: Date | null;
   created_at: Date;
   version: number;
+  deleted_at: Date | null;
+  deleted_by: UserRef | null;
+  delete_reason: string | null;
 }
 
 interface UserDbRow {
@@ -50,6 +53,11 @@ interface UserDbRow {
   dept_code: string | null;
   dept_name_en: string | null;
   dept_name_ar: string | null;
+  deleted_at: Date | null;
+  delete_reason: string | null;
+  deleted_by_id: string | null;
+  deleted_by_name: string | null;
+  deleted_by_employee_id: string | null;
 }
 
 /**
@@ -61,9 +69,11 @@ const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u
   (extract(epoch FROM u.updated_at) * 1000000)::bigint::text AS version,
   (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change,
   m.id::text AS manager_id, m.display_name AS manager_name, trim(m.employee_id) AS manager_employee_id,
-  dp.id::text AS dept_id, dp.code AS dept_code, dp.name_en AS dept_name_en, dp.name_ar AS dept_name_ar`;
+  dp.id::text AS dept_id, dp.code AS dept_code, dp.name_en AS dept_name_en, dp.name_ar AS dept_name_ar,
+  u.deleted_at, u.delete_reason, dby.id::text AS deleted_by_id, dby.display_name AS deleted_by_name, trim(dby.employee_id) AS deleted_by_employee_id`;
 const USER_FROM = Prisma.sql`FROM users u LEFT JOIN LATERAL auth_local_lookup(u.email) l ON true
-  LEFT JOIN users m ON m.id = u.manager_id LEFT JOIN departments dp ON dp.id = u.department_id`;
+  LEFT JOIN users m ON m.id = u.manager_id LEFT JOIN departments dp ON dp.id = u.department_id
+  LEFT JOIN users dby ON dby.id = u.deleted_by`;
 
 export const toUserDto = (r: UserDbRow): UserDto => ({
   id: r.id,
@@ -82,6 +92,9 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
   last_login_at: r.last_login_at,
   created_at: r.created_at,
   version: Number(r.version),
+  deleted_at: r.deleted_at,
+  deleted_by: r.deleted_by_id ? { id: r.deleted_by_id, display_name: r.deleted_by_name ?? '', employee_id: r.deleted_by_employee_id } : null,
+  delete_reason: r.delete_reason,
 });
 
 export interface AssignmentDto {
@@ -108,6 +121,8 @@ export interface UserFilter {
   roleId?: string;
   regionId?: number;
   groupId?: string;
+  /** true: only soft-deleted users (GET /users/deleted); otherwise soft-deleted users are left out. */
+  deleted?: boolean;
 }
 
 @Injectable()
@@ -120,7 +135,8 @@ export class UsersRepo {
   }
 
   async list(filter: UserFilter, limit: number, after: [string, string] | null, like: string | null): Promise<{ rows: UserDto[]; total: number }> {
-    const where: Prisma.Sql[] = [Prisma.sql`true`];
+    // Soft-deleted users (B14) are listed only by listDeleted.
+    const where: Prisma.Sql[] = [filter.deleted ? Prisma.sql`u.deleted_at IS NOT NULL` : Prisma.sql`u.deleted_at IS NULL`];
     if (like) where.push(Prisma.sql`(u.display_name ILIKE ${like} OR u.email ILIKE ${like} OR u.employee_id ILIKE ${like} OR u.phone ILIKE ${like})`);
     if (filter.status) where.push(Prisma.sql`u.status = ${filter.status}::"UserStatus"`);
     if (filter.groupId) where.push(Prisma.sql`EXISTS (SELECT 1 FROM group_members gm WHERE gm.user_id = u.id AND gm.group_id = ${filter.groupId}::uuid)`);

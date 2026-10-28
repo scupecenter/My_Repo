@@ -97,6 +97,9 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/audience', code: 'no_recipients', message: 'No active user matches this audience.' }],
         });
       }
+      if (/already deleted|is not deleted/i.test(msg)) {
+        return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });
+      }
       if (/not found/i.test(msg)) return new ProblemException(404, 'not_found', { detail: 'The resource does not exist.' });
       if (/at least one active System Admin/i.test(msg)) return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       return new ProblemException(422, 'validation_failed', { detail: 'The request is not valid.' });
