@@ -443,8 +443,9 @@ export interface paths {
         put?: never;
         /**
          * Set a temporary password for a user (local sign-in)
-         * @description Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Admins and delegates
-         *     can be reset by a System Admin only. Turns local sign-in on for the account if it was off, unlocks it, ends all its
+         * @description Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Whoever sets a
+         *     password can sign in as the user, so a delegate may reset only an account with no rights yet (no current or future
+         *     assignment, no Entra link, not an admin or delegate); anything else is System Admin only (403 `action_forbidden`). Turns local sign-in on for the account if it was off, unlocks it, ends all its
          *     sessions, and makes the user change the password at the next sign-in. Omit `temporary_password` to have the server
          *     generate one; it is returned once.
          */
@@ -3723,7 +3724,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             display_name: string;
-            employee_id: string;
+            /** @description 0.3.1: null for a local account created without an employee ID. */
+            employee_id: string | null;
         };
         Problem: {
             /**

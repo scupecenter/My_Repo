@@ -13,7 +13,7 @@ import { checkIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
-import { AssignmentDto, GroupRef, UserDto, UsersRepo } from './users.repo';
+import { AssignmentDto, GroupRef, PickerItem, UserDto, UsersRepo } from './users.repo';
 
 const reason = z.string().trim().min(3).max(1000);
 const employeeId = z.string().regex(/^[0-9]{4}$/);
@@ -92,6 +92,19 @@ export class UsersService {
     const items = rows.slice(0, limit);
     const last = items[items.length - 1];
     return { items, page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.display_name, last.id]) : null, total } };
+  }
+
+  /** GET /users/picker: any signed-in, non-pending user (the guard ensures that); never the full User shape. */
+  async picker(q: Query): Promise<{ items: PickerItem[]; page: { limit: number; next_cursor: string | null } }> {
+    const text = one(q, 'q')?.trim() ?? '';
+    if (text.length < 2 || text.length > 100) throw problems.validation([{ path: '/q', code: 'invalid', message: 'Type 2 to 100 characters.' }]);
+    const roleId = one(q, 'role_id');
+    if (roleId !== undefined && !uuidSchema.safeParse(roleId).success) throw problems.validation([{ path: '/role_id', code: 'invalid', message: 'Not a uuid.' }]);
+    const cursor = decodeCursor(one(q, 'cursor'), 2);
+    const rows = await this.repo.picker(likePattern(text), roleId, cursor ? [cursor[0] as string, cursor[1] as string] : null);
+    const items = rows.slice(0, 20);
+    const last = items[items.length - 1];
+    return { items, page: { limit: 20, next_cursor: rows.length > 20 && last ? encodeCursor([last.display_name, last.id]) : null } };
   }
 
   async detail(id: string): Promise<UserDetailDto | null> {

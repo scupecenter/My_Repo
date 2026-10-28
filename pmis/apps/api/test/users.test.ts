@@ -430,3 +430,16 @@ describe('what pmis_app may do in the database', () => {
     }
   });
 });
+
+describe('GET /users/picker', () => {
+  it('returns active users only, the reduced shape, and needs 2 characters', async () => {
+    const tag = `Pick${Date.now().toString(36)}`;
+    const active = await makeUser(db, { assigned: true, name: `${tag} Active` });
+    await makeUser(db, { status: 'pending_assignment', name: `${tag} Pending` });
+    const api = await loggedIn(app, active);
+    const res = await api.call('get', `/users/picker?q=${tag}`);
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([{ id: active.id, display_name: `${tag} Active`, employee_id: active.employeeId }]);
+    expect((await api.call('get', '/users/picker?q=a')).status).toBe(422);
+  });
+});

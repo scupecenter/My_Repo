@@ -1023,5 +1023,16 @@
   },
   "hybrid": {
     "banner": "Screens other than sign-in and users show sample data while the system is being built."
+  },
+  "sysAdmin": {
+    "badge": "System Admin",
+    "make": "Make System Admin",
+    "remove": "Remove System Admin",
+    "make_title": "Make {{name}} a System Admin",
+    "remove_title": "Remove {{name}} from System Admins",
+    "make_warning": "A System Admin has full control of the PMIS: every screen, every region, all settings, users and roles. Give it only to people who need it.",
+    "remove_warning": "The person loses System Admin rights at once. They keep any role assignments they hold. At least one active System Admin must remain.",
+    "activate_note": "This account is pending: it will be activated first.",
+    "self": "You cannot change your own System Admin rights."
   }
 }

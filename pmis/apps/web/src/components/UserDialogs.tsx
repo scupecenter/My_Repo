@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fieldErrors, useCreateLocalUser, useResetPassword } from '@/api/auth';
-import type { User } from '@/api/types';
+import { api, ApiError } from '@/api/client';
+import type { BulkResult, User, UserDetail } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
 import { PasswordMode, TempPasswordDialog } from './TempPassword';
 
@@ -83,6 +85,40 @@ export function ResetPasswordDialog({ user, onClose }: { user: Pick<User, 'id' |
       onSubmit={(reason) => reset.mutate({ reason, ...(typed ? { temporary_password: pw } : {}) }, { onSuccess: (r) => setShown(r.temporary_password) })}>
       <p className="rounded-md bg-card2 p-2 text-sm text-mute">{t('resetPw.note')}</p>
       <PasswordMode id="reset-pw" typed={typed} onTyped={setTyped} value={pw} onValue={setPw} errors={srv.temporary_password ?? (short ? ['too_short'] : undefined)} />
+    </FormDialog>
+  );
+}
+
+/**
+ * "Make System Admin" / "Remove System Admin" on the user page. Membership of the System Admins group is what makes an
+ * admin (ADR 0003); a pending account is activated first, because pending users cannot join a group. Step-up and the
+ * last-admin rule are enforced by the API.
+ */
+export function SystemAdminDialog({ user, adminGroupId, remove, onClose }: { user: UserDetail; adminGroupId: string; remove: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const run = useMutation<void, ApiError, string>({
+    mutationFn: async (reason) => {
+      if (remove) {
+        await api.del(`/groups/${adminGroupId}/members/${user.id}`, { query: { reason } });
+        return;
+      }
+      if (user.status !== 'active') await api.patch(`/users/${user.id}`, { version: user.version, body: { status: 'active', reason } });
+      const r = await api.post<BulkResult>(`/groups/${adminGroupId}/members`, { body: { user_ids: [user.id], reason } });
+      const bad = [...(r.failed ?? []), ...(r.skipped ?? [])].find((x) => x.code !== 'already_assigned');
+      if (bad) throw new ApiError(422, { type: 'about:blank', title: bad.message ?? bad.code, status: 422, code: bad.code as never });
+    },
+    onSuccess: onClose,
+    onSettled: () => ['user', 'users', 'group', 'groups', 'me'].forEach((k) => void qc.invalidateQueries({ queryKey: [k] })),
+  });
+  return (
+    <FormDialog open onClose={onClose} testid="sysadmin-dialog" busy={run.isPending} error={run.error ? errText(run.error, t) : null}
+      title={t(remove ? 'sysAdmin.remove_title' : 'sysAdmin.make_title', { name: user.display_name })}
+      submitLabel={t(remove ? 'sysAdmin.remove' : 'sysAdmin.make')} onSubmit={(reason) => run.mutate(reason)}>
+      <p className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="sysadmin-warning">
+        {t(remove ? 'sysAdmin.remove_warning' : 'sysAdmin.make_warning')}
+      </p>
+      {!remove && user.status !== 'active' && <p className="text-sm text-mute" data-testid="sysadmin-activate-note">{t('sysAdmin.activate_note')}</p>}
     </FormDialog>
   );
 }

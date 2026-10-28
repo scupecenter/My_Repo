@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.3.0
+  version: 0.3.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
     - 0.3.0 (2026-10-28): additive. Local sign-in with a password, for accounts created in the PMIS (owner decision 2026-10-28, ADR 0012): `POST /auth/local/login`, `POST /auth/local/password`, `POST /auth/local/step-up`, `POST /users` (create a local user with a temporary password), `POST /users/{user_id}/password-reset`; `Session.auth_method` and `must_change_password`; `User.phone`, `local_sign_in`, `must_change_password`; `Problem.step_up_method`; error codes `invalid_credentials`, `password_change_required`, `weak_password`. Microsoft 365 sign-in stays in the contract and is added later beside it.
     - 0.2.6 (2026-10-26): SLA rule sets and weight sets can be written and published (draft, preview, publish with effective date, reason and step-up, versions list); re-run of Project Status with an older weight set by id; enumerated export column codes for sites and tasks; required `reason` on `POST /settings/holidays/import` (not additive, see ADR 0011 amendment 0.2.6).
     - 0.2.5 (2026-10-26): additive. Phase 3b gaps (delegation to role or group, export column codes, `POST /tasks/{task_id}/act-on-behalf`) and admin additions: notification policy and catalogue, security log, log integrity, active sessions and revoke, log retention, `confirm_text` on dangerous actions, `last_admin` documented, and user soft delete and restore (B14) (ADR 0011).
@@ -6449,7 +6450,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
-        employee_id: { type: string, pattern: '^[0-9]{4}$' }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: '0.3.1: null for a local account created without an employee ID.' }
     # ---------------------------------------------------------- common
     Problem:
       type: object

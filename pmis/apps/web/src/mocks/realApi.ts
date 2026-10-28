@@ -15,6 +15,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/auth/logout'],
   ['get', '/me'],
   ['get', '/users'],
+  ['get', '/users/picker'],
   ['post', '/users'],
   ['get', '/users/:id'],
   ['patch', '/users/:id'],
@@ -26,7 +27,7 @@ export const REAL_API_AUTH_USERS = [
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
-const NOT_AN_ID = new Set(['deleted', 'picker']);
+const NOT_AN_ID = new Set(['deleted', 'picker']); // picker has its own line above
 
 export { HYBRID, isHybrid };
 

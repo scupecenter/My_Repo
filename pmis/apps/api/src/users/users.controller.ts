@@ -15,6 +15,11 @@ export class UsersController {
     return this.users.list(auth, query);
   }
 
+  @Get('picker')
+  picker(@Query() query: Record<string, unknown>) {
+    return this.users.picker(query);
+  }
+
   @Post()
   @HttpCode(201)
   create(@Body() body: unknown): Promise<{ user: UserDto; temporary_password: string }> {

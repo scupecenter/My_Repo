@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DbService } from '../db/db.service';
 
+export interface PickerItem {
+  id: string;
+  display_name: string;
+  employee_id: string | null;
+}
+
 export interface UserRef { id: string; display_name: string; employee_id: string | null }
 export interface GroupRef { id: string; name: string; is_system_admins: boolean }
 
@@ -118,6 +124,21 @@ export class UsersRepo {
       WHERE ${base} ${page} ORDER BY u.display_name, u.id::text LIMIT ${limit + 1}`);
     const total = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*) AS n FROM users u WHERE ${base}`);
     return { rows: rows.map(toUserDto), total: Number(total[0]?.n ?? 0) };
+  }
+
+  /** Name picker: active users only, id, name and employee ID, at most 20 per page (GET /users/picker). */
+  async picker(like: string, roleId: string | undefined, after: [string, string] | null): Promise<PickerItem[]> {
+    const role = roleId
+      ? Prisma.sql`AND EXISTS (SELECT 1 FROM user_role_assignments a WHERE a.user_id = u.id AND a.role_id = ${roleId}::uuid
+          AND a.valid_from <= now() AND (a.valid_to IS NULL OR a.valid_to > now()))`
+      : Prisma.empty;
+    const page = after ? Prisma.sql`AND (u.display_name, u.id::text) > (${after[0]}, ${after[1]})` : Prisma.empty;
+    const rows = await this.db.tx.$queryRaw<{ id: string; display_name: string; employee_id: string | null }[]>(Prisma.sql`
+      SELECT u.id::text AS id, u.display_name, u.employee_id FROM users u
+      WHERE u.status = 'active' AND NOT u.is_break_glass
+        AND (u.display_name ILIKE ${like} OR u.email ILIKE ${like} OR u.employee_id ILIKE ${like}) ${role} ${page}
+      ORDER BY u.display_name, u.id::text LIMIT 21`);
+    return rows.map((r) => ({ id: r.id, display_name: r.display_name, employee_id: r.employee_id?.trim() ?? null }));
   }
 
   async groupsOf(userId: string): Promise<GroupRef[]> {

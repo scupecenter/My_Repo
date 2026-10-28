@@ -2,7 +2,7 @@ import { Copy, KeyRound, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } f
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import { useCopyAssignments, useEditAssignments, useEndAssignments, useMfa, useProfiles, useSetMfa, useUser } from '@/api/admin';
+import { useCopyAssignments, useEditAssignments, useEndAssignments, useGroups, useMfa, useProfiles, useSetMfa, useUser } from '@/api/admin';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
 import type { Assignment, UserPickerItem } from '@/api/types';
@@ -11,7 +11,7 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { MODULES, ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
-import { LocalBadges, ResetPasswordDialog } from '@/components/UserDialogs';
+import { LocalBadges, ResetPasswordDialog, SystemAdminDialog } from '@/components/UserDialogs';
 import { isAdmin } from '@/lib/perm';
 import { MfaBadge, STATUS_TONE } from './Users';
 
@@ -88,14 +88,16 @@ export function UserDetailPage() {
   const { t, i18n } = useTranslation();
   const { userId = '' } = useParams();
   const toast = useToast();
-  const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles();
+  const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles(), groups = useGroups();
   const end = useEndAssignments(userId);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset'>(null);
+  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin'>(null);
   const ar = i18n.language === 'ar';
   if (q.isError) return <p role="alert" data-testid="user-missing">{t('errors.generic')}</p>;
   const u = q.data;
   if (!u) return <p>{t('common.loading')}</p>;
+  const isSysAdmin = (u.groups ?? []).some((g) => g.is_system_admins);
+  const adminGroupId = groups.data?.find((g) => g.is_system_admins)?.id;
   const rows = (u.assignments ?? []).filter((a) => a.is_active_now !== false);
   const chosen = rows.filter((a) => sel.has(a.id));
   const rn = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (ar && r?.name_ar) || r?.name_en || String(id); };
@@ -112,9 +114,17 @@ export function UserDetailPage() {
         <LocalBadges user={u} />
         <MfaBadge user={u} />
         <span className="text-mute" dir="ltr">{u.email}</span>
-        {isAdmin(me.data) && (
-          <button className="btn ms-auto" data-testid="user-reset-password" disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('resetPw.self') : undefined} onClick={() => setDlg('reset')}><KeyRound size={16} />{t('resetPw.open')}</button>
+        {isSysAdmin && <span className="chip bg-openBg text-openInk" data-testid="sysadmin-badge">{t('sysAdmin.badge')}</span>}
+        <div className="ms-auto flex flex-wrap gap-2">
+        {isAdmin(me.data) && adminGroupId && (
+          <button className="btn" data-testid={isSysAdmin ? 'sysadmin-remove' : 'sysadmin-make'} disabled={u.id === me.data?.user.id}
+            title={u.id === me.data?.user.id ? t('sysAdmin.self') : undefined} onClick={() => setDlg(isSysAdmin ? 'unadmin' : 'admin')}>
+            <ShieldCheck size={16} />{t(isSysAdmin ? 'sysAdmin.remove' : 'sysAdmin.make')}</button>
         )}
+        {isAdmin(me.data) && (
+          <button className="btn" data-testid="user-reset-password" disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('resetPw.self') : undefined} onClick={() => setDlg('reset')}><KeyRound size={16} />{t('resetPw.open')}</button>
+        )}
+        </div>
       </div>
       <section className="card p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -152,6 +162,7 @@ export function UserDetailPage() {
       {dlg === 'assign' && <AssignDialog open onClose={() => setDlg(null)} initialMode="person" initialPeople={[{ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }]} />}
       {dlg === 'edit' && <EditDialog userId={userId} rows={chosen} onClose={() => { setDlg(null); setSel(new Set()); }} />}
       {dlg === 'reset' && <ResetPasswordDialog user={u} onClose={() => setDlg(null)} />}
+      {(dlg === 'admin' || dlg === 'unadmin') && adminGroupId && <SystemAdminDialog user={u} adminGroupId={adminGroupId} remove={dlg === 'unadmin'} onClose={() => setDlg(null)} />}
       {dlg === 'copy' && <CopyDialog fromId={userId} onClose={() => setDlg(null)} />}
       {dlg === 'end' && (
         <FormDialog open onClose={() => setDlg(null)} testid="end-dialog" title={t('users.end_title', { count: chosen.length })} busy={end.isPending} error={end.isError ? errText(end.error, t) : null}
