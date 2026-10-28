@@ -11,6 +11,7 @@ import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
+import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
 
 export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'data' | 'admin' }[] = [
   { key: 'my_work', to: '/my-work', icon: <Home size={18} />, group: 'work' },
@@ -56,8 +57,16 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : allowed.has(n.key)));
+  // Users, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
+  const peopleTo = firstPeopleTab(me.data?.effective.nav);
+  const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
+  const sideItems = NAV.flatMap((n) => {
+    if (n.key === 'admin.users') return peopleTo ? [{ ...n, to: peopleTo }] : [];
+    if (PEOPLE_KEYS.has(n.key)) return [];
+    return items.some((i) => i.key === n.key) ? [n] : [];
+  });
   const pending = notes.data?.unread_count ?? 0;
-  const current = NAV.find((n) => loc.pathname.startsWith(n.to));
+  const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : NAV.find((n) => loc.pathname.startsWith(n.to));
   const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => void api.patch('/me/preferences', { body: p }).catch(() => {});
 
   const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); setLang(l); savePref({ locale: l }); };
@@ -72,14 +81,14 @@ export function Shell() {
           </div>
           <nav className="flex-1 overflow-y-auto px-2">
             {(['work', 'data', 'admin'] as const).map((g) => {
-              const list = items.filter((i) => i.group === g);
+              const list = sideItems.filter((i) => i.group === g);
               if (!list.length) return null;
               return (
                 <div key={g} className="mb-3">
                   <div className="px-2 py-1 text-xs font-semibold text-mute">{t(`nav.group_${g}`)}</div>
                   {list.map((n) => (
                     <NavLink key={n.key} to={n.to} data-testid={`nav-${n.key}`}
-                      className={({ isActive }) => `flex items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive ? 'border-s-2 border-accent bg-sideOn font-semibold' : 'hover:bg-hover'}`}>
+                      className={({ isActive }) => `flex items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive || (n.key === 'admin.users' && inPeople) ? 'border-s-2 border-accent bg-sideOn font-semibold' : 'hover:bg-hover'}`}>
                       {n.icon}<span className="flex-1">{t(`nav.${n.key}`)}</span>
                     </NavLink>
                   ))}

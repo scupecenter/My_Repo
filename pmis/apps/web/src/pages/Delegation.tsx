@@ -77,7 +77,7 @@ export function Delegation() {
   return (
     <div data-testid="page-delegation">
       <div className="mb-4 flex items-center gap-3">
-        <div className="me-auto"><h1 className="text-2xl font-bold">{t('deleg.title')}</h1><p className="text-mute">{t('deleg.subtitle')}</p></div>
+        <div className="me-auto"><h2 className="text-lg font-bold">{t('deleg.title')}</h2><p className="text-mute">{t('deleg.subtitle')}</p></div>
         <button className="btn btn-accent" data-testid="deleg-new" onClick={() => setDlg('grant')}><Plus size={16} />{t('deleg.grant')}</button>
       </div>
       <div role="tablist" className="mb-3 flex flex-wrap gap-1">

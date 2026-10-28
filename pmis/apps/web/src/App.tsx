@@ -6,6 +6,7 @@ import { setPasswordChangeHandler } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import type { Session } from '@/api/types';
 import { Shell } from '@/components/Shell';
+import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
 import { ChangePassword } from '@/pages/ChangePassword';
 import { EmployeeId } from '@/pages/EmployeeId';
@@ -49,13 +50,15 @@ function Gate() {
         <Route path="approvals" element={<Approvals />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
-        <Route path="admin/users" element={<Users />} />
-        <Route path="admin/users/:userId" element={<UserDetailPage />} />
-        <Route path="admin/roles" element={<Roles />} />
-        <Route path="admin/groups" element={<Groups />} />
-        <Route path="admin/delegation" element={<Delegation />} />
         <Route path="absence" element={<Absence />} />
-        <Route path="admin/matrix" element={<MatrixPage />} />
+        <Route element={<PeopleAdminLayout />}>
+          <Route path="admin/users" element={<Users />} />
+          <Route path="admin/users/:userId" element={<UserDetailPage />} />
+          <Route path="admin/roles" element={<Roles />} />
+          <Route path="admin/groups" element={<Groups />} />
+          <Route path="admin/delegation" element={<Delegation />} />
+          <Route path="admin/matrix" element={<MatrixPage />} />
+        </Route>
         <Route path="admin/settings/*" element={<SettingsRoutes />} />
         <Route path="admin/security-log" element={<SecurityLog />} />
         <Route path="admin/online" element={<OnlineNow />} />

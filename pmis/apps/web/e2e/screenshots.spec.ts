@@ -34,7 +34,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/task-drawer-${locale}-${theme}.png` });
     await page.keyboard.press('Escape');
-    await page.getByTestId('nav-admin.matrix').click();
+    await page.getByTestId('nav-admin.users').click(); await page.getByTestId('people-tab-matrix').click();
     await page.getByTestId('matrix-row-site_release').waitFor();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/matrix-${locale}-${theme}.png` });

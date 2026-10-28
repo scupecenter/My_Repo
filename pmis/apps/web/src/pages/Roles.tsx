@@ -37,7 +37,7 @@ export function Roles() {
   return (
     <div data-testid="page-roles">
       <div className="mb-4 flex items-center gap-3">
-        <div className="me-auto"><h1 className="text-2xl font-bold">{t('roles.title')}</h1><p className="text-mute">{t('roles.subtitle')}</p></div>
+        <div className="me-auto"><h2 className="text-lg font-bold">{t('roles.title')}</h2><p className="text-mute">{t('roles.subtitle')}</p></div>
         <button className="btn btn-accent" data-testid="role-new" onClick={() => setDlg('new')}><Plus size={16} />{t('roles.new')}</button>
       </div>
       <div className="card overflow-x-auto"><table className="w-full text-sm">

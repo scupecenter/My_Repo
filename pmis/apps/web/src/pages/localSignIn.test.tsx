@@ -261,3 +261,13 @@ describe('password helpers', () => {
     expect(ruleKey('weird')).toBe('weak');
   });
 });
+
+describe('Users & Roles tabs', () => {
+  it('opens the first tab the person may use and keeps the order of the tabs', async () => {
+    const { firstPeopleTab, PEOPLE_TABS } = await import('@/components/PeopleAdmin');
+    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
+    expect(firstPeopleTab(['admin.users', 'admin.matrix'])).toBe('/admin/users');
+    expect(firstPeopleTab(['sites', 'admin.matrix'])).toBe('/admin/matrix');
+    expect(firstPeopleTab(['sites'])).toBeNull();
+  });
+});
