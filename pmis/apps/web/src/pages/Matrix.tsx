@@ -112,7 +112,7 @@ export function MatrixPage() {
   return (
     <div data-testid="page-matrix">
       <div className="mb-3 flex flex-wrap items-end gap-3">
-        <div className="flex-1"><h1 className="text-2xl font-bold">{t('matrix.title')}</h1><p className="text-mute">{t('matrix.subtitle')}</p></div>
+        <div className="flex-1"><h2 className="text-lg font-bold">{t('matrix.title')}</h2><p className="text-mute">{t('matrix.subtitle')}</p></div>
         <span className="text-sm text-mute" data-testid="matrix-dirty">{t('matrix.changes', { count: dirty })}</span>
         <button className="btn" disabled={!dirty} data-testid="matrix-discard" onClick={() => { setCells({}); setLevels({}); }}>{t('matrix.discard')}</button>
         <button className="btn btn-primary" disabled={!dirty || publish.isPending} data-testid="matrix-publish" onClick={() => setAsking(true)}>{t('matrix.publish')}</button>

@@ -1034,5 +1034,8 @@
     "remove_warning": "The person loses System Admin rights at once. They keep any role assignments they hold. At least one active System Admin must remain.",
     "activate_note": "This account is pending: it will be activated first.",
     "self": "You cannot change your own System Admin rights."
+  },
+  "peopleAdmin": {
+    "tab_users": "Users"
   }
 }

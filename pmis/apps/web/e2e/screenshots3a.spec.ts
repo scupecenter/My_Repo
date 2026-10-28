@@ -20,7 +20,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('assignment-list').locator('tr').first().waitFor();
     await shot('user-detail');
 
-    await page.getByTestId('nav-admin.delegation').click();
+    await page.getByTestId('nav-admin.users').click(); await page.getByTestId('people-tab-delegation').click();
     await page.getByTestId('deleg-new').click();
     await page.getByTestId('deleg-to-search').fill('Ali');
     await page.getByTestId('deleg-to-opt-1103').click();

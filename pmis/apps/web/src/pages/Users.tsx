@@ -88,7 +88,7 @@ export function Users() {
   const toggle = (u: User) => setSel((s) => { const n = { ...s }; if (n[u.id]) delete n[u.id]; else n[u.id] = u; return n; });
   return (
     <div data-testid="page-users">
-      <h1 className="text-2xl font-bold">{t('users.title')}</h1>
+      <h2 className="text-lg font-bold">{t('peopleAdmin.tab_users')}</h2>
       <p className="mb-4 text-mute">{t('users.subtitle')}</p>
       <div role="tablist" className="mb-3 flex gap-1">
         {(['active', 'deleted'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => setTab(k)}>{t(`users.tab_${k}`)}</button>)}
