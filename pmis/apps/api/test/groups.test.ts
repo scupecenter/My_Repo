@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as Pg } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Api, delegate, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
+import { Api, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
 
 let app: NestExpressApplication;
 let db: Pg;
@@ -31,10 +31,24 @@ async function adminApi(): Promise<{ admin: TestUser; api: Api }> {
 }
 
 describe('GET /groups and GET /groups/{id}', () => {
-  it('lists groups with member counts, search and paging; any signed-in (non-pending) user may read', async () => {
+  it('needs view on admin.groups: a plain member gets 403 module_forbidden for the list and the detail', async () => {
+    const g = await newGroup();
+    const member = await makeUser(db, { assigned: true });
+    await addDirect(g, member.id);
+    const api = await loggedIn(app, member);
+    const list = await api.call('get', '/groups');
+    expect(list.status).toBe(403);
+    expect(list.body.code).toBe('module_forbidden');
+    const one = await api.call('get', `/groups/${g}`);
+    expect(one.status).toBe(403);
+    expect(one.body.code).toBe('module_forbidden');
+  });
+
+  it('lists groups with member counts, search and paging for a holder of admin.groups view', async () => {
     const tag = `Crew${Date.now().toString(36)}`;
     const ids = [await newGroup(`${tag} A`), await newGroup(`${tag} B`), await newGroup(`${tag} C`)];
     const member = await makeUser(db, { assigned: true });
+    await grantProfile(db, member.id, [['admin.groups', 'view']]);
     await addDirect(ids[0]!, member.id);
     const api = await loggedIn(app, member);
 
@@ -58,6 +72,7 @@ describe('GET /groups and GET /groups/{id}', () => {
     const b = await makeUser(db, { assigned: true, name: 'Bravo Member' });
     await addDirect(g, b.id);
     await addDirect(g, a.id);
+    await grantProfile(db, a.id, [['admin.groups', 'view']]);
     const api = await loggedIn(app, a);
     const res = await api.call('get', `/groups/${g}`);
     expect(res.status).toBe(200);

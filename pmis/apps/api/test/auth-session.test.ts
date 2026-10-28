@@ -170,7 +170,7 @@ describe('must change password (ADR 0012 section 5)', () => {
     expect(ok.status).toBe(200);
     expect(ok.body.must_change_password).toBe(false);
 
-    expect((await api.call('get', '/groups')).status).toBe(200); // everything works now
+    expect((await api.call('get', `/users/${u.id}`)).status).toBe(200); // everything works now (own record needs no grant)
     expect((await other.call('get', '/me')).status).toBe(401); // the other session ended
     expect((await new Api(app).login(u.email, u.password)).status).toBe(401); // the temporary password is dead
     expect((await new Api(app).login(u.email, NEW_PASSWORD)).status).toBe(200);
@@ -221,7 +221,7 @@ describe('pending accounts (ADR 0002 section 5)', () => {
     const { assign } = await import('./helpers');
     await assign(db, u.id);
     app.get(UserStateService).invalidateAll(); // the state is cached for up to 60 s
-    expect((await api.call('get', '/groups')).status).toBe(200);
+    expect((await api.call('get', `/users/${u.id}`)).status).toBe(200);
   });
 
   it('a System Admin without any assignment row is not pending (ADR 0012 section 9)', async () => {

@@ -78,7 +78,8 @@ export class GroupsService {
     private readonly syslog: SyslogService,
   ) {}
 
-  async list(q: Record<string, unknown>): Promise<{ items: GroupDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
+  async list(auth: AuthContext, q: Record<string, unknown>): Promise<{ items: GroupDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
+    await this.access.requireModuleView(auth, 'admin.groups');
     const str = (k: string): string | undefined => {
       const v = q[k];
       if (v === undefined) return undefined;
@@ -118,7 +119,8 @@ export class GroupsService {
     };
   }
 
-  async get(id: string): Promise<GroupDetailDto> {
+  async get(auth: AuthContext, id: string): Promise<GroupDetailDto> {
+    await this.access.requireModuleView(auth, 'admin.groups');
     const d = await this.detail(id);
     if (!d) throw problems.notFound();
     return d;

@@ -10,13 +10,13 @@ export class GroupsController {
   constructor(private readonly groups: GroupsService) {}
 
   @Get()
-  list(@Query() query: Record<string, unknown>) {
-    return this.groups.list(query);
+  list(@Auth() auth: AuthContext, @Query() query: Record<string, unknown>) {
+    return this.groups.list(auth, query);
   }
 
   @Get(':id')
-  async get(@Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<GroupDetailDto> {
-    const g = await this.groups.get(id);
+  async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<GroupDetailDto> {
+    const g = await this.groups.get(auth, id);
     res.setHeader('ETag', etagHeader(g.version));
     return g;
   }
