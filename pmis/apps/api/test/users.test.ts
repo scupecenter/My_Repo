@@ -441,5 +441,7 @@ describe('GET /users/picker', () => {
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([{ id: active.id, display_name: `${tag} Active`, employee_id: active.employeeId }]);
     expect((await api.call('get', '/users/picker?q=a')).status).toBe(422);
+    const domain = active.email.split('@')[1]!;
+    expect((await api.call('get', `/users/picker?q=${encodeURIComponent(domain)}`)).body.items).toEqual([]); // never matches on email
   });
 });

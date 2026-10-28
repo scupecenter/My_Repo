@@ -126,7 +126,10 @@ export class UsersRepo {
     return { rows: rows.map(toUserDto), total: Number(total[0]?.n ?? 0) };
   }
 
-  /** Name picker: active users only, id, name and employee ID, at most 20 per page (GET /users/picker). */
+  /**
+   * Name picker: active users only, id, name and employee ID, at most 20 per page (GET /users/picker). Any signed-in user
+   * may call it, so it never matches on email: a substring match would let anyone discover addresses letter by letter.
+   */
   async picker(like: string, roleId: string | undefined, after: [string, string] | null): Promise<PickerItem[]> {
     const role = roleId
       ? Prisma.sql`AND EXISTS (SELECT 1 FROM user_role_assignments a WHERE a.user_id = u.id AND a.role_id = ${roleId}::uuid
@@ -136,7 +139,7 @@ export class UsersRepo {
     const rows = await this.db.tx.$queryRaw<{ id: string; display_name: string; employee_id: string | null }[]>(Prisma.sql`
       SELECT u.id::text AS id, u.display_name, u.employee_id FROM users u
       WHERE u.status = 'active' AND NOT u.is_break_glass
-        AND (u.display_name ILIKE ${like} OR u.email ILIKE ${like} OR u.employee_id ILIKE ${like}) ${role} ${page}
+        AND (u.display_name ILIKE ${like} OR u.employee_id ILIKE ${like}) ${role} ${page}
       ORDER BY u.display_name, u.id::text LIMIT 21`);
     return rows.map((r) => ({ id: r.id, display_name: r.display_name, employee_id: r.employee_id?.trim() ?? null }));
   }
