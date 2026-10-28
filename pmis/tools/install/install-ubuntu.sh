@@ -10,8 +10,12 @@
 #
 # Every value (address, ports, database name, passwords) is asked here, on the server, and nothing secret is written to
 # the repository. Answers are kept in /etc/gsdn-pmis/install.conf, so running it again (after git pull) only needs Enter.
-#   sudo bash pmis/tools/install/install-ubuntu.sh
+#   sudo bash pmis/tools/install/install-ubuntu.sh          (first time, asks the questions)
+#   sudo bash pmis/tools/install/update.sh                  (later updates, no questions)
 set -euo pipefail
+
+# --update: no questions; every answer comes from the previous run (used by update.sh).
+AUTO=0; [[ ${1-} == --update ]] && AUTO=1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PMIS_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -35,6 +39,10 @@ die()  { printf '\033[1;31mxx %s\033[0m\n' "$*" >&2; exit 1; }
 # ask VAR "Question" [default]
 ask() {
   local __var=$1 __q=$2 __def=${3-} __ans
+  if (( AUTO )); then
+    [[ -n $__def ]] || die "No previous answer for \"$__q\". Run install-ubuntu.sh once without --update."
+    echo "$__q: $__def"; printf -v "$__var" '%s' "$__def"; return
+  fi
   if [[ -n $__def ]]; then read -rp "$__q [$__def]: " __ans; else read -rp "$__q: " __ans; fi
   __ans=${__ans:-$__def}
   [[ -n $__ans ]] || die "A value is required: $__q"
@@ -44,6 +52,7 @@ ask() {
 # ask_opt VAR "Question" [default]: may stay empty
 ask_opt() {
   local __var=$1 __q=$2 __def=${3-} __ans
+  (( AUTO )) && { printf -v "$__var" '%s' "$__def"; return; }
   read -rp "$__q${__def:+ [$__def]} (optional): " __ans
   printf -v "$__var" '%s' "${__ans:-$__def}"
 }
@@ -51,6 +60,7 @@ ask_opt() {
 # ask_secret VAR "Question" [allow_generate]: hidden input, asked twice; empty generates a random one when allowed.
 ask_secret() {
   local __var=$1 __q=$2 __gen=${3-1} __a __b
+  (( AUTO )) && die "\"$__q\" needs an answer. Run install-ubuntu.sh once without --update."
   if (( __gen )); then read -rsp "$__q (leave empty to generate one): " __a; else read -rsp "$__q: " __a; fi; echo
   if [[ -z $__a ]]; then
     (( __gen )) || die "A value is required."
@@ -65,7 +75,7 @@ ask_secret() {
 }
 
 ask_yes() { local a; read -rp "$1 [y/N]: " a; [[ $a =~ ^[Yy] ]]; }
-ask_no()  { local a; read -rp "$1 [Y/n]: " a; [[ ! $a =~ ^[Nn] ]]; }
+ask_no()  { (( AUTO )) && return 0; local a; read -rp "$1 [Y/n]: " a; [[ ! $a =~ ^[Nn] ]]; }
 
 is_port() { [[ $1 =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 65535 )); }
 port_busy() {
@@ -88,10 +98,12 @@ PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY=''
 if [[ -r $CONF_DIR/install.conf ]]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
-elif [[ -r $SITE ]]; then
-  PREV_SERVER_NAME=$(awk '/server_name/ {gsub(";",""); print $2; exit}' "$SITE")
-  PREV_HTTP_PORT=$(awk '/listen/ && !/ssl/ {gsub(";",""); print $2; exit}' "$SITE")
-  PREV_HTTPS_PORT=$(awk '/listen/ && /ssl/ {gsub(";",""); print $2; exit}' "$SITE")
+fi
+if [[ -r $SITE ]]; then
+  [[ -n $PREV_SERVER_NAME ]] || PREV_SERVER_NAME=$(awk '/server_name/ {gsub(";",""); print $2; exit}' "$SITE")
+  [[ -n $PREV_HTTP_PORT ]]   || PREV_HTTP_PORT=$(awk '/listen/ && !/ssl/ {gsub(";",""); print $2; exit}' "$SITE")
+  [[ -n $PREV_HTTPS_PORT ]]  || PREV_HTTPS_PORT=$(awk '/listen/ && /ssl/ {gsub(";",""); print $2; exit}' "$SITE")
+  # The certificate in use is always read from the live nginx site.
   PREV_CERT_PATH=$(awk '/ssl_certificate / {gsub(";",""); print $2; exit}' "$SITE")
   PREV_KEY_PATH=$(awk '/ssl_certificate_key/ {gsub(";",""); print $2; exit}' "$SITE")
 fi
@@ -216,7 +228,7 @@ fi
 say "6/6 Firewall"
 USE_UFW=0
 echo "Answer no if other apps on this server use ports besides SSH, HTTP and HTTPS: ufw would block them."
-if ask_yes "Enable the ufw firewall (allow only SSH, HTTP and HTTPS)?"; then
+if (( ! AUTO )) && ask_yes "Enable the ufw firewall (allow only SSH, HTTP and HTTPS)?"; then
   USE_UFW=1
   ask SSH_PORT "Your SSH port (so you do not lock yourself out)" 22
   is_port "$SSH_PORT" || die "Invalid port."
@@ -236,7 +248,7 @@ Summary
   First admin:    $( (( NEED_ADMIN )) && echo "$ADMIN_NAME <$ADMIN_EMAIL>" || echo "already exists" )
   Firewall:       $( (( USE_UFW )) && echo "ufw on, SSH port $SSH_PORT" || echo "not changed" )
 EOF
-ask_yes "Start the installation?" || die "Cancelled. Nothing was changed."
+(( AUTO )) || ask_yes "Start the installation?" || die "Cancelled. Nothing was changed."
 
 # ---------------------------------------------------------------- packages
 say "Installing base packages"
