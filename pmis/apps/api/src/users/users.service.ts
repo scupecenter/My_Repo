@@ -33,6 +33,9 @@ const patchSchema = z.object({
   reason,
 }).strict();
 
+const deleteSchema = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
+const restoreSchema = z.object({ reason }).strict();
+
 const orgSchema = z.object({
   manager_id: z.string().uuid().nullable(),
   department_id: z.string().uuid().nullable(),
@@ -168,6 +171,52 @@ export class UsersService {
       const ended = await this.sessions.revokeAll(id, auth.user.id, 'user_deactivated');
       await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, sessions: ended, reason: 'user_deactivated' }, auth.user.id);
     }
+    this.states.invalidate(id);
+    const next = await this.detail(id);
+    if (!next) throw new ProblemException(500, 'internal_error', {});
+    return next;
+  }
+
+  /** GET /users/deleted: soft-deleted users, newest deletion first. Email, employee ID and phone stay unique, so all can be restored. */
+  async listDeleted(auth: AuthContext, q: Query): Promise<{ items: (UserDto & { can_restore: boolean; restore_blocked_reason: null })[]; page: { limit: number; next_cursor: null; total: number } }> {
+    await this.access.requireModuleView(auth, 'admin.users');
+    const text = one(q, 'q')?.trim();
+    const { rows, total } = await this.repo.list({ deleted: true }, 200, null, text ? likePattern(text) : null);
+    const items = rows
+      .sort((a, b) => (b.deleted_at?.getTime() ?? 0) - (a.deleted_at?.getTime() ?? 0))
+      .map((u) => ({ ...u, can_restore: true, restore_blocked_reason: null }));
+    return { items, page: { limit: 200, next_cursor: null, total } };
+  }
+
+  /** POST /users/{id}/delete (B14): soft delete through idm_delete_user; sessions end and sign-in stops. */
+  async softDelete(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<UserDto & { can_restore: boolean; restore_blocked_reason: null }> {
+    const body = parse(deleteSchema, raw);
+    await this.access.requireAdmin('users', 'delete');
+    if (ifMatch === undefined || ifMatch.trim() === '') checkIfMatch(undefined, '');
+    await this.stepUp.require(auth);
+    const current = await this.detail(id);
+    if (!current) throw problems.notFound();
+    checkIfMatch(ifMatch, current.version);
+    await this.db.tx.$executeRaw`SELECT idm_delete_user(${id}::uuid, ${body.reason}::text)`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, reason: 'user_deleted' }, auth.user.id);
+    this.states.invalidate(id);
+    const next = await this.repo.find(id);
+    if (!next) throw new ProblemException(500, 'internal_error', {});
+    return { ...next, can_restore: true, restore_blocked_reason: null };
+  }
+
+  /** POST /users/{id}/restore (B14): back to the status before the delete; local sign-in on again. */
+  async restore(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<UserDetailDto> {
+    const body = parse(restoreSchema, raw);
+    await this.access.requireAdmin('users', 'delete');
+    if (ifMatch === undefined || ifMatch.trim() === '') checkIfMatch(undefined, '');
+    await this.stepUp.require(auth);
+    const current = await this.detail(id);
+    if (!current) throw problems.notFound();
+    checkIfMatch(ifMatch, current.version);
+    await this.db.tx.$executeRaw`SELECT idm_restore_user(${id}::uuid, ${body.reason}::text)`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
     this.states.invalidate(id);
     const next = await this.detail(id);
     if (!next) throw new ProblemException(500, 'internal_error', {});
