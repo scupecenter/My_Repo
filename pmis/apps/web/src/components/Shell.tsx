@@ -57,8 +57,8 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : allowed.has(n.key)));
-  // Users, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
-  const peopleTo = firstPeopleTab(me.data?.effective.nav);
+  // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
+  const peopleTo = firstPeopleTab(me.data);
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
   const sideItems = NAV.flatMap((n) => {
     if (n.key === 'admin.users') return peopleTo ? [{ ...n, to: peopleTo }] : [];

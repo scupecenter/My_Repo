@@ -54,6 +54,7 @@ function Gate() {
         <Route element={<PeopleAdminLayout />}>
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/users/:userId" element={<UserDetailPage />} />
+          <Route path="admin/online" element={<OnlineNow />} />
           <Route path="admin/roles" element={<Roles />} />
           <Route path="admin/groups" element={<Groups />} />
           <Route path="admin/delegation" element={<Delegation />} />
@@ -61,7 +62,6 @@ function Gate() {
         </Route>
         <Route path="admin/settings/*" element={<SettingsRoutes />} />
         <Route path="admin/security-log" element={<SecurityLog />} />
-        <Route path="admin/online" element={<OnlineNow />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

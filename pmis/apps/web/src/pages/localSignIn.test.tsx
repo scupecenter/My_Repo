@@ -265,9 +265,12 @@ describe('password helpers', () => {
 describe('Users & Roles tabs', () => {
   it('opens the first tab the person may use and keeps the order of the tabs', async () => {
     const { firstPeopleTab, PEOPLE_TABS } = await import('@/components/PeopleAdmin');
-    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
-    expect(firstPeopleTab(['admin.users', 'admin.matrix'])).toBe('/admin/users');
-    expect(firstPeopleTab(['sites', 'admin.matrix'])).toBe('/admin/matrix');
-    expect(firstPeopleTab(['sites'])).toBeNull();
+    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.online', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
+    const me = (nav: string[], grants: string[] = []) =>
+      ({ is_system_admin: false, effective: { nav, grants: grants.map((action) => ({ module_key: 'admin.users', action, region_ids: 'all' })) } }) as never;
+    expect(firstPeopleTab(me(['admin.users', 'admin.matrix']))).toBe('/admin/users');
+    expect(firstPeopleTab(me(['sites', 'admin.matrix']))).toBe('/admin/matrix');
+    expect(firstPeopleTab(me(['sites'], ['manage_users']))).toBe('/admin/online'); // Online now is opened by its grant
+    expect(firstPeopleTab(me(['sites']))).toBeNull();
   });
 });

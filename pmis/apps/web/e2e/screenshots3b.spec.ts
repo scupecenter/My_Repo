@@ -33,7 +33,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('integrity-result-security').waitFor();
     await shot('security-log');
 
-    await page.getByTestId('nav-admin.online').click();
+    await page.getByTestId('nav-admin.users').click(); await page.getByTestId('people-tab-online').click();
     await page.getByTestId('session-own').waitFor();
     await shot('online-now');
 
