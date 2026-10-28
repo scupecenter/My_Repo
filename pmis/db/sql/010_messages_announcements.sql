@@ -216,6 +216,10 @@ BEGIN
   IF a IS NULL OR NOT public.app_actor_is_admin('announcements', 'create') THEN
     RAISE EXCEPTION 'System Admin or a delegation of announcements.create required' USING ERRCODE = 'insufficient_privilege';
   END IF;
+  -- An announcement can reach any region, so a delegate needs an all-regions delegation (as in idm_need_global).
+  IF NOT public.app_actor_is_system_admin() AND public.app_actor_region_filter('announcements', 'create') IS NOT NULL THEN
+    RAISE EXCEPTION 'sending announcements needs an all-regions delegation' USING ERRCODE = 'insufficient_privilege';
+  END IF;
   INSERT INTO public.announcements (title, body, audience_all, created_by) VALUES (btrim(p_title), p_body, coalesce(p_all, false), a)
   RETURNING id INTO aid;
   INSERT INTO public.announcement_targets (announcement_id, kind, target_id)

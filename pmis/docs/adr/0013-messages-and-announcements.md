@@ -22,7 +22,7 @@ Owner answers (2026-10-28):
    - Only the two participants can read a thread, enforced by row-level security; a System Admin who is not a participant cannot read it. Messages are append-only (trigger). Each participant has a `last_read_at` for unread counts.
    - A thread keeps working after the manager link changes; the link only decides who can start a new one.
 3. **Announcements.**
-   - Sent by a System Admin or a delegate holding `announcements.create` (`ann_send`). The audience is everyone, or any mix of users, groups, roles (an assignment valid today) and departments.
+   - Sent by a System Admin or a delegate holding `announcements.create` for **all regions** (`ann_send`). A region-limited delegation is refused, because an announcement can reach anyone. The audience is everyone, or any mix of users, groups, roles (an assignment valid today) and departments.
    - **The recipients are fixed when it is sent** (`announcement_recipients`): active users who match, never the sender. A person who joins later does not receive it. This keeps the results exact and auditable.
    - Each recipient answers once (`ann_respond`): `agree`, or `disagree` with a note of at least 3 characters, enforced by a check constraint. Answers are append-only.
    - The web app shows unanswered announcements, oldest first, as a pop-up that cannot be dismissed. The API does not block other calls, because the pop-up is a UI duty and a background call must not fail because of it.
