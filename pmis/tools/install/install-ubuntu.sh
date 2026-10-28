@@ -98,7 +98,10 @@ esac
 
 say "3/4 Database (PostgreSQL 16, listens on localhost only)"
 # Other PostgreSQL clusters on this server are left alone; PMIS gets its own 16/main cluster.
-port_busy() { ss -ltnH "( sport = :$1 )" 2>/dev/null | grep -q .; }
+port_busy() {
+  if command -v ss >/dev/null; then ss -ltnH "( sport = :$1 )" | grep -q .
+  else (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; fi
+}
 PG16_PORT=$(awk '/^port *=/ {print $3}' /etc/postgresql/16/main/postgresql.conf 2>/dev/null || true)
 if command -v pg_lsclusters >/dev/null && pg_lsclusters -h 2>/dev/null | grep -q .; then
   echo "PostgreSQL clusters already on this server (they will not be changed):"
