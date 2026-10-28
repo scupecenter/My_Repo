@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { setPasswordChangeHandler } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import type { Session } from '@/api/types';
+import { AnnouncementPopup } from '@/components/AnnouncementPopup';
 import { Shell } from '@/components/Shell';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
@@ -17,6 +18,9 @@ import { MyWork } from '@/pages/MyWork';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
 import { Absence } from '@/pages/Absence';
+import { AnnouncementResults } from '@/pages/AnnouncementResults';
+import { Announcements } from '@/pages/Announcements';
+import { Messages } from '@/pages/Messages';
 import { Delegation } from '@/pages/Delegation';
 import { Groups } from '@/pages/Groups';
 import { Roles } from '@/pages/Roles';
@@ -36,6 +40,11 @@ function Gate() {
   if (s.isLoading) return null;
   const session = s.data;
   if (!session?.authenticated) return <Navigate to="/login" replace />;
+  // The announcement pop-up (ADR 0013) shows for every signed-in person, also on the screens below that stand alone.
+  return <><AnnouncementPopup />{gated(session)}</>;
+}
+
+function gated(session: Session) {
   // A temporary password is waiting: this screen is the only one reachable, whatever the URL.
   if (session.must_change_password) return <ChangePassword forced />;
   if (session.needs_employee_id) return <EmployeeId />;
@@ -50,6 +59,10 @@ function Gate() {
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="absence" element={<Absence />} />
+        <Route path="messages" element={<Messages />} />
+        <Route path="messages/:threadId" element={<Messages />} />
+        <Route path="admin/announcements" element={<Announcements />} />
+        <Route path="admin/announcements/:id" element={<AnnouncementResults />} />
         <Route element={<PeopleAdminLayout />}>
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/users/:userId" element={<UserDetailPage />} />

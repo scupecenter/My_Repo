@@ -1,6 +1,7 @@
 import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Notification, Session, TaskDetail, TaskSummary, WorkflowStep } from '@/api/types';
 import { initAdmin } from './adminData';
 import { initCfg } from './settingsData';
+import { initOrg } from './orgData';
 import { byId, staffRef, uid } from './ids';
 import { holdersOf, initialMatrix } from './matrixData';
 import { STAFF } from './staff';
@@ -10,16 +11,17 @@ export { staffRef, uid };
 
 /** Accounts offered on the fake Microsoft page. `linked=false` = first sign-in (needs employee ID). */
 export const ACCOUNTS: Record<string, { employee_id: string | null; name: string; email: string; status: 'active' | 'pending_assignment'; nav: string[] }> = {
-  pm: { employee_id: '1001', name: 'Ahmed Salem', email: 'ahmed.salem@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit'] },
-  reviewer: { employee_id: '1102', name: 'Mona Fathi', email: 'mona.fathi@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'templates', 'absence'] },
-  auditor: { employee_id: '1103', name: 'Ali Barka', email: 'ali.barka@example.com', status: 'active', nav: ['my_work', 'approvals', 'admin.security_log'] },
+  pm: { employee_id: '1001', name: 'Ahmed Salem', email: 'ahmed.salem@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'audit', 'messages', 'announcements'] },
+  reviewer: { employee_id: '1102', name: 'Mona Fathi', email: 'mona.fathi@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'templates', 'absence', 'messages'] },
+  auditor: { employee_id: '1103', name: 'Ali Barka', email: 'ali.barka@example.com', status: 'active', nav: ['my_work', 'approvals', 'admin.security_log', 'messages'] },
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
+  engineer: { employee_id: '1204', name: 'Sami Nuri', email: 'sami.nuri@example.com', status: 'active', nav: ['my_work', 'approvals', 'sites', 'absence', 'messages'] },
   pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
 };
 
 /** Demo passwords for the synthetic accounts (README). Local sign-in only; never real secrets. */
 export const DEMO_PASSWORDS: Record<string, string> = {
-  pm: 'Demo-Pm-2026-pass', reviewer: 'Demo-Lead-2026-pass', auditor: 'Demo-Audit-2026-pass', pending: 'Demo-Pending-2026-pass', newbie: 'Demo-First-2026-pass',
+  pm: 'Demo-Pm-2026-pass', engineer: 'Demo-Staff-2026-pass', reviewer: 'Demo-Lead-2026-pass', auditor: 'Demo-Audit-2026-pass', pending: 'Demo-Pending-2026-pass', newbie: 'Demo-First-2026-pass',
 };
 /** First sign-in demo account: its temporary password must be changed (and it then asks for the employee ID). */
 const MUST_CHANGE_DEMO = new Set(['newbie']);
@@ -75,6 +77,7 @@ const fresh = () => ({
     { id: '30000000-0000-4000-8000-000000000002', kind: 'task_returned', title: 'ZW310 B6 was returned with a note', created_at: '2026-10-23T10:00:00Z', read_at: null, link: '/my-work' },
   ] as Notification[],
   admin: initAdmin(),
+  org: initOrg(),
   cfg: initCfg(),
   session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string; method?: 'local' | 'm365' },
   auth: {} as Record<string, Cred>,
@@ -122,7 +125,7 @@ export function viewer() {
   // An admin assignment (Users & Roles) activates a pending account and opens the basic navigation.
   const u = db().admin.users.find((x) => (x.local ? `u:${x.local.id}` === s.account : x.employee_id === employee_id));
   const active = s.linked && u?.status === 'active';
-  return { ...a, employee_id, key: s.account, linked: s.linked, status: active ? ('active' as const) : a.status, nav: active && !a.nav.length ? ['my_work', 'approvals', 'sites', 'absence'] : a.nav };
+  return { ...a, employee_id, key: s.account, linked: s.linked, status: active ? ('active' as const) : a.status, nav: active && !a.nav.length ? ['my_work', 'approvals', 'sites', 'absence', 'messages'] : a.nav };
 }
 
 export function sessionBody(): Session {

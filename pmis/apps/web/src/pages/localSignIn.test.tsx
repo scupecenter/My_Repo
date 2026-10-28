@@ -237,6 +237,11 @@ describe('hybrid mode list', () => {
       'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/step-up', 'GET /auth/session', 'POST /auth/logout', 'GET /me',
       'GET /users', 'GET /users/picker', 'POST /users', 'GET /users/:id', 'PATCH /users/:id', 'POST /users/:id/password-reset', 'GET /groups', 'GET /groups/:id',
       'POST /groups/:id/members', 'DELETE /groups/:id/members/:userId',
+      // contract 0.4.0
+      'GET /departments', 'POST /departments', 'PATCH /departments/:id', 'PUT /users/:id/org',
+      'GET /messages/contacts', 'GET /messages/threads', 'POST /messages/threads', 'GET /messages/threads/:id', 'POST /messages/threads/:id/replies', 'POST /messages/threads/:id/read',
+      'GET /announcements', 'POST /announcements', 'GET /announcements/:id', 'GET /announcements/:id/responses', 'GET /announcements/:id/responses/export', 'POST /announcements/:id/respond',
+      'GET /me/announcements/pending',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

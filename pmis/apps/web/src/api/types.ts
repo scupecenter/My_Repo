@@ -114,3 +114,18 @@ export type WorkflowMilestone = S['WorkflowMilestone'];
 export type WorkflowGate = S['WorkflowGate'];
 export type LocalUserCreate = S['LocalUserCreate'];
 export type LocalUserCreated = S['LocalUserCreated'];
+
+// ---- contract 0.4.0
+export type Department = S['Department'];
+export type DepartmentInput = S['DepartmentInput'];
+export type DepartmentRef = S['DepartmentRef'];
+export type MessageContacts = S['MessageContacts'];
+export type MessageThreadSummary = S['MessageThreadSummary'];
+export type MessageItem = S['MessageItem'];
+export type MessageThread = S['MessageThread'];
+export type AnnouncementAudience = S['AnnouncementAudience'];
+export type AnnouncementInput = S['AnnouncementInput'];
+export type AnnouncementSummary = S['AnnouncementSummary'];
+export type AnnouncementDetail = S['AnnouncementDetail'];
+export type AnnouncementResponse = S['AnnouncementResponse'];
+export type PendingAnnouncement = S['PendingAnnouncement'];

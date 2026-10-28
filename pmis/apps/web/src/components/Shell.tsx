@@ -1,11 +1,12 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
+import { useUnreadTotal } from '@/api/msg';
 import { hasGrant } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
@@ -18,6 +19,7 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'd
   { key: 'approvals', to: '/approvals', icon: <Inbox size={18} />, group: 'work' },
   { key: 'sites', to: '/sites', icon: <LayoutGrid size={18} />, group: 'work' },
   { key: 'dashboard', to: '/dashboard', icon: <BarChart3 size={18} />, group: 'work' },
+  { key: 'messages', to: '/messages', icon: <MessageSquare size={18} />, group: 'work' },
   { key: 'templates', to: '/templates', icon: <FileText size={18} />, group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: <Users size={18} />, group: 'admin' },
   { key: 'admin.roles', to: '/admin/roles', icon: <KeyRound size={18} />, group: 'admin' },
@@ -28,6 +30,7 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'd
   { key: 'admin.settings', to: '/admin/settings', icon: <Settings size={18} />, group: 'admin' },
   { key: 'admin.security_log', to: '/admin/security-log', icon: <ScrollText size={18} />, group: 'admin' },
   { key: 'admin.online', to: '/admin/online', icon: <Activity size={18} />, group: 'admin' },
+  { key: 'announcements', to: '/admin/announcements', icon: <Megaphone size={18} />, group: 'admin' },
   { key: 'audit', to: '/audit', icon: <Eye size={18} />, group: 'admin' },
 ];
 
@@ -56,6 +59,7 @@ export function Shell() {
   }, []);
 
   const allowed = new Set(me.data?.effective.nav ?? []);
+  const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
   const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : allowed.has(n.key)));
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const peopleTo = firstPeopleTab(me.data);
@@ -90,6 +94,7 @@ export function Shell() {
                     <NavLink key={n.key} to={n.to} data-testid={`nav-${n.key}`}
                       className={({ isActive }) => `flex items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive || (n.key === 'admin.users' && inPeople) ? 'border-s-2 border-accent bg-sideOn font-semibold' : 'hover:bg-hover'}`}>
                       {n.icon}<span className="flex-1">{t(`nav.${n.key}`)}</span>
+                      {n.key === 'messages' && unread > 0 && <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>}
                     </NavLink>
                   ))}
                 </div>
