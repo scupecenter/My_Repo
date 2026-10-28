@@ -97,9 +97,25 @@ case $TLS_MODE in
 esac
 
 say "3/4 Database (PostgreSQL 16, listens on localhost only)"
+# Other PostgreSQL clusters on this server are left alone; PMIS gets its own 16/main cluster.
+port_busy() { ss -ltnH "( sport = :$1 )" 2>/dev/null | grep -q .; }
+PG16_PORT=$(awk '/^port *=/ {print $3}' /etc/postgresql/16/main/postgresql.conf 2>/dev/null || true)
+if command -v pg_lsclusters >/dev/null && pg_lsclusters -h 2>/dev/null | grep -q .; then
+  echo "PostgreSQL clusters already on this server (they will not be changed):"
+  pg_lsclusters | sed 's/^/   /'
+fi
+if [[ -n $PG16_PORT ]]; then
+  DEFAULT_DB_PORT=$PG16_PORT
+else
+  DEFAULT_DB_PORT=5432
+  while port_busy "$DEFAULT_DB_PORT"; do DEFAULT_DB_PORT=$((DEFAULT_DB_PORT + 1)); done
+fi
 ask DB_NAME "Database name" pmis
-ask DB_PORT "PostgreSQL port" 5432
+ask DB_PORT "PostgreSQL 16 port" "$DEFAULT_DB_PORT"
 is_port "$DB_PORT" || die "Invalid port."
+if [[ $DB_PORT != "${PG16_PORT:-}" ]] && port_busy "$DB_PORT"; then
+  die "Port $DB_PORT is already used by another service. Choose a free port."
+fi
 [[ $DB_NAME =~ ^[a-z_][a-z0-9_]*$ ]] || die "Use lowercase letters, digits and _ only."
 echo "The application role is pmis_app (fixed: the migrations grant rights to this name)."
 ask_secret DB_APP_PASSWORD "Password for database role pmis_app"
@@ -107,6 +123,7 @@ echo "The PostgreSQL superuser 'postgres' keeps peer login only (sudo -u postgre
 
 say "4/4 Firewall"
 USE_UFW=0
+echo "Answer no if other apps on this server use ports besides SSH, HTTP and HTTPS: ufw would block them."
 if ask_yes "Enable the ufw firewall (allow only SSH, HTTP and HTTPS)?"; then
   USE_UFW=1
   ask SSH_PORT "Your SSH port (so you do not lock yourself out)" 22
@@ -147,8 +164,10 @@ if [[ ! -x /usr/lib/postgresql/16/bin/postgres ]]; then
   echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
     > /etc/apt/sources.list.d/pgdg.list
   apt-get update -qq
-  apt-get install -y -qq postgresql-16 postgresql-contrib-16
+  apt-get install -y -qq postgresql-16
 fi
+# The package creates 16/main on the next free port only when no cluster exists yet.
+[[ -d /etc/postgresql/16/main ]] || pg_createcluster 16 main -p "$DB_PORT"
 
 # ---------------------------------------------------------------- PostgreSQL
 say "Configuring PostgreSQL"
@@ -225,7 +244,7 @@ EOF
      ln -sf /etc/nginx/sites-available/gsdn-pmis /etc/nginx/sites-enabled/gsdn-pmis
      rm -f /etc/nginx/sites-enabled/default
      nginx -t && systemctl reload nginx
-     apt-get install -y -qq certbot
+     command -v certbot >/dev/null || apt-get install -y -qq certbot
      certbot certonly --webroot -w "$ACME_ROOT" -d "$SERVER_NAME" -m "$LE_EMAIL" --agree-tos -n
      CERT_PATH=/etc/letsencrypt/live/$SERVER_NAME/fullchain.pem
      KEY_PATH=/etc/letsencrypt/live/$SERVER_NAME/privkey.pem
