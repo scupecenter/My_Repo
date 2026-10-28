@@ -151,6 +151,16 @@ BEGIN
   IF p_user = a THEN RAISE EXCEPTION 'use change password for your own account' USING ERRCODE = 'insufficient_privilege'; END IF;
   PERFORM public.idm_assert_user_change_allowed(p_user);
   IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = p_user AND NOT is_break_glass) THEN RAISE EXCEPTION 'user not found'; END IF;
+  -- Whoever sets a password can sign in as the user, so a delegate may do it only for an account that holds no rights:
+  -- no current or future assignment and no Entra link. Everything else is System Admin only.
+  IF NOT public.app_actor_is_system_admin() THEN
+    IF EXISTS (SELECT 1 FROM public.user_role_assignments r WHERE r.user_id = p_user AND (r.valid_to IS NULL OR r.valid_to > now())) THEN
+      RAISE EXCEPTION 'this user holds assignments: System Admin only' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.users WHERE id = p_user AND m365_object_id IS NOT NULL) THEN
+      RAISE EXCEPTION 'this user signs in with Microsoft 365: System Admin only' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  END IF;
   INSERT INTO public.local_credentials (user_id, password_hash, must_change, set_by) VALUES (p_user, p_hash, true, a)
   ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, must_change = true, enabled = true, set_at = now(),
     set_by = a, failed_count = 0, locked_until = NULL;
