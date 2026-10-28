@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Assignment, UserDetail } from '@/api/types';
-import { absentOn, accountStatus, db, save, slotsOf, STAFF, stepUpValid, toSummary, viewer, type MockTask } from './db';
+import { absentOn, accountKeyOf, accountStatus, cred, db, save, slotsOf, STAFF, stepUpValid, toSummary, viewer, type MockTask } from './db';
 import { PROFILES, type MockUser } from './adminData';
 import { find, guard, page, problem, stepUp, transition } from './handlers';
 import { byId, uid } from './ids';
@@ -19,10 +19,13 @@ const noReason = (b: { reason?: string }) => ((b.reason ?? '').trim().length < 3
 const tag = (n: number) => ({ headers: { ETag: `"${n}"` } });
 const now = () => new Date().toISOString();
 
-const userOf = (u: MockUser) => {
-  const s = byId(u.employee_id);
+/** Name, email and phone of an admin-list user: the registry row, or the data typed when a local user was created. */
+const prof = (u: MockUser) => (u.local ? { name_en: u.local.display_name, name_ar: u.local.display_name, email: u.local.email, phone: u.local.phone } : byId(u.employee_id));
+const uref = (u: MockUser) => (u.local ? { id: u.local.id, display_name: u.local.display_name, ...(u.employee_id ? { employee_id: u.employee_id } : {}) } : ref(u.employee_id));
+export const userOf = (u: MockUser) => {
+  const s = prof(u), c = cred(accountKeyOf(u));
   return {
-    ...ref(u.employee_id), email: s.email, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
+    ...uref(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
   };
 };
 const rowsOf = (e: string, ended = false) => A().assignments.filter((a) => a.user.employee_id === e && (ended || a.is_active_now));
@@ -31,7 +34,7 @@ const detail = (u: MockUser): UserDetail => ({
   groups: A().groups.filter((g) => g.members.includes(u.employee_id)).map((g) => ({ id: g.id, name: g.name, is_system_admins: g.is_system_admins })), teams: [...new Set(rowsOf(u.employee_id).map((a) => a.team ?? 'none'))],
 }) as UserDetail;
 const roleOf = (id: string) => A().roles.find((r) => r.id === id);
-const userBy = (id: string) => A().users.find((u) => uid(u.employee_id) === id);
+const userBy = (id: string) => A().users.find((u) => (u.local ? u.local.id : uid(u.employee_id)) === id);
 const tasksAll = () => [...db().tasks, ...db().extra, ...Object.values(db().ov)];
 const heldBy = (t: MockTask, e: string) => toSummary(t).ball_in_court?.holders.some((h) => h.employee_id === e);
 const emptyBulk = () => ({ bulk_action_id: crypto.randomUUID(), done: [] as { id: string; created_id?: string }[], skipped: [] as { ref: string; code: string; message?: string }[], failed: [] as { ref: string; code: string; message?: string }[] });
@@ -42,8 +45,8 @@ export const adminHandlers = [
     const g = needAdmin(); if (g) return g;
     const u = new URL(request.url).searchParams, q = (u.get('q') ?? '').toLowerCase(), st = u.get('status'), role = u.get('role_id'), grp = u.get('group_id');
     const items = A().users.filter((x) => {
-      const s = byId(x.employee_id);
-      return (!q || `${s.name_en} ${s.name_ar} ${s.email} ${s.employee_id}`.toLowerCase().includes(q)) && (!st || x.status === st)
+      const s = prof(x);
+      return (!q || `${s.name_en} ${s.name_ar} ${s.email} ${x.employee_id}`.toLowerCase().includes(q)) && (!st || x.status === st)
         && (!role || rowsOf(x.employee_id).some((a) => a.role.id === role)) && (!grp || A().groups.find((y) => y.id === grp)?.members.includes(x.employee_id));
     });
     return page(items.map(userOf));
@@ -98,8 +101,8 @@ export const adminHandlers = [
   }),
   http.get(`${B}/users/:id/assignments`, ({ params, request }) => {
     const g = needAdmin(); if (g) return g;
-    const e = eOf(params.id as string);
-    return e ? HttpResponse.json({ items: rowsOf(e, new URL(request.url).searchParams.get('include_ended') === 'true') }) : problem(404, 'not_found', 'User not found');
+    const e = eOf(params.id as string) ?? (userBy(params.id as string)?.local ? '' : undefined);
+    return e !== undefined ? HttpResponse.json({ items: rowsOf(e, new URL(request.url).searchParams.get('include_ended') === 'true') }) : problem(404, 'not_found', 'User not found');
   }),
 
   // ------------------------------------------------------------------ assignments
@@ -120,7 +123,7 @@ export const adminHandlers = [
       if (!u || !role) { out.failed.push({ ref: key, code: 'not_found' }); continue; }
       if (rowsOf(u.employee_id).some((a) => a.role.id === rid)) { out.skipped.push({ ref: key, code: 'already_assigned', message: 'Already holds this role' }); continue; }
       const row = {
-        id: crypto.randomUUID(), user: ref(u.employee_id), role: { id: role.id, code: role.code, name_en: role.name_en, name_ar: role.name_ar }, permission_level: b.defaults.permission_level, team: b.defaults.team ?? 'none',
+        id: crypto.randomUUID(), user: uref(u), role: { id: role.id, code: role.code, name_en: role.name_en, name_ar: role.name_ar }, permission_level: b.defaults.permission_level, team: b.defaults.team ?? 'none',
         region_ids: b.defaults.region_ids ?? role.default_region_ids ?? 'all', module_keys: b.defaults.module_keys ?? role.default_module_keys ?? 'all', profile_ids: b.defaults.profile_ids ?? [], is_primary: false,
         valid_from: b.defaults.valid_from ?? now(), valid_to: b.defaults.valid_to ?? null, is_active_now: true, assigned_at: now(), version: 1,
       } as Assignment;
@@ -191,7 +194,7 @@ export const adminHandlers = [
     const g = needAdmin(); if (g) return g;
     const u = userBy(params.id as string);
     if (!u) return problem(404, 'not_found', 'User not found');
-    return HttpResponse.json({ user: ref(u.employee_id), exempt: u.mfa.exempt, until: u.mfa.until, reason: u.mfa.reason, granted_by: u.mfa.by ? ref(u.mfa.by) : undefined });
+    return HttpResponse.json({ user: uref(u), exempt: u.mfa.exempt, until: u.mfa.until, reason: u.mfa.reason, granted_by: u.mfa.by ? ref(u.mfa.by) : undefined });
   }),
   http.put(`${B}/users/:id/mfa-exemption`, async ({ params, request }) => {
     const g = needAdmin(); if (g) return g;
@@ -203,7 +206,7 @@ export const adminHandlers = [
     const r = noReason(b); if (r) return r;
     if (b.until && Date.parse(b.until) <= Date.now()) return bad('/until', 'must_be_future');
     u.mfa = { exempt: true, until: b.until ?? null, reason: b.reason!.trim(), by: viewer()!.employee_id }; save();
-    return HttpResponse.json({ user: ref(u.employee_id), exempt: true, until: u.mfa.until, reason: u.mfa.reason, granted_by: ref(u.mfa.by!), granted_at: now() });
+    return HttpResponse.json({ user: uref(u), exempt: true, until: u.mfa.until, reason: u.mfa.reason, granted_by: ref(u.mfa.by!), granted_at: now() });
   }),
   http.post(`${B}/users/:id/mfa-exemption/revoke`, async ({ params, request }) => {
     const g = needAdmin(); if (g) return g;
@@ -212,7 +215,7 @@ export const adminHandlers = [
     if (!stepUpValid()) return stepUp();
     const r = noReason((await request.json()) as { reason?: string }); if (r) return r;
     u.mfa = { exempt: false, until: null, reason: null, by: null }; save();
-    return HttpResponse.json({ user: ref(u.employee_id), exempt: false, until: null, reason: null });
+    return HttpResponse.json({ user: uref(u), exempt: false, until: null, reason: null });
   }),
 
   // ------------------------------------------------------------------ roles
@@ -374,7 +377,7 @@ export const adminHandlers = [
   http.get(`${B}/reassignments/eligible-users`, ({ request }) => {
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams, q = (u.get('q') ?? '').toLowerCase(), from = u.get('from_user_id'), away = absentOn(TODAY);
-    return page(A().users.filter((x) => x.status === 'active' && !away.has(x.employee_id) && uid(x.employee_id) !== from && byId(x.employee_id).name_en.toLowerCase().includes(q)).map((x) => ref(x.employee_id)));
+    return page(A().users.filter((x) => x.status === 'active' && !away.has(x.employee_id) && (x.local ? x.local.id : uid(x.employee_id)) !== from && prof(x).name_en.toLowerCase().includes(q)).map(uref));
   }),
   http.get(`${B}/reassignments/alerts`, ({ request }) => {
     const g = guard(); if (g) return g;
@@ -513,7 +516,7 @@ function lastAdmin(u: MockUser) {
   return !!grp?.members.includes(u.employee_id) && !grp.members.some((m) => m !== u.employee_id && A().users.find((x) => x.employee_id === m)?.status === 'active');
 }
 const blocked = (d: ReturnType<typeof db>['admin']['deleted'][number]) =>
-  A().users.some((u) => u.employee_id === d.employee_id) ? { path: '/employee_id', text: 'employee ID' } : A().users.some((u) => byId(u.employee_id).email === d.email) ? { path: '/email', text: 'email' } : null;
+  A().users.some((u) => u.employee_id === d.employee_id) ? { path: '/employee_id', text: 'employee ID' } : A().users.some((u) => prof(u).email === d.email) ? { path: '/email', text: 'email' } : null;
 function deletedBody(d: ReturnType<typeof db>['admin']['deleted'][number]) {
   const b = blocked(d), s = STAFF.find((x) => x.employee_id === d.employee_id);
   return { id: uid(d.employee_id), display_name: d.name_en, employee_id: d.employee_id, email: d.email, status: d.status, locale: 'en' as const, mfa_exempt: false, created_at: '2026-09-01T08:00:00Z', version: d.version,

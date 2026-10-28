@@ -1,14 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { login, withStepUp, type DemoAccount } from './helpers';
 
-async function signIn(page: Page, locale: 'en' | 'ar', account: string) {
+async function signIn(page: Page, locale: 'en' | 'ar', account: DemoAccount) {
   await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
-  await page.goto('/login');
-  await page.getByTestId('login-submit').click();
-  await page.getByTestId(`mock-account-${account}`).click();
-}
-async function withStepUp(page: Page, act: () => Promise<void>) {
-  const [popup] = await Promise.all([page.waitForEvent('popup'), act().then(() => page.getByTestId('stepup-continue').click())]);
-  await popup.getByTestId('mock-stepup-verify').click();
+  await login(page, account);
 }
 
 for (const locale of ['en', 'ar'] as const) {

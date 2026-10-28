@@ -6,7 +6,8 @@ import path from 'node:path';
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  server: { port: 5173 },
+  // Hybrid / real mode in `npm run dev`: set VITE_PROXY_TARGET (for example https://pmis.example.internal) to forward /api to that server.
+  server: { port: 5173, proxy: process.env.VITE_PROXY_TARGET ? { '/api': { target: process.env.VITE_PROXY_TARGET, changeOrigin: true } } : undefined },
   test: {
     environment: 'jsdom',
     globals: true,

@@ -30,7 +30,10 @@
     "notifications": "Notifications",
     "mark_all_read": "Mark all as read",
     "no_notifications": "No notifications",
-    "sign_out": "Sign out"
+    "sign_out": "Sign out",
+    "account": "Account menu",
+    "change_password": "Change password",
+    "no_password": "You sign in with Microsoft 365. The password is managed there."
   },
   "palette": {
     "title": "Go to",
@@ -39,12 +42,17 @@
   },
   "login": {
     "title": "Sign in to GSDN PMIS",
-    "subtitle": "Enter your company email, 4-digit employee ID or registered phone. Microsoft 365 completes the sign-in.",
+    "subtitle": "Enter your 4-digit employee ID, company email or registered phone, and your password.",
     "label": "Email, employee ID or phone",
     "placeholder": "name@company.com · 1234 · +218…",
-    "button": "Continue with Microsoft 365",
-    "note": "PMIS never stores passwords.",
-    "error": "We could not sign you in. Try again."
+    "button": "Sign in",
+    "note": "Forgot your password? Ask a System Admin for a new temporary password.",
+    "error": "We could not sign you in. Try again.",
+    "password": "Password",
+    "invalid": "The ID or password is not correct, or the account cannot sign in. Check them and try again.",
+    "rate": "Too many attempts. Wait a minute and try again.",
+    "or": "or",
+    "m365": "Sign in with Microsoft 365"
   },
   "mock": {
     "title": "Microsoft 365 (mock)",
@@ -126,7 +134,11 @@
     "title": "Re-authentication needed",
     "body": "Final approval needs a fresh sign-in. Verify once and the action continues.",
     "continue": "Verify with Microsoft 365",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "body_password": "This action needs your password again. Enter it once and the action continues.",
+    "password": "Password",
+    "confirm": "Confirm",
+    "wrong": "The password is not correct. Try again."
   },
   "card": {
     "phone": "Phone",
@@ -158,7 +170,11 @@
     "delegate_forbidden": "Only a System Admin acting without delegation may change this.",
     "note_required": "A note is required.",
     "invalid_transition": "This action does not fit the task's current state or level.",
-    "template_rejected": "This file is not an approved template."
+    "template_rejected": "This file is not an approved template.",
+    "invalid_credentials": "The ID or password is not correct.",
+    "password_change_required": "Change your temporary password first.",
+    "weak_password": "This password does not meet the policy.",
+    "rate_limited": "Too many attempts. Wait a minute and try again."
   },
   "common": {
     "cancel": "Cancel",
@@ -933,5 +949,90 @@
     "progress": "Project progress: {{cur}}% now, {{next}}% with this set.",
     "recalc": "Progress will be recalculated.",
     "snapshots": "Saved weekly snapshots keep their values."
+  },
+  "changePw": {
+    "title": "Change password",
+    "forced": "You signed in with a temporary password. Choose your own password to continue.",
+    "current": "Current password",
+    "new": "New password",
+    "confirm": "Confirm new password",
+    "submit": "Change password",
+    "done": "Password changed.",
+    "policy_title": "The new password must follow these rules",
+    "policy_len": "12 to 128 characters.",
+    "policy_identity": "It does not contain your email, employee ID or phone.",
+    "policy_common": "It is not a common password.",
+    "policy_current": "It is not the same as your current password.",
+    "policy_short": "At least 12 characters; not a common password; not containing the email, ID or phone.",
+    "err_current_required": "Enter your current password.",
+    "err_current_wrong": "The current password is not correct.",
+    "err_mismatch": "The two passwords do not match.",
+    "rule_too_short": "Use at least 12 characters.",
+    "rule_too_long": "Use at most 128 characters.",
+    "rule_same_as_current": "The new password must differ from the current one.",
+    "rule_contains_email": "It must not contain your email name.",
+    "rule_contains_employee_id": "It must not contain your employee ID.",
+    "rule_contains_phone": "It must not contain your phone number.",
+    "rule_common_password": "This password is too common. Choose another.",
+    "rule_weak": "This password is too weak. Choose another.",
+    "weak": "This password is too weak. Choose another."
+  },
+  "tempPw": {
+    "mode": "Temporary password",
+    "generate": "Generate a temporary password (recommended)",
+    "type": "Type one myself",
+    "field": "Temporary password",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copy_failed": "Copy failed. Select the password and copy it by hand.",
+    "done": "I have copied it",
+    "warning": "This password is shown only once. It will not be shown again and cannot be recovered. Give it to the user by a separate channel; they must change it at the first sign-in.",
+    "body": "Temporary password.",
+    "body_for": "Temporary password for {{name}}."
+  },
+  "newUser": {
+    "open": "New user",
+    "title": "New user",
+    "submit": "Create user",
+    "created_title": "User created",
+    "name": "Display name",
+    "email": "Email",
+    "employee_id": "Employee ID (optional)",
+    "employee_id_hint": "4 digits. Leave empty if the person has none yet.",
+    "phone": "Phone (optional)",
+    "phone_hint": "International format, for example +218911234567.",
+    "err_display_name": "Enter a name.",
+    "err_email": "Enter a valid email.",
+    "err_employee_id": "The employee ID is 4 digits.",
+    "err_phone": "Use the international format, for example +218911234567.",
+    "dup_email": "This email is already used by another account.",
+    "dup_employee_id": "This employee ID is already used by another account.",
+    "dup_phone": "This phone is already used by another account."
+  },
+  "resetPw": {
+    "open": "Reset password",
+    "title": "Reset password for {{name}}",
+    "submit": "Reset password",
+    "note": "The user gets a new temporary password, is signed out everywhere, and must change it at the next sign-in. Your password is asked once.",
+    "done_title": "Password reset",
+    "self": "Use Change password for your own account."
+  },
+  "badges": {
+    "local": "Local sign-in",
+    "must_change": "Must change password"
+  },
+  "hybrid": {
+    "banner": "Screens other than sign-in and users show sample data while the system is being built."
+  },
+  "sysAdmin": {
+    "badge": "System Admin",
+    "make": "Make System Admin",
+    "remove": "Remove System Admin",
+    "make_title": "Make {{name}} a System Admin",
+    "remove_title": "Remove {{name}} from System Admins",
+    "make_warning": "A System Admin has full control of the PMIS: every screen, every region, all settings, users and roles. Give it only to people who need it.",
+    "remove_warning": "The person loses System Admin rights at once. They keep any role assignments they hold. At least one active System Admin must remain.",
+    "activate_note": "This account is pending: it will be activated first.",
+    "self": "You cannot change your own System Admin rights."
   }
 }

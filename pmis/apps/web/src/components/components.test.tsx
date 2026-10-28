@@ -15,10 +15,11 @@ import { renderApp, signIn } from '@/test/utils';
 const T = (n: number) => `10000000-0000-4000-8000-00000000${String(n).padStart(4, '0')}`;
 
 describe('Login', () => {
-  it('has one field and no password input', () => {
+  it('has the one identifier box and a password, and hides Microsoft 365 by default', () => {
     renderApp(<Login />);
     expect(screen.getByTestId('login-identifier')).toBeInTheDocument();
-    expect(document.querySelector('input[type=password]')).toBeNull();
+    expect(document.querySelector('input[type=password]')).not.toBeNull();
+    expect(screen.queryByTestId('login-m365')).toBeNull();
   });
 });
 

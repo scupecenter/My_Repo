@@ -16,6 +16,12 @@ datasource db {
 // ENUMS
 // ============================================================================
 
+enum AuthMethod {
+  local
+  m365
+  break_glass
+}
+
 enum UserStatus {
   pending_assignment
   active
@@ -351,8 +357,9 @@ model RoleDefaultModule {
 
 model User {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  m365_object_id  String     @unique // Entra ID oid claim
-  email           String     @unique
+  m365_object_id  String?    @unique // Entra ID oid claim; null for an account created in the PMIS (local sign-in, migration 0010)
+  email           String     @unique // lower case (check constraint)
+  phone           String?    @unique // E.164, a local sign-in identifier
   display_name    String
   employee_id     String?    @unique @db.Char(4) // 4-digit, entered at first sign-in
   status          UserStatus @default(pending_assignment)
@@ -371,9 +378,55 @@ model User {
   group_members    GroupMember[]
   delegations_from Delegation[]         @relation("DelegationFrom")
   delegations_to   Delegation[]         @relation("DelegationTo")
+  local_credential LocalCredential?     @relation("LocalCredentialUser")
+  credentials_set  LocalCredential[]    @relation("LocalCredentialSetBy")
+  sessions         UserSession[]        @relation("SessionUser")
+  sessions_revoked UserSession[]        @relation("SessionRevokedBy")
 
   @@index([status])
   @@map("users")
+}
+
+// Local sign-in (migration 0010, ADR 0012). Not readable by pmis_app: auth_local_* and idm_* functions only.
+model LocalCredential {
+  user_id         String    @id @db.Uuid
+  password_hash   String // argon2id PHC string, made by the API
+  must_change     Boolean   @default(true) // temporary password set by an admin
+  enabled         Boolean   @default(true)
+  set_at          DateTime  @default(now()) @db.Timestamptz(6)
+  set_by          String?   @db.Uuid
+  failed_count    Int       @default(0)
+  locked_until    DateTime? @db.Timestamptz(6) // 15 minutes after 5 failures
+  last_success_at DateTime? @db.Timestamptz(6)
+
+  user   User  @relation("LocalCredentialUser", fields: [user_id], references: [id], onDelete: Cascade)
+  setter User? @relation("LocalCredentialSetBy", fields: [set_by], references: [id])
+
+  @@map("local_credentials")
+}
+
+// Server-side session behind the pmis_session cookie (replaces Redis for now, ADR 0012 §4). Only the token's SHA-256 is stored.
+model UserSession {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token_hash       String     @unique @db.Char(64)
+  user_id          String     @db.Uuid
+  auth_method      AuthMethod
+  csrf_token       String
+  created_at       DateTime   @default(now()) @db.Timestamptz(6)
+  last_activity_at DateTime   @default(now()) @db.Timestamptz(6)
+  expires_at       DateTime   @db.Timestamptz(6) // absolute limit; idle limit is checked against last_activity_at
+  stepup_at        DateTime?  @db.Timestamptz(6)
+  ip               String?    @db.Inet
+  user_agent       String?
+  current_screen   String?
+  revoked_at       DateTime?  @db.Timestamptz(6)
+  revoked_by       String?    @db.Uuid
+  revoke_reason    String?
+
+  user    User  @relation("SessionUser", fields: [user_id], references: [id])
+  revoker User? @relation("SessionRevokedBy", fields: [revoked_by], references: [id])
+
+  @@map("user_sessions")
 }
 
 // One row = one person holding one role (main or sub-role), with its own level, scope and validity. A person can hold many rows.

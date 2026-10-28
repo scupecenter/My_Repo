@@ -4,7 +4,9 @@ import { byId, uid } from './ids';
 import { GROUPS, ROLES } from './matrixData';
 import { STAFF } from './staff';
 
-export type MockUser = { employee_id: string; status: 'pending_assignment' | 'active' | 'suspended' | 'disabled'; version: number; mfa: { exempt: boolean; until: string | null; reason: string | null; by: string | null } };
+export type MockUser = { employee_id: string; status: 'pending_assignment' | 'active' | 'suspended' | 'disabled'; version: number; mfa: { exempt: boolean; until: string | null; reason: string | null; by: string | null };
+  /** Account created in the PMIS with a password (employee_id is '' when none was given). */
+  local?: { id: string; display_name: string; email: string; phone: string | null } };
 export type MockDeleted = { employee_id: string; name_en: string; email: string; status: MockUser['status']; deleted_at: string; deleted_by: string; reason: string; version: number };
 export type MockProfile = { id: string; code: string; name_en: string; name_ar: string; is_active: true; grants: []; version: 1; assignment_count: number };
 export type MockExport = MasterExport & { polls: number; size: number };

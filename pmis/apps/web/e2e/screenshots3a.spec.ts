@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { login, withStepUp } from './helpers';
 import path from 'node:path';
 
 // Run with: SHOTS=1 npx playwright test e2e/screenshots3a.spec.ts
@@ -10,8 +11,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
     const shot = async (name: string) => { await page.waitForTimeout(500); await page.screenshot({ path: `${OUT}/${name}-${locale}-${theme}.png` }); };
     await page.goto('/login');
-    await page.getByTestId('login-submit').click();
-    await page.getByTestId('mock-account-pm').click();
+    await login(page, 'pm');
 
     await page.getByTestId('nav-admin.users').click();
     await page.getByTestId('user-row-1305').waitFor();
@@ -28,8 +28,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('deleg-right-edit_date').check();
     await page.getByTestId('deleg-until').fill('2026-11-30');
     await page.getByTestId('delegation-dialog-reason').fill('Cover during my leave');
-    const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByTestId('delegation-dialog-submit').click().then(() => page.getByTestId('stepup-continue').click())]);
-    await popup.getByTestId('mock-stepup-verify').click();
+    await withStepUp(page, () => page.getByTestId('delegation-dialog-submit').click());
     await page.getByTestId('deleg-row-1103').waitFor();
     await shot('delegation');
 

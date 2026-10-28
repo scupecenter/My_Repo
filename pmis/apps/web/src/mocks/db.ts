@@ -4,6 +4,7 @@ import { initCfg } from './settingsData';
 import { byId, staffRef, uid } from './ids';
 import { holdersOf, initialMatrix } from './matrixData';
 import { STAFF } from './staff';
+import { HYBRID } from '@/lib/hybrid';
 
 export { staffRef, uid };
 
@@ -15,6 +16,25 @@ export const ACCOUNTS: Record<string, { employee_id: string | null; name: string
   newbie: { employee_id: null, name: 'New Employee', email: 'new.employee@example.com', status: 'pending_assignment', nav: [] },
   pending: { employee_id: '1211', name: 'Wael Saadi', email: 'wael.saadi@example.com', status: 'pending_assignment', nav: [] },
 };
+
+/** Demo passwords for the synthetic accounts (README). Local sign-in only; never real secrets. */
+export const DEMO_PASSWORDS: Record<string, string> = {
+  pm: 'Demo-Pm-2026-pass', reviewer: 'Demo-Lead-2026-pass', auditor: 'Demo-Audit-2026-pass', pending: 'Demo-Pending-2026-pass', newbie: 'Demo-First-2026-pass',
+};
+/** First sign-in demo account: its temporary password must be changed (and it then asks for the employee ID). */
+const MUST_CHANGE_DEMO = new Set(['newbie']);
+
+export type Cred = { password: string; must_change: boolean; failures: number; locked_until: number | null; enabled: boolean };
+/** Credentials of an account key ('pm', ..., 'u:<uuid>' for created users, 'e:<id>' for registry staff after a reset). Demo accounts are seeded on first use. */
+export function cred(key: string, create = false): Cred | null {
+  const d = db();
+  d.auth ??= {};
+  if (!d.auth[key] && key in DEMO_PASSWORDS) d.auth[key] = { password: DEMO_PASSWORDS[key], must_change: MUST_CHANGE_DEMO.has(key), failures: 0, locked_until: null, enabled: true };
+  if (!d.auth[key] && create) d.auth[key] = { password: '', must_change: true, failures: 0, locked_until: null, enabled: true };
+  return d.auth[key] ?? null;
+}
+/** Sign-in attempt times, kept in memory only: 10 per minute answer 429 (the IP limit of ADR 0012). */
+export const attempts: number[] = [];
 
 type MockTask = TaskSummary & {
   submitted_by: string; waiting_since: string; level_kind: 'review' | 'approve'; docs: string[]; external: string; entered_by: string;
@@ -56,7 +76,8 @@ const fresh = () => ({
   ] as Notification[],
   admin: initAdmin(),
   cfg: initCfg(),
-  session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string },
+  session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string; method?: 'local' | 'm365' },
+  auth: {} as Record<string, Cred>,
 });
 
 export type Db = ReturnType<typeof fresh>;
@@ -72,17 +93,34 @@ export function db(): Db {
   return mem;
 }
 export const save = () => { lastRaw = JSON.stringify(mem); store()?.setItem(KEY, lastRaw); };
-export function resetDb() { mem = fresh(); lastRaw = null; store()?.removeItem(KEY); }
+export function resetDb() { mem = fresh(); lastRaw = null; attempts.length = 0; store()?.removeItem(KEY); }
 
 export const STEP_UP_SECONDS = 300;
-export const stepUpValid = () => { const t = db().session?.stepupAt; return !!t && Date.now() - t < STEP_UP_SECONDS * 1000; };
+export const stepUpValid = () => {
+  if (HYBRID) return true; // hybrid: the real server decides for real endpoints; mocked ones must not loop
+  const t = db().session?.stepupAt; return !!t && Date.now() - t < STEP_UP_SECONDS * 1000; };
+
+/** Account key of an admin-list user: a demo account, a created local user, or a registry person. */
+export function accountKeyOf(u: { employee_id: string; local?: { id: string } }) {
+  if (u.local) return `u:${u.local.id}`;
+  return Object.keys(ACCOUNTS).find((k) => ACCOUNTS[k].employee_id === u.employee_id) ?? `e:${u.employee_id}`;
+}
+/** Accounts that are not on the fake Microsoft page: created local users and registry staff with a reset password. */
+function accountOf(key: string): (typeof ACCOUNTS)[string] | null {
+  const u = db().admin.users.find((x) => accountKeyOf(x) === key);
+  if (!u) return null;
+  const s = STAFF.find((x) => x.employee_id === u.employee_id);
+  return { employee_id: u.employee_id || null, name: u.local?.display_name ?? s?.name_en ?? '', email: u.local?.email ?? s?.email ?? '', status: u.status === 'active' ? 'active' : 'pending_assignment', nav: [] };
+}
 
 export function viewer() {
   const s = db().session;
   if (!s) return null;
-  const a = ACCOUNTS[s.account], employee_id = s.employee_id ?? a.employee_id;
+  const a = ACCOUNTS[s.account] ?? accountOf(s.account);
+  if (!a) return null;
+  const employee_id = s.employee_id ?? a.employee_id;
   // An admin assignment (Users & Roles) activates a pending account and opens the basic navigation.
-  const u = db().admin.users.find((x) => x.employee_id === employee_id);
+  const u = db().admin.users.find((x) => (x.local ? `u:${x.local.id}` === s.account : x.employee_id === employee_id));
   const active = s.linked && u?.status === 'active';
   return { ...a, employee_id, key: s.account, linked: s.linked, status: active ? ('active' as const) : a.status, nav: active && !a.nav.length ? ['my_work', 'approvals', 'sites', 'absence'] : a.nav };
 }
@@ -92,7 +130,7 @@ export function sessionBody(): Session {
   if (!v) return { authenticated: false, csrf_token: 'csrf-anon' };
   const s = db().session!;
   return {
-    authenticated: true, csrf_token: 'csrf-mock', needs_employee_id: !s.linked, status: s.linked ? v.status : 'pending_assignment',
+    authenticated: true, csrf_token: 'csrf-mock', auth_method: s.method ?? 'm365', must_change_password: !!cred(s.account)?.must_change && s.method === 'local', needs_employee_id: !s.linked, status: s.linked ? v.status : 'pending_assignment',
     user: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: s.linked ? v.employee_id : null },
     mfa: true, stepup_valid_until: stepUpValid() ? new Date(s.stepupAt! + STEP_UP_SECONDS * 1000).toISOString() : null,
     expires_at: new Date(Date.now() + 8 * 3600e3).toISOString(),

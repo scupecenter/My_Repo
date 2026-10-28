@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.6
+  version: 0.3.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -9,7 +9,7 @@ info:
 
     ## Conventions
     - **Base path** `/api/v1`. JSON property names are snake_case (ADR 0001).
-    - **Auth**: session cookie `pmis_session` created by the Entra OIDC flow (ADR 0002). Unsafe methods (POST, PUT, PATCH, DELETE)
+    - **Auth**: session cookie `pmis_session` created by the local password sign-in (ADR 0012) or the Entra OIDC flow (ADR 0002). Unsafe methods (POST, PUT, PATCH, DELETE)
       also need the header `X-CSRF-Token` with the value from `GET /auth/session`. A future mobile client will use `bearerAuth`.
     - **Errors**: RFC 9457 `application/problem+json` (schema `Problem`). `code` is machine-readable and stable; `errors[]` lists
       field problems. Every response carries `X-Request-Id`, which is also written to the System Log.
@@ -29,6 +29,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
+    - 0.3.0 (2026-10-28): additive. Local sign-in with a password, for accounts created in the PMIS (owner decision 2026-10-28, ADR 0012): `POST /auth/local/login`, `POST /auth/local/password`, `POST /auth/local/step-up`, `POST /users` (create a local user with a temporary password), `POST /users/{user_id}/password-reset`; `Session.auth_method` and `must_change_password`; `User.phone`, `local_sign_in`, `must_change_password`; `Problem.step_up_method`; error codes `invalid_credentials`, `password_change_required`, `weak_password`. Microsoft 365 sign-in stays in the contract and is added later beside it.
     - 0.2.6 (2026-10-26): SLA rule sets and weight sets can be written and published (draft, preview, publish with effective date, reason and step-up, versions list); re-run of Project Status with an older weight set by id; enumerated export column codes for sites and tasks; required `reason` on `POST /settings/holidays/import` (not additive, see ADR 0011 amendment 0.2.6).
     - 0.2.5 (2026-10-26): additive. Phase 3b gaps (delegation to role or group, export column codes, `POST /tasks/{task_id}/act-on-behalf`) and admin additions: notification policy and catalogue, security log, log integrity, active sessions and revoke, log retention, `confirm_text` on dangerous actions, `last_admin` documented, and user soft delete and restore (B14) (ADR 0011).
     - 0.2.4 (2026-10-25): additive. `TaskSummary.lock_reasons`, `GET /tasks/{task_id}/slots`, `ImportBatch.site_id` and a described `task_id` on the template upload (ADR 0011).
@@ -310,6 +312,100 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /auth/local/login:
+    post:
+      tags: [auth]
+      operationId: localLogin
+      summary: Sign in with an identifier and a password (local account, ADR 0012)
+      description: |
+        `identifier` is a 4-digit employee ID, an email or an E.164 phone, like the one sign-in box. Every failure answers the
+        same 401 `invalid_credentials` with the same text and similar timing, whether the identifier is unknown, the password is
+        wrong, the account is locked (5 failures lock it for 15 minutes) or local sign-in is off for it, so the response never
+        tells who is registered. Rate limited per IP and per identifier (429 `rate_limited`). On success the session cookie
+        `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
+        `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
+        until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [identifier, password]
+              properties:
+                identifier: { type: string, minLength: 1, maxLength: 254 }
+                password: { type: string, format: password, minLength: 1, maxLength: 128 }
+      responses:
+        '200':
+          description: Signed in.
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/password:
+    post:
+      tags: [auth]
+      operationId: changeOwnPassword
+      summary: Change my password (required after a temporary password)
+      description: |
+        Needs the current password. Policy (422 `weak_password`, `errors[]` names the rule): 12 to 128 characters, not equal to
+        the current password, not containing the email, employee ID or phone, not in the server's list of common passwords.
+        On success the other sessions of the user end; this session stays and `must_change_password` becomes false.
+      x-db-path: auth_local_set_own_password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, format: password, maxLength: 128 }
+                new_password: { type: string, format: password, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/step-up:
+    post:
+      tags: [auth]
+      operationId: localStepUp
+      summary: Step-up for a local session (re-enter the password)
+      description: |
+        A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
+        for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
+        (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, maxLength: 128 }
+      responses:
+        '200':
+          description: Step-up recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
   # ------------------------------------------------------------------ me
   /me:
     get:
@@ -419,6 +515,31 @@ paths:
                       items: { type: array, items: { $ref: '#/components/schemas/User' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      operationId: createLocalUser
+      summary: Create a user who signs in with a password (local account, ADR 0012)
+      description: |
+        Needs `create` on `users` (System Admin or a delegation, all regions). The new account is `pending_assignment` until an
+        admin assigns it, like a first M365 sign-in. The server generates a temporary password when `temporary_password` is
+        omitted and returns it **once** in the response; it is never stored or shown again. The user must change it at the first
+        sign-in. Email, employee ID and phone must each be unused (409 `duplicate`, `errors[]` names the field).
+      x-db-path: idm_create_local_user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocalUserCreate' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalUserCreated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/deleted:
     get:
       tags: [users]
@@ -584,6 +705,47 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/password-reset:
+    post:
+      tags: [users]
+      operationId: resetUserPassword
+      summary: Set a temporary password for a user (local sign-in)
+      description: |
+        Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Whoever sets a
+        password can sign in as the user, so a delegate may reset only an account with no rights yet (no current or future
+        assignment, no Entra link, not an admin or delegate); anything else is System Admin only (403 `action_forbidden`). Turns local sign-in on for the account if it was off, unlocks it, ends all its
+        sessions, and makes the user change the password at the next sign-in. Omit `temporary_password` to have the server
+        generate one; it is returned once.
+      x-step-up: true
+      x-db-path: idm_reset_local_password
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+                temporary_password: { type: string, format: password, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [temporary_password]
+                properties:
+                  temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/assignments:
     parameters:
       - $ref: '#/components/parameters/UserId'
@@ -6288,7 +6450,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
-        employee_id: { type: string, pattern: '^[0-9]{4}$' }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: '0.3.1: null for a local account created without an employee ID.' }
     # ---------------------------------------------------------- common
     Problem:
       type: object
@@ -6310,7 +6472,8 @@ components:
               path: { type: string, description: 'JSON pointer or "slot:<id>" / "field:<code>".' }
               code: { type: string }
               message: { type: string }
-        step_up_url: { type: string, description: 'Present with `step_up_required`.' }
+        step_up_url: { type: string, description: 'Present with `step_up_required` on an M365 session.' }
+        step_up_method: { type: string, enum: [password, m365, totp], description: '0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.' }
         reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
@@ -6356,6 +6519,9 @@ components:
         - role_in_use
         - export_expired
         - confirmation_mismatch
+        - invalid_credentials
+        - password_change_required
+        - weak_password
         - internal_error
     PageEnvelope:
       type: object
@@ -6570,6 +6736,8 @@ components:
         needs_employee_id: { type: boolean }
         mfa: { type: boolean, description: 'The sign-in token carried `amr` = mfa.' }
         break_glass: { type: boolean }
+        auth_method: { type: string, enum: [local, m365, break_glass], description: '0.3.0. How this session signed in.' }
+        must_change_password: { type: boolean, description: '0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed.' }
         stepup_valid_until: { type: [string, 'null'], format: date-time }
         expires_at: { type: string, format: date-time }
     Me:
@@ -6640,6 +6808,9 @@ components:
             locale: { type: string, enum: [en, ar] }
             theme: { type: string, enum: [light, dark] }
             is_break_glass: { type: boolean }
+            phone: { type: [string, 'null'], description: '0.3.0. E.164; a local sign-in identifier.' }
+            local_sign_in: { type: boolean, description: '0.3.0. The account can sign in with a password.' }
+            must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
@@ -7915,6 +8086,23 @@ components:
       required: [reason]
       properties:
         reason: { $ref: '#/components/schemas/Reason' }
+    LocalUserCreate:
+      type: object
+      additionalProperties: false
+      required: [display_name, email, reason]
+      properties:
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, maxLength: 254 }
+        employee_id: { oneOf: [{ $ref: '#/components/schemas/EmployeeId' }, { type: 'null' }] }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$', description: 'E.164, for example +218911234567.' }
+        temporary_password: { type: string, format: password, minLength: 12, maxLength: 128, description: 'Omit to have the server generate one.' }
+        reason: { $ref: '#/components/schemas/Reason' }
+    LocalUserCreated:
+      type: object
+      required: [user, temporary_password]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
     # ---------------------------------------------------------- staff registry
     StaffField:
       type: string

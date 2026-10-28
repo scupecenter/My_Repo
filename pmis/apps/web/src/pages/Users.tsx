@@ -1,4 +1,4 @@
-import { RotateCcw, ShieldOff, Trash2, UserPlus, UserX } from 'lucide-react';
+import { RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -9,6 +9,8 @@ import type { DeletedUser, User } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { AssignDialog } from '@/components/AssignDialog';
+import { CreateUserDialog, LocalBadges } from '@/components/UserDialogs';
+import { isAdmin } from '@/lib/perm';
 import { IdBadge } from '@/components/PersonTag';
 
 export const STATUS_TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', pending_assignment: 'bg-waitBg text-waitInk', suspended: 'bg-lateBg text-lateInk', disabled: 'bg-lockBg text-lockInk' };
@@ -78,6 +80,8 @@ export function Users() {
   const [f, setF] = useState({ q: '', status: '', role_id: '' });
   const [sel, setSel] = useState<Record<string, User>>({});
   const [dlg, setDlg] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const canCreate = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'create' && ['users', 'admin.users'].includes(g.module_key as string));
   const users = useUsers(f), roles = useRoles();
   const items = users.data?.items ?? [];
   const chosen = Object.values(sel);
@@ -101,6 +105,7 @@ export function Users() {
           {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.name_en}</option>)}
         </select>
         <span className="flex-1" />
+        {canCreate && <button className="btn" data-testid="users-new" onClick={() => setCreating(true)}><UserRoundPlus size={16} />{t('newUser.open')}</button>}
         <button className="btn btn-accent" data-testid="users-assign" onClick={() => setDlg(true)}><UserPlus size={16} />{chosen.length ? t('users.assign_selected', { count: chosen.length }) : t('users.assign')}</button>
       </div>
       <div className="card overflow-x-auto">
@@ -110,18 +115,18 @@ export function Users() {
           </tr></thead>
           <tbody data-testid="users-list">
             {items.map((u) => (
-              <tr key={u.id} className="border-b border-line hover:bg-hover" data-testid={`user-row-${u.employee_id}`}>
-                <td className="p-2"><input type="checkbox" aria-label={t('users.select', { name: u.display_name })} data-testid={`user-select-${u.employee_id}`} checked={!!sel[u.id]} onChange={() => toggle(u)} /></td>
+              <tr key={u.id} className="border-b border-line hover:bg-hover" data-testid={`user-row-${u.employee_id ?? u.id}`}>
+                <td className="p-2"><input type="checkbox" aria-label={t('users.select', { name: u.display_name })} data-testid={`user-select-${u.employee_id ?? u.id}`} checked={!!sel[u.id]} onChange={() => toggle(u)} /></td>
                 <td className="p-2"><span className="inline-flex items-baseline gap-1">{u.display_name}{u.employee_id && <IdBadge employeeId={u.employee_id} />}</span></td>
                 <td className="p-2 text-mute" dir="ltr">{u.email}</td>
-                <td className="p-2"><span className={`chip ${STATUS_TONE[u.status]}`} data-testid={`user-status-${u.employee_id}`}>{t(`userStatus.${u.status}`)}</span></td>
-                <td className="p-2"><MfaBadge user={u} /></td>
+                <td className="p-2"><span className={`chip ${STATUS_TONE[u.status]}`} data-testid={`user-status-${u.employee_id ?? u.id}`}>{t(`userStatus.${u.status}`)}</span></td>
+                <td className="p-2"><span className="inline-flex flex-wrap gap-1"><LocalBadges user={u} /><MfaBadge user={u} /></span></td>
                 <td className="p-2 text-end"><span className="inline-flex gap-1">
-                  <Link className="btn" data-testid={`user-open-${u.employee_id}`} to={`/admin/users/${u.id}`}>{t('users.open')}</Link>
+                  <Link className="btn" data-testid={`user-open-${u.employee_id ?? u.id}`} to={`/admin/users/${u.id}`}>{t('users.open')}</Link>
                   {(u.status === 'suspended' || u.status === 'disabled')
-                    ? <button className="btn" data-testid={`user-reactivate-${u.employee_id}`} onClick={() => setAct({ kind: 'reactivate', user: u })}><RotateCcw size={14} />{t('users.reactivate')}</button>
-                    : <button className="btn" data-testid={`user-deactivate-${u.employee_id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'deactivate', user: u })}><UserX size={14} />{t('users.deactivate')}</button>}
-                  <button className="btn" data-testid={`user-delete-${u.employee_id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'delete', user: u })}><Trash2 size={14} />{t('users.delete')}</button></span></td>
+                    ? <button className="btn" data-testid={`user-reactivate-${u.employee_id ?? u.id}`} onClick={() => setAct({ kind: 'reactivate', user: u })}><RotateCcw size={14} />{t('users.reactivate')}</button>
+                    : <button className="btn" data-testid={`user-deactivate-${u.employee_id ?? u.id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'deactivate', user: u })}><UserX size={14} />{t('users.deactivate')}</button>}
+                  <button className="btn" data-testid={`user-delete-${u.employee_id ?? u.id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'delete', user: u })}><Trash2 size={14} />{t('users.delete')}</button></span></td>
               </tr>
             ))}
             {users.isSuccess && !items.length && <tr><td colSpan={6} className="p-6 text-center text-mute" data-testid="users-empty">{t('users.empty')}</td></tr>}
@@ -130,6 +135,7 @@ export function Users() {
       </div>
       </>}
       {act && <ActDialog act={act} onClose={() => setAct(null)} />}
+      {creating && <CreateUserDialog onClose={() => setCreating(false)} />}
       {dlg && <AssignDialog open onClose={() => { setDlg(false); setSel({}); }} initialMode={chosen.length === 1 ? 'person' : 'role'}
         initialPeople={chosen.map((u) => ({ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }))} />}
     </div>
