@@ -47,6 +47,11 @@ Read before any work:
 - Registers are separate modules, each with its own menu: Procurement (PR/PO/WO), Contractors, GECOL power, HLC fiber, Permits & HSE, Warehouse, Quality, Issue Log (several issues per site), Risk Register, Change Control, Readiness & Handover, As-Built, and Meetings.
 - The Audit Log records every user action with before and after values. It is append-only and nobody can edit it. The System/Error Log is kept separately.
 - Audit Log readers (decision B4): System Admins and the Project Manager see all of it. Each Team Lead sees the entries for their own modules and regions only. Anyone else gets it only through the `view_audit` grant in the permission grid, scoped like any other grant (B3). Every read of the Audit Log is itself audited.
+- **Messages and announcements (owner decision 2026-10-28, ADR 0013).**
+  - Each user may have a **direct manager** and a **department** (an admin-managed list), set by the System Admin or a delegate on the Users & Roles screen.
+  - **Messages:** a thread between an employee and their direct manager (either side may start it); a System Admin may write to anyone. Only the two participants can read it. The original message shows first, then the replies newest first. Messages are never edited or deleted.
+  - **Announcements:** sent by a System Admin or a delegate (`announcements.create`) to everyone, or to chosen users, groups, roles and departments. The recipients are fixed when it is sent. Each recipient must answer in a **blocking pop-up**: agree, or disagree with a mandatory note. Answers are final.
+  - The sender and the System Admins see the results (counts, answers, notes, who has not answered) and can export them.
 - The UI is in English by default, with Arabic (RTL) available as an instant switch. It has light and dark themes and uses the Cairo font, with ERPNext (frappe-ui) colors.
 
 ## Decisions agreed with the product owner (2026-10-24)

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.3.1
+  version: 0.4.0
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.0 (2026-10-28): additive. Departments and the direct manager (`GET/POST /departments`, `PATCH /departments/{department_id}`, `PUT /users/{user_id}/org`, `User.manager` and `User.department`); messages between an employee and their direct manager (`/messages/...`); announcements with an agree / disagree answer (`/announcements/...`, `GET /me/announcements/pending`) (ADR 0013).
     - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
     - 0.3.0 (2026-10-28): additive. Local sign-in with a password, for accounts created in the PMIS (owner decision 2026-10-28, ADR 0012): `POST /auth/local/login`, `POST /auth/local/password`, `POST /auth/local/step-up`, `POST /users` (create a local user with a temporary password), `POST /users/{user_id}/password-reset`; `Session.auth_method` and `must_change_password`; `User.phone`, `local_sign_in`, `must_change_password`; `Problem.step_up_method`; error codes `invalid_credentials`, `password_change_required`, `weak_password`. Microsoft 365 sign-in stays in the contract and is added later beside it.
     - 0.2.6 (2026-10-26): SLA rule sets and weight sets can be written and published (draft, preview, publish with effective date, reason and step-up, versions list); re-run of Project Status with an older weight set by id; enumerated export column codes for sites and tasks; required `reason` on `POST /settings/holidays/import` (not additive, see ADR 0011 amendment 0.2.6).
@@ -68,6 +69,12 @@ security:
   - cookieAuth: []
     csrfHeader: []
 tags:
+  - name: messages
+    description: "Threads between an employee and their direct manager; a System Admin may write to anyone (ADR 0013)."
+  - name: announcements
+    description: "Announcements to everyone or to chosen users, groups, roles and departments, answered agree or disagree (ADR 0013)."
+  - name: departments
+    description: "Admin-managed list of departments (ADR 0013)."
   - name: auth
     description: Sign-in, session, employee-ID link, step-up and break-glass (ADR 0002).
   - name: me
@@ -405,6 +412,371 @@ paths:
               schema: { $ref: '#/components/schemas/Session' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ------------------------------------------------------------------ departments, manager (0.4.0)
+  /departments:
+    get:
+      tags: [departments]
+      operationId: listDepartments
+      summary: Departments (any signed-in user; inactive ones only with include_inactive and admin.users view)
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Departments, by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Department' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [departments]
+      operationId: createDepartment
+      summary: Create a department
+      description: Needs `edit` on `users` (System Admin or an all-regions delegation). 409 `duplicate` when the code is taken.
+      x-db-path: idm_department_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DepartmentInput' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Department' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /departments/{department_id}:
+    parameters:
+      - { name: department_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [departments]
+      operationId: updateDepartment
+      summary: Rename, recode or (de)activate a department
+      description: Same rights as create. A department is never deleted; deactivating it keeps its members' link.
+      x-db-path: idm_department_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DepartmentInput' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Department' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/org:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [users]
+      operationId: setUserOrg
+      summary: Set a user's direct manager and department
+      description: |
+        Needs `edit` on `users` (all regions) and step-up. Admins and delegates are changed by a System Admin only.
+        The manager must be an active user and must not create a loop (422 `validation_failed`, `errors[].code` =
+        `manager_loop`). The department must be active. `null` clears either one.
+      x-step-up: true
+      x-db-path: idm_set_user_org
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [manager_id, department_id, reason]
+              properties:
+                manager_id: { type: [string, 'null'], format: uuid }
+                department_id: { type: [string, 'null'], format: uuid }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ------------------------------------------------------------------ messages (0.4.0)
+  /messages/contacts:
+    get:
+      tags: [messages]
+      operationId: getMessageContacts
+      summary: Who I may start a thread with
+      description: My direct manager and the people who report to me. A System Admin may write to any active user (`can_message_anyone`, use `GET /users/picker`).
+      responses:
+        '200':
+          description: Contacts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageContacts' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /messages/threads:
+    get:
+      tags: [messages]
+      operationId: listMessageThreads
+      summary: My threads, most recent activity first
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Threads.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    required: [unread_total]
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/MessageThreadSummary' } }
+                      unread_total: { type: integer, description: 'Threads with a message I have not read.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [messages]
+      operationId: startMessageThread
+      summary: Start a thread with my manager, one of my reports, or (System Admin) anyone
+      description: 403 `action_forbidden` when the recipient is not one of my contacts.
+      x-db-path: msg_start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [to_user_id, subject, body]
+              properties:
+                to_user_id: { type: string, format: uuid }
+                subject: { type: string, minLength: 1, maxLength: 200 }
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /messages/threads/{thread_id}:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [messages]
+      operationId: getMessageThread
+      summary: One thread, the original message first, then the replies newest first
+      description: Only the two participants can read a thread; anyone else gets 404. Reading does not mark it read; call `POST .../read`.
+      responses:
+        '200':
+          description: Thread.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /messages/threads/{thread_id}/replies:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [messages]
+      operationId: replyToMessageThread
+      summary: Reply in a thread (participants only)
+      x-db-path: msg_reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: The thread with the new reply first among the replies.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /messages/threads/{thread_id}/read:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [messages]
+      operationId: markMessageThreadRead
+      summary: Mark a thread read for me
+      x-db-path: msg_mark_read
+      responses:
+        '204': { description: 'Marked.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ announcements (0.4.0)
+  /announcements:
+    get:
+      tags: [announcements]
+      operationId: listAnnouncements
+      summary: Announcements I sent (a System Admin sees all), newest first, with answer counts
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Announcements.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/AnnouncementSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [announcements]
+      operationId: sendAnnouncement
+      summary: Send an announcement (System Admin, or a delegation of announcements.create)
+      description: |
+        The recipients are fixed when it is sent: active users matching `all` or any of the chosen users, groups, roles
+        (an assignment valid today) and departments, never the sender. 422 `validation_failed` with `errors[].code` =
+        `no_recipients` when nobody matches. Each recipient sees it as a blocking pop-up until they answer.
+      x-db-path: ann_send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnnouncementInput' }
+      responses:
+        '201':
+          description: Sent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnouncementSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /announcements/{announcement_id}:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: getAnnouncement
+      summary: One announcement with its audience and counts (sender or System Admin; a recipient gets the text only)
+      responses:
+        '200':
+          description: Announcement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnouncementDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/responses:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: listAnnouncementResponses
+      summary: Every recipient with their answer (sender or System Admin)
+      parameters:
+        - { name: decision, in: query, schema: { type: string, enum: [agree, disagree, pending] } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Responses.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/AnnouncementResponse' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/responses/export:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: exportAnnouncementResponses
+      summary: All answers as a CSV file that opens in Excel (UTF-8 with BOM); audited
+      responses:
+        '200':
+          description: 'CSV file (`Content-Disposition: attachment`).'
+          content:
+            text/csv:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/respond:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [announcements]
+      operationId: respondToAnnouncement
+      summary: Answer an announcement addressed to me (once)
+      description: '`disagree` needs a `note` of at least 3 characters (422 `note_required`). A second answer is 409 `duplicate`. Not addressed to me: 404.'
+      x-db-path: ann_respond
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [agree, disagree] }
+                note: { type: [string, 'null'], maxLength: 2000 }
+      responses:
+        '204': { description: 'Recorded.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /me/announcements/pending:
+    get:
+      tags: [announcements, me]
+      operationId: listMyPendingAnnouncements
+      summary: Announcements I have not answered yet, oldest first (the web app shows them as a blocking pop-up)
+      description: 'Pending and must-change-password accounts may call it too. A timer-driven call sends `X-PMIS-Live: 1`.'
+      parameters:
+        - $ref: '#/components/parameters/LivePoll'
+      responses:
+        '200':
+          description: Pending announcements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PendingAnnouncement' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ------------------------------------------------------------------ me
   /me:
@@ -6810,6 +7182,8 @@ components:
             is_break_glass: { type: boolean }
             phone: { type: [string, 'null'], description: '0.3.0. E.164; a local sign-in identifier.' }
             local_sign_in: { type: boolean, description: '0.3.0. The account can sign in with a password.' }
+            manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: '0.4.0. Direct manager.' }
+            department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }], description: '0.4.0.' }
             must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
@@ -8081,6 +8455,134 @@ components:
             lookup: { type: object, additionalProperties: true }
 
     # ================================================================ v0.2 additions
+    Department:
+      type: object
+      required: [id, code, name_en, is_active]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, pattern: '^[A-Z0-9_]{2,20}$' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        member_count: { type: integer }
+    DepartmentInput:
+      type: object
+      additionalProperties: false
+      required: [code, name_en, reason]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9_]{2,20}$', description: 'Stored in upper case.' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        is_active: { type: boolean }
+        reason: { $ref: '#/components/schemas/Reason' }
+    DepartmentRef:
+      type: object
+      required: [id, code, name_en]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+    MessageContacts:
+      type: object
+      required: [manager, reports, can_message_anyone]
+      properties:
+        manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        reports: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        can_message_anyone: { type: boolean }
+    MessageThreadSummary:
+      type: object
+      required: [id, subject, other, last_message_at, unread]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        other: { $ref: '#/components/schemas/UserRef' }
+        started_by_me: { type: boolean }
+        last_message_at: { type: string, format: date-time }
+        last_message_preview: { type: string, maxLength: 140 }
+        last_author: { $ref: '#/components/schemas/UserRef' }
+        reply_count: { type: integer }
+        unread: { type: boolean }
+    MessageItem:
+      type: object
+      required: [id, author, body, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/UserRef' }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+    MessageThread:
+      type: object
+      required: [id, subject, participants, original, replies]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        participants: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        original: { $ref: '#/components/schemas/MessageItem' }
+        replies: { type: array, description: 'Newest first.', items: { $ref: '#/components/schemas/MessageItem' } }
+        last_read_at: { type: [string, 'null'], format: date-time, description: 'My last read time; replies after it are new.' }
+    AnnouncementAudience:
+      type: object
+      additionalProperties: false
+      properties:
+        all: { type: boolean, default: false }
+        user_ids: { type: array, maxItems: 500, items: { type: string, format: uuid } }
+        group_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        role_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        department_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+    AnnouncementInput:
+      type: object
+      additionalProperties: false
+      required: [title, body, audience]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, minLength: 1, maxLength: 5000 }
+        audience: { $ref: '#/components/schemas/AnnouncementAudience' }
+    AnnouncementSummary:
+      type: object
+      required: [id, title, created_at, created_by, recipient_count, agree_count, disagree_count, pending_count]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        recipient_count: { type: integer }
+        agree_count: { type: integer }
+        disagree_count: { type: integer }
+        pending_count: { type: integer }
+    AnnouncementDetail:
+      allOf:
+        - $ref: '#/components/schemas/AnnouncementSummary'
+        - type: object
+          required: [body, audience]
+          properties:
+            body: { type: string }
+            audience:
+              type: object
+              properties:
+                all: { type: boolean }
+                users: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+                groups: { type: array, items: { $ref: '#/components/schemas/GroupRef' } }
+                roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
+                departments: { type: array, items: { $ref: '#/components/schemas/DepartmentRef' } }
+    AnnouncementResponse:
+      type: object
+      required: [user, decision]
+      properties:
+        user: { $ref: '#/components/schemas/UserRef' }
+        department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }] }
+        decision: { type: string, enum: [agree, disagree, pending] }
+        note: { type: [string, 'null'] }
+        responded_at: { type: [string, 'null'], format: date-time }
+    PendingAnnouncement:
+      type: object
+      required: [id, title, body, created_at, created_by]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { $ref: '#/components/schemas/UserRef' }
     WithReason:
       type: object
       required: [reason]
