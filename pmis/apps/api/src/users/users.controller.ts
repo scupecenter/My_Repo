@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
@@ -42,6 +42,18 @@ export class UsersController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<UserDetailDto> {
     const d = await this.users.patch(auth, id, ifMatch, body);
+    res.setHeader('ETag', etagHeader(d.version));
+    return d;
+  }
+
+  @Put(':id/org')
+  async setOrg(
+    @Auth() auth: AuthContext,
+    @Param('id') id: string,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<UserDetailDto> {
+    const d = await this.users.setOrg(auth, id, body);
     res.setHeader('ETag', etagHeader(d.version));
     return d;
   }

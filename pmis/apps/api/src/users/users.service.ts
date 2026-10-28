@@ -33,6 +33,12 @@ const patchSchema = z.object({
   reason,
 }).strict();
 
+const orgSchema = z.object({
+  manager_id: z.string().uuid().nullable(),
+  department_id: z.string().uuid().nullable(),
+  reason,
+}).strict();
+
 const resetSchema = z.object({ reason, temporary_password: z.string().max(1024).optional() }).strict();
 
 export interface UserDetailDto extends UserDto {
@@ -163,6 +169,18 @@ export class UsersService {
       await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, sessions: ended, reason: 'user_deactivated' }, auth.user.id);
     }
     this.states.invalidate(id);
+    const next = await this.detail(id);
+    if (!next) throw new ProblemException(500, 'internal_error', {});
+    return next;
+  }
+
+  /** PUT /users/{id}/org: direct manager and department together (idm_set_user_org). */
+  async setOrg(auth: AuthContext, id: string, raw: unknown): Promise<UserDetailDto> {
+    const body = parse(orgSchema, raw);
+    await this.access.requireAdmin('users', 'edit');
+    await this.stepUp.require(auth);
+    if (!uuidSchema.safeParse(id).success || !(await this.repo.find(id))) throw problems.notFound();
+    await this.db.tx.$executeRaw`SELECT idm_set_user_org(${id}::uuid, ${body.manager_id}::uuid, ${body.department_id}::uuid, ${body.reason}::text)`;
     const next = await this.detail(id);
     if (!next) throw new ProblemException(500, 'internal_error', {});
     return next;

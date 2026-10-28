@@ -38,4 +38,14 @@ export class AccessService {
       throw new ProblemException(403, 'module_forbidden', { detail: `You cannot use ${module}.` });
     }
   }
+
+  /**
+   * May send announcements: a System Admin, or a delegate of announcements.create covering all regions (the same test
+   * as ann_send). Drives the "announcements" navigation entry.
+   */
+  async canSendAnnouncements(): Promise<boolean> {
+    const rows = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT app_actor_is_admin('announcements', 'create'::"PermissionAction")
+      AND (app_actor_is_system_admin() OR app_actor_region_filter('announcements', 'create'::"PermissionAction") IS NULL) AS ok`;
+    return rows[0]?.ok === true;
+  }
 }

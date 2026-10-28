@@ -122,14 +122,15 @@ export async function grantProfile(db: PgClient, userId: string, grants: [string
   await db.query('INSERT INTO user_role_assignment_profiles (assignment_id, profile_id) VALUES ($1, $2)', [aid, p.rows[0].id]);
 }
 
-/** A partial delegation to a user, made by the bootstrap admin, covering (module, action) in all regions. */
-export async function delegate(db: PgClient, toUserId: string, grants: [string, string][]): Promise<void> {
+/** A partial delegation to a user, made by the bootstrap admin, covering (module, action) in all regions (or only the given ones). */
+export async function delegate(db: PgClient, toUserId: string, grants: [string, string][], regions?: number[]): Promise<void> {
   const from = await db.query('SELECT id FROM users WHERE email = $1', [BOOTSTRAP_ADMIN.email]);
   const d = await db.query(
     `INSERT INTO delegations (from_user_id, target_kind, target_user_id, is_full, all_regions, valid_from, reason)
-     VALUES ($1, 'user', $2, false, true, now() - interval '1 minute', 'test') RETURNING id`,
-    [from.rows[0].id, toUserId],
+     VALUES ($1, 'user', $2, false, $3, now() - interval '1 minute', 'test') RETURNING id`,
+    [from.rows[0].id, toUserId, regions === undefined],
   );
+  for (const r of regions ?? []) await db.query('INSERT INTO delegation_regions (delegation_id, region_id) VALUES ($1, $2)', [d.rows[0].id, r]);
   for (const [m, a] of grants) await db.query('INSERT INTO delegation_grants (delegation_id, module_key, action) VALUES ($1, $2, $3::"PermissionAction")', [d.rows[0].id, m, a]);
 }
 

@@ -131,7 +131,7 @@ describe('GET /me', () => {
       { module_key: 'sites', action: 'view', region_ids: [1, 3] },
       { module_key: 'sites.tasks', action: 'edit', region_ids: [1, 3] },
     ]); // warehouse is outside the assignment's modules: scopes never cross
-    expect(res.body.effective.nav).toEqual(['sites']);
+    expect(res.body.effective.nav).toEqual(['messages', 'sites']);
     expect(res.body.effective.matrix_levels).toEqual(expect.arrayContaining([{ module_key: 'sites', level: 'approve', region_ids: [1, 3] }]));
   });
 

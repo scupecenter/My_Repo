@@ -9,6 +9,7 @@ export interface PickerItem {
 }
 
 export interface UserRef { id: string; display_name: string; employee_id: string | null }
+export interface DepartmentRef { id: string; code: string; name_en: string; name_ar: string | null }
 export interface GroupRef { id: string; name: string; is_system_admins: boolean }
 
 export interface UserDto extends UserRef {
@@ -20,6 +21,8 @@ export interface UserDto extends UserRef {
   phone: string | null;
   local_sign_in: boolean;
   must_change_password: boolean;
+  manager: UserRef | null;
+  department: DepartmentRef | null;
   last_login_at: Date | null;
   created_at: Date;
   version: number;
@@ -40,6 +43,13 @@ interface UserDbRow {
   version: string;
   local_sign_in: boolean;
   must_change: boolean;
+  manager_id: string | null;
+  manager_name: string | null;
+  manager_employee_id: string | null;
+  dept_id: string | null;
+  dept_code: string | null;
+  dept_name_en: string | null;
+  dept_name_ar: string | null;
 }
 
 /**
@@ -49,8 +59,11 @@ interface UserDbRow {
 const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u.employee_id) AS employee_id, u.phone, u.status::text AS status,
   u.locale, u.theme, u.is_break_glass, u.last_login_at, u.created_at,
   (extract(epoch FROM u.updated_at) * 1000000)::bigint::text AS version,
-  (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change`;
-const USER_FROM = Prisma.sql`FROM users u LEFT JOIN LATERAL auth_local_lookup(u.email) l ON true`;
+  (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change,
+  m.id::text AS manager_id, m.display_name AS manager_name, trim(m.employee_id) AS manager_employee_id,
+  dp.id::text AS dept_id, dp.code AS dept_code, dp.name_en AS dept_name_en, dp.name_ar AS dept_name_ar`;
+const USER_FROM = Prisma.sql`FROM users u LEFT JOIN LATERAL auth_local_lookup(u.email) l ON true
+  LEFT JOIN users m ON m.id = u.manager_id LEFT JOIN departments dp ON dp.id = u.department_id`;
 
 export const toUserDto = (r: UserDbRow): UserDto => ({
   id: r.id,
@@ -64,6 +77,8 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
   phone: r.phone,
   local_sign_in: r.local_sign_in,
   must_change_password: r.must_change,
+  manager: r.manager_id ? { id: r.manager_id, display_name: r.manager_name ?? '', employee_id: r.manager_employee_id } : null,
+  department: r.dept_id ? { id: r.dept_id, code: r.dept_code ?? '', name_en: r.dept_name_en ?? '', name_ar: r.dept_name_ar } : null,
   last_login_at: r.last_login_at,
   created_at: r.created_at,
   version: Number(r.version),
