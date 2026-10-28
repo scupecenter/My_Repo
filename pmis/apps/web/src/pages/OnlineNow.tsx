@@ -11,7 +11,8 @@ import { isAdmin } from '@/lib/perm';
 
 type Target = { session: ActiveSession } | { user: ActiveSession['user'] };
 
-export function OnlineNow() {
+/** `embedded`: shown as a sub-tab of Users, so the tab label is the title. */
+export function OnlineNow({ embedded = false }: { embedded?: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
   const me = useMe(true);
@@ -23,7 +24,7 @@ export function OnlineNow() {
   const when = (s: string) => new Date(s).toISOString().replace('T', ' ').slice(11, 19);
   return (
     <div data-testid="page-online" className="space-y-3">
-      <div><h2 className="text-lg font-bold">{t('nav.admin.online')}</h2><p className="text-mute">{t('online.subtitle', { seconds: LIVE_POLL_MS / 1000 })}</p></div>
+      <div>{!embedded && <h2 className="text-lg font-bold">{t('nav.admin.online')}</h2>}<p className="text-mute">{t('online.subtitle', { seconds: LIVE_POLL_MS / 1000 })}</p></div>
       <div className="flex flex-wrap gap-2">
         <input className="input max-w-64" data-testid="online-search" aria-label={t('users.search')} placeholder={t('users.search')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input w-auto" data-testid="online-status" aria-label={t('users.status')} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}><option value="">{t('users.all_statuses')}</option><option value="online">{t('online.online')}</option><option value="idle">{t('online.idle')}</option></select>

@@ -1,7 +1,7 @@
 import { RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useRoles, useUsers } from '@/api/admin';
 import { useMe } from '@/api/hooks';
 import { useDeactivateUser, useDeletedUsers, useDeleteUser, useRestoreUser } from '@/api/settings';
@@ -10,7 +10,8 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { AssignDialog } from '@/components/AssignDialog';
 import { CreateUserDialog, LocalBadges } from '@/components/UserDialogs';
-import { isAdmin } from '@/lib/perm';
+import { hasGrant, isAdmin } from '@/lib/perm';
+import { OnlineNow } from '@/pages/OnlineNow';
 import { IdBadge } from '@/components/PersonTag';
 
 export const STATUS_TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', pending_assignment: 'bg-waitBg text-waitInk', suspended: 'bg-lateBg text-lateInk', disabled: 'bg-lockBg text-lockInk' };
@@ -75,7 +76,17 @@ function DeletedTab() {
 export function Users() {
   const { t } = useTranslation();
   const me = useMe(true);
-  const [tab, setTab] = useState<'active' | 'deleted'>('active');
+  const loc = useLocation(), go = useNavigate();
+  const [listTab, setListTab] = useState<'active' | 'deleted'>('active');
+  // Online now is the third sub-tab, beside Deleted; it keeps its own URL (/admin/online).
+  const tab: 'active' | 'deleted' | 'online' = loc.pathname.startsWith('/admin/online') ? 'online' : listTab;
+  const canList = !!me.data?.effective.nav.includes('admin.users' as never);
+  const subTabs = [...(canList ? (['active', 'deleted'] as const) : []), ...(hasGrant(me.data, 'manage_users') ? (['online'] as const) : [])];
+  const pick = (k: (typeof subTabs)[number]) => {
+    if (k === 'online') return go('/admin/online');
+    setListTab(k);
+    if (tab === 'online') go('/admin/users');
+  };
   const [act, setAct] = useState<Act | null>(null);
   const [f, setF] = useState({ q: '', status: '', role_id: '' });
   const [sel, setSel] = useState<Record<string, User>>({});
@@ -91,9 +102,9 @@ export function Users() {
       <h2 className="text-lg font-bold">{t('peopleAdmin.tab_users')}</h2>
       <p className="mb-4 text-mute">{t('users.subtitle')}</p>
       <div role="tablist" className="mb-3 flex gap-1">
-        {(['active', 'deleted'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => setTab(k)}>{t(`users.tab_${k}`)}</button>)}
+        {subTabs.map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => pick(k)}>{t(k === 'online' ? 'nav.admin.online' : `users.tab_${k}`)}</button>)}
       </div>
-      {tab === 'deleted' ? <DeletedTab /> : <>
+      {tab === 'online' ? <OnlineNow embedded /> : tab === 'deleted' ? <DeletedTab /> : <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className="input max-w-64" data-testid="users-search" aria-label={t('users.search')} placeholder={t('users.search')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input w-auto" data-testid="users-filter-status" aria-label={t('users.status')} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>

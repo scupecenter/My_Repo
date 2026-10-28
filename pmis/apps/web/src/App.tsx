@@ -23,7 +23,6 @@ import { Roles } from '@/pages/Roles';
 import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
-import { OnlineNow } from '@/pages/OnlineNow';
 import { SecurityLog } from '@/pages/SecurityLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 
@@ -54,7 +53,7 @@ function Gate() {
         <Route element={<PeopleAdminLayout />}>
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/users/:userId" element={<UserDetailPage />} />
-          <Route path="admin/online" element={<OnlineNow />} />
+          <Route path="admin/online" element={<Users />} />
           <Route path="admin/roles" element={<Roles />} />
           <Route path="admin/groups" element={<Groups />} />
           <Route path="admin/delegation" element={<Delegation />} />

@@ -270,7 +270,8 @@ describe('Users & Roles tabs', () => {
       ({ is_system_admin: false, effective: { nav, grants: grants.map((action) => ({ module_key: 'admin.users', action, region_ids: 'all' })) } }) as never;
     expect(firstPeopleTab(me(['admin.users', 'admin.matrix']))).toBe('/admin/users');
     expect(firstPeopleTab(me(['sites', 'admin.matrix']))).toBe('/admin/matrix');
-    expect(firstPeopleTab(me(['sites'], ['manage_users']))).toBe('/admin/online'); // Online now is opened by its grant
+    expect(firstPeopleTab(me(['sites'], ['manage_users']))).toBe('/admin/online'); // Online now (a sub-tab of Users) is opened by its grant
+    expect(PEOPLE_TABS.find((p) => p.key === 'admin.online')?.under).toBe('admin.users');
     expect(firstPeopleTab(me(['sites']))).toBeNull();
   });
 });
