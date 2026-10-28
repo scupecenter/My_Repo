@@ -200,6 +200,7 @@ Rollout
 - **Contract first.** No endpoint is built before it exists in `contracts/openapi.yaml`. The web app uses MSW mocks generated from the contract until the API is ready.
 - **Own your folders.** Each agent writes only inside its own folders (see `ORCHESTRATION.md`). Changes needed elsewhere go as a request to tech-lead.
 - **Small PRs** to `develop`. Each PR includes tests and a short note covering what changed, how it was tested, and any open questions.
+- **Every piece of work ends in a pull request with comments (owner instruction 2026-10-28).** Never leave pushed work without a PR: open one (or update the open PR of the branch) with a description in the sections what changed / security / how it was tested / open, and post a comment that points the reviewer to the parts that need a careful human review (permissions, passwords, grants, migrations). After each later push to the same branch, add a short PR comment saying what the push changed. Follow the PR afterwards: fix CI failures and answer review comments.
 - Never invent business rules. If the spec is silent, add the question to `docs/spec/open-questions.md` and use a configurable default.
 - Use only synthetic data (fictional names) until the product owner releases real data. Never commit secrets.
 - **Keep `CHANGELOG.md` current.** Every PR that changes a decision, the spec, the schema, the contract, the design or the forms adds a dated entry at the top under the right heading (قرارات, إضافة, تعديل, أمان, مفتوح).
