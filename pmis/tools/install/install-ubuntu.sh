@@ -77,7 +77,8 @@ port_busy() {
 [[ $EUID -eq 0 ]] || die "Run as root: sudo bash $0"
 [[ -r /etc/os-release ]] && . /etc/os-release
 [[ ${ID:-} == ubuntu ]] || die "This script supports Ubuntu only (found: ${PRETTY_NAME:-unknown})."
-[[ -d $MIGRATIONS_DIR && -f $WEB_DIR/package.json && -f $API_SRC/package.json ]] || die "Run it from inside the repository checkout ($PMIS_DIR looks wrong)."
+[[ -d $MIGRATIONS_DIR && -f $WEB_DIR/package.json ]] || die "Run it from inside the repository checkout ($PMIS_DIR looks wrong)."
+[[ -f $API_SRC/package.json ]] || die "The API code ($API_SRC) is not in this checkout yet. Nothing was changed; run git pull later and try again."
 command -v openssl >/dev/null || apt-get install -y -qq openssl
 
 # ---------------------------------------------------------------- previous answers
