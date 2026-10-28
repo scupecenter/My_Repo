@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AccessService } from './access/access.service';
+import { AnnouncementsController, MeAnnouncementsController } from './announcements/announcements.controller';
+import { AnnouncementsService } from './announcements/announcements.service';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { LogHmacService } from './auth/log-hmac.service';
@@ -15,21 +17,29 @@ import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { DbService } from './db/db.service';
 import { TxInterceptor } from './db/tx.interceptor';
+import { DepartmentsController } from './departments/departments.controller';
+import { DepartmentsService } from './departments/departments.service';
 import { GroupsController } from './groups/groups.controller';
 import { GroupsService } from './groups/groups.service';
 import { MeController } from './me/me.controller';
 import { MeService } from './me/me.service';
+import { MessagesController } from './messages/messages.controller';
+import { MessagesService } from './messages/messages.service';
 import { UsersController } from './users/users.controller';
 import { UsersRepo } from './users/users.repo';
 import { UsersService } from './users/users.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
-    controllers: [AuthController, MeController, UsersController, GroupsController],
+    controllers: [
+      AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
+      AnnouncementsController, MeAnnouncementsController,
+    ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
+      DepartmentsService, MessagesService, AnnouncementsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

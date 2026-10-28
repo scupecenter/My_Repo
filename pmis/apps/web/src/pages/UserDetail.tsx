@@ -1,4 +1,4 @@
-import { Copy, KeyRound, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
+import { Building2, Copy, KeyRound, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -8,7 +8,9 @@ import { useRegions } from '@/api/sites';
 import type { Assignment, UserPickerItem } from '@/api/types';
 import { AssignDialog, LEVELS } from '@/components/AssignDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { OrgDialog } from '@/components/OrgDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
+import { PersonTag } from '@/components/PersonTag';
 import { MODULES, ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
 import { LocalBadges, ResetPasswordDialog, SystemAdminDialog } from '@/components/UserDialogs';
@@ -91,13 +93,14 @@ export function UserDetailPage() {
   const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles(), groups = useGroups();
   const end = useEndAssignments(userId);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin'>(null);
+  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin' | 'org'>(null);
   const ar = i18n.language === 'ar';
   if (q.isError) return <p role="alert" data-testid="user-missing">{t('errors.generic')}</p>;
   const u = q.data;
   if (!u) return <p>{t('common.loading')}</p>;
   const isSysAdmin = (u.groups ?? []).some((g) => g.is_system_admins);
   const adminGroupId = groups.data?.find((g) => g.is_system_admins)?.id;
+  const canEditOrg = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'edit' && ['users', 'admin.users'].includes(g.module_key as string));
   const rows = (u.assignments ?? []).filter((a) => a.is_active_now !== false);
   const chosen = rows.filter((a) => sel.has(a.id));
   const rn = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (ar && r?.name_ar) || r?.name_en || String(id); };
@@ -154,6 +157,16 @@ export function UserDetailPage() {
           </tbody>
         </table></div>
       </section>
+      <section className="card p-4" data-testid="org-card">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <h2 className="me-auto flex items-center gap-2 font-bold"><Building2 size={16} />{t('org.title')}</h2>
+          {canEditOrg && <button className="btn" data-testid="org-edit" onClick={() => setDlg('org')}><Pencil size={16} />{t('org.edit')}</button>}
+        </div>
+        <dl className="grid gap-2 text-sm md:grid-cols-2">
+          <div><dt className="text-mute">{t('org.manager')}</dt><dd data-testid="org-manager-value">{u.manager ? <PersonTag name={u.manager.display_name} employeeId={u.manager.employee_id} /> : <span className="text-mute">{t('org.none')}</span>}</dd></div>
+          <div><dt className="text-mute">{t('org.department')}</dt><dd data-testid="org-department-value">{u.department ? (ar && u.department.name_ar) || u.department.name_en : <span className="text-mute">{t('org.none')}</span>}</dd></div>
+        </dl>
+      </section>
       <div className="grid gap-4 md:grid-cols-2">
         <MfaCard userId={userId} isSelf={u.id === me.data?.user.id} />
         <section className="card p-4"><h2 className="mb-1 font-bold">{t('users.groups')}</h2>
@@ -161,6 +174,7 @@ export function UserDetailPage() {
       </div>
       {dlg === 'assign' && <AssignDialog open onClose={() => setDlg(null)} initialMode="person" initialPeople={[{ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }]} />}
       {dlg === 'edit' && <EditDialog userId={userId} rows={chosen} onClose={() => { setDlg(null); setSel(new Set()); }} />}
+      {dlg === 'org' && <OrgDialog user={u} onClose={() => setDlg(null)} />}
       {dlg === 'reset' && <ResetPasswordDialog user={u} onClose={() => setDlg(null)} />}
       {(dlg === 'admin' || dlg === 'unadmin') && adminGroupId && <SystemAdminDialog user={u} adminGroupId={adminGroupId} remove={dlg === 'unadmin'} onClose={() => setDlg(null)} />}
       {dlg === 'copy' && <CopyDialog fromId={userId} onClose={() => setDlg(null)} />}

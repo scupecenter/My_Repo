@@ -237,6 +237,11 @@ describe('hybrid mode list', () => {
       'POST /auth/local/login', 'POST /auth/local/password', 'POST /auth/local/step-up', 'GET /auth/session', 'POST /auth/logout', 'GET /me',
       'GET /users', 'GET /users/picker', 'POST /users', 'GET /users/:id', 'PATCH /users/:id', 'POST /users/:id/password-reset', 'GET /groups', 'GET /groups/:id',
       'POST /groups/:id/members', 'DELETE /groups/:id/members/:userId',
+      // contract 0.4.0
+      'GET /departments', 'POST /departments', 'PATCH /departments/:id', 'PUT /users/:id/org',
+      'GET /messages/contacts', 'GET /messages/threads', 'POST /messages/threads', 'GET /messages/threads/:id', 'POST /messages/threads/:id/replies', 'POST /messages/threads/:id/read',
+      'GET /announcements', 'POST /announcements', 'GET /announcements/:id', 'GET /announcements/:id/responses', 'GET /announcements/:id/responses/export', 'POST /announcements/:id/respond',
+      'GET /me/announcements/pending',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
@@ -265,9 +270,13 @@ describe('password helpers', () => {
 describe('Users & Roles tabs', () => {
   it('opens the first tab the person may use and keeps the order of the tabs', async () => {
     const { firstPeopleTab, PEOPLE_TABS } = await import('@/components/PeopleAdmin');
-    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
-    expect(firstPeopleTab(['admin.users', 'admin.matrix'])).toBe('/admin/users');
-    expect(firstPeopleTab(['sites', 'admin.matrix'])).toBe('/admin/matrix');
-    expect(firstPeopleTab(['sites'])).toBeNull();
+    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.online', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
+    const me = (nav: string[], grants: string[] = []) =>
+      ({ is_system_admin: false, effective: { nav, grants: grants.map((action) => ({ module_key: 'admin.users', action, region_ids: 'all' })) } }) as never;
+    expect(firstPeopleTab(me(['admin.users', 'admin.matrix']))).toBe('/admin/users');
+    expect(firstPeopleTab(me(['sites', 'admin.matrix']))).toBe('/admin/matrix');
+    expect(firstPeopleTab(me(['sites'], ['manage_users']))).toBe('/admin/online'); // Online now (a sub-tab of Users) is opened by its grant
+    expect(PEOPLE_TABS.find((p) => p.key === 'admin.online')?.under).toBe('admin.users');
+    expect(firstPeopleTab(me(['sites']))).toBeNull();
   });
 });

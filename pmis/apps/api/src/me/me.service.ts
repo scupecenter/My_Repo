@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
 import type { AuthContext } from '../auth/auth.types';
 import { ProblemException } from '../common/problem';
@@ -8,7 +9,7 @@ import { AssignmentDto, GroupRef, UserDto, UsersRepo } from '../users/users.repo
 /** Module keys the web app knows (apps/web/src/components/Shell.tsx NAV). A System Admin sees all of them. */
 export const NAV_KEYS = [
   'my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation',
-  'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'admin.online', 'audit',
+  'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'admin.online', 'audit', 'messages', 'announcements',
 ] as const;
 
 /** Every action of the contract's PermissionAction (a System Admin holds all of them on every module). */
@@ -48,6 +49,7 @@ export class MeService {
   constructor(
     private readonly db: DbService,
     private readonly repo: UsersRepo,
+    private readonly access: AccessService,
   ) {}
 
   async me(auth: AuthContext): Promise<MeDto> {
@@ -136,6 +138,9 @@ export class MeService {
         }
       }
     }
+    // Messages are for every active user; Announcements for System Admins (above) and delegates of announcements.create.
+    nav.add('messages');
+    if (await this.access.canSendAnnouncements()) nav.add('announcements');
     return { grants: effGrants, nav: [...nav].sort(), matrix_levels: [...levels.values()] };
   }
 }

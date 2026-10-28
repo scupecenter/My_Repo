@@ -24,6 +24,24 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/groups/:id'],
   ['post', '/groups/:id/members'],
   ['delete', '/groups/:id/members/:userId'],
+  // Contract 0.4.0: departments, direct manager, messages, announcements (ADR 0013).
+  ['get', '/departments'],
+  ['post', '/departments'],
+  ['patch', '/departments/:id'],
+  ['put', '/users/:id/org'],
+  ['get', '/messages/contacts'],
+  ['get', '/messages/threads'],
+  ['post', '/messages/threads'],
+  ['get', '/messages/threads/:id'],
+  ['post', '/messages/threads/:id/replies'],
+  ['post', '/messages/threads/:id/read'],
+  ['get', '/announcements'],
+  ['post', '/announcements'],
+  ['get', '/announcements/:id'],
+  ['get', '/announcements/:id/responses'],
+  ['get', '/announcements/:id/responses/export'],
+  ['post', '/announcements/:id/respond'],
+  ['get', '/me/announcements/pending'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

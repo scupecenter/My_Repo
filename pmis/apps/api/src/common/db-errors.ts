@@ -28,6 +28,7 @@ export function pgInfo(e: unknown): PgInfo | null {
 }
 
 const FIELD_BY_CONSTRAINT: [RegExp, string][] = [
+  [/departments_code_key|departments.*\(code\)/i, '/code'],
   [/users_email_key|\(email\)|\bemail\b/i, '/email'],
   [/users_employee_id_key|\(employee_id\)|employee_id/i, '/employee_id'],
   [/users_phone_key|users_phone_e164|\(phone\)|\bphone\b/i, '/phone'],
@@ -71,6 +72,31 @@ export function mapDbError(e: unknown): ProblemException | null {
     case '23503':
       return new ProblemException(409, 'invalid_transition', { detail: 'The change conflicts with related data.' });
     case 'P0001': {
+      // Messages of idm_set_user_org and ann_send (migration 0011).
+      if (/manager loop|manager chain too deep/i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'This manager would create a loop in the reporting line.',
+          errors: [{ path: '/manager_id', code: 'manager_loop', message: 'This manager would create a loop.' }],
+        });
+      }
+      if (/manager must be an active/i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'The manager must be an active user.',
+          errors: [{ path: '/manager_id', code: 'inactive', message: 'The manager must be an active user.' }],
+        });
+      }
+      if (/department must exist and be active/i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'The department must exist and be active.',
+          errors: [{ path: '/department_id', code: 'inactive', message: 'The department must exist and be active.' }],
+        });
+      }
+      if (/no active recipient/i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'Nobody matches this audience.',
+          errors: [{ path: '/audience', code: 'no_recipients', message: 'No active user matches this audience.' }],
+        });
+      }
       if (/not found/i.test(msg)) return new ProblemException(404, 'not_found', { detail: 'The resource does not exist.' });
       if (/at least one active System Admin/i.test(msg)) return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       return new ProblemException(422, 'validation_failed', { detail: 'The request is not valid.' });

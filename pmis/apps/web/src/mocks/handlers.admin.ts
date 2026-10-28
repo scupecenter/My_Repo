@@ -4,6 +4,7 @@ import { API_BASE } from '@/api/client';
 import type { Assignment, UserDetail } from '@/api/types';
 import { absentOn, accountKeyOf, accountStatus, cred, db, save, slotsOf, STAFF, stepUpValid, toSummary, viewer, type MockTask } from './db';
 import { PROFILES, type MockUser } from './adminData';
+import { O } from './orgState';
 import { find, guard, page, problem, stepUp, transition } from './handlers';
 import { byId, uid } from './ids';
 
@@ -21,20 +22,25 @@ const now = () => new Date().toISOString();
 
 /** Name, email and phone of an admin-list user: the registry row, or the data typed when a local user was created. */
 const prof = (u: MockUser) => (u.local ? { name_en: u.local.display_name, name_ar: u.local.display_name, email: u.local.email, phone: u.local.phone } : byId(u.employee_id));
-const uref = (u: MockUser) => (u.local ? { id: u.local.id, display_name: u.local.display_name, ...(u.employee_id ? { employee_id: u.employee_id } : {}) } : ref(u.employee_id));
+export const uref = (u: MockUser) => (u.local ? { id: u.local.id, display_name: u.local.display_name, ...(u.employee_id ? { employee_id: u.employee_id } : {}) } : ref(u.employee_id));
+/** Direct manager and department of a user (0.4.0). */
+export const orgOf = (u: MockUser) => {
+  const id = uref(u).id, o = O(), mgr = o.managers[id] ? A().users.find((x) => uref(x).id === o.managers[id]) : undefined, d = o.departments.find((x) => x.id === o.deptOf[id]);
+  return { manager: mgr ? uref(mgr) : null, department: d ? { id: d.id, code: d.code, name_en: d.name_en, name_ar: d.name_ar } : null };
+};
 export const userOf = (u: MockUser) => {
   const s = prof(u), c = cred(accountKeyOf(u));
   return {
-    ...uref(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
+    ...uref(u), ...orgOf(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
   };
 };
 const rowsOf = (e: string, ended = false) => A().assignments.filter((a) => a.user.employee_id === e && (ended || a.is_active_now));
-const detail = (u: MockUser): UserDetail => ({
+export const detail = (u: MockUser): UserDetail => ({
   ...userOf(u), assignments: rowsOf(u.employee_id, true),
   groups: A().groups.filter((g) => g.members.includes(u.employee_id)).map((g) => ({ id: g.id, name: g.name, is_system_admins: g.is_system_admins })), teams: [...new Set(rowsOf(u.employee_id).map((a) => a.team ?? 'none'))],
 }) as UserDetail;
 const roleOf = (id: string) => A().roles.find((r) => r.id === id);
-const userBy = (id: string) => A().users.find((u) => (u.local ? u.local.id : uid(u.employee_id)) === id);
+export const userBy = (id: string) => A().users.find((u) => (u.local ? u.local.id : uid(u.employee_id)) === id);
 const tasksAll = () => [...db().tasks, ...db().extra, ...Object.values(db().ov)];
 const heldBy = (t: MockTask, e: string) => toSummary(t).ball_in_court?.holders.some((h) => h.employee_id === e);
 const emptyBulk = () => ({ bulk_action_id: crypto.randomUUID(), done: [] as { id: string; created_id?: string }[], skipped: [] as { ref: string; code: string; message?: string }[], failed: [] as { ref: string; code: string; message?: string }[] });

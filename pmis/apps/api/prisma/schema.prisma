@@ -360,6 +360,8 @@ model User {
   m365_object_id  String?    @unique // Entra ID oid claim; null for an account created in the PMIS (local sign-in, migration 0010)
   email           String     @unique // lower case (check constraint)
   phone           String?    @unique // E.164, a local sign-in identifier
+  manager_id      String?    @db.Uuid // direct manager (migration 0011); set only through idm_set_user_org
+  department_id   String?    @db.Uuid
   display_name    String
   employee_id     String?    @unique @db.Char(4) // 4-digit, entered at first sign-in
   status          UserStatus @default(pending_assignment)
@@ -374,16 +376,26 @@ model User {
   // Role, sub-role, permission level, team, regions and modules live on the assignments (many-to-many).
   // There is deliberately no user-level default: effective access is the union of the active assignments.
   assignments      UserRoleAssignment[]
-  assigned_by_me   UserRoleAssignment[] @relation("AssignmentAssignedBy")
+  assigned_by_me   UserRoleAssignment[]    @relation("AssignmentAssignedBy")
   group_members    GroupMember[]
-  delegations_from Delegation[]         @relation("DelegationFrom")
-  delegations_to   Delegation[]         @relation("DelegationTo")
-  local_credential LocalCredential?     @relation("LocalCredentialUser")
-  credentials_set  LocalCredential[]    @relation("LocalCredentialSetBy")
-  sessions         UserSession[]        @relation("SessionUser")
-  sessions_revoked UserSession[]        @relation("SessionRevokedBy")
+  delegations_from Delegation[]            @relation("DelegationFrom")
+  delegations_to   Delegation[]            @relation("DelegationTo")
+  local_credential LocalCredential?        @relation("LocalCredentialUser")
+  credentials_set  LocalCredential[]       @relation("LocalCredentialSetBy")
+  sessions         UserSession[]           @relation("SessionUser")
+  sessions_revoked UserSession[]           @relation("SessionRevokedBy")
+  manager          User?                   @relation("UserManager", fields: [manager_id], references: [id], onDelete: SetNull)
+  reports          User[]                  @relation("UserManager")
+  department       Department?             @relation(fields: [department_id], references: [id], onDelete: SetNull)
+  threads_started  MessageThread[]
+  thread_links     MessageParticipant[]
+  messages_written Message[]
+  announcements    Announcement[]
+  announcements_in AnnouncementRecipient[]
 
   @@index([status])
+  @@index([manager_id], map: "users_manager_idx")
+  @@index([department_id], map: "users_department_idx")
   @@map("users")
 }
 
@@ -1975,4 +1987,117 @@ model Setting {
   updated_at  DateTime @updatedAt @db.Timestamptz(6)
 
   @@map("settings")
+}
+
+// Departments, messages and announcements (migration 0011, ADR 0013). pmis_app only reads these tables (row-level
+// security); writes go through idm_department_save / idm_set_user_org, msg_* and ann_* functions.
+model Department {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code       String   @unique
+  name_en    String
+  name_ar    String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  users User[]
+
+  @@map("departments")
+}
+
+model MessageThread {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subject         String
+  created_by      String   @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  last_message_at DateTime @default(now()) @db.Timestamptz(6)
+
+  creator      User                 @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  participants MessageParticipant[]
+  messages     Message[]
+
+  @@map("message_threads")
+}
+
+model MessageParticipant {
+  thread_id    String    @db.Uuid
+  user_id      String    @db.Uuid
+  last_read_at DateTime? @db.Timestamptz(6)
+
+  thread MessageThread @relation(fields: [thread_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user   User          @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([thread_id, user_id])
+  @@index([user_id], map: "message_participants_user_idx")
+  @@map("message_participants")
+}
+
+// Append-only (trigger). The original message has is_original = true; replies are shown newest first under it.
+model Message {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  thread_id   String   @db.Uuid
+  author_id   String   @db.Uuid
+  body        String
+  is_original Boolean  @default(false)
+  created_at  DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+
+  thread MessageThread @relation(fields: [thread_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  author User          @relation(fields: [author_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([thread_id, created_at], map: "messages_thread_idx")
+  @@map("messages")
+}
+
+model Announcement {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String
+  body         String
+  audience_all Boolean  @default(false)
+  created_by   String   @db.Uuid
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  creator    User                    @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  targets    AnnouncementTarget[]
+  recipients AnnouncementRecipient[]
+
+  @@map("announcements")
+}
+
+model AnnouncementTarget {
+  announcement_id String @db.Uuid
+  kind            String // user, group, role, department
+  target_id       String @db.Uuid
+
+  announcement Announcement @relation(fields: [announcement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([announcement_id, kind, target_id])
+  @@map("announcement_targets")
+}
+
+// Fixed when the announcement is sent.
+model AnnouncementRecipient {
+  announcement_id String @db.Uuid
+  user_id         String @db.Uuid
+
+  announcement Announcement          @relation(fields: [announcement_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user         User                  @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  response     AnnouncementResponse?
+
+  @@id([announcement_id, user_id])
+  @@index([user_id], map: "announcement_recipients_user_idx")
+  @@map("announcement_recipients")
+}
+
+// Append-only (trigger). A disagreement needs a note of at least 3 characters (check constraint).
+model AnnouncementResponse {
+  announcement_id String   @db.Uuid
+  user_id         String   @db.Uuid
+  decision        String // agree, disagree
+  note            String?
+  responded_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  recipient AnnouncementRecipient @relation(fields: [announcement_id, user_id], references: [announcement_id, user_id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([announcement_id, user_id])
+  @@map("announcement_responses")
 }

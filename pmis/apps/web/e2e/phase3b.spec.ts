@@ -131,7 +131,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('integrity-count-audit')).toHaveText('1842');
       await page.getByTestId('seclog-outcome').selectOption('failure');
       await expect(page.getByTestId('seclog-list').locator('tr').first()).toBeVisible();
-      await page.getByTestId('nav-admin.online').click();
+      await page.getByTestId('nav-admin.users').click(); await page.getByTestId('users-tab-online').click();
       await expect(page.getByTestId('session-own')).toBeVisible();
       const other = page.locator('[data-testid^="session-revoke-"]').first();
       await other.click();
@@ -142,7 +142,8 @@ for (const locale of ['en', 'ar'] as const) {
 
     test('security auditor sees the log without IPs and without online now', async ({ page }) => {
       await signIn(page, locale, 'auditor');
-      await expect(page.getByTestId('nav-admin.online')).toHaveCount(0);
+      await expect(page.getByTestId('nav-admin.online')).toHaveCount(0); // Online now is a sub-tab of Users now
+      await expect(page.getByTestId('users-tab-online')).toHaveCount(0);
       await page.getByTestId('nav-admin.security_log').click();
       await expect(page.locator('[data-testid^="seclog-row-"]').first()).toBeVisible();
       await expect(page.getByTestId('seclog-ip-col')).toHaveCount(0);
