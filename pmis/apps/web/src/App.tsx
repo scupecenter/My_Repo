@@ -1,8 +1,13 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { setPasswordChangeHandler } from '@/api/client';
 import { useSession } from '@/api/hooks';
+import type { Session } from '@/api/types';
 import { Shell } from '@/components/Shell';
 import { Approvals } from '@/pages/Approvals';
+import { ChangePassword } from '@/pages/ChangePassword';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
@@ -31,12 +36,15 @@ function Gate() {
   if (s.isLoading) return null;
   const session = s.data;
   if (!session?.authenticated) return <Navigate to="/login" replace />;
+  // A temporary password is waiting: this screen is the only one reachable, whatever the URL.
+  if (session.must_change_password) return <ChangePassword forced />;
   if (session.needs_employee_id) return <EmployeeId />;
   if (session.status === 'pending_assignment') return <Pending session={session} />;
   return (
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<Navigate to="/my-work" replace />} />
+        <Route path="change-password" element={<ChangePassword />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="sites" element={<Sites />} />
@@ -58,6 +66,12 @@ function Gate() {
 }
 
 export function App() {
+  const qc = useQueryClient();
+  // Any API call that answers 403 password_change_required sends the user to the change-password screen.
+  useEffect(() => {
+    setPasswordChangeHandler(() => qc.setQueryData<Session>(['session'], (s) => (s && !s.must_change_password ? { ...s, must_change_password: true } : s)));
+    return () => setPasswordChangeHandler(null);
+  }, [qc]);
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

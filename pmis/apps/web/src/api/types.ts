@@ -112,3 +112,5 @@ export type SitesExportColumnCode = S['SitesExportColumnCode'];
 export type TasksExportColumnCode = S['TasksExportColumnCode'];
 export type WorkflowMilestone = S['WorkflowMilestone'];
 export type WorkflowGate = S['WorkflowGate'];
+export type LocalUserCreate = S['LocalUserCreate'];
+export type LocalUserCreated = S['LocalUserCreated'];

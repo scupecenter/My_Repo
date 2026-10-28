@@ -162,6 +162,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with an identifier and a password (local account, ADR 0012)
+         * @description `identifier` is a 4-digit employee ID, an email or an E.164 phone, like the one sign-in box. Every failure answers the
+         *     same 401 `invalid_credentials` with the same text and similar timing, whether the identifier is unknown, the password is
+         *     wrong, the account is locked (5 failures lock it for 15 minutes) or local sign-in is off for it, so the response never
+         *     tells who is registered. Rate limited per IP and per identifier (429 `rate_limited`). On success the session cookie
+         *     `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
+         *     `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
+         *     until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+         */
+        post: operations["localLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my password (required after a temporary password)
+         * @description Needs the current password. Policy (422 `weak_password`, `errors[]` names the rule): 12 to 128 characters, not equal to
+         *     the current password, not containing the email, employee ID or phone, not in the server's list of common passwords.
+         *     On success the other sessions of the user end; this session stays and `must_change_password` becomes false.
+         */
+        post: operations["changeOwnPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/step-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step-up for a local session (re-enter the password)
+         * @description A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
+         *     for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
+         *     (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+         */
+        post: operations["localStepUp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -243,7 +313,14 @@ export interface paths {
          */
         get: operations["listUsers"];
         put?: never;
-        post?: never;
+        /**
+         * Create a user who signs in with a password (local account, ADR 0012)
+         * @description Needs `create` on `users` (System Admin or a delegation, all regions). The new account is `pending_assignment` until an
+         *     admin assigns it, like a first M365 sign-in. The server generates a temporary password when `temporary_password` is
+         *     omitted and returns it **once** in the response; it is never stored or shown again. The user must change it at the first
+         *     sign-in. Email, employee ID and phone must each be unused (409 `duplicate`, `errors[]` names the field).
+         */
+        post: operations["createLocalUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -349,6 +426,29 @@ export interface paths {
          * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
          */
         post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a temporary password for a user (local sign-in)
+         * @description Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Admins and delegates
+         *     can be reset by a System Admin only. Turns local sign-in on for the account if it was off, unlocks it, ends all its
+         *     sessions, and makes the user change the password at the next sign-in. Omit `temporary_password` to have the server
+         *     generate one; it is returned once.
+         */
+        post: operations["resetUserPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3643,8 +3743,13 @@ export interface components {
                 code: string;
                 message?: string;
             }[];
-            /** @description Present with `step_up_required`. */
+            /** @description Present with `step_up_required` on an M365 session. */
             step_up_url?: string;
+            /**
+             * @description 0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.
+             * @enum {string}
+             */
+            step_up_method?: "password" | "m365" | "totp";
             /** @description Closed-list reason; for `template_rejected` a TemplateRejectReason. */
             reason?: components["schemas"]["TemplateRejectReason"] | string;
             claimed_by?: components["schemas"]["UserRef"];
@@ -3652,7 +3757,7 @@ export interface components {
             missing?: string[];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -3877,6 +3982,13 @@ export interface components {
             /** @description The sign-in token carried `amr` = mfa. */
             mfa?: boolean;
             break_glass?: boolean;
+            /**
+             * @description 0.3.0. How this session signed in.
+             * @enum {string}
+             */
+            auth_method?: "local" | "m365" | "break_glass";
+            /** @description 0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed. */
+            must_change_password?: boolean;
             /** Format: date-time */
             stepup_valid_until?: string | null;
             /** Format: date-time */
@@ -3922,6 +4034,12 @@ export interface components {
             /** @enum {string} */
             theme?: "light" | "dark";
             is_break_glass?: boolean;
+            /** @description 0.3.0. E.164; a local sign-in identifier. */
+            phone?: string | null;
+            /** @description 0.3.0. The account can sign in with a password. */
+            local_sign_in?: boolean;
+            /** @description 0.3.0. A temporary password is waiting to be changed. */
+            must_change_password?: boolean;
             /** @description Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption. */
             mfa_exempt?: boolean;
             /** Format: date-time */
@@ -5143,6 +5261,25 @@ export interface components {
         };
         WithReason: {
             reason: components["schemas"]["Reason"];
+        };
+        LocalUserCreate: {
+            display_name: string;
+            /** Format: email */
+            email: string;
+            employee_id?: components["schemas"]["EmployeeId"] | null;
+            /** @description E.164, for example +218911234567. */
+            phone?: string | null;
+            /**
+             * Format: password
+             * @description Omit to have the server generate one.
+             */
+            temporary_password?: string;
+            reason: components["schemas"]["Reason"];
+        };
+        LocalUserCreated: {
+            user: components["schemas"]["User"];
+            /** @description Shown once. Hand it to the user by a separate channel. */
+            temporary_password: string;
         };
         /**
          * @description Personal-data fields that follow visibility settings.
@@ -6915,6 +7052,99 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    localLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    identifier: string;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    changeOwnPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    current_password: string;
+                    /** Format: password */
+                    new_password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localStepUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Step-up recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -7057,6 +7287,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    createLocalUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalUserCreated"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listDeletedUsers: {
@@ -7255,6 +7513,44 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    resetUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                    /** Format: password */
+                    temporary_password?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reset. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shown once. Hand it to the user by a separate channel. */
+                        temporary_password: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listUserAssignments: {

@@ -1,4 +1,4 @@
-import { Copy, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
+import { Copy, KeyRound, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -11,6 +11,8 @@ import { errText, FormDialog } from '@/components/FormDialog';
 import { PeoplePicker } from '@/components/PeoplePicker';
 import { MODULES, ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
+import { LocalBadges, ResetPasswordDialog } from '@/components/UserDialogs';
+import { isAdmin } from '@/lib/perm';
 import { MfaBadge, STATUS_TONE } from './Users';
 
 function EditDialog({ userId, rows, onClose }: { userId: string; rows: Assignment[]; onClose: () => void }) {
@@ -89,7 +91,7 @@ export function UserDetailPage() {
   const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles();
   const end = useEndAssignments(userId);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy'>(null);
+  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset'>(null);
   const ar = i18n.language === 'ar';
   if (q.isError) return <p role="alert" data-testid="user-missing">{t('errors.generic')}</p>;
   const u = q.data;
@@ -107,8 +109,12 @@ export function UserDetailPage() {
         <h1 className="text-2xl font-bold" data-testid="user-name">{u.display_name}</h1>
         {u.employee_id && <span className="mono rounded bg-card2 px-1 text-sm">{u.employee_id}</span>}
         <span className={`chip ${STATUS_TONE[u.status]}`} data-testid="user-status">{t(`userStatus.${u.status}`)}</span>
+        <LocalBadges user={u} />
         <MfaBadge user={u} />
         <span className="text-mute" dir="ltr">{u.email}</span>
+        {isAdmin(me.data) && (
+          <button className="btn ms-auto" data-testid="user-reset-password" disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('resetPw.self') : undefined} onClick={() => setDlg('reset')}><KeyRound size={16} />{t('resetPw.open')}</button>
+        )}
       </div>
       <section className="card p-4">
         <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -145,6 +151,7 @@ export function UserDetailPage() {
       </div>
       {dlg === 'assign' && <AssignDialog open onClose={() => setDlg(null)} initialMode="person" initialPeople={[{ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }]} />}
       {dlg === 'edit' && <EditDialog userId={userId} rows={chosen} onClose={() => { setDlg(null); setSel(new Set()); }} />}
+      {dlg === 'reset' && <ResetPasswordDialog user={u} onClose={() => setDlg(null)} />}
       {dlg === 'copy' && <CopyDialog fromId={userId} onClose={() => setDlg(null)} />}
       {dlg === 'end' && (
         <FormDialog open onClose={() => setDlg(null)} testid="end-dialog" title={t('users.end_title', { count: chosen.length })} busy={end.isPending} error={end.isError ? errText(end.error, t) : null}

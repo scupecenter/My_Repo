@@ -1,13 +1,14 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, Menu, Moon, Search, Sun, LogOut } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
-import { useLogout, useMe, useNotifications } from '@/api/hooks';
+import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { hasGrant } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
+import { HYBRID } from '@/lib/hybrid';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 
@@ -36,6 +37,7 @@ export function Shell() {
   const { t } = useTranslation();
   const me = useMe(true);
   const notes = useNotifications(true);
+  const session = useSession();
   const nav = useNavigate();
   const loc = useLocation();
   const qc = useQueryClient();
@@ -100,12 +102,24 @@ export function Shell() {
           <button className="btn" data-testid="topbar-lang" aria-label={t('top.language')} onClick={switchLang}>{lang === 'en' ? 'ع' : 'EN'}</button>
           <button className="btn" data-testid="topbar-theme" aria-label={t('top.theme')} onClick={switchTheme}>{theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}</button>
           <NotificationBell count={pending} />
-          <span className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user">
-            <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-xs font-bold text-accentInk">{(me.data?.user.display_name ?? '?').split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>
-            {me.data?.user.display_name}
-          </span>
+          <Popover.Root>
+            <Popover.Trigger asChild>
+              <button className="flex items-center gap-2 rounded-full border border-line px-2 py-1 text-sm" data-testid="topbar-user" aria-label={t('top.account')}>
+                <span className="grid h-6 w-6 place-items-center rounded-full bg-accent text-xs font-bold text-accentInk">{(me.data?.user.display_name ?? '?').split(' ').map((w) => w[0]).join('').slice(0, 2)}</span>
+                {me.data?.user.display_name}
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content align="end" sideOffset={6} data-testid="user-menu" className="card z-50 w-56 p-2">
+                {session.data?.auth_method === 'local'
+                  ? <Popover.Close asChild><button className="btn w-full justify-start" data-testid="user-menu-change-password" onClick={() => nav('/change-password')}><Lock size={14} />{t('top.change_password')}</button></Popover.Close>
+                  : <p className="p-2 text-sm text-mute">{t('top.no_password')}</p>}
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
           <button className="btn" data-testid="topbar-signout" aria-label={t('top.sign_out')} onClick={() => logout.mutate(undefined, { onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); nav('/login'); } })}><LogOut size={16} /></button>
         </header>
+        {HYBRID && <div role="status" data-testid="hybrid-banner" className="border-b border-line bg-waitBg px-4 py-1 text-xs text-waitInk">{t('hybrid.banner')}</div>}
         <main className="p-6"><Outlet /></main>
       </div>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
