@@ -97,9 +97,10 @@ fi
 if [[ -r $CONF_DIR/pmis.env ]]; then
   _url=$(sed -n 's/^DATABASE_URL=//p' "$CONF_DIR/pmis.env")
   if [[ -n $_url ]]; then
+    # Secrets go through stdin, never argv (visible to every local user in ps).
     read -r PREV_DB_PORT PREV_DB_NAME PREV_DB_PASSWORD < <(python3 -c '
 import sys, urllib.parse as u
-p = u.urlsplit(sys.argv[1]); print(p.port or 5432, p.path.lstrip("/"), u.unquote(p.password or ""))' "$_url")
+p = u.urlsplit(sys.stdin.read().strip()); print(p.port or 5432, p.path.lstrip("/"), u.unquote(p.password or ""))' <<<"$_url")
   fi
   PREV_LOG_HMAC_KEY=$(sed -n 's/^LOG_HMAC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_API_PORT=${PREV_API_PORT:-$(sed -n 's/^PORT=//p' "$CONF_DIR/pmis.env")}
@@ -188,6 +189,8 @@ if [[ $API_PORT != "${PREV_API_PORT:-}" ]] && port_busy "$API_PORT"; then die "P
 
 say "5/6 First System Admin"
 psql_su() { sudo -u postgres env PGOPTIONS="-c client_min_messages=warning" psql -p "$DB_PORT" -v ON_ERROR_STOP=1 -qAt "$@"; }
+# SQL string literal for a value sent on stdin (standard_conforming_strings is on: only ' needs doubling).
+sql_lit() { local v=${1//\'/\'\'}; printf "'%s'" "$v"; }
 ADMINS=0
 if [[ -n $PG16_PORT && $PG16_PORT == "$DB_PORT" ]] && systemctl is-active -q postgresql@16-main 2>/dev/null; then
   ADMINS=$(psql_su -d "$DB_NAME" -c "SELECT count(*) FROM group_members gm JOIN groups g ON g.id = gm.group_id AND g.is_system_admins AND g.is_active" 2>/dev/null || echo 0)
@@ -269,13 +272,9 @@ systemctl enable -q postgresql
 systemctl restart postgresql@16-main
 
 if [[ $(psql_su -c "SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app'") == 1 ]]; then
-  psql_su -v pw="$DB_APP_PASSWORD" <<'SQL'
-ALTER ROLE pmis_app WITH LOGIN PASSWORD :'pw';
-SQL
+  printf 'ALTER ROLE pmis_app WITH LOGIN PASSWORD %s;\n' "$(sql_lit "$DB_APP_PASSWORD")" | psql_su >/dev/null
 else
-  psql_su -v pw="$DB_APP_PASSWORD" <<'SQL'
-CREATE ROLE pmis_app LOGIN PASSWORD :'pw';
-SQL
+  printf 'CREATE ROLE pmis_app LOGIN PASSWORD %s;\n' "$(sql_lit "$DB_APP_PASSWORD")" | psql_su >/dev/null
   echo "Role pmis_app created."
 fi
 
@@ -328,7 +327,7 @@ chown -R root:root "$API_ROOT"
 cd - >/dev/null
 
 install -d -m 750 -o root -g "$SERVICE_USER" "$CONF_DIR"
-DB_URL_PW=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$DB_APP_PASSWORD")
+DB_URL_PW=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().rstrip("\n"), safe=""))' <<<"$DB_APP_PASSWORD")
 LOG_HMAC_KEY=${PREV_LOG_HMAC_KEY:-$(openssl rand -hex 32)}
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
@@ -387,9 +386,9 @@ echo "API is up on 127.0.0.1:$API_PORT."
 if (( NEED_ADMIN )); then
   say "Creating the first System Admin"
   ADMIN_HASH=$(printf '%s' "$ADMIN_PASSWORD" | node "$API_ROOT/dist/cli.js" hash-password) || die "The password was refused (see the message above). Run the installer again."
-  psql_su -d "$DB_NAME" -v email="$ADMIN_EMAIL" -v name="$ADMIN_NAME" -v emp="$ADMIN_EMP" -v phone="$ADMIN_PHONE" -v hash="$ADMIN_HASH" >/dev/null <<'SQL'
-SELECT idm_bootstrap_admin(:'email', :'name', nullif(:'emp', ''), nullif(:'phone', ''), :'hash');
-SQL
+  printf 'SELECT idm_bootstrap_admin(%s, %s, nullif(%s, %s), nullif(%s, %s), %s);\n' \
+    "$(sql_lit "$ADMIN_EMAIL")" "$(sql_lit "$ADMIN_NAME")" "$(sql_lit "$ADMIN_EMP")" "''" "$(sql_lit "$ADMIN_PHONE")" "''" "$(sql_lit "$ADMIN_HASH")" \
+    | psql_su -d "$DB_NAME" >/dev/null
   unset ADMIN_PASSWORD ADMIN_HASH
   echo "Created. Sign in with $ADMIN_EMAIL${ADMIN_EMP:+ or $ADMIN_EMP} and the password you typed."
 fi
