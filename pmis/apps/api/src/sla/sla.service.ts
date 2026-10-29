@@ -107,7 +107,9 @@ export class SlaService {
   ) {}
 
   // ------------------------------------------------------------------ GET /settings/sla-rules
-  async rules(q: Query): Promise<unknown> {
+  async rules(auth: AuthContext, q: Query): Promise<unknown> {
+    // Same gate as the rule-set endpoints: the rows name who changed them and count open tasks in every region.
+    await this.access.requireModuleView(auth, 'admin.settings');
     const limit = parseLimit(oneParam(q, 'limit'));
     const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
     const taskCode = oneParam(q, 'task_code');

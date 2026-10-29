@@ -11,8 +11,8 @@ export class SlaController {
   constructor(private readonly sla: SlaService) {}
 
   @Get('sla-rules')
-  rules(@Query() q: Record<string, unknown>) {
-    return this.sla.rules(q);
+  rules(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.sla.rules(auth, q);
   }
 
   @Get('sla-rule-sets')

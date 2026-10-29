@@ -881,6 +881,11 @@ BEGIN
   SELECT * INTO gate_rule FROM public.phase_gate_rules WHERE workflow_id = s.workflow_version_id AND to_code = st.code AND is_active LIMIT 1;
   IF NOT FOUND THEN RETURN NEW; END IF;
   SELECT * INTO g FROM public.gate_eval(NEW.site_id, gate_rule.link_code);
+  -- Fail closed: no Site RFI date while its gate is still blocked or pending.
+  IF g.status IN ('blocked', 'pending') THEN
+    PERFORM public.calc_err('validation_failed', jsonb_build_object('detail', 'The gate ' || gate_rule.link_code || ' is not open yet.', 'reasons', coalesce(g.reasons, '[]'::jsonb),
+      'errors', jsonb_build_array(jsonb_build_object('path', '/actual_date', 'code', 'gate_not_open', 'message', 'The gate ' || gate_rule.link_code || ' is not open yet.'))));
+  END IF;
   IF g.status = 'open' AND NEW.actual_date < g.gate_date THEN
     PERFORM public.calc_err('validation_failed', jsonb_build_object('detail', 'The date cannot be earlier than the gate ' || gate_rule.link_code || ' (' || g.gate_date::text || ').',
       'errors', jsonb_build_array(jsonb_build_object('path', '/actual_date', 'code', 'before_gate', 'message', 'The date cannot be earlier than the gate date ' || g.gate_date::text || '.'))));
@@ -1234,7 +1239,7 @@ DECLARE
   s public.sla_rule_sets%ROWTYPE; latest public.sla_rule_sets%ROWTYPE; today date := public.cal_today(); errs jsonb := '[]'::jsonb; regs integer[];
   i public.sla_rule_set_items%ROWTYPE; changed integer := 0; n integer := 0; o jsonb; actor uuid := public.app_actor();
 BEGIN
-  PERFORM public.calc_require_admin('sla_rules');
+  PERFORM public.calc_require_admin('sla_rules', true);  -- a published set replaces the rules of every region
   PERFORM public.calc_require_reason(p_reason);
   SELECT * INTO s FROM public.sla_rule_sets WHERE id = p_set FOR UPDATE;
   IF NOT FOUND THEN PERFORM public.calc_err('not_found'); END IF;

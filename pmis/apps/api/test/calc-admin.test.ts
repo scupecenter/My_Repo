@@ -235,6 +235,7 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
 
   it('keeps the seeded rules as version 1 and shows them to a settings reader only', async () => {
     expect((await plain.api.call('get', '/settings/sla-rule-sets')).status).toBe(403);
+    expect((await plain.api.call('get', '/settings/sla-rules')).status).toBe(403);  // names who changed rules and counts open tasks everywhere
     expect((await plain.api.call('post', '/settings/sla-rule-sets', { reason: REASON })).status).toBe(403);
     const res = await admin.api.call('get', '/settings/sla-rule-sets');
     expect(res.status).toBe(200);
@@ -324,12 +325,14 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
     expect((await plain.api.call('post', `/settings/sla-rule-sets/${draftId}/preview`, { effective_date: '2031-01-01' })).status).toBe(403);
   });
 
-  it('a regional delegate cannot apply a version to open tasks outside their regions', async () => {
+  it('a regional delegate cannot publish a version, which replaces the rules of every region, applied or not', async () => {
     const d = await actor(app, db, { level: 'entry' });
     await delegate(db, d.user.id, [['sla_rules', 'edit']], [1]);
     await d.api.stepUp(d.user.password);
     const res = await d.api.call('post', `/settings/sla-rule-sets/${draftId}/publish`, { effective_date: await dbDate(db, 'cal_today()'), reason: REASON, apply_to_open_tasks: true }, { 'If-Match': draftTag });
     expect(res.status).toBe(403);
+    const notApplied = await d.api.call('post', `/settings/sla-rule-sets/${draftId}/publish`, { effective_date: await dbDate(db, 'cal_today()'), reason: REASON, apply_to_open_tasks: false }, { 'If-Match': draftTag });
+    expect(notApplied.status).toBe(403);
     expect((await admin.api.call('get', `/settings/sla-rule-sets/${draftId}`)).body.status).toBe('draft');
   });
 

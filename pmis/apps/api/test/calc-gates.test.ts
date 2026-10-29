@@ -284,6 +284,16 @@ describe('Site RFI (MS4) is pre-filled, editable, and then approved (Q38)', () =
     expect(ok.body.actual_date).toBe(await wd(db, -3));
   });
 
+  it('refuses a Site RFI date while its gate is not open (fail closed)', async () => {
+    const { site } = await rfiSite();
+    const id = await taskId(db, site, 'MS4');
+    // take the gate's base away: without a CW Completion (MS3) date the RFI Readiness gate (G4) is not open
+    await db.query(`UPDATE task_instances SET actual_date = NULL, state = 'open' WHERE site_id = $1 AND task_def_id = (SELECT id FROM task_definitions WHERE code = 'MS3' AND workflow_id = (SELECT workflow_version_id FROM sites WHERE id = $1))`, [site.id]);
+    const st = (await gate(site, 'G4')).status;
+    expect(['blocked', 'pending']).toContain(st);
+    await expect(db.query(`UPDATE task_instances SET actual_date = $2 WHERE id = $1`, [id, await wd(db, -2)])).rejects.toThrow(/not open/);
+  });
+
   it('keeps a date the user edited when a condition date moves, and follows it when nobody edited', async () => {
     const edited = await rfiSite();
     const untouched = await rfiSite();
