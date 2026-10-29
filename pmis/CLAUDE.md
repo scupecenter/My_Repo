@@ -44,7 +44,17 @@ Read before any work:
 - Visibility defaults to everything. It can be limited per user to one or more of the 7 regions and to selected modules.
 - Data entry works three ways: manual entry, upload of the Master as an approved template, or upload of other approved templates. Every upload goes through batch → review → approve.
 - **Approved templates only.** The system issues each template with an ID and version embedded in the file (hidden sheet `_tpl` containing `template_id` and `version`). A user downloads the template from beside the task or from the Templates page, fills it, and uploads that same template. Uploads without a valid embedded ID and version are rejected. Each rejection is written to the System Log.
-- Registers are separate modules, each with its own menu: Procurement (PR/PO/WO), Contractors, GECOL power, HLC fiber, Permits & HSE, Warehouse, Quality, Issue Log (several issues per site), Risk Register, Change Control, Readiness & Handover, As-Built, and Meetings.
+- Registers are separate modules, each with its own menu: Procurement (PR/PO/WO), Contractors, GECOL power, HLC fiber, Permits & HSE, Warehouse, Quality, Issue Log (several issues per site), Risk Register, Change Control, Readiness & Handover, As-Built, and Meetings. RF & Design and Acquisition, which are sheets in the Master, are registers too.
+- **Site Register and streams (owner decision 2026-10-29).**
+  - The Sites module is named **Site Register** (سجل المواقع).
+  - It has a **stream filter** and one **sub-section per stream**. A sub-section shows and works on the sites' status in that stream only: its tasks, current step, late items and milestone.
+  - Default streams are seed data, admin-configurable and versioned with the workflow:
+    - Design & Acquisition: stage 1;
+    - Civil Works: stages 2–4;
+    - Installation (TE): stages 5–8;
+    - Handover & Closure: stages 9–10.
+  - Spec: `docs/spec/registers-and-streams.md`.
+- **Two entry ways everywhere (owner confirmation 2026-10-29).** The Site Register and every other register accept either manual entry or an approved template (download, fill, upload the same template). Both go through Entry → Review → Approve.
 - The Audit Log records every user action with before and after values. It is append-only and nobody can edit it. The System/Error Log is kept separately.
 - Audit Log readers (decision B4): System Admins and the Project Manager see all of it. Each Team Lead sees the entries for their own modules and regions only. Anyone else gets it only through the `view_audit` grant in the permission grid, scoped like any other grant (B3). Every read of the Audit Log is itself audited.
 - **Messages and announcements (owner decision 2026-10-28, ADR 0013).**
