@@ -43,3 +43,47 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q72 | Default: the daily Progress & Plan page has no approval; it is a dated log, and a repeated reason can become an issue. |
 | Q73 | Default: one Site Register template per stream with only that stream's input columns, plus the full Master template; a stream template uploaded in another stream is rejected. |
 | Q74 | Default: As-Built and Warehouse items are matched by Warehouse item code ("Fiber Patch Cord" = As-Built "Patch Cord Fiber (m)"); concrete stays in As-Built only. |
+
+## Approval engine questions (from PR scupecenter/My_Repo#43)
+
+| # | Answer |
+|---|---|
+| E1 | As built: a 2-level stage uses the Entry and Approve cells (Review is left out); a 1-level task's submission is the final approval, with step-up. |
+| E2 | As built: entry needs `edit` on sites, the final approval needs `approve`; review needs `view` plus being a holder of the review cell in the Matrix. |
+| E3 | Default: milestone dates (except Site RFI) are calculated automatically from their tasks, as in the Master formulas, with no approval of their own. Site RFI is pre-filled, editable and approved. |
+| E4 | As built: "self-approval" (B5, step-up and flag) is when the same person reaches the final approval, by skip or on a 1-level task. Entry and review by the same person is a logged skip only. |
+| E5 | Superseded by D1 below: with no parent/sub-roles there is no inheritance question. |
+| E6 | **Owner decision:** open snags on the site block the approval of CW PAC (B13), TE PAC (D16), CW FAC (B15) and TE FAC (D18). |
+
+## Reference data questions
+
+| # | Answer |
+|---|---|
+| D1 | **Owner decision (changes CLAUDE.md "6 main roles and 9 sub-roles"):** there is no main/sub-role split. All roles are flat "roles", and their names and properties are editable in Roles & Responsibilities. For now keep the seeded names (the 6 former main roles, the 10 former sub-roles and Management) as plain roles. |
+| D2 | Default: the seeded workflow v1 and SLA v1 apply to every imported site, however old (effective from 2024-01-01). Later rule changes are new versions and never rewrite the past. |
+| D3 | Default: the Arabic role names stay as proposed; the owner reviews and edits them on the Roles screen. |
+| D4 | Default: no SLA on the 9 gates for now (a gate opens on the previous milestone date when its conditions are met); the admin can add one later in Settings. |
+| D5 | Default: B10 (CW MOS) keeps one SLA of 14–21 working days for both B-10a (tower) and B-10b (adaption). |
+
+## CW forms and dashboard questions (Q19–Q36)
+
+| Q | Answer |
+|---|---|
+| Q19 | **Owner decision (differs from the default):** every CW DN and RN, including the first DN, is a record in the Warehouse register (Warehouse Matrix row). Task B7 reads the first DN from the register instead of holding its own slot. |
+| Q20 | Default: each form template has a configurable signatory list; each block reads a Matrix level of the owning row or a named role (for example the Project Manager); the contractor signs by hand; a level held by a group or role prints a blank name. |
+| Q21 | Default: the approved DN posts the stock issue; the uploader enters the dispatch date written on the signed DN (required, not after the upload date), used for posting, WH Serials and the TE dispatch date. |
+| Q22 | Default: the applicant enters "Qty Approved" per line in the prepare screen; it is at least the dispatched quantity and is checked at review. |
+| Q23 | Default: condition per RN line in the PMIS; the Master export writes one row per condition with a suffix on the document number (`-G` good, `-F` faulty). |
+| Q24 | Default: the RN header takes the dismantle contractor and order when a CW Dismantle order exists, otherwise the CW contractor and order; E2 is split into E2a (CW dismantle) and E2b (TE dismantle). |
+| Q25 | **Owner decision (narrows CLAUDE.md "any snag on the site"):** only open CW snags block the CW PAC; TE snags do not block it. By the same logic only TE snags block the TE PAC (see E6). The generated PAC pre-ticks "Accepted", the other two boxes are greyed. |
+| Q26 | **Owner decision (differs from the default):** the PAC date and the FAC date are the PMIS approval dates of B13 and B15 (and of the TE PAC / FAC tasks). The form prints them blank or as "date of approval". |
+| Q27 | Default: CW DLP = 3 calendar months (EDATE); FB differences of up to 2 days in the parallel run are tagged "DLP rule change". |
+| Q28 | **Owner decision (differs from the default):** the PAC acceptance checklist (34 Pass / Fail / N/A items and the measured grounding resistance) is entered in the PMIS now, as part of the PAC prepare screen, and printed filled on the generated PAC. |
+| Q29 | Default: Tower Type, CW Schedule (MS3 vs its baseline: Ahead / On / Behind) and the region name are filled automatically; the region labels use the PMIS names (Zawia, Sebha). |
+| Q30 | **Owner decision (differs from the default):** a FAC cannot be generated before the DLP ends, nor while snags are open; the two statement boxes stay ticked by hand. |
+| Q31 | **Owner decision:** design a provisional Snag List template in the style of the approved CW forms; the owner approves it later. |
+| Q32 | **Owner decision:** the numbering pattern of each form is a setting defined and edited in the PMIS (prefix, region code, year, sequence, reset rule); the owner approves the final patterns later. Seed: `{KIND}-CW-{REGION}-{YYYY}-{SEQ:4}` with DN, RN, PAC, FAC and SL. |
+| Q33 | **Owner decision (differs from CLAUDE.md "PAC BoQ = DN − RN"):** the PAC "Accepted Item List (BoQ)" prints the CW As-Built quantities. A non-blocking warning shows per item where the net DN − RN differs. |
+| Q34 | **Owner decision (differs from the default):** the dashboard reference date can be changed by the user, as in the legacy dashboard. |
+| Q35 | Default: health index bands green ≥ 85, amber ≥ 70, red below 70, as an admin setting, shown as draft. |
+| Q36 | Default: the dashboard counts issues for owner bars and totals, and sites for "sites with an open issue"; issue age in working days from the raised date. |
