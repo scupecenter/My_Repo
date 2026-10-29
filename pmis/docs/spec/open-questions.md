@@ -51,7 +51,7 @@ Added 2026-10-29 from the CW forms (`cw-forms-binding.md`) and the legacy dashbo
 | Q35 | **Health index bands.** The contract `HealthIndex.band` is green / amber / red, but no thresholds are defined. The legacy pill used SPI ≥ 0.95 / ≥ 0.85 and behind share < 10% / < 25%. | Green ≥ 85, amber ≥ 70, red below 70 as a configurable setting, labelled draft with the index (Q16). |
 | Q36 | **Counting issues on the dashboard.** The legacy dashboard counts sites with one open issue (GA:GE). The PMIS allows several issues per site. "Needs attention", "open issues by owner" and the issue age need a rule. | Count issues for owner bars and totals, and count sites for "sites with an open issue". Age is per issue, in working days from the raised date. The issue list is ordered by D41. |
 
-Added 2026-10-29 from `registers-and-streams.md`. The Master links between sheets were traced from the formulas of `GSDN_Site_Master.xlsx`, read with openpyxl without `data_only`.
+Added 2026-10-29 from `registers-and-streams.md`. **Answered by the owner on 2026-10-29: see `owner-answers-2026-10-29.md`** (owner decisions that differ from the proposed default: Q56, Q60, Q63, Q65, Q66). The Master links between sheets were traced from the formulas of `GSDN_Site_Master.xlsx`, read with openpyxl without `data_only`.
 
 | # | Gap (source) | Proposed default |
 |---|---|---|
