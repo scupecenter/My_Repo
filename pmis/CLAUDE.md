@@ -19,7 +19,7 @@ Read before any work:
 - **Holidays are managed in Settings → Work calendar (decision B12).** The System Admin, or a delegate, can add, edit, delete and import holidays (date, name EN/AR, kind national/religious, "tentative" flag) and the weekend days, without code. Seed: `db/seed/holidays-2026-2027.csv`; religious dates are tentative until the admin confirms them on the official announcement, and the screen reminds the admin of tentative dates 14 days ahead. Every change is audited with before/after values and a reason. A change recalculates SLA due dates of open tasks; closed tasks keep their computed values. A banner shows while the table for the coming year is empty.
 - Delivery Scenario: New Build, Expansion, Hot Swap, Cold Swap, Relocation. Overall Status: Not Started, In Progress, On Hold, Completed, Cancelled.
 - Regions: Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha.
-- Roles: 6 main roles (Project Manager, RF & Design / Acquisition Team Lead, CW Team Lead, TE Team Lead, Inventory Supervisor, Project Support) and 9 sub-roles.
+- Roles (owner decision 2026-10-29): roles are flat, with no main/sub-role split. Seed: Project Manager, RF & Design / Acquisition Team Lead, CW Team Lead, TE Team Lead, Inventory Supervisor, Project Support, RF Engineer, MW Engineer, Acquisition Team, Power Engineer, GECOL Power Team, HLC Fiber Team, Site Engineers (CW), Site Engineers (TE), HOTO Engineer, Project Procurement Team and Management. Names and properties are editable in Roles & Responsibilities.
 - Aljeel supervising engineers (AAT SE) only supervise. TE installation steps through On-Air are the TE vendor's (A&T Global) responsibility.
 
 ## Workflow rules (agreed with the product owner)
@@ -78,7 +78,7 @@ Roles, groups and administration
 - Groups: named sets of users (for example "System Admins", "CW Reviewers Tripoli"). A matrix cell (entry/review/approve) accepts users, roles, groups or a mix. A task assigned to a group shows in every member's inbox; the first member to act claims it. Default rule is any one member; it can be set per cell to "all members must approve". (Decision B10) Under "all members must approve", one member's rejection rejects the task and sends it back with that note. A task whose level has no eligible holder (for example an expired assignment with no replacement) goes to the System Admins' inbox with an immediate alert and shows on the dashboard as "no holder"; it is never skipped automatically.
 - System Admin is a group (one or more people) with full control. An admin can delegate full or partial rights, either time-bound or until revoked. A delegate cannot re-delegate or remove an admin, and at least one active admin must always exist. Every action by a delegate is logged as "X on behalf of System Admin".
 - Admin overrides are all allowed: unlock a stage or task, skip or mark N/A, accept without document or workflow, reopen an approved task, edit any date, and change the rules (documents, SLA, templates, gates, number of approval levels, QC photo rules) from settings screens without code. Each override requires a reason and step-up MFA, is written to the audit log with before/after values, shows an "Admin override" badge, is reversible, and is excluded from or flagged in KPIs.
-- The default sub-role mapping (RF Engineer, MW Engineer, Acquisition Team under RF & Design / Acquisition TL; Power Engineer, GECOL Power Team, HLC Fiber Team, Site Engineers (CW) under CW TL; Site Engineers (TE), HOTO Engineer under TE TL; Project Procurement Team under Project Support) is seed data, editable in the UI.
+- The seeded roles are plain roles (no parent role, owner decision 2026-10-29), editable in the UI.
 - Default approval is 3 levels for every stage, configurable per stage.
 
 Configuration owned by the System Admin (or a delegate)
@@ -100,9 +100,8 @@ Configuration owned by the System Admin (or a delegate)
   - The screen warns when a change affects the Master-format export or the parallel-run comparison. During the parallel-run month the warning requires an explicit confirmation.
   - Project Status and the dashboard read the active workflow version per site.
   - **Freeze during pilot and parallel run (decision B9):** structural changes are blocked from the pilot start to the end of the parallel-run month. Only a System Admin can lift the freeze, with a written reason and step-up MFA, and the lift is audited. Light changes, and new tasks inside an existing stage (B8), stay allowed.
-- **Roles are fully admin-defined.** The 6 main roles and 9 sub-roles are seed data only. The admin can create a new role with:
+- **Roles are fully admin-defined.** The seeded roles are seed data only. The admin can create a new role with:
   - a name (EN/AR) and a description of its duties
-  - a parent role if it is a sub-role
   - a default permission profile
   - default regions and modules
   - whether it may hold matrix levels (entry/review/approve)
@@ -125,7 +124,7 @@ Business rules
 
 Documents and QC
 - **Acceptance documents and QC photos are different things.** Acceptance documents (TE PAC, SSV, CW FAC, TE FAC, HOTO and so on) are the official forms, filled, signed, scanned and uploaded. They close their task through the 3-level workflow. QC photos are photos of a fixed defect. Wherever a QC check or snag exists, the site engineer uploads fresh photos of the fix, then the reviewer reviews and the approver approves, which closes that snag.
-- A preliminary acceptance (for example CW PAC) cannot be approved while any snag on the site is open. Its lock reason shows the count.
+- An acceptance cannot be approved while a snag of its own stream is open on the site (owner decision 2026-10-29): open CW snags block CW PAC and CW FAC, open TE snags block TE PAC and TE FAC. Its lock reason shows the count. A FAC cannot be generated before its DLP ends.
 - QC photo requirements are configured per snag type: minimum count, required shot types, formats (JPG/PNG/HEIC), and maximum size. Photos taken before the snag was raised are rejected using the EXIF date. A missing EXIF date is accepted with an "unknown capture date" flag for the reviewer.
 - **Document Library (admin).** Every document is defined in data, never in code: name EN/AR, kind (scanned document, photo, email, report, approved Excel template), placement (one or more tasks, QC, or a register), mandatory or conditional (with the rule), formats and size, minimum/maximum files, photo rules, expiry date, and an optional blank form to download. On publish, the admin chooses whether it applies to new tasks only or also to open tasks. Approved tasks never change. Documents are deactivated, never deleted.
 - Seed content of the library: Stage 1 has A1 SAR (each candidate), A2 TSSR, A3 owner contract (or contract with the tower owner for an existing third-party tower) plus a civil aviation permit when near an airport, and A4 LLD. Stage 2 has B1 PR email (outsourced only), B2 PO/WO email or internal work order, B3 CW access permission, B4 STA/ST report (when tower analysis is required), B6 layout, and B7 approval email and CW DN. Stage 3 has B9 MOS proof; B11 has no document, and defects become QC snags. Stages 4 to 10 are seeded from blueprint v1.0 and the Master, then reviewed by the product owner in the library screen. The default for every document is PDF or image, 20 MB, multiple files allowed.
@@ -145,11 +144,11 @@ Generated documents (forms issued by the system)
   3. The PDF is printed and signed on paper.
   4. The signed scan is uploaded into the same slot.
   5. The upload goes through the 3-level approval.
-- **Item tables come from the system, not from the form.** The DN and RN line tables are built from the warehouse movement lines (item master: description, UOM; quantities approved, dispatched or returned; serials when tracked). Only items with a quantity are printed, plus a configurable number of blank rows. The fixed 28-item lists in the source forms become seed data for the CW item master. The PAC "Accepted Item List (BoQ)" is computed from the net quantities on site (DN minus RN). The PAC snag list comes from the site's QC snags with their closure status. FAC references its PAC automatically.
+- **Item tables come from the system, not from the form.** The DN and RN line tables are built from the warehouse movement lines (item master: description, UOM; quantities approved, dispatched or returned; serials when tracked). Only items with a quantity are printed, plus a configurable number of blank rows. The fixed 28-item lists in the source forms become seed data for the CW item master. The PAC "Accepted Item List (BoQ)" prints the CW As-Built quantities (owner decision 2026-10-29), with a warning per item where the net DN minus RN differs. The PAC acceptance checklist is entered in the PMIS and printed filled. The PAC snag list comes from the site's QC snags with their closure status. FAC references its PAC automatically.
 - **Pre-filled vs signed by hand.** The system fills every data field: ref no., dates, site, region (checked), contractor, PO/WO, warehouse, quantities, snags, and the names and positions of signatories from the Responsibility Matrix. Signatures and stamps stay blank for wet signature, and the signed scan is uploaded back into the same slot.
 - **Warehouse link**: an approved DN posts the stock issue to the site, and an approved RN posts the return. Until approval, the quantities show as "pending issue" or "pending return", and stock is reserved so it cannot be issued twice.
 - **Guards**:
-  - CW PAC cannot be generated while any snag on the site is open.
+  - CW PAC cannot be generated while any CW snag on the site is open.
   - Numbers are never reused or deleted. A wrong form is voided with a reason and reissued with a new number.
   - Every generation, void and download is audited.
 - **TE forms are deferred.** Each TE document will be classified in the Document Library as one of: issued by Aljeel (generated by the system), issued by the vendor (uploaded only, with its metadata fields), or jointly signed (generated by the system, signed by both parties). The classification is agreed with the owner later and needs no code change.
