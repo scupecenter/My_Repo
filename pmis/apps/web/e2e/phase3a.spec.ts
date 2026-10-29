@@ -15,8 +15,11 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId('user-select-1211').check();
       await page.getByTestId('users-assign').click();
       await page.getByTestId('assign-role-cw_team_lead').check();
+      // The dry-run preview comes first (it needs the step-up too); confirm opens only after it.
+      await withStepUp(page, () => page.getByTestId('assign-preview').click());
+      await expect(page.getByTestId('assign-preview-done')).toBeVisible();
       await page.getByTestId('assign-dialog-reason').fill('New joiner in Zawia');
-      await withStepUp(page, () => page.getByTestId('assign-dialog-submit').click());
+      await page.getByTestId('assign-dialog-submit').click();
       await expect(page.getByTestId('user-status-1211')).toHaveAttribute('data-testid', 'user-status-1211');
       await expect(page.getByTestId('assign-dialog')).toHaveCount(0);
       await page.getByTestId('topbar-signout').click();

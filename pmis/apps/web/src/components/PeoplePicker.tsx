@@ -27,6 +27,10 @@ export function PeoplePicker({ value, onChange, single, blockId, blockHint, id =
       </div>
       <input className="input" data-testid={`${id}-search`} aria-label={t('picker.search')} placeholder={t('picker.search')} value={q} onChange={(e) => setQ(e.target.value)} />
       {(eligible || q.trim().length >= 2) && (
+        <>
+        {!single && found.filter((u) => !picked.has(u.id) && u.id !== blockId).length > 1 && (
+          <button type="button" className="btn mt-1" data-testid={`${id}-add-all`} onClick={() => { onChange([...value, ...found.filter((u) => !picked.has(u.id) && u.id !== blockId)]); setQ(''); }}>{t('assign.add_all')}</button>
+        )}
         <ul className="card mt-1 max-h-40 overflow-y-auto" role="listbox" aria-label={t('picker.results')}>
           {found.length === 0 && <li className="p-2 text-sm text-mute">{t('picker.none')}</li>}
           {found.map((u) => {
@@ -41,6 +45,7 @@ export function PeoplePicker({ value, onChange, single, blockId, blockHint, id =
             );
           })}
         </ul>
+        </>
       )}
       {blockHint && value.some((v) => v.id === blockId) && <p role="alert" className="text-sm text-lateInk" data-testid={`${id}-blocked`}>{blockHint}</p>}
     </div>

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.0
+  version: 0.4.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.1 (2026-10-29): additive. The Sites module is the **Site Register** (سجل المواقع) and has streams (جزئية): `stream` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks`, `SiteListItem.streams` (`StreamStatus`), `Stream`, `stage.stream_code` and `streams` in the task grid, `TaskSummary.stream_code`; `TransitionResult.votes_missing` and `returned_to_level` (owner decision 2026-10-29, workflow engine).
     - 0.4.0 (2026-10-28): additive. Departments and the direct manager (`GET/POST /departments`, `PATCH /departments/{department_id}`, `PUT /users/{user_id}/org`, `User.manager` and `User.department`); messages between an employee and their direct manager (`/messages/...`); announcements with an agree / disagree answer (`/announcements/...`, `GET /me/announcements/pending`) (ADR 0013).
     - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
     - 0.3.0 (2026-10-28): additive. Local sign-in with a password, for accounts created in the PMIS (owner decision 2026-10-28, ADR 0012): `POST /auth/local/login`, `POST /auth/local/password`, `POST /auth/local/step-up`, `POST /users` (create a local user with a temporary password), `POST /users/{user_id}/password-reset`; `Session.auth_method` and `must_change_password`; `User.phone`, `local_sign_in`, `must_change_password`; `Problem.step_up_method`; error codes `invalid_credentials`, `password_change_required`, `weak_password`. Microsoft 365 sign-in stays in the contract and is added later beside it.
@@ -94,7 +95,7 @@ tags:
   - name: regions
     description: The 7 regions.
   - name: sites
-    description: Site list with filters and mini rail, site detail and task grid.
+    description: "Site Register (سجل المواقع): site list with filters, mini rail and streams (جزئية), site detail and task grid. A stream groups stages (default DESIGN_ACQ: stage 1; CW: stages 2-4; TE: stages 5-8; CLOSURE: stages 9-10; a configurable mapping stage -> stream that is part of the workflow version)."
   - name: tasks
     description: Task detail, data entry, workflow actions, comments, files (ADR 0004).
   - name: approvals
@@ -1763,7 +1764,9 @@ paths:
       tags: [sites]
       operationId: listSites
       summary: Sites with filters and the mini rail
-      description: Only sites in the caller's regions for the `sites` module are returned (RLS).
+      description: |
+        Only sites in the caller's regions for the `sites` module are returned (RLS and decision B3: each assignment counts for its own regions and modules).
+        Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
         - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
         - name: region_id
@@ -1774,6 +1777,10 @@ paths:
         - { name: stage_code, in: query, description: 'Current milestone/stage code (stable code, ADR 0010).', schema: { type: string } }
         - { name: scenario, in: query, schema: { $ref: '#/components/schemas/DeliveryScenario' } }
         - { name: overall_status, in: query, schema: { $ref: '#/components/schemas/OverallStatus' } }
+        - name: stream
+          in: query
+          description: 'Stream code (for example `CW`). Shows each site''s status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code.'
+          schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
         - { name: bucket, in: query, schema: { type: string, enum: [all, mine, late, waiting_approval, closed], default: all } }
         - { name: cluster_code, in: query, schema: { type: string } }
         - { name: delivery_batch, in: query, schema: { type: string } }
@@ -1825,6 +1832,11 @@ paths:
       tags: [sites]
       operationId: listSiteTasks
       summary: Task grid of a site, grouped by stage (site's workflow version)
+      parameters:
+        - name: stream
+          in: query
+          description: Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have.
+          schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
       responses:
         '200':
           description: Stages with their tasks.
@@ -1835,6 +1847,7 @@ paths:
                 required: [workflow_version, stages]
                 properties:
                   workflow_version: { type: integer }
+                  streams: { type: array, items: { $ref: '#/components/schemas/Stream' }, description: 'The streams of the site''s workflow version, in order.' }
                   stages:
                     type: array
                     items:
@@ -1842,6 +1855,7 @@ paths:
                       required: [code, name_en, tasks]
                       properties:
                         code: { type: string }
+                        stream_code: { type: [string, 'null'] }
                         name_en: { type: string }
                         name_ar: { type: [string, 'null'] }
                         tasks: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
@@ -7529,6 +7543,27 @@ components:
       properties:
         code: { type: string, description: 'Stable milestone code.' }
         state: { type: string, enum: [done, current, late, na, planned, not_in_workflow] }
+    Stream:
+      type: object
+      required: [code, name_en, sort_order]
+      properties:
+        code: { type: string, description: 'Stable code, for example DESIGN_ACQ, CW, TE, CLOSURE.' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        sort_order: { type: integer }
+    StreamStatus:
+      description: The status of one site within one stream (only the tasks and stages of that stream).
+      allOf:
+        - $ref: '#/components/schemas/Stream'
+        - type: object
+          required: [state, done_tasks, total_tasks, late_count]
+          properties:
+            state: { type: string, enum: [not_started, in_progress, done, na], description: 'na = the site has no counting task in the stream; done = all of them approved or N/A.' }
+            current_stage: { type: [string, 'null'], description: 'Code of the first stage of the stream that is not done yet; null when done or N/A.' }
+            done_tasks: { type: integer, description: 'Counting tasks approved.' }
+            total_tasks: { type: integer, description: 'Counting tasks of the stream that are not N/A.' }
+            late_count: { type: integer, description: 'Open tasks past their due date.' }
+            milestone_date: { type: [string, 'null'], format: date, description: 'Date of the milestone that closes the stream (the milestone task of its last stage) once approved.' }
     SiteListItem:
       type: object
       required: [id, site_code, name, region_id, overall_status, rail]
@@ -7546,6 +7581,7 @@ components:
         late_task_count: { type: integer }
         waiting_approval_count: { type: integer }
         rail: { type: array, items: { $ref: '#/components/schemas/RailNode' } }
+        streams: { type: array, items: { $ref: '#/components/schemas/StreamStatus' }, description: 'One entry per stream of the site''s workflow version, in order.' }
         custom: { $ref: '#/components/schemas/CustomValues' }
     PipelineNode:
       type: object
@@ -7682,6 +7718,7 @@ components:
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
         stage_code: { type: string }
+        stream_code: { type: [string, 'null'] }
         state: { $ref: '#/components/schemas/TaskState' }
         current_level: { type: integer }
         levels_required: { type: integer }
@@ -7801,6 +7838,8 @@ components:
         step_ids: { type: array, items: { type: string, format: uuid } }
         skipped_levels: { type: array, items: { type: integer }, description: 'Levels auto-skipped (same holder).' }
         unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+        votes_missing: { type: integer, minimum: 1, description: 'Under `all_members`: members who have not voted yet; the level stays open. Absent when the level completed.' }
+        returned_to_level: { type: integer, minimum: 1, description: 'After a rejection: the level the task went back to (a level skipped by the same person is not a target, B6).' }
     OnBehalfKind:
       type: [string, 'null']
       enum: [system_admin, assignee, null]

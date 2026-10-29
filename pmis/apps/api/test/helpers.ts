@@ -117,16 +117,27 @@ export async function adminApi(app: NestExpressApplication, db: PgClient): Promi
 export async function makeUser(db: PgClient, o: MakeUserOptions = {}): Promise<TestUser> {
   const tag = uniq();
   const email = `user.${tag}@example.test`;
-  const employeeId = await freeEmployeeId(db);
-  const phone = await freePhone(db);
   const password = o.password ?? PASSWORD;
   const name = o.name ?? `Test User ${tag}`;
   const status = o.status ?? (o.assigned === false ? 'pending_assignment' : 'active');
-  const u = await db.query(
-    `INSERT INTO users (email, display_name, employee_id, phone, status, updated_at) VALUES ($1, $2, $3, $4, $5::"UserStatus", now()) RETURNING id`,
-    [email, name, employeeId, phone, status],
-  );
-  const id = u.rows[0].id as string;
+  // Suites run in parallel on one database: another suite may take the same random employee id or phone between the check and the insert.
+  let employeeId = '';
+  let phone = '';
+  let id = '';
+  for (let attempt = 0; ; attempt++) {
+    employeeId = await freeEmployeeId(db);
+    phone = await freePhone(db);
+    try {
+      const u = await db.query(
+        `INSERT INTO users (email, display_name, employee_id, phone, status, updated_at) VALUES ($1, $2, $3, $4, $5::"UserStatus", now()) RETURNING id`,
+        [email, name, employeeId, phone, status],
+      );
+      id = u.rows[0].id as string;
+      break;
+    } catch (e) {
+      if ((e as { code?: string }).code !== '23505' || attempt >= 8) throw e;
+    }
+  }
   await db.query('INSERT INTO local_credentials (user_id, password_hash, must_change) VALUES ($1, $2, $3)', [id, await hashFast(password), o.mustChange ?? false]);
   if (o.assigned) await assign(db, id);
   return { id, email, employeeId, phone, password, name };
@@ -166,11 +177,20 @@ export async function delegate(db: PgClient, toUserId: string, grants: [string, 
 export async function makeAdmin(db: PgClient, password = PASSWORD): Promise<TestUser> {
   const tag = uniq();
   const email = `admin.${tag}@example.test`;
-  const employeeId = await freeEmployeeId(db);
-  const phone = await freePhone(db);
+  let employeeId = await freeEmployeeId(db);
+  let phone = await freePhone(db);
   const name = `Test Admin ${tag}`;
-  const r = await db.query('SELECT idm_bootstrap_admin($1, $2, $3, $4, $5) AS id', [email, name, employeeId, phone, await hashFast(password)]);
-  return { id: r.rows[0].id as string, email, employeeId, phone, password, name };
+  const hash = await hashFast(password);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await db.query('SELECT idm_bootstrap_admin($1, $2, $3, $4, $5) AS id', [email, name, employeeId, phone, hash]);
+      return { id: r.rows[0].id as string, email, employeeId, phone, password, name };
+    } catch (e) {
+      if ((e as { code?: string }).code !== '23505' || attempt >= 8) throw e;
+      employeeId = await freeEmployeeId(db);
+      phone = await freePhone(db);
+    }
+  }
 }
 
 let ipSeq = randomInt(1, 200);

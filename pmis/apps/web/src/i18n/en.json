@@ -23,7 +23,9 @@
     "admin.security_log": "Security log",
     "admin.online": "Online now",
     "messages": "Messages",
-    "announcements": "Announcements"
+    "announcements": "Announcements",
+    "admin.profiles": "Permission profiles",
+    "admin.assignments": "Assignments"
   },
   "top": {
     "search": "Search or jump to…",
@@ -155,7 +157,7 @@
   },
   "errors": {
     "generic": "Something went wrong.",
-    "precondition_failed": "Someone changed this task. The list was refreshed; try again.",
+    "precondition_failed": "Someone changed this. It was reloaded; check and try again.",
     "forbidden": "You are not allowed to do this.",
     "retry": "Retry",
     "export_expired": "The file expired. Start a new export.",
@@ -176,7 +178,13 @@
     "invalid_credentials": "The ID or password is not correct.",
     "password_change_required": "Change your temporary password first.",
     "weak_password": "This password does not meet the policy.",
-    "rate_limited": "Too many attempts. Wait a minute and try again."
+    "rate_limited": "Too many attempts. Wait a minute and try again.",
+    "precondition_required": "Reload and try again.",
+    "too_many_rows": "Too many rows in one request (at most 2000 assignments). Split the selection.",
+    "not_supported": "This option is not supported yet.",
+    "invalid": "A value is not valid.",
+    "not_found": "Not found.",
+    "partial_failed": "Some rows were not saved: {{count}}."
   },
   "common": {
     "cancel": "Cancel",
@@ -478,7 +486,37 @@
     "copy_title": "Copy assignments to other people",
     "copy_mode": "If they already have assignments",
     "mode_add": "Add the missing ones",
-    "mode_replace": "Replace theirs"
+    "mode_replace": "Replace theirs",
+    "preview_title": "Preview (nothing is saved yet)",
+    "preview_needed": "Run the preview, then confirm.",
+    "preview_stale": "The selection changed. Run the preview again.",
+    "done_n": "{{count}} will be assigned",
+    "skipped_n": "{{count}} skipped",
+    "failed_n": "{{count}} refused",
+    "row_done": "Will be assigned",
+    "role_default": "Role default",
+    "profile_needed": "This role has no default profile: pick one.",
+    "too_many_people": "At most 500 people per request.",
+    "add_all": "Add all results",
+    "people_n": "{{count}} people selected",
+    "failed_title": "Not saved",
+    "after_result": "{{done}} assigned, {{skipped}} skipped, {{failed}} refused.",
+    "end_title": "End {{count}} assignment(s)",
+    "end_submit": "End selected",
+    "ended": "{{count}} assignment(s) ended.",
+    "ended_partial": "{{done}} ended, {{failed}} refused.",
+    "assign_to_role": "Assign people to this role",
+    "all_roles": "All roles",
+    "include_ended": "Include ended",
+    "person": "Person",
+    "status_active": "Active",
+    "status_ended": "Ended",
+    "empty": "No assignments.",
+    "total": "{{count}} assignments",
+    "load_more": "Load more",
+    "title_page": "Assignments",
+    "subtitle": "Who holds which role. Pick a role, select many people, preview, then confirm.",
+    "select_row": "Select row"
   },
   "mfa": {
     "title": "MFA requirement",
@@ -516,7 +554,15 @@
     "people": "People",
     "active": "Active",
     "inactive": "Inactive",
-    "saved": "Role saved."
+    "saved": "Role saved.",
+    "parent": "Parent role (makes this a sub-role)",
+    "no_parent": "None (main role)",
+    "default_profile": "Default permission profile",
+    "no_profile": "None",
+    "default_regions": "Default regions",
+    "default_modules": "Default modules",
+    "sub_role": "Sub-role",
+    "in_use_hint": "A role with assignments that have not ended cannot be deactivated."
   },
   "groups": {
     "title": "Groups",
@@ -560,7 +606,8 @@
     "n_modules": "{{count}} module(s)",
     "all_regions": "All regions",
     "all_modules": "All modules",
-    "redelegate_on": "may re-delegate"
+    "redelegate_on": "may re-delegate",
+    "modules_unsupported": "Limiting a delegation to modules is not available yet. Choose rights and regions instead."
   },
   "right": {
     "unlock": "Unlock",
@@ -1039,7 +1086,9 @@
     "self": "You cannot change your own System Admin rights."
   },
   "peopleAdmin": {
-    "tab_users": "Users"
+    "tab_users": "Users",
+    "tab_assignments": "Assignments",
+    "tab_profiles": "Permission profiles"
   },
   "messages": {
     "new": "New message",
@@ -1160,5 +1209,47 @@
     "self_manager": "A person cannot be their own manager.",
     "manager_loop": "This would make the manager report to this person, directly or through others. Choose another manager.",
     "saved": "Manager and department saved."
+  },
+  "code": {
+    "already_assigned": "Already holds this role",
+    "self_beneficiary": "Cannot assign to yourself",
+    "not_found": "Not found",
+    "validation_failed": "Invalid or missing value",
+    "last_admin": "Last active admin",
+    "precondition_failed": "Changed by someone else"
+  },
+  "profiles": {
+    "title": "Permission profiles",
+    "subtitle": "Named permission grids that can be applied to many assignments.",
+    "new": "New profile",
+    "edit": "Edit profile",
+    "code": "Code",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "description": "Description",
+    "active": "Active",
+    "inactive": "Inactive",
+    "grants": "Permission grid",
+    "module": "Module",
+    "assignments": "Assignments",
+    "saved": "Profile saved.",
+    "field_rules": "{{count}} field rule(s) kept as they are",
+    "empty": "No profiles.",
+    "action": {
+      "view": "View",
+      "create": "Create",
+      "edit": "Edit",
+      "delete": "Delete",
+      "approve": "Approve",
+      "export": "Export",
+      "import": "Import",
+      "download_documents": "Download documents",
+      "view_audit": "Audit log",
+      "administer": "Administer",
+      "manage_users": "Manage users",
+      "view_security_log": "Security log"
+    },
+    "include_inactive": "Show inactive",
+    "n_grants": "{{count}} grants"
   }
 }

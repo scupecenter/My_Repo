@@ -9,10 +9,12 @@ import { hasGrant } from '@/lib/perm';
  * of its grant when it has one (Online now: `manage_users`, as in the old sidebar). A page with `under` is a sub-tab of
  * that tab (Online now sits under Users, beside Deleted) and has no tab of its own.
  */
-export const PEOPLE_TABS: readonly { key: string; to: string; label: string; grant?: string; under?: string }[] = [
+export const PEOPLE_TABS: readonly { key: string; to: string; label: string; grant?: string; under?: string; navAny?: readonly string[] }[] = [
   { key: 'admin.users', to: '/admin/users', label: 'peopleAdmin.tab_users' },
   { key: 'admin.online', to: '/admin/online', label: 'nav.admin.online', grant: 'manage_users', under: 'admin.users' },
+  { key: 'admin.assignments', to: '/admin/assignments', label: 'peopleAdmin.tab_assignments', navAny: ['admin.users'] },
   { key: 'admin.roles', to: '/admin/roles', label: 'nav.admin.roles' },
+  { key: 'admin.profiles', to: '/admin/profiles', label: 'peopleAdmin.tab_profiles', navAny: ['admin.roles'] },
   { key: 'admin.groups', to: '/admin/groups', label: 'nav.admin.groups' },
   { key: 'admin.delegation', to: '/admin/delegation', label: 'nav.admin.delegation' },
   { key: 'admin.matrix', to: '/admin/matrix', label: 'nav.admin.matrix' },
@@ -23,7 +25,8 @@ export const PEOPLE_KEYS: ReadonlySet<string> = new Set(PEOPLE_TABS.map((p) => p
 /** Whether this person may open the tab. */
 export function peopleTabAllowed(me: Me | undefined, tab: (typeof PEOPLE_TABS)[number]): boolean {
   if (!me) return false;
-  return tab.grant ? hasGrant(me, tab.grant) : me.effective.nav.includes(tab.key as never);
+  if (tab.grant) return hasGrant(me, tab.grant);
+  return [tab.key, ...(tab.navAny ?? [])].some((k) => me.effective.nav.includes(k as never));
 }
 
 /** First tab this person may open, or null when they may open none. */

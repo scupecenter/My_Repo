@@ -23,6 +23,8 @@ import { Announcements } from '@/pages/Announcements';
 import { Messages } from '@/pages/Messages';
 import { Delegation } from '@/pages/Delegation';
 import { Groups } from '@/pages/Groups';
+import { Assignments } from '@/pages/Assignments';
+import { Profiles } from '@/pages/Profiles';
 import { Roles } from '@/pages/Roles';
 import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
@@ -67,7 +69,9 @@ function gated(session: Session) {
           <Route path="admin/users" element={<Users />} />
           <Route path="admin/users/:userId" element={<UserDetailPage />} />
           <Route path="admin/online" element={<Users />} />
+          <Route path="admin/assignments" element={<Assignments />} />
           <Route path="admin/roles" element={<Roles />} />
+          <Route path="admin/profiles" element={<Profiles />} />
           <Route path="admin/groups" element={<Groups />} />
           <Route path="admin/delegation" element={<Delegation />} />
           <Route path="admin/matrix" element={<MatrixPage />} />

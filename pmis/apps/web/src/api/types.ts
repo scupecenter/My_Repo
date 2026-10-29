@@ -129,3 +129,7 @@ export type AnnouncementSummary = S['AnnouncementSummary'];
 export type AnnouncementDetail = S['AnnouncementDetail'];
 export type AnnouncementResponse = S['AnnouncementResponse'];
 export type PendingAnnouncement = S['PendingAnnouncement'];
+export type PermissionCatalogue = S['PermissionCatalogue'];
+export type PermissionProfileInput = S['PermissionProfileInput'];
+export type RoleInput = S['RoleInput'];
+export type RolePatch = S['RolePatch'];

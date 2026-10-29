@@ -11,19 +11,21 @@
     "sites": "المواقع",
     "dashboard": "لوحة المؤشرات",
     "templates": "القوالب",
-    "admin.users": "المستخدمون والأدوار",
+    "admin.users": "المستخدمين والأدوار",
     "admin.matrix": "مصفوفة المسؤوليات",
     "admin.settings": "الإعدادات",
     "audit": "سجل التدقيق",
     "open_menu": "تبديل القائمة",
     "admin.roles": "الأدوار",
     "admin.groups": "المجموعات",
-    "admin.delegation": "التفويض",
+    "admin.delegation": "التفويضات",
     "absence": "الغياب والتغطية",
     "admin.security_log": "سجل الأمان",
     "admin.online": "المتصلون الآن",
     "messages": "الرسائل",
-    "announcements": "التنبيهات"
+    "announcements": "التنبيهات",
+    "admin.profiles": "ملفات الصلاحيات",
+    "admin.assignments": "الإسنادات"
   },
   "top": {
     "search": "ابحث أو انتقل إلى…",
@@ -155,7 +157,7 @@
   },
   "errors": {
     "generic": "حدث خطأ ما.",
-    "precondition_failed": "غيّر أحدٌ هذه المهمة. تم تحديث القائمة، حاول مجددًا.",
+    "precondition_failed": "غيّر أحدٌ هذا العنصر. تم تحديثه، راجع وحاول مجددًا.",
     "forbidden": "غير مسموح لك بهذا الإجراء.",
     "retry": "إعادة المحاولة",
     "export_expired": "انتهت صلاحية الملف. ابدأ تصديرًا جديدًا.",
@@ -176,7 +178,13 @@
     "invalid_credentials": "الرقم أو كلمة المرور غير صحيحين.",
     "password_change_required": "غيّر كلمة المرور المؤقتة أولًا.",
     "weak_password": "كلمة المرور لا تستوفي الشروط.",
-    "rate_limited": "محاولات كثيرة. انتظر دقيقة ثم حاول مرة أخرى."
+    "rate_limited": "محاولات كثيرة. انتظر دقيقة ثم حاول مرة أخرى.",
+    "precondition_required": "أعد التحميل وحاول مجددًا.",
+    "too_many_rows": "عدد الصفوف في الطلب كبير جدًا (حتى 2000 إسناد). قسّم الاختيار.",
+    "not_supported": "هذا الخيار غير مدعوم حاليًا.",
+    "invalid": "قيمة غير صالحة.",
+    "not_found": "غير موجود.",
+    "partial_failed": "لم يتم حفظ بعض الصفوف: {{count}}."
   },
   "common": {
     "cancel": "إلغاء",
@@ -478,7 +486,37 @@
     "copy_title": "نسخ الإسنادات إلى أشخاص آخرين",
     "copy_mode": "إذا كانت لديهم إسنادات",
     "mode_add": "إضافة الناقص",
-    "mode_replace": "استبدال إسناداتهم"
+    "mode_replace": "استبدال إسناداتهم",
+    "preview_title": "معاينة (لم يُحفظ شيء بعد)",
+    "preview_needed": "شغّل المعاينة ثم أكّد.",
+    "preview_stale": "تغيّر الاختيار. شغّل المعاينة من جديد.",
+    "done_n": "سيُسند {{count}}",
+    "skipped_n": "تم تخطي {{count}}",
+    "failed_n": "رُفض {{count}}",
+    "row_done": "سيتم الإسناد",
+    "role_default": "افتراضي الدور",
+    "profile_needed": "لا يملك هذا الدور ملفًا افتراضيًا: اختر ملفًا.",
+    "too_many_people": "حتى 500 شخص في الطلب الواحد.",
+    "add_all": "إضافة كل النتائج",
+    "people_n": "تم اختيار {{count}} شخص",
+    "failed_title": "لم يُحفظ",
+    "after_result": "تم إسناد {{done}}، وتخطي {{skipped}}، ورفض {{failed}}.",
+    "end_title": "إنهاء {{count}} إسناد",
+    "end_submit": "إنهاء المحدد",
+    "ended": "تم إنهاء {{count}} إسناد.",
+    "ended_partial": "تم إنهاء {{done}}، ورفض {{failed}}.",
+    "assign_to_role": "إسناد أشخاص إلى هذا الدور",
+    "all_roles": "كل الأدوار",
+    "include_ended": "مع المنتهية",
+    "person": "الشخص",
+    "status_active": "نشط",
+    "status_ended": "منتهٍ",
+    "empty": "لا إسنادات.",
+    "total": "{{count}} إسناد",
+    "load_more": "عرض المزيد",
+    "title_page": "الإسنادات",
+    "subtitle": "من يحمل أي دور. اختر دورًا، حدد عدة أشخاص، عاين ثم أكّد.",
+    "select_row": "تحديد الصف"
   },
   "mfa": {
     "title": "اشتراط المصادقة الثنائية",
@@ -516,7 +554,15 @@
     "people": "الأشخاص",
     "active": "نشط",
     "inactive": "معطّل",
-    "saved": "تم حفظ الدور."
+    "saved": "تم حفظ الدور.",
+    "parent": "الدور الأب (يجعله دورًا فرعيًا)",
+    "no_parent": "بلا (دور رئيسي)",
+    "default_profile": "ملف الصلاحيات الافتراضي",
+    "no_profile": "بلا",
+    "default_regions": "المناطق الافتراضية",
+    "default_modules": "الوحدات الافتراضية",
+    "sub_role": "دور فرعي",
+    "in_use_hint": "لا يمكن تعطيل دور له إسنادات لم تنتهِ."
   },
   "groups": {
     "title": "المجموعات",
@@ -560,7 +606,8 @@
     "n_modules": "{{count}} وحدة",
     "all_regions": "كل المناطق",
     "all_modules": "كل الوحدات",
-    "redelegate_on": "يجوز إعادة التفويض"
+    "redelegate_on": "يجوز إعادة التفويض",
+    "modules_unsupported": "تحديد التفويض بوحدات غير متاح بعد. اختر الصلاحيات والمناطق بدلًا من ذلك."
   },
   "right": {
     "unlock": "فك القفل",
@@ -1039,7 +1086,9 @@
     "self": "لا يمكنك تغيير صلاحيات مدير النظام لنفسك."
   },
   "peopleAdmin": {
-    "tab_users": "المستخدمون"
+    "tab_users": "المستخدمون",
+    "tab_assignments": "الإسنادات",
+    "tab_profiles": "ملفات الصلاحيات"
   },
   "messages": {
     "new": "رسالة جديدة",
@@ -1160,5 +1209,47 @@
     "self_manager": "لا يمكن أن يكون الشخص مديرًا لنفسه.",
     "manager_loop": "هذا سيجعل الرئيس المباشر تابعًا لهذا الشخص، مباشرة أو عبر آخرين. اختر رئيسًا آخر.",
     "saved": "تم حفظ الرئيس المباشر والإدارة."
+  },
+  "code": {
+    "already_assigned": "يحمل هذا الدور مسبقًا",
+    "self_beneficiary": "لا يمكن الإسناد لنفسك",
+    "not_found": "غير موجود",
+    "validation_failed": "قيمة ناقصة أو غير صالحة",
+    "last_admin": "آخر مدير نشط",
+    "precondition_failed": "غيّره شخص آخر"
+  },
+  "profiles": {
+    "title": "ملفات الصلاحيات",
+    "subtitle": "جداول صلاحيات مسماة يمكن تطبيقها على عدة إسنادات.",
+    "new": "ملف جديد",
+    "edit": "تعديل الملف",
+    "code": "الرمز",
+    "name_en": "الاسم (إنجليزي)",
+    "name_ar": "الاسم (عربي)",
+    "description": "الوصف",
+    "active": "نشط",
+    "inactive": "معطّل",
+    "grants": "جدول الصلاحيات",
+    "module": "الوحدة",
+    "assignments": "الإسنادات",
+    "saved": "تم حفظ الملف.",
+    "field_rules": "{{count}} قاعدة حقول تبقى كما هي",
+    "empty": "لا ملفات.",
+    "action": {
+      "view": "عرض",
+      "create": "إنشاء",
+      "edit": "تعديل",
+      "delete": "حذف",
+      "approve": "اعتماد",
+      "export": "تصدير",
+      "import": "استيراد",
+      "download_documents": "تنزيل المستندات",
+      "view_audit": "سجل التدقيق",
+      "administer": "إدارة",
+      "manage_users": "إدارة المستخدمين",
+      "view_security_log": "سجل الأمان"
+    },
+    "include_inactive": "عرض المعطّلة",
+    "n_grants": "{{count}} صلاحية"
   }
 }

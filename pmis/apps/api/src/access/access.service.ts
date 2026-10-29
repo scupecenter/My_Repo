@@ -45,6 +45,22 @@ export class AccessService {
     throw new ProblemException(403, 'module_forbidden', { detail: `You cannot use ${modules.join(' or ')}.` });
   }
 
+  /**
+   * Regions in which the caller holds (module, action), tuple by tuple (decision B3: every assignment counts for its own regions and
+   * modules only). null = every region (System Admin, all-regions assignment or delegation); [] = none.
+   */
+  async regions(module: string, action: DbAction): Promise<number[] | null> {
+    const rows = await this.db.tx.$queryRaw<{ r: number[] | null }[]>`SELECT wf_actor_regions(${module}, ${action}::"PermissionAction") AS r`;
+    return rows[0]?.r ?? null;
+  }
+
+  /** Like regions(), but a module the caller cannot use at all answers 403 module_forbidden. */
+  async requireRegions(module: string, action: DbAction = 'view'): Promise<number[] | null> {
+    const r = await this.regions(module, action);
+    if (r !== null && r.length === 0) throw new ProblemException(403, 'module_forbidden', { detail: `You cannot use ${module}.` });
+    return r;
+  }
+
   /** The caller is an active member of the System Admins group (not merely a delegate). */
   async isSystemAdmin(): Promise<boolean> {
     const rows = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT app_actor_is_system_admin() AS ok`;

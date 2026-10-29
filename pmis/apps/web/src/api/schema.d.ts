@@ -1111,7 +1111,8 @@ export interface paths {
         };
         /**
          * Sites with filters and the mini rail
-         * @description Only sites in the caller's regions for the `sites` module are returned (RLS).
+         * @description Only sites in the caller's regions for the `sites` module are returned (RLS and decision B3: each assignment counts for its own regions and modules).
+         *     Every item carries `streams`: the status of the site in each stream of its workflow version.
          */
         get: operations["listSites"];
         put?: never;
@@ -4634,6 +4635,34 @@ export interface components {
             /** @enum {string} */
             state: "done" | "current" | "late" | "na" | "planned" | "not_in_workflow";
         };
+        Stream: {
+            /** @description Stable code, for example DESIGN_ACQ, CW, TE, CLOSURE. */
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            sort_order: number;
+        };
+        /** @description The status of one site within one stream (only the tasks and stages of that stream). */
+        StreamStatus: components["schemas"]["Stream"] & {
+            /**
+             * @description na = the site has no counting task in the stream; done = all of them approved or N/A.
+             * @enum {string}
+             */
+            state: "not_started" | "in_progress" | "done" | "na";
+            /** @description Code of the first stage of the stream that is not done yet; null when done or N/A. */
+            current_stage?: string | null;
+            /** @description Counting tasks approved. */
+            done_tasks: number;
+            /** @description Counting tasks of the stream that are not N/A. */
+            total_tasks: number;
+            /** @description Open tasks past their due date. */
+            late_count: number;
+            /**
+             * Format: date
+             * @description Date of the milestone that closes the stream (the milestone task of its last stage) once approved.
+             */
+            milestone_date?: string | null;
+        };
         SiteListItem: {
             /** Format: uuid */
             id: string;
@@ -4649,6 +4678,8 @@ export interface components {
             late_task_count?: number;
             waiting_approval_count?: number;
             rail: components["schemas"]["RailNode"][];
+            /** @description One entry per stream of the site's workflow version, in order. */
+            streams?: components["schemas"]["StreamStatus"][];
             custom?: components["schemas"]["CustomValues"];
         };
         PipelineNode: {
@@ -4793,6 +4824,7 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             stage_code: string;
+            stream_code?: string | null;
             state: components["schemas"]["TaskState"];
             current_level?: number;
             levels_required?: number;
@@ -4928,6 +4960,10 @@ export interface components {
             /** @description Levels auto-skipped (same holder). */
             skipped_levels?: number[];
             unlocked_task_ids?: string[];
+            /** @description Under `all_members`: members who have not voted yet; the level stays open. Absent when the level completed. */
+            votes_missing?: number;
+            /** @description After a rejection: the level the task went back to (a level skipped by the same person is not a target, B6). */
+            returned_to_level?: number;
         };
         /**
          * @description `system_admin`: a delegate acting for the System Admin. `assignee`: a lead acting for the assignee of a level (B12b). Null when `on_behalf_of` is absent.
@@ -9202,6 +9238,8 @@ export interface operations {
                 stage_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
                 overall_status?: components["schemas"]["OverallStatus"];
+                /** @description Stream code (for example `CW`). Shows each site's status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code. */
+                stream?: string;
                 bucket?: "all" | "mine" | "late" | "waiting_approval" | "closed";
                 cluster_code?: string;
                 delivery_batch?: string;
@@ -9262,7 +9300,10 @@ export interface operations {
     };
     listSiteTasks: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have. */
+                stream?: string;
+            };
             header?: never;
             path: {
                 site_id: components["parameters"]["SiteId"];
@@ -9279,8 +9320,11 @@ export interface operations {
                 content: {
                     "application/json": {
                         workflow_version: number;
+                        /** @description The streams of the site's workflow version, in order. */
+                        streams?: components["schemas"]["Stream"][];
                         stages: {
                             code: string;
+                            stream_code?: string | null;
                             name_en: string;
                             name_ar?: string | null;
                             tasks: components["schemas"]["TaskSummary"][];
