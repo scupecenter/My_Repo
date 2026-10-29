@@ -151,7 +151,7 @@ describe('streams (owner decision 2026-10-29)', () => {
     // design: A1 and the MS1 milestone task approved; civil works started with one late task in review
     await makeTask(db, s, 'A1', 'approved');
     await makeTask(db, s, 'MS1', 'approved', { actualDate: '2026-03-02' });
-    await makeTask(db, s, 'B1', 'entry');
+    await makeTask(db, s, 'B1', 'entry', { dueDate: '2099-12-31' });   // an explicit due date: the SLA clock is not started over it (migration 0017)
     await makeTask(db, s, 'B2', 'locked');
     await makeTask(db, s, 'B3', 'in_review', { dueDate: '2026-01-01' });
     await makeTask(db, s, 'D1', 'locked');
@@ -271,6 +271,9 @@ describe('GET /sites/{id} and the task grid', () => {
     expect(a2).toMatchObject({ task_code: 'A2', state: 'locked' });
     expect(a2.lock_reasons[0]).toMatchObject({ kind: 'predecessor_not_approved', ref_code: 'A1' });
     expect(a2.ball_in_court).toBeUndefined();
-    expect(a1.sla).toMatchObject({ colour: 'none' });
+    // SLA A-1 starts the day the task opens (migration 0017): zero days elapsed, green
+    expect(a1.sla).toMatchObject({ code: 'A-1', colour: 'green', elapsed_wd: 0, min_wd: 10, max_wd: 20, start_event: 'OPEN', rule_set_version: 1 });
+    expect(a1.sla.start_date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(a2.sla).toMatchObject({ colour: 'none', elapsed_wd: null });
   });
 });

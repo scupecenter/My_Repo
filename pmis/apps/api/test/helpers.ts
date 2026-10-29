@@ -36,6 +36,13 @@ export async function superDb(solo = false): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the third database (suites that change SLA versions or calendars; see global-setup). */
+export async function superDbCalc(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_CALC });
+  await c.connect();
+  return c;
+}
+
 let seq = 0;
 const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).toString(36)}${randomBytes(2).toString('hex')}`;
 

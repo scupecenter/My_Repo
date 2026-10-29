@@ -87,10 +87,15 @@ export default async function setup(): Promise<() => Promise<void>> {
   const solo = `${dbName}_solo`;
   const main = await buildDatabase(adminUrl, dbName, appPassword);
   const one = await buildDatabase(adminUrl, solo, appPassword);
+  // The third database is for suites that change shared calculation settings (SLA versions, the default calendar): they must not touch what the other suites compute.
+  const calc = `${dbName}_calc`;
+  const third = await buildDatabase(adminUrl, calc, appPassword);
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
   process.env.TEST_SUPER_URL_SOLO = one.superUrl;
+  process.env.TEST_DATABASE_URL_CALC = third.appUrl;
+  process.env.TEST_SUPER_URL_CALC = third.superUrl;
 
   return async () => {
     if (process.env.TEST_KEEP_DB === '1') return;
@@ -98,6 +103,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.connect();
     await a.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${solo} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${calc} WITH (FORCE)`);
     await a.end();
   };
 }

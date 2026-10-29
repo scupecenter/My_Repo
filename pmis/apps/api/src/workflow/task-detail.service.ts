@@ -148,7 +148,7 @@ export class TaskDetailService {
       actual_start: row.actual_start,
       submitted_date: row.submitted_date,
       approved_date: row.approved_date,
-      prefill_date: null,
+      prefill_date: typeof (row.values as Record<string, unknown> | null)?.prefilled_date === 'string' ? ((row.values as Record<string, unknown>).prefilled_date as string) : null,
       values: row.values && typeof row.values === 'object' ? (row.values as Record<string, unknown>) : {},
       field_access: {},
       approval_path: path,

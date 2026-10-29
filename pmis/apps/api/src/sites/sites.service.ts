@@ -409,12 +409,28 @@ export class SitesService {
       FROM sites s JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active
       ${STAGE_AGG}
       WHERE s.id = ${site.id}::uuid ORDER BY st.seq`);
-    const gates = await this.db.tx.$queryRaw<{ link_code: string; seq: number; name_en: string; name_ar: string | null; from_code: string; to_code: string }[]>(Prisma.sql`
-      SELECT link_code, seq, name_en, name_ar, from_code, to_code FROM phase_gate_rules WHERE workflow_id = ${site.workflow_id}::uuid AND is_active ORDER BY seq`);
+    // gate_eval (migration 0017): the gate date (previous milestone date, later when a required permit starts later, shifted by Change Control) and why it is closed
+    const gates = await this.db.tx.$queryRaw<{ link_code: string; seq: number; name_en: string; name_ar: string | null; from_code: string; to_code: string;
+      gate_status: string; gate_date: string | null; shifted: boolean; reasons: unknown }[]>(Prisma.sql`
+      SELECT r.link_code, r.seq, r.name_en, r.name_ar, r.from_code, r.to_code, ge.status AS gate_status, ge.gate_date::text AS gate_date, ge.shifted, ge.reasons
+      FROM phase_gate_rules r CROSS JOIN LATERAL gate_eval(${site.id}::uuid, r.link_code) ge
+      WHERE r.workflow_id = ${site.workflow_id}::uuid AND r.is_active ORDER BY r.seq`);
     const baselines = await this.db.tx.$queryRaw<{ milestone_code: string; baseline_date: string | null }[]>(Prisma.sql`
       SELECT DISTINCT ON (be.milestone_code) be.milestone_code, be.baseline_date::text AS baseline_date
       FROM baseline_entries be JOIN baseline_versions bv ON bv.id = be.version_id AND bv.status = 'approved'
       WHERE be.site_id = ${site.id}::uuid ORDER BY be.milestone_code, bv.version DESC`);
+    // variance in working days: actual minus baseline (negative = early)
+    const pairs = stages.flatMap((r) => {
+      const b = baselines.find((x) => x.milestone_code === r.code)?.baseline_date;
+      return r.ms_done && r.ms_date && b ? [{ code: r.code, b, a: r.ms_date }] : [];
+    });
+    const variance = new Map<string, number>();
+    if (pairs.length > 0) {
+      const v = await this.db.tx.$queryRaw<{ code: string; wd: number | null }[]>(Prisma.sql`
+        SELECT u.c AS code, cal_workdays_between(u.b::date, u.a::date) AS wd
+        FROM unnest(${pairs.map((p) => p.code)}::text[], ${pairs.map((p) => p.b)}::text[], ${pairs.map((p) => p.a)}::text[]) AS u(c, b, a)`);
+      for (const x of v) if (x.wd !== null) variance.set(x.code, Number(x.wd));
+    }
     const byCode = new Map(stages.map((s) => [s.code, s]));
     const current = stages.find((r) => !stageDone(r) && !stageNa(r));
     const nodes: Record<string, unknown>[] = [];
@@ -428,7 +444,7 @@ export class SitesService {
       actual_date: r.ms_done ? r.ms_date : null,
       baseline_date: baselines.find((b) => b.milestone_code === r.code)?.baseline_date ?? null,
       planned_date: null,
-      variance_wd: null,
+      variance_wd: variance.get(r.code) ?? null,
       lock_reasons: [],
       shifted_by_suspension: false,
     });
@@ -436,7 +452,8 @@ export class SitesService {
       const from = byCode.get(g.from_code);
       const to = byCode.get(g.to_code);
       const fromOk = !from || stageDone(from) || stageNa(from);
-      const state = to && stageDone(to) ? 'done' : to && stageNa(to) && fromOk ? 'na' : fromOk ? 'current' : 'locked';
+      const open = g.gate_status === 'open';
+      const state = to && stageDone(to) ? 'done' : to && stageNa(to) && fromOk ? 'na' : fromOk && (open || g.gate_status === 'na') ? 'current' : 'locked';
       return {
         code: g.link_code,
         kind: 'gate',
@@ -444,12 +461,12 @@ export class SitesService {
         name_ar: g.name_ar,
         state,
         progress: state === 'done' ? 1 : 0,
-        actual_date: from && from.ms_done ? from.ms_date : null,
+        actual_date: g.gate_date ?? (from && from.ms_done ? from.ms_date : null),
         baseline_date: null,
         planned_date: null,
         variance_wd: null,
-        lock_reasons: [],
-        shifted_by_suspension: false,
+        lock_reasons: fromOk && !open && g.gate_status !== 'na' && Array.isArray(g.reasons) ? g.reasons : [],
+        shifted_by_suspension: g.shifted === true,
       };
     };
     for (const st of stages) {
