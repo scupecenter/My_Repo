@@ -65,11 +65,9 @@ export class SessionService {
     const csrf = randomBytes(32).toString('base64url');
     const ipValue = ip && isIP(ip) ? ip : null;
     const ua = userAgent ? userAgent.slice(0, 400) : null;
+    // auth_session_create (migration 0014) checks the account and the recent password check, and sets the 12-hour limit.
     const rows = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
-      INSERT INTO user_sessions (token_hash, user_id, auth_method, csrf_token, expires_at, ip, user_agent)
-      VALUES (${sha256Hex(token)}, ${userId}::uuid, ${method}::"AuthMethod", ${csrf},
-              now() + make_interval(hours => ${ABSOLUTE_HOURS}::int), ${ipValue}::inet, ${ua})
-      RETURNING id::text AS id`);
+      SELECT auth_session_create(${userId}::uuid, ${sha256Hex(token)}, ${method}::"AuthMethod", ${csrf}, ${ipValue}::inet, ${ua})::text AS id`);
     return { token, csrf, id: rows[0]!.id };
   }
 

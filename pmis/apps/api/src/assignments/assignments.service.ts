@@ -180,6 +180,8 @@ export class AssignmentsService {
   /** POST /assignments/copy */
   async copy(auth: AuthContext, key: string | undefined, raw: unknown, requestId: string | undefined): Promise<BulkResultDto> {
     await this.access.requireAdmin('assignments', 'create');
+    // Copying reads the source person's assignments, so it needs the same right as listing them.
+    await this.access.requireModuleView(auth, 'admin.users');
     await this.stepUp.require(auth);
     const b = parse(copySchema, raw);
     // Nobody copies another person's rights to themselves, not even as a preview. (The database refuses it for System Admins too.)

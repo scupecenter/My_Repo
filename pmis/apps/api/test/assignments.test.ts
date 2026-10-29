@@ -493,5 +493,13 @@ describe('POST /assignments/copy', () => {
     const denied = await plainApi.call('post', '/assignments/copy', { from_user_id: from.id, to_user_ids: [target.id], mode: 'add', reason: 'not allowed' });
     expect(denied.status).toBe(403);
     expect(denied.body.code).toBe('action_forbidden');
+
+    // assignments.create alone does not let a delegate read (and copy) someone else's assignments
+    const blind = await makeUser(db, {});
+    await delegate(db, blind.id, [['assignments', 'create']]);
+    const blindApi = await loggedIn(app, blind);
+    await blindApi.stepUp(blind.password);
+    const noView = await blindApi.call('post', '/assignments/copy', { from_user_id: from.id, to_user_ids: [target.id], mode: 'add', reason: 'no view', dry_run: true });
+    expect(noView.status).toBe(403);
   });
 });

@@ -7,6 +7,7 @@ GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO pmis_app;
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_log FROM pmis_app;      -- 001: append-only
 SELECT idm_revoke_app_writes('pmis_app');                         -- 008: identity tables only through idm_*
 REVOKE ALL ON local_credentials FROM pmis_app;                    -- 009: password hashes only through auth_local_*
-REVOKE DELETE, TRUNCATE ON user_sessions FROM pmis_app;           -- 009: sessions are revoked, never deleted
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON user_sessions FROM pmis_app;  -- 013: created only by auth_session_create, never deleted
+GRANT UPDATE (last_activity_at, stepup_at, current_screen, revoked_at, revoked_by, revoke_reason) ON user_sessions TO pmis_app;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON departments, message_threads, message_participants, messages, announcements,
   announcement_targets, announcement_recipients, announcement_responses FROM pmis_app;  -- 010: only through idm_*, msg_*, ann_*
