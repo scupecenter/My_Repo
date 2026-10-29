@@ -60,6 +60,10 @@ describe('assignment edit', () => {
     await u.selectOptions(within(dlg).getByTestId('assign-role-select'), (within(dlg).getByTestId('assign-role-select').querySelectorAll('option')[3] as HTMLOptionElement).value);
     await u.type(within(dlg).getByTestId('assign-people-search'), 'Wael');
     await u.click(await within(dlg).findByTestId('assign-people-opt-1211'));
+    // Confirm stays off until a preview of the same selection has run.
+    expect(within(dlg).getByTestId('assign-dialog-submit')).toBeDisabled();
+    await u.click(within(dlg).getByTestId('assign-preview'));
+    expect(await within(dlg).findByTestId('assign-preview-done')).toHaveTextContent('1');
     await u.type(within(dlg).getByTestId('assign-dialog-reason'), 'New joiner');
     await u.click(within(dlg).getByTestId('assign-dialog-submit'));
     await waitFor(() => expect(screen.getByTestId('user-status-1211')).toHaveTextContent('Active'));

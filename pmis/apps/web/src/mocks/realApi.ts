@@ -45,6 +45,26 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/announcements/:id/responses/export'],
   ['post', '/announcements/:id/respond'],
   ['get', '/me/announcements/pending'],
+  // Contract 0.4.0: regions, roles, permission profiles, assignments, delegations (apps/api: regions, roles, permissions, assignments, delegations).
+  ['get', '/regions'],
+  ['get', '/roles'],
+  ['post', '/roles'],
+  ['get', '/roles/:id'],
+  ['patch', '/roles/:id'],
+  ['get', '/permissions/catalogue'],
+  ['get', '/permission-profiles'],
+  ['post', '/permission-profiles'],
+  ['get', '/permission-profiles/:id'],
+  ['put', '/permission-profiles/:id'],
+  ['get', '/users/:id/assignments'],
+  ['get', '/assignments'],
+  ['post', '/assignments/bulk-assign'],
+  ['post', '/assignments/bulk-update'],
+  ['post', '/assignments/bulk-end'],
+  ['post', '/assignments/copy'],
+  ['get', '/delegations'],
+  ['post', '/delegations'],
+  ['post', '/delegations/:id/revoke'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

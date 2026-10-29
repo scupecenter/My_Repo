@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Assignment, UserDetail } from '@/api/types';
 import { absentOn, accountKeyOf, accountStatus, cred, db, save, slotsOf, STAFF, stepUpValid, toSummary, viewer, type MockTask } from './db';
-import { PROFILES, type MockUser } from './adminData';
+import { PROFILES, type MockProfile, type MockUser } from './adminData';
 import { O } from './orgState';
 import { find, guard, page, problem, stepUp, transition } from './handlers';
 import { byId, uid } from './ids';
@@ -44,6 +44,15 @@ export const userBy = (id: string) => A().users.find((u) => (u.local ? u.local.i
 const tasksAll = () => [...db().tasks, ...db().extra, ...Object.values(db().ov)];
 const heldBy = (t: MockTask, e: string) => toSummary(t).ball_in_court?.holders.some((h) => h.employee_id === e);
 const emptyBulk = () => ({ bulk_action_id: crypto.randomUUID(), done: [] as { id: string; created_id?: string }[], skipped: [] as { ref: string; code: string; message?: string }[], failed: [] as { ref: string; code: string; message?: string }[] });
+
+type ProfileIn = { code: string; name_en: string; name_ar?: string; description?: string; is_active?: boolean; grants?: { module_key: string; action: string }[]; field_rules?: { field_id: string; access: string }[]; reason?: string };
+/** Profiles live in the mock db; an older saved db has none yet. */
+const profilesOf = (): MockProfile[] => (A().profiles ??= PROFILES.map((p) => ({ ...p })));
+const dedupe = (g: { module_key: string; action: string }[]) => [...new Map(g.map((x) => [`${x.module_key}|${x.action}`, { module_key: x.module_key, action: x.action }])).values()];
+const profileBody = (p: MockProfile) => ({
+  ...p, name_ar: p.name_ar || null, assignment_count: A().assignments.filter((a) => a.is_active_now && a.profile_ids.includes(p.id)).length,
+  field_rules: p.field_rules.map((r) => ({ ...r, field_code: 'f', entity_type: 'site' })), changed_by: ref('1001'), changed_at: '2026-10-01T08:00:00Z',
+});
 
 export const adminHandlers = [
   // ------------------------------------------------------------------ users
@@ -114,8 +123,11 @@ export const adminHandlers = [
   // ------------------------------------------------------------------ assignments
   http.get(`${B}/assignments`, ({ request }) => {
     const g = needAdmin(); if (g) return g;
-    const u = new URL(request.url).searchParams, role = u.get('role_id'), user = u.get('user_id');
-    return page(A().assignments.filter((a) => a.is_active_now && (!role || a.role.id === role) && (!user || a.user.id === user)));
+    const u = new URL(request.url).searchParams, role = u.get('role_id'), user = u.get('user_id'), ended = u.get('include_ended') === 'true';
+    const limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0) || 0;
+    const all = A().assignments.filter((a) => (ended || a.is_active_now) && (!role || a.role.id === role) && (!user || a.user.id === user))
+      .sort((x, y) => x.user.display_name.localeCompare(y.user.display_name) || x.id.localeCompare(y.id));
+    return HttpResponse.json({ items: all.slice(start, start + limit), page: { limit, next_cursor: start + limit < all.length ? String(start + limit) : null, total: all.length } });
   }),
   http.post(`${B}/assignments/bulk-assign`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
@@ -123,14 +135,21 @@ export const adminHandlers = [
     const b = (await request.json()) as { user_ids: string[]; role_ids: string[]; defaults: Partial<Assignment>; reason?: string; dry_run?: boolean };
     const r = noReason(b); if (r) return r;
     if (!b.user_ids?.length || !b.role_ids?.length || !b.defaults?.permission_level) return bad('/user_ids', 'required');
+    if (b.user_ids.length > 500) return bad('/user_ids', 'too_many_rows', 'Too many rows');
+    if (new Set(b.user_ids).size * new Set(b.role_ids).size > 2000) return bad('/user_ids', 'too_many_rows', 'Too many rows');
     const out = { ...emptyBulk(), dry_run: !!b.dry_run };
     for (const uidv of b.user_ids) for (const rid of b.role_ids) {
       const u = userBy(uidv), role = roleOf(rid), key = `${uidv}:${rid}`;
-      if (!u || !role) { out.failed.push({ ref: key, code: 'not_found' }); continue; }
+      if (!u || !role) { out.failed.push({ ref: key, code: 'not_found', message: 'No such user or role.' }); continue; }
+      if (!role.is_active) { out.failed.push({ ref: key, code: 'validation_failed', message: 'The role is inactive.' }); continue; }
+      // The real API refuses a row for the caller themselves, per row (not the whole request).
+      if (u.employee_id && u.employee_id === viewer()!.employee_id) { out.failed.push({ ref: key, code: 'self_beneficiary', message: 'You cannot assign roles to yourself.' }); continue; }
+      // No explicit profile and no role default: the real API refuses the row.
+      if (!b.defaults.profile_ids?.length && !role.default_profile_id) { out.failed.push({ ref: key, code: 'validation_failed', message: 'Give profile_ids: the role has no default for it.' }); continue; }
       if (rowsOf(u.employee_id).some((a) => a.role.id === rid)) { out.skipped.push({ ref: key, code: 'already_assigned', message: 'Already holds this role' }); continue; }
       const row = {
         id: crypto.randomUUID(), user: uref(u), role: { id: role.id, code: role.code, name_en: role.name_en, name_ar: role.name_ar }, permission_level: b.defaults.permission_level, team: b.defaults.team ?? 'none',
-        region_ids: b.defaults.region_ids ?? role.default_region_ids ?? 'all', module_keys: b.defaults.module_keys ?? role.default_module_keys ?? 'all', profile_ids: b.defaults.profile_ids ?? [], is_primary: false,
+        region_ids: b.defaults.region_ids ?? role.default_region_ids ?? 'all', module_keys: b.defaults.module_keys ?? role.default_module_keys ?? 'all', profile_ids: b.defaults.profile_ids ?? (role.default_profile_id ? [role.default_profile_id] : []), is_primary: false,
         valid_from: b.defaults.valid_from ?? now(), valid_to: b.defaults.valid_to ?? null, is_active_now: true, assigned_at: now(), version: 1,
       } as Assignment;
       out.done.push({ id: row.id, created_id: row.id });
@@ -179,6 +198,8 @@ export const adminHandlers = [
     const r = noReason(b); if (r) return r;
     const from = userBy(b.from_user_id);
     if (!from || !b.to_user_ids?.length) return bad('/to_user_ids', 'required');
+    // The real API refuses the whole request when the caller is among the targets.
+    if (b.to_user_ids.some((id) => userBy(id)?.employee_id === viewer()!.employee_id)) return problem(403, 'self_beneficiary', 'You cannot copy assignments to yourself');
     const out = { ...emptyBulk(), dry_run: !!b.dry_run };
     for (const tid of b.to_user_ids) {
       const to = userBy(tid);
@@ -193,7 +214,64 @@ export const adminHandlers = [
     save();
     return HttpResponse.json(out);
   }),
-  http.get(`${B}/permission-profiles`, () => (viewer() ? HttpResponse.json({ items: PROFILES }) : problem(401, 'unauthenticated', 'Sign in required'))),
+  // ------------------------------------------------------------------ permission profiles and catalogue (real shapes; version is the If-Match value)
+  http.get(`${B}/permissions/catalogue`, () => {
+    if (!viewer()) return problem(401, 'unauthenticated', 'Sign in required');
+    const op = ['view', 'create', 'edit', 'delete', 'approve', 'export', 'import', 'download_documents', 'view_audit'];
+    return HttpResponse.json({
+      modules: [
+        { key: 'sites', name_en: 'Sites', screens: [{ key: 'sites.documents', name_en: 'Site documents' }], actions: op },
+        { key: 'approvals', name_en: 'Approvals', actions: ['view', 'approve', 'view_audit'] },
+        { key: 'my_work', name_en: 'My Work', actions: ['view'] },
+        { key: 'dashboard', name_en: 'Dashboard', actions: ['view', 'export'] },
+        { key: 'procurement', name_en: 'Procurement (PR/PO/WO)', actions: op },
+        { key: 'warehouse', name_en: 'Warehouse', actions: op },
+        { key: 'quality', name_en: 'Quality', actions: op },
+        { key: 'issues', name_en: 'Issue Log', actions: op },
+        { key: 'risks', name_en: 'Risk Register', actions: op },
+        { key: 'reports', name_en: 'Reports', actions: ['view', 'export'] },
+        { key: 'admin', name_en: 'Administration', screens: [{ key: 'admin.users', name_en: 'Users and roles' }, { key: 'admin.roles', name_en: 'Roles and permission profiles' }], actions: ['view', 'create', 'edit', 'delete', 'administer'] },
+      ],
+      actions: [...op, 'administer'],
+      delegable_rights: ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit'],
+    });
+  }),
+  http.get(`${B}/permission-profiles`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const all = new URL(request.url).searchParams.get('include_inactive') === 'true';
+    return HttpResponse.json({ items: profilesOf().filter((p) => all || p.is_active).map(profileBody) });
+  }),
+  http.get(`${B}/permission-profiles/:id`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const p = profilesOf().find((x) => x.id === params.id);
+    return p ? HttpResponse.json(profileBody(p), tag(p.version)) : problem(404, 'not_found', 'Profile not found');
+  }),
+  http.post(`${B}/permission-profiles`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const b = (await request.json()) as ProfileIn;
+    const r = noReason(b); if (r) return r;
+    if (!/^[A-Z][A-Z0-9_]{1,40}$/.test(b.code ?? '')) return bad('/code', 'invalid_string');
+    if ((b.name_en ?? '').trim().length < 1) return bad('/name_en', 'too_small');
+    if (profilesOf().some((x) => x.code === b.code)) return problem(409, 'duplicate', 'A profile with this code exists');
+    const p: MockProfile = { id: crypto.randomUUID(), code: b.code, name_en: b.name_en, name_ar: b.name_ar ?? '', description: b.description ?? null, is_active: b.is_active ?? true, grants: dedupe(b.grants ?? []), field_rules: b.field_rules ?? [], version: 1, assignment_count: 0 };
+    A().profiles.push(p); save();
+    return HttpResponse.json(profileBody(p), { status: 201, ...tag(p.version) });
+  }),
+  http.put(`${B}/permission-profiles/:id`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const ifm = request.headers.get('If-Match');
+    if (!ifm) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match');
+    if (!stepUpValid()) return stepUp();
+    const p = profilesOf().find((x) => x.id === params.id);
+    if (!p) return problem(404, 'not_found', 'Profile not found');
+    if (ifm !== `"${p.version}"` && ifm !== '*') return problem(412, 'precondition_failed', 'The profile changed; reload and retry');
+    const b = (await request.json()) as ProfileIn;
+    const r = noReason(b); if (r) return r;
+    if (b.code !== p.code) return bad('/code', 'immutable');
+    Object.assign(p, { name_en: b.name_en, name_ar: b.name_ar ?? '', description: b.description ?? null, is_active: b.is_active ?? true, grants: dedupe(b.grants ?? []), field_rules: b.field_rules ?? [], version: p.version + 1 }); save();
+    return HttpResponse.json(profileBody(p), tag(p.version));
+  }),
 
   // ------------------------------------------------------------------ MFA exemption
   http.get(`${B}/users/:id/mfa-exemption`, ({ params }) => {
@@ -233,12 +311,13 @@ export const adminHandlers = [
   http.post(`${B}/roles`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
-    const b = (await request.json()) as { code: string; name_en: string; name_ar?: string; can_hold_matrix_levels: boolean; description_en?: string; reason?: string };
+    const b = (await request.json()) as { code: string; name_en: string; name_ar?: string; can_hold_matrix_levels: boolean; description_en?: string; parent_role_id?: string | null; default_profile_id?: string | null; default_region_ids?: 'all' | number[]; default_module_keys?: 'all' | string[]; reason?: string };
     const r = noReason(b); if (r) return r;
     if (!/^[A-Z][A-Z0-9_]{1,40}$/.test(b.code ?? '')) return bad('/code', 'pattern');
     if ((b.name_en ?? '').trim().length < 2) return bad('/name_en', 'min_length');
     if (A().roles.some((x) => x.code.toUpperCase() === b.code)) return problem(409, 'duplicate', 'A role with this code exists');
-    const role = { id: crypto.randomUUID(), code: b.code, name_en: b.name_en, name_ar: b.name_ar ?? null, description_en: b.description_en ?? null, can_hold_matrix_levels: !!b.can_hold_matrix_levels, is_active: true, active_assignment_count: 0, version: 1 } as never;
+    if (b.parent_role_id && (!roleOf(b.parent_role_id) || roleOf(b.parent_role_id)!.parent_role_id)) return bad('/parent_role_id', 'invalid');
+    const role = { id: crypto.randomUUID(), code: b.code, name_en: b.name_en, name_ar: b.name_ar ?? null, description_en: b.description_en ?? null, parent_role_id: b.parent_role_id ?? null, sub_roles: [], default_profile_id: b.default_profile_id ?? null, default_region_ids: b.default_region_ids ?? 'all', default_module_keys: b.default_module_keys ?? 'all', can_hold_matrix_levels: !!b.can_hold_matrix_levels, is_active: true, active_assignment_count: 0, version: 1 } as never;
     A().roles.push(role); save();
     return HttpResponse.json(role, { status: 201, ...tag(1) });
   }),
@@ -247,6 +326,7 @@ export const adminHandlers = [
     if (!stepUpValid()) return stepUp();
     const role = roleOf(params.id as string);
     if (!role) return problem(404, 'not_found', 'Role not found');
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match');
     if (request.headers.get('If-Match') !== `"${role.version ?? 1}"`) return problem(412, 'precondition_failed', 'The role changed; reload and retry');
     const { reason, ...patch } = (await request.json()) as { reason?: string; is_active?: boolean };
     const r = noReason({ reason }); if (r) return r;
@@ -337,8 +417,10 @@ export const adminHandlers = [
     const label = kind === 'user' ? to && byId(to.employee_id).name_en : kind === 'role' ? roleOf(tid!)?.name_en : A().groups.find((x) => x.id === tid)?.name;
     if (!label) return bad(b.target_kind ? '/target_id' : '/to_user_id', 'not_found');
     if (b.scope === 'partial' && !b.rights?.length) return bad('/rights', 'required');
+    // Real API: a delegation cannot be limited to modules yet (module_codes is always [] on read).
+    if (b.module_codes?.length) return bad('/module_codes', 'not_supported');
     if (b.valid_to && b.valid_to < b.valid_from) return bad('/valid_to', 'before_valid_from');
-    const d = { id: crypto.randomUUID(), from: viewer()!.employee_id!, to: to?.employee_id ?? null, target_kind: kind, target_id: tid!, label, scope: b.scope, rights: b.scope === 'partial' ? b.rights! : [], region_codes: b.region_codes ?? [], module_codes: b.module_codes ?? [], allow_redelegate: !!b.allow_redelegate, valid_from: b.valid_from, valid_to: b.valid_to ?? null, revoked_at: null, reason: b.reason!.trim() };
+    const d = { id: crypto.randomUUID(), from: viewer()!.employee_id!, to: to?.employee_id ?? null, target_kind: kind, target_id: tid!, label, scope: b.scope, rights: b.scope === 'partial' ? b.rights! : [], region_codes: b.region_codes ?? [], module_codes: [], allow_redelegate: !!b.allow_redelegate, valid_from: b.valid_from, valid_to: b.valid_to ?? null, revoked_at: null, reason: b.reason!.trim() };
     A().delegations.push(d); save();
     return HttpResponse.json(delegationBody(d), { status: 201 });
   }),

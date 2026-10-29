@@ -242,6 +242,11 @@ describe('hybrid mode list', () => {
       'GET /messages/contacts', 'GET /messages/threads', 'POST /messages/threads', 'GET /messages/threads/:id', 'POST /messages/threads/:id/replies', 'POST /messages/threads/:id/read',
       'GET /announcements', 'POST /announcements', 'GET /announcements/:id', 'GET /announcements/:id/responses', 'GET /announcements/:id/responses/export', 'POST /announcements/:id/respond',
       'GET /me/announcements/pending',
+      // contract 0.4.0: regions, roles, permission profiles, assignments, delegations
+      'GET /regions', 'GET /roles', 'POST /roles', 'GET /roles/:id', 'PATCH /roles/:id', 'GET /permissions/catalogue',
+      'GET /permission-profiles', 'POST /permission-profiles', 'GET /permission-profiles/:id', 'PUT /permission-profiles/:id',
+      'GET /users/:id/assignments', 'GET /assignments', 'POST /assignments/bulk-assign', 'POST /assignments/bulk-update', 'POST /assignments/bulk-end', 'POST /assignments/copy',
+      'GET /delegations', 'POST /delegations', 'POST /delegations/:id/revoke',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
@@ -270,7 +275,7 @@ describe('password helpers', () => {
 describe('Users & Roles tabs', () => {
   it('opens the first tab the person may use and keeps the order of the tabs', async () => {
     const { firstPeopleTab, PEOPLE_TABS } = await import('@/components/PeopleAdmin');
-    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.online', 'admin.roles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
+    expect(PEOPLE_TABS.map((p) => p.key)).toEqual(['admin.users', 'admin.online', 'admin.assignments', 'admin.roles', 'admin.profiles', 'admin.groups', 'admin.delegation', 'admin.matrix']);
     const me = (nav: string[], grants: string[] = []) =>
       ({ is_system_admin: false, effective: { nav, grants: grants.map((action) => ({ module_key: 'admin.users', action, region_ids: 'all' })) } }) as never;
     expect(firstPeopleTab(me(['admin.users', 'admin.matrix']))).toBe('/admin/users');

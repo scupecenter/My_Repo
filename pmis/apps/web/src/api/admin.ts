@@ -1,8 +1,8 @@
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile } from './client';
 import type {
   Absence, AbsenceInput, Assignment, AssignmentPatch, BulkAssignRequest, BulkResult, Delegation, DelegationInput, ExportPart, ExportPartKey, GroupDetail, Group, MasterExport, MasterExportRequest, MfaExemption,
-  Page, PermissionProfile, ReassignRequest, ReassignmentAlert, Role, User, UserDetail, UserPickerItem,
+  Page, PermissionCatalogue, PermissionProfile, PermissionProfileInput, ReassignRequest, ReassignmentAlert, Role, User, UserDetail, UserPickerItem,
 } from './types';
 
 const key = (k: string, ...r: unknown[]) => [k, ...r];
@@ -12,7 +12,16 @@ export const useUsers = (f: { q: string; status: string; role_id: string }) =>
   useQuery({ queryKey: key('users', f), queryFn: () => api.get<Page<User>>('/users', { query: { ...f, limit: 200 } }) });
 export const useUser = (id: string) => useQuery({ queryKey: key('user', id), queryFn: () => api.get<UserDetail>(`/users/${id}`) });
 export const useRoles = () => useQuery({ queryKey: ['roles'], queryFn: () => api.get<{ items: Role[] }>('/roles', { query: { include_inactive: true } }).then((r) => r.items) });
-export const useProfiles = () => useQuery({ queryKey: ['profiles'], staleTime: Infinity, queryFn: () => api.get<{ items: PermissionProfile[] }>('/permission-profiles').then((r) => r.items) });
+export const useProfiles = (includeInactive = false) =>
+  useQuery({ queryKey: ['profiles', includeInactive], staleTime: 60_000, queryFn: () => api.get<{ items: PermissionProfile[] }>('/permission-profiles', { query: { include_inactive: includeInactive } }).then((r) => r.items) });
+export const useCatalogue = () => useQuery({ queryKey: ['catalogue'], staleTime: Infinity, queryFn: () => api.get<PermissionCatalogue>('/permissions/catalogue') });
+/** The by-role view: `GET /assignments`, ordered by person name, cursor-paged. */
+export const useAssignments = (f: { role_id: string; include_ended: boolean }) =>
+  useInfiniteQuery({
+    queryKey: key('assignments', f), initialPageParam: '',
+    queryFn: ({ pageParam }) => api.get<Page<Assignment>>('/assignments', { query: { role_id: f.role_id, include_ended: f.include_ended, limit: 100, cursor: pageParam } }),
+    getNextPageParam: (last) => last.page.next_cursor ?? undefined,
+  });
 export const useGroups = () => useQuery({ queryKey: ['groups'], queryFn: () => api.get<Page<Group>>('/groups').then((r) => r.items) });
 export const useGroup = (id: string | null) => useQuery({ queryKey: key('group', id), enabled: !!id, queryFn: () => api.get<GroupDetail>(`/groups/${id}`) });
 export const useMfa = (id: string) => useQuery({ queryKey: key('mfa', id), queryFn: () => api.get<MfaExemption>(`/users/${id}/mfa-exemption`) });
@@ -27,7 +36,7 @@ export const usePicker = (q: string) =>
 export const bulkAssign = (body: BulkAssignRequest) => api.post<BulkResult>('/assignments/bulk-assign', { idempotencyKey: crypto.randomUUID(), body });
 export const useBulkAssign = () => {
   const qc = useQueryClient();
-  return useMutation<BulkResult, ApiError, BulkAssignRequest>({ mutationFn: bulkAssign, onSettled: () => refresh(qc, 'users', 'user', 'roles') });
+  return useMutation<BulkResult, ApiError, BulkAssignRequest>({ mutationFn: bulkAssign, onSettled: () => refresh(qc, 'users', 'user', 'roles', 'assignments') });
 };
 
 type Snap = { rollback: () => void };
@@ -37,7 +46,13 @@ function patchUser(qc: QueryClient, userId: string, fn: (a: Assignment) => Assig
   if (before) qc.setQueryData<UserDetail>(k, { ...before, assignments: (before.assignments ?? []).flatMap((a) => fn(a) ?? []) });
   return () => qc.setQueryData(k, before);
 }
-const failed = (r: BulkResult) => { if (r.failed.length) throw new ApiError(409, { type: 'about:blank', title: 'Some rows failed', status: 409, code: r.failed[0].code }); return r; };
+/** A bulk call that answered 200 but refused some rows (precondition_failed, last_admin, self_beneficiary ...). Carries the per-row result. */
+export class BulkError extends ApiError {
+  constructor(public result: BulkResult) {
+    super(409, { type: 'about:blank', title: 'Some rows failed', status: 409, code: result.failed[0].code } as never);
+  }
+}
+const failed = (r: BulkResult) => { if (r.failed.length) throw new BulkError(r); return r; };
 
 export function useEditAssignments(userId: string) {
   const qc = useQueryClient();
@@ -62,7 +77,26 @@ export function useEndAssignments(userId: string) {
       return { rollback: patchUser(qc, userId, (a) => (ids.has(a.id) ? { ...a, is_active_now: false, valid_to: new Date().toISOString() } : a)) };
     },
     onError: (_e, _v, c) => c?.rollback(),
-    onSettled: () => refresh(qc, 'user', 'users', 'roles'),
+    onSettled: () => refresh(qc, 'user', 'users', 'roles', 'assignments'),
+  });
+}
+
+/** End rows from the by-role view. The rows leave the cached list at once and come back if the server refuses. */
+export function useEndByRole() {
+  const qc = useQueryClient();
+  type Cache = { pages: Page<Assignment>[]; pageParams: unknown[] };
+  return useMutation<BulkResult, ApiError, { rows: Assignment[]; reason: string; dry_run?: boolean }, Snap>({
+    mutationFn: ({ rows, reason, dry_run }) => api.post<BulkResult>('/assignments/bulk-end', { idempotencyKey: crypto.randomUUID(), body: { items: rows.map((r) => ({ id: r.id, version: r.version })), reason, dry_run: !!dry_run } }),
+    onMutate: async ({ rows, dry_run }) => {
+      if (dry_run) return { rollback: () => {} };
+      await qc.cancelQueries({ queryKey: ['assignments'] });
+      const snaps = qc.getQueriesData<Cache>({ queryKey: ['assignments'] });
+      const ids = new Set(rows.map((r) => r.id));
+      snaps.forEach(([k, d]) => d && qc.setQueryData(k, { ...d, pages: d.pages.map((p) => ({ ...p, items: p.items.filter((a) => !ids.has(a.id)) })) }));
+      return { rollback: () => snaps.forEach(([k, d]) => qc.setQueryData(k, d)) };
+    },
+    onError: (_e, _v, c) => c?.rollback(),
+    onSettled: (_d, _e, v) => { if (!v.dry_run) refresh(qc, 'assignments', 'user', 'users', 'roles'); },
   });
 }
 export const useCopyAssignments = () => {
@@ -79,6 +113,26 @@ export const useSetMfa = (userId: string) => {
     onSettled: () => refresh(qc, 'mfa', 'users', 'user'),
   });
 };
+
+export const useCreateProfile = () => {
+  const qc = useQueryClient();
+  return useMutation<PermissionProfile, ApiError, PermissionProfileInput>({ mutationFn: (body) => api.post('/permission-profiles', { body }), onSettled: () => refresh(qc, 'profiles') });
+};
+/** `PUT` replaces the whole profile; `If-Match` carries its version. Optimistic in the cached lists, rolled back on failure. */
+export function useReplaceProfile() {
+  const qc = useQueryClient();
+  return useMutation<PermissionProfile, ApiError, { profile: PermissionProfile; body: PermissionProfileInput }, Snap>({
+    mutationFn: ({ profile, body }) => api.put(`/permission-profiles/${profile.id}`, { version: profile.version, body }),
+    onMutate: async ({ profile, body }) => {
+      await qc.cancelQueries({ queryKey: ['profiles'] });
+      const snaps = qc.getQueriesData<PermissionProfile[]>({ queryKey: ['profiles'] });
+      snaps.forEach(([k, d]) => d && qc.setQueryData(k, d.map((p) => (p.id === profile.id ? { ...p, name_en: body.name_en, name_ar: body.name_ar ?? null, description: body.description ?? null, is_active: body.is_active ?? true, grants: body.grants } : p))));
+      return { rollback: () => snaps.forEach(([k, d]) => qc.setQueryData(k, d)) };
+    },
+    onError: (_e, _v, c) => c?.rollback(),
+    onSettled: () => refresh(qc, 'profiles', 'assignments'),
+  });
+}
 
 export const useCreateRole = () => {
   const qc = useQueryClient();
