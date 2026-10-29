@@ -1,4 +1,4 @@
-import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Notification, Session, TaskDetail, TaskSummary, WorkflowStep } from '@/api/types';
+import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Notification, Session, TaskDetail, TaskSummary, UserRef, WorkflowStep } from '@/api/types';
 import { initAdmin } from './adminData';
 import { initCfg } from './settingsData';
 import { initOrg } from './orgData';
@@ -41,6 +41,7 @@ export const attempts: number[] = [];
 type MockTask = TaskSummary & {
   submitted_by: string; waiting_since: string; level_kind: 'review' | 'approve'; docs: string[]; external: string; entered_by: string;
   /** Generated site-grid tasks (mocks/sites.ts) carry their own slots, steps and comments once touched. */
+  claimed_by?: UserRef; actual_start?: string | null;
   gen?: boolean; slots?: DocumentSlot[]; steps?: WorkflowStep[]; comments?: Comment[]; locks?: { kind: 'predecessor_not_approved' | 'gate_closed'; message: string; ref_code?: string }[];
 };
 
@@ -169,7 +170,7 @@ export function ballFor(t: MockTask): BallInCourt {
   const kind = level === 1 ? 'entry' : level >= (t.levels_required ?? 3) ? 'approve' : 'review';
   const to = db().admin.reassigned[t.id];
   const holders = to ? [{ kind: 'user' as const, ref_id: uid(to), user_id: uid(to), label: byId(to).name_en, employee_id: to }] : holdersOf(db().matrix, t.stage_code, level);
-  return { level, level_kind: kind, holders: holders.map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h)) };
+  return { level, level_kind: kind, holders: holders.map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h)), ...(t.claimed_by ? { claimed_by: t.claimed_by } : {}) };
 }
 
 /** Levels after `level 1` the submitter's own seats take over (same person on consecutive levels, B5/B6/B7). */
@@ -188,8 +189,8 @@ export const canEditTask = (t: MockTask) => {
 export const absentOn = (day: string) => new Set(db().admin.absences.filter((a) => a.from_date <= day && day <= a.to_date).map((a) => a.employee_id));
 
 export function toSummary(t: MockTask): TaskSummary {
-  const { submitted_by: _s, waiting_since: _w, level_kind: _l, docs: _d, external: _e, entered_by: _b, gen: _g, slots: _sl, steps: _st, comments: _c, locks: _lk, ...rest } = t;
-  void [_s, _w, _l, _d, _e, _b, _g, _sl, _st, _c, _lk];
+  const { claimed_by: _cb, actual_start: _as, submitted_by: _s, waiting_since: _w, level_kind: _l, docs: _d, external: _e, entered_by: _b, gen: _g, slots: _sl, steps: _st, comments: _c, locks: _lk, ...rest } = t;
+  void [_cb, _as, _s, _w, _l, _d, _e, _b, _g, _sl, _st, _c, _lk];
   const ball = ballFor(t), away = absentOn('2026-10-25');
   const bad = ball.holders.find((h) => h.account_status && h.account_status !== 'active');
   return { ...rest, ball_in_court: ball, ...(bad ? { holder_account_status: bad.account_status } : {}), lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [], holder_absent: rest.holder_absent || (ball.holders.some((h) => !!h.employee_id && away.has(h.employee_id))) };
@@ -210,7 +211,8 @@ function allowed(t: MockTask): TaskDetail['allowed_actions'] {
   const v = viewer();
   if (!v) return [];
   const out: TaskDetail['allowed_actions'] = [{ action: 'comment' }];
-  if ((t.state === 'entry' || t.state === 'open') && canEditTask(t)) {
+  if (t.state === 'open' && canEditTask(t)) out.push({ action: 'start' }, { action: 'edit' });
+  else if (t.state === 'entry' && canEditTask(t)) {
     const sp = skipPath(t, v.employee_id);
     const missing = slotsOf(t).some((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected'));
     out.push({ action: 'edit' }, { action: 'submit', step_up: sp.final, final: sp.final, will_skip_to: sp.to, disabled_reason: missing ? 'mandatory_slots_missing' : null });
@@ -218,6 +220,8 @@ function allowed(t: MockTask): TaskDetail['allowed_actions'] {
   if (inbox(t) && canAct(t.level_kind)) {
     const sp = t.level_kind === 'review' ? skipPath(t, v.employee_id, t.current_level ?? 2) : null;
     out.push({ action: t.level_kind === 'approve' ? 'approve' : 'review', step_up: t.level_kind === 'approve' || !!sp?.final, will_skip_to: sp?.to ?? null, final: sp?.final }, { action: 'reject' });
+    // a group level can be taken by one holder; only generated site-grid tasks offer it in the mock
+    if (t.gen) out.push({ action: t.claimed_by?.id === uid(v.employee_id ?? '9999') ? 'release' : 'claim' });
   }
   return out;
 }
@@ -238,7 +242,7 @@ export function toDetail(t: MockTask): TaskDetail {
     ...toSummary(t), approval_path: path, slots: slotsOf(t), allowed_actions: allowed(t), workflow_version: 1,
     lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [],
     missing_for_submit: slotsOf(t).filter((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected')).map((s) => s.name_en),
-    planned_start: t.planned_date, actual_start: t.actual_date,
+    planned_start: t.planned_date, actual_start: t.actual_start ?? t.actual_date,
   } as TaskDetail;
 }
 

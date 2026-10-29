@@ -1,4 +1,4 @@
-import type { DocumentSlot, PipelineNode, SiteDetail, SiteListItem, SiteTasks } from '@/api/types';
+import type { DocumentSlot, PipelineNode, SiteDetail, SiteListItem, SiteTasks, StreamStatus } from '@/api/types';
 import { db, toSummary, type MockTask } from './db';
 import { STAGE_CODES } from './matrixData';
 
@@ -29,6 +29,16 @@ const DEFS: [number, string, string, string, [number, number] | null, string | n
   [9, 'B15', 'CW FAC', 'FAC الأعمال المدنية', [3, 10], 'CW FAC', 'TPL-SITE'], [9, 'D18', 'TE FAC', 'FAC لـ TE', [3, 10], 'TE FAC', 'TPL-SITE'],
 ];
 
+/** Default streams (CLAUDE.md) and the stage -> stream mapping of the mock stage codes. The API has no DISMANTLE stream yet, so the mock has none either. */
+export const STREAMS = [
+  { code: 'DESIGN_ACQ', name_en: 'Design & Acquisition', name_ar: 'التصميم والاستحواذ', sort_order: 1 },
+  { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sort_order: 2 },
+  { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sort_order: 3 },
+  { code: 'CLOSURE', name_en: 'Handover & Closure', name_ar: 'التسليم والإغلاق', sort_order: 4 },
+];
+const STREAM_OF = ['DESIGN_ACQ', 'CW', 'CW', 'CW', 'TE', 'TE', 'TE', 'TE', 'CLOSURE', 'CLOSURE'];
+export const streamOfStage = (code: string) => STREAM_OF[STAGE_CODES.indexOf(code as never)] ?? null;
+
 const pad = (n: number, w = 12) => String(n).padStart(w, '0');
 export const siteIdOf = (i: number) => `50000000-0000-4000-8000-${pad(i + 1)}`;
 export const taskIdOf = (i: number, k: number) => `60000000-0000-4000-8000-${pad((i + 1) * 100 + k)}`;
@@ -52,8 +62,9 @@ export function siteMeta(i: number) {
 function genTask(i: number, k: number): MockTask {
   const m = siteMeta(i), [s, code, en, ar, sla, doc, tpl] = DEFS[k];
   const j = DEFS.filter((d, q) => q < k && d[0] === s).length;
-  const na = m.scenario === 'expansion' && (s === 1 || s === 2);
-  const state: MockTask['state'] = na ? 'na' : s < m.p ? 'approved' : s === m.p ? (j < i % 3 ? 'approved' : j === i % 3 ? 'entry' : 'locked') : 'locked';
+  // expansion: PRE-CW and CW only apply with adaption work; on every second expansion site there is none, and no new power or fiber either, so the whole Civil Works stream is N/A
+  const na = m.scenario === 'expansion' && (s === 1 || s === 2 || (s === 3 && i % 2 === 0));
+  const state: MockTask['state'] = na ? 'na' : s < m.p ? 'approved' : s === m.p ? (j < i % 3 ? 'approved' : j === i % 3 ? (i % 6 === 5 ? 'open' : 'entry') : 'locked') : 'locked';
   const planned = addDays(TODAY, -(m.p * 25 + (i % 9)) + s * 25 + j * 4);
   const actual = state === 'approved' ? addDays(planned, ((i + j) % 7) - 2) : null;
   const elapsed = state === 'approved' ? (i + j) % 7 : (i * 3 + j) % 9;
@@ -68,7 +79,7 @@ function genTask(i: number, k: number): MockTask {
   const locks = s > m.p ? [{ kind: 'gate_closed' as const, ref_code: STAGE_CODES[s - 1], message: `Milestone ${STAGE_EN[s - 1]} is not complete yet.` }]
     : [{ kind: 'predecessor_not_approved' as const, ref_code: DEFS[k - 1]?.[1], message: `${DEFS[k - 1]?.[1] ?? 'Previous task'} must be approved first.` }];
   return {
-    id: taskIdOf(i, k), site_id: m.id, site_code: m.code, region_id: m.region_id as MockTask['region_id'], task_code: code, name_en: en, name_ar: ar, stage_code: STAGE_CODES[s], state,
+    id: taskIdOf(i, k), site_id: m.id, site_code: m.code, region_id: m.region_id as MockTask['region_id'], task_code: code, name_en: en, name_ar: ar, stage_code: STAGE_CODES[s], stream_code: STREAM_OF[s], state,
     current_level: state === 'approved' ? levels : 1, levels_required: levels, planned_date: planned, actual_date: actual,
     sla: { colour, min_wd: sla?.[0] ?? null, max_wd: max, elapsed_wd: sla && state !== 'locked' ? elapsed : null, due_date: sla ? addDays(planned, max ?? 0) : null },
     slots_filled: slots.filter((x) => x.files.length).length, slots_required: slots.length, template_id: tpl, return_count: 0, version: 1,
@@ -105,14 +116,34 @@ export function pipelineOf(i: number): PipelineNode[] {
 }
 
 const bad = (p: PipelineNode[]) => p.map((n) => ({ code: n.code, state: n.state === 'locked' || n.state === 'awaiting_confirmation' ? 'planned' : n.state }));
-export function listItem(i: number): SiteListItem {
-  const m = siteMeta(i), pipe = pipelineOf(i), tasks = siteTasks(i);
+
+/** The status of one site in each stream, with the real shape of `StreamStatus` (stages and counting tasks of the stream only). */
+export function streamStatuses(i: number): StreamStatus[] {
+  const tasks = siteTasks(i);
+  return STREAMS.map((s) => {
+    const stages = STAGE_CODES.filter((c) => streamOfStage(c) === s.code);
+    const own = tasks.filter((t) => stages.includes(t.stage_code as never) && t.state !== 'na');
+    const done = own.filter((t) => t.state === 'approved').length;
+    const cur = stages.find((c) => own.some((t) => t.stage_code === c && t.state !== 'approved'));
+    const state: StreamStatus['state'] = !own.length ? 'na' : done === own.length ? 'done' : own.some((t) => t.state !== 'locked') ? 'in_progress' : 'not_started';
+    return {
+      ...s, state, current_stage: state === 'done' || state === 'na' ? null : cur ?? null, done_tasks: done, total_tasks: own.length,
+      late_count: own.filter((t) => t.state !== 'approved' && t.sla?.colour === 'red').length,
+      milestone_date: state === 'done' ? own.map((t) => t.actual_date ?? '').sort().pop() || null : null,
+    };
+  });
+}
+
+export function listItem(i: number, stream?: string): SiteListItem {
+  const m = siteMeta(i), pipe = pipelineOf(i).filter((n) => !stream || streamOfStage(n.code) === stream);
+  const tasks = siteTasks(i).filter((t) => !stream || streamOfStage(t.stage_code) === stream);
   const cur = pipe.find((n) => n.state === 'current' || n.state === 'late');
   return {
     id: m.id, site_code: m.code, name: m.name, region_id: m.region_id as SiteListItem['region_id'], cluster_code: m.cluster, delivery_scenario: m.scenario, overall_status: m.status,
     current_milestone: cur?.code ?? null, next_milestone: pipe.find((n) => n.state === 'planned')?.code ?? null, workflow_version: 1,
     late_task_count: tasks.filter((t) => t.sla?.colour === 'red' && t.state !== 'approved').length,
     waiting_approval_count: tasks.filter((t) => t.state === 'in_review' || t.state === 'in_approval').length, rail: bad(pipe) as SiteListItem['rail'],
+    streams: streamStatuses(i),
   };
 }
 
@@ -125,10 +156,12 @@ export function detail(i: number): SiteDetail {
   } as SiteDetail;
 }
 
-export function gridOf(i: number): SiteTasks {
+export function gridOf(i: number, stream?: string): SiteTasks {
   const tasks = siteTasks(i);
   return {
     workflow_version: 1,
-    stages: STAGE_CODES.map((code, s) => ({ code, name_en: STAGE_EN[s], name_ar: STAGE_AR[s], tasks: tasks.filter((t) => t.stage_code === code).map(toSummary) })),
+    streams: STREAMS,
+    stages: STAGE_CODES.map((code, s) => ({ code, stream_code: STREAM_OF[s], name_en: STAGE_EN[s], name_ar: STAGE_AR[s], tasks: tasks.filter((t) => t.stage_code === code).map(toSummary) }))
+      .filter((st) => !stream || st.stream_code === stream),
   };
 }

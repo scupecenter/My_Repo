@@ -89,25 +89,37 @@ ALTER TABLE roles DROP COLUMN parent_role_id;   -- also drops roles_parent_role_
 -- ---------------------------------------------------------------------------------------------------------------------
 -- The stream whose open snags block a task: CW for CW PAC (B13) and CW FAC (B15), TE for TE PAC (D16) and TE FAC (D18);
 -- NULL for every other task. Task codes are stable across workflow versions.
-CREATE OR REPLACE FUNCTION wf_snag_scope(p_task uuid) RETURNS text
+-- Internal (not granted to the application role): no region gate, so the engine's check can never fail open.
+CREATE OR REPLACE FUNCTION wf_snag_scope_of(p_task uuid) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   SELECT CASE td.code WHEN 'B13' THEN 'CW' WHEN 'B15' THEN 'CW' WHEN 'D16' THEN 'TE' WHEN 'D18' THEN 'TE' END
   FROM public.task_instances t JOIN public.task_definitions td ON td.id = t.task_def_id
-  WHERE t.id = p_task AND public.app_region_check(t.region_id)
+  WHERE t.id = p_task
+$$;
+
+CREATE OR REPLACE FUNCTION wf_open_snags_of(p_task uuid) RETURNS int
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT count(*)::int
+  FROM public.task_instances t
+  JOIN public.snags s ON s.site_id = t.site_id
+  JOIN public.snag_types st ON st.id = s.snag_type_id
+  WHERE t.id = p_task
+    AND upper(btrim(s.scope)) = public.wf_snag_scope_of(p_task)
+    AND s.status IN ('open', 'fix_uploaded', 'in_review')
+    AND st.blocks_preliminary_acceptance
+$$;
+
+-- Read helpers for the task view: the same values, limited to tasks in the caller's regions.
+CREATE OR REPLACE FUNCTION wf_snag_scope(p_task uuid) RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT public.wf_snag_scope_of(t.id) FROM public.task_instances t WHERE t.id = p_task AND public.app_region_check(t.region_id)
 $$;
 
 -- Open snags of that stream on the task's site (not only those linked to the task); 0 for a task no snag can block.
 -- Open = open, fix uploaded or in review (the fix is approved by the workflow before the snag closes).
 CREATE OR REPLACE FUNCTION wf_open_snags(p_task uuid) RETURNS int
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-  SELECT count(*)::int
-  FROM public.task_instances t
-  JOIN public.snags s ON s.site_id = t.site_id
-  JOIN public.snag_types st ON st.id = s.snag_type_id
-  WHERE t.id = p_task AND public.app_region_check(t.region_id)
-    AND upper(btrim(s.scope)) = public.wf_snag_scope(p_task)
-    AND s.status IN ('open', 'fix_uploaded', 'in_review')
-    AND st.blocks_preliminary_acceptance
+  SELECT public.wf_open_snags_of(t.id) FROM public.task_instances t WHERE t.id = p_task AND public.app_region_check(t.region_id)
 $$;
 
 -- Submit, review and approve share one function (0015); its old final-approval snag check is replaced by the stream rule.
@@ -133,9 +145,9 @@ BEGIN
   mode := public.wf_require_actor(p_task, k, actor);
 
   -- E6 / Q25: the four acceptances are blocked by the open snags of their own stream, whatever the action (submit, review, approve).
-  v_scope := public.wf_snag_scope(p_task);
+  v_scope := public.wf_snag_scope_of(p_task);
   IF v_scope IS NOT NULL THEN
-    n_snags := public.wf_open_snags(p_task);
+    n_snags := public.wf_open_snags_of(p_task);
     IF n_snags > 0 THEN PERFORM public.wf_err('open_snags', jsonb_build_object('count', n_snags, 'scope', v_scope)); END IF;
   END IF;
 
@@ -212,6 +224,10 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 3. Ownership and execute rights (CREATE OR REPLACE keeps those of the existing functions; the new ones are set here)
 -- ---------------------------------------------------------------------------------------------------------------------
+ALTER FUNCTION wf_snag_scope_of(uuid) OWNER TO pmis_definer;
+ALTER FUNCTION wf_open_snags_of(uuid) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION wf_snag_scope_of(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION wf_open_snags_of(uuid) FROM PUBLIC;
 ALTER FUNCTION wf_snag_scope(uuid) OWNER TO pmis_definer;
 ALTER FUNCTION wf_open_snags(uuid) OWNER TO pmis_definer;
 REVOKE ALL ON FUNCTION wf_snag_scope(uuid) FROM PUBLIC;

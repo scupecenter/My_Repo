@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -20,6 +20,7 @@ const file = () => new File(['%PDF-1.4'], 'sar.pdf', { type: 'application/pdf' }
 async function submitA1AsReviewer() {
   await signIn('reviewer');
   const t0 = await api.get<TaskDetail>(`/tasks/${A1}`);
+  await api.patch(`/tasks/${A1}`, { version: t0.version, body: { actual_date: '2026-10-20' } }); // the engine needs the actual date to submit
   await api.post(`/tasks/${A1}/slots/${t0.slots[0].id}/files`, { body: (() => { const f = new FormData(); f.append('file', file()); return f; })() });
   const t1 = await api.get<TaskDetail>(`/tasks/${A1}`);
   await api.post(`/tasks/${A1}/submit`, { version: t1.version });
@@ -107,6 +108,14 @@ describe('Task drawer', () => {
     const slot = (await screen.findAllByTestId(/^slot-input-/))[0];
     await userEvent.upload(slot, file());
     await waitFor(() => expect(screen.getByTestId('drawer-submit')).toBeEnabled());
+    // submitting without the actual date is refused in plain words (422 mandatory_fields_missing), nothing changes
+    await userEvent.click(screen.getByTestId('drawer-submit'));
+    expect(await screen.findByText('Fill the mandatory fields first: actual_date.')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-state')).toHaveTextContent('Entry');
+    // save the date (If-Match), then submit
+    fireEvent.change(screen.getByTestId('drawer-actual-date'), { target: { value: '2026-10-20' } });
+    await userEvent.click(screen.getByTestId('drawer-save'));
+    expect(await screen.findByText('Saved.')).toBeInTheDocument();
     await userEvent.click(screen.getByTestId('drawer-submit'));
     await waitFor(() => expect(screen.getByTestId('drawer-state')).toHaveTextContent('Awaiting approval'));
     await waitFor(() => expect(screen.getByTestId('history-list')).toHaveTextContent(/Auto-skipped/));

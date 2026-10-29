@@ -65,6 +65,25 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/delegations'],
   ['post', '/delegations'],
   ['post', '/delegations/:id/revoke'],
+  // Contract 0.4.1: Site Register with streams, tasks and approvals (apps/api: sites, workflow; migration 0015).
+  // Document slots, file upload and templates are not in the API yet and stay mocked.
+  ['get', '/sites'],
+  ['get', '/sites/:id'],
+  ['get', '/sites/:id/tasks'],
+  ['get', '/tasks/:id'],
+  ['patch', '/tasks/:id'],
+  ['post', '/tasks/:id/start'],
+  ['post', '/tasks/:id/submit'],
+  ['post', '/tasks/:id/review'],
+  ['post', '/tasks/:id/approve'],
+  ['post', '/tasks/:id/reject'],
+  ['post', '/tasks/:id/claim'],
+  ['post', '/tasks/:id/release'],
+  ['get', '/tasks/:id/history'],
+  ['get', '/tasks/:id/comments'],
+  ['post', '/tasks/:id/comments'],
+  ['get', '/approvals'],
+  ['post', '/approvals/bulk'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

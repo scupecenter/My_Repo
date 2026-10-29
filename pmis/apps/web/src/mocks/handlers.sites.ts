@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Matrix, MatrixPatch } from '@/api/types';
-import { canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
+import { canAct, canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
 import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handlers';
 import { uid } from './ids';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
-import { detail, gridOf, listItem, siteIndex, SITE_COUNT, siteMeta, TODAY } from './sites';
+import { detail, gridOf, listItem, siteIndex, SITE_COUNT, siteMeta, STREAMS, TODAY } from './sites';
 
 const B = API_BASE;
 const REGIONS = [['Tripoli', 'طرابلس'], ['Middle', 'الوسطى'], ['WM', 'الجبل الغربي'], ['Zawia', 'الزاوية'], ['Benghazi', 'بنغازي'], ['GM', 'الجبل الأخضر'], ['Sebha', 'سبها']];
@@ -23,10 +23,14 @@ export const siteHandlers = [
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
     const q = (u.get('q') ?? '').toLowerCase(), regions = u.getAll('region_id').map(Number), limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
-    const sc = u.get('scenario'), st = u.get('overall_status'), stage = u.get('stage_code');
+    const sc = u.get('scenario'), st = u.get('overall_status'), stage = u.get('stage_code'), stream = u.get('stream');
+    if (stream && !STREAMS.some((x) => x.code === stream)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/stream', code: 'unknown_stream' }] });
     const all = Array.from({ length: SITE_COUNT }, (_, i) => siteMeta(i)).filter((m) =>
       (!q || `${m.code} ${m.name}`.toLowerCase().includes(q)) && (!regions.length || regions.includes(m.region_id)) && (!sc || m.scenario === sc) && (!st || m.status === st));
-    const items = all.map((m) => listItem(m.i)).filter((x) => !stage || x.current_milestone === stage);
+    // with a stream: rail and counts cover that stream only, and sites where it does not apply are left out (contract 0.4.1)
+    const items = all.map((m) => listItem(m.i, stream ?? undefined))
+      .filter((x) => !stream || x.streams?.find((s) => s.code === stream)?.state !== 'na')
+      .filter((x) => !stage || (stream ? x.rail.find((r) => r.state === 'current' || r.state === 'late')?.code === stage : x.current_milestone === stage));
     const slice = items.slice(start, start + limit), next = start + limit < items.length ? String(start + limit) : null;
     return HttpResponse.json({ items: slice, page: { limit, next_cursor: next, total: items.length } });
   }),
@@ -35,10 +39,12 @@ export const siteHandlers = [
     const i = siteIndex(params.id as string);
     return i >= 0 && i < SITE_COUNT ? HttpResponse.json(detail(i), { headers: { ETag: '"1"' } }) : problem(404, 'not_found', 'Site not found');
   }),
-  http.get(`${B}/sites/:id/tasks`, ({ params }) => {
+  http.get(`${B}/sites/:id/tasks`, ({ params, request }) => {
     const g = guard(); if (g) return g;
     const i = siteIndex(params.id as string);
-    return i >= 0 && i < SITE_COUNT ? HttpResponse.json(gridOf(i)) : problem(404, 'not_found', 'Site not found');
+    const stream = new URL(request.url).searchParams.get('stream');
+    if (stream && !STREAMS.some((x) => x.code === stream)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/stream', code: 'unknown_stream' }] });
+    return i >= 0 && i < SITE_COUNT ? HttpResponse.json(gridOf(i, stream ?? undefined)) : problem(404, 'not_found', 'Site not found');
   }),
 
   http.patch(`${B}/tasks/:id`, async ({ params, request }) => {
@@ -48,8 +54,9 @@ export const siteHandlers = [
     const bad = ifMatch(request, t); if (bad) return bad;
     if ((t.state !== 'entry' && t.state !== 'open') || !canEditTask(t)) return problem(403, 'forbidden', 'You cannot edit this task');
     const body = (await request.json()) as Record<string, unknown>;
-    for (const k of ['planned_date', 'actual_date'] as const) if (k in body && !validDate(body[k])) return invalid(`/${k}`, 'invalid_date');
+    for (const k of ['planned_date', 'actual_start', 'actual_date'] as const) if (k in body && !validDate(body[k])) return invalid(`/${k}`, 'invalid_date');
     if ('planned_date' in body) t.planned_date = body.planned_date as string | null;
+    if ('actual_start' in body) t.actual_start = body.actual_start as string | null;
     if ('actual_date' in body) t.actual_date = body.actual_date as string | null;
     t.version += 1;
     save();
@@ -61,6 +68,7 @@ export const siteHandlers = [
     if (!t) return problem(404, 'not_found', 'Task not found');
     const bad = ifMatch(request, t); if (bad) return bad;
     if (t.state !== 'entry' || !canEditTask(t)) return problem(409, 'invalid_transition', 'Task cannot be submitted');
+    if (!t.actual_date) return problem(422, 'mandatory_fields_missing', 'Mandatory fields are missing', { missing: ['actual_date'] } as never);
     const miss = slotsOf(t).filter((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected'));
     if (miss.length) return problem(422, 'mandatory_slots_missing', 'Mandatory documents are missing', { errors: miss.map((s) => ({ path: `/slots/${s.id}`, code: 'missing' })) });
     const v = viewer()!, sp = skipPath(t, v.employee_id);
@@ -76,6 +84,37 @@ export const siteHandlers = [
     save();
     return HttpResponse.json({ task: toDetail(t), step_ids: [], skipped_levels: sp.skipped }, { headers: { ETag: `"${t.version}"` } });
   }),
+  // open -> entry (the holder starts the work); claim / release: a group level is taken by one holder at a time
+  http.post(`${B}/tasks/:id/start`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const t = find(params.id as string);
+    if (!t) return problem(404, 'not_found', 'Task not found');
+    const bad = ifMatch(request, t); if (bad) return bad;
+    if (t.state !== 'open') return problem(409, 'invalid_transition', 'The task is not open');
+    if (!canEditTask(t)) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+    const { actual_start } = (await request.json().catch(() => ({}))) as { actual_start?: string };
+    t.state = 'entry'; t.version += 1;
+    t.actual_start = actual_start ?? TODAY;
+    save();
+    return HttpResponse.json({ task: toDetail(t), step_ids: [], skipped_levels: [], unlocked_task_ids: [] }, { headers: { ETag: `"${t.version}"` } });
+  }),
+  ...(['claim', 'release'] as const).map((op) =>
+    http.post(`${B}/tasks/:id/${op}`, ({ params, request }) => {
+      const g = guard(); if (g) return g;
+      const t = find(params.id as string), v = viewer()!;
+      if (!t) return problem(404, 'not_found', 'Task not found');
+      const bad = ifMatch(request, t); if (bad) return bad;
+      if (!canAct(t.level_kind) || (t.state !== 'in_review' && t.state !== 'in_approval')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+      const me = { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined };
+      if (op === 'claim') {
+        if (t.claimed_by && t.claimed_by.id !== me.id) return problem(409, 'already_claimed', 'Another holder has claimed this level', { claimed_by: t.claimed_by } as never);
+        t.claimed_by = me;
+      } else if (t.claimed_by?.id === me.id) t.claimed_by = undefined;
+      else return problem(409, 'invalid_transition', 'You have not claimed this level');
+      t.version += 1;
+      save();
+      return HttpResponse.json({ task: toDetail(t), step_ids: [], skipped_levels: [], unlocked_task_ids: [] }, { headers: { ETag: `"${t.version}"` } });
+    })),
   http.get(`${B}/tasks/:id/history`, ({ params }) => {
     const g = guard(); if (g) return g;
     const t = find(params.id as string);
