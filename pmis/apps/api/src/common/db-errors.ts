@@ -38,6 +38,54 @@ function duplicateField(message: string): string | undefined {
   return FIELD_BY_CONSTRAINT.find(([re]) => re.test(message))?.[1];
 }
 
+const WF_RE = /wf:([a-z_]+):(\{.*\})/s;
+
+/** Errors of the wf_* functions (migration 0015) arrive as P0001 with the message `wf:<code>:<json>`. */
+export function mapWfError(message: string): ProblemException | null {
+  const m = WF_RE.exec(message);
+  if (!m) return null;
+  let extra: Record<string, unknown> = {};
+  try {
+    extra = JSON.parse(m[2] as string) as Record<string, unknown>;
+  } catch {
+    /* no details */
+  }
+  const detail = typeof extra.detail === 'string' ? extra.detail : undefined;
+  switch (m[1]) {
+    case 'not_found':
+      return new ProblemException(404, 'not_found', { detail: 'The task does not exist or is not visible to you.' });
+    case 'precondition_failed':
+      return new ProblemException(412, 'precondition_failed', { detail: 'The task changed since you read it. Reload and try again.' });
+    case 'action_forbidden':
+      return new ProblemException(403, 'action_forbidden', { detail: detail ?? 'You are not allowed to do this.' });
+    case 'not_eligible_holder':
+      return new ProblemException(403, 'not_eligible_holder', { detail: detail ?? 'You are not a holder of the level the task is at.' });
+    case 'already_claimed':
+      return new ProblemException(409, 'already_claimed', { detail: 'Another holder has claimed this level.', extra: { claimed_by: { id: extra.claimed_by } } });
+    case 'invalid_transition':
+      return new ProblemException(409, 'invalid_transition', { detail: detail ?? 'This is not possible in the current state.' });
+    case 'note_required':
+      return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
+    case 'mandatory_slots_missing':
+    case 'mandatory_fields_missing':
+      return new ProblemException(422, m[1], {
+        detail: m[1] === 'mandatory_slots_missing' ? 'Mandatory document slots are missing.' : 'Mandatory fields are missing.',
+        extra: { missing: Array.isArray(extra.missing) ? extra.missing : [] },
+      });
+    case 'open_snags':
+      return new ProblemException(422, 'open_snags', { detail: `The task cannot be approved while ${String(extra.count ?? 'some')} snag(s) are open.` });
+    case 'step_up_required':
+      return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+    case 'validation_failed':
+      return new ProblemException(422, 'validation_failed', {
+        detail: detail ?? 'The request is not valid.',
+        errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
+      });
+    default:
+      return null;
+  }
+}
+
 /**
  * Maps a PostgreSQL error raised by an idm_* / auth_local_* function (or a constraint) to a problem.
  * Returns null when the error is not one we know how to describe (the caller answers 500).
@@ -80,6 +128,8 @@ export function mapDbError(e: unknown): ProblemException | null {
     case '23503':
       return new ProblemException(409, 'invalid_transition', { detail: 'The change conflicts with related data.' });
     case 'P0001': {
+      const wf = mapWfError(msg);
+      if (wf) return wf;
       // Messages of idm_set_user_org and ann_send (migration 0011).
       if (/manager loop|manager chain too deep/i.test(msg)) {
         return new ProblemException(422, 'validation_failed', {

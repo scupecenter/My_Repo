@@ -36,8 +36,15 @@ import { RolesController } from './roles/roles.controller';
 import { RolesService } from './roles/roles.service';
 import { MessagesController } from './messages/messages.controller';
 import { MessagesService } from './messages/messages.service';
+import { SitesController } from './sites/sites.controller';
+import { SitesService } from './sites/sites.service';
 import { UsersController } from './users/users.controller';
 import { UsersRepo } from './users/users.repo';
+import { ApprovalsService } from './workflow/approvals.service';
+import { TaskDetailService } from './workflow/task-detail.service';
+import { TaskViewService } from './workflow/task-view.service';
+import { TasksController } from './workflow/tasks.controller';
+import { WorkflowService } from './workflow/workflow.service';
 import { UsersService } from './users/users.service';
 
 export function appModuleFor(config: AppConfig) {
@@ -45,14 +52,14 @@ export function appModuleFor(config: AppConfig) {
     controllers: [
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController,
+      DelegationsController, SitesController, TasksController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService,
+      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

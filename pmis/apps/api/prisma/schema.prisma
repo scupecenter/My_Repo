@@ -85,6 +85,8 @@ enum TaskState {
 }
 
 enum WorkflowAction {
+  start
+  review
   submit
   approve
   reject
@@ -690,10 +692,11 @@ model WorkflowDefinition {
   created_at     DateTime       @default(now()) @db.Timestamptz(6)
   published_at   DateTime?      @db.Timestamptz(6)
 
-  stages StageDefinition[]
-  gates  PhaseGateRule[]
-  tasks  TaskDefinition[]
-  sites  Site[]
+  stages  StageDefinition[]
+  gates   PhaseGateRule[]
+  tasks   TaskDefinition[]
+  sites   Site[]
+  streams WorkflowStream[]
 
   @@index([status, effective_from])
   @@map("workflow_definitions")
@@ -712,16 +715,35 @@ model StageDefinition {
   counts_in_project_status Boolean @default(true)
   approval_levels          Int     @default(3)
   is_active                Boolean @default(true)
+  stream_code              String? // the stream (Site Register sub-section) this stage belongs to; migration 0015
 
   workflow     WorkflowDefinition @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  stream       WorkflowStream?    @relation(fields: [workflow_id, stream_code], references: [workflow_id, code])
   tasks        TaskDefinition[]
   matrix_cells MatrixCell[]
   custom       Json               @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@unique([workflow_id, code])
   @@unique([id, workflow_id])
+  @@index([workflow_id, stream_code], map: "stage_definitions_stream_idx")
   @@index([custom], type: Gin)
   @@map("stage_definitions")
+}
+
+// A stream groups stages for the Site Register sub-sections (owner decision 2026-10-29). Versioned with the workflow definition.
+model WorkflowStream {
+  workflow_id String  @db.Uuid
+  code        String
+  name_en     String
+  name_ar     String?
+  sort_order  Int
+
+  workflow WorkflowDefinition @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  stages   StageDefinition[]
+
+  @@id([workflow_id, code])
+  @@unique([workflow_id, sort_order])
+  @@map("workflow_streams")
 }
 
 model TaskDefinition {
@@ -773,44 +795,52 @@ model TaskPredecessor {
 }
 
 model TaskInstance {
-  id                       String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  site_id                  String         @db.Uuid
+  id                       String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id                  String           @db.Uuid
   region_id                Int // denormalised from site for RLS and filters
-  site                     Site           @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
-  task_def_id              String         @db.Uuid
-  state                    TaskState      @default(locked)
-  current_level            Int            @default(0) // 1 entry, 2 review, 3 approve
-  levels_required          Int            @default(3) // frozen at creation
-  ball_in_court_user_id    String?        @db.Uuid
-  ball_in_court_group_id   String?        @db.Uuid
-  ball_in_court_role_id    String?        @db.Uuid
-  external_party_id        String?        @db.Uuid
-  baseline_date            DateTime?      @db.Date
-  planned_date             DateTime?      @db.Date
-  planned_start            DateTime?      @db.Date
-  actual_start             DateTime?      @db.Date
-  actual_date              DateTime?      @db.Date
-  submitted_date           DateTime?      @db.Date
-  approved_date            DateTime?      @db.Date
+  site                     Site             @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
+  task_def_id              String           @db.Uuid
+  state                    TaskState        @default(locked)
+  current_level            Int              @default(0) // 1 entry, 2 review, 3 approve
+  levels_required          Int              @default(3) // frozen at creation
+  ball_in_court_user_id    String?          @db.Uuid
+  ball_in_court_group_id   String?          @db.Uuid
+  ball_in_court_role_id    String?          @db.Uuid
+  external_party_id        String?          @db.Uuid
+  baseline_date            DateTime?        @db.Date
+  planned_date             DateTime?        @db.Date
+  planned_start            DateTime?        @db.Date
+  actual_start             DateTime?        @db.Date
+  actual_date              DateTime?        @db.Date
+  submitted_date           DateTime?        @db.Date
+  approved_date            DateTime?        @db.Date
   values                   Json? // task-specific extra fields (result, analysis type, status text)
-  sla_rule_id              String?        @db.Uuid // snapshot taken when the task opens; re-pointed only by the admin path
-  sla_rule                 SlaRule?       @relation(fields: [sla_rule_id], references: [id])
+  sla_rule_id              String?          @db.Uuid // snapshot taken when the task opens; re-pointed only by the admin path
+  sla_rule                 SlaRule?         @relation(fields: [sla_rule_id], references: [id])
   lock_reason              String?
-  is_na                    Boolean        @default(false)
+  is_na                    Boolean          @default(false)
   na_reason                String?
-  admin_override           Boolean        @default(false)
-  has_override_flag_in_kpi Boolean        @default(false)
-  due_date                 DateTime?      @db.Date
-  version                  Int            @default(1)
-  created_at               DateTime       @default(now()) @db.Timestamptz(6)
-  updated_at               DateTime       @updatedAt @db.Timestamptz(6)
-  task_def                 TaskDefinition @relation(fields: [task_def_id], references: [id])
-  external_party           ExternalParty? @relation(fields: [external_party_id], references: [id])
+  admin_override           Boolean          @default(false)
+  has_override_flag_in_kpi Boolean          @default(false)
+  due_date                 DateTime?        @db.Date
+  path_frozen_at           DateTime?        @db.Timestamptz(6) // B7: the level path is final from the first submission
+  level_round              Int              @default(0)
+  level_opened_at          DateTime?        @db.Timestamptz(6)
+  return_count             Int              @default(0)
+  last_return_note         String?
+  self_approval            Boolean          @default(false)
+  version                  Int              @default(1)
+  created_at               DateTime         @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime         @updatedAt @db.Timestamptz(6)
+  task_def                 TaskDefinition   @relation(fields: [task_def_id], references: [id])
+  external_party           ExternalParty?   @relation(fields: [external_party_id], references: [id])
   steps                    WorkflowStep[]
   slots                    DocumentSlot[]
   comments                 Comment[]
   snags                    Snag[]
-  custom                   Json           @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+  level_actors             TaskLevelActor[]
+  level_voters             TaskLevelVoter[]
+  custom                   Json             @default("{}") @db.JsonB // admin-defined fields, validated by trigger
 
   @@unique([id, region_id])
   @@unique([site_id, task_def_id])
@@ -842,6 +872,7 @@ model WorkflowStep {
   batch_row_id    String?        @db.Uuid
   before_state    TaskState?
   after_state     TaskState?
+  self_approval   Boolean        @default(false) // B5: the final level was reached by self-skip, or the task has one level
   created_at      DateTime       @default(now()) @db.Timestamptz(6)
 
   task TaskInstance @relation(fields: [task_id], references: [id], onDelete: Cascade)
@@ -849,6 +880,33 @@ model WorkflowStep {
   @@index([task_id, created_at])
   @@index([acted_by])
   @@map("workflow_steps")
+}
+
+// Who handled each level in the current pass ('acted' or 'skipped'): decides where a rejection goes (B6). Written only by wf_* functions.
+model TaskLevelActor {
+  task_id  String       @db.Uuid
+  level    Int
+  user_id  String       @db.Uuid
+  how      String
+  acted_at DateTime     @default(now()) @db.Timestamptz(6)
+  task     TaskInstance @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, level])
+  @@map("task_level_actors")
+}
+
+// Members who must vote at a level under the rule all_members, fixed when the level opens.
+model TaskLevelVoter {
+  task_id  String       @db.Uuid
+  level    Int
+  round    Int
+  user_id  String       @db.Uuid
+  voted_at DateTime?    @db.Timestamptz(6)
+  task     TaskInstance @relation(fields: [task_id], references: [id], onDelete: Cascade)
+
+  @@id([task_id, level, round, user_id])
+  @@index([user_id], map: "task_level_voters_user_idx")
+  @@map("task_level_voters")
 }
 
 // Responsibility Matrix: stage or task x level -> assignees. task_def_id null = stage default.
@@ -1182,20 +1240,30 @@ model ImportBatchRow {
 // ============================================================================
 
 model Comment {
-  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  task_id           String?       @db.Uuid
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_id           String?          @db.Uuid
   region_id         Int // from the task (composite FK) or the register row
   entity_type       String? // for register records
-  entity_id         String?       @db.Uuid
-  author_id         String        @db.Uuid
+  entity_id         String?          @db.Uuid
+  author_id         String           @db.Uuid
   body              String
-  is_rejection_note Boolean       @default(false)
-  created_at        DateTime      @default(now()) @db.Timestamptz(6)
-  task              TaskInstance? @relation(fields: [task_id, region_id], references: [id, region_id], onUpdate: Cascade, onDelete: Cascade)
+  is_rejection_note Boolean          @default(false)
+  created_at        DateTime         @default(now()) @db.Timestamptz(6)
+  task              TaskInstance?    @relation(fields: [task_id, region_id], references: [id, region_id], onUpdate: Cascade, onDelete: Cascade)
+  mentions          CommentMention[]
 
   @@index([task_id, created_at])
   @@index([entity_type, entity_id])
   @@map("comments")
+}
+
+model CommentMention {
+  comment_id String  @db.Uuid
+  user_id    String  @db.Uuid
+  comment    Comment @relation(fields: [comment_id], references: [id], onDelete: Cascade)
+
+  @@id([comment_id, user_id])
+  @@map("comment_mentions")
 }
 
 model Notification {

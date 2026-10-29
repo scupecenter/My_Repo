@@ -54,6 +54,7 @@ export class ProblemFilter implements ExceptionFilter {
     body.instance = req.originalUrl?.split('?')[0];
     if (problem.opts.errors && problem.opts.errors.length > 0) body.errors = problem.opts.errors;
     if (problem.opts.step_up_method) body.step_up_method = problem.opts.step_up_method;
+    if (problem.opts.extra) Object.assign(body, problem.opts.extra);
 
     for (const [k, v] of Object.entries(problem.opts.headers ?? {})) res.setHeader(k, v);
     res.status(status).type('application/problem+json').send(JSON.stringify(body));

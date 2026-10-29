@@ -19,7 +19,13 @@ export class DbService implements OnModuleDestroy {
   readonly client: PrismaClient;
 
   constructor(@Inject(APP_CONFIG) config: AppConfig) {
-    this.client = new PrismaClient({ datasourceUrl: config.databaseUrl, log: ['error'] });
+    const client = new PrismaClient({ datasourceUrl: config.databaseUrl, log: [{ emit: 'event', level: 'error' }] });
+    // A refusal of the workflow engine (wf:<code>:<json>, for example a stale If-Match) is an answer to the caller, not a server error.
+    client.$on('error', (e) => {
+      if (/wf:[a-z_]+:\{/.test(e.message)) return;
+      process.stderr.write(`prisma:error ${e.message}\n`);
+    });
+    this.client = client;
   }
 
   get tx(): Tx {

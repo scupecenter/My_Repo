@@ -20,3 +20,17 @@ export function checkIfMatch(header: string | undefined, current: number | strin
     throw new ProblemException(412, 'precondition_failed', { detail: 'The resource changed since you read it. Reload and try again.' });
   }
 }
+
+/**
+ * If-Match for a mutation that hands the version to the database: missing is 428, `*` means any version (null), a malformed or
+ * non-numeric value is 412 (it cannot match any version).
+ */
+export function parseIfMatch(header: string | undefined): number | null {
+  if (header === undefined || header.trim() === '') {
+    throw new ProblemException(428, 'precondition_required', { detail: 'Send the ETag you last read in If-Match.' });
+  }
+  if (header.trim() === '*') return null;
+  const first = header.split(',')[0]?.trim().replace(/^W\//, '').replace(/^"|"$/g, '') ?? '';
+  if (!/^[0-9]{1,9}$/.test(first)) throw new ProblemException(412, 'precondition_failed', { detail: 'The If-Match value does not match any version.' });
+  return Number(first);
+}
