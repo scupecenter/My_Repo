@@ -85,6 +85,34 @@ export async function ensureRole(db: PgClient, code = 'TEST_ROLE'): Promise<stri
   return r.rows[0].id as string;
 }
 
+/** A permission profile with the given (module, action) grants, created straight in the database. Returns its id. */
+export async function makeProfile(db: PgClient, grants: [string, string][], code = `PROF_${uniq()}`): Promise<string> {
+  const p = await db.query('INSERT INTO permission_profiles (code, name_en) VALUES ($1, $1) RETURNING id', [code]);
+  for (const [m, a] of grants) await db.query('INSERT INTO permission_grants (profile_id, module_key, action) VALUES ($1, $2, $3::"PermissionAction")', [p.rows[0].id, m, a]);
+  return p.rows[0].id as string;
+}
+
+/** A role with a unique code, created straight in the database. Returns its id. */
+export async function makeRole(db: PgClient, over: { code?: string; parent?: string; profile?: string; regions?: number[]; allRegions?: boolean; modules?: string[]; allModules?: boolean; canHold?: boolean } = {}): Promise<string> {
+  const code = over.code ?? `ROLE_${uniq().toUpperCase()}`;
+  const r = await db.query(
+    `INSERT INTO roles (code, name_en, parent_role_id, default_profile_id, default_all_regions, default_all_modules, can_hold_matrix_levels) VALUES ($1, $1, $2, $3, $4, $5, $6) RETURNING id`,
+    [code, over.parent ?? null, over.profile ?? null, over.allRegions ?? false, over.allModules ?? false, over.canHold ?? true],
+  );
+  for (const region of over.regions ?? []) await db.query('INSERT INTO role_default_regions (role_id, region_id) VALUES ($1, $2)', [r.rows[0].id, region]);
+  for (const m of over.modules ?? []) await db.query('INSERT INTO role_default_modules (role_id, module_key) VALUES ($1, $2)', [r.rows[0].id, m]);
+  return r.rows[0].id as string;
+}
+
+/** A System Admin who is signed in and has passed step-up. */
+export async function adminApi(app: NestExpressApplication, db: PgClient): Promise<{ admin: TestUser; api: Api }> {
+  const admin = await makeAdmin(db);
+  const api = await loggedIn(app, admin);
+  const res = await api.stepUp(admin.password);
+  if (res.status !== 200) throw new Error(`step-up failed in test setup: ${res.status} ${JSON.stringify(res.body)}`);
+  return { admin, api };
+}
+
 /** A local account created straight in the database (as the superuser), the way idm_create_local_user would leave it. */
 export async function makeUser(db: PgClient, o: MakeUserOptions = {}): Promise<TestUser> {
   const tag = uniq();

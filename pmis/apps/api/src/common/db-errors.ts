@@ -28,7 +28,7 @@ export function pgInfo(e: unknown): PgInfo | null {
 }
 
 const FIELD_BY_CONSTRAINT: [RegExp, string][] = [
-  [/departments_code_key|departments.*\(code\)/i, '/code'],
+  [/departments_code_key|departments.*\(code\)|\(code\)=|roles_code_key|permission_profiles_code_key/i, '/code'],
   [/users_email_key|\(email\)|\bemail\b/i, '/email'],
   [/users_employee_id_key|\(employee_id\)|employee_id/i, '/employee_id'],
   [/users_phone_key|users_phone_e164|\(phone\)|\bphone\b/i, '/phone'],
@@ -48,18 +48,26 @@ export function mapDbError(e: unknown): ProblemException | null {
   const msg = info.message;
   switch (info.sqlstate) {
     case '42501': {
-      if (/yourself|your own|own account|own status|own password/i.test(msg)) {
-        return new ProblemException(403, 'self_beneficiary', { detail: 'You cannot do this to your own account.' });
+      // Delegation rules: only a System Admin delegates (a delegate may pass on only what the admin allowed, never wider).
+      if (/can create a delegation|re-delegation needs|cannot delegate (wider|more|%)|cannot delegate \S+\.\S+ ?:|cannot outlive the parent|only a System Admin or the delegator/i.test(msg)) {
+        return new ProblemException(403, 'delegate_forbidden', { detail: 'A delegate cannot delegate or revoke beyond what the System Admin allowed.' });
+      }
+      // Nobody changes their own rights: assigning to oneself, a profile that gives the actor rights, field rules that apply to the actor.
+      if (/yourself|your own (assignments?|account|status|password|name)|own account|own status|own password|gives you rights|apply to you|role you hold/i.test(msg)) {
+        return new ProblemException(403, 'self_beneficiary', { detail: 'You cannot do this to your own account or rights.' });
       }
       // "System Admin only", "no signed-in actor", "delegation covering ... required", "global scope" and so on.
       return new ProblemException(403, 'action_forbidden', { detail: 'You are not allowed to do this.' });
     }
     case '23505': {
       const path = duplicateField(msg);
-      const errors: FieldError[] = path ? [{ path, code: 'duplicate', message: 'Already used by another account.' }] : [];
-      return new ProblemException(409, 'duplicate', { detail: 'The value is already used by another account.', errors });
+      const errors: FieldError[] = path ? [{ path, code: 'duplicate', message: path === '/code' ? 'This code is already in use.' : 'Already used by another account.' }] : [];
+      return new ProblemException(409, 'duplicate', { detail: path === '/code' ? 'The code is already in use.' : 'The value is already used by another account.', errors });
     }
     case '23514': {
+      if (/is assigned or referenced/i.test(msg)) {
+        return new ProblemException(409, 'role_in_use', { detail: 'The role is assigned or referenced: deactivate it instead of deleting.' });
+      }
       if (/System Admin must remain/i.test(msg)) {
         return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       }

@@ -58,9 +58,9 @@ async function buildDatabase(adminUrl: string, dbName: string, appPassword: stri
     }
   }
   await db.query(readFileSync(join(REPO_PMIS, 'db', 'sql', 'app_grants.sql'), 'utf8'));
-  // The 7 regions are seed data (CLAUDE.md), not part of a migration.
+  // The 7 regions are seed data (CLAUDE.md). Migration 0013 seeds them; this insert keeps the suites working on a database built without it.
   await db.query(`INSERT INTO regions (id, code, name_en) VALUES (1,'TRIPOLI','Tripoli'),(2,'MIDDLE','Middle'),(3,'WM','WM'),(4,'ZAWIA','Zawia'),
-    (5,'BENGHAZI','Benghazi'),(6,'GM','GM'),(7,'SEBHA','Sebha')`);
+    (5,'BENGHAZI','Benghazi'),(6,'GM','GM'),(7,'SEBHA','Sebha') ON CONFLICT (id) DO NOTHING`);
 
   // Cheap parameters: the test hashes only have to be valid argon2id PHC strings (the API verifies whatever the string says).
   const hash = await argon2.hash(BOOTSTRAP_ADMIN.password, { type: argon2.argon2id, memoryCost: 4096, timeCost: 2, parallelism: 1 });
