@@ -116,6 +116,36 @@ describe('roles', () => {
     await u.click(within(dlg).getByTestId('role-dialog-submit'));
     expect(await within(dlg).findByTestId('role-dialog-error')).toHaveTextContent('still assigned');
   });
+
+  it('shows one flat list: no sub-role chip, no parent field, and a new role is posted without a parent (flat roles, 2026-10-29)', async () => {
+    await signIn('pm'); await stepUpDone();
+    const u = userEvent.setup();
+    let posted: Record<string, unknown> | null = null;
+    server.use(http.post(`${API_BASE}/roles`, async ({ request }) => {
+      posted = (await request.json()) as Record<string, unknown>;
+      return HttpResponse.json({ id: 'a0000000-0000-4000-8000-000000000001', code: 'FLAT_ONE', name_en: 'Flat one', is_active: true, can_hold_matrix_levels: true, version: 1 }, { status: 201 });
+    }));
+    renderApp(<Roles />);
+    const list = await screen.findByTestId('roles-list');
+    await waitFor(() => expect(within(list).getAllByTestId(/^role-row-/).length).toBeGreaterThan(3));
+    expect(list.textContent).not.toMatch(/sub-role|دور فرعي/i);
+    for (const row of within(list).getAllByTestId(/^role-row-/)) expect(row.className).not.toMatch(/ps-8/);
+    await u.click(screen.getByTestId('role-new'));
+    const dlg = await screen.findByTestId('role-dialog');
+    expect(within(dlg).queryByTestId('role-parent')).toBeNull();
+    expect(dlg.textContent).not.toMatch(/parent|sub-role|main role|رئيسي|فرعي/i);
+    await u.type(within(dlg).getByTestId('role-code'), 'FLAT_ONE');
+    await u.type(within(dlg).getByTestId('role-name-en'), 'Flat one');
+    await u.type(within(dlg).getByTestId('role-dialog-reason'), 'Flat role');
+    await u.click(within(dlg).getByTestId('role-dialog-submit'));
+    await waitFor(() => expect(posted).not.toBeNull());
+    expect((posted as Record<string, unknown> | null)?.parent_role_id ?? null).toBeNull();
+  });
+
+  it('the Arabic role texts never say main or sub (رئيسي / فرعي)', async () => {
+    const ar = (await import('@/i18n/ar.json')).default as { roles: Record<string, string> };
+    expect(JSON.stringify(ar.roles)).not.toMatch(/رئيسي|فرعي/);
+  });
 });
 
 describe('permission profiles', () => {

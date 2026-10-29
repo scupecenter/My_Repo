@@ -101,7 +101,7 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
 export interface AssignmentDto {
   id: string;
   user: UserRef;
-  role: { id: string; code: string; name_en: string; name_ar: string | null; parent_role_id: string | null };
+  role: { id: string; code: string; name_en: string; name_ar: string | null };
   permission_level: string;
   team: string;
   region_ids: 'all' | number[];
@@ -143,7 +143,7 @@ export function toAssignmentDto(a: AssignmentRow, now: Date): AssignmentDto {
   return {
     id: a.id,
     user: { id: a.user.id, display_name: a.user.display_name, employee_id: a.user.employee_id?.trim() ?? null },
-    role: { id: a.role.id, code: a.role.code, name_en: a.role.name_en, name_ar: a.role.name_ar, parent_role_id: a.role.parent_role_id },
+    role: { id: a.role.id, code: a.role.code, name_en: a.role.name_en, name_ar: a.role.name_ar },
     permission_level: a.permission_level,
     team: a.team,
     region_ids: a.all_regions ? 'all' : a.regions.map((r) => r.region_id).sort((x, y) => x - y),

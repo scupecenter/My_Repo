@@ -555,13 +555,10 @@
     "active": "Active",
     "inactive": "Inactive",
     "saved": "Role saved.",
-    "parent": "Parent role (makes this a sub-role)",
-    "no_parent": "None (main role)",
     "default_profile": "Default permission profile",
     "no_profile": "None",
     "default_regions": "Default regions",
     "default_modules": "Default modules",
-    "sub_role": "Sub-role",
     "in_use_hint": "A role with assignments that have not ended cannot be deactivated."
   },
   "groups": {

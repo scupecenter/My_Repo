@@ -43,7 +43,7 @@ export interface AnnouncementDetailDto extends AnnouncementSummaryDto {
     all: boolean;
     users: UserRef[];
     groups: { id: string; name: string; is_system_admins: boolean }[];
-    roles: { id: string; code: string; name_en: string; name_ar: string | null; parent_role_id: string | null }[];
+    roles: { id: string; code: string; name_en: string; name_ar: string | null }[];
     departments: DepartmentRef[];
   };
 }
@@ -154,8 +154,8 @@ export class AnnouncementsService {
     const groups = await this.db.tx.$queryRaw<{ id: string; name: string; is_system_admins: boolean }[]>`
       SELECT g.id::text AS id, g.name, g.is_system_admins FROM announcement_targets t JOIN groups g ON g.id = t.target_id
       WHERE t.announcement_id = ${id}::uuid AND t.kind = 'group' ORDER BY g.name, g.id::text`;
-    const roles = await this.db.tx.$queryRaw<{ id: string; code: string; name_en: string; name_ar: string | null; parent_role_id: string | null }[]>`
-      SELECT r.id::text AS id, r.code, r.name_en, r.name_ar, r.parent_role_id::text AS parent_role_id FROM announcement_targets t
+    const roles = await this.db.tx.$queryRaw<{ id: string; code: string; name_en: string; name_ar: string | null }[]>`
+      SELECT r.id::text AS id, r.code, r.name_en, r.name_ar FROM announcement_targets t
       JOIN roles r ON r.id = t.target_id WHERE t.announcement_id = ${id}::uuid AND t.kind = 'role' ORDER BY r.name_en, r.id::text`;
     const departments = await this.db.tx.$queryRaw<DepartmentRef[]>`
       SELECT d.id::text AS id, d.code, d.name_en, d.name_ar FROM announcement_targets t JOIN departments d ON d.id = t.target_id

@@ -872,10 +872,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Roles and sub-roles (tree) */
+        /**
+         * Roles (flat list)
+         * @description One flat list in the admin's order (`sort`, then name). There is no main/sub-role nesting. Since 0.4.2 `parent_role_id` and `sub_roles` are gone from the answer.
+         */
         get: operations["listRoles"];
         put?: never;
-        /** Create a role or sub-role (admin) */
+        /**
+         * Create a role (admin)
+         * @description Roles are flat. `parent_role_id` is deprecated in 0.4.2 and accepted only as `null`; any other value is refused with 422 `validation_failed` on `/parent_role_id`.
+         */
         post: operations["createRole"];
         delete?: never;
         options?: never;
@@ -1213,6 +1219,7 @@ export interface paths {
         /**
          * Submit for review (level 1 done)
          * @description Refused with 422 `mandatory_slots_missing` or `mandatory_fields_missing` (listing them). Freezes `levels_required`.
+         *     CW PAC (B13) and CW FAC (B15) are refused with 422 `open_snags` (with `count` and `scope: CW`) while any open CW snag exists on the site; TE PAC (D16) and TE FAC (D18) likewise for open TE snags (owner decision 2026-10-29). The same check applies to review and approve.
          *     Self-skip may carry the task further (`skipped_levels` in the result). If the chain reaches final approval, step-up is required.
          */
         post: operations["submitTask"];
@@ -1250,7 +1257,7 @@ export interface paths {
         put?: never;
         /**
          * Final approval (level N)
-         * @description Refused with 422 `open_snags` for preliminary acceptances while snags are open. Under `all_members` the result shows the votes still missing.
+         * @description Refused with 422 `open_snags` (with `count` and `scope`) for CW PAC (B13) and CW FAC (B15) while an open CW snag exists on the site, and for TE PAC (D16) and TE FAC (D18) while an open TE snag exists; snags of the other stream do not block. Under `all_members` the result shows the votes still missing.
          */
         post: operations["approveTask"];
         delete?: never;
@@ -3301,7 +3308,7 @@ export interface paths {
         put?: never;
         /**
          * Generate the numbered PDF (template version recorded)
-         * @description Takes the next number from the form's sequence. Refused with 422 `open_snags` for a PAC while any snag on the site is open. The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
+         * @description Takes the next number from the form's sequence. Refused with 422 `open_snags` for a CW PAC while an open CW snag exists on the site (TE snags do not block it; a TE PAC is blocked by open TE snags the same way). The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
          */
         post: operations["generateFormPdf"];
         delete?: never;
@@ -3598,7 +3605,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Snags of a site (the open count drives the PAC lock) */
+        /** Snags of a site (the open count of each stream, CW or TE, drives the lock of its PAC and FAC) */
         get: operations["listSiteSnags"];
         put?: never;
         /** Raise a snag */
@@ -4048,6 +4055,13 @@ export interface components {
             claimed_by?: components["schemas"]["UserRef"];
             /** @description Missing slot or field names. */
             missing?: string[];
+            /** @description 0.4.2. With `open_snags`: the number of open snags of the stream that block the task. */
+            count?: number;
+            /**
+             * @description 0.4.2. With `open_snags`: the stream of the blocking snags.
+             * @enum {string}
+             */
+            scope?: "CW" | "TE";
         };
         /** @enum {string} */
         ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
@@ -4377,8 +4391,6 @@ export interface components {
             code: string;
             name_en: string;
             name_ar?: string | null;
-            /** Format: uuid */
-            parent_role_id?: string | null;
         };
         Role: components["schemas"]["RoleRef"] & {
             description_en?: string | null;
@@ -4390,7 +4402,6 @@ export interface components {
             can_hold_matrix_levels: boolean;
             is_active: boolean;
             active_assignment_count?: number;
-            sub_roles?: components["schemas"]["RoleRef"][];
             version?: number;
         };
         RoleInput: {
@@ -4399,8 +4410,11 @@ export interface components {
             name_ar?: string;
             description_en?: string;
             description_ar?: string;
-            /** Format: uuid */
-            parent_role_id?: string | null;
+            /**
+             * @deprecated
+             * @description Deprecated in 0.4.2 (roles are flat). Accepted only as null so older clients keep working; any other value is refused with 422.
+             */
+            parent_role_id?: null;
             /** Format: uuid */
             default_profile_id?: string | null;
             default_region_ids?: "all" | components["schemas"]["RegionId"][];
@@ -8180,7 +8194,7 @@ export interface operations {
                 /** @description Search name, email or employee ID. */
                 q?: string;
                 status?: components["schemas"]["UserStatus"];
-                /** @description Users holding this role or sub-role (active rows). */
+                /** @description Users holding this role (active rows). */
                 role_id?: string;
                 region_id?: components["schemas"]["RegionId"];
                 group_id?: string;

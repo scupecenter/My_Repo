@@ -247,7 +247,7 @@ export class AssignmentsService {
         }
         const row: NewRow = {
           userId, roleId, level: d.permission_level, team: d.team ?? role.team, validFrom, validTo,
-          primary: role.parent_role_id === null && !hasPrimary.has(userId),
+          primary: !hasPrimary.has(userId),
           allRegions, regions, allModules, modules, profiles,
         };
         const created = await this.tryAssign(row, b.reason);

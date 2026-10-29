@@ -305,8 +305,23 @@ export class TaskViewService {
     const dtos = await this.summaries(rows);
     const locked = dtos.filter((d) => d.state === 'locked').map((d) => d.id);
     const reasons = await this.lockReasons(locked);
-    for (const d of dtos) d.lock_reasons = reasons.get(d.id) ?? [];
+    const snags = await this.snagReasons(dtos.filter((d) => ['open', 'entry', 'in_review', 'in_approval'].includes(d.state)).map((d) => d.id));
+    for (const d of dtos) d.lock_reasons = [...(reasons.get(d.id) ?? []), ...(snags.get(d.id) ?? [])];
     return dtos;
+  }
+
+  /** CW PAC / CW FAC (open CW snags) and TE PAC / TE FAC (open TE snags) show the count of open snags of their stream (E6, Q25). */
+  async snagReasons(taskIds: string[]): Promise<Map<string, TaskSummaryDto['lock_reasons']>> {
+    const out = new Map<string, TaskSummaryDto['lock_reasons']>();
+    if (taskIds.length === 0) return out;
+    const rows = await this.db.tx.$queryRaw<{ task_id: string; scope: string; n: number }[]>(Prisma.sql`
+      SELECT g.id::text AS task_id, g.scope, wf_open_snags(g.id) AS n
+      FROM (SELECT x.id, wf_snag_scope(x.id) AS scope FROM unnest(${taskIds}::uuid[]) AS x(id)) g WHERE g.scope IS NOT NULL`);
+    for (const r of rows) {
+      if (!r.scope || r.n <= 0) continue;
+      out.set(r.task_id, [{ kind: 'open_snags', ref_code: r.scope, message: `${r.n} open ${r.scope} snag(s) on the site must be closed first.`, count: Number(r.n) }]);
+    }
+    return out;
   }
 
   async usersByIds(ids: string[]): Promise<Map<string, UserLite>> {

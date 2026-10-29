@@ -39,7 +39,7 @@ export function initAdmin() {
   });
   const groups = GROUPS.map((g, i) => ({ ...g, members: (i === 0 ? ['1001', '1102', '1203'] : i === 1 ? ['1204', '1205', '1206', '1207'] : ['1305', '1306', '1307']).map((e) => e) })) as (Group & { members: string[] })[];
   return {
-    users, assignments, roles: ROLES.map((r) => ({ ...r, version: 1, parent_role_id: null, sub_roles: [], default_profile_id: PROFILES[0].id, default_region_ids: 'all', default_module_keys: 'all' })) as Role[], groups,
+    users, assignments, roles: ROLES.map((r) => ({ ...r, version: 1, default_profile_id: PROFILES[0].id, default_region_ids: 'all', default_module_keys: 'all' })) as Role[], groups,
     profiles: PROFILES.map((p) => ({ ...p })) as MockProfile[],
     delegations: [] as { id: string; from: string; to: string | null; target_kind: 'user' | 'role' | 'group'; target_id: string; label: string; region_codes: number[]; module_codes: string[]; allow_redelegate: boolean; scope: 'full' | 'partial'; rights: string[]; valid_from: string; valid_to: string | null; revoked_at: string | null; reason: string; group_id?: string; role_id?: string }[],
     absences: [{ id: '95000000-0000-4000-8000-000000000001', employee_id: '1102', kind: 'sick' as const, from_date: '2026-10-24', to_date: '2026-10-29', note: 'Sick leave', recorded_by: '1001', version: 1 }] as { id: string; employee_id: string; kind: 'annual' | 'sick' | 'emergency' | 'other'; from_date: string; to_date: string; note: string | null; recorded_by: string; version: number }[],

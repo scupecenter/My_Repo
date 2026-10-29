@@ -556,21 +556,100 @@ describe('group levels', () => {
   });
 });
 
+async function snagOn(site: { id: string }, scope: string, by: string, over: { status?: string; taskId?: string | null } = {}): Promise<string> {
+  const st = await db.query(`INSERT INTO snag_types (code, name_en) VALUES ($1, 'Test snag') RETURNING id`, [`WFS${Date.now() % 100000}${Math.floor(Math.random() * 1e6)}`]);
+  const sn = await db.query(
+    `INSERT INTO snags (site_id, region_id, task_id, snag_type_id, scope, description, raised_by, status) VALUES ($1, $2, $3, $4, $5, 'crack', $6, $7::"SnagStatus") RETURNING id`,
+    [site.id, REGION, over.taskId ?? null, st.rows[0].id, scope, by, over.status ?? 'open'],
+  );
+  return sn.rows[0].id as string;
+}
+
 describe('open snags and comments', () => {
-  it('a task cannot be approved while a snag that blocks it is open', async () => {
+  // Owner decision 2026-10-29 (Q25, E6): open snags of the task's own stream block CW PAC (B13), CW FAC (B15), TE PAC (D16), TE FAC (D18).
+  const gated: [string, 'CW' | 'TE', 'CW' | 'TE'][] = [['B13', 'CW', 'TE'], ['B15', 'CW', 'TE'], ['D16', 'TE', 'CW'], ['D18', 'TE', 'CW']];
+  for (const [code, own, other] of gated) {
+    it(`${code}: open ${own} snags on the site block it (count in the 422 and the lock reason); ${other} snags, closed snags and other sites do not`, async () => {
+      const a = await actor(app, db, { level: 'approve' });
+      const f = await flow(code, { entry: [a], review: [a], approve: [a] }, 'in_approval');
+      const otherSite = await makeSite(db, REGION);
+      // none of these blocks: the other stream, closed, cancelled, and another site's snag
+      await snagOn(f.site, other, a.user.id);
+      await snagOn(f.site, own, a.user.id, { status: 'closed' });
+      await snagOn(f.site, own, a.user.id, { status: 'cancelled' });
+      await snagOn(otherSite, own, a.user.id);
+      // two that block, neither linked to the task (a site-level snag counts)
+      const s1 = await snagOn(f.site, own, a.user.id);
+      const s2 = await snagOn(f.site, own, a.user.id, { status: 'fix_uploaded' });
+      const t = await get(a, f.taskId);
+      expect(t.lock_reasons).toEqual([expect.objectContaining({ kind: 'open_snags', ref_code: own, count: 2 })]);
+      const blocked = await act(a, f.taskId, 'approve', t.version);
+      expect(blocked.status).toBe(422);
+      expect(blocked.body.code).toBe('open_snags');
+      expect(blocked.body.count).toBe(2);
+      expect(blocked.body.scope).toBe(own);
+      await db.query(`UPDATE snags SET status = 'closed' WHERE id = $1`, [s1]);
+      expect((await act(a, f.taskId, 'approve', t.version)).status).toBe(422); // one still open
+      await db.query(`UPDATE snags SET status = 'closed' WHERE id = $1`, [s2]);
+      expect((await get(a, f.taskId)).lock_reasons).toEqual([]);
+      expect((await act(a, f.taskId, 'approve', t.version)).status).toBe(200);
+    });
+
+    it(`${code}: an open ${own} snag also blocks the submission, and a non-holder is refused with 403 before the snag count`, async () => {
+      const e = await actor(app, db, { level: 'entry' });
+      const outsider = await actor(app, db, { level: 'entry' });
+      const f = await flow(code, { entry: [e], review: [e], approve: [e] }, 'entry');
+      await snagOn(f.site, own, e.user.id);
+      const t = await get(e, f.taskId);
+      const blocked = await act(e, f.taskId, 'submit', t.version);
+      expect(blocked.status).toBe(422);
+      expect(blocked.body.code).toBe('open_snags');
+      expect(blocked.body.count).toBe(1);
+      const denied = await act(outsider, f.taskId, 'submit', t.version);
+      expect(denied.status).toBe(403);
+      expect(denied.body.code).toBe('not_eligible_holder');
+    });
+  }
+
+  it('a CW snag blocks CW PAC but not TE PAC on the same site, and a TE snag blocks TE PAC but not CW PAC', async () => {
+    const a = await actor(app, db, { level: 'approve' });
+    const cwFirst = await flow('B13', { entry: [a], review: [a], approve: [a] }, 'in_approval');
+    const te = await makeTask(db, cwFirst.site, 'D16', 'in_approval', { level: 3 });
+    await setCell(db, 'D16', REGION, 'entry', { user: [a.user.id] });
+    await setCell(db, 'D16', REGION, 'review', { user: [a.user.id] });
+    await setCell(db, 'D16', REGION, 'approve', { user: [a.user.id] });
+    await snagOn(cwFirst.site, 'CW', a.user.id);
+    expect((await act(a, cwFirst.taskId, 'approve', (await get(a, cwFirst.taskId)).version)).body.code).toBe('open_snags');
+    const teDone = await act(a, te, 'approve', (await get(a, te)).version);
+    expect(teDone.status).toBe(200);
+    expect(teDone.body.task.state).toBe('approved');
+
+    const b = await actor(app, db, { level: 'approve' });
+    const teFirst = await flow('D16', { entry: [b], review: [b], approve: [b] }, 'in_approval');
+    const cw = await makeTask(db, teFirst.site, 'B13', 'in_approval', { level: 3 });
+    await setCell(db, 'B13', REGION, 'entry', { user: [b.user.id] });
+    await setCell(db, 'B13', REGION, 'review', { user: [b.user.id] });
+    await setCell(db, 'B13', REGION, 'approve', { user: [b.user.id] });
+    await snagOn(teFirst.site, 'TE', b.user.id);
+    expect((await act(b, teFirst.taskId, 'approve', (await get(b, teFirst.taskId)).version)).body.code).toBe('open_snags');
+    expect((await act(b, cw, 'approve', (await get(b, cw)).version)).status).toBe(200);
+  });
+
+  it('the old rule is gone: a snag linked by task_id does not block a task that is not a PAC or FAC', async () => {
     const a = await actor(app, db, { level: 'approve' });
     const f = await flow('A1', { entry: [a], review: [a], approve: [a] }, 'in_approval');
-    const st = await db.query(`INSERT INTO snag_types (code, name_en) VALUES ($1, 'Test snag') RETURNING id`, [`WFS${Date.now() % 100000}`]);
-    const sn = await db.query(
-      `INSERT INTO snags (site_id, region_id, task_id, snag_type_id, scope, description, raised_by) VALUES ($1, $2, $3, $4, 'CW', 'crack', $5) RETURNING id`,
-      [f.site.id, REGION, f.taskId, st.rows[0].id, a.user.id],
-    );
+    await snagOn(f.site, 'CW', a.user.id, { taskId: f.taskId });
     const t = await get(a, f.taskId);
-    const blocked = await act(a, f.taskId, 'approve', t.version);
-    expect(blocked.status).toBe(422);
-    expect(blocked.body.code).toBe('open_snags');
-    await db.query(`UPDATE snags SET status = 'closed' WHERE id = $1`, [sn.rows[0].id]);
+    expect(t.lock_reasons).toEqual([]);
     expect((await act(a, f.taskId, 'approve', t.version)).status).toBe(200);
+  });
+
+  it('a snag type that does not block preliminary acceptance is ignored', async () => {
+    const a = await actor(app, db, { level: 'approve' });
+    const f = await flow('B13', { entry: [a], review: [a], approve: [a] }, 'in_approval');
+    const sid = await snagOn(f.site, 'CW', a.user.id);
+    await db.query(`UPDATE snag_types SET blocks_preliminary_acceptance = false WHERE id = (SELECT snag_type_id FROM snags WHERE id = $1)`, [sid]);
+    expect((await act(a, f.taskId, 'approve', (await get(a, f.taskId)).version)).status).toBe(200);
   });
 
   it('comments: add with a mention, list oldest first, and refuse outsiders', async () => {

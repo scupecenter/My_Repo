@@ -291,6 +291,6 @@ Source: BP §06 level 4. The factors are progress, baseline adherence, SLA adher
   - Either Approved and valid on the gate date, or N/A for this site with a reason and an approver.
   - A permit type with Has Expiry blank is treated as not valid.
   - Alert 30 calendar days before expiry (Setting "Expiring alert").
-- **Preliminary acceptance and snags (CLAUDE.md, D54):** CW PAC and TE PAC cannot be approved while any snag on the site is open. The lock reason shows the count.
+- **Acceptances and snags (owner decision 2026-10-29, Q25 and E6):** an acceptance cannot be submitted or approved while an open snag of its own stream exists on the site. Open CW snags (`snags.scope = 'CW'`) block CW PAC (B13) and CW FAC (B15); open TE snags (`scope = 'TE'`) block TE PAC (D16) and TE FAC (D18). Snags of the other stream do not block. Any snag on the site counts, whether or not it is linked to the task. The snag types with `blocks_preliminary_acceptance = false` are ignored. The lock reason and the 422 `open_snags` carry the count.
 - **Seeds:** `entry_role` in the catalogue is the default Responsibility Matrix seed. The stage owner comes from BP §03 and §14. The sub-role choice is an ASSUMPTION, editable in the Matrix.
 - **Template IDs:** `TPL-*` codes follow the synthetic prototype (`design/prototype-v2/data.js`). They are ASSUMPTIONS until the Templates page issues the real IDs.

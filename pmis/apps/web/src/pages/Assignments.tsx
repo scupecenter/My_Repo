@@ -36,7 +36,7 @@ export function Assignments() {
       <div className="mb-3 flex flex-wrap items-center gap-3">
         <select className="input w-auto" data-testid="assignments-role" aria-label={t('users.role')} value={roleId} onChange={(e) => { setRoleId(e.target.value); setSel(new Set()); }}>
           <option value="">{t('assign.all_roles')}</option>
-          {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.parent_role_id ? '— ' : ''}{rname(r)}</option>)}
+          {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{rname(r)}</option>)}
         </select>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="assignments-ended" checked={ended} onChange={(e) => setEnded(e.target.checked)} />{t('assign.include_ended')}</label>
         <span className="text-sm text-mute" data-testid="assignments-total">{t('assign.total', { count: total })}</span>

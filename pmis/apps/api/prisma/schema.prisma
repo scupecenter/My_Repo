@@ -308,7 +308,7 @@ model Region {
   @@map("regions")
 }
 
-// Fully admin-defined. A role with parent_role_id is a sub-role (two levels only). Never deleted while assigned (FK + trigger).
+// Fully admin-defined and flat: no main/sub-role split (owner decision 2026-10-29, migration 0016 dropped parent_role_id). Never deleted while assigned (FK + trigger).
 model Role {
   id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code                   String   @unique
@@ -316,7 +316,6 @@ model Role {
   name_ar                String?
   description_en         String? // the duties of the role
   description_ar         String?
-  parent_role_id         String?  @db.Uuid
   team                   TeamKind @default(none)
   default_profile_id     String?  @db.Uuid
   default_all_regions    Boolean  @default(false) // prefill for new assignments
@@ -325,8 +324,6 @@ model Role {
   sort                   Int      @default(0)
   is_active              Boolean  @default(true)
 
-  parent          Role?                @relation("RoleParent", fields: [parent_role_id], references: [id])
-  children        Role[]               @relation("RoleParent")
   default_profile PermissionProfile?   @relation(fields: [default_profile_id], references: [id])
   default_regions RoleDefaultRegion[]
   default_modules RoleDefaultModule[]
@@ -334,7 +331,6 @@ model Role {
   field_perms     FieldPermission[]
   delegations     Delegation[]
 
-  @@index([parent_role_id])
   @@map("roles")
 }
 
