@@ -22,6 +22,7 @@ const inputSchema = z.object({
   name_ar: z.string().trim().max(200).optional(),
   description_en: z.string().max(2000).optional(),
   description_ar: z.string().max(2000).optional(),
+  // Deprecated (owner decision 2026-10-29: roles are flat). Still accepted so an old client keeps working, but only as null.
   parent_role_id: z.string().uuid().nullable().optional(),
   default_profile_id: z.string().uuid().nullable().optional(),
   default_region_ids: regionScope.optional(),
@@ -48,7 +49,6 @@ export interface RoleRefDto {
   code: string;
   name_en: string;
   name_ar: string | null;
-  parent_role_id: string | null;
 }
 
 export interface RoleDto extends RoleRefDto {
@@ -60,15 +60,14 @@ export interface RoleDto extends RoleRefDto {
   can_hold_matrix_levels: boolean;
   is_active: boolean;
   active_assignment_count: number;
-  sub_roles: RoleRefDto[];
   version: number;
 }
 
 const ROLE_INCLUDE = { default_regions: true, default_modules: true } satisfies Prisma.RoleInclude;
 type RoleRow = Prisma.RoleGetPayload<{ include: typeof ROLE_INCLUDE }>;
 
-const ref = (r: { id: string; code: string; name_en: string; name_ar: string | null; parent_role_id: string | null }): RoleRefDto => ({
-  id: r.id, code: r.code, name_en: r.name_en, name_ar: r.name_ar, parent_role_id: r.parent_role_id,
+const ref = (r: { id: string; code: string; name_en: string; name_ar: string | null }): RoleRefDto => ({
+  id: r.id, code: r.code, name_en: r.name_en, name_ar: r.name_ar,
 });
 
 @Injectable()
@@ -79,7 +78,7 @@ export class RolesService {
     private readonly stepUp: StepUpService,
   ) {}
 
-  /** GET /roles: main roles first, each followed by its sub-roles; every role lists its sub_roles. */
+  /** GET /roles: one flat list in the admin's order (sort, then name). There is no main/sub-role nesting. */
   async list(q: Query): Promise<{ items: RoleDto[] }> {
     const includeInactive = boolParam(q, 'include_inactive') ?? false;
     const rows = await this.db.tx.role.findMany({
@@ -87,18 +86,7 @@ export class RolesService {
       include: ROLE_INCLUDE,
       orderBy: [{ sort: 'asc' }, { name_en: 'asc' }, { id: 'asc' }],
     });
-    const dtos = await this.toDtos(rows);
-    const byParent = new Map<string, RoleDto[]>();
-    for (const d of dtos) if (d.parent_role_id) byParent.set(d.parent_role_id, [...(byParent.get(d.parent_role_id) ?? []), d]);
-    const ordered: RoleDto[] = [];
-    const placed = new Set<string>();
-    for (const d of dtos) {
-      if (d.parent_role_id && dtos.some((x) => x.id === d.parent_role_id)) continue; // placed under its parent
-      ordered.push(d);
-      placed.add(d.id);
-      for (const s of byParent.get(d.id) ?? []) { ordered.push(s); placed.add(s.id); }
-    }
-    return { items: ordered };
+    return { items: await this.toDtos(rows) };
   }
 
   async get(id: string): Promise<RoleDto> {
@@ -113,7 +101,7 @@ export class RolesService {
     const b = parse(inputSchema, raw);
     await this.checkReferences(b.parent_role_id ?? null, b.default_profile_id ?? null, b.default_module_keys);
     const rows = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT idm_role_save(NULL::uuid, ${b.code}::text, ${b.name_en}::text, ${b.name_ar ?? null}::text,
-      ${b.description_en ?? null}::text, ${b.description_ar ?? null}::text, ${b.parent_role_id ?? null}::uuid, NULL::"TeamKind", ${b.default_profile_id ?? null}::uuid,
+      ${b.description_en ?? null}::text, ${b.description_ar ?? null}::text, NULL::uuid, NULL::"TeamKind", ${b.default_profile_id ?? null}::uuid,
       ${b.default_region_ids === 'all'}::boolean, ${b.default_module_keys === 'all'}::boolean, ${b.can_hold_matrix_levels}::boolean, NULL::int, NULL::boolean,
       ${b.reason}::text)::text AS id`);
     const id = rows[0]!.id;
@@ -152,7 +140,7 @@ export class RolesService {
     // idm_role_save overwrites the optional columns, so every value not in the patch is passed back unchanged.
     await this.db.tx.$executeRaw(Prisma.sql`SELECT idm_role_save(${id}::uuid, ${cur.code}::text, ${b.name_en ?? cur.name_en}::text,
       ${b.name_ar !== undefined ? b.name_ar : cur.name_ar}::text, ${b.description_en !== undefined ? b.description_en : cur.description_en}::text,
-      ${b.description_ar !== undefined ? b.description_ar : cur.description_ar}::text, ${cur.parent_role_id}::uuid, NULL::"TeamKind",
+      ${b.description_ar !== undefined ? b.description_ar : cur.description_ar}::text, NULL::uuid, NULL::"TeamKind",
       ${b.default_profile_id !== undefined ? b.default_profile_id : cur.default_profile_id}::uuid, ${allRegions}::boolean, ${allModules}::boolean,
       ${b.can_hold_matrix_levels ?? cur.can_hold_matrix_levels}::boolean, NULL::int, ${b.is_active ?? cur.is_active}::boolean, ${b.reason}::text)`);
     if (regionsGiven || modulesGiven) {
@@ -173,11 +161,7 @@ export class RolesService {
 
   private async checkReferences(parent: string | null, profile: string | null, modules: 'all' | string[] | undefined): Promise<void> {
     const errors: FieldError[] = [];
-    if (parent) {
-      const p = await this.db.tx.role.findUnique({ where: { id: parent }, select: { parent_role_id: true } });
-      if (!p) errors.push({ path: '/parent_role_id', code: 'not_found', message: 'No such role.' });
-      else if (p.parent_role_id) errors.push({ path: '/parent_role_id', code: 'invalid', message: 'A sub-role must have a main role as its parent (two levels only).' });
-    }
+    if (parent) errors.push({ path: '/parent_role_id', code: 'not_supported', message: 'Roles are flat: a role cannot have a parent role.' });
     if (profile && (await this.db.tx.permissionProfile.count({ where: { id: profile } })) === 0) {
       errors.push({ path: '/default_profile_id', code: 'not_found', message: 'No such permission profile.' });
     }
@@ -199,10 +183,6 @@ export class RolesService {
     const counts = await this.db.tx.$queryRaw<{ role_id: string; n: bigint }[]>(Prisma.sql`SELECT role_id::text AS role_id, count(*) AS n FROM user_role_assignments
       WHERE role_id = ANY(${rows.map((r) => r.id)}::uuid[]) AND valid_from <= now() AND (valid_to IS NULL OR valid_to > now()) GROUP BY role_id`);
     const count = new Map(counts.map((c) => [c.role_id, Number(c.n)]));
-    const children = await this.db.tx.role.findMany({
-      where: { parent_role_id: { in: rows.map((r) => r.id) } },
-      orderBy: [{ sort: 'asc' }, { name_en: 'asc' }, { id: 'asc' }],
-    });
     return rows.map((r) => {
       const regions = r.default_regions.map((x) => x.region_id).sort((a, b) => a - b);
       const modules = r.default_modules.map((x) => x.module_key).sort();
@@ -216,8 +196,7 @@ export class RolesService {
         can_hold_matrix_levels: r.can_hold_matrix_levels,
         is_active: r.is_active,
         active_assignment_count: count.get(r.id) ?? 0,
-        sub_roles: children.filter((c) => c.parent_role_id === r.id).map(ref),
-        version: contentVersion([r.code, r.name_en, r.name_ar, r.description_en, r.description_ar, r.parent_role_id, r.team, r.default_profile_id,
+        version: contentVersion([r.code, r.name_en, r.name_ar, r.description_en, r.description_ar, r.team, r.default_profile_id,
           r.default_all_regions, r.default_all_modules, r.can_hold_matrix_levels, r.sort, r.is_active, regions, modules]),
       };
     });

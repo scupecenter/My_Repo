@@ -54,7 +54,7 @@ export interface TaskSummaryDto {
     start_date: string | null;
     elapsed_wd: number | null;
     due_date: string | null;
-    colour: 'none';
+    colour: 'green' | 'amber' | 'red' | 'none';
     rule_id: string | null;
     rule_set_version: number | null;
   };
@@ -97,6 +97,11 @@ export interface TaskRow {
   sla_min: number | null;
   sla_max: number | null;
   sla_start: string | null;
+  sla_code: string | null;
+  sla_rule_set_version: number | null;
+  sla_start_date: string | null;
+  sla_elapsed: number | null;
+  sla_colour: 'green' | 'amber' | 'red' | 'none';
   return_count: number;
   last_return_note: string | null;
   admin_override: boolean;
@@ -145,7 +150,8 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       t.planned_date::text AS planned_date, t.actual_date::text AS actual_date, t.due_date::text AS due_date,
       t.planned_start::text AS planned_start, t.actual_start::text AS actual_start, t.submitted_date::text AS submitted_date,
       t.approved_date::text AS approved_date, t.baseline_date::text AS baseline_date, t.values AS "values",
-      t.sla_rule_id::text AS sla_rule_id, r.min_working_days AS sla_min, r.max_working_days AS sla_max, r.start_event AS sla_start,
+      t.sla_rule_id::text AS sla_rule_id, r.min_working_days AS sla_min, r.max_working_days AS sla_max, coalesce(r.start_ref, r.start_event) AS sla_start,
+      r.code AS sla_code, rs.version AS sla_rule_set_version, t.sla_start_date::text AS sla_start_date, sl.elapsed AS sla_elapsed, sl.colour AS sla_colour,
       t.return_count, t.last_return_note, t.admin_override, t.is_na, t.na_reason, t.version,
       t.ball_in_court_user_id::text AS pinned_user, t.external_party_id::text AS external_party_id, wd.version AS workflow_version,
       k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder,
@@ -162,6 +168,15 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
     JOIN LATERAL (SELECT CASE WHEN t.path_frozen_at IS NULL THEN least(greatest(coalesce(td.approval_levels, st.approval_levels), 1), 3)
                               ELSE t.levels_required END AS n) lv ON true
     LEFT JOIN sla_rules r ON r.id = t.sla_rule_id
+    LEFT JOIN sla_rule_sets rs ON rs.id = r.rule_set_id
+    LEFT JOIN LATERAL (
+      -- running task: working days from the start event to today; approved task: the value kept at approval (migration 0017)
+      SELECT x.elapsed, sla_colour(x.elapsed, r.min_working_days, r.max_working_days) AS colour
+      FROM (SELECT CASE WHEN t.sla_start_date IS NULL OR r.id IS NULL THEN NULL
+                        WHEN t.state = 'approved' THEN t.sla_elapsed_wd
+                        WHEN t.state IN ('open', 'entry', 'in_review', 'in_approval', 'rejected', 'suspended') THEN cal_workdays_between(t.sla_start_date, cal_today(), r.calendar_id)
+                   END AS elapsed) x
+    ) sl ON true
     LEFT JOIN LATERAL (
       SELECT x.kind, wf_cell(t.id, x.kind) AS cell_id, wf_rule(t.id, x.kind) AS rule, wf_has_holder(t.id, x.kind) AS has_holder,
         (SELECT count(*) FROM task_level_voters v WHERE v.task_id = t.id AND v.level = t.current_level AND v.round = t.level_round) AS votes_needed,
@@ -237,16 +252,16 @@ export class TaskViewService {
         planned_date: r.planned_date,
         actual_date: r.actual_date,
         sla: {
-          code: null,
+          code: r.sla_code,
           min_wd: r.sla_min,
           max_wd: r.sla_max,
           start_event: r.sla_start,
-          start_date: null,
-          elapsed_wd: null,
+          start_date: r.sla_start_date,
+          elapsed_wd: r.sla_elapsed,
           due_date: r.due_date,
-          colour: 'none',
+          colour: r.sla_colour ?? 'none',
           rule_id: r.sla_rule_id,
-          rule_set_version: null,
+          rule_set_version: r.sla_rule_set_version,
         },
         slots_filled: Number(r.slots_filled),
         slots_required: Number(r.slots_required),
@@ -305,8 +320,23 @@ export class TaskViewService {
     const dtos = await this.summaries(rows);
     const locked = dtos.filter((d) => d.state === 'locked').map((d) => d.id);
     const reasons = await this.lockReasons(locked);
-    for (const d of dtos) d.lock_reasons = reasons.get(d.id) ?? [];
+    const snags = await this.snagReasons(dtos.filter((d) => ['open', 'entry', 'in_review', 'in_approval'].includes(d.state)).map((d) => d.id));
+    for (const d of dtos) d.lock_reasons = [...(reasons.get(d.id) ?? []), ...(snags.get(d.id) ?? [])];
     return dtos;
+  }
+
+  /** CW PAC / CW FAC (open CW snags) and TE PAC / TE FAC (open TE snags) show the count of open snags of their stream (E6, Q25). */
+  async snagReasons(taskIds: string[]): Promise<Map<string, TaskSummaryDto['lock_reasons']>> {
+    const out = new Map<string, TaskSummaryDto['lock_reasons']>();
+    if (taskIds.length === 0) return out;
+    const rows = await this.db.tx.$queryRaw<{ task_id: string; scope: string; n: number }[]>(Prisma.sql`
+      SELECT g.id::text AS task_id, g.scope, wf_open_snags(g.id) AS n
+      FROM (SELECT x.id, wf_snag_scope(x.id) AS scope FROM unnest(${taskIds}::uuid[]) AS x(id)) g WHERE g.scope IS NOT NULL`);
+    for (const r of rows) {
+      if (!r.scope || r.n <= 0) continue;
+      out.set(r.task_id, [{ kind: 'open_snags', ref_code: r.scope, message: `${r.n} open ${r.scope} snag(s) on the site must be closed first.`, count: Number(r.n) }]);
+    }
+    return out;
   }
 
   async usersByIds(ids: string[]): Promise<Map<string, UserLite>> {

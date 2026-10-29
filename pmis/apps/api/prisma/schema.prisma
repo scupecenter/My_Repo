@@ -308,7 +308,7 @@ model Region {
   @@map("regions")
 }
 
-// Fully admin-defined. A role with parent_role_id is a sub-role (two levels only). Never deleted while assigned (FK + trigger).
+// Fully admin-defined and flat: no main/sub-role split (owner decision 2026-10-29, migration 0016 dropped parent_role_id). Never deleted while assigned (FK + trigger).
 model Role {
   id                     String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code                   String   @unique
@@ -316,7 +316,6 @@ model Role {
   name_ar                String?
   description_en         String? // the duties of the role
   description_ar         String?
-  parent_role_id         String?  @db.Uuid
   team                   TeamKind @default(none)
   default_profile_id     String?  @db.Uuid
   default_all_regions    Boolean  @default(false) // prefill for new assignments
@@ -325,8 +324,6 @@ model Role {
   sort                   Int      @default(0)
   is_active              Boolean  @default(true)
 
-  parent          Role?                @relation("RoleParent", fields: [parent_role_id], references: [id])
-  children        Role[]               @relation("RoleParent")
   default_profile PermissionProfile?   @relation(fields: [default_profile_id], references: [id])
   default_regions RoleDefaultRegion[]
   default_modules RoleDefaultModule[]
@@ -334,7 +331,6 @@ model Role {
   field_perms     FieldPermission[]
   delegations     Delegation[]
 
-  @@index([parent_role_id])
   @@map("roles")
 }
 
@@ -823,6 +819,10 @@ model TaskInstance {
   admin_override           Boolean          @default(false)
   has_override_flag_in_kpi Boolean          @default(false)
   due_date                 DateTime?        @db.Date
+  sla_start_date           DateTime?        @db.Date // the start event date of the SLA clock (migration 0017)
+  sla_target_date          DateTime?        @db.Date // start + SLA min (green until here)
+  sla_end_date             DateTime?        @db.Date // the end event, kept when the task is approved
+  sla_elapsed_wd           Int? // working days start to end, kept when the task is approved; running tasks are computed on read
   path_frozen_at           DateTime?        @db.Timestamptz(6) // B7: the level path is final from the first submission
   level_round              Int              @default(0)
   level_opened_at          DateTime?        @db.Timestamptz(6)
@@ -1292,6 +1292,7 @@ model WorkCalendar {
   weekend_days Int[]   @default([5, 6])
   is_default   Boolean @default(false) // exactly one default (partial unique index, migration 0005)
   is_active    Boolean @default(true)
+  version      Int     @default(1) // bumped by trigger on every change (migration 0017)
 
   holidays  Holiday[]
   sla_rules SlaRule[]
@@ -1300,15 +1301,18 @@ model WorkCalendar {
 }
 
 model Holiday {
-  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  calendar_id String       @db.Uuid
-  date        DateTime     @db.Date
-  name        String
-  name_ar     String?
-  kind        String       @default("national") // national | religious (CHECK holidays_kind_check, migration 0013)
-  tentative   Boolean      @default(false) // religious dates stay tentative until the admin confirms them (B12)
-  note        String?
-  calendar    WorkCalendar @relation(fields: [calendar_id], references: [id])
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  calendar_id  String       @db.Uuid
+  date         DateTime     @db.Date
+  name         String
+  name_ar      String?
+  kind         String       @default("national") // national | religious (CHECK holidays_kind_check, migration 0013)
+  tentative    Boolean      @default(false) // religious dates stay tentative until the admin confirms them (B12)
+  note         String?
+  version      Int          @default(1) // bumped by trigger (migration 0017)
+  confirmed_at DateTime?    @db.Timestamptz(6)
+  confirmed_by String?      @db.Uuid
+  calendar     WorkCalendar @relation(fields: [calendar_id], references: [id])
 
   @@unique([calendar_id, date])
   @@map("holidays")
@@ -1332,15 +1336,74 @@ model SlaRule {
   reason           String
   changed_by       String            @db.Uuid
   changed_at       DateTime          @default(now()) @db.Timestamptz(6)
+  // migration 0017: where the clock starts and ends (task/milestone/gate code, PRED, OPEN, DLP:<task>:<setting>), the SLA sheet code, the rule set version
+  start_ref        String?
+  end_ref          String?
+  code             String?
+  rule_set_id      String?           @db.Uuid
 
   task_def  TaskDefinition @relation(fields: [task_def_id], references: [id])
   region    Region?        @relation(fields: [region_id], references: [id])
   calendar  WorkCalendar   @relation(fields: [calendar_id], references: [id])
+  rule_set  SlaRuleSet?    @relation(fields: [rule_set_id], references: [id])
   instances TaskInstance[]
 
   @@index([task_def_id, effective_from])
   @@index([region_id])
   @@map("sla_rules")
+}
+
+// Version of the whole SLA rule set (migration 0017, contract 0.2.6). A published version owns one sla_rules row per task and override;
+// a draft keeps its items until it is published. Written only by admin_save_sla_rule_set / admin_publish_sla_rule_set.
+model SlaRuleSet {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  version             Int       @unique
+  status              String    @default("draft") // draft | published
+  effective_from      DateTime? @db.Date
+  effective_to        DateTime? @db.Date
+  base_version        Int?
+  reason              String
+  created_by          String?   @db.Uuid
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  published_by        String?   @db.Uuid
+  published_at        DateTime? @db.Timestamptz(6)
+  apply_to_open_tasks Boolean?
+  apply_pending       Boolean   @default(false)
+  affected_open_tasks Int?
+  row_version         Int       @default(1)
+
+  rules SlaRule[]
+  items SlaRuleSetItem[]
+
+  @@map("sla_rule_sets")
+}
+
+model SlaRuleSetItem {
+  set_id           String     @db.Uuid
+  task_def_id      String     @db.Uuid
+  min_working_days Int
+  max_working_days Int
+  start_ref        String
+  end_ref          String?
+  calendar_id      String     @db.Uuid
+  code             String?
+  overrides        Json       @default("[]") @db.JsonB // [{scenario, region_id, min_working_days, max_working_days}]
+  set              SlaRuleSet @relation(fields: [set_id], references: [id], onDelete: Cascade)
+
+  @@id([set_id, task_def_id])
+  @@map("sla_rule_set_items")
+}
+
+// Permit types (Master Setting tblPAType). Has Expiry is a property of the type (D36, Q63); every permit record can override it (Q63c).
+model PermitType {
+  code       String  @id
+  name_ar    String?
+  kind       String // permit | access | ptw
+  has_expiry Boolean
+  sort_order Int     @default(0)
+  is_active  Boolean @default(true)
+
+  @@map("permit_types")
 }
 
 model BaselineVersion {
@@ -1788,6 +1851,7 @@ model PermitRecord {
   status           String?
   valid_from       DateTime? @db.Date
   valid_to         DateTime? @db.Date
+  has_expiry       Boolean? // Q63c: yes = valid_to required once approved; no = permanent. Defaults from the permit type (trigger).
   na_reason        String?
   na_approved_by   String?
   hse_checks       Json? // JSA/TRA, toolbox talk, work at height, lifting, LOTO, rescue

@@ -70,8 +70,10 @@ describe('roles', () => {
     expect(res.headers['etag']).toBe(`"${res.body.version}"`);
     expect(res.body).toMatchObject({
       code, name_en: 'Management', name_ar: 'الإدارة', default_profile_id: profile, default_region_ids: 'all', default_module_keys: ['dashboard', 'reports'],
-      can_hold_matrix_levels: false, is_active: true, active_assignment_count: 0, sub_roles: [], parent_role_id: null,
+      can_hold_matrix_levels: false, is_active: true, active_assignment_count: 0,
     });
+    expect(res.body).not.toHaveProperty('parent_role_id');
+    expect(res.body).not.toHaveProperty('sub_roles');
     const get = await api.call('get', `/roles/${res.body.id}`);
     expect(get.status).toBe(200);
     expect(get.body).toEqual(res.body);
@@ -85,23 +87,41 @@ describe('roles', () => {
     expect((await reader.call('get', `/roles/${res.body.id}`)).status).toBe(200);
   });
 
-  it('makes a sub-role under a main role and lists main roles with their sub-roles', async () => {
+  it('lists roles flat in the admin order; a role with a parent is refused (roles are flat)', async () => {
     const { api } = await adminApi(app, db);
-    const main = await api.call('post', '/roles', { code: `LEAD_${uid()}`, name_en: 'Team Lead', can_hold_matrix_levels: true, reason: 'main role', default_region_ids: [1], default_module_keys: 'all' });
-    const sub = await api.call('post', '/roles', { code: `ENG_${uid()}`, name_en: 'Site Engineer', parent_role_id: main.body.id, can_hold_matrix_levels: true, reason: 'sub-role' });
-    expect(sub.status).toBe(201);
-    expect(sub.body.parent_role_id).toBe(main.body.id);
-    expect(main.body).toMatchObject({ default_region_ids: [1], default_module_keys: 'all' });
-    const list = await api.call('get', '/roles');
-    const items = list.body.items as { id: string; sub_roles: { id: string }[] }[];
-    const iMain = items.findIndex((r) => r.id === main.body.id);
-    expect(items[iMain]!.sub_roles.map((r) => r.id)).toEqual([sub.body.id]);
-    expect(items[iMain + 1]!.id).toBe(sub.body.id); // the sub-role follows its parent
+    const lead = await api.call('post', '/roles', { code: `LEAD_${uid()}`, name_en: 'Team Lead', can_hold_matrix_levels: true, reason: 'plain role', default_region_ids: [1], default_module_keys: 'all' });
+    const eng = await api.call('post', '/roles', { code: `ENG_${uid()}`, name_en: 'Site Engineer', can_hold_matrix_levels: true, reason: 'plain role', parent_role_id: null });
+    expect(lead.status).toBe(201);
+    expect(eng.status).toBe(201);
+    expect(lead.body).toMatchObject({ default_region_ids: [1], default_module_keys: 'all' });
+    const list = await api.call('get', '/roles?include_inactive=true');
+    const items = list.body.items as { id: string }[];
+    expect(items.every((r) => !('parent_role_id' in r) && !('sub_roles' in r))).toBe(true);
+    // the list follows the admin's order (sort, then name), never main-then-sub nesting
+    const want = await db.query('SELECT id FROM roles WHERE id = ANY($1::uuid[]) ORDER BY sort ASC, name_en ASC, id ASC', [items.map((r) => r.id)]);
+    expect(items.map((r) => r.id)).toEqual((want.rows as { id: string }[]).map((r) => r.id));
+    expect(items.map((r) => r.id)).toEqual(expect.arrayContaining([lead.body.id, eng.body.id]));
 
-    const deeper = await api.call('post', '/roles', { code: `X_${uid()}`, name_en: 'Too deep', parent_role_id: sub.body.id, can_hold_matrix_levels: true, reason: 'three levels' });
-    expect(deeper.status).toBe(422);
-    expect(deeper.body.errors[0].path).toBe('/parent_role_id');
+    const withParent = await api.call('post', '/roles', { code: `X_${uid()}`, name_en: 'Child', parent_role_id: lead.body.id, can_hold_matrix_levels: true, reason: 'sub-role attempt' });
+    expect(withParent.status).toBe(422);
+    expect(withParent.body.errors[0].path).toBe('/parent_role_id');
     expect((await api.call('post', '/roles', { code: `X_${uid()}`, name_en: 'Orphan', parent_role_id: randomUUID(), can_hold_matrix_levels: true, reason: 'no parent' })).status).toBe(422);
+    // PATCH has no parent field at all
+    const patch = await api.call('patch', `/roles/${eng.body.id}`, { parent_role_id: lead.body.id, reason: 'make it a sub-role' }, { 'If-Match': eng.headers['etag']! });
+    expect(patch.status).toBe(422);
+    // and the database refuses it too, whoever calls idm_role_save
+    await expect(db.query(
+      `SELECT idm_role_save(NULL, $1, 'Db child', NULL, NULL, NULL, $2, 'none', NULL, false, false, true, 0, true, 'x')`, [`DBX_${uid()}`, lead.body.id],
+    )).rejects.toThrow(/roles are flat/);
+    const col = await db.query(`SELECT 1 FROM information_schema.columns WHERE table_name = 'roles' AND column_name = 'parent_role_id'`);
+    expect(col.rowCount).toBe(0);
+  });
+
+  it('keeps every seeded role and its name (17 roles, no parent link)', async () => {
+    const seeded = await db.query(`SELECT count(*)::int AS n FROM roles WHERE code IN ('PM','RFD_ACQ_TL','CW_TL','TE_TL','INV_SUP','PROJ_SUPPORT','MANAGEMENT','RF_ENG','MW_ENG','ACQ_TEAM','POWER_ENG','GECOL_TEAM','HLC_TEAM','SITE_ENG_CW','SITE_ENG_TE','HOTO_ENG','PROC_TEAM')`);
+    expect(seeded.rows[0].n).toBe(17);
+    const names = await db.query(`SELECT name_en FROM roles WHERE code IN ('CW_TL','SITE_ENG_CW','MANAGEMENT') ORDER BY code`);
+    expect(names.rows.map((r) => r.name_en)).toEqual(['CW Team Lead', 'Management', 'Site Engineers (CW)']);
   });
 
   it('renames a role and changes its defaults with If-Match (428 without, 412 when stale); the code is kept', async () => {

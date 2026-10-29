@@ -73,7 +73,10 @@ export function mapWfError(message: string): ProblemException | null {
         extra: { missing: Array.isArray(extra.missing) ? extra.missing : [] },
       });
     case 'open_snags':
-      return new ProblemException(422, 'open_snags', { detail: `The task cannot be approved while ${String(extra.count ?? 'some')} snag(s) are open.` });
+      return new ProblemException(422, 'open_snags', {
+        detail: `This acceptance cannot be submitted or approved while ${String(extra.count ?? 'some')} open ${typeof extra.scope === 'string' ? `${extra.scope} ` : ''}snag(s) remain on the site.`,
+        extra: { count: Number(extra.count ?? 0), ...(typeof extra.scope === 'string' ? { scope: extra.scope } : {}) },
+      });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
     case 'validation_failed':

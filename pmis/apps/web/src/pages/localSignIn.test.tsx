@@ -247,6 +247,11 @@ describe('hybrid mode list', () => {
       'GET /permission-profiles', 'POST /permission-profiles', 'GET /permission-profiles/:id', 'PUT /permission-profiles/:id',
       'GET /users/:id/assignments', 'GET /assignments', 'POST /assignments/bulk-assign', 'POST /assignments/bulk-update', 'POST /assignments/bulk-end', 'POST /assignments/copy',
       'GET /delegations', 'POST /delegations', 'POST /delegations/:id/revoke',
+      // contract 0.4.1: Site Register, tasks, approvals
+      'GET /sites', 'GET /sites/:id', 'GET /sites/:id/tasks',
+      'GET /tasks/:id', 'PATCH /tasks/:id', 'POST /tasks/:id/start', 'POST /tasks/:id/submit', 'POST /tasks/:id/review', 'POST /tasks/:id/approve', 'POST /tasks/:id/reject',
+      'POST /tasks/:id/claim', 'POST /tasks/:id/release', 'GET /tasks/:id/history', 'GET /tasks/:id/comments', 'POST /tasks/:id/comments',
+      'GET /approvals', 'POST /approvals/bulk',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

@@ -30,7 +30,10 @@ export type Group = S['Group'];
 export type UserPickerItem = S['UserPickerItem'];
 export type TaskEntryPatch = S['TaskEntryPatch'];
 export type AllowedAction = S['AllowedAction'];
-export type SiteTasks = { workflow_version: number; stages: { code: string; name_en: string; name_ar?: string | null; tasks: TaskSummary[] }[] };
+export type Stream = S['Stream'];
+export type StreamStatus = S['StreamStatus'];
+/** `GET /sites/{id}/tasks`: `streams` are the streams of the site's workflow version; each stage carries its `stream_code`. */
+export type SiteTasks = { workflow_version: number; streams?: Stream[]; stages: { code: string; stream_code?: string | null; name_en: string; name_ar?: string | null; tasks: TaskSummary[] }[] };
 export type BallInCourt = S['BallInCourt'];
 export type LockReason = S['LockReason'];
 export type User = S['User'];

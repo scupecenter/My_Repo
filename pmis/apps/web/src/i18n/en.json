@@ -8,7 +8,7 @@
     "group_admin": "Administration",
     "my_work": "My Work",
     "approvals": "Approvals",
-    "sites": "Sites",
+    "sites": "Site Register",
     "dashboard": "Dashboard",
     "templates": "Templates",
     "admin.users": "Users & Roles",
@@ -132,7 +132,10 @@
     "done": "Done",
     "bulk_result": "{{done}} done, {{skipped}} skipped, {{failed}} failed",
     "returned_note": "Last returned: {{note}}",
-    "wd": "wd"
+    "wd": "wd",
+    "bulk_issues": "Not done",
+    "bulk_skipped": "Skipped",
+    "bulk_failed": "Failed"
   },
   "stepUp": {
     "title": "Re-authentication needed",
@@ -199,8 +202,8 @@
     "save": "Save"
   },
   "sites": {
-    "title": "Sites",
-    "subtitle": "Every site with its position on the milestone pipeline.",
+    "title": "Site Register",
+    "subtitle": "Every site with its position on the milestone pipeline. Pick a stream to see each site's status in that stream only.",
     "search": "Search code or name",
     "all_regions": "All regions",
     "all_scenarios": "All scenarios",
@@ -214,7 +217,16 @@
     "status": "Status",
     "pipeline": "Pipeline",
     "late": "Late",
-    "empty": "No site matches these filters."
+    "empty": "No site matches these filters.",
+    "streams_label": "Streams",
+    "stream_all": "All",
+    "show_na": "Show N/A sites ({{count}})",
+    "na_hint": "The stream does not apply to this site.",
+    "stream_status": "Stream status",
+    "current_stage": "Current stage",
+    "progress": "Done / total",
+    "milestone": "Milestone",
+    "dismantle_todo": "Dismantle (owner decision Q41) is a fifth sub-section outside the stage mapping. The API has no DISMANTLE stream yet, so there is nothing to list. It will fill in once the stream exists."
   },
   "scenario": {
     "new_build": "New Build",
@@ -240,7 +252,17 @@
     "te_pac": "TE PAC",
     "kpi_acceptance": "KPI Acceptance",
     "hoto": "HOTO",
-    "final_closure": "Final Closure"
+    "final_closure": "Final Closure",
+    "MS1": "Site Release",
+    "MS2": "PRE-CW Completion",
+    "MS3": "CW Completion",
+    "MS4": "Site RFI",
+    "MS5": "TE Completion",
+    "MS6": "On-Air",
+    "MS7": "TE PAC",
+    "MS8": "KPI Acceptance",
+    "MS9": "HOTO",
+    "MS10": "Final Closure"
   },
   "taskState": {
     "locked": "Locked",
@@ -301,7 +323,15 @@
     "not_found": "This site does not exist or is outside your regions.",
     "cluster": "Cluster {{code}}: {{at}} of {{total}} sites at TE PAC (information only)",
     "tasks": "Tasks",
-    "all_stages": "All stages"
+    "all_stages": "All stages",
+    "back": "Site Register",
+    "stream_summary": "{{done}} of {{total}} tasks done",
+    "late_n": "{{count}} late",
+    "milestone_date": "Milestone {{date}}",
+    "stream_empty": "This site has no tasks in this stream.",
+    "stream_na": "The stream does not apply to this site.",
+    "dismantle_todo": "Dismantle has no stream in the API yet (owner decision Q41), so there are no tasks to show here.",
+    "streams": "Streams"
   },
   "grid": {
     "title": "Task grid",
@@ -347,7 +377,17 @@
     "self_approval_note": "You hold every remaining level, so this submission is the final approval. Re-authentication is required.",
     "skip_note": "Same holder on the next level: it is skipped and the task lands on level {{level}}.",
     "submit": "Submit for review",
-    "submit_final": "Submit as final approval"
+    "submit_final": "Submit as final approval",
+    "start": "Start work",
+    "save": "Save",
+    "saved": "Saved.",
+    "claim": "Claim",
+    "release": "Release",
+    "claimed_by": "Claimed by {{name}}",
+    "actual_start": "Actual start",
+    "started": "The task is started.",
+    "claimed": "You claimed this level.",
+    "released": "You released this level."
   },
   "matrix": {
     "title": "Responsibility Matrix",
@@ -555,13 +595,10 @@
     "active": "Active",
     "inactive": "Inactive",
     "saved": "Role saved.",
-    "parent": "Parent role (makes this a sub-role)",
-    "no_parent": "None (main role)",
     "default_profile": "Default permission profile",
     "no_profile": "None",
     "default_regions": "Default regions",
     "default_modules": "Default modules",
-    "sub_role": "Sub-role",
     "in_use_hint": "A role with assignments that have not ended cannot be deactivated."
   },
   "groups": {
@@ -1251,5 +1288,31 @@
     },
     "include_inactive": "Show inactive",
     "n_grants": "{{count}} grants"
+  },
+  "taskErrors": {
+    "open_snags": "This task cannot be approved while snags are still open. Clear them first.",
+    "mandatory_fields_missing": "Fill the mandatory fields first.",
+    "mandatory_fields_missing_list": "Fill the mandatory fields first: {{list}}.",
+    "mandatory_slots_missing": "Upload the mandatory documents first.",
+    "mandatory_slots_missing_list": "Upload the mandatory documents first: {{list}}.",
+    "note_required": "Write a note that explains the rejection.",
+    "already_claimed": "Another holder has already claimed this level.",
+    "already_claimed_by": "{{name}} has already claimed this level.",
+    "not_eligible_holder": "You do not hold this level of the task, so you cannot act on it.",
+    "invalid_transition": "This does not fit the task's current state or level. Reload and check.",
+    "duplicate": "The task was listed twice."
+  },
+  "stream": {
+    "DESIGN_ACQ": "Design & Acquisition",
+    "CW": "Civil Works",
+    "TE": "Installation (TE)",
+    "CLOSURE": "Handover & Closure",
+    "DISMANTLE": "Dismantle"
+  },
+  "streamState": {
+    "not_started": "Not started",
+    "in_progress": "In progress",
+    "done": "Done",
+    "na": "N/A"
   }
 }

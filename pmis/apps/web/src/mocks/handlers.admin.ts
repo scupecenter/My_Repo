@@ -316,8 +316,8 @@ export const adminHandlers = [
     if (!/^[A-Z][A-Z0-9_]{1,40}$/.test(b.code ?? '')) return bad('/code', 'pattern');
     if ((b.name_en ?? '').trim().length < 2) return bad('/name_en', 'min_length');
     if (A().roles.some((x) => x.code.toUpperCase() === b.code)) return problem(409, 'duplicate', 'A role with this code exists');
-    if (b.parent_role_id && (!roleOf(b.parent_role_id) || roleOf(b.parent_role_id)!.parent_role_id)) return bad('/parent_role_id', 'invalid');
-    const role = { id: crypto.randomUUID(), code: b.code, name_en: b.name_en, name_ar: b.name_ar ?? null, description_en: b.description_en ?? null, parent_role_id: b.parent_role_id ?? null, sub_roles: [], default_profile_id: b.default_profile_id ?? null, default_region_ids: b.default_region_ids ?? 'all', default_module_keys: b.default_module_keys ?? 'all', can_hold_matrix_levels: !!b.can_hold_matrix_levels, is_active: true, active_assignment_count: 0, version: 1 } as never;
+    if (b.parent_role_id) return bad('/parent_role_id', 'not_supported'); // roles are flat (owner decision 2026-10-29)
+    const role = { id: crypto.randomUUID(), code: b.code, name_en: b.name_en, name_ar: b.name_ar ?? null, description_en: b.description_en ?? null, default_profile_id: b.default_profile_id ?? null, default_region_ids: b.default_region_ids ?? 'all', default_module_keys: b.default_module_keys ?? 'all', can_hold_matrix_levels: !!b.can_hold_matrix_levels, is_active: true, active_assignment_count: 0, version: 1 } as never;
     A().roles.push(role); save();
     return HttpResponse.json(role, { status: 201, ...tag(1) });
   }),

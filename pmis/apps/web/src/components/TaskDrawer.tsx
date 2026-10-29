@@ -1,9 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Clock, FileUp, MessageSquare, Undo2, UserX, X } from 'lucide-react';
+import { Check, Clock, FileUp, HandMetal, MessageSquare, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError } from '@/api/client';
 import { useTask } from '@/api/hooks';
+import { taskErrorMessage } from '@/lib/taskErrors';
 import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, useUpload, type TaskOp } from '@/api/sites';
 import type { DocumentSlot, TaskDetail } from '@/api/types';
 import { Holders } from './HolderChip';
@@ -72,14 +72,20 @@ function Body({ task }: { task: TaskDetail }) {
   const act = (a: string) => task.allowed_actions.find((x) => x.action === a);
   const edit = !!act('edit'), submit = act('submit');
   const missing = task.slots.some((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected'));
+  const DONE: Partial<Record<TaskOp, string>> = { start: 'drawer.started', claim: 'drawer.claimed', release: 'drawer.released' };
+  // The 422/409/403 codes of the engine are shown in plain words (lib/taskErrors.ts); a cancelled step-up shows nothing.
+  const fail = (e: unknown) => { const m = taskErrorMessage(t, e); if (m) toast(m, 'err'); };
   const run = (o: TaskOp, note?: string) => op.mutate({ task, op: o, note }, {
-    onSuccess: () => { toast(t('approvals.done')); setRejecting(false); },
-    onError: (e) => toast(e instanceof ApiError && e.code === 'mandatory_slots_missing' ? t('drawer.slots_missing') : e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.status === 403 ? t('errors.forbidden') : e instanceof ApiError && e.code === 'step_up_required' ? '' : t('errors.generic'), 'err'),
+    onSuccess: () => { toast(t(DONE[o] ?? 'approvals.done')); setRejecting(false); },
+    onError: (e) => { if (o === 'reject') setRejecting(false); fail(e); },
   });
-  const save = (field: 'planned_date' | 'actual_date', v: string) => { if ((v || null) !== (task[field] ?? null)) date.mutate({ task, patch: { [field]: v || null } }, { onError: () => toast(t('errors.generic'), 'err') }); };
+  const [draft, setDraft] = useState({ planned_date: task.planned_date ?? '', actual_start: task.actual_start ?? '', actual_date: task.actual_date ?? '' });
+  const dirty = (['planned_date', 'actual_start', 'actual_date'] as const).filter((k) => (draft[k] || null) !== (task[k] ?? null));
+  const save = () => date.mutate({ task, patch: Object.fromEntries(dirty.map((k) => [k, draft[k] || null])) }, { onSuccess: () => toast(t('drawer.saved')), onError: fail });
   const name = (i18n.language === 'ar' && task.name_ar) || task.name_en;
   const final = (a?: { final?: boolean }) => !!a?.final;
-  const review = act('review'), approve = act('approve');
+  const review = act('review'), approve = act('approve'), start = act('start'), claim = act('claim'), release = act('release');
+  const claimedBy = task.ball_in_court?.claimed_by;
 
   return (
     <div className="flex h-full flex-col" data-testid="task-drawer-body" data-state={task.state}>
@@ -98,18 +104,20 @@ function Body({ task }: { task: TaskDetail }) {
         <section aria-label={t('grid.ball')}>
           <div className="mb-1 text-sm text-mute">{t('grid.ball')}</div>
           <Holders holders={task.ball_in_court?.holders ?? []} />
+          {claimedBy && <p className="mt-1 text-sm text-openInk" data-testid="drawer-claimed-by">{t('drawer.claimed_by', { name: claimedBy.display_name })}</p>}
           <ol className="mt-2 flex flex-wrap gap-2 text-sm" data-testid="approval-path">
             {task.approval_path.map((l) => <li key={l.level} data-status={l.status} className={`chip ${l.status === 'current' ? 'bg-openBg text-openInk' : l.status === 'done' ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`}>{l.level}. {t(`level.${l.kind}`)}{l.will_skip ? ` · ${t('drawer.will_skip')}` : ''}</li>)}
           </ol>
         </section>
 
         <section className="grid grid-cols-2 gap-3 text-sm" aria-label={t('drawer.dates')}>
-          {(['planned_date', 'actual_date'] as const).map((f) => (
-            <label key={f} className="block"><span className="text-mute">{t(f === 'planned_date' ? 'grid.plan' : 'grid.actual')}</span>
-              <input type="date" className="input mono" data-testid={`drawer-${f === 'planned_date' ? 'plan' : 'actual'}-date`} disabled={!edit} defaultValue={task[f] ?? ''} key={`${f}-${task[f]}`} onBlur={(e) => save(f, e.target.value)} />
+          {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
+            <label key={f} className="block"><span className="text-mute">{t(label)}</span>
+              <input type="date" className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
             </label>
           ))}
           <div><span className="text-mute">{t('grid.sla')}</span><div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span></div></div>
+          {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={!dirty.length || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}
         </section>
 
         <section aria-label={t('grid.docs')}>
@@ -123,8 +131,11 @@ function Body({ task }: { task: TaskDetail }) {
       </div>
       <footer className="space-y-2 border-t border-line p-4">
         {submit && (final(submit) || submit.will_skip_to) && <p className="text-sm text-waitInk" data-testid="drawer-skip-note">{final(submit) ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: submit.will_skip_to })}</p>}
-        {submit && missing && <p className="text-sm text-mute" data-testid="drawer-missing">{t('drawer.slots_missing')}</p>}
+        {submit && (missing || !!task.missing_for_submit?.length) && <p className="text-sm text-mute" data-testid="drawer-missing">{missing ? t('drawer.slots_missing') : t('taskErrors.mandatory_fields_missing_list', { list: task.missing_for_submit?.join(', ') })}</p>}
         <div className="flex gap-2">
+          {start && <button className="btn" data-testid="drawer-start" disabled={op.isPending} onClick={() => run('start')}><Play size={16} />{t('drawer.start')}</button>}
+          {claim && <button className="btn" data-testid="drawer-claim" disabled={op.isPending} onClick={() => run('claim')}><HandMetal size={16} />{t('drawer.claim')}</button>}
+          {release && <button className="btn" data-testid="drawer-release" disabled={op.isPending} onClick={() => run('release')}><UserMinus size={16} />{t('drawer.release')}</button>}
           {(act('reject')) && <button className="btn btn-danger" data-testid="drawer-reject" disabled={op.isPending} onClick={() => setRejecting(true)}><Undo2 size={16} />{t('approvals.reject')}</button>}
           {submit && <button className="btn btn-primary ms-auto" data-testid="drawer-submit" disabled={missing || !!submit.disabled_reason || op.isPending} onClick={() => run('submit')}><Check size={16} />{final(submit) ? t('drawer.submit_final') : t('drawer.submit')}</button>}
           {review && <button className="btn btn-primary ms-auto" data-testid="drawer-review" disabled={op.isPending} onClick={() => run('review')}><Check size={16} />{t('approvals.pass')}</button>}

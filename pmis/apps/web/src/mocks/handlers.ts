@@ -150,6 +150,9 @@ export const handlers = [
       if (op === 'reject' && !body.note?.trim()) return problem(422, 'note_required', 'A rejection needs a note', { errors: [{ path: '/note', code: 'required' }] });
       if (t.state !== 'in_review' && t.state !== 'in_approval') return problem(409, 'invalid_transition', 'Task is not waiting for review');
       if (!canAct(t.level_kind) || (op === 'review' && t.level_kind !== 'review') || (op === 'approve' && t.level_kind !== 'approve')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+      if (t.claimed_by && t.claimed_by.id !== uid(viewer()!.employee_id ?? '9999')) return problem(409, 'already_claimed', 'Another holder has claimed this level', { claimed_by: t.claimed_by } as never);
+      // An acceptance (PAC) cannot be approved while snags are open on the site (owner decision 2026-10-29); the mock reads the site's open_snags count (i % 4).
+      if (op === 'approve' && t.gen && ['B13', 'D16'].includes(t.task_code) && Number(t.site_id.slice(-12)) > 0 && (Number(t.site_id.slice(-12)) - 1) % 4 > 0) return problem(422, 'open_snags', 'Snags are still open');
       if (op === 'approve' && !stepUpValid()) return stepUp();
       const sp = t.gen && op === 'review' ? skipPath(t, viewer()!.employee_id, t.current_level ?? 2) : null;
       if (sp?.final && !stepUpValid()) return stepUp();
@@ -157,6 +160,7 @@ export const handlers = [
       const skippedPrev = t.gen && op === 'reject' && !!t.steps?.some((x) => x.action === 'auto_skip' && x.level === (t.current_level ?? 2) - 1);
       transition(t, sp?.final ? 'approve' : op === 'review' ? 'pass' : op, body.note);
       if (skippedPrev) { t.state = 'entry'; t.current_level = 1; }
+      t.claimed_by = undefined;
       if (t.gen) recordStep(t, op === 'review' && sp?.final ? 'approve' : op, body.note, sp?.skipped);
       save();
       return HttpResponse.json({ task: toDetail(t), step_ids: [] }, { headers: { ETag: `"${t.version}"` } });

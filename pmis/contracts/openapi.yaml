@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.1
+  version: 0.4.3
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.3 (2026-10-29): documentation of behaviour, no shape changed. `SlaStartEvent` also accepts the reserved values `PRED` (the latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the task date plus the DLP months), because the Master measures some steps from register fields the PMIS does not read yet. `TaskSummary.sla` is filled (start date, elapsed working days, colour, due date, rule set version). `PipelineNode` gates carry the calculated gate date, the Change Control shift and the lock reasons. Holiday, weekend-day and SLA rule-set changes recalculate the due dates of open tasks only.
+    - 0.4.2 (2026-10-29): roles are flat (`parent_role_id` and `sub_roles` removed from Role, `parent_role_id` accepted only as null on create); `Problem.count` and `Problem.scope` for `open_snags`, which now blocks CW PAC/FAC on open CW snags and TE PAC/FAC on open TE snags of the site.
     - 0.4.1 (2026-10-29): additive. The Sites module is the **Site Register** (سجل المواقع) and has streams (جزئية): `stream` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks`, `SiteListItem.streams` (`StreamStatus`), `Stream`, `stage.stream_code` and `streams` in the task grid, `TaskSummary.stream_code`; `TransitionResult.votes_missing` and `returned_to_level` (owner decision 2026-10-29, workflow engine).
     - 0.4.0 (2026-10-28): additive. Departments and the direct manager (`GET/POST /departments`, `PATCH /departments/{department_id}`, `PUT /users/{user_id}/org`, `User.manager` and `User.department`); messages between an employee and their direct manager (`/messages/...`); announcements with an agree / disagree answer (`/announcements/...`, `GET /me/announcements/pending`) (ADR 0013).
     - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
@@ -85,7 +87,7 @@ tags:
   - name: assignments
     description: Many-to-many role assignments, by role or by person, in bulk (AU-10..AU-13).
   - name: roles
-    description: Admin-defined roles and sub-roles.
+    description: "Admin-defined roles. Roles are flat (owner decision 2026-10-29), with no main/sub-role split."
   - name: permissions
     description: Permission grid, profiles and field-level rules (ADR 0003).
   - name: groups
@@ -870,7 +872,7 @@ paths:
       parameters:
         - { name: q, in: query, description: 'Search name, email or employee ID.', schema: { type: string } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
-        - { name: role_id, in: query, description: 'Users holding this role or sub-role (active rows).', schema: { type: string, format: uuid } }
+        - { name: role_id, in: query, description: 'Users holding this role (active rows).', schema: { type: string, format: uuid } }
         - { name: region_id, in: query, schema: { $ref: '#/components/schemas/RegionId' } }
         - { name: group_id, in: query, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/Limit'
@@ -1311,7 +1313,8 @@ paths:
     get:
       tags: [roles]
       operationId: listRoles
-      summary: Roles and sub-roles (tree)
+      summary: Roles (flat list)
+      description: One flat list in the admin's order (`sort`, then name). There is no main/sub-role nesting. Since 0.4.2 `parent_role_id` and `sub_roles` are gone from the answer.
       parameters:
         - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
       responses:
@@ -1328,7 +1331,8 @@ paths:
     post:
       tags: [roles]
       operationId: createRole
-      summary: Create a role or sub-role (admin)
+      summary: Create a role (admin)
+      description: Roles are flat. `parent_role_id` is deprecated in 0.4.2 and accepted only as `null`; any other value is refused with 422 `validation_failed` on `/parent_role_id`.
       x-step-up: true
       x-db-path: idm_save_role
       requestBody:
@@ -1939,6 +1943,7 @@ paths:
       summary: Submit for review (level 1 done)
       description: |
         Refused with 422 `mandatory_slots_missing` or `mandatory_fields_missing` (listing them). Freezes `levels_required`.
+        CW PAC (B13) and CW FAC (B15) are refused with 422 `open_snags` (with `count` and `scope: CW`) while any open CW snag exists on the site; TE PAC (D16) and TE FAC (D18) likewise for open TE snags (owner decision 2026-10-29). The same check applies to review and approve.
         Self-skip may carry the task further (`skipped_levels` in the result). If the chain reaches final approval, step-up is required.
       x-step-up: conditional (only when self-skip reaches final approval, or levels_required = 1)
       parameters:
@@ -1989,7 +1994,7 @@ paths:
       tags: [tasks]
       operationId: approveTask
       summary: Final approval (level N)
-      description: Refused with 422 `open_snags` for preliminary acceptances while snags are open. Under `all_members` the result shows the votes still missing.
+      description: Refused with 422 `open_snags` (with `count` and `scope`) for CW PAC (B13) and CW FAC (B15) while an open CW snag exists on the site, and for TE PAC (D16) and TE FAC (D18) while an open TE snag exists; snags of the other stream do not block. Under `all_members` the result shows the votes still missing.
       x-step-up: true
       parameters:
         - $ref: '#/components/parameters/TaskId'
@@ -5339,7 +5344,7 @@ paths:
       tags: [forms]
       operationId: generateFormPdf
       summary: Generate the numbered PDF (template version recorded)
-      description: Takes the next number from the form's sequence. Refused with 422 `open_snags` for a PAC while any snag on the site is open. The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
+      description: Takes the next number from the form's sequence. Refused with 422 `open_snags` for a CW PAC while an open CW snag exists on the site (TE snags do not block it; a TE PAC is blocked by open TE snags the same way). The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
       x-db-path: forms_generate
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5884,7 +5889,7 @@ paths:
     get:
       tags: [qc]
       operationId: listSiteSnags
-      summary: Snags of a site (the open count drives the PAC lock)
+      summary: Snags of a site (the open count of each stream, CW or TE, drives the lock of its PAC and FAC)
       parameters:
       - name: state
         in: query
@@ -6863,6 +6868,8 @@ components:
         reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
+        count: { type: integer, description: '0.4.2. With `open_snags`: the number of open snags of the stream that block the task.' }
+        scope: { type: string, enum: [CW, TE], description: '0.4.2. With `open_snags`: the stream of the blocking snags.' }
     ErrorCode:
       type: string
       enum:
@@ -7239,7 +7246,6 @@ components:
         code: { type: string }
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
-        parent_role_id: { type: [string, 'null'], format: uuid }
     Role:
       allOf:
         - $ref: '#/components/schemas/RoleRef'
@@ -7264,7 +7270,6 @@ components:
             can_hold_matrix_levels: { type: boolean }
             is_active: { type: boolean }
             active_assignment_count: { type: integer }
-            sub_roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
             version: { type: integer }
     RoleInput:
       type: object
@@ -7275,7 +7280,7 @@ components:
         name_ar: { type: string }
         description_en: { type: string }
         description_ar: { type: string }
-        parent_role_id: { type: [string, 'null'], format: uuid }
+        parent_role_id: { type: 'null', deprecated: true, description: 'Deprecated in 0.4.2 (roles are flat). Accepted only as null so older clients keep working; any other value is refused with 422.' }
         default_profile_id: { type: [string, 'null'], format: uuid }
         default_region_ids:
           oneOf:
@@ -8204,7 +8209,7 @@ components:
       type: string
       minLength: 1
       maxLength: 60
-      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
+      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
     SlaRuleOverride:
       type: object
       description: 'A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule).'

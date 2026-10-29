@@ -36,6 +36,13 @@ export async function superDb(solo = false): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the third database (suites that change SLA versions or calendars; see global-setup). */
+export async function superDbCalc(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_CALC });
+  await c.connect();
+  return c;
+}
+
 let seq = 0;
 const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).toString(36)}${randomBytes(2).toString('hex')}`;
 
@@ -93,11 +100,11 @@ export async function makeProfile(db: PgClient, grants: [string, string][], code
 }
 
 /** A role with a unique code, created straight in the database. Returns its id. */
-export async function makeRole(db: PgClient, over: { code?: string; parent?: string; profile?: string; regions?: number[]; allRegions?: boolean; modules?: string[]; allModules?: boolean; canHold?: boolean } = {}): Promise<string> {
+export async function makeRole(db: PgClient, over: { code?: string; profile?: string; regions?: number[]; allRegions?: boolean; modules?: string[]; allModules?: boolean; canHold?: boolean } = {}): Promise<string> {
   const code = over.code ?? `ROLE_${uniq().toUpperCase()}`;
   const r = await db.query(
-    `INSERT INTO roles (code, name_en, parent_role_id, default_profile_id, default_all_regions, default_all_modules, can_hold_matrix_levels) VALUES ($1, $1, $2, $3, $4, $5, $6) RETURNING id`,
-    [code, over.parent ?? null, over.profile ?? null, over.allRegions ?? false, over.allModules ?? false, over.canHold ?? true],
+    `INSERT INTO roles (code, name_en, default_profile_id, default_all_regions, default_all_modules, can_hold_matrix_levels) VALUES ($1, $1, $2, $3, $4, $5) RETURNING id`,
+    [code, over.profile ?? null, over.allRegions ?? false, over.allModules ?? false, over.canHold ?? true],
   );
   for (const region of over.regions ?? []) await db.query('INSERT INTO role_default_regions (role_id, region_id) VALUES ($1, $2)', [r.rows[0].id, region]);
   for (const m of over.modules ?? []) await db.query('INSERT INTO role_default_modules (role_id, module_key) VALUES ($1, $2)', [r.rows[0].id, m]);
