@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { contentVersion } from '../common/etag';
 import { DbService } from '../db/db.service';
 
 export interface PickerItem {
@@ -115,6 +116,49 @@ export interface AssignmentDto {
   version: number;
 }
 
+export const ASSIGNMENT_INCLUDE = {
+  role: true,
+  regions: true,
+  modules: true,
+  UserRoleAssignmentProfile: true,
+  assigner: { select: { id: true, display_name: true, employee_id: true } },
+  user: { select: { id: true, display_name: true, employee_id: true } },
+} satisfies Prisma.UserRoleAssignmentInclude;
+
+export type AssignmentRow = Prisma.UserRoleAssignmentGetPayload<{ include: typeof ASSIGNMENT_INCLUDE }>;
+
+/**
+ * Assignments have no version column: the version is an integer derived from everything an edit can change, so
+ * bulk-update and bulk-end detect a row that changed since it was read (If-Match style, per item).
+ */
+export function assignmentVersion(a: AssignmentRow): number {
+  return contentVersion([
+    a.permission_level, a.team, a.valid_from.toISOString(), a.valid_to?.toISOString() ?? null, a.all_regions, a.all_modules, a.is_primary,
+    a.regions.map((r) => r.region_id).sort((x, y) => x - y), a.modules.map((m) => m.module_key).sort(),
+    a.UserRoleAssignmentProfile.map((p) => p.profile_id).sort(),
+  ]);
+}
+
+export function toAssignmentDto(a: AssignmentRow, now: Date): AssignmentDto {
+  return {
+    id: a.id,
+    user: { id: a.user.id, display_name: a.user.display_name, employee_id: a.user.employee_id?.trim() ?? null },
+    role: { id: a.role.id, code: a.role.code, name_en: a.role.name_en, name_ar: a.role.name_ar, parent_role_id: a.role.parent_role_id },
+    permission_level: a.permission_level,
+    team: a.team,
+    region_ids: a.all_regions ? 'all' : a.regions.map((r) => r.region_id).sort((x, y) => x - y),
+    module_keys: a.all_modules ? 'all' : a.modules.map((m) => m.module_key).sort(),
+    profile_ids: a.UserRoleAssignmentProfile.map((p) => p.profile_id).sort(),
+    is_primary: a.is_primary,
+    valid_from: a.valid_from,
+    valid_to: a.valid_to,
+    is_active_now: a.valid_from <= now && (a.valid_to === null || a.valid_to > now),
+    assigned_by: a.assigner ? { id: a.assigner.id, display_name: a.assigner.display_name, employee_id: a.assigner.employee_id?.trim() ?? null } : undefined,
+    assigned_at: a.assigned_at,
+    version: assignmentVersion(a),
+  };
+}
+
 export interface UserFilter {
   q?: string;
   status?: string;
@@ -184,37 +228,14 @@ export class UsersRepo {
     return rows.map((m) => ({ id: m.group.id, name: m.group.name, is_system_admins: m.group.is_system_admins }));
   }
 
-  /** Assignments that have not ended (current and scheduled), primary first. */
-  async assignmentsOf(userId: string): Promise<AssignmentDto[]> {
+  /** Assignments that have not ended (current and scheduled), primary first; `includeEnded` adds the ended ones. */
+  async assignmentsOf(userId: string, includeEnded = false): Promise<AssignmentDto[]> {
     const now = new Date();
     const rows = await this.db.tx.userRoleAssignment.findMany({
-      where: { user_id: userId, OR: [{ valid_to: null }, { valid_to: { gt: now } }] },
-      include: {
-        role: true,
-        regions: true,
-        modules: true,
-        UserRoleAssignmentProfile: true,
-        assigner: { select: { id: true, display_name: true, employee_id: true } },
-        user: { select: { id: true, display_name: true, employee_id: true } },
-      },
-      orderBy: [{ is_primary: 'desc' }, { assigned_at: 'asc' }],
+      where: { user_id: userId, ...(includeEnded ? {} : { OR: [{ valid_to: null }, { valid_to: { gt: now } }] }) },
+      include: ASSIGNMENT_INCLUDE,
+      orderBy: [{ is_primary: 'desc' }, { assigned_at: 'asc' }, { id: 'asc' }],
     });
-    return rows.map((a) => ({
-      id: a.id,
-      user: { id: a.user.id, display_name: a.user.display_name, employee_id: a.user.employee_id?.trim() ?? null },
-      role: { id: a.role.id, code: a.role.code, name_en: a.role.name_en, name_ar: a.role.name_ar, parent_role_id: a.role.parent_role_id },
-      permission_level: a.permission_level,
-      team: a.team,
-      region_ids: a.all_regions ? 'all' : a.regions.map((r) => r.region_id).sort((x, y) => x - y),
-      module_keys: a.all_modules ? 'all' : a.modules.map((m) => m.module_key).sort(),
-      profile_ids: a.UserRoleAssignmentProfile.map((p) => p.profile_id),
-      is_primary: a.is_primary,
-      valid_from: a.valid_from,
-      valid_to: a.valid_to,
-      is_active_now: a.valid_from <= now,
-      assigned_by: a.assigner ? { id: a.assigner.id, display_name: a.assigner.display_name, employee_id: a.assigner.employee_id?.trim() ?? null } : undefined,
-      assigned_at: a.assigned_at,
-      version: 1,
-    }));
+    return rows.map((a) => toAssignmentDto(a, now));
   }
 }

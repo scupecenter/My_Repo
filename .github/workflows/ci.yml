@@ -1,0 +1,186 @@
+# GSDN PMIS continuous integration.
+# Runs the checks a contributor runs locally (see pmis/infra/README.md to reproduce them).
+#
+# Secrets: none. The PostgreSQL passwords below are CI-only test values for a throwaway
+# database service container that exists for the length of one job. They are not secrets.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # CI-only test values for the postgres:16 service container. Never reused outside CI.
+  CI_PG_SUPERUSER_PASSWORD: ci-only-postgres-test-value
+  CI_PMIS_APP_PASSWORD: ci-only-pmis-app-test-value
+  NODE_VERSION: '22'
+
+jobs:
+  api:
+    name: API (typecheck, lint, build, tests on PostgreSQL 16)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ env.CI_PG_SUPERUSER_PASSWORD }}
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pmis/apps/api/package-lock.json
+
+      - name: Create the pmis_app role (CI test password)
+        env:
+          PGPASSWORD: ${{ env.CI_PG_SUPERUSER_PASSWORD }}
+        run: |
+          psql -h 127.0.0.1 -p 5432 -U postgres -v ON_ERROR_STOP=1 \
+            -v app_pw="$CI_PMIS_APP_PASSWORD" <<'SQL'
+          SELECT format('CREATE ROLE pmis_app LOGIN PASSWORD %L', :'app_pw')
+          WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') \gexec
+          SQL
+
+      - name: Install dependencies
+        working-directory: pmis/apps/api
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: pmis/apps/api
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: pmis/apps/api
+        run: npm run lint
+
+      - name: Build
+        working-directory: pmis/apps/api
+        run: npm run build
+
+      # global-setup.ts creates the test databases, applies prisma/migrations and
+      # pmis/db/sql/app_grants.sql as the superuser, then runs the suites as pmis_app.
+      - name: Test
+        working-directory: pmis/apps/api
+        env:
+          TEST_PG_ADMIN_URL: postgresql://postgres:${{ env.CI_PG_SUPERUSER_PASSWORD }}@127.0.0.1:5432/postgres
+          TEST_PG_APP_PASSWORD: ${{ env.CI_PMIS_APP_PASSWORD }}
+        run: npm test
+
+  web:
+    name: Web (typecheck, lint, unit tests, build, Playwright e2e)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: pmis/apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: pmis/apps/web
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: pmis/apps/web
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: pmis/apps/web
+        run: npm run lint
+
+      - name: Unit tests
+        working-directory: pmis/apps/web
+        run: npm test
+
+      - name: Build
+        working-directory: pmis/apps/web
+        run: npm run build
+
+      - name: Install Chromium for Playwright
+        working-directory: pmis/apps/web
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts uses PW_CHROMIUM_PATH when set, otherwise the local-only
+      # /opt/pw-browsers path. Point it at the browser this job just downloaded.
+      - name: Point Playwright at the downloaded Chromium
+        working-directory: pmis/apps/web
+        run: |
+          CHROME="$(node --input-type=module -e "import { chromium } from '@playwright/test'; console.log(chromium.executablePath());")"
+          test -x "$CHROME"
+          echo "PW_CHROMIUM_PATH=$CHROME" >> "$GITHUB_ENV"
+          echo "Chromium: $CHROME"
+
+      - name: End-to-end tests
+        working-directory: pmis/apps/web
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npm run e2e -- --reporter=list,html
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            pmis/apps/web/playwright-report/
+            pmis/apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  contract:
+    name: OpenAPI contract lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Fails on errors only. The current warnings are reported but do not fail the job.
+      - name: Lint openapi.yaml
+        working-directory: pmis
+        run: npx -y @redocly/cli@1 lint contracts/openapi.yaml --config contracts/redocly.yaml --format=stylish
+
+  installer:
+    name: Installer scripts (syntax and shellcheck)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure shellcheck is installed
+        run: command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
+
+      - name: Bash syntax check
+        working-directory: pmis
+        run: bash -n tools/install/install-ubuntu.sh tools/install/update.sh
+
+      - name: Shellcheck (errors only)
+        working-directory: pmis
+        run: shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh

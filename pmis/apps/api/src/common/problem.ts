@@ -5,7 +5,7 @@ export type ErrorCode =
   | 'validation_failed' | 'unauthenticated' | 'mfa_required' | 'step_up_required' | 'pending_assignment'
   | 'module_forbidden' | 'action_forbidden' | 'field_read_only' | 'not_eligible_holder' | 'self_beneficiary'
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
-  | 'invalid_transition' | 'note_required' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
+  | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'password_change_required' | 'weak_password' | 'internal_error';
 
 export interface FieldError {
@@ -27,6 +27,7 @@ const TITLES: Record<string, string> = {
   not_found: 'Not found',
   already_assigned: 'Already assigned',
   note_required: 'A note is required',
+  role_in_use: 'The role is in use',
   precondition_failed: 'The resource changed',
   precondition_required: 'If-Match header required',
   duplicate: 'Already exists',

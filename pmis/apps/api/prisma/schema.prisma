@@ -703,7 +703,7 @@ model WorkflowDefinition {
 model StageDefinition {
   id                       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   workflow_id              String  @db.Uuid
-  code                     String // S01..S10 in v1; stable
+  code                     String // MS1..MS10 in v1; stable
   seq                      Int // unique per workflow (deferrable constraint, migration 0008)
   name_en                  String
   name_ar                  String?
@@ -1236,6 +1236,10 @@ model Holiday {
   calendar_id String       @db.Uuid
   date        DateTime     @db.Date
   name        String
+  name_ar     String?
+  kind        String       @default("national") // national | religious (CHECK holidays_kind_check, migration 0013)
+  tentative   Boolean      @default(false) // religious dates stay tentative until the admin confirms them (B12)
+  note        String?
   calendar    WorkCalendar @relation(fields: [calendar_id], references: [id])
 
   @@unique([calendar_id, date])
@@ -1243,7 +1247,7 @@ model Holiday {
 }
 
 // Versioned SLA rule. min = target (green), max = limit (above = late), counted in working days of the calendar from
-// start_event (a task code, milestone code S01..S10 or gate code). Scenario/region NULL = applies to all.
+// start_event (a task code, milestone code MS1..MS10 or gate code G2..G10). Scenario/region NULL = applies to all.
 // Overlap of effective ranges for the same task+scenario+region is rejected by an exclusion constraint (migration 0005).
 // Edits create a new row; a rule referenced by task instances is immutable apart from effective_to.
 model SlaRule {
@@ -1292,7 +1296,7 @@ model BaselineEntry {
   site_id        String    @db.Uuid
   region_id      Int
   site           Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
-  milestone_code String // S01..S10
+  milestone_code String // MS1..MS10
   baseline_date  DateTime? @db.Date
   planned_start  DateTime? @db.Date
 
@@ -1309,7 +1313,7 @@ model BaselineEntry {
 model PhaseGateRule {
   id                   String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   workflow_id          String  @db.Uuid
-  link_code            String // B01..B09 in v1; stable
+  link_code            String // G2..G10 in v1; stable (gate Gn sits between MS(n-1) and MSn)
   seq                  Int
   name_en              String
   name_ar              String?

@@ -429,6 +429,37 @@ describe('what pmis_app may do in the database', () => {
       await c.end();
     }
   });
+
+  it('creates sessions only through auth_session_create, after a recent successful check (migration 0014)', async () => {
+    const { Client } = await import('pg');
+    const u = await makeUser(db, { assigned: true });
+    const disabled = await makeUser(db, { status: 'disabled' });
+    const c = new Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await c.connect();
+    const hash = 'a'.repeat(64);
+    const csrf = 'c'.repeat(43);
+    try {
+      expect((await c.query('SELECT * FROM auth_local_lookup($1)', [disabled.email])).rowCount).toBe(0);
+      expect((await c.query('SELECT * FROM auth_local_lookup($1)', [disabled.employeeId])).rowCount).toBe(0);
+      expect((await c.query('SELECT * FROM auth_local_lookup($1)', [u.email])).rowCount).toBe(1);
+      await expect(c.query(`INSERT INTO user_sessions (token_hash, user_id, auth_method, csrf_token, expires_at)
+        VALUES ($1, $2, 'local', $3, now() + interval '1 hour')`, [hash, u.id, csrf])).rejects.toThrow(/permission denied/);
+      await expect(c.query('UPDATE user_sessions SET user_id = $1', [u.id])).rejects.toThrow(/permission denied/);
+      await c.query('BEGIN');
+      await c.query("SELECT set_config('app.user_id', $1, true)", [u.id]);
+      await expect(c.query(`SELECT auth_session_create($1, $2, 'local', $3, NULL, NULL)`, [u.id, hash, csrf])).rejects.toThrow(/no recent successful sign-in/);
+      await c.query('ROLLBACK');
+    } finally {
+      await c.end();
+    }
+  });
+
+  it('never revives a revoked session', async () => {
+    const u = await makeUser(db, { assigned: true });
+    const api = await loggedIn(app, u);
+    expect((await api.call('post', '/auth/logout')).status).toBe(204);
+    await expect(db.query('UPDATE user_sessions SET revoked_at = NULL WHERE user_id = $1', [u.id])).rejects.toThrow(/cannot be changed back/);
+  });
 });
 
 describe('GET /users/picker', () => {
