@@ -1,6 +1,6 @@
 # Seed plan (synthetic data only)
 
-Seeding runs through `prisma db seed` (TypeScript, deterministic PRNG with fixed seed so every environment gets identical data). Because RLS is forced, the seed script sets `app.region_ids = '*'` at the start of its transaction. Only fictional names are used. Real names per role are entered after go-live.
+Reference data (sections 1-5, 9a profiles, 10, 10a, 10c and the workflow below) is also seeded by migration `0013_reference_seed` (mirror `db/sql/012_reference_seed.sql`), idempotent and run as the migration role. Milestone codes are `MS1`..`MS10` and gate codes `G2`..`G10` (the `S01`/`B01` codes below are superseded; `B01`..`B07` are SLA planning links). Seeding of synthetic data runs through `prisma db seed` (TypeScript, deterministic PRNG with fixed seed so every environment gets identical data). Because RLS is forced, the seed script sets `app.region_ids = '*'` at the start of its transaction. Only fictional names are used. Real names per role are entered after go-live.
 
 ## Reference data (always, also in production)
 1. `regions`: ids 1..7 = Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha.
