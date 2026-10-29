@@ -579,10 +579,13 @@ describe('open snags and comments', () => {
     const elsewhere = await actor(app, db, { level: 'entry', regions: [2] });
     const viewOnly = await actor(app, db, { level: 'view', grants: [['sites', 'view']] });
     const f = await flow('A1', { entry: [e], review: [e], approve: [e] });
-    const c1 = await e.api.call('post', `/tasks/${f.taskId}/comments`, { body: 'first', mention_user_ids: [peer.user.id] });
+    const c1 = await e.api.call('post', `/tasks/${f.taskId}/comments`, { body: 'first', mention_user_ids: [peer.user.id, elsewhere.user.id] });
     expect(c1.status).toBe(201);
     expect(c1.body.author.id).toBe(e.user.id);
+    // a person outside the task's region is not mentioned and does not get the comment text in a notification
     expect(c1.body.mentions.map((m: { id: string }) => m.id)).toEqual([peer.user.id]);
+    const leaked = await db.query(`SELECT count(*)::int AS n FROM notifications WHERE user_id = $1 AND task_id = $2`, [elsewhere.user.id, f.taskId]);
+    expect(leaked.rows[0].n).toBe(0);
     await viewOnly.api.call('post', `/tasks/${f.taskId}/comments`, { body: 'second' });
     const list = await peer.api.call('get', `/tasks/${f.taskId}/comments`);
     expect(list.body.items.map((c: { body: string }) => c.body)).toEqual(['first', 'second']);

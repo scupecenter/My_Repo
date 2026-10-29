@@ -789,7 +789,8 @@ BEGIN
   IF coalesce(btrim(p_body), '') = '' THEN PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'The comment is empty.')); END IF;
   INSERT INTO public.comments (task_id, region_id, author_id, body) VALUES (p_task, t.region_id, actor, p_body) RETURNING id INTO cid;
   FOREACH m IN ARRAY coalesce(p_mentions, ARRAY[]::uuid[]) LOOP
-    IF EXISTS (SELECT 1 FROM public.users u WHERE u.id = m AND u.status = 'active') AND m <> actor THEN
+    -- only people who can see the task are mentioned and notified (the notification carries the comment text)
+    IF m <> actor AND public.wf_user_in_scope(m, t.region_id) THEN
       INSERT INTO public.comment_mentions (comment_id, user_id) VALUES (cid, m) ON CONFLICT DO NOTHING;
       PERFORM public.wf_notify(m, 'mention', 'You were mentioned', public.wf_label(p_task) || ': ' || left(p_body, 200), p_task);
     END IF;
