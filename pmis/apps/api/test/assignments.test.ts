@@ -66,15 +66,18 @@ describe('POST /assignments/bulk-assign', () => {
     const s = await setup();
     const people = [await pending(), await pending(), await pending()];
     await s.api.call('post', '/assignments/bulk-assign', assignBody(s, [people[0]!]));
-    const rowsBefore = await count('SELECT count(*) AS n FROM user_role_assignments');
-    const auditBefore = await count('SELECT count(*) AS n FROM audit_log');
+    // counted for this test's role and admin only: other test files write to the same tables in parallel
+    const rowsSql = 'SELECT count(*) AS n FROM user_role_assignments WHERE role_id = $1';
+    const auditSql = 'SELECT count(*) AS n FROM audit_log WHERE actor_id = $1';
+    const rowsBefore = await count(rowsSql, [s.role]);
+    const auditBefore = await count(auditSql, [s.admin.id]);
     const res = await s.api.call('post', '/assignments/bulk-assign', { ...assignBody(s, people), dry_run: true });
     expect(res.status).toBe(200);
     expect(res.body.dry_run).toBe(true);
     expect(res.body.done).toHaveLength(2);
     expect(res.body.skipped).toEqual([expect.objectContaining({ ref: `${people[0]!.id}:${s.role}`, code: 'already_assigned' })]);
-    expect(await count('SELECT count(*) AS n FROM user_role_assignments')).toBe(rowsBefore);
-    expect(await count('SELECT count(*) AS n FROM audit_log')).toBe(auditBefore);
+    expect(await count(rowsSql, [s.role])).toBe(rowsBefore);
+    expect(await count(auditSql, [s.admin.id])).toBe(auditBefore);
     const st = await db.query('SELECT status FROM users WHERE id = $1', [people[1]!.id]);
     expect(st.rows[0].status).toBe('pending_assignment');
   });
