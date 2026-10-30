@@ -23,6 +23,7 @@ import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { DbService } from './db/db.service';
+import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
 import { DelegationsController } from './delegations/delegations.controller';
 import { DelegationsService } from './delegations/delegations.service';
@@ -63,7 +64,7 @@ export function appModuleFor(config: AppConfig) {
       DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService,
+      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

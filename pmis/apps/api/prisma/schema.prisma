@@ -1406,6 +1406,18 @@ model PermitType {
   @@map("permit_types")
 }
 
+// What the calculation layer last saw of each gate on each site (migration 0018, Q81): a gate that was open and is blocked now raises an alert,
+// it does not re-lock tasks that are open. Written only by calc_gate_watch. The foreign key to sites (on delete cascade) lives in the migration.
+model SiteGateState {
+  site_id   String   @db.Uuid
+  gate_code String
+  is_open   Boolean
+  since     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([site_id, gate_code])
+  @@map("site_gate_state")
+}
+
 model BaselineVersion {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   version     Int       @unique

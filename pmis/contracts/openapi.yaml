@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.3
+  version: 0.4.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.4 (2026-10-30): owner answers Q76 to Q84 (minor, additive). `TaskSummary.sla.negative` (boolean): true when an approved task closed its SLA clock at an actual date before the start (a negative duration, data-quality alert, Q82). `SlaStartEvent` also accepts `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting, `sla.dlp_days.cw`, default 90; used by B-15 CW FAC, Q80). `LockReason` `gate_closed` is now returned for the tasks of the stage behind a closed gate (`ref_code` = the gate code, followed by the gate's own reasons), because a gate locks the tasks of the next stage until it opens, except the tasks in the setting `calc.gate_lock_exempt_tasks` (Q81). No endpoint was added or removed.
     - 0.4.3 (2026-10-29): documentation of behaviour, no shape changed. `SlaStartEvent` also accepts the reserved values `PRED` (the latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the task date plus the DLP months), because the Master measures some steps from register fields the PMIS does not read yet. `TaskSummary.sla` is filled (start date, elapsed working days, colour, due date, rule set version). `PipelineNode` gates carry the calculated gate date, the Change Control shift and the lock reasons. Holiday, weekend-day and SLA rule-set changes recalculate the due dates of open tasks only.
     - 0.4.2 (2026-10-29): roles are flat (`parent_role_id` and `sub_roles` removed from Role, `parent_role_id` accepted only as null on create); `Problem.count` and `Problem.scope` for `open_snags`, which now blocks CW PAC/FAC on open CW snags and TE PAC/FAC on open TE snags of the site.
     - 0.4.1 (2026-10-29): additive. The Sites module is the **Site Register** (سجل المواقع) and has streams (جزئية): `stream` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks`, `SiteListItem.streams` (`StreamStatus`), `Stream`, `stage.stream_code` and `streams` in the task grid, `TaskSummary.stream_code`; `TransitionResult.votes_missing` and `returned_to_level` (owner decision 2026-10-29, workflow engine).
@@ -7711,6 +7712,7 @@ components:
         colour: { type: string, enum: [green, amber, red, none] }
         rule_id: { type: [string, 'null'], format: uuid }
         rule_set_version: { type: [integer, 'null'], minimum: 1, description: 'SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6).' }
+        negative: { type: boolean, description: '0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise.' }
     TaskSummary:
       type: object
       required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
@@ -8209,7 +8211,7 @@ components:
       type: string
       minLength: 1
       maxLength: 60
-      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
+      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
     SlaRuleOverride:
       type: object
       description: 'A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule).'

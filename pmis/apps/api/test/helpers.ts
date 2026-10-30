@@ -19,6 +19,7 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     host: '127.0.0.1',
     cookieSecure: false,
     logHmacKey: 'test-only-hmac-key-0123456789abcdef',
+    jobsEnabled: false,
     ...over,
   };
 }
@@ -39,6 +40,13 @@ export async function superDb(solo = false): Promise<PgClient> {
 /** Superuser connection to the third database (suites that change SLA versions or calendars; see global-setup). */
 export async function superDbCalc(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_CALC });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the fourth database (the owner-answer suites of migration 0018; see global-setup). */
+export async function superDbCalc2(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_CALC2 });
   await c.connect();
   return c;
 }

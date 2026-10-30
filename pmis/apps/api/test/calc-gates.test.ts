@@ -136,14 +136,39 @@ describe('gate CW Readiness: permits approved and valid on the gate date (D36, Q
     expect((await taskRow(db, site2, 'MS3')).actual_date).toBe(itemsDay);
   });
 
-  it('leaves the milestone uncalculated when its latest condition date is before the gate (Master BP)', async () => {
-    const site = await cwSite(await wd(db, -8), await wd(db, -6));              // items done on the 6th day back
-    await permit(site, 'Access - CW', { from: await wd(db, -4), to: await wd(db, 30) });   // the gate moves to the 4th day back
+  it('takes the later of the gate date and its latest condition date when the conditions are earlier (owner answer Q76, differs from the Master BP)', async () => {
+    const itemsDay = await wd(db, -6);                                           // items done on the 6th working day back
+    const site = await cwSite(await wd(db, -8), itemsDay);
+    const permitStart = await wd(db, -4);
+    await permit(site, 'Access - CW', { from: permitStart, to: await wd(db, 30) });        // the gate moves to the 4th day back, later than the items
     await permit(site, 'PTW - CW', { status: 'N/A', naReason: 'not needed', naBy: 'CW Team Lead' });
-    expect((await gate(site, 'G3')).status).toBe('open');
+    expect(await gate(site, 'G3')).toMatchObject({ status: 'open', gate_date: permitStart });
     const ms3 = await taskRow(db, site, 'MS3');
-    expect(ms3.state).toBe('open');
-    expect(String(ms3.lock_reason)).toMatch(/before the gate date/);
+    expect(ms3.state).toBe('approved');                                          // not blank: calculated
+    expect(ms3.actual_date).toBe(permitStart);                                   // the later of the two dates
+    expect(ms3.lock_reason).toBeNull();
+    // the setting that used to keep the milestones blank is empty
+    expect((await q<{ value: unknown }>(db, `SELECT value FROM settings WHERE key = 'calc.milestone_ge_gate'`))[0]!.value).toEqual([]);
+  });
+
+  it('gives every other calculated milestone the same rule: MS5 to MS10 take the later of the gate date and their conditions (Q76)', async () => {
+    // TE Completion (MS5): gate G5 = the Site RFI date, the TE installation item done before it
+    const rfiDay = await wd(db, -3);
+    const site = await newSite(db);
+    await makeTask(db, site, 'MS4', 'approved', { actualDate: rfiDay });
+    await makeTask(db, site, 'D6', 'approved', { actualDate: await wd(db, -7) });
+    await permit(site, 'Access - TE', { from: await wd(db, -9), to: await wd(db, 40) });
+    await permit(site, 'PTW - TE', { from: await wd(db, -9), to: await wd(db, 40) });
+    const ms5 = await makeTask(db, site, 'MS5', 'locked');
+    await open(db, ms5);
+    const row = await taskRow(db, site, 'MS5');
+    expect(row.state).toBe('approved');
+    expect(row.actual_date).toBe(rfiDay);                                        // the gate date, later than D6
+    // On-Air Readiness (MS6) the same way
+    const ms6 = await makeTask(db, site, 'MS6', 'locked');
+    for (const c of ['D7', 'D8', 'D9', 'D10']) await makeTask(db, site, c, 'approved', { actualDate: await wd(db, -8) });
+    await open(db, ms6);
+    expect((await taskRow(db, site, 'MS6')).actual_date).toBe(rfiDay);
   });
 
   it('is held by an active stop work on the PTW and released by the lift date', async () => {

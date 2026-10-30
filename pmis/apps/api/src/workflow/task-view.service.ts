@@ -57,6 +57,8 @@ export interface TaskSummaryDto {
     colour: 'green' | 'amber' | 'red' | 'none';
     rule_id: string | null;
     rule_set_version: number | null;
+    /** Q82: an approved task whose actual date is before its SLA start (a negative duration): a data-quality flag for review. */
+    negative: boolean;
   };
   slots_filled: number;
   slots_required: number;
@@ -262,6 +264,7 @@ export class TaskViewService {
           colour: r.sla_colour ?? 'none',
           rule_id: r.sla_rule_id,
           rule_set_version: r.sla_rule_set_version,
+          negative: r.state === 'approved' && r.sla_elapsed !== null && r.sla_elapsed < 0,
         },
         slots_filled: Number(r.slots_filled),
         slots_required: Number(r.slots_required),
@@ -296,7 +299,11 @@ export class TaskViewService {
     });
   }
 
-  /** The predecessors that keep a locked task locked, as lock reasons. */
+  /**
+   * What keeps a locked task locked, as lock reasons: the predecessors that are not approved, and a closed gate in front of its stage (Q81).
+   * A gate adds one `gate_closed` item with the gate code, followed by the gate's own reasons (permit, stop work, suspension). A gate that has
+   * no date yet only shows when no predecessor is left open (otherwise the predecessors are the reason).
+   */
   async lockReasons(taskIds: string[]): Promise<Map<string, TaskSummaryDto['lock_reasons']>> {
     const out = new Map<string, TaskSummaryDto['lock_reasons']>();
     if (taskIds.length === 0) return out;
@@ -312,6 +319,34 @@ export class TaskViewService {
       const list = out.get(r.task_id) ?? [];
       list.push({ kind: 'predecessor_not_approved', ref_code: r.code, message: `${r.code} ${r.name_en} is not approved yet.`, count: null });
       out.set(r.task_id, list);
+    }
+    // The gate in front of each locked task's stage (the same rule as wf_gate_hold: exempt tasks are free), evaluated once per site and gate.
+    const gates = await this.db.tx.$queryRaw<{ task_id: string; gate_code: string; gate_status: string; reasons: TaskSummaryDto['lock_reasons'] }[]>(Prisma.sql`
+      WITH tk AS (
+        SELECT t.id, t.site_id, g.link_code
+        FROM task_instances t
+        JOIN sites s ON s.id = t.site_id
+        JOIN task_definitions td ON td.id = t.task_def_id
+        JOIN stage_definitions sd ON sd.id = td.stage_id
+        JOIN phase_gate_rules g ON g.workflow_id = s.workflow_version_id AND g.to_code = sd.code AND g.is_active
+        WHERE t.id = ANY(${taskIds}::uuid[]) AND t.state = 'locked' AND NOT gate_lock_exempt(td.code)
+      ), ev AS (
+        SELECT d.site_id, d.link_code, e.status, e.reasons
+        FROM (SELECT DISTINCT site_id, link_code FROM tk) d
+        CROSS JOIN LATERAL gate_eval(d.site_id, d.link_code) e
+      )
+      SELECT tk.id::text AS task_id, tk.link_code AS gate_code, ev.status AS gate_status, ev.reasons
+      FROM tk JOIN ev ON ev.site_id = tk.site_id AND ev.link_code = tk.link_code
+      WHERE ev.status NOT IN ('open', 'na')`);
+    for (const g of gates) {
+      const list = out.get(g.task_id) ?? [];
+      if (g.gate_status === 'pending' && list.length > 0) continue;
+      let items = Array.isArray(g.reasons) ? g.reasons : [];
+      if (items.length === 0) items = [{ kind: 'condition_not_met', ref_code: g.gate_code, message: `The gate ${g.gate_code} is not open.`, count: null }];
+      const why = items.map((x) => x.message).join(' ');
+      list.push({ kind: 'gate_closed', ref_code: g.gate_code, message: `The gate ${g.gate_code} is closed.${why ? ` ${why}` : ''}`, count: null });
+      for (const x of items) list.push({ kind: x.kind, ref_code: x.ref_code ?? null, message: x.message, count: x.count ?? null });
+      out.set(g.task_id, list);
     }
     return out;
   }
