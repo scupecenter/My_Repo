@@ -1,4 +1,5 @@
 import type { Group, Matrix, MatrixAssignee, MatrixCell, Role } from '@/api/types';
+import { cellLevel, usedLevels } from '@/lib/matrixLevels';
 import { byId, uid } from './ids';
 
 type Row = Matrix['stages'][number];
@@ -48,14 +49,19 @@ const cell = (stage_code: string, level: number, holders: (string | MatrixAssign
   assignees: holders.map((h) => (typeof h === 'string' ? asUser(h) : h)),
 });
 
-/** Recomputes who holds two consecutive levels (the second is skipped for them, MX-06). */
+/** Recomputes who holds two consecutive levels in use (the second is skipped for them, MX-06). Cells are 1 entry, 2 review, 3 approve; a 2-level row skips from cell 1 to cell 3. */
 export function recomputeSkip(m: Matrix): Matrix {
   for (const row of m.stages) {
+    const used = usedLevels(row.approval_levels);
     for (const c of row.cells) {
-      const next = row.cells.find((x) => x.level === c.level + 1);
-      const users = new Set(next && c.level < row.approval_levels ? next.assignees.filter((a) => a.kind === 'user').map((a) => a.ref_id) : []);
+      const nextLevel = used[used.indexOf(c.level as 1 | 2 | 3) + 1];
+      const next = nextLevel ? row.cells.find((x) => x.level === nextLevel) : undefined;
+      const users = new Set(next ? next.assignees.filter((a) => a.kind === 'user').map((a) => a.ref_id) : []);
       c.skip_preview = c.assignees.filter((a) => a.kind === 'user' && users.has(a.ref_id)).map((a) => ({ id: a.ref_id, display_name: a.label, employee_id: a.employee_id ?? undefined })) as MatrixCell['skip_preview'];
+      c.level_kind = c.level === 1 ? 'entry' : c.level === 2 ? 'review' : 'approve';
+      c.used = used.includes(c.level as 1 | 2 | 3);
     }
+    row.used_levels = used;
   }
   return m;
 }
@@ -73,4 +79,9 @@ export function initialMatrix(): Matrix {
 }
 
 export const rowOf = (m: Matrix, code: string) => m.stages.find((s) => s.code === code);
-export const holdersOf = (m: Matrix, code: string, level: number): MatrixAssignee[] => rowOf(m, code)?.cells.find((c) => c.level === level)?.assignees ?? [];
+/** Holders of position `position` (1 = entry) of a path of `n` levels (default: the row's own count). The last position is always cell 3 (approve). */
+export const holdersOf = (m: Matrix, code: string, position: number, n?: number): MatrixAssignee[] => {
+  const row = rowOf(m, code);
+  const level = cellLevel(position, n ?? row?.approval_levels ?? 3);
+  return row?.cells.find((c) => c.level === level && !c.task_code && !c.region_id)?.assignees ?? [];
+};

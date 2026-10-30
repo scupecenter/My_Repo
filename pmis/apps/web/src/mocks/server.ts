@@ -5,4 +5,5 @@ import { authHandlers } from './handlers.auth';
 import { orgHandlers } from './handlers.org';
 import { settingsHandlers } from './handlers.settings';
 import { siteHandlers } from './handlers.sites';
-export const server = setupServer(...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);
+import { registerHandlers } from './handlers.registers';
+export const server = setupServer(...registerHandlers, ...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);

@@ -7,6 +7,8 @@ const schema = z.object({
   HOST: z.string().min(1).default('127.0.0.1'),
   COOKIE_SECURE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   LOG_HMAC_KEY: z.string().min(16, 'LOG_HMAC_KEY must be at least 16 characters'),
+  // Daily job (owner answer Q84). Absent = on, except when NODE_ENV=test.
+  JOBS_ENABLED: z.enum(['true', 'false']).optional(),
 });
 
 export interface AppConfig {
@@ -16,6 +18,8 @@ export interface AppConfig {
   host: string;
   cookieSecure: boolean;
   logHmacKey: string;
+  /** Runs the daily job (SLA versions due, tentative-holiday reminder) at start-up and at 02:00 Africa/Tripoli. */
+  jobsEnabled: boolean;
 }
 
 /** Reads the settings from the environment only. Throws one readable error listing every problem. */
@@ -33,6 +37,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     host: v.HOST,
     cookieSecure: v.COOKIE_SECURE,
     logHmacKey: v.LOG_HMAC_KEY,
+    jobsEnabled: v.JOBS_ENABLED === undefined ? v.NODE_ENV !== 'test' : v.JOBS_ENABLED === 'true',
   };
 }
 

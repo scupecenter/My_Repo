@@ -1495,7 +1495,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Responsibility Matrix for a workflow version, with self-skip preview */
+        /**
+         * Responsibility Matrix for a workflow version, with self-skip preview
+         * @description One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
+         *     dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
+         *     its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
+         *     3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+         *     `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
+         *     to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
+         *     for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
+         *     `preview` shows in advance where one person holds consecutive levels, so the level is skipped (B6), and where that reaches
+         *     the last level, which is a self-approval that needs step-up (B5). Needs view on `admin.matrix`, or the `matrix.edit` right.
+         *     The `ETag` is the matrix revision, to send back in `If-Match` on `PATCH /matrix`.
+         */
         get: operations["getMatrix"];
         put?: never;
         post?: never;
@@ -1504,8 +1516,16 @@ export interface paths {
         head?: never;
         /**
          * Save changed cells and stage level counts in one step
-         * @description All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
-         *     `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+         * @description All changes in one transaction, with step-up, `If-Match` (the matrix revision) and a reason. Needs System Admin or a
+         *     delegation with `matrix.edit`; a cell without `region_id` and a level count reach every region and need the right for all
+         *     regions, a cell with `region_id` needs it for that region. `stage_code` is a stage code of the workflow version or the
+         *     code of a register or Dismantle row. A used level with no holder is refused (422 `empty_cell`, `Problem.cells` lists the
+         *     cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
+         *     refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
+         *     level count is audited with before and after values and the reason.
+         *     The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+         *     submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
+         *     rejection (decision B7). The answer shows both counts per stage in `task_counts`.
          */
         patch: operations["updateMatrix"];
         trace?: never;
@@ -3000,6 +3020,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim a group-held level (any one member)
+         * @description The first member who acts claims the level; the others get 409 `already_claimed` (B10, as for tasks).
+         */
+        post: operations["claimRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release my claim back to the group */
+        post: operations["releaseRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /** Steps of one version (timeline), including auto-skips */
+        get: operations["getRegisterRecordHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /** All versions of the logical record, newest first */
+        get: operations["listRegisterRecordVersions"];
+        put?: never;
+        /**
+         * New version of an approved record (state `entry`)
+         * @description Copies the approved version that is in force (the values filled by the approval are not copied). The approved version stays in
+         *     force until the new one is approved (R9, RE-03). GECOL and HLC: a new request is a new version of the site's record (Q55).
+         *     Needs the register row's entry holder; 409 when the record is not approved or an open version exists.
+         */
+        post: operations["createRegisterRecordVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document-library": {
         parameters: {
             query?: never;
@@ -4055,6 +4172,15 @@ export interface components {
             claimed_by?: components["schemas"]["UserRef"];
             /** @description Missing slot or field names. */
             missing?: string[];
+            /** @description 0.4.6. With `empty_cell`: the cells of levels in use that have no holder. */
+            cells?: {
+                stage_code: string;
+                task_code?: string | null;
+                level: number;
+                /** @enum {string} */
+                level_kind?: "entry" | "review" | "approve";
+                region_id?: number | null;
+            }[];
             /** @description 0.4.2. With `open_snags`: the number of open snags of the stream that block the task. */
             count?: number;
             /**
@@ -4062,6 +4188,11 @@ export interface components {
              * @enum {string}
              */
             scope?: "CW" | "TE";
+            /**
+             * Format: uuid
+             * @description 0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).
+             */
+            existing_id?: string;
         };
         /** @enum {string} */
         ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
@@ -4777,6 +4908,8 @@ export interface components {
              */
             user_id?: string;
             account_status?: components["schemas"]["UserAccountStatus"];
+            /** @description 0.4.6. In the matrix: for a role, the people with an active assignment of it; for a group, its members. Absent for users. */
+            member_count?: number;
         };
         BallInCourt: {
             level: number;
@@ -4826,6 +4959,8 @@ export interface components {
             rule_id?: string | null;
             /** @description SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6). */
             rule_set_version?: number | null;
+            /** @description 0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise. */
+            negative?: boolean;
         };
         TaskSummary: {
             /** Format: uuid */
@@ -5074,21 +5209,75 @@ export interface components {
         MatrixCell: {
             /** Format: uuid */
             id: string;
+            /** @description The row: a stage code, or the register key of a register or Dismantle row. */
             stage_code: string;
-            /** @description null = stage default. */
+            /** @description null = the row default; a task code = a holder override for that task. */
             task_code?: string | null;
+            /** @description 1 entry, 2 review, 3 approve, whatever the number of levels of the row. */
             level: number;
+            /**
+             * @description 0.4.6.
+             * @enum {string}
+             */
+            level_kind?: "entry" | "review" | "approve";
+            /** @description 0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight). */
+            used?: boolean;
+            /** @description null = every region. */
             region_id?: components["schemas"]["RegionId"] | null;
-            /** @enum {string} */
+            /**
+             * @description The Entry level is always any_one.
+             * @enum {string}
+             */
             rule: "any_one" | "all_members";
             assignees: components["schemas"]["MatrixAssignee"][];
             /** @description People who also hold the next level (level will be skipped for them). */
             skip_preview?: components["schemas"]["UserRef"][];
+            /**
+             * Format: date-time
+             * @description 0.4.6.
+             */
+            updated_at?: string | null;
         };
+        /** @description 0.4.6. One person who holds consecutive levels of a row, in the regions listed. */
+        MatrixSkipCase: {
+            /** @description null = the row default; a task code = the override cells of that task. */
+            task_code?: string | null;
+            user: components["schemas"]["UserRef"];
+            /**
+             * @description The level the person acts at.
+             * @enum {string}
+             */
+            from_level_kind: "entry" | "review";
+            /** @description The levels skipped after it, in order. Each skip is logged (B6). */
+            skipped_level_kinds: ("review" | "approve")[];
+            /** @description True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log. */
+            self_approval: boolean;
+            /** @description Regions where this holds (only regions the caller can see). */
+            region_ids: components["schemas"]["RegionId"][];
+        };
+        /** @description 0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`. */
+        MatrixPreview: {
+            /** @description The row has one level: every submission by its Entry holders is a self-approval (B5). */
+            single_level: boolean;
+            skips: components["schemas"]["MatrixSkipCase"][];
+        };
+        /** @description 0.4.6. Open tasks of a stage in the caller's regions, for the level-count change (decision B7). Tasks with their own level count are left out of `not_submitted`. */
+        MatrixTaskCounts: {
+            /** @description Not yet submitted (locked, open or in entry before the first submission): they follow the current level count. */
+            not_submitted: number;
+            /** @description Submitted at least once and not finished: they keep the level path frozen at their first submission. */
+            in_flight: number;
+        };
+        /**
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).
+         * @enum {string}
+         */
+        MatrixRowKey: "procurement" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
-            /** @description Matrix revision (ETag). */
+            /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
             version: number;
+            /** @description Stage rows in workflow order, then the register rows, then Dismantle. */
             stages: {
                 /**
                  * @description Register and Dismantle rows (B11); `code` is then the register key.
@@ -5096,23 +5285,34 @@ export interface components {
                  * @enum {string}
                  */
                 kind: "stage" | "register" | "dismantle";
-                register_key?: components["schemas"]["RegisterKey"] | null;
+                register_key?: components["schemas"]["MatrixRowKey"] | null;
                 code: string;
                 name_en: string;
                 name_ar?: string | null;
                 approval_levels: number;
+                /** @description 0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3]. */
+                used_levels?: number[];
+                /** @description 0.4.6. Regions that have cells of their own in this row (visible regions only). */
+                region_ids_with_cells?: components["schemas"]["RegionId"][];
+                task_counts?: components["schemas"]["MatrixTaskCounts"];
+                preview?: components["schemas"]["MatrixPreview"];
+                /** @description The row default of each level first, then the task and region cells. */
                 cells: components["schemas"]["MatrixCell"][];
             }[];
         };
         MatrixPatch: {
             workflow_version?: number;
             stage_levels?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
                 approval_levels: number;
             }[];
             cells?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
+                /** @description Only for stage rows: a holder override for one task of the stage. */
                 task_code?: string | null;
+                /** @description 1 entry, 2 review, 3 approve. */
                 level: number;
                 region_id?: components["schemas"]["RegionId"] | null;
                 /** @enum {string} */
@@ -5322,7 +5522,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
         SlaStartEvent: string;
         /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
         SlaRuleOverride: {
@@ -6193,6 +6393,8 @@ export interface components {
             read_only?: boolean;
             in_list?: boolean;
             is_custom?: boolean;
+            /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
+            section?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -6238,13 +6440,65 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version")[];
+            /**
+             * Format: uuid
+             * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
+             */
+            entity_id?: string;
+            /** @description Business version of the logical record (1, 2, 3 ...). Not the ETag. */
+            version_no?: number;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            /** @description The approved version that is in force. */
+            is_current?: boolean;
+            /** @description Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task's Matrix row, and the final approval fills the task's date and approves it. */
+            task?: {
+                /** Format: uuid */
+                id: string;
+                task_code: string;
+            };
+            self_approval?: boolean;
+            approved_by?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** @enum {string} */
+            source?: "manual" | "template";
+            /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
+            last_transition?: {
+                step_ids?: string[];
+                skipped_levels?: number[];
+                unlocked_task_ids?: string[];
+                votes_missing?: number;
+                returned_to_level?: number;
+            };
             created_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            /** @description ETag (If-Match). */
             version: number;
+        };
+        RegisterRecordStep: {
+            /** Format: uuid */
+            id: string;
+            level: number;
+            /** @enum {string} */
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void";
+            acted_by?: components["schemas"]["UserRef"];
+            note?: string | null;
+            before_state?: components["schemas"]["RegisterRecordState"];
+            after_state?: components["schemas"]["RegisterRecordState"];
+            self_approval?: boolean;
+            stepup_verified?: boolean;
+            /**
+             * Format: uuid
+             * @description Set when the version came from a template batch.
+             */
+            batch_row_id?: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
         RegisterRecordInput: {
             /**
@@ -9939,7 +10193,7 @@ export interface operations {
             query?: {
                 /** @description Default = current published version. */
                 workflow_version?: number;
-                /** @description Show region-specific cells for this region. */
+                /** @description Also return the cells specific to this region. */
                 region_id?: components["schemas"]["RegionId"];
             };
             header?: never;
@@ -9960,6 +10214,8 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     updateMatrix: {
@@ -12594,6 +12850,10 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
+                /** @description All versions of one logical record. */
+                entity_id?: string;
+                /** @description Default false = the latest version of each logical record. */
+                all_versions?: boolean;
                 q?: string;
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
@@ -12911,6 +13171,175 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    claimRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Claimed. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    releaseRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Released. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRegisterRecordHistory: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Steps, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["RegisterRecordStep"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRegisterRecordVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RegisterRecord"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRegisterRecordVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
         };
     };

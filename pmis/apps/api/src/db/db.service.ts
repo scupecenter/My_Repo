@@ -22,7 +22,7 @@ export class DbService implements OnModuleDestroy {
     const client = new PrismaClient({ datasourceUrl: config.databaseUrl, log: [{ emit: 'event', level: 'error' }] });
     // A refusal of the workflow engine (wf:<code>:<json>, for example a stale If-Match) is an answer to the caller, not a server error.
     client.$on('error', (e) => {
-      if (/wf:[a-z_]+:\{/.test(e.message)) return;
+      if (/wf:[a-z_]+:\{|ERROR: matrix: /.test(e.message)) return; // matrix_save refuses a missing right with a "matrix: ..." message (403 for the caller)
       process.stderr.write(`prisma:error ${e.message}\n`);
     });
     this.client = client;

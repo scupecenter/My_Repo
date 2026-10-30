@@ -15,6 +15,8 @@ import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
+import { RegisterPage } from '@/pages/Register';
+import { RegisterBatch } from '@/pages/RegisterBatch';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
 import { Absence } from '@/pages/Absence';
@@ -60,6 +62,8 @@ function gated(session: Session) {
         <Route path="approvals" element={<Approvals />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
+        <Route path="registers/:key" element={<RegisterPage />} />
+        <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="absence" element={<Absence />} />
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:threadId" element={<Messages />} />

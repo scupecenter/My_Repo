@@ -7,6 +7,8 @@ import { AssignmentsController } from './assignments/assignments.controller';
 import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
+import { RegistersController } from './registers/registers.controller';
+import { RegistersService } from './registers/registers.service';
 import { SlaController } from './sla/sla.controller';
 import { SlaService } from './sla/sla.service';
 import { AuthController } from './auth/auth.controller';
@@ -23,6 +25,7 @@ import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { DbService } from './db/db.service';
+import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
 import { DelegationsController } from './delegations/delegations.controller';
 import { DelegationsService } from './delegations/delegations.service';
@@ -30,6 +33,8 @@ import { DepartmentsController } from './departments/departments.controller';
 import { DepartmentsService } from './departments/departments.service';
 import { GroupsController } from './groups/groups.controller';
 import { GroupsService } from './groups/groups.service';
+import { MatrixController } from './matrix/matrix.controller';
+import { MatrixService } from './matrix/matrix.service';
 import { MeController } from './me/me.controller';
 import { MeService } from './me/me.service';
 import { PermissionsController } from './permissions/permissions.controller';
@@ -56,14 +61,14 @@ export function appModuleFor(config: AppConfig) {
     controllers: [
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, TasksController, CalendarController, SlaController,
+      DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService,
+      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

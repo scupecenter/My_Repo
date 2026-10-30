@@ -910,9 +910,11 @@ model TaskLevelVoter {
 }
 
 // Responsibility Matrix: stage or task x level -> assignees. task_def_id null = stage default.
+// A cell belongs to a stage (stage_id) or to a register / Dismantle row (register_key), never both (migrations 0019, 0020).
 model MatrixCell {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  stage_id    String     @db.Uuid
+  stage_id    String?    @db.Uuid // NULL on the matrix row of a register (register_key set instead), migration 0019
+  register_key String?   // B11: the register this row belongs to (procurement, gecol, hlc, permits_hse ...)
   task_def_id String?    @db.Uuid
   level       Int // 1 entry, 2 review, 3 approve
   rule        MatrixRule @default(any_one)
@@ -921,13 +923,23 @@ model MatrixCell {
   updated_by  String?    @db.Uuid
   updated_at  DateTime   @updatedAt @db.Timestamptz(6)
 
-  stage     StageDefinition      @relation(fields: [stage_id], references: [id])
+  stage     StageDefinition?     @relation(fields: [stage_id], references: [id])
   task_def  TaskDefinition?      @relation(fields: [task_def_id], references: [id])
   assignees MatrixCellAssignee[]
 
   @@unique([stage_id, task_def_id, level, region_id])
   @@index([stage_id, level])
   @@map("matrix_cells")
+}
+
+// One row: the revision of the whole matrix (ETag of GET /matrix, If-Match of PATCH /matrix).
+model MatrixState {
+  id         Boolean  @id @default(true)
+  revision   Int      @default(1)
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("matrix_state")
 }
 
 model MatrixCellAssignee {
@@ -1406,6 +1418,18 @@ model PermitType {
   @@map("permit_types")
 }
 
+// What the calculation layer last saw of each gate on each site (migration 0018, Q81): a gate that was open and is blocked now raises an alert,
+// it does not re-lock tasks that are open. Written only by calc_gate_watch. The foreign key to sites (on delete cascade) lives in the migration.
+model SiteGateState {
+  site_id   String   @db.Uuid
+  gate_code String
+  is_open   Boolean
+  since     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([site_id, gate_code])
+  @@map("site_gate_state")
+}
+
 model BaselineVersion {
   id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   version     Int       @unique
@@ -1786,6 +1810,8 @@ model ProcurementRecord {
   order_status String?
   remark       String?
   custom       Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+  register_record_id String? @db.Uuid // 0019: the approved version that produced this row
+  record_version     Int?
 
   @@index([site_id])
   @@index([region_id, order_status])
@@ -1814,6 +1840,9 @@ model GecolRecord {
   status                  String?
   remark                  String?
   custom                  Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+  request_date            DateTime? @db.Date // Q56: the GECOL request is entered in the GECOL register
+  register_record_id      String?   @db.Uuid // 0019
+  record_version          Int?
 
   @@index([region_id, status])
   @@index([custom], type: Gin)
@@ -1835,6 +1864,8 @@ model HlcRecord {
   status              String?
   remark              String?
   custom              Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+  register_record_id  String?   @db.Uuid // 0019
+  record_version      Int?
 
   @@index([region_id, status])
   @@index([custom], type: Gin)
@@ -1859,6 +1890,8 @@ model PermitRecord {
   stop_lifted_date DateTime? @db.Date
   remark           String?
   custom           Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
+  register_record_id String? @db.Uuid // 0019
+  record_version     Int?
 
   @@index([site_id])
   @@index([region_id, status])
@@ -2242,4 +2275,140 @@ model AnnouncementResponse {
 
   @@id([announcement_id, user_id])
   @@map("announcement_responses")
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Register framework (migration 0019). Written only through the reg_* functions; scalar foreign keys, no back-relations.
+// ---------------------------------------------------------------------------------------------------------------------
+model RegisterDefinition {
+  register_key      String   @id
+  name_en           String
+  name_ar           String?
+  module_key        String
+  kind              String   @default("register")
+  site_scoped       Boolean  @default(true)
+  multiple_per_site Boolean  @default(true)
+  record_types      String[]
+  approval_levels   Int      @default(3) // the level count of the register's Matrix row (1..3)
+  rules             Json     @default("{}") @db.JsonB
+  enabled           Boolean  @default(false)
+  sort_order        Int      @default(0)
+  is_active         Boolean  @default(true)
+
+  @@map("register_definitions")
+}
+
+model RegisterField {
+  register_key String
+  code         String
+  label_en     String
+  label_ar     String?
+  field_type   String
+  required     Boolean @default(false)
+  is_actual    Boolean @default(false)
+  derived      Boolean @default(false)
+  options      Json?   @db.JsonB
+  in_list      Boolean @default(false)
+  section      String?
+  sort_order   Int     @default(0)
+  is_active    Boolean @default(true)
+
+  @@id([register_key, code])
+  @@map("register_fields")
+}
+
+model RegisterTaskSource {
+  register_key String
+  task_code    String
+  date_field   String
+  data_eq      Json    @default("{}") @db.JsonB
+  data_in      Json    @default("{}") @db.JsonB
+  sort_order   Int     @default(0)
+  is_active    Boolean @default(true)
+
+  @@id([register_key, task_code])
+  @@map("register_task_sources")
+}
+
+model RegisterRecord {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entity_id             String    @db.Uuid
+  version_no            Int       @default(1)
+  supersedes_id         String?   @db.Uuid
+  is_current            Boolean   @default(false)
+  register_key          String
+  record_type           String?
+  site_id               String?   @db.Uuid
+  region_id             Int?
+  is_global             Boolean   @default(false)
+  state                 String    @default("entry")
+  current_level         Int       @default(1)
+  levels_required       Int       @default(3)
+  path_frozen_at        DateTime? @db.Timestamptz(6)
+  level_round           Int       @default(0)
+  level_opened_at       DateTime? @db.Timestamptz(6)
+  ball_in_court_user_id String?   @db.Uuid
+  return_count          Int       @default(0)
+  last_return_note      String?
+  self_approval         Boolean   @default(false)
+  task_id               String?   @db.Uuid
+  data                  Json      @default("{}") @db.JsonB
+  custom                Json      @default("{}") @db.JsonB
+  external_party_id     String?   @db.Uuid
+  source                String    @default("manual")
+  batch_row_id          String?   @db.Uuid
+  version               Int       @default(1)
+  created_by            String?   @db.Uuid
+  created_at            DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime  @default(now()) @db.Timestamptz(6)
+  submitted_at          DateTime? @db.Timestamptz(6)
+  approved_at           DateTime? @db.Timestamptz(6)
+  approved_by           String?   @db.Uuid
+  voided_at             DateTime? @db.Timestamptz(6)
+  voided_by             String?   @db.Uuid
+  void_reason           String?
+
+  @@unique([entity_id, version_no], map: "register_records_version_key")
+  @@index([register_key, site_id])
+  @@map("register_records")
+}
+
+model RegisterStep {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  record_id       String   @db.Uuid
+  level           Int
+  action          String
+  acted_by        String?  @db.Uuid
+  note            String?
+  before_state    String?
+  after_state     String?
+  stepup_verified Boolean  @default(false)
+  self_approval   Boolean  @default(false)
+  batch_row_id    String?  @db.Uuid
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([record_id, created_at])
+  @@map("register_steps")
+}
+
+model RegisterLevelActor {
+  record_id String   @db.Uuid
+  level     Int
+  user_id   String   @db.Uuid
+  how       String
+  acted_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([record_id, level])
+  @@map("register_level_actors")
+}
+
+model RegisterLevelVoter {
+  record_id String    @db.Uuid
+  level     Int
+  round     Int
+  user_id   String    @db.Uuid
+  voted_at  DateTime? @db.Timestamptz(6)
+
+  @@id([record_id, level, round, user_id])
+  @@map("register_level_voters")
 }

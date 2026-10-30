@@ -19,7 +19,8 @@ printf '%s' "$PASSWORD" | node dist/cli.js hash-password   # argon2id PHC hash f
 ## Environment (see `.env.example`)
 
 `DATABASE_URL` (role `pmis_app`), `PORT` (3000), `HOST` (127.0.0.1), `COOKIE_SECURE` (true; `false` only for plain-http development),
-`LOG_HMAC_KEY` (>= 16 characters), `NODE_ENV`. Nothing else is read.
+`LOG_HMAC_KEY` (>= 16 characters), `NODE_ENV`, `JOBS_ENABLED` (the daily job: SLA versions that take effect and the 14-day reminder of tentative
+holidays, once at start-up and at 02:00 Africa/Tripoli; absent = on, except when `NODE_ENV=test`). Nothing else is read.
 
 ## Tests
 

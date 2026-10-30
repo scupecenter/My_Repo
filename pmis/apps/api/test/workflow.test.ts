@@ -99,8 +99,9 @@ describe('three levels with three different people', () => {
 
     // audit with before and after values
     const audit = await db.query(`SELECT action, before, after, actor_id FROM audit_log WHERE entity_type = 'task' AND entity_id = $1 ORDER BY id`, [f.taskId]);
-    expect(audit.rows.map((x) => x.action)).toEqual(['task_start', 'task_submit', 'task_review', 'task_approve']);
-    const approve = audit.rows[3];
+    // the fixture's actual date (2026-01-05) is before the clock start (the day the task opened): Q82 writes its data-quality audit row at the approval
+    expect(audit.rows.map((x) => x.action)).toEqual(['task_start', 'task_submit', 'task_review', 'sla_negative_duration', 'task_approve']);
+    const approve = audit.rows[4];
     expect(approve.before.state).toBe('in_approval');
     expect(approve.after.state).toBe('approved');
     expect(approve.actor_id).toBe(a.user.id);

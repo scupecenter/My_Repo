@@ -20,6 +20,7 @@ export type PipelineNode = S['PipelineNode'];
 export type DocumentSlot = S['DocumentSlot'];
 export type DocumentFile = S['DocumentFile'];
 export type WorkflowStep = S['WorkflowStep'];
+export type RegisterRecordStep = S['RegisterRecordStep'];
 export type Comment = S['Comment'];
 export type Matrix = S['Matrix'];
 export type MatrixCell = S['MatrixCell'];
@@ -136,3 +137,16 @@ export type PermissionCatalogue = S['PermissionCatalogue'];
 export type PermissionProfileInput = S['PermissionProfileInput'];
 export type RoleInput = S['RoleInput'];
 export type RolePatch = S['RolePatch'];
+
+// ---- registers (B11) and template import
+export type RegisterKey = S['RegisterKey'];
+export type RegisterField = S['RegisterField'];
+export type RegisterDefinition = S['RegisterDefinition'];
+export type RegisterRecord = S['RegisterRecord'];
+export type RegisterRecordState = S['RegisterRecordState'];
+export type RegisterRecordInput = S['RegisterRecordInput'];
+export type RegisterRecordPatch = S['RegisterRecordPatch'];
+export type Template = S['Template'];
+export type ImportBatch = S['ImportBatch'];
+export type ImportRow = S['ImportRow'];
+export type ImportDecisionRequest = S['ImportDecisionRequest'];

@@ -84,6 +84,26 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/tasks/:id/comments'],
   ['get', '/approvals'],
   ['post', '/approvals/bulk'],
+  // Contract 0.4.6: the Responsibility Matrix, stage rows and the register and Dismantle rows (apps/api: matrix; migration 0020).
+  ['get', '/matrix'],
+  ['patch', '/matrix'],
+  // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
+  // Template entry (`/templates`, `/import-batches`) is not built in the API yet and stays mocked.
+  ['get', '/registers'],
+  ['get', '/registers/:key/records'],
+  ['post', '/registers/:key/records'],
+  ['get', '/registers/:key/records/:id'],
+  ['patch', '/registers/:key/records/:id'],
+  ['post', '/registers/:key/records/:id/submit'],
+  ['post', '/registers/:key/records/:id/review'],
+  ['post', '/registers/:key/records/:id/approve'],
+  ['post', '/registers/:key/records/:id/reject'],
+  ['post', '/registers/:key/records/:id/claim'],
+  ['post', '/registers/:key/records/:id/release'],
+  ['post', '/registers/:key/records/:id/void'],
+  ['get', '/registers/:key/records/:id/history'],
+  ['get', '/registers/:key/records/:id/versions'],
+  ['post', '/registers/:key/records/:id/versions'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

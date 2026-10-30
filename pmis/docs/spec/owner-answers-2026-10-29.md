@@ -87,3 +87,18 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q34 | **Owner decision (differs from the default):** the dashboard reference date can be changed by the user, as in the legacy dashboard. |
 | Q35 | Default: health index bands green ≥ 85, amber ≥ 70, red below 70, as an admin setting, shown as draft. |
 | Q36 | Default: the dashboard counts issues for owner bars and totals, and sites for "sites with an open issue"; issue age in working days from the raised date. |
+
+## SLA and gate questions (Q75–Q84, from migration 0017)
+
+| Q | Answer |
+|---|---|
+| Q75 | Default: A-1, A-3, S-1 and S-2 start from their register dates, as in the Master. Until the RF & Design, Acquisition and Change Control registers are built, the clock starts the day the task opens; it switches to the register date when the register exists. |
+| Q76 | **Owner decision (differs from the Master):** when the latest condition date is earlier than the gate date, every milestone takes the later of the two dates (as MS2 and MS4 already do), instead of staying blank. `calc.milestone_ge_gate` becomes empty. |
+| Q77 | **Owner decision:** Commissioning Power Safe stays a yes/no field; gate G6 (On-Air Readiness) has no condition on it. |
+| Q78 | **Owner decision:** the six PTW HSE checks are information only and do not hold a gate; stop work still holds it. |
+| Q79 | Default: an edited Site RFI date earlier than the RFI Readiness gate is refused (422 `before_gate`); the setting can switch it off. |
+| Q81 | **Owner decision (differs from the default):** a gate locks the tasks of the next stage until it opens (its permits valid, no stop work, no suspension), except the GECOL and HLC tasks, which run in parallel with civil works. |
+| Q82 | **Owner decision:** a task's SLA clock closes at its actual date (as in the Master); a negative duration (actual date before the start) raises a data-quality alert for review. |
+| Q80 | **Owner decision:** the SLA of B-15 (CW FAC) and B06 starts from the DLP end counted as in the Master, PAC date + 90 calendar days (for CW). This applies to these SLA start events only; the printed DLP and `dlp.months.cw` stay 3 months (Q27). |
+| Q83 | Default: holidays and weekend days are changed by a System Admin or a delegate holding `calendars.edit` for all regions. |
+| Q84 | Default: build a daily job (also run at start-up) that applies future-dated SLA versions and sends the 14-day reminder for tentative holidays. |

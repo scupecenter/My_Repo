@@ -7,7 +7,7 @@ export type ErrorCode =
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'password_change_required' | 'weak_password' | 'internal_error'
-  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags';
+  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell';
 
 export interface FieldError {
   path: string;
@@ -34,6 +34,7 @@ const TITLES: Record<string, string> = {
   mandatory_slots_missing: 'Mandatory document slots are missing',
   mandatory_fields_missing: 'Mandatory fields are missing',
   open_snags: 'Open snags block this approval',
+  empty_cell: 'A level in use has no holder',
   role_in_use: 'The role is in use',
   precondition_failed: 'The resource changed',
   precondition_required: 'If-Match header required',

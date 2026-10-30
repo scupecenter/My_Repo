@@ -189,7 +189,8 @@ describe('the SLA clock of a task', () => {
     const cases: [number, string][] = [[-2, 'green'], [-3, 'green'], [-4, 'amber'], [-5, 'amber'], [-6, 'red']];   // D-1: min 3, max 5
     for (const [offset, colour] of cases) {
       const site = await newSite(db);
-      const ms4 = await wd(db, offset);
+      // counted back from the last working day on or before today, so the test also holds when it runs on a Friday or Saturday
+      const ms4 = await wd(db, offset, 'cal_add_workdays(cal_add_workdays(cal_today(), 1), -1)');
       await makeTask(db, site, 'MS4', 'approved', { actualDate: ms4 });
       const d1 = await makeTask(db, site, 'D1', 'locked');
       await db.query(`UPDATE task_instances SET state = 'open' WHERE id = $1`, [d1]);

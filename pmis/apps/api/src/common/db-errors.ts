@@ -53,9 +53,14 @@ export function mapWfError(message: string): ProblemException | null {
   const detail = typeof extra.detail === 'string' ? extra.detail : undefined;
   switch (m[1]) {
     case 'not_found':
-      return new ProblemException(404, 'not_found', { detail: 'The task does not exist or is not visible to you.' });
+      return new ProblemException(404, 'not_found', { detail: detail ?? 'The task does not exist or is not visible to you.' });
+    case 'duplicate':
+      return new ProblemException(409, 'duplicate', {
+        detail: detail ?? 'It exists already.',
+        extra: typeof extra.existing_id === 'string' ? { existing_id: extra.existing_id } : undefined,
+      });
     case 'precondition_failed':
-      return new ProblemException(412, 'precondition_failed', { detail: 'The task changed since you read it. Reload and try again.' });
+      return new ProblemException(412, 'precondition_failed', { detail: detail ?? 'The task changed since you read it. Reload and try again.' });
     case 'action_forbidden':
       return new ProblemException(403, 'action_forbidden', { detail: detail ?? 'You are not allowed to do this.' });
     case 'not_eligible_holder':
@@ -76,6 +81,11 @@ export function mapWfError(message: string): ProblemException | null {
       return new ProblemException(422, 'open_snags', {
         detail: `This acceptance cannot be submitted or approved while ${String(extra.count ?? 'some')} open ${typeof extra.scope === 'string' ? `${extra.scope} ` : ''}snag(s) remain on the site.`,
         extra: { count: Number(extra.count ?? 0), ...(typeof extra.scope === 'string' ? { scope: extra.scope } : {}) },
+      });
+    case 'empty_cell':
+      return new ProblemException(422, 'empty_cell', {
+        detail: detail ?? 'Every level in use needs at least one holder.',
+        extra: { cells: Array.isArray(extra.cells) ? extra.cells : [] },
       });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
@@ -121,6 +131,14 @@ export function mapDbError(e: unknown): ProblemException | null {
       }
       if (/System Admin must remain/i.test(msg)) {
         return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
+      }
+      // custom-field trigger (0007): `field "code": ...`, `field "code" is required`, `unknown custom field "code" on table`
+      const cf = /(?:unknown custom field|field) "([^"]+)"([^\n]*)/i.exec(msg);
+      if (cf) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'A custom field value is not valid.',
+          errors: [{ path: `/custom/${cf[1]}`, code: 'invalid', message: `${cf[1]}${(cf[2] ?? '').replace(/ on \w+$/, '')}`.trim() }],
+        });
       }
       const path = duplicateField(msg);
       return new ProblemException(422, 'validation_failed', {

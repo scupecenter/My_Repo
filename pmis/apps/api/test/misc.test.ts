@@ -27,8 +27,8 @@ describe('problem+json, request ids, unknown routes', () => {
       [api, 'delete', '/users/00000000-0000-4000-8000-000000000000'],
       [api, 'post', '/groups'], // createGroup is in the contract but not built yet
       [api, 'patch', '/groups/00000000-0000-4000-8000-000000000000'],
-      [api, 'get', '/matrix'], // in the contract, not built yet
-      [new Api(app), 'get', '/matrix'], // unauthenticated: still a plain 404
+      [api, 'get', '/exports/parts'], // in the contract, not built yet
+      [new Api(app), 'get', '/exports/parts'], // unauthenticated: still a plain 404
     ];
     for (const [client, method, path] of cases) {
       const res = await client.call(method, path, method === 'get' || method === 'delete' ? undefined : {});
