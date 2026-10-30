@@ -43,18 +43,24 @@ function AddHolder({ onAdd, taken }: { onAdd: (a: MatrixAssignee) => void; taken
   );
 }
 
-function Cell({ row, level, cell, onChange }: { row: Row; level: number; cell?: MatrixCell; onChange: (c: MatrixCell) => void }) {
+/** Who sits in a cell: only people, only roles/groups, or a mix. */
+const holderKind = (c: MatrixCell) => (c.assignees.every((a) => a.kind === 'user') ? 'user' : 'mixed');
+
+function Cell({ row, level, cell, onChange, refused }: { row: Row; level: number; cell?: MatrixCell; onChange: (c: MatrixCell) => void; refused?: boolean }) {
   const { t } = useTranslation();
   const base: MatrixCell = cell ?? { id: '', stage_code: row.code, task_code: null, level, region_id: null, rule: 'any_one', assignees: [] };
   const set = (p: Partial<MatrixCell>) => onChange({ ...base, ...p });
   const group = base.assignees.length > 1 || base.assignees.some((a) => a.kind !== 'user');
   return (
-    <td className="p-2 align-top" data-testid={`matrix-cell-${row.code}-${level}`}>
-      <div className="flex min-h-12 flex-wrap items-start gap-1 rounded-md border border-dashed border-line p-1.5">
+    <td className="p-2 align-top" data-testid={`matrix-cell-${row.code}-${level}`} data-refused={refused || undefined}>
+      <div className={`flex min-h-12 flex-wrap items-start gap-1 rounded-md border border-dashed p-1.5 ${refused ? 'border-late bg-lateBg' : 'border-line'}`}>
         {base.assignees.map((a) => <HolderChip key={a.ref_id} a={a} onRemove={() => set({ assignees: base.assignees.filter((x) => x.ref_id !== a.ref_id) })} />)}
         <AddHolder taken={new Set(base.assignees.map((a) => a.ref_id))} onAdd={(a) => set({ assignees: [...base.assignees, a] })} />
       </div>
-      {group && (
+      <div className="mt-1 text-xs text-mute" data-testid={`matrix-rule-${row.code}-${level}`} data-rule={base.rule} data-kind={holderKind(base)}>
+        {t('matrixMore.rule')}: {t(`matrixMore.rule_${base.rule}`)}{base.assignees.length > 0 && holderKind(base) === 'mixed' ? ` · ${t('matrixMore.kind_mixed')}` : ''}
+      </div>
+      {(group || base.rule === 'all_members') && (
         <label className="mt-1 flex items-center gap-1 text-xs text-mute">
           <input type="checkbox" data-testid={`matrix-all-${row.code}-${level}`} checked={base.rule === 'all_members'} onChange={(e) => set({ rule: e.target.checked ? 'all_members' : 'any_one' })} />{t('matrix.all_members')}
         </label>
@@ -71,6 +77,8 @@ export function MatrixPage() {
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [asking, setAsking] = useState(false);
   const [reason, setReason] = useState('');
+  const [refused, setRefused] = useState<string[]>([]);
+  const [error, setError] = useState('');
   const m = q.data;
   const dirty = Object.keys(cells).length + Object.keys(levels).length;
 
@@ -83,11 +91,24 @@ export function MatrixPage() {
   } : null), [m, cells, levels]);
   // Skip preview on the draft: someone holding level L and L+1 skips L+1 (MX-06), recomputed live while editing.
   const skip = (r: Row, level: number) => {
+    // an untouched row shows the server's own preview (`skip_preview` of the cell); an edited row is recomputed live
+    const touched = r.cells.some((c) => cells[key(r.code, c.level)]) || levels[r.code] !== undefined;
+    const given = r.cells.find((c) => c.level === level)?.skip_preview;
+    if (!touched && given) return given.map((u) => u.display_name);
     const next = r.cells.find((c) => c.level === level + 1), cur = r.cells.find((c) => c.level === level);
     if (!next || !cur || level >= r.approval_levels) return [];
     const ids = new Set(next.assignees.filter((a) => a.kind === 'user').map((a) => a.ref_id));
     return cur.assignees.filter((a) => a.kind === 'user' && ids.has(a.ref_id)).map((a) => a.label);
   };
+
+  // B5: a person who holds every used level of a row approves their own submission. Shown before publishing, on the draft.
+  const selfRows = (draft?.stages ?? []).map((r) => {
+    const used = Array.from({ length: r.approval_levels }, (_, i) => r.cells.find((c) => c.level === i + 1));
+    if (used.some((c) => !c)) return null;
+    const sets = used.map((c) => new Map(c!.assignees.filter((a) => a.kind === 'user').map((a) => [a.ref_id, a.label])));
+    const names = [...sets[0].entries()].filter(([id]) => sets.every((s) => s.has(id))).map(([, n]) => n);
+    return names.length ? { row: r, names } : null;
+  }).filter((x): x is { row: Row; names: string[] } => !!x);
 
   const send = () => {
     if (!m || !draft) return;
@@ -98,8 +119,17 @@ export function MatrixPage() {
     };
     if (!patch.stage_levels?.length) delete patch.stage_levels;
     publish.mutate({ matrix: m, patch, draft }, {
-      onSuccess: () => { toast(t('matrix.published')); setCells({}); setLevels({}); setAsking(false); setReason(''); },
-      onError: (e) => { setAsking(false); toast(e instanceof ApiError && e.code === 'empty_cell' ? t('matrix.empty_cell') : e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.code === 'step_up_required' ? '' : t('errors.generic'), 'err'); },
+      onSuccess: () => { toast(t('matrix.published')); setCells({}); setLevels({}); setAsking(false); setReason(''); setRefused([]); setError(''); },
+      onError: (e) => {
+        setAsking(false);
+        if (e instanceof ApiError && e.code === 'step_up_required') return; // the step-up dialog already said it
+        // empty_cell: say which levels have no holder (`errors[].path` = /cells/<stage>/<level>), keep the edits so they can be fixed
+        const bad = e instanceof ApiError ? (e.problem.errors ?? []).filter((x) => x.code === 'empty_cell').map((x) => x.path.split('/').slice(-2)) : [];
+        setRefused(bad.map(([s, l]) => key(s, Number(l))));
+        const names = bad.map(([s, l]) => t('matrixMore.empty_cell_one', { name: (m?.stages.find((r) => r.code === s)?.name_en ?? s), level: l }));
+        const msg = e instanceof ApiError && e.code === 'empty_cell' ? (names.join(' ') || t('matrix.empty_cell')) : e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.status === 403 ? t('errors.forbidden') : t('errors.generic');
+        setError(msg); toast(msg, 'err');
+      },
     });
   };
 
@@ -114,9 +144,18 @@ export function MatrixPage() {
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <div className="flex-1"><h2 className="text-lg font-bold">{t('matrix.title')}</h2><p className="text-mute">{t('matrix.subtitle')}</p></div>
         <span className="text-sm text-mute" data-testid="matrix-dirty">{t('matrix.changes', { count: dirty })}</span>
-        <button className="btn" disabled={!dirty} data-testid="matrix-discard" onClick={() => { setCells({}); setLevels({}); }}>{t('matrix.discard')}</button>
+        <button className="btn" disabled={!dirty} data-testid="matrix-discard" onClick={() => { setCells({}); setLevels({}); setRefused([]); setError(''); }}>{t('matrix.discard')}</button>
         <button className="btn btn-primary" disabled={!dirty || publish.isPending} data-testid="matrix-publish" onClick={() => setAsking(true)}>{t('matrix.publish')}</button>
       </div>
+      {error && <p role="alert" data-testid="matrix-error" className="mb-3 rounded-md bg-lateBg p-3 text-lateInk">{t('matrixMore.refused')} {error}</p>}
+      {selfRows.length > 0 && (
+        <div className="mb-3 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="matrix-warnings">
+          <b>{t('matrixMore.warn_title')}</b>
+          <ul className="mt-1 list-disc ps-5">
+            {selfRows.map((x) => <li key={x.row.code} data-testid={`matrix-warn-self-${x.row.code}`}>{t('matrixMore.self_approval_row', { names: x.names.join(', '), row: x.row.name_en })}</li>)}
+          </ul>
+        </div>
+      )}
       <div className="card overflow-x-auto">
         <table className="w-full min-w-[960px] text-sm" data-testid="matrix-table">
           <thead className="bg-card2 text-start text-mute"><tr>{['stage', 'levels', 'entry', 'review', 'approve', 'skip'].map((c) => <th key={c} className="p-2 text-start">{t(`matrix.col_${c}`)}</th>)}</tr></thead>
@@ -139,7 +178,7 @@ export function MatrixPage() {
                       const level = slot === 1 ? 1 : slot === 3 ? n : 2;
                       const used = slot === 1 || (slot === 3 && n > 1) || (slot === 2 && n === 3);
                       return used
-                        ? <Cell key={slot} row={r} level={level} cell={r.cells.find((c) => c.level === level)} onChange={(c) => setCells((x) => ({ ...x, [key(r.code, level)]: c }))} />
+                        ? <Cell key={slot} row={r} level={level} refused={refused.includes(key(r.code, level))} cell={r.cells.find((c) => c.level === level)} onChange={(c) => setCells((x) => ({ ...x, [key(r.code, level)]: c }))} />
                         : <td key={slot} className="p-2 text-mute">—</td>;
                     })}
                     <td className="p-2 align-top text-xs text-mute" data-testid={`matrix-skip-${r.code}`}>
