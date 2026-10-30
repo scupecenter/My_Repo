@@ -2,61 +2,72 @@ import type { RegisterDefinition, RegisterField } from '@/api/types';
 
 /**
  * Form layout and client-side checks of the registers built first (spec registers-and-streams.md §3.3, §3.5, §3.6, §3.7).
- * The contract's RegisterField has no `section`, so the section of each field code is kept here (TODO(contract): ask tech-lead for `section`
- * on RegisterField; codes the map does not know land in a "details" section, so a new custom field still shows up).
+ * Field codes, values and sections are the ones of the API (`register_fields`, migration 0019): the form is built from
+ * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
+ * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
 export const REGISTER_KEYS_LIVE = ['procurement', 'gecol', 'hlc', 'permits_hse'] as const;
 export const REGISTER_KEYS_SOON = ['contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings'] as const;
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
 
 type Data = Record<string, unknown>;
-export type SectionDef = { id: string; fields: string[]; when?: (d: Data) => boolean };
 
-const isPtw = (d: Data) => typeof d.type === 'string' && d.type.startsWith('ptw');
+/** The server's section names that have a translated title; any other name is shown as the server gives it. */
+const SECTION_ID: Record<string, string> = {
+  'Site and scope': 'site_scope', Request: 'request', Order: 'order', Assignment: 'assignment', 'Status and remark': 'status_remark', 'Survey and layout': 'survey',
+  'Notice and works': 'notice', Acceptance: 'acceptance', 'Meter and power-on': 'meter', Remark: 'remark', 'Status and team': 'fiber_status', 'Installation and test': 'install',
+  Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop',
+};
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
+
+/** Permit types of the permit-to-work kind are the `PTW - ...` codes of the permit type list. */
+const isPtw = (d: Data) => typeof d.permit_type === 'string' && d.permit_type.startsWith('PTW');
+const isNa = (d: Data) => typeof d.status === 'string' && d.status.toLowerCase() === 'n/a';
+const isApproved = (d: Data) => typeof d.status === 'string' && d.status.toLowerCase() === 'approved';
+const is = (v: unknown, s: string) => typeof v === 'string' && v.toLowerCase() === s.toLowerCase();
 /** Q63c: the switch decides whether the expiry date exists. Unset counts as Yes (the permit type's default is a Setting, not in the contract). */
 export const hasExpiry = (d: Data) => d.has_expiry !== false;
 
-export const SECTIONS: Record<string, SectionDef[]> = {
-  procurement: [
-    { id: 'site_scope', fields: ['scope', 'delivery'] }, { id: 'request', fields: ['pr_no', 'pr_date'] }, { id: 'order', fields: ['po_wo_no', 'po_wo_date'] },
-    { id: 'assignment', fields: ['contractor', 'team'] }, { id: 'status_remark', fields: ['order_status', 'remark'] },
-  ],
-  gecol: [
-    { id: 'request', fields: ['pr_no', 'pr_date'] }, { id: 'survey', fields: ['survey_date', 'layout_received', 'layout_approved'] }, { id: 'notice', fields: ['notice_date', 'mos_date', 'install_finish'] },
-    { id: 'acceptance', fields: ['aat_acceptance', 'docs_approval'] }, { id: 'meter', fields: ['meter_no', 'power_on', 'billing_conversion'] }, { id: 'remark', fields: ['remark'] },
-  ],
-  hlc: [
-    { id: 'request', fields: ['request_no', 'request_date', 'fiber_uplink'] }, { id: 'fiber_status', fields: ['fiber_status', 'fiber_team'] },
-    { id: 'install', fields: ['install_date', 'tx_tested_date'] }, { id: 'remark', fields: ['remark'] },
-  ],
-  permits_hse: [
-    { id: 'permit', fields: ['type', 'applied_date', 'status'] }, { id: 'validity', fields: ['valid_from', 'has_expiry', 'valid_to'] },
-    { id: 'na', fields: ['na_reason', 'na_approved_by'], when: (d) => d.status === 'na' },
-    { id: 'ptw', fields: ['jsa_tra', 'toolbox_talk', 'work_at_height', 'lifting_plan', 'loto', 'rescue_plan'], when: isPtw },
-    { id: 'stop', fields: ['stop_work', 'stop_lifted_date'], when: isPtw }, { id: 'remark', fields: ['remark'] },
-  ],
-};
+export type FormSection = { id: string; title: string; fields: RegisterField[] };
 
-/** Sections to show: the known ones in order (only fields the caller may see), then every other field in "details". */
-export function sectionsFor(def: RegisterDefinition, data: Data): { id: string; fields: RegisterField[] }[] {
-  const byCode = new Map(def.fields.map((f) => [f.code, f]));
-  const known = SECTIONS[def.register_key] ?? [];
-  const used = new Set(known.flatMap((s) => s.fields));
-  const out = known.filter((s) => !s.when || s.when(data)).map((s) => ({ id: s.id, fields: s.fields.map((c) => byCode.get(c)).filter((f): f is RegisterField => !!f && !isHidden(def.register_key, f.code, data)) })).filter((s) => s.fields.length);
-  const rest = def.fields.filter((f) => !used.has(f.code));
-  return rest.length ? [...out, { id: 'details', fields: rest }] : out;
+/** Sections to show, in the order the server lists the fields: only fields the caller may see and that apply (see `isHidden`). Custom fields land in "details". */
+export function sectionsFor(def: RegisterDefinition, data: Data): FormSection[] {
+  const out: FormSection[] = [];
+  for (const f of def.fields) {
+    if (isHidden(def.register_key, f.code, data)) continue;
+    const title = f.section ?? 'Details';
+    const id = f.section ? (SECTION_ID[f.section] ?? slug(f.section)) : 'details';
+    let s = out.find((x) => x.id === id);
+    if (!s) { s = { id, title, fields: [] }; out.push(s); }
+    s.fields.push(f);
+  }
+  return out;
 }
 
-/** A field that is not shown is not sent: `valid_to` of a permanent permit, N/A and PTW fields on other rows. */
+/** A field that is not shown is not sent: `valid_to` of a permanent permit, N/A fields on other rows, PTW fields on other permit types. */
 export function isHidden(key: string, code: string, d: Data) {
   if (key !== 'permits_hse') return false;
   if (code === 'valid_to') return !hasExpiry(d);
-  if (code === 'na_reason' || code === 'na_approved_by') return d.status !== 'na';
+  if (code === 'na_reason' || code === 'na_approved_by') return !isNa(d);
   if (['jsa_tra', 'toolbox_talk', 'work_at_height', 'lifting_plan', 'loto', 'rescue_plan', 'stop_work', 'stop_lifted_date'].includes(code)) return !isPtw(d);
   return false;
 }
+
+/** The data the server accepts: no hidden field, no system-filled field (`read_only`, Q45), no empty value. */
 export function visibleData(def: RegisterDefinition, d: Data): Data {
-  return Object.fromEntries(Object.entries(d).filter(([c, v]) => !isHidden(def.register_key, c, d) && v !== '' && v !== undefined));
+  const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
+  return Object.fromEntries(Object.entries(d).filter(([c, v]) => !isHidden(def.register_key, c, d) && !ro.has(c) && v !== '' && v !== undefined));
+}
+
+/**
+ * The patch of an edit: the visible values, and `null` for every value the record had that is now empty or hidden (the API clears a
+ * field with an explicit null; a key that is absent stays as it is).
+ */
+export function patchData(def: RegisterDefinition, before: Data, after: Data): Data {
+  const now = visibleData(def, after);
+  const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
+  const cleared = Object.keys(before).filter((c) => !ro.has(c) && !(c in now) && before[c] !== null && before[c] !== undefined);
+  return { ...now, ...Object.fromEntries(cleared.map((c) => [c, null])) };
 }
 
 /** Who enters what (Q56): the note shown under the title of each register. */
@@ -67,13 +78,13 @@ export const defaultsFor = (key: string): Data => (key === 'permits_hse' ? { has
 
 export const DATE_MIN = '2020-01-01';
 export const DATE_MAX = '2035-12-31';
-/** Actual dates may not lie in the future (V2); everything else only has to be inside the range. */
-const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date'] };
-/** later >= earlier (chronology, spec §3). */
+/** Actual dates may not lie in the future (V2): the fields the server marks `is_actual`. The date of a task source is checked by the server at submit. */
+const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date', 'stop_lifted_date'] };
+/** later >= earlier: the chronology rules the server enforces (spec §3; Q96 lists what is not enforced). */
 const ORDER: Record<string, [string, string][]> = {
   procurement: [['pr_date', 'po_wo_date']],
-  gecol: [['survey_date', 'notice_date'], ['notice_date', 'install_finish'], ['install_finish', 'aat_acceptance'], ['install_finish', 'power_on']],
-  hlc: [['install_date', 'tx_tested_date']],
+  gecol: [['request_date', 'installation_finish']],
+  hlc: [['installation_date', 'tx_link_tested_date']],
   permits_hse: [['valid_from', 'valid_to']],
 };
 
@@ -85,7 +96,7 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
   const fail = (c: string, code: string, params?: Record<string, string>) => { out[c] ??= { code, params }; };
   if (def.site_scoped && !siteId) fail('site_id', 'site_required');
   for (const f of def.fields) {
-    if (isHidden(key, f.code, data)) continue;
+    if (isHidden(key, f.code, data) || f.read_only) continue;
     const v = data[f.code];
     const empty = v === undefined || v === null || v === '';
     if (f.required && empty) { fail(f.code, 'required'); continue; }
@@ -102,14 +113,17 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
     if (typeof x === 'string' && typeof y === 'string' && x && y && y < x && !isHidden(key, b, data)) fail(b, 'before_earlier', { other: a });
   }
   if (key === 'procurement') {
-    if (data.delivery === 'in_house' && data.pr_no) fail('pr_no', 'in_house_with_pr');
-    if (data.delivery === 'outsourced' && data.po_wo_no && !data.pr_no) fail('pr_no', 'po_without_pr');
+    const hasPr = !!(data.pr_no || data.pr_date), hasPo = !!(data.po_wo_no || data.po_wo_date);
+    if (is(data.delivery, 'In-House') && hasPr) fail('pr_no', 'in_house_with_pr');
+    if (is(data.delivery, 'Outsourced') && hasPo && !hasPr) fail('pr_no', 'po_without_pr');
+    if (is(data.scope, 'TE Installation') && (hasPr || hasPo)) fail('scope', 'no_pr_po');
   }
   if (key === 'permits_hse') {
-    if (data.status === 'approved' && !data.valid_from) fail('valid_from', 'approved_needs_valid_from');
-    if (data.status === 'na' && !data.na_reason) fail('na_reason', 'required');
-    // Q63c: "has expiry date" = Yes makes the expiry date required; No hides it and the permit is permanent.
-    if (hasExpiry(data) && !data.valid_to) fail('valid_to', 'required');
+    if (isApproved(data) && !data.valid_from) fail('valid_from', 'approved_needs_valid_from');
+    if (isNa(data) && !data.na_reason) fail('na_reason', 'required');
+    // Q63c: an approved permit with "has expiry date" = Yes needs the expiry date; No hides it and the permit is permanent.
+    if (isApproved(data) && hasExpiry(data) && !data.valid_to) fail('valid_to', 'required');
+    if (data.stop_lifted_date && data.stop_work !== true && isPtw(data)) fail('stop_lifted_date', 'no_stop_work');
   }
   return out;
 }

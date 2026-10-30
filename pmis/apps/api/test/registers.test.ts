@@ -41,6 +41,9 @@ describe('catalogue and read access', () => {
     const permits = all.body.items.find((i: { register_key: string }) => i.register_key === 'permits_hse');
     expect(permits.fields.find((f: { code: string }) => f.code === 'permit_type').options.map((o: { value: string }) => o.value)).toContain('Access - CW');
     expect(permits.fields.find((f: { code: string }) => f.code === 'na_approved_by').read_only).toBe(true);
+    // 0.4.6: the form section of each base field, from the field definitions
+    expect(permits.fields.find((f: { code: string }) => f.code === 'valid_from').section).toBe('Validity');
+    expect(all.body.items.find((i: { register_key: string }) => i.register_key === 'gecol').fields.find((f: { code: string }) => f.code === 'power_on_date').section).toBe('Meter and power-on');
 
     // permission denied: no grant on the module at all
     const nobody = await actor(app, db, { grants: G('gecol', 'view'), regions: [R], modules: null });
@@ -452,6 +455,87 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     expect((await taskRow(db, t.site, 'B1')).actual_date).toBe('2026-01-05');             // the task keeps its first date
   });
 
+  const unlinked = (id: string): Promise<{ id: string }[]> =>
+    q<{ id: string }>(db, `SELECT id::text AS id FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_task_unlinked'`, [id]);
+  const linkOf = async (id: string): Promise<string | null> => (await q<{ t: string | null }>(db, 'SELECT task_id::text AS t FROM register_records WHERE id = $1', [id]))[0]!.t;
+
+  it('drops the task link when an edit after a rejection no longer matches the task source: the record is approved on the register row, the task stays open', async () => {
+    const t = await team(app, db, 'procurement', 'procurement', R);
+    const { stageReview } = await withTasks(t, ['B1'], ['B1']);
+    const rec = await createRec(t, PROC);
+    let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
+    expect(res.body.task.task_code).toBe('B1');
+    expect(await linkOf(rec.id)).not.toBeNull();
+    res = await post(stageReview.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'wrong scope' });
+    expect(res.body.state).toBe('entry');
+    // the scope no longer says CW / Tower Erection / Site Adaption: STA is not a source of B1
+    const fixed = await patch(t.entry.api, 'procurement', rec.id, res.body.version, { data: { scope: 'STA' } });
+    expect(fixed.status).toBe(200);
+    res = await post(t.entry.api, 'procurement', rec.id, 'submit', fixed.body.version);
+    expect(res.status).toBe(200);
+    expect(res.body.task).toBeUndefined();
+    expect(await linkOf(rec.id)).toBeNull();
+    expect(await unlinked(rec.id)).toHaveLength(1);
+    // the register row's holders decide now, not the stage row's
+    expect((await post(stageReview.api, 'procurement', rec.id, 'review', res.body.version)).status).toBe(403);
+    res = await post(t.review.api, 'procurement', rec.id, 'review', res.body.version);
+    res = await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version);
+    expect(res.body.state).toBe('approved');
+    expect(res.body.last_transition.unlocked_task_ids).toEqual([]);
+    expect(await taskRow(db, t.site, 'B1')).toMatchObject({ state: 'open', actual_date: null });
+    expect((await q<{ scope: string }>(db, 'SELECT scope FROM procurement_records WHERE id = $1', [rec.entity_id]))[0]!.scope).toBe('STA');
+  });
+
+  it('re-checks the match just before the task is closed: data that changed, or a source date that is gone, leaves the task open and the record approved', async () => {
+    for (const change of [`data = data || '{"scope": "STA"}'::jsonb`, `data = data - 'pr_date'`]) {
+      const t = await team(app, db, 'procurement', 'procurement', R);
+      const { stageReview, stageApprove } = await withTasks(t, ['B1'], ['B1']);
+      const rec = await createRec(t, PROC);
+      let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
+      expect(res.body.task.task_code).toBe('B1');
+      res = await post(stageReview.api, 'procurement', rec.id, 'review', res.body.version);
+      expect(res.body.state).toBe('in_approval');
+      // the data changes behind the workflow (a direct correction by the database administrator)
+      await db.query(`UPDATE register_records SET ${change} WHERE id = $1`, [rec.id]);
+      await stageApprove.api.stepUp(stageApprove.user.password);
+      res = await post(stageApprove.api, 'procurement', rec.id, 'approve', res.body.version);
+      expect(res.status, change).toBe(200);
+      expect(res.body.state).toBe('approved');
+      expect(res.body.last_transition.unlocked_task_ids).toEqual([]);
+      expect(await taskRow(db, t.site, 'B1')).toMatchObject({ state: 'open', actual_date: null });
+      expect(await linkOf(rec.id)).toBeNull();
+      expect(await unlinked(rec.id)).toHaveLength(1);
+      expect(await q(db, `SELECT 1 FROM audit_log WHERE entity_type = 'task' AND entity_id = $1 AND action = 'task_approve'`, [await taskId(db, t.site, 'B1')])).toHaveLength(0);
+    }
+  });
+
+  it('refuses a future source date: at submit when a task is linked, and again when the task is closed (422 future_date)', async () => {
+    const t = await team(app, db, 'permits_hse', 'permits_hse', R);
+    const { stageReview, stageApprove } = await withTasks(t, ['B3'], ['B3']);
+    // Valid From is not an actual date field of the register, but it is the date of task B3 now
+    const rec = await createRec(t, { ...PERMIT_CW, valid_from: '2035-06-01', valid_to: '2035-12-31' });
+    const early = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
+    expect(early.status).toBe(422);
+    expect(early.body.errors[0]).toMatchObject({ path: '/data/valid_from', code: 'future_date' });
+    expect(await linkOf(rec.id)).toBeNull();
+    expect((await taskRow(db, t.site, 'B3')).state).toBe('open');
+
+    // a past date goes through; the date moves into the future behind the workflow: the approval is refused and nothing changes
+    const ok = await patch(t.entry.api, 'permits_hse', rec.id, early.body.version ?? rec.version, { data: { valid_from: '2025-12-01' } });
+    expect(ok.status).toBe(200);
+    let res = await post(t.entry.api, 'permits_hse', rec.id, 'submit', ok.body.version);
+    expect(res.body.task.task_code).toBe('B3');
+    res = await post(stageReview.api, 'permits_hse', rec.id, 'review', res.body.version);
+    await db.query(`UPDATE register_records SET data = data || '{"valid_from": "2035-06-01"}'::jsonb WHERE id = $1`, [rec.id]);
+    await stageApprove.api.stepUp(stageApprove.user.password);
+    const late = await post(stageApprove.api, 'permits_hse', rec.id, 'approve', res.body.version);
+    expect(late.status).toBe(422);
+    expect(late.body.errors[0]).toMatchObject({ path: '/data/valid_from', code: 'future_date' });
+    expect((await q<{ state: string }>(db, 'SELECT state FROM register_records WHERE id = $1', [rec.id]))[0]!.state).toBe('in_approval');
+    expect(await taskRow(db, t.site, 'B3')).toMatchObject({ state: 'open', actual_date: null });
+    expect(await q(db, 'SELECT 1 FROM permit_records WHERE id = $1', [rec.entity_id])).toHaveLength(0);   // the whole approval rolled back
+  });
+
   it('refuses a submission whose task is still locked, and needs the task\'s mandatory document slots', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
     const { stageReview, stageApprove } = await withTasks(t, ['D1'], []);                    // D1 stays locked
@@ -731,7 +815,9 @@ describe('region scope (B3) and rows without a site (Q69)', () => {
     await db.query(`UPDATE register_definitions SET enabled = true WHERE register_key = 'risks'`);
     try {
       const u = await actor(app, db, { level: 'entry', grants: G('risks', 'view', 'create'), regions: [6], modules: null });
-      await db.query(`INSERT INTO matrix_cells (register_key, level, rule, region_id, is_global, updated_at) VALUES ('risks', 1, 'any_one', NULL, true, now()) ON CONFLICT DO NOTHING`);
+      // migration 0020 seeds a global entry cell for this row (the Matrix suite reads it): add the holder to it and take only that holder away again
+      const existed = await q<{ id: string }>(db, `SELECT id FROM matrix_cells WHERE register_key = 'risks' AND level = 1 AND region_id IS NULL`);
+      if (existed.length === 0) await db.query(`INSERT INTO matrix_cells (register_key, level, rule, region_id, is_global, updated_at) VALUES ('risks', 1, 'any_one', NULL, true, now())`);
       const cell = await q<{ id: string }>(db, `SELECT id FROM matrix_cells WHERE register_key = 'risks' AND level = 1 AND region_id IS NULL`);
       await db.query('INSERT INTO matrix_cell_assignees (cell_id, kind, ref_id) VALUES ($1, $2::"AssigneeKind", $3)', [cell[0]!.id, 'user', u.user.id]);
       const made = await u.api.call('post', recPath('risks'), { data: {} });
@@ -741,8 +827,8 @@ describe('region scope (B3) and rows without a site (Q69)', () => {
       expect((await other.api.call('get', recPath('risks', made.body.id))).status).toBe(200);
       const nobody = await actor(app, db, { grants: G('procurement', 'view'), regions: [1], modules: null });
       expect((await nobody.api.call('get', recPath('risks', made.body.id))).status).toBe(403);
-      await db.query('DELETE FROM matrix_cell_assignees WHERE cell_id = $1', [cell[0]!.id]);
-      await db.query(`DELETE FROM matrix_cells WHERE id = $1`, [cell[0]!.id]);
+      await db.query('DELETE FROM matrix_cell_assignees WHERE cell_id = $1 AND kind = $2::"AssigneeKind" AND ref_id = $3', [cell[0]!.id, 'user', u.user.id]);
+      if (existed.length === 0) await db.query(`DELETE FROM matrix_cells WHERE id = $1`, [cell[0]!.id]);
     } finally {
       await db.query(`UPDATE register_definitions SET enabled = false WHERE register_key = 'risks'`);
     }

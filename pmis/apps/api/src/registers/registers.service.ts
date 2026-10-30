@@ -111,6 +111,7 @@ interface FieldRow {
   derived: boolean;
   options: unknown;
   in_list: boolean;
+  section: string | null;
 }
 
 const FIELD_ENTITY: Record<string, string> = { procurement: 'procurement', gecol: 'gecol', hlc: 'hlc', permits_hse: 'permit' };
@@ -166,8 +167,8 @@ export class RegistersService {
 
   private async fieldsOf(key: string): Promise<unknown[]> {
     const rows = await this.db.tx.$queryRaw<FieldRow[]>(Prisma.sql`
-      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list
-      FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code`);
+      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section
+      FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code COLLATE "C"`);
     let permitTypes: string[] | null = null;
     const out: unknown[] = [];
     for (const f of rows) {
@@ -186,6 +187,7 @@ export class RegistersService {
         read_only: f.derived,
         in_list: f.in_list,
         is_custom: false,
+        ...(f.section ? { section: f.section } : {}),
         ...(options ? { options } : {}),
       });
     }

@@ -61,9 +61,9 @@ describe('Manual entry: create, submit, review, approve', () => {
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('register-new'));
     await chooseSite(u);
-    await u.selectOptions(screen.getByTestId('reg-field-scope'), 'cw');
-    await u.selectOptions(screen.getByTestId('reg-field-delivery'), 'outsourced');
-    await u.selectOptions(screen.getByTestId('reg-field-order_status'), 'open');
+    await u.selectOptions(screen.getByTestId('reg-field-scope'), 'CW');
+    await u.selectOptions(screen.getByTestId('reg-field-delivery'), 'Outsourced');
+    await u.type(screen.getByTestId('reg-field-order_status'), 'Open'); // a free list until the owner fixes its values (Q95)
     await u.type(screen.getByTestId('reg-field-pr_no'), 'PR-2026-100');
     await u.click(screen.getByTestId('reg-submit'));
     await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In review'));
@@ -81,7 +81,7 @@ describe('Manual entry: create, submit, review, approve', () => {
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('register-new'));
     await chooseSite(u);
-    await u.selectOptions(screen.getByTestId('reg-field-delivery'), 'in_house');
+    await u.selectOptions(screen.getByTestId('reg-field-delivery'), 'In-House');
     await u.type(screen.getByTestId('reg-field-pr_no'), 'PR-1');
     await u.click(screen.getByTestId('reg-submit'));
     expect(await screen.findByTestId('reg-error-scope')).toHaveTextContent('Scope is required.');
@@ -125,8 +125,9 @@ describe('Permits: has expiry date (Q63c)', () => {
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('register-new'));
     await chooseSite(u);
-    await u.selectOptions(screen.getByTestId('reg-field-type'), 'access_cw');
-    await u.selectOptions(screen.getByTestId('reg-field-status'), 'applied');
+    await u.selectOptions(screen.getByTestId('reg-field-permit_type'), 'Access - CW');
+    await u.selectOptions(screen.getByTestId('reg-field-status'), 'Approved');
+    await u.type(screen.getByTestId('reg-field-valid_from'), '2026-09-10');
     expect(screen.getByTestId('reg-field-has_expiry')).toBeChecked();
     expect(screen.getByTestId('reg-field-valid_to')).toBeInTheDocument();
     await u.click(screen.getByTestId('reg-submit'));
@@ -138,7 +139,7 @@ describe('Permits: has expiry date (Q63c)', () => {
     await u.click(screen.getByTestId('reg-submit'));
     await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In review'));
     const items = (await api.get<{ items: RegisterRecord[] }>('/registers/permits_hse/records')).items;
-    const mine = items.find((r) => r.state === 'in_review' && r.data.type === 'access_cw' && r.data.has_expiry === false);
+    const mine = items.find((r) => r.state === 'in_review' && r.data.permit_type === 'Access - CW' && r.data.has_expiry === false);
     expect(mine).toBeTruthy();
     expect(mine!.data.valid_to).toBeUndefined();
   });
@@ -149,7 +150,7 @@ describe('Permits: has expiry date (Q63c)', () => {
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('register-new'));
     expect(screen.queryByTestId('reg-section-ptw')).not.toBeInTheDocument();
-    await u.selectOptions(await screen.findByTestId('reg-field-type'), 'ptw_cw');
+    await u.selectOptions(await screen.findByTestId('reg-field-permit_type'), 'PTW - CW');
     expect(screen.getByTestId('reg-section-ptw')).toBeInTheDocument();
   });
 });
@@ -175,10 +176,10 @@ describe('GECOL and HLC ownership (Q56, Q55)', () => {
     expect(await screen.findByTestId('register-owner-note')).toHaveTextContent(/counts as a purchase request/);
     await u.click(screen.getByTestId('register-new'));
     await chooseSite(u, 'WM103');
-    await u.type(screen.getByTestId('reg-field-install_date'), '2026-10-10');
-    await u.type(screen.getByTestId('reg-field-tx_tested_date'), '2026-10-01');
+    await u.type(screen.getByTestId('reg-field-installation_date'), '2026-10-10');
+    await u.type(screen.getByTestId('reg-field-tx_link_tested_date'), '2026-10-01');
     await u.click(screen.getByTestId('reg-submit'));
-    expect(await screen.findByTestId('reg-error-tx_tested_date')).toHaveTextContent(/cannot be earlier than Installation Date/);
+    expect(await screen.findByTestId('reg-error-tx_link_tested_date')).toHaveTextContent(/cannot be earlier than Installation Date/);
   });
 });
 
@@ -239,7 +240,7 @@ describe('Matrix: self-approval and empty cell', () => {
     await u.click(screen.getByTestId('matrix-publish'));
     await u.type(screen.getByTestId('matrix-reason'), 'Test empty');
     await u.click(screen.getByTestId('matrix-publish-confirm'));
-    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('Site Release, level 3 has no holder');
+    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('Site Release: the Approve level has no holder');
     expect(screen.getByTestId('matrix-cell-site_release-3')).toHaveAttribute('data-refused', 'true');
   });
 });

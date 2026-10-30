@@ -827,7 +827,7 @@ BEGIN
   SELECT * INTO r FROM public.register_records WHERE id = p_record;
   SELECT * INTO s FROM public.register_task_sources x WHERE x.register_key = r.register_key AND x.task_code = p_task_code AND x.is_active;
   IF NOT FOUND THEN RETURN false; END IF;
-  IF NOT (r.data ? s.date_field) THEN RETURN false; END IF;
+  IF nullif(r.data ->> s.date_field, '') IS NULL THEN RETURN false; END IF;   -- a task is never closed by a record without the source date
   FOR k, v IN SELECT * FROM jsonb_each(s.data_eq) LOOP
     IF lower(coalesce(r.data ->> k, '')) <> lower(v #>> '{}') THEN RETURN false; END IF;
   END LOOP;
@@ -879,8 +879,19 @@ BEGIN
     RETURN ARRAY[]::uuid[];
   END IF;
   SELECT td.code INTO td_code FROM public.task_definitions td WHERE td.id = t.task_def_id;
+  -- The data may have changed since the link (an edit after a rejection back to entry): the task is closed only by a record that matches its source
+  -- row now. Otherwise the record stays approved on the register row, the link is dropped and the task stays open.
+  IF NOT public.reg_source_matches(p_record, td_code) THEN
+    UPDATE public.register_records SET task_id = NULL WHERE id = p_record;
+    PERFORM public.reg_audit('register_record_task_unlinked', p_record, jsonb_build_object('task_id', t.id, 'task_code', td_code), jsonb_build_object('task_id', NULL),
+      'the record no longer matches the source of task ' || td_code || ' (or its date is empty): approved on the register row only, the task stays open');
+    RETURN ARRAY[]::uuid[];
+  END IF;
   SELECT * INTO s FROM public.register_task_sources x WHERE x.register_key = r.register_key AND x.task_code = td_code;
   d := (r.data ->> s.date_field)::date;
+  IF d > public.cal_today() THEN   -- the same rule as an actual date typed on the task (wf_save_entry)
+    PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item('/data/' || s.date_field, 'future_date', 'An actual date cannot be in the future.')));
+  END IF;
   before := public.wf_snap(t.id);
   UPDATE public.task_instances SET actual_date = d, state = 'approved', current_level = r.levels_required, levels_required = r.levels_required,
     path_frozen_at = coalesce(path_frozen_at, now()), submitted_date = coalesce(r.submitted_at::date, current_date), approved_date = current_date,
@@ -1014,6 +1025,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE
   actor uuid := public.app_actor(); r public.register_records%ROWTYPE; n int; lvl int; k text; mode text; ch record; before jsonb; step_ids uuid[] := ARRAY[]::uuid[];
   sk int; self boolean; after_state text; v_left int; sid uuid; first boolean; errs jsonb; missing_s text[]; tid uuid; unlocked uuid[] := ARRAY[]::uuid[]; aname text; h record;
+  td_code text; src_field text;
 BEGIN
   r := public.reg_lock(p_record, p_version);
   IF NOT EXISTS (SELECT 1 FROM public.register_definitions d WHERE d.register_key = r.register_key AND d.is_active AND d.enabled) THEN
@@ -1045,6 +1057,21 @@ BEGIN
       UPDATE public.register_records SET levels_required = public.reg_levels_live(p_record), path_frozen_at = now() WHERE id = p_record;   -- B7
     END IF;
     SELECT * INTO r FROM public.register_records WHERE id = p_record;
+    IF r.task_id IS NOT NULL THEN
+      -- every submit (also after a rejection back to entry): the link stays only while the record matches the task source, and its date is not in the future
+      SELECT td.code INTO td_code FROM public.task_instances ti JOIN public.task_definitions td ON td.id = ti.task_def_id WHERE ti.id = r.task_id;
+      IF NOT public.reg_source_matches(p_record, td_code) THEN
+        UPDATE public.register_records SET task_id = NULL WHERE id = p_record;
+        PERFORM public.reg_audit('register_record_task_unlinked', p_record, jsonb_build_object('task_id', r.task_id, 'task_code', td_code), jsonb_build_object('task_id', NULL),
+          'the record no longer matches the source of task ' || td_code || ' (or its date is empty): it is approved on the register row only');
+        r.task_id := NULL;
+      ELSE
+        SELECT x.date_field INTO src_field FROM public.register_task_sources x WHERE x.register_key = r.register_key AND x.task_code = td_code;
+        IF (r.data ->> src_field)::date > public.cal_today() THEN
+          PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item('/data/' || src_field, 'future_date', 'An actual date cannot be in the future.')));
+        END IF;
+      END IF;
+    END IF;
     IF r.task_id IS NOT NULL THEN
       missing_s := public.wf_missing_slots(r.task_id);
       IF cardinality(missing_s) > 0 THEN PERFORM public.wf_err('mandatory_slots_missing', jsonb_build_object('missing', to_jsonb(missing_s))); END IF;

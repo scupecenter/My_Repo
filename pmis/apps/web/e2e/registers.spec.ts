@@ -25,9 +25,9 @@ for (const c of CASES) {
       await page.getByTestId('register-new').click();
       await page.getByTestId('reg-site-search').fill('TR101');
       await page.getByTestId('reg-site-opt-TR101').click();
-      await page.getByTestId('reg-field-scope').selectOption('cw');
-      await page.getByTestId('reg-field-delivery').selectOption('outsourced');
-      await page.getByTestId('reg-field-order_status').selectOption('open');
+      await page.getByTestId('reg-field-scope').selectOption('CW');
+      await page.getByTestId('reg-field-delivery').selectOption('Outsourced');
+      await page.getByTestId('reg-field-order_status').fill('Open');
       await page.getByTestId('reg-field-pr_no').fill('PR-2026-E2E');
       await page.getByTestId('reg-submit').click();
       await expect(page.getByTestId('register-drawer-body')).toHaveAttribute('data-state', 'in_review');

@@ -82,6 +82,11 @@ export function mapWfError(message: string): ProblemException | null {
         detail: `This acceptance cannot be submitted or approved while ${String(extra.count ?? 'some')} open ${typeof extra.scope === 'string' ? `${extra.scope} ` : ''}snag(s) remain on the site.`,
         extra: { count: Number(extra.count ?? 0), ...(typeof extra.scope === 'string' ? { scope: extra.scope } : {}) },
       });
+    case 'empty_cell':
+      return new ProblemException(422, 'empty_cell', {
+        detail: detail ?? 'Every level in use needs at least one holder.',
+        extra: { cells: Array.isArray(extra.cells) ? extra.cells : [] },
+      });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
     case 'validation_failed':

@@ -1495,7 +1495,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Responsibility Matrix for a workflow version, with self-skip preview */
+        /**
+         * Responsibility Matrix for a workflow version, with self-skip preview
+         * @description One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
+         *     dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
+         *     its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
+         *     3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+         *     `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
+         *     to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
+         *     for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
+         *     `preview` shows in advance where one person holds consecutive levels, so the level is skipped (B6), and where that reaches
+         *     the last level, which is a self-approval that needs step-up (B5). Needs view on `admin.matrix`, or the `matrix.edit` right.
+         *     The `ETag` is the matrix revision, to send back in `If-Match` on `PATCH /matrix`.
+         */
         get: operations["getMatrix"];
         put?: never;
         post?: never;
@@ -1504,8 +1516,16 @@ export interface paths {
         head?: never;
         /**
          * Save changed cells and stage level counts in one step
-         * @description All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
-         *     `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+         * @description All changes in one transaction, with step-up, `If-Match` (the matrix revision) and a reason. Needs System Admin or a
+         *     delegation with `matrix.edit`; a cell without `region_id` and a level count reach every region and need the right for all
+         *     regions, a cell with `region_id` needs it for that region. `stage_code` is a stage code of the workflow version or the
+         *     code of a register or Dismantle row. A used level with no holder is refused (422 `empty_cell`, `Problem.cells` lists the
+         *     cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
+         *     refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
+         *     level count is audited with before and after values and the reason.
+         *     The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+         *     submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
+         *     rejection (decision B7). The answer shows both counts per stage in `task_counts`.
          */
         patch: operations["updateMatrix"];
         trace?: never;
@@ -4152,6 +4172,15 @@ export interface components {
             claimed_by?: components["schemas"]["UserRef"];
             /** @description Missing slot or field names. */
             missing?: string[];
+            /** @description 0.4.6. With `empty_cell`: the cells of levels in use that have no holder. */
+            cells?: {
+                stage_code: string;
+                task_code?: string | null;
+                level: number;
+                /** @enum {string} */
+                level_kind?: "entry" | "review" | "approve";
+                region_id?: number | null;
+            }[];
             /** @description 0.4.2. With `open_snags`: the number of open snags of the stream that block the task. */
             count?: number;
             /**
@@ -4879,6 +4908,8 @@ export interface components {
              */
             user_id?: string;
             account_status?: components["schemas"]["UserAccountStatus"];
+            /** @description 0.4.6. In the matrix: for a role, the people with an active assignment of it; for a group, its members. Absent for users. */
+            member_count?: number;
         };
         BallInCourt: {
             level: number;
@@ -5178,21 +5209,75 @@ export interface components {
         MatrixCell: {
             /** Format: uuid */
             id: string;
+            /** @description The row: a stage code, or the register key of a register or Dismantle row. */
             stage_code: string;
-            /** @description null = stage default. */
+            /** @description null = the row default; a task code = a holder override for that task. */
             task_code?: string | null;
+            /** @description 1 entry, 2 review, 3 approve, whatever the number of levels of the row. */
             level: number;
+            /**
+             * @description 0.4.6.
+             * @enum {string}
+             */
+            level_kind?: "entry" | "review" | "approve";
+            /** @description 0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight). */
+            used?: boolean;
+            /** @description null = every region. */
             region_id?: components["schemas"]["RegionId"] | null;
-            /** @enum {string} */
+            /**
+             * @description The Entry level is always any_one.
+             * @enum {string}
+             */
             rule: "any_one" | "all_members";
             assignees: components["schemas"]["MatrixAssignee"][];
             /** @description People who also hold the next level (level will be skipped for them). */
             skip_preview?: components["schemas"]["UserRef"][];
+            /**
+             * Format: date-time
+             * @description 0.4.6.
+             */
+            updated_at?: string | null;
         };
+        /** @description 0.4.6. One person who holds consecutive levels of a row, in the regions listed. */
+        MatrixSkipCase: {
+            /** @description null = the row default; a task code = the override cells of that task. */
+            task_code?: string | null;
+            user: components["schemas"]["UserRef"];
+            /**
+             * @description The level the person acts at.
+             * @enum {string}
+             */
+            from_level_kind: "entry" | "review";
+            /** @description The levels skipped after it, in order. Each skip is logged (B6). */
+            skipped_level_kinds: ("review" | "approve")[];
+            /** @description True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log. */
+            self_approval: boolean;
+            /** @description Regions where this holds (only regions the caller can see). */
+            region_ids: components["schemas"]["RegionId"][];
+        };
+        /** @description 0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`. */
+        MatrixPreview: {
+            /** @description The row has one level: every submission by its Entry holders is a self-approval (B5). */
+            single_level: boolean;
+            skips: components["schemas"]["MatrixSkipCase"][];
+        };
+        /** @description 0.4.6. Open tasks of a stage in the caller's regions, for the level-count change (decision B7). Tasks with their own level count are left out of `not_submitted`. */
+        MatrixTaskCounts: {
+            /** @description Not yet submitted (locked, open or in entry before the first submission): they follow the current level count. */
+            not_submitted: number;
+            /** @description Submitted at least once and not finished: they keep the level path frozen at their first submission. */
+            in_flight: number;
+        };
+        /**
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).
+         * @enum {string}
+         */
+        MatrixRowKey: "procurement" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
-            /** @description Matrix revision (ETag). */
+            /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
             version: number;
+            /** @description Stage rows in workflow order, then the register rows, then Dismantle. */
             stages: {
                 /**
                  * @description Register and Dismantle rows (B11); `code` is then the register key.
@@ -5200,23 +5285,34 @@ export interface components {
                  * @enum {string}
                  */
                 kind: "stage" | "register" | "dismantle";
-                register_key?: components["schemas"]["RegisterKey"] | null;
+                register_key?: components["schemas"]["MatrixRowKey"] | null;
                 code: string;
                 name_en: string;
                 name_ar?: string | null;
                 approval_levels: number;
+                /** @description 0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3]. */
+                used_levels?: number[];
+                /** @description 0.4.6. Regions that have cells of their own in this row (visible regions only). */
+                region_ids_with_cells?: components["schemas"]["RegionId"][];
+                task_counts?: components["schemas"]["MatrixTaskCounts"];
+                preview?: components["schemas"]["MatrixPreview"];
+                /** @description The row default of each level first, then the task and region cells. */
                 cells: components["schemas"]["MatrixCell"][];
             }[];
         };
         MatrixPatch: {
             workflow_version?: number;
             stage_levels?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
                 approval_levels: number;
             }[];
             cells?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
+                /** @description Only for stage rows: a holder override for one task of the stage. */
                 task_code?: string | null;
+                /** @description 1 entry, 2 review, 3 approve. */
                 level: number;
                 region_id?: components["schemas"]["RegionId"] | null;
                 /** @enum {string} */
@@ -6297,6 +6393,8 @@ export interface components {
             read_only?: boolean;
             in_list?: boolean;
             is_custom?: boolean;
+            /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
+            section?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -10095,7 +10193,7 @@ export interface operations {
             query?: {
                 /** @description Default = current published version. */
                 workflow_version?: number;
-                /** @description Show region-specific cells for this region. */
+                /** @description Also return the cells specific to this region. */
                 region_id?: components["schemas"]["RegionId"];
             };
             header?: never;
@@ -10116,6 +10214,8 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     updateMatrix: {

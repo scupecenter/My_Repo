@@ -8,10 +8,13 @@ import { useGroups, useMatrix, usePicker, usePublishMatrix, useRoles } from '@/a
 import type { Matrix as MatrixT, MatrixAssignee, MatrixCell, MatrixPatch } from '@/api/types';
 import { HolderChip } from '@/components/HolderChip';
 import { useToast } from '@/components/Toast';
+import { levelKind, usedLevels } from '@/lib/matrixLevels';
 
 type Row = MatrixT['stages'][number];
-const LEVEL_KIND = (level: number, n: number) => (level === 1 ? 'entry' : level === n ? 'approve' : 'review');
+/** Cells are level 1 = entry, 2 = review, 3 = approve, whatever the number of levels of the row (owner answer E1): a 2-level row uses cells 1 and 3. */
 const key = (code: string, level: number) => `${code}:${level}`;
+/** The default cell of a level: the row default for every region (task and region cells come after it, but are not edited on this screen). */
+const defaultCell = (cells: MatrixCell[], level: number) => cells.find((c) => c.level === level && !c.task_code && !c.region_id);
 
 function AddHolder({ onAdd, taken }: { onAdd: (a: MatrixAssignee) => void; taken: Set<string> }) {
   const { t } = useTranslation();
@@ -85,7 +88,7 @@ export function MatrixPage() {
   const draft = useMemo<MatrixT | null>(() => (m ? {
     ...m, stages: m.stages.map((r) => {
       const n = levels[r.code] ?? r.approval_levels;
-      const cs = [...r.cells.map((c) => cells[key(r.code, c.level)] ?? c), ...Object.values(cells).filter((c) => c.stage_code === r.code && !r.cells.some((x) => x.level === c.level))];
+      const cs = [...r.cells.map((c) => (!c.task_code && !c.region_id ? cells[key(r.code, c.level)] ?? c : c)), ...Object.values(cells).filter((c) => c.stage_code === r.code && !defaultCell(r.cells, c.level))];
       return { ...r, approval_levels: n, cells: cs };
     }),
   } : null), [m, cells, levels]);
@@ -93,17 +96,20 @@ export function MatrixPage() {
   const skip = (r: Row, level: number) => {
     // an untouched row shows the server's own preview (`skip_preview` of the cell); an edited row is recomputed live
     const touched = r.cells.some((c) => cells[key(r.code, c.level)]) || levels[r.code] !== undefined;
-    const given = r.cells.find((c) => c.level === level)?.skip_preview;
+    const given = defaultCell(r.cells, level)?.skip_preview;
     if (!touched && given) return given.map((u) => u.display_name);
-    const next = r.cells.find((c) => c.level === level + 1), cur = r.cells.find((c) => c.level === level);
-    if (!next || !cur || level >= r.approval_levels) return [];
+    // the next level in use: entry > review > approve for 3 levels, entry > approve for 2 (cell 3)
+    const used = usedLevels(levels[r.code] ?? r.approval_levels);
+    const nextLevel = used[used.indexOf(level as 1 | 2 | 3) + 1];
+    const next = nextLevel ? defaultCell(r.cells, nextLevel) : undefined, cur = defaultCell(r.cells, level);
+    if (!next || !cur) return [];
     const ids = new Set(next.assignees.filter((a) => a.kind === 'user').map((a) => a.ref_id));
     return cur.assignees.filter((a) => a.kind === 'user' && ids.has(a.ref_id)).map((a) => a.label);
   };
 
   // B5: a person who holds every used level of a row approves their own submission. Shown before publishing, on the draft.
   const selfRows = (draft?.stages ?? []).map((r) => {
-    const used = Array.from({ length: r.approval_levels }, (_, i) => r.cells.find((c) => c.level === i + 1));
+    const used = usedLevels(r.approval_levels).map((l) => defaultCell(r.cells, l));
     if (used.some((c) => !c)) return null;
     const sets = used.map((c) => new Map(c!.assignees.filter((a) => a.kind === 'user').map((a) => [a.ref_id, a.label])));
     const names = [...sets[0].entries()].filter(([id]) => sets.every((s) => s.has(id))).map(([, n]) => n);
@@ -123,10 +129,10 @@ export function MatrixPage() {
       onError: (e) => {
         setAsking(false);
         if (e instanceof ApiError && e.code === 'step_up_required') return; // the step-up dialog already said it
-        // empty_cell: say which levels have no holder (`errors[].path` = /cells/<stage>/<level>), keep the edits so they can be fixed
-        const bad = e instanceof ApiError ? (e.problem.errors ?? []).filter((x) => x.code === 'empty_cell').map((x) => x.path.split('/').slice(-2)) : [];
-        setRefused(bad.map(([s, l]) => key(s, Number(l))));
-        const names = bad.map(([s, l]) => t('matrixMore.empty_cell_one', { name: (m?.stages.find((r) => r.code === s)?.name_en ?? s), level: l }));
+        // empty_cell (422): `Problem.cells` lists the levels in use that have no holder (stage_code = the row, level = cell level); keep the edits so they can be fixed
+        const bad = e instanceof ApiError && e.code === 'empty_cell' ? (e.problem.cells ?? []).filter((x) => !x.task_code && !x.region_id) : [];
+        setRefused(bad.map((c) => key(c.stage_code, c.level)));
+        const names = bad.map((c) => t('matrixMore.empty_cell_one', { name: (m?.stages.find((r) => r.code === c.stage_code)?.name_en ?? c.stage_code), level: t(`level.${levelKind(c.level)}`) }));
         const msg = e instanceof ApiError && e.code === 'empty_cell' ? (names.join(' ') || t('matrix.empty_cell')) : e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.status === 403 ? t('errors.forbidden') : t('errors.generic');
         setError(msg); toast(msg, 'err');
       },
@@ -164,7 +170,8 @@ export function MatrixPage() {
               <tr key={`h-${g.id}`}><th colSpan={6} className="bg-card2 p-2 text-start text-xs uppercase text-mute" data-testid={`matrix-group-${g.id}`}>{t(`matrix.group_${g.id}`)}</th></tr>,
               ...g.rows.map((r) => {
                 const n = r.approval_levels;
-                const skips = [1, 2].map((l) => ({ l, who: skip(r, l) })).filter((x) => x.who.length);
+                const used = usedLevels(n);
+                const skips = used.slice(0, -1).map((l, i) => ({ l, to: used[i + 1]!, who: skip(r, l) })).filter((x) => x.who.length);
                 return (
                   <tr key={r.code} className="border-t border-line" data-testid={`matrix-row-${r.code}`}>
                     <td className="p-2 align-top font-semibold">{(i18n.language === 'ar' && r.name_ar) || r.name_en}</td>
@@ -173,16 +180,14 @@ export function MatrixPage() {
                         {[1, 2, 3].map((v) => <option key={v} value={v}>{t('matrix.levels', { count: v })}</option>)}
                       </select>
                     </td>
-                    {[1, 2, 3].map((slot) => {
-                      // Entry is level 1, approve is the last level, review sits between; unused columns stay empty.
-                      const level = slot === 1 ? 1 : slot === 3 ? n : 2;
-                      const used = slot === 1 || (slot === 3 && n > 1) || (slot === 2 && n === 3);
-                      return used
-                        ? <Cell key={slot} row={r} level={level} refused={refused.includes(key(r.code, level))} cell={r.cells.find((c) => c.level === level)} onChange={(c) => setCells((x) => ({ ...x, [key(r.code, level)]: c }))} />
-                        : <td key={slot} className="p-2 text-mute">—</td>;
+                    {([1, 2, 3] as const).map((level) => {
+                      // Column = cell level (1 entry, 2 review, 3 approve). A 2-level row leaves the Review column empty and keeps its cell for tasks in flight.
+                      return used.includes(level)
+                        ? <Cell key={level} row={r} level={level} refused={refused.includes(key(r.code, level))} cell={defaultCell(r.cells, level)} onChange={(c) => setCells((x) => ({ ...x, [key(r.code, level)]: c }))} />
+                        : <td key={level} className="p-2 text-mute" data-testid={`matrix-unused-${r.code}-${level}`}>—</td>;
                     })}
                     <td className="p-2 align-top text-xs text-mute" data-testid={`matrix-skip-${r.code}`}>
-                      {skips.length ? skips.map((x) => <div key={x.l}>{t('matrix.skip_line', { from: t(`level.${LEVEL_KIND(x.l, n)}`), to: t(`level.${LEVEL_KIND(x.l + 1, n)}`), names: x.who.join(', ') })}</div>) : '—'}
+                      {skips.length ? skips.map((x) => <div key={x.l}>{t('matrix.skip_line', { from: t(`level.${levelKind(x.l)}`), to: t(`level.${levelKind(x.to)}`), names: x.who.join(', ') })}</div>) : '—'}
                       {n === 1 && <div className="text-waitInk">{t('matrix.self_approval')}</div>}
                     </td>
                   </tr>

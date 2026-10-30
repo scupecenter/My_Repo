@@ -1,14 +1,15 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Ban, Check, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCreateRecord, useRecordClaim, useRecordHistory, useRecordOp, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
+import { useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
-import { defaultsFor, OWNER_NOTE, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
+import { cellLevel } from '@/lib/matrixLevels';
+import { defaultsFor, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
 import { Holders } from './HolderChip';
@@ -26,7 +27,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   const lang = i18n.language;
   const session = useSession().data;
   const matrix = useMatrix().data;
-  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key);
+  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key), newVersion = useNewVersion(key);
   const hist = useRecordHistory(key, record?.id ?? null);
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(key));
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
@@ -50,8 +51,9 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   // B5 / B6 preview from the Matrix row: who holds the next levels as well.
   const row = matrix?.stages.find((s) => s.code === key);
   const me = session?.user?.employee_id;
-  const holds = (l: number) => !!row?.cells.find((c) => c.level === l)?.assignees.some((a) => a.kind === 'user' && a.employee_id === me);
   const n = record?.levels_required ?? row?.approval_levels ?? def.approval_levels;
+  // position p of the path -> matrix cell: 1 entry, the last position is always cell 3 (approve), a 2-level path skips cell 2 (owner answer E1)
+  const holds = (p: number) => !!row?.cells.find((c) => c.level === cellLevel(p, n) && !c.task_code && !c.region_id)?.assignees.some((a) => a.kind === 'user' && a.employee_id === me);
   const from = record && record.state !== 'entry' ? record.current_level ?? 2 : 1;
   let next = from + 1;
   while (me && next <= n && holds(next)) next += 1;
@@ -65,7 +67,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
     if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: body }, {
       onSuccess: (r) => { toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
     });
-    else update.mutate({ record, patch: { data: body } }, { onSuccess: () => { toast(t('registers.saved')); setDirty(false); }, onError: fail });
+    else update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: () => { toast(t('registers.saved')); setDirty(false); }, onError: fail });
   };
   const run = (o: RecordOp, r: RegisterRecord, note?: string) => op.mutate({ record: r, op: o, note }, {
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
@@ -80,14 +82,14 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
         onSuccess: (r) => op.mutate({ record: r, op: 'submit' }, { onSuccess: () => { toast(t('approvals.done')); onCreated(r.id); }, onError: (e) => { fail(e); onCreated(r.id); } }),
         onError: fail,
       });
-    } else if (dirty) update.mutate({ record, patch: { data: visibleData(def, data) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
+    } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
-  const busy = create.isPending || update.isPending || op.isPending || claim.isPending;
+  const busy = create.isPending || update.isPending || op.isPending || claim.isPending || newVersion.isPending;
   const claimedBy = record?.ball_in_court?.claimed_by;
   const mine = claimedBy?.id === session?.user?.id;
   const canClaim = !!record && (act('review') || act('approve')) && !claimedBy && (record.ball_in_court?.holders.length ?? 0) > 1;
-  const srcId = typeof record?.data.source_task_id === 'string' ? record.data.source_task_id : null;
+  const src = record?.task ?? null; // Q43: the task this record is the source of (set by the server at the first submission)
 
   return (
     <div className="flex h-full flex-col" data-testid="register-drawer-body" data-state={record?.state ?? 'new'}>
@@ -102,10 +104,10 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
       </header>
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
-        {srcId && record?.site_id && (
+        {src && record?.site_id && (
           <p className="flex items-center gap-2 rounded-md bg-openBg p-3 text-sm text-openInk" data-testid="reg-source">
             <Link2 size={14} />{t('registers.source_task')}{' '}
-            <Link className="font-semibold underline" data-testid="reg-source-link" to={`/sites/${record.site_id}?task=${srcId}`}>{String(record.data.source_task_code ?? t('registers.open_task'))}</Link>
+            <Link className="font-semibold underline" data-testid="reg-source-link" to={`/sites/${record.site_id}?task=${src.id}`}>{src.task_code}</Link>
           </p>
         )}
         {record?.last_return_note && record.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="reg-return-note">{t('approvals.returned_note', { note: record.last_return_note })}</div>}
@@ -145,7 +147,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
           )}
           {sections.map((s) => (
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
-              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: t('regSections.details') })}</h3>
+              <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {s.fields.map((f) => {
                   const iss = issues[f.code];
@@ -169,7 +171,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
           <section aria-labelledby="rg-history">
             <h3 id="rg-history" className="mb-1 flex items-center gap-1 font-semibold"><Clock size={14} />{t('drawer.history')}</h3>
             <ol data-testid="reg-history" className="space-y-1 text-sm">
-              {hist.data?.items.map((x) => <li key={x.id}>{t(`step.${x.action}`)} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}</li>)}
+              {hist.data?.items.map((x) => <li key={x.id}>{t(`step.${x.action}`, { defaultValue: x.action })} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}</li>)}
               {hist.isSuccess && !hist.data.items.length && <li className="text-mute">{t('drawer.no_history')}</li>}
               {hist.isError && <li className="text-mute">{t('registers.history_soon')}</li>}
             </ol>
@@ -180,6 +182,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
         {editable && (!record || act('submit')) && (finalSelf || skipTo) && <p className="text-sm text-waitInk" data-testid="reg-skip-note">{finalSelf ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: skipTo })}</p>}
         {editable && tried && issueList.length > 0 && <p className="text-sm text-lateInk" data-testid="reg-missing">{t('registers.fix_list', { list: issueList.map((c) => (c === 'site_id' ? t('registers.site') : labelOf(c))).join(', ') })}</p>}
         <div className="flex flex-wrap gap-2">
+          {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
           {record && act('void') && <button className="btn" data-testid="reg-void" disabled={busy} onClick={() => setVoiding(true)}><Ban size={16} />{t('registers.void')}</button>}
           {record && canClaim && <button className="btn" data-testid="reg-claim" disabled={busy} onClick={() => claim.mutate({ record, op: 'claim' }, { onError: fail })}><HandMetal size={16} />{t('drawer.claim')}</button>}
           {record && mine && <button className="btn" data-testid="reg-release" disabled={busy} onClick={() => claim.mutate({ record, op: 'release' }, { onError: fail })}><UserMinus size={16} />{t('drawer.release')}</button>}

@@ -20,6 +20,7 @@ export type PipelineNode = S['PipelineNode'];
 export type DocumentSlot = S['DocumentSlot'];
 export type DocumentFile = S['DocumentFile'];
 export type WorkflowStep = S['WorkflowStep'];
+export type RegisterRecordStep = S['RegisterRecordStep'];
 export type Comment = S['Comment'];
 export type Matrix = S['Matrix'];
 export type MatrixCell = S['MatrixCell'];

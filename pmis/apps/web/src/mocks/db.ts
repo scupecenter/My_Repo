@@ -171,7 +171,7 @@ export function ballFor(t: MockTask): BallInCourt {
   const level = t.state === 'in_review' || t.state === 'in_approval' ? t.current_level ?? 2 : t.state === 'approved' ? t.levels_required ?? 3 : 1;
   const kind = level === 1 ? 'entry' : level >= (t.levels_required ?? 3) ? 'approve' : 'review';
   const to = db().admin.reassigned[t.id];
-  const holders = to ? [{ kind: 'user' as const, ref_id: uid(to), user_id: uid(to), label: byId(to).name_en, employee_id: to }] : holdersOf(db().matrix, t.stage_code, level);
+  const holders = to ? [{ kind: 'user' as const, ref_id: uid(to), user_id: uid(to), label: byId(to).name_en, employee_id: to }] : holdersOf(db().matrix, t.stage_code, level, t.levels_required ?? 3);
   return { level, level_kind: kind, holders: holders.map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h)), ...(t.claimed_by ? { claimed_by: t.claimed_by } : {}) };
 }
 
@@ -179,7 +179,7 @@ export function ballFor(t: MockTask): BallInCourt {
 export function skipPath(t: MockTask, employeeId: string | null | undefined, from = 1) {
   const L = t.levels_required ?? 3, skipped: number[] = [];
   let n = from + 1;
-  while (n <= L && employeeId && holdersOf(db().matrix, t.stage_code, n).some((a) => a.kind === 'user' && a.employee_id === employeeId)) skipped.push(n++);
+  while (n <= L && employeeId && holdersOf(db().matrix, t.stage_code, n, L).some((a) => a.kind === 'user' && a.employee_id === employeeId)) skipped.push(n++);
   return { skipped, to: n > L ? null : n, final: n > L };
 }
 export const canEditTask = (t: MockTask) => {
@@ -234,9 +234,9 @@ export function toDetail(t: MockTask): TaskDetail {
     const level = k + 1, cur = t.current_level ?? 1, kind = level === 1 ? 'entry' : level === L ? 'approve' : 'review';
     const done = t.state === 'approved' || level < cur || (level === 1 && inbox(t));
     const status = done ? 'done' : level === cur && t.state !== 'locked' ? 'current' : 'pending';
-    const next = holdersOf(m, t.stage_code, level + 1).map((a) => a.ref_id);
+    const next = holdersOf(m, t.stage_code, level + 1, L).map((a) => a.ref_id);
     return {
-      level, kind, status, will_skip: level < L && holdersOf(m, t.stage_code, level).some((a) => a.kind === 'user' && next.includes(a.ref_id)),
+      level, kind, status, will_skip: level < L && holdersOf(m, t.stage_code, level, L).some((a) => a.kind === 'user' && next.includes(a.ref_id)),
       ...(level === 1 && done ? { acted_by: staffRef(byId(t.entered_by)), acted_at: '2026-10-20T09:00:00Z' } : {}),
     };
   });

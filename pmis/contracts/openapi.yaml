@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.5
+  version: 0.4.6
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,7 +29,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register.
+    - 0.4.6 (2026-10-30): additive. Responsibility Matrix administration (P1-BE-12). `GET /matrix` rows carry `used_levels`, `region_ids_with_cells`, `task_counts` (B7: tasks that follow a new level count and tasks in flight that keep theirs) and `preview` (`MatrixPreview`: where one person holds consecutive levels, the self-skip, and where that reaches the last level, the B5 self-approval, so the screen warns in advance); cells carry `level_kind`, `used` and `updated_at`; assignees of kind role or group carry `member_count`. `Matrix.stages[].register_key` is a `MatrixRowKey` (the register keys plus `rf_design`, `acquisition` and `deliverables`, which have their own matrix rows, Q44 and Q71). `PATCH /matrix` also edits the register and Dismantle rows (`stage_code` is then the row code), answers `empty_cell` with the cells that miss a holder (`Problem.cells`), refuses `rule: all_members` on the Entry level (`entry_rule_fixed`) and needs `matrix.edit` (all-regions for a cell without a region and for a level count). `RegisterField.section` (the form section of a base field, English, in field order) lets the register form follow the server's field definitions. The register rows of the matrix are the register's own rows: cells are keyed by `register_key` and the level count is `RegisterDefinition.approval_levels`, one source for the matrix screen and the register engine.
+    - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register. A record that is the source of a task is checked again at every submit and just before the task is closed: when its data no longer matches the task source, or the source date is empty, `task` is dropped and the record is approved on the register row only (the task stays open); a source date in the future is refused with 422 `validation_failed` (`errors[].code` `future_date`), as for a date typed on the task.
     - 0.4.4 (2026-10-30): owner answers Q76 to Q84 (minor, additive). `TaskSummary.sla.negative` (boolean): true when an approved task closed its SLA clock at an actual date before the start (a negative duration, data-quality alert, Q82). `SlaStartEvent` also accepts `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting, `sla.dlp_days.cw`, default 90; used by B-15 CW FAC, Q80). `LockReason` `gate_closed` is now returned for the tasks of the stage behind a closed gate (`ref_code` = the gate code, followed by the gate's own reasons), because a gate locks the tasks of the next stage until it opens, except the tasks in the setting `calc.gate_lock_exempt_tasks` (Q81). No endpoint was added or removed.
     - 0.4.3 (2026-10-29): documentation of behaviour, no shape changed. `SlaStartEvent` also accepts the reserved values `PRED` (the latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the task date plus the DLP months), because the Master measures some steps from register fields the PMIS does not read yet. `TaskSummary.sla` is filled (start date, elapsed working days, colour, due date, rule set version). `PipelineNode` gates carry the calculated gate date, the Change Control shift and the lock reasons. Holiday, weekend-day and SLA rule-set changes recalculate the due dates of open tasks only.
     - 0.4.2 (2026-10-29): roles are flat (`parent_role_id` and `sub_roles` removed from Role, `parent_role_id` accepted only as null on create); `Problem.count` and `Problem.scope` for `open_snags`, which now blocks CW PAC/FAC on open CW snags and TE PAC/FAC on open TE snags of the site.
@@ -2348,9 +2349,20 @@ paths:
       tags: [matrix]
       operationId: getMatrix
       summary: Responsibility Matrix for a workflow version, with self-skip preview
+      description: |
+        One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
+        dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
+        its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
+        3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+        `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
+        to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
+        for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
+        `preview` shows in advance where one person holds consecutive levels, so the level is skipped (B6), and where that reaches
+        the last level, which is a self-approval that needs step-up (B5). Needs view on `admin.matrix`, or the `matrix.edit` right.
+        The `ETag` is the matrix revision, to send back in `If-Match` on `PATCH /matrix`.
       parameters:
         - { name: workflow_version, in: query, description: 'Default = current published version.', schema: { type: integer, minimum: 1 } }
-        - { name: region_id, in: query, description: 'Show region-specific cells for this region.', schema: { $ref: '#/components/schemas/RegionId' } }
+        - { name: region_id, in: query, description: 'Also return the cells specific to this region.', schema: { $ref: '#/components/schemas/RegionId' } }
       responses:
         '200':
           description: Matrix.
@@ -2361,14 +2373,25 @@ paths:
               schema: { $ref: '#/components/schemas/Matrix' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     patch:
       tags: [matrix]
       operationId: updateMatrix
       summary: Save changed cells and stage level counts in one step
       description: |
-        All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
-        `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+        All changes in one transaction, with step-up, `If-Match` (the matrix revision) and a reason. Needs System Admin or a
+        delegation with `matrix.edit`; a cell without `region_id` and a level count reach every region and need the right for all
+        regions, a cell with `region_id` needs it for that region. `stage_code` is a stage code of the workflow version or the
+        code of a register or Dismantle row. A used level with no holder is refused (422 `empty_cell`, `Problem.cells` lists the
+        cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
+        refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
+        level count is audited with before and after values and the reason.
+        The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+        submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
+        rejection (decision B7). The answer shows both counts per stage in `task_counts`.
       x-step-up: true
+      x-db-path: matrix_save
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -7004,6 +7027,18 @@ components:
         reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
+        cells:
+          type: array
+          description: '0.4.6. With `empty_cell`: the cells of levels in use that have no holder.'
+          items:
+            type: object
+            required: [stage_code, level]
+            properties:
+              stage_code: { type: string }
+              task_code: { type: [string, 'null'] }
+              level: { type: integer, minimum: 1, maximum: 3 }
+              level_kind: { type: string, enum: [entry, review, approve] }
+              region_id: { type: [integer, 'null'] }
         count: { type: integer, description: '0.4.2. With `open_snags`: the number of open snags of the stream that block the task.' }
         scope: { type: string, enum: [CW, TE], description: '0.4.2. With `open_snags`: the stream of the blocking snags.' }
         existing_id: { type: string, format: uuid, description: '0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).' }
@@ -7805,6 +7840,7 @@ components:
         employee_id: { oneOf: [{ $ref: '#/components/schemas/EmployeeId' }, { type: 'null' }], description: '4-digit employee ID when `kind` is `user`; null for role and group holders.' }
         user_id: { type: string, format: uuid, description: 'Present only when `kind` is `user` (same value as `ref_id`).' }
         account_status: { $ref: '#/components/schemas/UserAccountStatus' }
+        member_count: { type: integer, minimum: 0, description: '0.4.6. In the matrix: for a role, the people with an active assignment of it; for a group, its members. Absent for users.' }
     BallInCourt:
       type: object
       required: [level, holders]
@@ -8069,35 +8105,72 @@ components:
       required: [id, stage_code, level, rule, assignees]
       properties:
         id: { type: string, format: uuid }
-        stage_code: { type: string }
-        task_code: { type: [string, 'null'], description: 'null = stage default.' }
-        level: { type: integer, minimum: 1 }
-        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
-        rule: { type: string, enum: [any_one, all_members] }
+        stage_code: { type: string, description: 'The row: a stage code, or the register key of a register or Dismantle row.' }
+        task_code: { type: [string, 'null'], description: 'null = the row default; a task code = a holder override for that task.' }
+        level: { type: integer, minimum: 1, maximum: 3, description: '1 entry, 2 review, 3 approve, whatever the number of levels of the row.' }
+        level_kind: { type: string, enum: [entry, review, approve], description: '0.4.6.' }
+        used: { type: boolean, description: '0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight).' }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }], description: 'null = every region.' }
+        rule: { type: string, enum: [any_one, all_members], description: 'The Entry level is always any_one.' }
         assignees: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' } }
         skip_preview:
           type: array
           description: People who also hold the next level (level will be skipped for them).
           items: { $ref: '#/components/schemas/UserRef' }
+        updated_at: { type: [string, 'null'], format: date-time, description: '0.4.6.' }
+    MatrixSkipCase:
+      type: object
+      description: '0.4.6. One person who holds consecutive levels of a row, in the regions listed.'
+      required: [user, from_level_kind, skipped_level_kinds, self_approval, region_ids]
+      properties:
+        task_code: { type: [string, 'null'], description: 'null = the row default; a task code = the override cells of that task.' }
+        user: { $ref: '#/components/schemas/UserRef' }
+        from_level_kind: { type: string, enum: [entry, review], description: 'The level the person acts at.' }
+        skipped_level_kinds: { type: array, items: { type: string, enum: [review, approve] }, description: 'The levels skipped after it, in order. Each skip is logged (B6).' }
+        self_approval: { type: boolean, description: 'True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log.' }
+        region_ids: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: 'Regions where this holds (only regions the caller can see).' }
+    MatrixPreview:
+      type: object
+      description: '0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`.'
+      required: [single_level, skips]
+      properties:
+        single_level: { type: boolean, description: 'The row has one level: every submission by its Entry holders is a self-approval (B5).' }
+        skips: { type: array, items: { $ref: '#/components/schemas/MatrixSkipCase' } }
+    MatrixTaskCounts:
+      type: object
+      description: '0.4.6. Open tasks of a stage in the caller''s regions, for the level-count change (decision B7). Tasks with their own level count are left out of `not_submitted`.'
+      required: [not_submitted, in_flight]
+      properties:
+        not_submitted: { type: integer, minimum: 0, description: 'Not yet submitted (locked, open or in entry before the first submission): they follow the current level count.' }
+        in_flight: { type: integer, minimum: 0, description: 'Submitted at least once and not finished: they keep the level path frozen at their first submission.' }
+    MatrixRowKey:
+      type: string
+      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).'
+      enum: [procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
     Matrix:
       type: object
       required: [workflow_version, stages, version]
       properties:
         workflow_version: { type: integer }
-        version: { type: integer, description: 'Matrix revision (ETag).' }
+        version: { type: integer, description: 'Matrix revision (ETag). Rises with every saved change, in any workflow version.' }
         stages:
           type: array
+          description: 'Stage rows in workflow order, then the register rows, then Dismantle.'
           items:
             type: object
             required: [code, name_en, approval_levels, cells]
             properties:
               kind: { type: string, enum: [stage, register, dismantle], default: stage, description: 'Register and Dismantle rows (B11); `code` is then the register key.' }
-              register_key: { oneOf: [{ $ref: '#/components/schemas/RegisterKey' }, { type: 'null' }] }
+              register_key: { oneOf: [{ $ref: '#/components/schemas/MatrixRowKey' }, { type: 'null' }] }
               code: { type: string }
               name_en: { type: string }
               name_ar: { type: [string, 'null'] }
               approval_levels: { type: integer, minimum: 1, maximum: 3 }
-              cells: { type: array, items: { $ref: '#/components/schemas/MatrixCell' } }
+              used_levels: { type: array, items: { type: integer, minimum: 1, maximum: 3 }, description: '0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3].' }
+              region_ids_with_cells: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: '0.4.6. Regions that have cells of their own in this row (visible regions only).' }
+              task_counts: { $ref: '#/components/schemas/MatrixTaskCounts' }
+              preview: { $ref: '#/components/schemas/MatrixPreview' }
+              cells: { type: array, items: { $ref: '#/components/schemas/MatrixCell' }, description: 'The row default of each level first, then the task and region cells.' }
     MatrixPatch:
       type: object
       required: [reason]
@@ -8110,7 +8183,7 @@ components:
             type: object
             required: [stage_code, approval_levels]
             properties:
-              stage_code: { type: string }
+              stage_code: { type: string, description: 'A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6).' }
               approval_levels: { type: integer, minimum: 1, maximum: 3 }
         cells:
           type: array
@@ -8118,9 +8191,9 @@ components:
             type: object
             required: [stage_code, level, rule, assignees]
             properties:
-              stage_code: { type: string }
-              task_code: { type: [string, 'null'] }
-              level: { type: integer, minimum: 1, maximum: 3 }
+              stage_code: { type: string, description: 'A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6).' }
+              task_code: { type: [string, 'null'], description: 'Only for stage rows: a holder override for one task of the stage.' }
+              level: { type: integer, minimum: 1, maximum: 3, description: '1 entry, 2 review, 3 approve.' }
               region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
               rule: { type: string, enum: [any_one, all_members] }
               assignees:
@@ -9212,6 +9285,7 @@ components:
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         in_list: { type: boolean }
         is_custom: { type: boolean }
+        section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
         options:
           type: array
           items:

@@ -910,6 +910,7 @@ model TaskLevelVoter {
 }
 
 // Responsibility Matrix: stage or task x level -> assignees. task_def_id null = stage default.
+// A cell belongs to a stage (stage_id) or to a register / Dismantle row (register_key), never both (migrations 0019, 0020).
 model MatrixCell {
   id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   stage_id    String?    @db.Uuid // NULL on the matrix row of a register (register_key set instead), migration 0019
@@ -929,6 +930,16 @@ model MatrixCell {
   @@unique([stage_id, task_def_id, level, region_id])
   @@index([stage_id, level])
   @@map("matrix_cells")
+}
+
+// One row: the revision of the whole matrix (ETag of GET /matrix, If-Match of PATCH /matrix).
+model MatrixState {
+  id         Boolean  @id @default(true)
+  revision   Int      @default(1)
+  updated_by String?  @db.Uuid
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("matrix_state")
 }
 
 model MatrixCellAssignee {

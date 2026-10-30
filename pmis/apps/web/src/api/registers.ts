@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { ImportBatch, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, Template, UserRef, WorkflowStep } from './types';
+import type { ImportBatch, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UserRef } from './types';
 
 export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
@@ -92,8 +92,7 @@ export function useRecordOp(key: string) {
   });
 }
 
-// TODO(contract): claim, release and history of a register record are not in openapi.yaml yet (tasks have them). The shapes below copy
-// /tasks/{id}/claim, /release and /history; the mock serves them, the real API does not until tech-lead adds them.
+/** `POST .../claim` and `.../release` (contract 0.4.5): one member of a group level takes the level, or gives it back. If-Match = record version. */
 export function useRecordClaim(key: string) {
   const qc = useQueryClient();
   return useMutation<RegisterRecord, ApiError, { record: RegisterRecord; op: 'claim' | 'release' }, { before?: RegisterRecord }>({
@@ -110,8 +109,22 @@ export function useRecordClaim(key: string) {
     onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
   });
 }
+/** `GET .../history` (contract 0.4.5): the steps of this version, oldest first, auto-skips included. */
 export const useRecordHistory = (key: string, id: string | null) =>
-  useQuery({ queryKey: ['register-history', key, id], enabled: !!id, retry: false, queryFn: () => api.get<Page<WorkflowStep>>(`/registers/${key}/records/${id}/history`) });
+  useQuery({ queryKey: ['register-history', key, id], enabled: !!id, retry: false, queryFn: () => api.get<Page<RegisterRecordStep>>(`/registers/${key}/records/${id}/history`) });
+
+/** `GET .../versions`: every version of the logical record, newest first. */
+export const useRecordVersions = (key: string, id: string | null) =>
+  useQuery({ queryKey: ['register-versions', key, id], enabled: !!id, queryFn: () => api.get<{ items: RegisterRecord[] }>(`/registers/${key}/records/${id}/versions`).then((r) => r.items) });
+
+/** `POST .../versions`: a new version (state `entry`) of an approved record; the approved one stays in force until the new one is approved. */
+export function useNewVersion(key: string) {
+  const qc = useQueryClient();
+  return useMutation<RegisterRecord, ApiError, RegisterRecord>({
+    mutationFn: (record) => api.post(`/registers/${key}/records/${record.id}/versions`, { version: record.version }),
+    onSettled: (_d, _e, v) => { settle(qc, key, v.id); void qc.invalidateQueries({ queryKey: ['register-versions', key] }); },
+  });
+}
 
 // ---- template entry (contract: /templates, /import-batches)
 export const useTemplates = () => useQuery({ queryKey: ['templates'], staleTime: 300_000, queryFn: () => api.get<{ items: Template[] }>('/templates').then((r) => r.items) });

@@ -1,6 +1,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Matrix, MatrixPatch } from '@/api/types';
+import { levelKind, usedLevels } from '@/lib/matrixLevels';
 import { canAct, canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
 import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handlers';
 import { uid } from './ids';
@@ -186,7 +187,10 @@ export const siteHandlers = [
     for (const c of body.cells ?? []) {
       const r = rowOf(m, c.stage_code);
       if (!r) continue;
-      if (c.level <= r.approval_levels && c.assignees.length === 0) return invalid(`/cells/${c.stage_code}/${c.level}`, 'empty_cell', 'A used level needs at least one holder');
+      // 422 empty_cell as the API answers it: the level in use (cell 1, and 3 / 2 and 3 for 2 / 3 levels) has no holder; `cells` lists them
+      if (usedLevels(r.approval_levels).includes(c.level as 1 | 2 | 3) && c.assignees.length === 0) {
+        return problem(422, 'empty_cell', 'A used level needs at least one holder', { cells: [{ stage_code: c.stage_code, task_code: null, level: c.level, level_kind: levelKind(c.level), region_id: null }] } as never);
+      }
       const label = (a: { kind: string; ref_id: string }) => (a.kind === 'user' ? STAFF.find((s) => uid(s.employee_id) === a.ref_id) : a.kind === 'role' ? ROLES.find((x) => x.id === a.ref_id) : GROUPS.find((x) => x.id === a.ref_id));
       const assignees = c.assignees.map((a) => { const x = label(a) as { name_en?: string; name?: string; employee_id?: string } | undefined; return { kind: a.kind, ref_id: a.ref_id, label: x?.name_en ?? x?.name ?? '?', employee_id: a.kind === 'user' ? x?.employee_id ?? null : null, ...(a.kind === 'user' ? { user_id: a.ref_id } : {}) }; });
       const cur = r.cells.find((x) => x.level === c.level);

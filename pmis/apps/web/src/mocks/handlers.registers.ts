@@ -1,8 +1,9 @@
 // MSW handlers for the generic register endpoints and template import, following contracts/openapi.yaml (/registers, /import-batches).
-// Claim, release and history of a record are NOT in the contract yet: they are mock-only (TODO(contract), see api/registers.ts).
+// The record shapes are the ones the real API answers (contract 0.4.5/0.4.6): entity_id, version_no, is_current, task (Q43), allowed_actions with claim,
+// release and new_version, history steps, and the versions of a logical record. Template import (/import-batches) is mock-only: the API does not build it yet.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { BallInCourt, ImportBatch, ImportRow, RegisterDefinition, RegisterRecord, WorkflowStep } from '@/api/types';
+import type { BallInCourt, ImportBatch, ImportRow, RegisterDefinition, RegisterRecord, RegisterRecordStep } from '@/api/types';
 import { DATE_MAX, DATE_MIN, hasExpiry, validateRecord, visibleData } from '@/lib/registerForms';
 import { db, save, stepUpValid, viewer, accountStatus } from './db';
 import { guard, page, problem, stepUp } from './handlers';
@@ -17,25 +18,33 @@ const defOf = (key: string): RegisterDefinition | undefined => REGISTER_DEFS.fin
 const levelsOf = (key: string) => rowOf(db().matrix, key)?.approval_levels ?? 3;
 const tag = (r: MockRecord) => HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
 const ref = () => { const v = viewer()!; return { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined }; };
-const userHolds = (key: string, level: number, emp?: string | null) => holdersOf(db().matrix, key, level).some((a) => a.kind === 'user' && a.employee_id === emp);
+/** Position `level` (1 = entry) of a path of `n` levels: the last position is always matrix cell 3 (approve), so a 2-level path uses cells 1 and 3. */
+const userHolds = (key: string, level: number, emp?: string | null, n?: number) => holdersOf(db().matrix, key, level, n ?? levelsOf(key)).some((a) => a.kind === 'user' && a.employee_id === emp);
 /** The admin account acts at every level (as in the task mock); anyone else only where the matrix row names them. */
-const canAt = (key: string, level: number) => { const v = viewer(); return !!v && (v.key === 'pm' || userHolds(key, level, v.employee_id)); };
+const canAt = (key: string, level: number, n?: number) => { const v = viewer(); return !!v && (v.key === 'pm' || userHolds(key, level, v.employee_id, n)); };
 
 function ball(r: MockRecord): BallInCourt {
   const L = r.levels_required ?? levelsOf(r.register_key), level = r.state === 'entry' ? 1 : r.current_level;
-  const holders = holdersOf(db().matrix, r.register_key, level).map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h));
+  const holders = holdersOf(db().matrix, r.register_key, level, L).map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h));
   return { level, level_kind: level === 1 ? 'entry' : level >= L ? 'approve' : 'review', holders, rule: 'any_one', ...(r.claimed_by ? { claimed_by: r.claimed_by } : {}) };
 }
 
 function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   const out: NonNullable<RegisterRecord['allowed_actions']> = [];
   const L = r.levels_required ?? levelsOf(r.register_key);
-  if (r.state === 'entry' && canAt(r.register_key, 1)) out.push('edit', 'submit');
-  if (r.state === 'in_review' && canAt(r.register_key, r.current_level)) out.push('review', 'reject');
-  if (r.state === 'in_approval' && canAt(r.register_key, L)) out.push('approve', 'reject');
+  if (r.state === 'entry' && canAt(r.register_key, 1, L)) out.push('edit', 'submit');
+  if (r.state === 'in_review' && canAt(r.register_key, r.current_level, L)) out.push('review', 'reject');
+  if (r.state === 'in_approval' && canAt(r.register_key, L, L)) out.push('approve', 'reject');
+  if (r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r) && canAt(r.register_key, 1, L)) out.push('new_version');
   if (r.state !== 'voided' && viewer()?.key === 'pm') out.push('void');
   return out;
 }
+
+const versionsOf = (r: MockRecord) => R().records.filter((x) => x.entity_id === r.entity_id).sort((a, b) => b.version_no - a.version_no);
+const isLatest = (r: MockRecord) => versionsOf(r)[0]!.id === r.id;
+/** The approved version in force: the newest approved one. */
+const isCurrent = (r: MockRecord) => r.state === 'approved' && versionsOf(r).find((x) => x.state === 'approved')!.id === r.id;
+const hasOpenVersion = (r: MockRecord) => versionsOf(r).some((x) => ['entry', 'in_review', 'in_approval'].includes(x.state));
 
 export function toRecord(r: MockRecord): RegisterRecord {
   const m = r.site_index !== null ? siteMeta(r.site_index) : null;
@@ -43,6 +52,7 @@ export function toRecord(r: MockRecord): RegisterRecord {
     id: r.id, register_key: r.register_key, record_type: r.record_type, site_id: m?.id ?? null, site_code: m?.code ?? null, region_id: (m?.region_id ?? null) as never, state: r.state,
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
+    entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: 'manual', ...(r.task ? { task: r.task } : {}),
   };
 }
 
@@ -51,8 +61,8 @@ const noMatch = (req: Request, r: MockRecord) => {
   if (!h) return problem(428, 'precondition_required', 'If-Match is required');
   return Number(h.replace(/"/g, '')) === r.version ? null : problem(412, 'precondition_failed', 'The record changed; reload and retry');
 };
-const step = (r: MockRecord, action: WorkflowStep['action'], level: number, note?: string, self = false) => {
-  r.steps.push({ id: crypto.randomUUID(), level, action, acted_by: ref(), note: note ?? null, created_at: new Date().toISOString(), self_approval: self } as WorkflowStep);
+const step = (r: MockRecord, action: RegisterRecordStep['action'], level: number, note?: string, self = false) => {
+  r.steps.push({ id: crypto.randomUUID(), level, action, acted_by: ref(), note: note ?? null, created_at: new Date().toISOString(), self_approval: self });
 };
 const touch = (r: MockRecord) => { r.version += 1; r.updated_at = new Date().toISOString(); };
 
@@ -77,7 +87,8 @@ export const registerHandlers = [
     const u = new URL(request.url).searchParams;
     const q = (u.get('q') ?? '').toLowerCase(), region = u.get('region_id'), state = u.get('state'), type = u.get('record_type'), site = u.get('site_id');
     const limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
-    const all = R().records.filter((r) => r.register_key === def.register_key).map(toRecord).filter((r) =>
+    const entity = u.get('entity_id'), allVersions = u.get('all_versions') === 'true';
+    const all = R().records.filter((r) => r.register_key === def.register_key && (!entity || r.entity_id === entity) && (allVersions || entity || isLatest(r))).map(toRecord).filter((r) =>
       (!state || r.state === state) && (!type || r.record_type === type) && (!site || r.site_id === site) && (!region || String(r.region_id) === region)
       && (!q || `${r.site_code ?? ''} ${Object.values(r.data).filter((x) => typeof x === 'string').join(' ')}`.toLowerCase().includes(q)));
     const items = all.slice(start, start + limit);
@@ -91,13 +102,15 @@ export const registerHandlers = [
     const si = b.site_id ? siteIndex(b.site_id) : null;
     if (def.site_scoped && (si === null || si < 0 || si >= SITE_COUNT)) return invalid([{ path: '/site_id', code: b.site_id ? 'site_not_found' : 'site_required' }]);
     if (!viewer() || !(viewer()!.key === 'pm' || userHolds(def.register_key, 1, viewer()!.employee_id))) return problem(403, 'forbidden', 'Not allowed');
-    if (!def.multiple_per_site && R().records.some((r) => r.register_key === def.register_key && r.site_index === si && r.state !== 'voided'))
+    if (!def.multiple_per_site && R().records.some((r) => r.register_key === def.register_key && r.site_index === si && r.state !== 'voided' && r.version_no === 1))
       return problem(409, 'duplicate', 'This site already has a row; a new request is a new version of it (Q55)');
     const data = visibleData(def, b.data ?? {});
     const bad = Object.entries(data).filter(([c, v]) => def.fields.find((f) => f.code === c)?.type === 'date' && typeof v === 'string' && (v < DATE_MIN || v > DATE_MAX));
     if (bad.length) return invalid(bad.map(([c]) => ({ path: `/data/${c}`, code: 'date_range' })));
     const now = new Date().toISOString();
-    const r: MockRecord = { id: recId(++R().seq), register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
+    const id = recId(++R().seq);
+    const r: MockRecord = { id, entity_id: id, version_no: 1, register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
+    step(r, 'create', 1);
     R().records.unshift(r); save();
     return HttpResponse.json(toRecord(r), { status: 201, headers: { ETag: `"${r.version}"` } });
   }),
@@ -114,8 +127,12 @@ export const registerHandlers = [
     if (r.state !== 'entry') return problem(409, 'invalid_transition', 'Only a record in entry can be edited');
     if (!actions(r)!.includes('edit')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
     const b = (await request.json()) as { data?: Record<string, unknown> };
-    r.data = visibleData(def, { ...r.data, ...(b.data ?? {}) });
+    // a key that is sent applies, an explicit null clears it (as the API does); read-only fields cannot be typed (Q45)
+    const merged: Record<string, unknown> = { ...r.data };
+    for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
+    r.data = visibleData(def, merged);
     if (b.data && !hasExpiry(r.data)) delete r.data.valid_to;
+    step(r, 'edit', 1);
     touch(r); save();
     return tag(r);
   }),
@@ -130,7 +147,7 @@ export const registerHandlers = [
       const key = r.register_key, L = r.levels_required ?? levelsOf(key), v = viewer()!;
       const finish = (self: boolean) => { if (!stepUpValid() && self) return stepUp(); r.state = 'approved'; r.current_level = L; return null; };
       // Holding every level of the row makes the submission a self-approval (B5): step-up, and the approval is flagged.
-      const holdsAll = Array.from({ length: L }, (_, i) => userHolds(key, i + 1, v.employee_id)).every(Boolean);
+      const holdsAll = Array.from({ length: L }, (_, i) => userHolds(key, i + 1, v.employee_id, L)).every(Boolean);
       const claimed = r.claimed_by && r.claimed_by.id !== uid(v.employee_id ?? '9999');
       if (op === 'void') {
         if (v.key !== 'pm') return problem(403, 'forbidden', 'Not allowed');
@@ -150,7 +167,7 @@ export const registerHandlers = [
         if (errs.length) return invalid(errs);
         r.levels_required = L; // B7: the level path is snapshotted at first submission
         let next = 2;
-        while (next <= L && userHolds(key, next, v.employee_id)) next += 1;
+        while (next <= L && userHolds(key, next, v.employee_id, L)) next += 1;
         const skipped = Array.from({ length: next - 2 }, (_, i) => i + 2);
         if (next > L) { const e = finish(true); if (e) return e; } // the submitter holds every level they would reach: a self-approval (B5)
         else { r.state = next === L && L >= 3 ? 'in_approval' : 'in_review'; r.current_level = next; }
@@ -171,7 +188,7 @@ export const registerHandlers = [
       r.claimed_by = undefined; touch(r); save();
       return tag(r);
     })),
-  // TODO(contract): not in openapi.yaml.
+  // claim and release of a group level (contract 0.4.5)
   ...(['claim', 'release'] as const).map((op) =>
     http.post(`${B}/registers/:key/records/:id/${op}`, ({ params, request }) => {
       const g = guard(); if (g) return g;
@@ -189,6 +206,27 @@ export const registerHandlers = [
     const g = guard(); if (g) return g;
     const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);
     return r ? page(r.steps) : problem(404, 'not_found', 'Record not found');
+  }),
+  // every version of the logical record, newest first; and a new version of the approved one (R9, Q55)
+  http.get(`${B}/registers/:key/records/:id/versions`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);
+    return r ? HttpResponse.json({ items: versionsOf(r).map(toRecord) }) : problem(404, 'not_found', 'Record not found');
+  }),
+  http.post(`${B}/registers/:key/records/:id/versions`, ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const r = R().records.find((x) => x.id === params.id && x.register_key === params.key), def = defOf(params.key as string);
+    if (!r || !def) return problem(404, 'not_found', 'Record not found');
+    const bad = noMatch(request, r); if (bad) return bad;
+    if (!canAt(r.register_key, 1, r.levels_required ?? levelsOf(r.register_key))) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+    if (r.state !== 'approved' || !isCurrent(r) || hasOpenVersion(r)) return problem(409, 'invalid_transition', 'Only an approved record without an open version can get a new version');
+    const now = new Date().toISOString(), id = recId(++R().seq);
+    const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
+    const v: MockRecord = { ...r, id, version_no: r.version_no + 1, supersedes_id: r.id, state: 'entry', current_level: 1, levels_required: levelsOf(r.register_key), version: 1, return_count: 0, last_return_note: null, task: null,
+      data: Object.fromEntries(Object.entries(r.data).filter(([c]) => !ro.has(c))), created_at: now, updated_at: now, created_by: viewer()!.employee_id ?? '9999', steps: [], claimed_by: undefined };
+    step(v, 'new_version', 1);
+    R().records.unshift(v); save();
+    return HttpResponse.json(toRecord(v), { status: 201, headers: { ETag: `"${v.version}"` } });
   }),
 
   // ---- template import for registers; a call with `task_id` or another template falls through to the task upload mock
@@ -271,9 +309,9 @@ export const registerHandlers = [
 // ---- batch helpers
 function makeBatch(key: MockRecord['register_key'], template_id: string, file_name: string): MockBatch {
   const L = levelsOf(key), def = defOf(key)!;
-  const sample = (i: number): Record<string, unknown> => key === 'procurement' ? { scope: 'cw', delivery: 'outsourced', pr_no: `PR-2026-1${i}`, pr_date: '2026-09-1' + i, order_status: 'open' }
-    : key === 'gecol' ? { survey_date: `2026-09-0${i + 1}`, meter_no: `M-9${i}00` } : key === 'hlc' ? { request_no: `HLC-2026-1${i}`, request_date: '2026-09-1' + i, fiber_status: 'planned' }
-      : { type: 'access_cw', status: 'approved', valid_from: `2026-09-0${i + 1}`, has_expiry: true, valid_to: '2027-01-01' };
+  const sample = (i: number): Record<string, unknown> => key === 'procurement' ? { scope: 'CW', delivery: 'Outsourced', pr_no: `PR-2026-1${i}`, pr_date: '2026-09-1' + i, order_status: 'Open' }
+    : key === 'gecol' ? { pr_no: `GPR-2026-1${i}`, request_date: '2026-09-0' + i, survey_date: `2026-09-0${i + 1}`, meter_no: `M-9${i}00` } : key === 'hlc' ? { request_no: `HLC-2026-1${i}`, request_date: '2026-09-1' + i, fiber_status: 'Planned' }
+      : { permit_type: 'Access - CW', status: 'Approved', valid_from: `2026-09-0${i + 1}`, has_expiry: true, valid_to: '2027-01-01' };
   const taken = new Set(R().records.filter((r) => r.register_key === key && !def.multiple_per_site).map((r) => r.site_index));
   const sites = [10, 11, 12, 13].map((s) => { let x = s; while (taken.has(x)) x += 7; return x; });
   const rows: MockBatch['rows'] = sites.slice(0, 3).map((s, i) => ({ id: crypto.randomUUID(), row_no: i + 2, key: siteMeta(s).code, action: 'create' as const, decision: 'pending' as const, payload: sample(i + 1), site_index: s, errors: [], diff: Object.fromEntries(Object.entries(sample(i + 1)).slice(0, 3).map(([k, v]) => [k, { new: v }])) }));
@@ -286,7 +324,8 @@ function applyBatch(b: MockBatch, rows: MockBatch['rows']) {
   const now = new Date().toISOString();
   for (const x of rows) {
     if (x.action !== 'create') continue;
-    R().records.unshift({ id: recId(++R().seq), register_key: b.register_key, record_type: b.register_key === 'procurement' ? 'pr' : null, site_index: x.site_index, state: 'approved', current_level: b.levels_required, levels_required: b.levels_required, data: x.payload, version: 1, return_count: 0, last_return_note: null, created_by: b.uploaded_by, created_at: now, updated_at: now, steps: [{ id: crypto.randomUUID(), level: 1, action: 'submit', acted_by: ref(), note: `via batch ${b.id.slice(0, 8)}`, created_at: now } as WorkflowStep] });
+    const id = recId(++R().seq);
+    R().records.unshift({ id, entity_id: id, version_no: 1, register_key: b.register_key, record_type: b.register_key === 'procurement' ? 'pr' : null, site_index: x.site_index, state: 'approved', current_level: b.levels_required, levels_required: b.levels_required, data: x.payload, version: 1, return_count: 0, last_return_note: null, created_by: b.uploaded_by, created_at: now, updated_at: now, steps: [{ id: crypto.randomUUID(), level: 1, action: 'submit', acted_by: ref(), note: `via batch ${b.id.slice(0, 8)}`, created_at: now }] });
   }
 }
 function toRow(r: MockBatch['rows'][number]): ImportRow {
