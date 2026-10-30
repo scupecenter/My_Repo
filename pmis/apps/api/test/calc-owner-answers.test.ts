@@ -115,7 +115,7 @@ describe('Q78: the PTW HSE checks are information only; stop work still holds th
 describe('Q80: the SLA of B-15 (CW FAC) starts from the CW PAC date + 90 calendar days', () => {
   it('has the setting sla.dlp_days.cw = 90 and the new start event on B-15 only; the TE FAC keeps the Master months', async () => {
     expect(await setting('sla.dlp_days.cw')).toBe(90);
-    const r = await q<{ code: string; start_ref: string }>(db, `SELECT DISTINCT code, start_ref FROM sla_rules WHERE code IN ('B-15', 'B06') ORDER BY code`);
+    const r = await q<{ code: string; start_ref: string }>(db, `SELECT DISTINCT code COLLATE "C" AS code, start_ref FROM sla_rules WHERE code IN ('B-15', 'B06') ORDER BY 1`);
     expect(r).toEqual([{ code: 'B-15', start_ref: 'DLPD:B13:sla.dlp_days.cw' }, { code: 'B06', start_ref: 'DLP:D16:dlp.months.te' }]);
     const items = await q<{ start_ref: string }>(db, `SELECT start_ref FROM sla_rule_set_items WHERE code = 'B-15'`);
     expect(items.every((i) => i.start_ref === 'DLPD:B13:sla.dlp_days.cw')).toBe(true);
