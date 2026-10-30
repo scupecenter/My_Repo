@@ -84,7 +84,7 @@ describe('Q77: Commissioning Power Safe stays yes/no and gate G6 has no conditio
 describe('Q78: the PTW HSE checks are information only; stop work still holds the gate', () => {
   it('does not evaluate the HSE checks, even if the old setting is put back', async () => {
     const hits = await q<{ proname: string }>(db, `SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-      WHERE n.nspname = 'public' AND p.prosrc ILIKE '%hse_checks%'`);
+      WHERE n.nspname = 'public' AND p.prosrc ILIKE '%hse_checks%' AND p.proname <> 'reg_apply'`);  // reg_apply only stores the register value
     expect(hits).toEqual([]);                                                // no function of the database reads them
     expect(await setting('calc.ptw_hse_check_keys')).toBeUndefined();         // the setting that asked for them is gone
     await setSetting('calc.ptw_hse_check_keys', ['jsa_tra', 'toolbox_talk']);

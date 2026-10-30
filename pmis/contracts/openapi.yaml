@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.4
+  version: 0.4.5
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register.
     - 0.4.4 (2026-10-30): owner answers Q76 to Q84 (minor, additive). `TaskSummary.sla.negative` (boolean): true when an approved task closed its SLA clock at an actual date before the start (a negative duration, data-quality alert, Q82). `SlaStartEvent` also accepts `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting, `sla.dlp_days.cw`, default 90; used by B-15 CW FAC, Q80). `LockReason` `gate_closed` is now returned for the tasks of the stage behind a closed gate (`ref_code` = the gate code, followed by the gate's own reasons), because a gate locks the tasks of the next stage until it opens, except the tasks in the setting `calc.gate_lock_exempt_tasks` (Q81). No endpoint was added or removed.
     - 0.4.3 (2026-10-29): documentation of behaviour, no shape changed. `SlaStartEvent` also accepts the reserved values `PRED` (the latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the task date plus the DLP months), because the Master measures some steps from register fields the PMIS does not read yet. `TaskSummary.sla` is filled (start date, elapsed working days, colour, due date, rule set version). `PipelineNode` gates carry the calculated gate date, the Change Control shift and the lock reasons. Holiday, weekend-day and SLA rule-set changes recalculate the due dates of open tasks only.
     - 0.4.2 (2026-10-29): roles are flat (`parent_role_id` and `sub_roles` removed from Role, `parent_role_id` accepted only as null on create); `Problem.count` and `Problem.scope` for `open_snags`, which now blocks CW PAC/FAC on open CW snags and TE PAC/FAC on open TE snags of the site.
@@ -4582,6 +4583,14 @@ paths:
       - name: record_type
         in: query
         schema: {type: string}
+      - name: entity_id
+        in: query
+        description: All versions of one logical record.
+        schema: {type: string, format: uuid}
+      - name: all_versions
+        in: query
+        description: Default false = the latest version of each logical record.
+        schema: {type: boolean}
       - name: q
         in: query
         schema: {type: string}
@@ -4735,7 +4744,7 @@ paths:
       operationId: approveRegisterRecord
       summary: Approve (final level)
       description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
-      x-step-up: when the caller holds every level (self-approval, B5)
+      x-step-up: true
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -4817,6 +4826,132 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/claim:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: claimRegisterRecord
+      summary: Claim a group-held level (any one member)
+      description: The first member who acts claims the level; the others get 409 `already_claimed` (B10, as for tasks).
+      x-db-path: reg_claim_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Claimed.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/release:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: releaseRegisterRecord
+      summary: Release my claim back to the group
+      x-db-path: reg_release_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Released.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/history:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: getRegisterRecordHistory
+      summary: Steps of one version (timeline), including auto-skips
+      parameters:
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Steps, oldest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/RegisterRecordStep'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /registers/{register_key}/records/{record_id}/versions:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: listRegisterRecordVersions
+      summary: All versions of the logical record, newest first
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: createRegisterRecordVersion
+      summary: New version of an approved record (state `entry`)
+      description: |
+        Copies the approved version that is in force (the values filled by the approval are not copied). The approved version stays in
+        force until the new one is approved (R9, RE-03). GECOL and HLC: a new request is a new version of the site's record (Q55).
+        Needs the register row's entry holder; 409 when the record is not approved or an open version exists.
+      x-db-path: reg_new_version
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
   /document-library:
     get:
@@ -6871,6 +7006,7 @@ components:
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
         count: { type: integer, description: '0.4.2. With `open_snags`: the number of open snags of the stream that block the task.' }
         scope: { type: string, enum: [CW, TE], description: '0.4.2. With `open_snags`: the stream of the blocking snags.' }
+        existing_id: { type: string, format: uuid, description: '0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).' }
     ErrorCode:
       type: string
       enum:
@@ -9121,11 +9257,50 @@ components:
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
-        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void] } }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version] } }
+        entity_id: { type: string, format: uuid, description: 'The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.' }
+        version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
+        supersedes_id: { type: [string, 'null'], format: uuid }
+        is_current: { type: boolean, description: 'The approved version that is in force.' }
+        task:
+          type: object
+          description: 'Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task''s Matrix row, and the final approval fills the task''s date and approves it.'
+          required: [id, task_code]
+          properties:
+            id: { type: string, format: uuid }
+            task_code: { type: string }
+        self_approval: { type: boolean }
+        approved_by: { $ref: '#/components/schemas/UserRef' }
+        approved_at: { type: [string, 'null'], format: date-time }
+        source: { type: string, enum: [manual, template] }
+        last_transition:
+          type: object
+          description: Present on the answer of a transition (submit, review, approve, reject, claim, release).
+          properties:
+            step_ids: { type: array, items: { type: string, format: uuid } }
+            skipped_levels: { type: array, items: { type: integer } }
+            unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+            votes_missing: { type: integer }
+            returned_to_level: { type: integer }
         created_by: { $ref: '#/components/schemas/UserRef' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-        version: { type: integer }
+        version: { type: integer, description: 'ETag (If-Match).' }
+    RegisterRecordStep:
+      type: object
+      required: [id, level, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        level: { type: integer }
+        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void] }
+        acted_by: { $ref: '#/components/schemas/UserRef' }
+        note: { type: [string, 'null'] }
+        before_state: { $ref: '#/components/schemas/RegisterRecordState' }
+        after_state: { $ref: '#/components/schemas/RegisterRecordState' }
+        self_approval: { type: boolean }
+        stepup_verified: { type: boolean }
+        batch_row_id: { type: [string, 'null'], format: uuid, description: 'Set when the version came from a template batch.' }
+        created_at: { type: string, format: date-time }
     RegisterRecordInput:
       type: object
       required: [data]
