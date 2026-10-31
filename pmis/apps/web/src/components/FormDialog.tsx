@@ -6,9 +6,11 @@ import { ApiError } from '@/api/client';
 /** Message for a failed call: a specific text for known problem codes, else the generic one. */
 export function errText(e: unknown, t: (k: string) => string) {
   if (!(e instanceof ApiError)) return t('errors.generic');
-  const k = `errors.${e.code}`;
-  const s = t(k);
-  return s === k ? (e.status === 403 ? t('errors.forbidden') : t('errors.generic')) : s;
+  // A field-level code (too_many_rows, not_supported) is more telling than the generic validation_failed.
+  const keys = [`errors.${e.code}`, ...(e.problem.errors ?? []).map((x) => `errors.${x.code}`)];
+  const first = e.code === 'validation_failed' ? [...keys.slice(1), keys[0]] : keys;
+  for (const k of first) { const s = t(k); if (s !== k) return s; }
+  return e.status === 403 ? t('errors.forbidden') : t('errors.generic');
 }
 
 /** Dialog with an optional mandatory reason (min 3 characters, as the contract says). `onSubmit` gets the trimmed reason. */

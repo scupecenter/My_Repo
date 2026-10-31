@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.2.6
+  version: 0.4.6
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -9,7 +9,7 @@ info:
 
     ## Conventions
     - **Base path** `/api/v1`. JSON property names are snake_case (ADR 0001).
-    - **Auth**: session cookie `pmis_session` created by the Entra OIDC flow (ADR 0002). Unsafe methods (POST, PUT, PATCH, DELETE)
+    - **Auth**: session cookie `pmis_session` created by the local password sign-in (ADR 0012) or the Entra OIDC flow (ADR 0002). Unsafe methods (POST, PUT, PATCH, DELETE)
       also need the header `X-CSRF-Token` with the value from `GET /auth/session`. A future mobile client will use `bearerAuth`.
     - **Errors**: RFC 9457 `application/problem+json` (schema `Problem`). `code` is machine-readable and stable; `errors[]` lists
       field problems. Every response carries `X-Request-Id`, which is also written to the System Log.
@@ -29,6 +29,15 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.6 (2026-10-30): additive. Responsibility Matrix administration (P1-BE-12). `GET /matrix` rows carry `used_levels`, `region_ids_with_cells`, `task_counts` (B7: tasks that follow a new level count and tasks in flight that keep theirs) and `preview` (`MatrixPreview`: where one person holds consecutive levels, the self-skip, and where that reaches the last level, the B5 self-approval, so the screen warns in advance); cells carry `level_kind`, `used` and `updated_at`; assignees of kind role or group carry `member_count`. `Matrix.stages[].register_key` is a `MatrixRowKey` (the register keys plus `rf_design`, `acquisition` and `deliverables`, which have their own matrix rows, Q44 and Q71). `PATCH /matrix` also edits the register and Dismantle rows (`stage_code` is then the row code), answers `empty_cell` with the cells that miss a holder (`Problem.cells`), refuses `rule: all_members` on the Entry level (`entry_rule_fixed`) and needs `matrix.edit` (all-regions for a cell without a region and for a level count). `RegisterField.section` (the form section of a base field, English, in field order) lets the register form follow the server's field definitions. The register rows of the matrix are the register's own rows: cells are keyed by `register_key` and the level count is `RegisterDefinition.approval_levels`, one source for the matrix screen and the register engine.
+    - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register. A record that is the source of a task is checked again at every submit and just before the task is closed: when its data no longer matches the task source, or the source date is empty, `task` is dropped and the record is approved on the register row only (the task stays open); a source date in the future is refused with 422 `validation_failed` (`errors[].code` `future_date`), as for a date typed on the task.
+    - 0.4.4 (2026-10-30): owner answers Q76 to Q84 (minor, additive). `TaskSummary.sla.negative` (boolean): true when an approved task closed its SLA clock at an actual date before the start (a negative duration, data-quality alert, Q82). `SlaStartEvent` also accepts `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting, `sla.dlp_days.cw`, default 90; used by B-15 CW FAC, Q80). `LockReason` `gate_closed` is now returned for the tasks of the stage behind a closed gate (`ref_code` = the gate code, followed by the gate's own reasons), because a gate locks the tasks of the next stage until it opens, except the tasks in the setting `calc.gate_lock_exempt_tasks` (Q81). No endpoint was added or removed.
+    - 0.4.3 (2026-10-29): documentation of behaviour, no shape changed. `SlaStartEvent` also accepts the reserved values `PRED` (the latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the task date plus the DLP months), because the Master measures some steps from register fields the PMIS does not read yet. `TaskSummary.sla` is filled (start date, elapsed working days, colour, due date, rule set version). `PipelineNode` gates carry the calculated gate date, the Change Control shift and the lock reasons. Holiday, weekend-day and SLA rule-set changes recalculate the due dates of open tasks only.
+    - 0.4.2 (2026-10-29): roles are flat (`parent_role_id` and `sub_roles` removed from Role, `parent_role_id` accepted only as null on create); `Problem.count` and `Problem.scope` for `open_snags`, which now blocks CW PAC/FAC on open CW snags and TE PAC/FAC on open TE snags of the site.
+    - 0.4.1 (2026-10-29): additive. The Sites module is the **Site Register** (سجل المواقع) and has streams (جزئية): `stream` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks`, `SiteListItem.streams` (`StreamStatus`), `Stream`, `stage.stream_code` and `streams` in the task grid, `TaskSummary.stream_code`; `TransitionResult.votes_missing` and `returned_to_level` (owner decision 2026-10-29, workflow engine).
+    - 0.4.0 (2026-10-28): additive. Departments and the direct manager (`GET/POST /departments`, `PATCH /departments/{department_id}`, `PUT /users/{user_id}/org`, `User.manager` and `User.department`); messages between an employee and their direct manager (`/messages/...`); announcements with an agree / disagree answer (`/announcements/...`, `GET /me/announcements/pending`) (ADR 0013).
+    - 0.3.1 (2026-10-28): `UserPickerItem.employee_id` may be null (a local account created without an employee ID).
+    - 0.3.0 (2026-10-28): additive. Local sign-in with a password, for accounts created in the PMIS (owner decision 2026-10-28, ADR 0012): `POST /auth/local/login`, `POST /auth/local/password`, `POST /auth/local/step-up`, `POST /users` (create a local user with a temporary password), `POST /users/{user_id}/password-reset`; `Session.auth_method` and `must_change_password`; `User.phone`, `local_sign_in`, `must_change_password`; `Problem.step_up_method`; error codes `invalid_credentials`, `password_change_required`, `weak_password`. Microsoft 365 sign-in stays in the contract and is added later beside it.
     - 0.2.6 (2026-10-26): SLA rule sets and weight sets can be written and published (draft, preview, publish with effective date, reason and step-up, versions list); re-run of Project Status with an older weight set by id; enumerated export column codes for sites and tasks; required `reason` on `POST /settings/holidays/import` (not additive, see ADR 0011 amendment 0.2.6).
     - 0.2.5 (2026-10-26): additive. Phase 3b gaps (delegation to role or group, export column codes, `POST /tasks/{task_id}/act-on-behalf`) and admin additions: notification policy and catalogue, security log, log integrity, active sessions and revoke, log retention, `confirm_text` on dangerous actions, `last_admin` documented, and user soft delete and restore (B14) (ADR 0011).
     - 0.2.4 (2026-10-25): additive. `TaskSummary.lock_reasons`, `GET /tasks/{task_id}/slots`, `ImportBatch.site_id` and a described `task_id` on the template upload (ADR 0011).
@@ -66,6 +75,12 @@ security:
   - cookieAuth: []
     csrfHeader: []
 tags:
+  - name: messages
+    description: "Threads between an employee and their direct manager; a System Admin may write to anyone (ADR 0013)."
+  - name: announcements
+    description: "Announcements to everyone or to chosen users, groups, roles and departments, answered agree or disagree (ADR 0013)."
+  - name: departments
+    description: "Admin-managed list of departments (ADR 0013)."
   - name: auth
     description: Sign-in, session, employee-ID link, step-up and break-glass (ADR 0002).
   - name: me
@@ -75,7 +90,7 @@ tags:
   - name: assignments
     description: Many-to-many role assignments, by role or by person, in bulk (AU-10..AU-13).
   - name: roles
-    description: Admin-defined roles and sub-roles.
+    description: "Admin-defined roles. Roles are flat (owner decision 2026-10-29), with no main/sub-role split."
   - name: permissions
     description: Permission grid, profiles and field-level rules (ADR 0003).
   - name: groups
@@ -85,7 +100,7 @@ tags:
   - name: regions
     description: The 7 regions.
   - name: sites
-    description: Site list with filters and mini rail, site detail and task grid.
+    description: "Site Register (سجل المواقع): site list with filters, mini rail and streams (جزئية), site detail and task grid. A stream groups stages (default DESIGN_ACQ: stage 1; CW: stages 2-4; TE: stages 5-8; CLOSURE: stages 9-10; a configurable mapping stage -> stream that is part of the workflow version)."
   - name: tasks
     description: Task detail, data entry, workflow actions, comments, files (ADR 0004).
   - name: approvals
@@ -310,6 +325,465 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
+  /auth/local/login:
+    post:
+      tags: [auth]
+      operationId: localLogin
+      summary: Sign in with an identifier and a password (local account, ADR 0012)
+      description: |
+        `identifier` is a 4-digit employee ID, an email or an E.164 phone, like the one sign-in box. Every failure answers the
+        same 401 `invalid_credentials` with the same text and similar timing, whether the identifier is unknown, the password is
+        wrong, the account is locked (5 failures lock it for 15 minutes) or local sign-in is off for it, so the response never
+        tells who is registered. Rate limited per IP and per identifier (429 `rate_limited`). On success the session cookie
+        `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
+        `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
+        until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [identifier, password]
+              properties:
+                identifier: { type: string, minLength: 1, maxLength: 254 }
+                password: { type: string, format: password, minLength: 1, maxLength: 128 }
+      responses:
+        '200':
+          description: Signed in.
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/password:
+    post:
+      tags: [auth]
+      operationId: changeOwnPassword
+      summary: Change my password (required after a temporary password)
+      description: |
+        Needs the current password. Policy (422 `weak_password`, `errors[]` names the rule): 12 to 128 characters, not equal to
+        the current password, not containing the email, employee ID or phone, not in the server's list of common passwords.
+        On success the other sessions of the user end; this session stays and `must_change_password` becomes false.
+      x-db-path: auth_local_set_own_password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, format: password, maxLength: 128 }
+                new_password: { type: string, format: password, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/step-up:
+    post:
+      tags: [auth]
+      operationId: localStepUp
+      summary: Step-up for a local session (re-enter the password)
+      description: |
+        A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
+        for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
+        (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, maxLength: 128 }
+      responses:
+        '200':
+          description: Step-up recorded.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  # ------------------------------------------------------------------ departments, manager (0.4.0)
+  /departments:
+    get:
+      tags: [departments]
+      operationId: listDepartments
+      summary: Departments (any signed-in user; inactive ones only with include_inactive and admin.users view)
+      parameters:
+        - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200':
+          description: Departments, by name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Department' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [departments]
+      operationId: createDepartment
+      summary: Create a department
+      description: Needs `edit` on `users` (System Admin or an all-regions delegation). 409 `duplicate` when the code is taken.
+      x-db-path: idm_department_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DepartmentInput' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Department' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /departments/{department_id}:
+    parameters:
+      - { name: department_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [departments]
+      operationId: updateDepartment
+      summary: Rename, recode or (de)activate a department
+      description: Same rights as create. A department is never deleted; deactivating it keeps its members' link.
+      x-db-path: idm_department_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DepartmentInput' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Department' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/org:
+    parameters:
+      - $ref: '#/components/parameters/UserId'
+    put:
+      tags: [users]
+      operationId: setUserOrg
+      summary: Set a user's direct manager and department
+      description: |
+        Needs `edit` on `users` (all regions) and step-up. Admins and delegates are changed by a System Admin only.
+        The manager must be an active user and must not create a loop (422 `validation_failed`, `errors[].code` =
+        `manager_loop`). The department must be active. `null` clears either one.
+      x-step-up: true
+      x-db-path: idm_set_user_org
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [manager_id, department_id, reason]
+              properties:
+                manager_id: { type: [string, 'null'], format: uuid }
+                department_id: { type: [string, 'null'], format: uuid }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  # ------------------------------------------------------------------ messages (0.4.0)
+  /messages/contacts:
+    get:
+      tags: [messages]
+      operationId: getMessageContacts
+      summary: Who I may start a thread with
+      description: My direct manager and the people who report to me. A System Admin may write to any active user (`can_message_anyone`, use `GET /users/picker`).
+      responses:
+        '200':
+          description: Contacts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageContacts' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /messages/threads:
+    get:
+      tags: [messages]
+      operationId: listMessageThreads
+      summary: My threads, most recent activity first
+      parameters:
+        - { name: unread, in: query, schema: { type: boolean } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Threads.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    required: [unread_total]
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/MessageThreadSummary' } }
+                      unread_total: { type: integer, description: 'Threads with a message I have not read.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [messages]
+      operationId: startMessageThread
+      summary: Start a thread with my manager, one of my reports, or (System Admin) anyone
+      description: 403 `action_forbidden` when the recipient is not one of my contacts.
+      x-db-path: msg_start
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [to_user_id, subject, body]
+              properties:
+                to_user_id: { type: string, format: uuid }
+                subject: { type: string, minLength: 1, maxLength: 200 }
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /messages/threads/{thread_id}:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [messages]
+      operationId: getMessageThread
+      summary: One thread, the original message first, then the replies newest first
+      description: Only the two participants can read a thread; anyone else gets 404. Reading does not mark it read; call `POST .../read`.
+      responses:
+        '200':
+          description: Thread.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /messages/threads/{thread_id}/replies:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [messages]
+      operationId: replyToMessageThread
+      summary: Reply in a thread (participants only)
+      x-db-path: msg_reply
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        '201':
+          description: The thread with the new reply first among the replies.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessageThread' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /messages/threads/{thread_id}/read:
+    parameters:
+      - { name: thread_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [messages]
+      operationId: markMessageThreadRead
+      summary: Mark a thread read for me
+      x-db-path: msg_mark_read
+      responses:
+        '204': { description: 'Marked.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ------------------------------------------------------------------ announcements (0.4.0)
+  /announcements:
+    get:
+      tags: [announcements]
+      operationId: listAnnouncements
+      summary: Announcements I sent (a System Admin sees all), newest first, with answer counts
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Announcements.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/AnnouncementSummary' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [announcements]
+      operationId: sendAnnouncement
+      summary: Send an announcement (System Admin, or a delegation of announcements.create)
+      description: |
+        The recipients are fixed when it is sent: active users matching `all` or any of the chosen users, groups, roles
+        (an assignment valid today) and departments, never the sender. 422 `validation_failed` with `errors[].code` =
+        `no_recipients` when nobody matches. Each recipient sees it as a blocking pop-up until they answer.
+      x-db-path: ann_send
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AnnouncementInput' }
+      responses:
+        '201':
+          description: Sent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnouncementSummary' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /announcements/{announcement_id}:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: getAnnouncement
+      summary: One announcement with its audience and counts (sender or System Admin; a recipient gets the text only)
+      responses:
+        '200':
+          description: Announcement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AnnouncementDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/responses:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: listAnnouncementResponses
+      summary: Every recipient with their answer (sender or System Admin)
+      parameters:
+        - { name: decision, in: query, schema: { type: string, enum: [agree, disagree, pending] } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Responses.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/AnnouncementResponse' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/responses/export:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    get:
+      tags: [announcements]
+      operationId: exportAnnouncementResponses
+      summary: All answers as a CSV file that opens in Excel (UTF-8 with BOM); audited
+      responses:
+        '200':
+          description: 'CSV file (`Content-Disposition: attachment`).'
+          content:
+            text/csv:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /announcements/{announcement_id}/respond:
+    parameters:
+      - { name: announcement_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [announcements]
+      operationId: respondToAnnouncement
+      summary: Answer an announcement addressed to me (once)
+      description: '`disagree` needs a `note` of at least 3 characters (422 `note_required`). A second answer is 409 `duplicate`. Not addressed to me: 404.'
+      x-db-path: ann_respond
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [agree, disagree] }
+                note: { type: [string, 'null'], maxLength: 2000 }
+      responses:
+        '204': { description: 'Recorded.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /me/announcements/pending:
+    get:
+      tags: [announcements, me]
+      operationId: listMyPendingAnnouncements
+      summary: Announcements I have not answered yet, oldest first (the web app shows them as a blocking pop-up)
+      description: 'Pending and must-change-password accounts may call it too. A timer-driven call sends `X-PMIS-Live: 1`.'
+      parameters:
+        - $ref: '#/components/parameters/LivePoll'
+      responses:
+        '200':
+          description: Pending announcements.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PendingAnnouncement' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   # ------------------------------------------------------------------ me
   /me:
     get:
@@ -401,7 +875,7 @@ paths:
       parameters:
         - { name: q, in: query, description: 'Search name, email or employee ID.', schema: { type: string } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/UserStatus' } }
-        - { name: role_id, in: query, description: 'Users holding this role or sub-role (active rows).', schema: { type: string, format: uuid } }
+        - { name: role_id, in: query, description: 'Users holding this role (active rows).', schema: { type: string, format: uuid } }
         - { name: region_id, in: query, schema: { $ref: '#/components/schemas/RegionId' } }
         - { name: group_id, in: query, schema: { type: string, format: uuid } }
         - $ref: '#/components/parameters/Limit'
@@ -419,6 +893,31 @@ paths:
                       items: { type: array, items: { $ref: '#/components/schemas/User' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      operationId: createLocalUser
+      summary: Create a user who signs in with a password (local account, ADR 0012)
+      description: |
+        Needs `create` on `users` (System Admin or a delegation, all regions). The new account is `pending_assignment` until an
+        admin assigns it, like a first M365 sign-in. The server generates a temporary password when `temporary_password` is
+        omitted and returns it **once** in the response; it is never stored or shown again. The user must change it at the first
+        sign-in. Email, employee ID and phone must each be unused (409 `duplicate`, `errors[]` names the field).
+      x-db-path: idm_create_local_user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LocalUserCreate' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LocalUserCreated' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/deleted:
     get:
       tags: [users]
@@ -584,6 +1083,47 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/password-reset:
+    post:
+      tags: [users]
+      operationId: resetUserPassword
+      summary: Set a temporary password for a user (local sign-in)
+      description: |
+        Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Whoever sets a
+        password can sign in as the user, so a delegate may reset only an account with no rights yet (no current or future
+        assignment, no Entra link, not an admin or delegate); anything else is System Admin only (403 `action_forbidden`). Turns local sign-in on for the account if it was off, unlocks it, ends all its
+        sessions, and makes the user change the password at the next sign-in. Omit `temporary_password` to have the server
+        generate one; it is returned once.
+      x-step-up: true
+      x-db-path: idm_reset_local_password
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+                temporary_password: { type: string, format: password, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Reset.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [temporary_password]
+                properties:
+                  temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/assignments:
     parameters:
       - $ref: '#/components/parameters/UserId'
@@ -776,7 +1316,8 @@ paths:
     get:
       tags: [roles]
       operationId: listRoles
-      summary: Roles and sub-roles (tree)
+      summary: Roles (flat list)
+      description: One flat list in the admin's order (`sort`, then name). There is no main/sub-role nesting. Since 0.4.2 `parent_role_id` and `sub_roles` are gone from the answer.
       parameters:
         - { name: include_inactive, in: query, schema: { type: boolean, default: false } }
       responses:
@@ -793,7 +1334,8 @@ paths:
     post:
       tags: [roles]
       operationId: createRole
-      summary: Create a role or sub-role (admin)
+      summary: Create a role (admin)
+      description: Roles are flat. `parent_role_id` is deprecated in 0.4.2 and accepted only as `null`; any other value is refused with 422 `validation_failed` on `/parent_role_id`.
       x-step-up: true
       x-db-path: idm_save_role
       requestBody:
@@ -1229,7 +1771,9 @@ paths:
       tags: [sites]
       operationId: listSites
       summary: Sites with filters and the mini rail
-      description: Only sites in the caller's regions for the `sites` module are returned (RLS).
+      description: |
+        Only sites in the caller's regions for the `sites` module are returned (RLS and decision B3: each assignment counts for its own regions and modules).
+        Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
         - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
         - name: region_id
@@ -1240,6 +1784,10 @@ paths:
         - { name: stage_code, in: query, description: 'Current milestone/stage code (stable code, ADR 0010).', schema: { type: string } }
         - { name: scenario, in: query, schema: { $ref: '#/components/schemas/DeliveryScenario' } }
         - { name: overall_status, in: query, schema: { $ref: '#/components/schemas/OverallStatus' } }
+        - name: stream
+          in: query
+          description: 'Stream code (for example `CW`). Shows each site''s status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code.'
+          schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
         - { name: bucket, in: query, schema: { type: string, enum: [all, mine, late, waiting_approval, closed], default: all } }
         - { name: cluster_code, in: query, schema: { type: string } }
         - { name: delivery_batch, in: query, schema: { type: string } }
@@ -1291,6 +1839,11 @@ paths:
       tags: [sites]
       operationId: listSiteTasks
       summary: Task grid of a site, grouped by stage (site's workflow version)
+      parameters:
+        - name: stream
+          in: query
+          description: Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have.
+          schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
       responses:
         '200':
           description: Stages with their tasks.
@@ -1301,6 +1854,7 @@ paths:
                 required: [workflow_version, stages]
                 properties:
                   workflow_version: { type: integer }
+                  streams: { type: array, items: { $ref: '#/components/schemas/Stream' }, description: 'The streams of the site''s workflow version, in order.' }
                   stages:
                     type: array
                     items:
@@ -1308,6 +1862,7 @@ paths:
                       required: [code, name_en, tasks]
                       properties:
                         code: { type: string }
+                        stream_code: { type: [string, 'null'] }
                         name_en: { type: string }
                         name_ar: { type: [string, 'null'] }
                         tasks: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
@@ -1391,6 +1946,7 @@ paths:
       summary: Submit for review (level 1 done)
       description: |
         Refused with 422 `mandatory_slots_missing` or `mandatory_fields_missing` (listing them). Freezes `levels_required`.
+        CW PAC (B13) and CW FAC (B15) are refused with 422 `open_snags` (with `count` and `scope: CW`) while any open CW snag exists on the site; TE PAC (D16) and TE FAC (D18) likewise for open TE snags (owner decision 2026-10-29). The same check applies to review and approve.
         Self-skip may carry the task further (`skipped_levels` in the result). If the chain reaches final approval, step-up is required.
       x-step-up: conditional (only when self-skip reaches final approval, or levels_required = 1)
       parameters:
@@ -1441,7 +1997,7 @@ paths:
       tags: [tasks]
       operationId: approveTask
       summary: Final approval (level N)
-      description: Refused with 422 `open_snags` for preliminary acceptances while snags are open. Under `all_members` the result shows the votes still missing.
+      description: Refused with 422 `open_snags` (with `count` and `scope`) for CW PAC (B13) and CW FAC (B15) while an open CW snag exists on the site, and for TE PAC (D16) and TE FAC (D18) while an open TE snag exists; snags of the other stream do not block. Under `all_members` the result shows the votes still missing.
       x-step-up: true
       parameters:
         - $ref: '#/components/parameters/TaskId'
@@ -1793,9 +2349,20 @@ paths:
       tags: [matrix]
       operationId: getMatrix
       summary: Responsibility Matrix for a workflow version, with self-skip preview
+      description: |
+        One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
+        dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
+        its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
+        3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+        `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
+        to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
+        for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
+        `preview` shows in advance where one person holds consecutive levels, so the level is skipped (B6), and where that reaches
+        the last level, which is a self-approval that needs step-up (B5). Needs view on `admin.matrix`, or the `matrix.edit` right.
+        The `ETag` is the matrix revision, to send back in `If-Match` on `PATCH /matrix`.
       parameters:
         - { name: workflow_version, in: query, description: 'Default = current published version.', schema: { type: integer, minimum: 1 } }
-        - { name: region_id, in: query, description: 'Show region-specific cells for this region.', schema: { $ref: '#/components/schemas/RegionId' } }
+        - { name: region_id, in: query, description: 'Also return the cells specific to this region.', schema: { $ref: '#/components/schemas/RegionId' } }
       responses:
         '200':
           description: Matrix.
@@ -1806,14 +2373,25 @@ paths:
               schema: { $ref: '#/components/schemas/Matrix' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
     patch:
       tags: [matrix]
       operationId: updateMatrix
       summary: Save changed cells and stage level counts in one step
       description: |
-        All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
-        `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+        All changes in one transaction, with step-up, `If-Match` (the matrix revision) and a reason. Needs System Admin or a
+        delegation with `matrix.edit`; a cell without `region_id` and a level count reach every region and need the right for all
+        regions, a cell with `region_id` needs it for that region. `stage_code` is a stage code of the workflow version or the
+        code of a register or Dismantle row. A used level with no holder is refused (422 `empty_cell`, `Problem.cells` lists the
+        cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
+        refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
+        level count is audited with before and after values and the reason.
+        The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+        submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
+        rejection (decision B7). The answer shows both counts per stage in `task_counts`.
       x-step-up: true
+      x-db-path: matrix_save
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -4028,6 +4606,14 @@ paths:
       - name: record_type
         in: query
         schema: {type: string}
+      - name: entity_id
+        in: query
+        description: All versions of one logical record.
+        schema: {type: string, format: uuid}
+      - name: all_versions
+        in: query
+        description: Default false = the latest version of each logical record.
+        schema: {type: boolean}
       - name: q
         in: query
         schema: {type: string}
@@ -4181,7 +4767,7 @@ paths:
       operationId: approveRegisterRecord
       summary: Approve (final level)
       description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
-      x-step-up: when the caller holds every level (self-approval, B5)
+      x-step-up: true
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -4263,6 +4849,132 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/claim:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: claimRegisterRecord
+      summary: Claim a group-held level (any one member)
+      description: The first member who acts claims the level; the others get 409 `already_claimed` (B10, as for tasks).
+      x-db-path: reg_claim_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Claimed.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/release:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: releaseRegisterRecord
+      summary: Release my claim back to the group
+      x-db-path: reg_release_record
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '200':
+          description: Released.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/history:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: getRegisterRecordHistory
+      summary: Steps of one version (timeline), including auto-skips
+      parameters:
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Steps, oldest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/RegisterRecordStep'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /registers/{register_key}/records/{record_id}/versions:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: listRegisterRecordVersions
+      summary: All versions of the logical record, newest first
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: createRegisterRecordVersion
+      summary: New version of an approved record (state `entry`)
+      description: |
+        Copies the approved version that is in force (the values filled by the approval are not copied). The approved version stays in
+        force until the new one is approved (R9, RE-03). GECOL and HLC: a new request is a new version of the site's record (Q55).
+        Needs the register row's entry holder; 409 when the record is not approved or an open version exists.
+      x-db-path: reg_new_version
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
   /document-library:
     get:
@@ -4791,7 +5503,7 @@ paths:
       tags: [forms]
       operationId: generateFormPdf
       summary: Generate the numbered PDF (template version recorded)
-      description: Takes the next number from the form's sequence. Refused with 422 `open_snags` for a PAC while any snag on the site is open. The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
+      description: Takes the next number from the form's sequence. Refused with 422 `open_snags` for a CW PAC while an open CW snag exists on the site (TE snags do not block it; a TE PAC is blocked by open TE snags the same way). The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
       x-db-path: forms_generate
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5336,7 +6048,7 @@ paths:
     get:
       tags: [qc]
       operationId: listSiteSnags
-      summary: Snags of a site (the open count drives the PAC lock)
+      summary: Snags of a site (the open count of each stream, CW or TE, drives the lock of its PAC and FAC)
       parameters:
       - name: state
         in: query
@@ -6288,7 +7000,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
-        employee_id: { type: string, pattern: '^[0-9]{4}$' }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: '0.3.1: null for a local account created without an employee ID.' }
     # ---------------------------------------------------------- common
     Problem:
       type: object
@@ -6310,10 +7022,26 @@ components:
               path: { type: string, description: 'JSON pointer or "slot:<id>" / "field:<code>".' }
               code: { type: string }
               message: { type: string }
-        step_up_url: { type: string, description: 'Present with `step_up_required`.' }
+        step_up_url: { type: string, description: 'Present with `step_up_required` on an M365 session.' }
+        step_up_method: { type: string, enum: [password, m365, totp], description: '0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.' }
         reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
+        cells:
+          type: array
+          description: '0.4.6. With `empty_cell`: the cells of levels in use that have no holder.'
+          items:
+            type: object
+            required: [stage_code, level]
+            properties:
+              stage_code: { type: string }
+              task_code: { type: [string, 'null'] }
+              level: { type: integer, minimum: 1, maximum: 3 }
+              level_kind: { type: string, enum: [entry, review, approve] }
+              region_id: { type: [integer, 'null'] }
+        count: { type: integer, description: '0.4.2. With `open_snags`: the number of open snags of the stream that block the task.' }
+        scope: { type: string, enum: [CW, TE], description: '0.4.2. With `open_snags`: the stream of the blocking snags.' }
+        existing_id: { type: string, format: uuid, description: '0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).' }
     ErrorCode:
       type: string
       enum:
@@ -6356,6 +7084,9 @@ components:
         - role_in_use
         - export_expired
         - confirmation_mismatch
+        - invalid_credentials
+        - password_change_required
+        - weak_password
         - internal_error
     PageEnvelope:
       type: object
@@ -6570,6 +7301,8 @@ components:
         needs_employee_id: { type: boolean }
         mfa: { type: boolean, description: 'The sign-in token carried `amr` = mfa.' }
         break_glass: { type: boolean }
+        auth_method: { type: string, enum: [local, m365, break_glass], description: '0.3.0. How this session signed in.' }
+        must_change_password: { type: boolean, description: '0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed.' }
         stepup_valid_until: { type: [string, 'null'], format: date-time }
         expires_at: { type: string, format: date-time }
     Me:
@@ -6640,6 +7373,11 @@ components:
             locale: { type: string, enum: [en, ar] }
             theme: { type: string, enum: [light, dark] }
             is_break_glass: { type: boolean }
+            phone: { type: [string, 'null'], description: '0.3.0. E.164; a local sign-in identifier.' }
+            local_sign_in: { type: boolean, description: '0.3.0. The account can sign in with a password.' }
+            manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: '0.4.0. Direct manager.' }
+            department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }], description: '0.4.0.' }
+            must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
@@ -6680,7 +7418,6 @@ components:
         code: { type: string }
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
-        parent_role_id: { type: [string, 'null'], format: uuid }
     Role:
       allOf:
         - $ref: '#/components/schemas/RoleRef'
@@ -6705,7 +7442,6 @@ components:
             can_hold_matrix_levels: { type: boolean }
             is_active: { type: boolean }
             active_assignment_count: { type: integer }
-            sub_roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
             version: { type: integer }
     RoleInput:
       type: object
@@ -6716,7 +7452,7 @@ components:
         name_ar: { type: string }
         description_en: { type: string }
         description_ar: { type: string }
-        parent_role_id: { type: [string, 'null'], format: uuid }
+        parent_role_id: { type: 'null', deprecated: true, description: 'Deprecated in 0.4.2 (roles are flat). Accepted only as null so older clients keep working; any other value is refused with 422.' }
         default_profile_id: { type: [string, 'null'], format: uuid }
         default_region_ids:
           oneOf:
@@ -6984,6 +7720,27 @@ components:
       properties:
         code: { type: string, description: 'Stable milestone code.' }
         state: { type: string, enum: [done, current, late, na, planned, not_in_workflow] }
+    Stream:
+      type: object
+      required: [code, name_en, sort_order]
+      properties:
+        code: { type: string, description: 'Stable code, for example DESIGN_ACQ, CW, TE, CLOSURE.' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        sort_order: { type: integer }
+    StreamStatus:
+      description: The status of one site within one stream (only the tasks and stages of that stream).
+      allOf:
+        - $ref: '#/components/schemas/Stream'
+        - type: object
+          required: [state, done_tasks, total_tasks, late_count]
+          properties:
+            state: { type: string, enum: [not_started, in_progress, done, na], description: 'na = the site has no counting task in the stream; done = all of them approved or N/A.' }
+            current_stage: { type: [string, 'null'], description: 'Code of the first stage of the stream that is not done yet; null when done or N/A.' }
+            done_tasks: { type: integer, description: 'Counting tasks approved.' }
+            total_tasks: { type: integer, description: 'Counting tasks of the stream that are not N/A.' }
+            late_count: { type: integer, description: 'Open tasks past their due date.' }
+            milestone_date: { type: [string, 'null'], format: date, description: 'Date of the milestone that closes the stream (the milestone task of its last stage) once approved.' }
     SiteListItem:
       type: object
       required: [id, site_code, name, region_id, overall_status, rail]
@@ -7001,6 +7758,7 @@ components:
         late_task_count: { type: integer }
         waiting_approval_count: { type: integer }
         rail: { type: array, items: { $ref: '#/components/schemas/RailNode' } }
+        streams: { type: array, items: { $ref: '#/components/schemas/StreamStatus' }, description: 'One entry per stream of the site''s workflow version, in order.' }
         custom: { $ref: '#/components/schemas/CustomValues' }
     PipelineNode:
       type: object
@@ -7082,6 +7840,7 @@ components:
         employee_id: { oneOf: [{ $ref: '#/components/schemas/EmployeeId' }, { type: 'null' }], description: '4-digit employee ID when `kind` is `user`; null for role and group holders.' }
         user_id: { type: string, format: uuid, description: 'Present only when `kind` is `user` (same value as `ref_id`).' }
         account_status: { $ref: '#/components/schemas/UserAccountStatus' }
+        member_count: { type: integer, minimum: 0, description: '0.4.6. In the matrix: for a role, the people with an active assignment of it; for a group, its members. Absent for users.' }
     BallInCourt:
       type: object
       required: [level, holders]
@@ -7125,6 +7884,7 @@ components:
         colour: { type: string, enum: [green, amber, red, none] }
         rule_id: { type: [string, 'null'], format: uuid }
         rule_set_version: { type: [integer, 'null'], minimum: 1, description: 'SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6).' }
+        negative: { type: boolean, description: '0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise.' }
     TaskSummary:
       type: object
       required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
@@ -7137,6 +7897,7 @@ components:
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
         stage_code: { type: string }
+        stream_code: { type: [string, 'null'] }
         state: { $ref: '#/components/schemas/TaskState' }
         current_level: { type: integer }
         levels_required: { type: integer }
@@ -7256,6 +8017,8 @@ components:
         step_ids: { type: array, items: { type: string, format: uuid } }
         skipped_levels: { type: array, items: { type: integer }, description: 'Levels auto-skipped (same holder).' }
         unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+        votes_missing: { type: integer, minimum: 1, description: 'Under `all_members`: members who have not voted yet; the level stays open. Absent when the level completed.' }
+        returned_to_level: { type: integer, minimum: 1, description: 'After a rejection: the level the task went back to (a level skipped by the same person is not a target, B6).' }
     OnBehalfKind:
       type: [string, 'null']
       enum: [system_admin, assignee, null]
@@ -7342,35 +8105,72 @@ components:
       required: [id, stage_code, level, rule, assignees]
       properties:
         id: { type: string, format: uuid }
-        stage_code: { type: string }
-        task_code: { type: [string, 'null'], description: 'null = stage default.' }
-        level: { type: integer, minimum: 1 }
-        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
-        rule: { type: string, enum: [any_one, all_members] }
+        stage_code: { type: string, description: 'The row: a stage code, or the register key of a register or Dismantle row.' }
+        task_code: { type: [string, 'null'], description: 'null = the row default; a task code = a holder override for that task.' }
+        level: { type: integer, minimum: 1, maximum: 3, description: '1 entry, 2 review, 3 approve, whatever the number of levels of the row.' }
+        level_kind: { type: string, enum: [entry, review, approve], description: '0.4.6.' }
+        used: { type: boolean, description: '0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight).' }
+        region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }], description: 'null = every region.' }
+        rule: { type: string, enum: [any_one, all_members], description: 'The Entry level is always any_one.' }
         assignees: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' } }
         skip_preview:
           type: array
           description: People who also hold the next level (level will be skipped for them).
           items: { $ref: '#/components/schemas/UserRef' }
+        updated_at: { type: [string, 'null'], format: date-time, description: '0.4.6.' }
+    MatrixSkipCase:
+      type: object
+      description: '0.4.6. One person who holds consecutive levels of a row, in the regions listed.'
+      required: [user, from_level_kind, skipped_level_kinds, self_approval, region_ids]
+      properties:
+        task_code: { type: [string, 'null'], description: 'null = the row default; a task code = the override cells of that task.' }
+        user: { $ref: '#/components/schemas/UserRef' }
+        from_level_kind: { type: string, enum: [entry, review], description: 'The level the person acts at.' }
+        skipped_level_kinds: { type: array, items: { type: string, enum: [review, approve] }, description: 'The levels skipped after it, in order. Each skip is logged (B6).' }
+        self_approval: { type: boolean, description: 'True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log.' }
+        region_ids: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: 'Regions where this holds (only regions the caller can see).' }
+    MatrixPreview:
+      type: object
+      description: '0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`.'
+      required: [single_level, skips]
+      properties:
+        single_level: { type: boolean, description: 'The row has one level: every submission by its Entry holders is a self-approval (B5).' }
+        skips: { type: array, items: { $ref: '#/components/schemas/MatrixSkipCase' } }
+    MatrixTaskCounts:
+      type: object
+      description: '0.4.6. Open tasks of a stage in the caller''s regions, for the level-count change (decision B7). Tasks with their own level count are left out of `not_submitted`.'
+      required: [not_submitted, in_flight]
+      properties:
+        not_submitted: { type: integer, minimum: 0, description: 'Not yet submitted (locked, open or in entry before the first submission): they follow the current level count.' }
+        in_flight: { type: integer, minimum: 0, description: 'Submitted at least once and not finished: they keep the level path frozen at their first submission.' }
+    MatrixRowKey:
+      type: string
+      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).'
+      enum: [procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
     Matrix:
       type: object
       required: [workflow_version, stages, version]
       properties:
         workflow_version: { type: integer }
-        version: { type: integer, description: 'Matrix revision (ETag).' }
+        version: { type: integer, description: 'Matrix revision (ETag). Rises with every saved change, in any workflow version.' }
         stages:
           type: array
+          description: 'Stage rows in workflow order, then the register rows, then Dismantle.'
           items:
             type: object
             required: [code, name_en, approval_levels, cells]
             properties:
               kind: { type: string, enum: [stage, register, dismantle], default: stage, description: 'Register and Dismantle rows (B11); `code` is then the register key.' }
-              register_key: { oneOf: [{ $ref: '#/components/schemas/RegisterKey' }, { type: 'null' }] }
+              register_key: { oneOf: [{ $ref: '#/components/schemas/MatrixRowKey' }, { type: 'null' }] }
               code: { type: string }
               name_en: { type: string }
               name_ar: { type: [string, 'null'] }
               approval_levels: { type: integer, minimum: 1, maximum: 3 }
-              cells: { type: array, items: { $ref: '#/components/schemas/MatrixCell' } }
+              used_levels: { type: array, items: { type: integer, minimum: 1, maximum: 3 }, description: '0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3].' }
+              region_ids_with_cells: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: '0.4.6. Regions that have cells of their own in this row (visible regions only).' }
+              task_counts: { $ref: '#/components/schemas/MatrixTaskCounts' }
+              preview: { $ref: '#/components/schemas/MatrixPreview' }
+              cells: { type: array, items: { $ref: '#/components/schemas/MatrixCell' }, description: 'The row default of each level first, then the task and region cells.' }
     MatrixPatch:
       type: object
       required: [reason]
@@ -7383,7 +8183,7 @@ components:
             type: object
             required: [stage_code, approval_levels]
             properties:
-              stage_code: { type: string }
+              stage_code: { type: string, description: 'A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6).' }
               approval_levels: { type: integer, minimum: 1, maximum: 3 }
         cells:
           type: array
@@ -7391,9 +8191,9 @@ components:
             type: object
             required: [stage_code, level, rule, assignees]
             properties:
-              stage_code: { type: string }
-              task_code: { type: [string, 'null'] }
-              level: { type: integer, minimum: 1, maximum: 3 }
+              stage_code: { type: string, description: 'A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6).' }
+              task_code: { type: [string, 'null'], description: 'Only for stage rows: a holder override for one task of the stage.' }
+              level: { type: integer, minimum: 1, maximum: 3, description: '1 entry, 2 review, 3 approve.' }
               region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
               rule: { type: string, enum: [any_one, all_members] }
               assignees:
@@ -7620,7 +8420,7 @@ components:
       type: string
       minLength: 1
       maxLength: 60
-      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
+      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
     SlaRuleOverride:
       type: object
       description: 'A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule).'
@@ -7910,11 +8710,156 @@ components:
             lookup: { type: object, additionalProperties: true }
 
     # ================================================================ v0.2 additions
+    Department:
+      type: object
+      required: [id, code, name_en, is_active]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, pattern: '^[A-Z0-9_]{2,20}$' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        member_count: { type: integer }
+    DepartmentInput:
+      type: object
+      additionalProperties: false
+      required: [code, name_en, reason]
+      properties:
+        code: { type: string, pattern: '^[A-Za-z0-9_]{2,20}$', description: 'Stored in upper case.' }
+        name_en: { type: string, minLength: 1, maxLength: 120 }
+        name_ar: { type: [string, 'null'], maxLength: 120 }
+        is_active: { type: boolean }
+        reason: { $ref: '#/components/schemas/Reason' }
+    DepartmentRef:
+      type: object
+      required: [id, code, name_en]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+    MessageContacts:
+      type: object
+      required: [manager, reports, can_message_anyone]
+      properties:
+        manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        reports: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        can_message_anyone: { type: boolean }
+    MessageThreadSummary:
+      type: object
+      required: [id, subject, other, last_message_at, unread]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        other: { $ref: '#/components/schemas/UserRef' }
+        started_by_me: { type: boolean }
+        last_message_at: { type: string, format: date-time }
+        last_message_preview: { type: string, maxLength: 140 }
+        last_author: { $ref: '#/components/schemas/UserRef' }
+        reply_count: { type: integer }
+        unread: { type: boolean }
+    MessageItem:
+      type: object
+      required: [id, author, body, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        author: { $ref: '#/components/schemas/UserRef' }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+    MessageThread:
+      type: object
+      required: [id, subject, participants, original, replies]
+      properties:
+        id: { type: string, format: uuid }
+        subject: { type: string }
+        participants: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+        original: { $ref: '#/components/schemas/MessageItem' }
+        replies: { type: array, description: 'Newest first.', items: { $ref: '#/components/schemas/MessageItem' } }
+        last_read_at: { type: [string, 'null'], format: date-time, description: 'My last read time; replies after it are new.' }
+    AnnouncementAudience:
+      type: object
+      additionalProperties: false
+      properties:
+        all: { type: boolean, default: false }
+        user_ids: { type: array, maxItems: 500, items: { type: string, format: uuid } }
+        group_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        role_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+        department_ids: { type: array, maxItems: 100, items: { type: string, format: uuid } }
+    AnnouncementInput:
+      type: object
+      additionalProperties: false
+      required: [title, body, audience]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        body: { type: string, minLength: 1, maxLength: 5000 }
+        audience: { $ref: '#/components/schemas/AnnouncementAudience' }
+    AnnouncementSummary:
+      type: object
+      required: [id, title, created_at, created_by, recipient_count, agree_count, disagree_count, pending_count]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        recipient_count: { type: integer }
+        agree_count: { type: integer }
+        disagree_count: { type: integer }
+        pending_count: { type: integer }
+    AnnouncementDetail:
+      allOf:
+        - $ref: '#/components/schemas/AnnouncementSummary'
+        - type: object
+          required: [body, audience]
+          properties:
+            body: { type: string }
+            audience:
+              type: object
+              properties:
+                all: { type: boolean }
+                users: { type: array, items: { $ref: '#/components/schemas/UserRef' } }
+                groups: { type: array, items: { $ref: '#/components/schemas/GroupRef' } }
+                roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
+                departments: { type: array, items: { $ref: '#/components/schemas/DepartmentRef' } }
+    AnnouncementResponse:
+      type: object
+      required: [user, decision]
+      properties:
+        user: { $ref: '#/components/schemas/UserRef' }
+        department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }] }
+        decision: { type: string, enum: [agree, disagree, pending] }
+        note: { type: [string, 'null'] }
+        responded_at: { type: [string, 'null'], format: date-time }
+    PendingAnnouncement:
+      type: object
+      required: [id, title, body, created_at, created_by]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        body: { type: string }
+        created_at: { type: string, format: date-time }
+        created_by: { $ref: '#/components/schemas/UserRef' }
     WithReason:
       type: object
       required: [reason]
       properties:
         reason: { $ref: '#/components/schemas/Reason' }
+    LocalUserCreate:
+      type: object
+      additionalProperties: false
+      required: [display_name, email, reason]
+      properties:
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        email: { type: string, format: email, maxLength: 254 }
+        employee_id: { oneOf: [{ $ref: '#/components/schemas/EmployeeId' }, { type: 'null' }] }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$', description: 'E.164, for example +218911234567.' }
+        temporary_password: { type: string, format: password, minLength: 12, maxLength: 128, description: 'Omit to have the server generate one.' }
+        reason: { $ref: '#/components/schemas/Reason' }
+    LocalUserCreated:
+      type: object
+      required: [user, temporary_password]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
     # ---------------------------------------------------------- staff registry
     StaffField:
       type: string
@@ -8340,6 +9285,7 @@ components:
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         in_list: { type: boolean }
         is_custom: { type: boolean }
+        section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
         options:
           type: array
           items:
@@ -8385,11 +9331,50 @@ components:
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
-        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void] } }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version] } }
+        entity_id: { type: string, format: uuid, description: 'The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.' }
+        version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
+        supersedes_id: { type: [string, 'null'], format: uuid }
+        is_current: { type: boolean, description: 'The approved version that is in force.' }
+        task:
+          type: object
+          description: 'Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task''s Matrix row, and the final approval fills the task''s date and approves it.'
+          required: [id, task_code]
+          properties:
+            id: { type: string, format: uuid }
+            task_code: { type: string }
+        self_approval: { type: boolean }
+        approved_by: { $ref: '#/components/schemas/UserRef' }
+        approved_at: { type: [string, 'null'], format: date-time }
+        source: { type: string, enum: [manual, template] }
+        last_transition:
+          type: object
+          description: Present on the answer of a transition (submit, review, approve, reject, claim, release).
+          properties:
+            step_ids: { type: array, items: { type: string, format: uuid } }
+            skipped_levels: { type: array, items: { type: integer } }
+            unlocked_task_ids: { type: array, items: { type: string, format: uuid } }
+            votes_missing: { type: integer }
+            returned_to_level: { type: integer }
         created_by: { $ref: '#/components/schemas/UserRef' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
-        version: { type: integer }
+        version: { type: integer, description: 'ETag (If-Match).' }
+    RegisterRecordStep:
+      type: object
+      required: [id, level, action, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        level: { type: integer }
+        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void] }
+        acted_by: { $ref: '#/components/schemas/UserRef' }
+        note: { type: [string, 'null'] }
+        before_state: { $ref: '#/components/schemas/RegisterRecordState' }
+        after_state: { $ref: '#/components/schemas/RegisterRecordState' }
+        self_approval: { type: boolean }
+        stepup_verified: { type: boolean }
+        batch_row_id: { type: [string, 'null'], format: uuid, description: 'Set when the version came from a template batch.' }
+        created_at: { type: string, format: date-time }
     RegisterRecordInput:
       type: object
       required: [data]

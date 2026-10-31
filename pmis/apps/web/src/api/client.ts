@@ -31,7 +31,11 @@ let csrf = '';
 let stepUpHandler: StepUpHandler | null = null;
 let pendingStepUp: Promise<boolean> | null = null;
 
+let passwordChangeHandler: (() => void) | null = null;
+
 export const setCsrfToken = (t: string) => { csrf = t; };
+/** Called on any 403 `password_change_required`; the app shows the change-password screen. */
+export const setPasswordChangeHandler = (h: (() => void) | null) => { passwordChangeHandler = h; };
 export const setStepUpHandler = (h: StepUpHandler | null) => { stepUpHandler = h; };
 
 // IDs from the URL or the server are interpolated into paths: refuse anything that could walk to another endpoint.
@@ -91,6 +95,7 @@ export async function request<T>(method: string, path: string, opts: RequestOpti
     pendingStepUp ??= stepUpHandler(problem).finally(() => { pendingStepUp = null; });
     if (await pendingStepUp) return request<T>(method, path, opts, true);
   }
+  if (res.status === 403 && problem.code === 'password_change_required') passwordChangeHandler?.();
   throw new ApiError(res.status, problem);
 }
 

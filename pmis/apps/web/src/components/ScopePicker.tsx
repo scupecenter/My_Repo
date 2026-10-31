@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useCatalogue } from '@/api/admin';
 
 export type Scope = 'all' | string[];
 /** "All" or a set of values (regions as numbers, modules as keys). Used by assignment dialogs. */
@@ -21,3 +22,11 @@ export function ScopePicker<T extends string | number>({ id, label, options, val
 }
 
 export const MODULES = ['sites', 'approvals', 'my_work', 'dashboard', 'procurement', 'warehouse', 'quality', 'issues', 'risks', 'reports'];
+
+/** Module choices for assignments and role defaults: the top-level modules of the server catalogue, named from the locale file when it has the key. */
+export function useModuleOptions(): [string, string][] {
+  const { t, i18n } = useTranslation();
+  const cat = useCatalogue();
+  const list: { key: string; name_en: string; name_ar?: string }[] = cat.data?.modules ?? MODULES.map((key) => ({ key, name_en: key }));
+  return list.map((m): [string, string] => [m.key, i18n.exists(`module.${m.key}`) ? t(`module.${m.key}`) : (i18n.language === 'ar' && m.name_ar) || m.name_en]);
+}

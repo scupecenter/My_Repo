@@ -1,16 +1,11 @@
 import { expect, test } from '@playwright/test';
+import { login, stepUp } from './helpers';
 
-async function signIn(page: import('@playwright/test').Page, id: string, account: 'pm' | 'reviewer') {
-  await page.goto('/login');
-  await page.getByTestId('login-identifier').fill(id);
-  await page.getByTestId('login-submit').click();
-  await page.getByTestId(`mock-account-${account}`).click();
-}
 
 for (const locale of ['en', 'ar'] as const) {
   test(`site -> edit date -> upload -> submit -> switch account -> approve (${locale})`, async ({ page }) => {
     await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
-    await signIn(page, '1102', 'reviewer');
+    await login(page, 'reviewer');
     await page.getByTestId('nav-sites').click();
     await expect(page.getByTestId('page-sites')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('dir', locale === 'ar' ? 'rtl' : 'ltr');
@@ -36,14 +31,14 @@ for (const locale of ['en', 'ar'] as const) {
 
     // switch account: the Project Manager approves with step-up
     await page.getByTestId('topbar-signout').click();
-    await signIn(page, '1001', 'pm');
+    await login(page, 'pm');
     await page.getByTestId('nav-approvals').click();
     const item = page.locator('[data-site="TR101"]');
     await expect(item).toBeVisible();
     await item.locator('[data-testid^="approval-open-"]').click();
     await expect(page.getByTestId('approval-docs')).toContainText('SAR');
-    const [popup] = await Promise.all([page.waitForEvent('popup'), page.getByTestId('approval-approve').click().then(() => page.getByTestId('stepup-continue').click())]);
-    await popup.getByTestId('mock-stepup-verify').click();
+    await page.getByTestId('approval-approve').click();
+    await stepUp(page, 'pm');
     await expect(item).toHaveCount(0);
   });
 }

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { api, ApiError, downloadFile } from '@/api/client';
 import { useDatePatch } from '@/api/sites';
 import type { SiteTasks, TaskSummary } from '@/api/types';
+import { taskErrorMessage } from '@/lib/taskErrors';
 import { Holders } from './HolderChip';
 import { useToast } from './Toast';
 import { useVirtual } from './useVirtual';
@@ -92,7 +93,7 @@ export function TaskGrid({ siteId, stages, onOpen }: { siteId: string; stages: S
     const field = COLS[edit.col] as 'planned_date' | 'actual_date', val = draft.trim();
     if (val && !isIso(val)) { setBad(true); return; }
     if ((val || null) !== (task[field] ?? null)) {
-      patch.mutate({ task, patch: { [field]: val || null } }, { onError: (e) => toast(e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.status === 403 ? t('errors.forbidden') : t('errors.generic'), 'err') });
+      patch.mutate({ task, patch: { [field]: val || null } }, { onError: (e) => { const m = taskErrorMessage(t, e); if (m) toast(m, 'err'); } });
     }
     stop();
   };

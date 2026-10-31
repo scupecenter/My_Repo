@@ -20,6 +20,7 @@ export type PipelineNode = S['PipelineNode'];
 export type DocumentSlot = S['DocumentSlot'];
 export type DocumentFile = S['DocumentFile'];
 export type WorkflowStep = S['WorkflowStep'];
+export type RegisterRecordStep = S['RegisterRecordStep'];
 export type Comment = S['Comment'];
 export type Matrix = S['Matrix'];
 export type MatrixCell = S['MatrixCell'];
@@ -30,7 +31,10 @@ export type Group = S['Group'];
 export type UserPickerItem = S['UserPickerItem'];
 export type TaskEntryPatch = S['TaskEntryPatch'];
 export type AllowedAction = S['AllowedAction'];
-export type SiteTasks = { workflow_version: number; stages: { code: string; name_en: string; name_ar?: string | null; tasks: TaskSummary[] }[] };
+export type Stream = S['Stream'];
+export type StreamStatus = S['StreamStatus'];
+/** `GET /sites/{id}/tasks`: `streams` are the streams of the site's workflow version; each stage carries its `stream_code`. */
+export type SiteTasks = { workflow_version: number; streams?: Stream[]; stages: { code: string; stream_code?: string | null; name_en: string; name_ar?: string | null; tasks: TaskSummary[] }[] };
 export type BallInCourt = S['BallInCourt'];
 export type LockReason = S['LockReason'];
 export type User = S['User'];
@@ -112,3 +116,37 @@ export type SitesExportColumnCode = S['SitesExportColumnCode'];
 export type TasksExportColumnCode = S['TasksExportColumnCode'];
 export type WorkflowMilestone = S['WorkflowMilestone'];
 export type WorkflowGate = S['WorkflowGate'];
+export type LocalUserCreate = S['LocalUserCreate'];
+export type LocalUserCreated = S['LocalUserCreated'];
+
+// ---- contract 0.4.0
+export type Department = S['Department'];
+export type DepartmentInput = S['DepartmentInput'];
+export type DepartmentRef = S['DepartmentRef'];
+export type MessageContacts = S['MessageContacts'];
+export type MessageThreadSummary = S['MessageThreadSummary'];
+export type MessageItem = S['MessageItem'];
+export type MessageThread = S['MessageThread'];
+export type AnnouncementAudience = S['AnnouncementAudience'];
+export type AnnouncementInput = S['AnnouncementInput'];
+export type AnnouncementSummary = S['AnnouncementSummary'];
+export type AnnouncementDetail = S['AnnouncementDetail'];
+export type AnnouncementResponse = S['AnnouncementResponse'];
+export type PendingAnnouncement = S['PendingAnnouncement'];
+export type PermissionCatalogue = S['PermissionCatalogue'];
+export type PermissionProfileInput = S['PermissionProfileInput'];
+export type RoleInput = S['RoleInput'];
+export type RolePatch = S['RolePatch'];
+
+// ---- registers (B11) and template import
+export type RegisterKey = S['RegisterKey'];
+export type RegisterField = S['RegisterField'];
+export type RegisterDefinition = S['RegisterDefinition'];
+export type RegisterRecord = S['RegisterRecord'];
+export type RegisterRecordState = S['RegisterRecordState'];
+export type RegisterRecordInput = S['RegisterRecordInput'];
+export type RegisterRecordPatch = S['RegisterRecordPatch'];
+export type Template = S['Template'];
+export type ImportBatch = S['ImportBatch'];
+export type ImportRow = S['ImportRow'];
+export type ImportDecisionRequest = S['ImportDecisionRequest'];

@@ -24,7 +24,8 @@ Precedence when sources disagree: CLAUDE.md (newest owner decisions) > Master fo
 
 ### 2.1 Milestones
 - There are 10 milestones in a fixed order: Site Release (V), PRE-CW Completion (AW), CW Completion (BP), Site RFI (BZ), TE Completion (CU), On-Air (DP), TE PAC (EL), KPI Acceptance (ES), HOTO (EY), Final Closure (FM). Each one has a baseline column next to it: U, AV, BO, BY, CT, DO, EK, ER, EX, FL. (CLAUDE.md; BP §17; Master row 2.)
-- A milestone is calculated and never typed. It appears when its gate is open and all of its conditions are met, and it equals the latest of the condition dates. (BP §03)
+- A milestone is calculated and never typed. It appears when its gate is open and all of its conditions are met, and it equals the latest of the condition dates and the gate date. (BP §03; owner answer Q76: no milestone stays blank when its conditions are earlier than its gate, unlike the Master BP, CU, DP, EL, ES, EY and FM.)
+- A gate locks the tasks of the next stage until it opens (permits valid, no stop work, no suspension), except the tasks listed in the setting `calc.gate_lock_exempt_tasks` (seed: the GECOL and HLC tasks C1 to C4, which run in parallel with civil works). A gate that closes again does not re-lock the tasks that are already open: it raises an alert to the System Admins and the stage lead. (Owner answer Q81.)
 - The derivation of each milestone is in the `notes` column of the `milestone` rows in `task-catalogue.csv`, copied from the Master formula in row 5 of the named column.
 - Exception (CLAUDE.md): **Site RFI** works like a task. Its date field unlocks when the BZ conditions are met. It is pre-filled with the latest condition date and can be edited. It then goes through review and approval. It has no document. Its approved value is the MS4 date.
   - ASSUMPTION: the edited date may not be earlier than the RFI Readiness gate (BQ). This follows the `>= gate` pattern used in BP, CU, DP, EL and EY.
@@ -40,10 +41,10 @@ The 9 gates are W, AX, BQ, CA, CV, DQ, EM, ET and EZ (BP §21; Master row 2).
 | Gate | Opens from | Extra conditions (Master) | N/A when |
 |---|---|---|---|
 | G2 Pre-CW Readiness (W) | MS1 | none | never |
-| G3 CW Readiness (AX) | MS2 | MAX with: the first approved Access - CW Valid From, and the first PTW - CW HSE Valid Date. Each permit is also satisfied by an approved N/A (with reason and approver, D36). The gate stays blank while a PTW - CW Stop Work is active. | CW N/A |
+| G3 CW Readiness (AX) | MS2 | MAX with: the first approved Access - CW Valid From, and the first PTW - CW HSE Valid Date. Each permit is also satisfied by an approved N/A (with reason and approver, D36). The gate stays blank while a PTW - CW Stop Work is active. The PTW HSE checks are information only and are not evaluated (owner answer Q78). | CW N/A |
 | G4 RFI Readiness (BQ) | MS3 if CW applies, else MS2 | none | RFI N/A |
 | G5 TE Installation Readiness (CA) | MS4, or MS1 where RFI is N/A | MAX with: the first approved Access - TE Valid From, and the first PTW - TE HSE Valid Date (an approved N/A is accepted) | TE N/A |
-| G6 On-Air Readiness (CV) | MS5 | MAX with: Commissioning Power Safe Date (Readiness & Handover). The gate stays blank until it exists. | never (follows MS5) |
+| G6 On-Air Readiness (CV) | MS5 | No extra condition (owner answer Q77): Commissioning Power Safe stays a yes/no field in Readiness & Handover and does not hold the gate. | never (follows MS5) |
 | G7 TE PAC Readiness (DQ) | MS6 | Blank while a PTW - TE Stop Work is active | never |
 | G8 Cluster Optimization Readiness (EM) | MS7 of the site itself | none | never |
 | G9 HOTO Readiness (ET) | MS8 | none | never |
@@ -291,6 +292,6 @@ Source: BP §06 level 4. The factors are progress, baseline adherence, SLA adher
   - Either Approved and valid on the gate date, or N/A for this site with a reason and an approver.
   - A permit type with Has Expiry blank is treated as not valid.
   - Alert 30 calendar days before expiry (Setting "Expiring alert").
-- **Preliminary acceptance and snags (CLAUDE.md, D54):** CW PAC and TE PAC cannot be approved while any snag on the site is open. The lock reason shows the count.
+- **Acceptances and snags (owner decision 2026-10-29, Q25 and E6):** an acceptance cannot be submitted or approved while an open snag of its own stream exists on the site. Open CW snags (`snags.scope = 'CW'`) block CW PAC (B13) and CW FAC (B15); open TE snags (`scope = 'TE'`) block TE PAC (D16) and TE FAC (D18). Snags of the other stream do not block. Any snag on the site counts, whether or not it is linked to the task. The snag types with `blocks_preliminary_acceptance = false` are ignored. The lock reason and the 422 `open_snags` carry the count.
 - **Seeds:** `entry_role` in the catalogue is the default Responsibility Matrix seed. The stage owner comes from BP §03 and §14. The sub-role choice is an ASSUMPTION, editable in the Matrix.
 - **Template IDs:** `TPL-*` codes follow the synthetic prototype (`design/prototype-v2/data.js`). They are ASSUMPTIONS until the Templates page issues the real IDs.

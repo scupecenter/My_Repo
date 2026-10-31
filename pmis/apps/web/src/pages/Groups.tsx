@@ -24,7 +24,7 @@ export function Groups() {
   return (
     <div data-testid="page-groups">
       <div className="mb-4 flex items-center gap-3">
-        <div className="me-auto"><h1 className="text-2xl font-bold">{t('groups.title')}</h1><p className="text-mute">{t('groups.subtitle')}</p></div>
+        <div className="me-auto"><h2 className="text-lg font-bold">{t('groups.title')}</h2><p className="text-mute">{t('groups.subtitle')}</p></div>
         <button className="btn btn-accent" data-testid="group-new" onClick={() => setDlg('new')}><Plus size={16} />{t('groups.new')}</button>
       </div>
       <div className="grid gap-4 md:grid-cols-[260px_1fr]">

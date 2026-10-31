@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { login } from './helpers';
 import path from 'node:path';
 
 // Run with: SHOTS=1 npx playwright test e2e/screenshots3b.spec.ts
@@ -10,8 +11,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
     const shot = async (name: string) => { await page.waitForTimeout(500); await page.screenshot({ path: `${OUT}/${name}-${locale}-${theme}.png`, fullPage: true }); };
     await page.goto('/login');
-    await page.getByTestId('login-submit').click();
-    await page.getByTestId('mock-account-pm').click();
+    await login(page, 'pm');
 
     await page.getByTestId('nav-admin.settings').click();
     await page.getByTestId('holiday-2026-11-03').waitFor();
@@ -33,7 +33,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('integrity-result-security').waitFor();
     await shot('security-log');
 
-    await page.getByTestId('nav-admin.online').click();
+    await page.getByTestId('nav-admin.users').click(); await page.getByTestId('users-tab-online').click();
     await page.getByTestId('session-own').waitFor();
     await shot('online-now');
 

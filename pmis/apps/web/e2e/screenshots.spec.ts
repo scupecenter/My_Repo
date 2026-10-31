@@ -1,4 +1,5 @@
 import { test } from '@playwright/test';
+import { login } from './helpers';
 import path from 'node:path';
 
 // Run with: SHOTS=1 npx playwright test e2e/screenshots.spec.ts
@@ -10,9 +11,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
     await page.goto('/login');
     await page.screenshot({ path: `${OUT}/login-${locale}-${theme}.png` });
-    await page.getByTestId('login-identifier').fill('1001');
-    await page.getByTestId('login-submit').click();
-    await page.getByTestId('mock-account-pm').click();
+    await login(page, 'pm');
     await page.getByTestId('my-work-count-do_now').waitFor();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/my-work-${locale}-${theme}.png` });
@@ -35,7 +34,7 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/task-drawer-${locale}-${theme}.png` });
     await page.keyboard.press('Escape');
-    await page.getByTestId('nav-admin.matrix').click();
+    await page.getByTestId('nav-admin.users').click(); await page.getByTestId('people-tab-matrix').click();
     await page.getByTestId('matrix-row-site_release').waitFor();
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/matrix-${locale}-${theme}.png` });

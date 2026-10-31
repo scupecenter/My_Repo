@@ -162,6 +162,366 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/local/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in with an identifier and a password (local account, ADR 0012)
+         * @description `identifier` is a 4-digit employee ID, an email or an E.164 phone, like the one sign-in box. Every failure answers the
+         *     same 401 `invalid_credentials` with the same text and similar timing, whether the identifier is unknown, the password is
+         *     wrong, the account is locked (5 failures lock it for 15 minutes) or local sign-in is off for it, so the response never
+         *     tells who is registered. Rate limited per IP and per identifier (429 `rate_limited`). On success the session cookie
+         *     `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
+         *     `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
+         *     until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+         */
+        post: operations["localLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my password (required after a temporary password)
+         * @description Needs the current password. Policy (422 `weak_password`, `errors[]` names the rule): 12 to 128 characters, not equal to
+         *     the current password, not containing the email, employee ID or phone, not in the server's list of common passwords.
+         *     On success the other sessions of the user end; this session stays and `must_change_password` becomes false.
+         */
+        post: operations["changeOwnPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/step-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Step-up for a local session (re-enter the password)
+         * @description A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
+         *     for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
+         *     (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+         */
+        post: operations["localStepUp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Departments (any signed-in user; inactive ones only with include_inactive and admin.users view) */
+        get: operations["listDepartments"];
+        put?: never;
+        /**
+         * Create a department
+         * @description Needs `edit` on `users` (System Admin or an all-regions delegation). 409 `duplicate` when the code is taken.
+         */
+        post: operations["createDepartment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/departments/{department_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                department_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, recode or (de)activate a department
+         * @description Same rights as create. A department is never deleted; deactivating it keeps its members' link.
+         */
+        patch: operations["updateDepartment"];
+        trace?: never;
+    };
+    "/users/{user_id}/org": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set a user's direct manager and department
+         * @description Needs `edit` on `users` (all regions) and step-up. Admins and delegates are changed by a System Admin only.
+         *     The manager must be an active user and must not create a loop (422 `validation_failed`, `errors[].code` =
+         *     `manager_loop`). The department must be active. `null` clears either one.
+         */
+        put: operations["setUserOrg"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/contacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Who I may start a thread with
+         * @description My direct manager and the people who report to me. A System Admin may write to any active user (`can_message_anyone`, use `GET /users/picker`).
+         */
+        get: operations["getMessageContacts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/threads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My threads, most recent activity first */
+        get: operations["listMessageThreads"];
+        put?: never;
+        /**
+         * Start a thread with my manager, one of my reports, or (System Admin) anyone
+         * @description 403 `action_forbidden` when the recipient is not one of my contacts.
+         */
+        post: operations["startMessageThread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/threads/{thread_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One thread, the original message first, then the replies newest first
+         * @description Only the two participants can read a thread; anyone else gets 404. Reading does not mark it read; call `POST .../read`.
+         */
+        get: operations["getMessageThread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/threads/{thread_id}/replies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reply in a thread (participants only) */
+        post: operations["replyToMessageThread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/messages/threads/{thread_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a thread read for me */
+        post: operations["markMessageThreadRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/announcements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Announcements I sent (a System Admin sees all), newest first, with answer counts */
+        get: operations["listAnnouncements"];
+        put?: never;
+        /**
+         * Send an announcement (System Admin, or a delegation of announcements.create)
+         * @description The recipients are fixed when it is sent: active users matching `all` or any of the chosen users, groups, roles
+         *     (an assignment valid today) and departments, never the sender. 422 `validation_failed` with `errors[].code` =
+         *     `no_recipients` when nobody matches. Each recipient sees it as a blocking pop-up until they answer.
+         */
+        post: operations["sendAnnouncement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/announcements/{announcement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        /** One announcement with its audience and counts (sender or System Admin; a recipient gets the text only) */
+        get: operations["getAnnouncement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/announcements/{announcement_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        /** Every recipient with their answer (sender or System Admin) */
+        get: operations["listAnnouncementResponses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/announcements/{announcement_id}/responses/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        /** All answers as a CSV file that opens in Excel (UTF-8 with BOM); audited */
+        get: operations["exportAnnouncementResponses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/announcements/{announcement_id}/respond": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer an announcement addressed to me (once)
+         * @description `disagree` needs a `note` of at least 3 characters (422 `note_required`). A second answer is 409 `duplicate`. Not addressed to me: 404.
+         */
+        post: operations["respondToAnnouncement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/announcements/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Announcements I have not answered yet, oldest first (the web app shows them as a blocking pop-up)
+         * @description Pending and must-change-password accounts may call it too. A timer-driven call sends `X-PMIS-Live: 1`.
+         */
+        get: operations["listMyPendingAnnouncements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -243,7 +603,14 @@ export interface paths {
          */
         get: operations["listUsers"];
         put?: never;
-        post?: never;
+        /**
+         * Create a user who signs in with a password (local account, ADR 0012)
+         * @description Needs `create` on `users` (System Admin or a delegation, all regions). The new account is `pending_assignment` until an
+         *     admin assigns it, like a first M365 sign-in. The server generates a temporary password when `temporary_password` is
+         *     omitted and returns it **once** in the response; it is never stored or shown again. The user must change it at the first
+         *     sign-in. Email, employee ID and phone must each be unused (409 `duplicate`, `errors[]` names the field).
+         */
+        post: operations["createLocalUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -349,6 +716,30 @@ export interface paths {
          * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
          */
         post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/password-reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a temporary password for a user (local sign-in)
+         * @description Needs `edit` on `users` (all regions) and step-up. Not for yourself (use `POST /auth/local/password`). Whoever sets a
+         *     password can sign in as the user, so a delegate may reset only an account with no rights yet (no current or future
+         *     assignment, no Entra link, not an admin or delegate); anything else is System Admin only (403 `action_forbidden`). Turns local sign-in on for the account if it was off, unlocks it, ends all its
+         *     sessions, and makes the user change the password at the next sign-in. Omit `temporary_password` to have the server
+         *     generate one; it is returned once.
+         */
+        post: operations["resetUserPassword"];
         delete?: never;
         options?: never;
         head?: never;
@@ -481,10 +872,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Roles and sub-roles (tree) */
+        /**
+         * Roles (flat list)
+         * @description One flat list in the admin's order (`sort`, then name). There is no main/sub-role nesting. Since 0.4.2 `parent_role_id` and `sub_roles` are gone from the answer.
+         */
         get: operations["listRoles"];
         put?: never;
-        /** Create a role or sub-role (admin) */
+        /**
+         * Create a role (admin)
+         * @description Roles are flat. `parent_role_id` is deprecated in 0.4.2 and accepted only as `null`; any other value is refused with 422 `validation_failed` on `/parent_role_id`.
+         */
         post: operations["createRole"];
         delete?: never;
         options?: never;
@@ -720,7 +1117,8 @@ export interface paths {
         };
         /**
          * Sites with filters and the mini rail
-         * @description Only sites in the caller's regions for the `sites` module are returned (RLS).
+         * @description Only sites in the caller's regions for the `sites` module are returned (RLS and decision B3: each assignment counts for its own regions and modules).
+         *     Every item carries `streams`: the status of the site in each stream of its workflow version.
          */
         get: operations["listSites"];
         put?: never;
@@ -821,6 +1219,7 @@ export interface paths {
         /**
          * Submit for review (level 1 done)
          * @description Refused with 422 `mandatory_slots_missing` or `mandatory_fields_missing` (listing them). Freezes `levels_required`.
+         *     CW PAC (B13) and CW FAC (B15) are refused with 422 `open_snags` (with `count` and `scope: CW`) while any open CW snag exists on the site; TE PAC (D16) and TE FAC (D18) likewise for open TE snags (owner decision 2026-10-29). The same check applies to review and approve.
          *     Self-skip may carry the task further (`skipped_levels` in the result). If the chain reaches final approval, step-up is required.
          */
         post: operations["submitTask"];
@@ -858,7 +1257,7 @@ export interface paths {
         put?: never;
         /**
          * Final approval (level N)
-         * @description Refused with 422 `open_snags` for preliminary acceptances while snags are open. Under `all_members` the result shows the votes still missing.
+         * @description Refused with 422 `open_snags` (with `count` and `scope`) for CW PAC (B13) and CW FAC (B15) while an open CW snag exists on the site, and for TE PAC (D16) and TE FAC (D18) while an open TE snag exists; snags of the other stream do not block. Under `all_members` the result shows the votes still missing.
          */
         post: operations["approveTask"];
         delete?: never;
@@ -1096,7 +1495,19 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Responsibility Matrix for a workflow version, with self-skip preview */
+        /**
+         * Responsibility Matrix for a workflow version, with self-skip preview
+         * @description One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
+         *     dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
+         *     its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
+         *     3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+         *     `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
+         *     to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
+         *     for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
+         *     `preview` shows in advance where one person holds consecutive levels, so the level is skipped (B6), and where that reaches
+         *     the last level, which is a self-approval that needs step-up (B5). Needs view on `admin.matrix`, or the `matrix.edit` right.
+         *     The `ETag` is the matrix revision, to send back in `If-Match` on `PATCH /matrix`.
+         */
         get: operations["getMatrix"];
         put?: never;
         post?: never;
@@ -1105,8 +1516,16 @@ export interface paths {
         head?: never;
         /**
          * Save changed cells and stage level counts in one step
-         * @description All changes in one transaction. A used level with no assignee is refused (422 `empty_cell`). Roles with
-         *     `can_hold_matrix_levels = false` are refused. Applies to new level transitions only (MX-04).
+         * @description All changes in one transaction, with step-up, `If-Match` (the matrix revision) and a reason. Needs System Admin or a
+         *     delegation with `matrix.edit`; a cell without `region_id` and a level count reach every region and need the right for all
+         *     regions, a cell with `region_id` needs it for that region. `stage_code` is a stage code of the workflow version or the
+         *     code of a register or Dismantle row. A used level with no holder is refused (422 `empty_cell`, `Problem.cells` lists the
+         *     cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
+         *     refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
+         *     level count is audited with before and after values and the reason.
+         *     The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+         *     submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
+         *     rejection (decision B7). The answer shows both counts per stage in `task_counts`.
          */
         patch: operations["updateMatrix"];
         trace?: never;
@@ -2601,6 +3020,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/claim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Claim a group-held level (any one member)
+         * @description The first member who acts claims the level; the others get 409 `already_claimed` (B10, as for tasks).
+         */
+        post: operations["claimRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Release my claim back to the group */
+        post: operations["releaseRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /** Steps of one version (timeline), including auto-skips */
+        get: operations["getRegisterRecordHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /** All versions of the logical record, newest first */
+        get: operations["listRegisterRecordVersions"];
+        put?: never;
+        /**
+         * New version of an approved record (state `entry`)
+         * @description Copies the approved version that is in force (the values filled by the approval are not copied). The approved version stays in
+         *     force until the new one is approved (R9, RE-03). GECOL and HLC: a new request is a new version of the site's record (Q55).
+         *     Needs the register row's entry holder; 409 when the record is not approved or an open version exists.
+         */
+        post: operations["createRegisterRecordVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document-library": {
         parameters: {
             query?: never;
@@ -2909,7 +3425,7 @@ export interface paths {
         put?: never;
         /**
          * Generate the numbered PDF (template version recorded)
-         * @description Takes the next number from the form's sequence. Refused with 422 `open_snags` for a PAC while any snag on the site is open. The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
+         * @description Takes the next number from the form's sequence. Refused with 422 `open_snags` for a CW PAC while an open CW snag exists on the site (TE snags do not block it; a TE PAC is blocked by open TE snags the same way). The signed scan is then uploaded into the slot in `slot_id` and goes through the 3-level approval. Audited.
          */
         post: operations["generateFormPdf"];
         delete?: never;
@@ -3206,7 +3722,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Snags of a site (the open count drives the PAC lock) */
+        /** Snags of a site (the open count of each stream, CW or TE, drives the lock of its PAC and FAC) */
         get: operations["listSiteSnags"];
         put?: never;
         /** Raise a snag */
@@ -3623,7 +4139,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             display_name: string;
-            employee_id: string;
+            /** @description 0.3.1: null for a local account created without an employee ID. */
+            employee_id: string | null;
         };
         Problem: {
             /**
@@ -3643,16 +4160,42 @@ export interface components {
                 code: string;
                 message?: string;
             }[];
-            /** @description Present with `step_up_required`. */
+            /** @description Present with `step_up_required` on an M365 session. */
             step_up_url?: string;
+            /**
+             * @description 0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.
+             * @enum {string}
+             */
+            step_up_method?: "password" | "m365" | "totp";
             /** @description Closed-list reason; for `template_rejected` a TemplateRejectReason. */
             reason?: components["schemas"]["TemplateRejectReason"] | string;
             claimed_by?: components["schemas"]["UserRef"];
             /** @description Missing slot or field names. */
             missing?: string[];
+            /** @description 0.4.6. With `empty_cell`: the cells of levels in use that have no holder. */
+            cells?: {
+                stage_code: string;
+                task_code?: string | null;
+                level: number;
+                /** @enum {string} */
+                level_kind?: "entry" | "review" | "approve";
+                region_id?: number | null;
+            }[];
+            /** @description 0.4.2. With `open_snags`: the number of open snags of the stream that block the task. */
+            count?: number;
+            /**
+             * @description 0.4.2. With `open_snags`: the stream of the blocking snags.
+             * @enum {string}
+             */
+            scope?: "CW" | "TE";
+            /**
+             * Format: uuid
+             * @description 0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).
+             */
+            existing_id?: string;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -3877,6 +4420,13 @@ export interface components {
             /** @description The sign-in token carried `amr` = mfa. */
             mfa?: boolean;
             break_glass?: boolean;
+            /**
+             * @description 0.3.0. How this session signed in.
+             * @enum {string}
+             */
+            auth_method?: "local" | "m365" | "break_glass";
+            /** @description 0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed. */
+            must_change_password?: boolean;
             /** Format: date-time */
             stepup_valid_until?: string | null;
             /** Format: date-time */
@@ -3922,6 +4472,16 @@ export interface components {
             /** @enum {string} */
             theme?: "light" | "dark";
             is_break_glass?: boolean;
+            /** @description 0.3.0. E.164; a local sign-in identifier. */
+            phone?: string | null;
+            /** @description 0.3.0. The account can sign in with a password. */
+            local_sign_in?: boolean;
+            /** @description 0.4.0. Direct manager. */
+            manager?: components["schemas"]["UserRef"] | null;
+            /** @description 0.4.0. */
+            department?: components["schemas"]["DepartmentRef"] | null;
+            /** @description 0.3.0. A temporary password is waiting to be changed. */
+            must_change_password?: boolean;
             /** @description Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption. */
             mfa_exempt?: boolean;
             /** Format: date-time */
@@ -3962,8 +4522,6 @@ export interface components {
             code: string;
             name_en: string;
             name_ar?: string | null;
-            /** Format: uuid */
-            parent_role_id?: string | null;
         };
         Role: components["schemas"]["RoleRef"] & {
             description_en?: string | null;
@@ -3975,7 +4533,6 @@ export interface components {
             can_hold_matrix_levels: boolean;
             is_active: boolean;
             active_assignment_count?: number;
-            sub_roles?: components["schemas"]["RoleRef"][];
             version?: number;
         };
         RoleInput: {
@@ -3984,8 +4541,11 @@ export interface components {
             name_ar?: string;
             description_en?: string;
             description_ar?: string;
-            /** Format: uuid */
-            parent_role_id?: string | null;
+            /**
+             * @deprecated
+             * @description Deprecated in 0.4.2 (roles are flat). Accepted only as null so older clients keep working; any other value is refused with 422.
+             */
+            parent_role_id?: null;
             /** Format: uuid */
             default_profile_id?: string | null;
             default_region_ids?: "all" | components["schemas"]["RegionId"][];
@@ -4220,6 +4780,34 @@ export interface components {
             /** @enum {string} */
             state: "done" | "current" | "late" | "na" | "planned" | "not_in_workflow";
         };
+        Stream: {
+            /** @description Stable code, for example DESIGN_ACQ, CW, TE, CLOSURE. */
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            sort_order: number;
+        };
+        /** @description The status of one site within one stream (only the tasks and stages of that stream). */
+        StreamStatus: components["schemas"]["Stream"] & {
+            /**
+             * @description na = the site has no counting task in the stream; done = all of them approved or N/A.
+             * @enum {string}
+             */
+            state: "not_started" | "in_progress" | "done" | "na";
+            /** @description Code of the first stage of the stream that is not done yet; null when done or N/A. */
+            current_stage?: string | null;
+            /** @description Counting tasks approved. */
+            done_tasks: number;
+            /** @description Counting tasks of the stream that are not N/A. */
+            total_tasks: number;
+            /** @description Open tasks past their due date. */
+            late_count: number;
+            /**
+             * Format: date
+             * @description Date of the milestone that closes the stream (the milestone task of its last stage) once approved.
+             */
+            milestone_date?: string | null;
+        };
         SiteListItem: {
             /** Format: uuid */
             id: string;
@@ -4235,6 +4823,8 @@ export interface components {
             late_task_count?: number;
             waiting_approval_count?: number;
             rail: components["schemas"]["RailNode"][];
+            /** @description One entry per stream of the site's workflow version, in order. */
+            streams?: components["schemas"]["StreamStatus"][];
             custom?: components["schemas"]["CustomValues"];
         };
         PipelineNode: {
@@ -4318,6 +4908,8 @@ export interface components {
              */
             user_id?: string;
             account_status?: components["schemas"]["UserAccountStatus"];
+            /** @description 0.4.6. In the matrix: for a role, the people with an active assignment of it; for a group, its members. Absent for users. */
+            member_count?: number;
         };
         BallInCourt: {
             level: number;
@@ -4367,6 +4959,8 @@ export interface components {
             rule_id?: string | null;
             /** @description SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6). */
             rule_set_version?: number | null;
+            /** @description 0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise. */
+            negative?: boolean;
         };
         TaskSummary: {
             /** Format: uuid */
@@ -4379,6 +4973,7 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             stage_code: string;
+            stream_code?: string | null;
             state: components["schemas"]["TaskState"];
             current_level?: number;
             levels_required?: number;
@@ -4514,6 +5109,10 @@ export interface components {
             /** @description Levels auto-skipped (same holder). */
             skipped_levels?: number[];
             unlocked_task_ids?: string[];
+            /** @description Under `all_members`: members who have not voted yet; the level stays open. Absent when the level completed. */
+            votes_missing?: number;
+            /** @description After a rejection: the level the task went back to (a level skipped by the same person is not a target, B6). */
+            returned_to_level?: number;
         };
         /**
          * @description `system_admin`: a delegate acting for the System Admin. `assignee`: a lead acting for the assignee of a level (B12b). Null when `on_behalf_of` is absent.
@@ -4610,21 +5209,75 @@ export interface components {
         MatrixCell: {
             /** Format: uuid */
             id: string;
+            /** @description The row: a stage code, or the register key of a register or Dismantle row. */
             stage_code: string;
-            /** @description null = stage default. */
+            /** @description null = the row default; a task code = a holder override for that task. */
             task_code?: string | null;
+            /** @description 1 entry, 2 review, 3 approve, whatever the number of levels of the row. */
             level: number;
+            /**
+             * @description 0.4.6.
+             * @enum {string}
+             */
+            level_kind?: "entry" | "review" | "approve";
+            /** @description 0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight). */
+            used?: boolean;
+            /** @description null = every region. */
             region_id?: components["schemas"]["RegionId"] | null;
-            /** @enum {string} */
+            /**
+             * @description The Entry level is always any_one.
+             * @enum {string}
+             */
             rule: "any_one" | "all_members";
             assignees: components["schemas"]["MatrixAssignee"][];
             /** @description People who also hold the next level (level will be skipped for them). */
             skip_preview?: components["schemas"]["UserRef"][];
+            /**
+             * Format: date-time
+             * @description 0.4.6.
+             */
+            updated_at?: string | null;
         };
+        /** @description 0.4.6. One person who holds consecutive levels of a row, in the regions listed. */
+        MatrixSkipCase: {
+            /** @description null = the row default; a task code = the override cells of that task. */
+            task_code?: string | null;
+            user: components["schemas"]["UserRef"];
+            /**
+             * @description The level the person acts at.
+             * @enum {string}
+             */
+            from_level_kind: "entry" | "review";
+            /** @description The levels skipped after it, in order. Each skip is logged (B6). */
+            skipped_level_kinds: ("review" | "approve")[];
+            /** @description True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log. */
+            self_approval: boolean;
+            /** @description Regions where this holds (only regions the caller can see). */
+            region_ids: components["schemas"]["RegionId"][];
+        };
+        /** @description 0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`. */
+        MatrixPreview: {
+            /** @description The row has one level: every submission by its Entry holders is a self-approval (B5). */
+            single_level: boolean;
+            skips: components["schemas"]["MatrixSkipCase"][];
+        };
+        /** @description 0.4.6. Open tasks of a stage in the caller's regions, for the level-count change (decision B7). Tasks with their own level count are left out of `not_submitted`. */
+        MatrixTaskCounts: {
+            /** @description Not yet submitted (locked, open or in entry before the first submission): they follow the current level count. */
+            not_submitted: number;
+            /** @description Submitted at least once and not finished: they keep the level path frozen at their first submission. */
+            in_flight: number;
+        };
+        /**
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).
+         * @enum {string}
+         */
+        MatrixRowKey: "procurement" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
-            /** @description Matrix revision (ETag). */
+            /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
             version: number;
+            /** @description Stage rows in workflow order, then the register rows, then Dismantle. */
             stages: {
                 /**
                  * @description Register and Dismantle rows (B11); `code` is then the register key.
@@ -4632,23 +5285,34 @@ export interface components {
                  * @enum {string}
                  */
                 kind: "stage" | "register" | "dismantle";
-                register_key?: components["schemas"]["RegisterKey"] | null;
+                register_key?: components["schemas"]["MatrixRowKey"] | null;
                 code: string;
                 name_en: string;
                 name_ar?: string | null;
                 approval_levels: number;
+                /** @description 0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3]. */
+                used_levels?: number[];
+                /** @description 0.4.6. Regions that have cells of their own in this row (visible regions only). */
+                region_ids_with_cells?: components["schemas"]["RegionId"][];
+                task_counts?: components["schemas"]["MatrixTaskCounts"];
+                preview?: components["schemas"]["MatrixPreview"];
+                /** @description The row default of each level first, then the task and region cells. */
                 cells: components["schemas"]["MatrixCell"][];
             }[];
         };
         MatrixPatch: {
             workflow_version?: number;
             stage_levels?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
                 approval_levels: number;
             }[];
             cells?: {
+                /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
+                /** @description Only for stage rows: a holder override for one task of the stage. */
                 task_code?: string | null;
+                /** @description 1 entry, 2 review, 3 approve. */
                 level: number;
                 region_id?: components["schemas"]["RegionId"] | null;
                 /** @enum {string} */
@@ -4858,7 +5522,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
         SlaStartEvent: string;
         /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
         SlaRuleOverride: {
@@ -5141,8 +5805,144 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        Department: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            is_active: boolean;
+            member_count?: number;
+        };
+        DepartmentInput: {
+            /** @description Stored in upper case. */
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            is_active?: boolean;
+            reason: components["schemas"]["Reason"];
+        };
+        DepartmentRef: {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+        };
+        MessageContacts: {
+            manager: components["schemas"]["UserRef"] | null;
+            reports: components["schemas"]["UserRef"][];
+            can_message_anyone: boolean;
+        };
+        MessageThreadSummary: {
+            /** Format: uuid */
+            id: string;
+            subject: string;
+            other: components["schemas"]["UserRef"];
+            started_by_me?: boolean;
+            /** Format: date-time */
+            last_message_at: string;
+            last_message_preview?: string;
+            last_author?: components["schemas"]["UserRef"];
+            reply_count?: number;
+            unread: boolean;
+        };
+        MessageItem: {
+            /** Format: uuid */
+            id: string;
+            author: components["schemas"]["UserRef"];
+            body: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        MessageThread: {
+            /** Format: uuid */
+            id: string;
+            subject: string;
+            participants: components["schemas"]["UserRef"][];
+            original: components["schemas"]["MessageItem"];
+            /** @description Newest first. */
+            replies: components["schemas"]["MessageItem"][];
+            /**
+             * Format: date-time
+             * @description My last read time; replies after it are new.
+             */
+            last_read_at?: string | null;
+        };
+        AnnouncementAudience: {
+            /** @default false */
+            all: boolean;
+            user_ids?: string[];
+            group_ids?: string[];
+            role_ids?: string[];
+            department_ids?: string[];
+        };
+        AnnouncementInput: {
+            title: string;
+            body: string;
+            audience: components["schemas"]["AnnouncementAudience"];
+        };
+        AnnouncementSummary: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"];
+            recipient_count: number;
+            agree_count: number;
+            disagree_count: number;
+            pending_count: number;
+        };
+        AnnouncementDetail: components["schemas"]["AnnouncementSummary"] & {
+            body: string;
+            audience: {
+                all?: boolean;
+                users?: components["schemas"]["UserRef"][];
+                groups?: components["schemas"]["GroupRef"][];
+                roles?: components["schemas"]["RoleRef"][];
+                departments?: components["schemas"]["DepartmentRef"][];
+            };
+        };
+        AnnouncementResponse: {
+            user: components["schemas"]["UserRef"];
+            department?: components["schemas"]["DepartmentRef"] | null;
+            /** @enum {string} */
+            decision: "agree" | "disagree" | "pending";
+            note?: string | null;
+            /** Format: date-time */
+            responded_at?: string | null;
+        };
+        PendingAnnouncement: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            body: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"];
+        };
         WithReason: {
             reason: components["schemas"]["Reason"];
+        };
+        LocalUserCreate: {
+            display_name: string;
+            /** Format: email */
+            email: string;
+            employee_id?: components["schemas"]["EmployeeId"] | null;
+            /** @description E.164, for example +218911234567. */
+            phone?: string | null;
+            /**
+             * Format: password
+             * @description Omit to have the server generate one.
+             */
+            temporary_password?: string;
+            reason: components["schemas"]["Reason"];
+        };
+        LocalUserCreated: {
+            user: components["schemas"]["User"];
+            /** @description Shown once. Hand it to the user by a separate channel. */
+            temporary_password: string;
         };
         /**
          * @description Personal-data fields that follow visibility settings.
@@ -5593,6 +6393,8 @@ export interface components {
             read_only?: boolean;
             in_list?: boolean;
             is_custom?: boolean;
+            /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
+            section?: string | null;
             options?: {
                 value: string;
                 label_en: string;
@@ -5638,13 +6440,65 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version")[];
+            /**
+             * Format: uuid
+             * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
+             */
+            entity_id?: string;
+            /** @description Business version of the logical record (1, 2, 3 ...). Not the ETag. */
+            version_no?: number;
+            /** Format: uuid */
+            supersedes_id?: string | null;
+            /** @description The approved version that is in force. */
+            is_current?: boolean;
+            /** @description Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task's Matrix row, and the final approval fills the task's date and approves it. */
+            task?: {
+                /** Format: uuid */
+                id: string;
+                task_code: string;
+            };
+            self_approval?: boolean;
+            approved_by?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            approved_at?: string | null;
+            /** @enum {string} */
+            source?: "manual" | "template";
+            /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
+            last_transition?: {
+                step_ids?: string[];
+                skipped_levels?: number[];
+                unlocked_task_ids?: string[];
+                votes_missing?: number;
+                returned_to_level?: number;
+            };
             created_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
             updated_at?: string;
+            /** @description ETag (If-Match). */
             version: number;
+        };
+        RegisterRecordStep: {
+            /** Format: uuid */
+            id: string;
+            level: number;
+            /** @enum {string} */
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void";
+            acted_by?: components["schemas"]["UserRef"];
+            note?: string | null;
+            before_state?: components["schemas"]["RegisterRecordState"];
+            after_state?: components["schemas"]["RegisterRecordState"];
+            self_approval?: boolean;
+            stepup_verified?: boolean;
+            /**
+             * Format: uuid
+             * @description Set when the version came from a template batch.
+             */
+            batch_row_id?: string | null;
+            /** Format: date-time */
+            created_at: string;
         };
         RegisterRecordInput: {
             /**
@@ -6915,6 +7769,570 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    localLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    identifier: string;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    changeOwnPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    current_password: string;
+                    /** Format: password */
+                    new_password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localStepUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Step-up recorded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    listDepartments: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Departments, by name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Department"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepartmentInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Department"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                department_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DepartmentInput"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Department"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setUserOrg: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    manager_id: string | null;
+                    /** Format: uuid */
+                    department_id: string | null;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMessageContacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Contacts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageContacts"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listMessageThreads: {
+        parameters: {
+            query?: {
+                unread?: boolean;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Threads. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MessageThreadSummary"][];
+                        /** @description Threads with a message I have not read. */
+                        unread_total: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    startMessageThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    to_user_id: string;
+                    subject: string;
+                    body: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageThread"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMessageThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thread. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageThread"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    replyToMessageThread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    body: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The thread with the new reply first among the replies. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageThread"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    markMessageThreadRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                thread_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marked. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAnnouncements: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Announcements. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["AnnouncementSummary"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    sendAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnnouncementInput"];
+            };
+        };
+        responses: {
+            /** @description Sent. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Announcement. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnnouncementDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAnnouncementResponses: {
+        parameters: {
+            query?: {
+                decision?: "agree" | "disagree" | "pending";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Responses. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["AnnouncementResponse"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportAnnouncementResponses: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file (`Content-Disposition: attachment`). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    respondToAnnouncement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                announcement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "agree" | "disagree";
+                    note?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Recorded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMyPendingAnnouncements: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending announcements. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PendingAnnouncement"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -7030,7 +8448,7 @@ export interface operations {
                 /** @description Search name, email or employee ID. */
                 q?: string;
                 status?: components["schemas"]["UserStatus"];
-                /** @description Users holding this role or sub-role (active rows). */
+                /** @description Users holding this role (active rows). */
                 role_id?: string;
                 region_id?: components["schemas"]["RegionId"];
                 group_id?: string;
@@ -7057,6 +8475,34 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    createLocalUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalUserCreated"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listDeletedUsers: {
@@ -7255,6 +8701,44 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    resetUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                    /** Format: password */
+                    temporary_password?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reset. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @description Shown once. Hand it to the user by a separate channel. */
+                        temporary_password: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listUserAssignments: {
@@ -8022,6 +9506,8 @@ export interface operations {
                 stage_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
                 overall_status?: components["schemas"]["OverallStatus"];
+                /** @description Stream code (for example `CW`). Shows each site's status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code. */
+                stream?: string;
                 bucket?: "all" | "mine" | "late" | "waiting_approval" | "closed";
                 cluster_code?: string;
                 delivery_batch?: string;
@@ -8082,7 +9568,10 @@ export interface operations {
     };
     listSiteTasks: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have. */
+                stream?: string;
+            };
             header?: never;
             path: {
                 site_id: components["parameters"]["SiteId"];
@@ -8099,8 +9588,11 @@ export interface operations {
                 content: {
                     "application/json": {
                         workflow_version: number;
+                        /** @description The streams of the site's workflow version, in order. */
+                        streams?: components["schemas"]["Stream"][];
                         stages: {
                             code: string;
+                            stream_code?: string | null;
                             name_en: string;
                             name_ar?: string | null;
                             tasks: components["schemas"]["TaskSummary"][];
@@ -8701,7 +10193,7 @@ export interface operations {
             query?: {
                 /** @description Default = current published version. */
                 workflow_version?: number;
-                /** @description Show region-specific cells for this region. */
+                /** @description Also return the cells specific to this region. */
                 region_id?: components["schemas"]["RegionId"];
             };
             header?: never;
@@ -8722,6 +10214,8 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     updateMatrix: {
@@ -11356,6 +12850,10 @@ export interface operations {
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
                 record_type?: string;
+                /** @description All versions of one logical record. */
+                entity_id?: string;
+                /** @description Default false = the latest version of each logical record. */
+                all_versions?: boolean;
                 q?: string;
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
@@ -11673,6 +13171,175 @@ export interface operations {
             409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    claimRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Claimed. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    releaseRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Released. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getRegisterRecordHistory: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Steps, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["RegisterRecordStep"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRegisterRecordVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RegisterRecord"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRegisterRecordVersion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
             428: components["responses"]["PreconditionRequired"];
         };
     };

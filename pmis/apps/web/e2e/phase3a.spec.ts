@@ -1,15 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { login, withStepUp, type DemoAccount } from './helpers';
 
-async function signIn(page: Page, locale: 'en' | 'ar', account: string) {
+async function signIn(page: Page, locale: 'en' | 'ar', account: DemoAccount) {
   await page.addInitScript((l) => { if (!localStorage.getItem('pmis.locale')) localStorage.setItem('pmis.locale', l); }, locale);
-  await page.goto('/login');
-  await page.getByTestId('login-submit').click();
-  await page.getByTestId(`mock-account-${account}`).click();
-}
-/** Runs `act` (which triggers a step-up), then completes the popup. */
-async function withStepUp(page: Page, act: () => Promise<void>) {
-  const [popup] = await Promise.all([page.waitForEvent('popup'), act().then(() => page.getByTestId('stepup-continue').click())]);
-  await popup.getByTestId('mock-stepup-verify').click();
+  await login(page, account);
 }
 
 for (const locale of ['en', 'ar'] as const) {
@@ -21,13 +15,15 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId('user-select-1211').check();
       await page.getByTestId('users-assign').click();
       await page.getByTestId('assign-role-cw_team_lead').check();
+      // The dry-run preview comes first (it needs the step-up too); confirm opens only after it.
+      await withStepUp(page, () => page.getByTestId('assign-preview').click());
+      await expect(page.getByTestId('assign-preview-done')).toBeVisible();
       await page.getByTestId('assign-dialog-reason').fill('New joiner in Zawia');
-      await withStepUp(page, () => page.getByTestId('assign-dialog-submit').click());
+      await page.getByTestId('assign-dialog-submit').click();
       await expect(page.getByTestId('user-status-1211')).toHaveAttribute('data-testid', 'user-status-1211');
       await expect(page.getByTestId('assign-dialog')).toHaveCount(0);
       await page.getByTestId('topbar-signout').click();
-      await page.getByTestId('login-submit').click();
-      await page.getByTestId('mock-account-pending').click();
+      await login(page, 'pending');
       await expect(page.getByTestId('page-my-work')).toBeVisible();
       await expect(page.getByTestId('pending-screen')).toHaveCount(0);
     });

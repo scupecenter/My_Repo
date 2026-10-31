@@ -1,23 +1,36 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { setPasswordChangeHandler } from '@/api/client';
 import { useSession } from '@/api/hooks';
+import type { Session } from '@/api/types';
+import { AnnouncementPopup } from '@/components/AnnouncementPopup';
 import { Shell } from '@/components/Shell';
+import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
+import { ChangePassword } from '@/pages/ChangePassword';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
 import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
+import { RegisterPage } from '@/pages/Register';
+import { RegisterBatch } from '@/pages/RegisterBatch';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
 import { Absence } from '@/pages/Absence';
+import { AnnouncementResults } from '@/pages/AnnouncementResults';
+import { Announcements } from '@/pages/Announcements';
+import { Messages } from '@/pages/Messages';
 import { Delegation } from '@/pages/Delegation';
 import { Groups } from '@/pages/Groups';
+import { Assignments } from '@/pages/Assignments';
+import { Profiles } from '@/pages/Profiles';
 import { Roles } from '@/pages/Roles';
 import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
-import { OnlineNow } from '@/pages/OnlineNow';
 import { SecurityLog } from '@/pages/SecurityLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 
@@ -31,26 +44,44 @@ function Gate() {
   if (s.isLoading) return null;
   const session = s.data;
   if (!session?.authenticated) return <Navigate to="/login" replace />;
+  // The announcement pop-up (ADR 0013) shows for every signed-in person, also on the screens below that stand alone.
+  return <><AnnouncementPopup />{gated(session)}</>;
+}
+
+function gated(session: Session) {
+  // A temporary password is waiting: this screen is the only one reachable, whatever the URL.
+  if (session.must_change_password) return <ChangePassword forced />;
   if (session.needs_employee_id) return <EmployeeId />;
   if (session.status === 'pending_assignment') return <Pending session={session} />;
   return (
     <Routes>
       <Route element={<Shell />}>
         <Route index element={<Navigate to="/my-work" replace />} />
+        <Route path="change-password" element={<ChangePassword />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
-        <Route path="admin/users" element={<Users />} />
-        <Route path="admin/users/:userId" element={<UserDetailPage />} />
-        <Route path="admin/roles" element={<Roles />} />
-        <Route path="admin/groups" element={<Groups />} />
-        <Route path="admin/delegation" element={<Delegation />} />
+        <Route path="registers/:key" element={<RegisterPage />} />
+        <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="absence" element={<Absence />} />
-        <Route path="admin/matrix" element={<MatrixPage />} />
+        <Route path="messages" element={<Messages />} />
+        <Route path="messages/:threadId" element={<Messages />} />
+        <Route path="admin/announcements" element={<Announcements />} />
+        <Route path="admin/announcements/:id" element={<AnnouncementResults />} />
+        <Route element={<PeopleAdminLayout />}>
+          <Route path="admin/users" element={<Users />} />
+          <Route path="admin/users/:userId" element={<UserDetailPage />} />
+          <Route path="admin/online" element={<Users />} />
+          <Route path="admin/assignments" element={<Assignments />} />
+          <Route path="admin/roles" element={<Roles />} />
+          <Route path="admin/profiles" element={<Profiles />} />
+          <Route path="admin/groups" element={<Groups />} />
+          <Route path="admin/delegation" element={<Delegation />} />
+          <Route path="admin/matrix" element={<MatrixPage />} />
+        </Route>
         <Route path="admin/settings/*" element={<SettingsRoutes />} />
         <Route path="admin/security-log" element={<SecurityLog />} />
-        <Route path="admin/online" element={<OnlineNow />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>
@@ -58,6 +89,12 @@ function Gate() {
 }
 
 export function App() {
+  const qc = useQueryClient();
+  // Any API call that answers 403 password_change_required sends the user to the change-password screen.
+  useEffect(() => {
+    setPasswordChangeHandler(() => qc.setQueryData<Session>(['session'], (s) => (s && !s.must_change_password ? { ...s, must_change_password: true } : s)));
+    return () => setPasswordChangeHandler(null);
+  }, [qc]);
   return (
     <Routes>
       <Route path="/login" element={<Login />} />

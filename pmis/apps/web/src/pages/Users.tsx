@@ -1,7 +1,7 @@
-import { RotateCcw, ShieldOff, Trash2, UserPlus, UserX } from 'lucide-react';
+import { RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useRoles, useUsers } from '@/api/admin';
 import { useMe } from '@/api/hooks';
 import { useDeactivateUser, useDeletedUsers, useDeleteUser, useRestoreUser } from '@/api/settings';
@@ -9,6 +9,10 @@ import type { DeletedUser, User } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { AssignDialog } from '@/components/AssignDialog';
+import { CreateUserDialog, LocalBadges } from '@/components/UserDialogs';
+import { hasGrant, isAdmin } from '@/lib/perm';
+import { OnlineNow } from '@/pages/OnlineNow';
+import { Departments } from '@/pages/Departments';
 import { IdBadge } from '@/components/PersonTag';
 
 export const STATUS_TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', pending_assignment: 'bg-waitBg text-waitInk', suspended: 'bg-lateBg text-lateInk', disabled: 'bg-lockBg text-lockInk' };
@@ -71,25 +75,38 @@ function DeletedTab() {
 }
 
 export function Users() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const ar = i18n.language === 'ar';
   const me = useMe(true);
-  const [tab, setTab] = useState<'active' | 'deleted'>('active');
+  const loc = useLocation(), go = useNavigate();
+  const [listTab, setListTab] = useState<'active' | 'deleted' | 'departments'>('active');
+  // Online now is the third sub-tab, beside Deleted; it keeps its own URL (/admin/online).
+  const tab: 'active' | 'deleted' | 'departments' | 'online' = loc.pathname.startsWith('/admin/online') ? 'online' : listTab;
+  const canList = !!me.data?.effective.nav.includes('admin.users' as never);
+  const subTabs = [...(canList ? (['active', 'deleted', 'departments'] as const) : []), ...(hasGrant(me.data, 'manage_users') ? (['online'] as const) : [])];
+  const pick = (k: (typeof subTabs)[number]) => {
+    if (k === 'online') return go('/admin/online');
+    setListTab(k);
+    if (tab === 'online') go('/admin/users');
+  };
   const [act, setAct] = useState<Act | null>(null);
   const [f, setF] = useState({ q: '', status: '', role_id: '' });
   const [sel, setSel] = useState<Record<string, User>>({});
   const [dlg, setDlg] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const canCreate = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'create' && ['users', 'admin.users'].includes(g.module_key as string));
   const users = useUsers(f), roles = useRoles();
   const items = users.data?.items ?? [];
   const chosen = Object.values(sel);
   const toggle = (u: User) => setSel((s) => { const n = { ...s }; if (n[u.id]) delete n[u.id]; else n[u.id] = u; return n; });
   return (
     <div data-testid="page-users">
-      <h1 className="text-2xl font-bold">{t('users.title')}</h1>
+      <h2 className="text-lg font-bold">{t('peopleAdmin.tab_users')}</h2>
       <p className="mb-4 text-mute">{t('users.subtitle')}</p>
       <div role="tablist" className="mb-3 flex gap-1">
-        {(['active', 'deleted'] as const).map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => setTab(k)}>{t(`users.tab_${k}`)}</button>)}
+        {subTabs.map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => pick(k)}>{t(k === 'online' ? 'nav.admin.online' : k === 'departments' ? 'dept.tab' : `users.tab_${k}`)}</button>)}
       </div>
-      {tab === 'deleted' ? <DeletedTab /> : <>
+      {tab === 'online' ? <OnlineNow embedded /> : tab === 'deleted' ? <DeletedTab /> : tab === 'departments' ? <Departments /> : <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className="input max-w-64" data-testid="users-search" aria-label={t('users.search')} placeholder={t('users.search')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input w-auto" data-testid="users-filter-status" aria-label={t('users.status')} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
@@ -101,35 +118,38 @@ export function Users() {
           {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.name_en}</option>)}
         </select>
         <span className="flex-1" />
+        {canCreate && <button className="btn" data-testid="users-new" onClick={() => setCreating(true)}><UserRoundPlus size={16} />{t('newUser.open')}</button>}
         <button className="btn btn-accent" data-testid="users-assign" onClick={() => setDlg(true)}><UserPlus size={16} />{chosen.length ? t('users.assign_selected', { count: chosen.length }) : t('users.assign')}</button>
       </div>
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="border-b border-line bg-card2 text-start text-mute"><tr>
-            <th className="w-10 p-2" /><th className="p-2 text-start">{t('users.name')}</th><th className="p-2 text-start">{t('users.email')}</th><th className="p-2 text-start">{t('users.status')}</th><th className="p-2 text-start">{t('users.flags')}</th><th className="p-2" />
+            <th className="w-10 p-2" /><th className="p-2 text-start">{t('users.name')}</th><th className="p-2 text-start">{t('users.email')}</th><th className="p-2 text-start">{t('users.department')}</th><th className="p-2 text-start">{t('users.status')}</th><th className="p-2 text-start">{t('users.flags')}</th><th className="p-2" />
           </tr></thead>
           <tbody data-testid="users-list">
             {items.map((u) => (
-              <tr key={u.id} className="border-b border-line hover:bg-hover" data-testid={`user-row-${u.employee_id}`}>
-                <td className="p-2"><input type="checkbox" aria-label={t('users.select', { name: u.display_name })} data-testid={`user-select-${u.employee_id}`} checked={!!sel[u.id]} onChange={() => toggle(u)} /></td>
+              <tr key={u.id} className="border-b border-line hover:bg-hover" data-testid={`user-row-${u.employee_id ?? u.id}`}>
+                <td className="p-2"><input type="checkbox" aria-label={t('users.select', { name: u.display_name })} data-testid={`user-select-${u.employee_id ?? u.id}`} checked={!!sel[u.id]} onChange={() => toggle(u)} /></td>
                 <td className="p-2"><span className="inline-flex items-baseline gap-1">{u.display_name}{u.employee_id && <IdBadge employeeId={u.employee_id} />}</span></td>
                 <td className="p-2 text-mute" dir="ltr">{u.email}</td>
-                <td className="p-2"><span className={`chip ${STATUS_TONE[u.status]}`} data-testid={`user-status-${u.employee_id}`}>{t(`userStatus.${u.status}`)}</span></td>
-                <td className="p-2"><MfaBadge user={u} /></td>
+                <td className="p-2" data-testid={`user-dept-${u.employee_id ?? u.id}`}>{u.department ? (ar && u.department.name_ar) || u.department.name_en : <span className="text-mute">—</span>}</td>
+                <td className="p-2"><span className={`chip ${STATUS_TONE[u.status]}`} data-testid={`user-status-${u.employee_id ?? u.id}`}>{t(`userStatus.${u.status}`)}</span></td>
+                <td className="p-2"><span className="inline-flex flex-wrap gap-1"><LocalBadges user={u} /><MfaBadge user={u} /></span></td>
                 <td className="p-2 text-end"><span className="inline-flex gap-1">
-                  <Link className="btn" data-testid={`user-open-${u.employee_id}`} to={`/admin/users/${u.id}`}>{t('users.open')}</Link>
+                  <Link className="btn" data-testid={`user-open-${u.employee_id ?? u.id}`} to={`/admin/users/${u.id}`}>{t('users.open')}</Link>
                   {(u.status === 'suspended' || u.status === 'disabled')
-                    ? <button className="btn" data-testid={`user-reactivate-${u.employee_id}`} onClick={() => setAct({ kind: 'reactivate', user: u })}><RotateCcw size={14} />{t('users.reactivate')}</button>
-                    : <button className="btn" data-testid={`user-deactivate-${u.employee_id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'deactivate', user: u })}><UserX size={14} />{t('users.deactivate')}</button>}
-                  <button className="btn" data-testid={`user-delete-${u.employee_id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'delete', user: u })}><Trash2 size={14} />{t('users.delete')}</button></span></td>
+                    ? <button className="btn" data-testid={`user-reactivate-${u.employee_id ?? u.id}`} onClick={() => setAct({ kind: 'reactivate', user: u })}><RotateCcw size={14} />{t('users.reactivate')}</button>
+                    : <button className="btn" data-testid={`user-deactivate-${u.employee_id ?? u.id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'deactivate', user: u })}><UserX size={14} />{t('users.deactivate')}</button>}
+                  <button className="btn" data-testid={`user-delete-${u.employee_id ?? u.id}`} disabled={u.id === me.data?.user.id} title={u.id === me.data?.user.id ? t('errors.self_beneficiary') : undefined} onClick={() => setAct({ kind: 'delete', user: u })}><Trash2 size={14} />{t('users.delete')}</button></span></td>
               </tr>
             ))}
-            {users.isSuccess && !items.length && <tr><td colSpan={6} className="p-6 text-center text-mute" data-testid="users-empty">{t('users.empty')}</td></tr>}
+            {users.isSuccess && !items.length && <tr><td colSpan={7} className="p-6 text-center text-mute" data-testid="users-empty">{t('users.empty')}</td></tr>}
           </tbody>
         </table>
       </div>
       </>}
       {act && <ActDialog act={act} onClose={() => setAct(null)} />}
+      {creating && <CreateUserDialog onClose={() => setCreating(false)} />}
       {dlg && <AssignDialog open onClose={() => { setDlg(false); setSel({}); }} initialMode={chosen.length === 1 ? 'person' : 'role'}
         initialPeople={chosen.map((u) => ({ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }))} />}
     </div>

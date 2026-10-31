@@ -8,6 +8,7 @@ import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
 import { RejectDialog } from '@/components/RejectDialog';
 import { useToast } from '@/components/Toast';
+import { taskErrorMessage } from '@/lib/taskErrors';
 
 const TABS = ['all', 'review', 'approve'] as const;
 
@@ -25,7 +26,8 @@ export function Approvals() {
   const items = list.data?.items ?? [];
   const current = items.find((i) => i.task.id === sel) ?? null;
 
-  const onError = (e: unknown) => toast(e instanceof ApiError && e.code === 'precondition_failed' ? t('errors.precondition_failed') : e instanceof ApiError && e.status === 403 ? t('errors.forbidden') : e instanceof ApiError && e.code === 'step_up_required' ? '' : t('errors.generic'), 'err');
+  const onError = (e: unknown) => { const m = taskErrorMessage(t, e); if (m) toast(m, 'err'); };
+  const [report, setReport] = useState<{ ref: string; site: string; code: string; message: string; kind: 'skipped' | 'failed' }[]>([]);
 
   const act = (item: ApprovalItem, op: 'review' | 'approve') =>
     decide.mutate({ item, op }, { onSuccess: () => toast(t('approvals.done')), onError });
@@ -34,7 +36,11 @@ export function Approvals() {
   const kindOfPicked = picked.length && picked.every((i) => i.level_kind === picked[0].level_kind) ? picked[0].level_kind : null;
   const runBulk = (action: 'pass' | 'approve') =>
     bulk.mutate({ action, items: picked }, {
-      onSuccess: (r) => { setChecked(new Set()); toast(t('approvals.bulk_result', { done: r.done.length, skipped: r.skipped.length, failed: r.failed.length }), r.failed.length ? 'err' : 'ok'); },
+      onSuccess: (r) => {
+        setChecked(new Set());
+        const issue = (kind: 'skipped' | 'failed') => (i: { ref: string; code: string; message?: string }) => ({ ref: i.ref, site: picked.find((p) => p.task.id === i.ref)?.task.site_code ?? i.ref, code: i.code, kind, message: taskErrorMessage(t, new ApiError(422, { code: i.code, title: i.message ?? i.code, status: 422, type: 'about:blank' } as never)) || (i.message ?? i.code) });
+        setReport([...r.skipped.map(issue('skipped')), ...r.failed.map(issue('failed'))]);
+        toast(t('approvals.bulk_result', { done: r.done.length, skipped: r.skipped.length, failed: r.failed.length }), r.failed.length ? 'err' : 'ok'); },
       onError,
     });
 
@@ -63,6 +69,12 @@ export function Approvals() {
               <span className="flex-1 text-sm font-semibold">{t('approvals.selected', { count: picked.length })}</span>
               {kindOfPicked === 'review' && <button className="btn" data-testid="bulk-pass" onClick={() => runBulk('pass')}>{t('approvals.bulk_pass', { count: picked.length })}</button>}
               {kindOfPicked === 'approve' && <button className="btn btn-primary" data-testid="bulk-approve" onClick={() => runBulk('approve')}>{t('approvals.bulk_approve', { count: picked.length })}</button>}
+            </div>
+          )}
+          {report.length > 0 && (
+            <div className="border-b border-line bg-waitBg p-3 text-sm text-waitInk" data-testid="bulk-report">
+              <div className="flex items-center"><b className="flex-1">{t('approvals.bulk_issues')}</b><button className="btn px-2 py-0.5 text-xs" onClick={() => setReport([])}>{t('common.close')}</button></div>
+              <ul>{report.map((r) => <li key={r.ref} data-testid={`bulk-issue-${r.code}`}><b className="mono">{r.site}</b> · {t(r.kind === 'failed' ? 'approvals.bulk_failed' : 'approvals.bulk_skipped')}: {r.message}</li>)}</ul>
             </div>
           )}
           <ul data-testid="approvals-list">

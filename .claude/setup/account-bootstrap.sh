@@ -63,13 +63,13 @@ if git clone --depth 1 https://github.com/scupecenter/my_repo.git "$TMP/myrepo" 
 fi
 
 # --- 4) OmniRoute skill set (45 skills + ponytail + config-codex-cli) ------
-if git clone --depth 1 https://github.com/diegosouzapw/OmniRoute.git "$TMP/omni" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/diegosouzapw/OmniRoute.git "$TMP/omni" >/dev/null 2>&1 && git -C "$TMP/omni" fetch --depth 1 origin f5ae2a2f484f2ffcf3ac8a956e00471bc47f422d >/dev/null 2>&1 && git -C "$TMP/omni" checkout -q f5ae2a2f484f2ffcf3ac8a956e00471bc47f422d >/dev/null 2>&1; then
   for d in "$TMP/omni/skills"/*/ ; do n="$(basename "$d")"; rm -rf "$SK/$n"; cp -R "$d" "$SK/$n"; done
 fi
 
 
 # --- 5) grill-me + grilling (Matt Pocock, MIT) from upstream ---------------
-if git clone --depth 1 https://github.com/mattpocock/skills.git "$TMP/mp" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/mattpocock/skills.git "$TMP/mp" >/dev/null 2>&1 && git -C "$TMP/mp" fetch --depth 1 origin 5beb35b040e3de97e54fa9e386d7e42d15c295c2 >/dev/null 2>&1 && git -C "$TMP/mp" checkout -q 5beb35b040e3de97e54fa9e386d7e42d15c295c2 >/dev/null 2>&1; then
   for s in grill-me grilling ; do
     d="$(find "$TMP/mp/skills" -type d -name "$s" | head -1)"
     [ -n "$d" ] && { rm -rf "${SK:?}/$s"; cp -R "$d" "$SK/$s"; }
@@ -77,28 +77,28 @@ if git clone --depth 1 https://github.com/mattpocock/skills.git "$TMP/mp" >/dev/
 fi
 
 # --- 6) karpathy-guidelines (MIT) from upstream ----------------------------
-if git clone --depth 1 https://github.com/multica-ai/andrej-karpathy-skills.git "$TMP/kp" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/multica-ai/andrej-karpathy-skills.git "$TMP/kp" >/dev/null 2>&1 && git -C "$TMP/kp" fetch --depth 1 origin 2c606141936f1eeef17fa3043a72095b4765b9c2 >/dev/null 2>&1 && git -C "$TMP/kp" checkout -q 2c606141936f1eeef17fa3043a72095b4765b9c2 >/dev/null 2>&1; then
   [ -d "$TMP/kp/skills/karpathy-guidelines" ] && { rm -rf "${SK:?}/karpathy-guidelines"; cp -R "$TMP/kp/skills/karpathy-guidelines" "$SK/karpathy-guidelines"; }
 fi
 
 # --- 7) find-skills (Vercel Labs, MIT) from upstream -----------------------
-if git clone --depth 1 https://github.com/vercel-labs/skills.git "$TMP/vl" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/vercel-labs/skills.git "$TMP/vl" >/dev/null 2>&1 && git -C "$TMP/vl" fetch --depth 1 origin a80e4c9d12d607631249d4d7d059f835d4b2f13a >/dev/null 2>&1 && git -C "$TMP/vl" checkout -q a80e4c9d12d607631249d4d7d059f835d4b2f13a >/dev/null 2>&1; then
   [ -d "$TMP/vl/skills/find-skills" ] && { rm -rf "${SK:?}/find-skills"; cp -R "$TMP/vl/skills/find-skills" "$SK/find-skills"; }
 fi
 
 # --- 8) taste-skill / design-taste-frontend (Leonxlnx, MIT) ----------------
 #     Needs Node 22+ and CHROME_PATH for its inspect/draw scripts.
-if git clone --depth 1 https://github.com/Leonxlnx/taste-skill.git "$TMP/ts" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/Leonxlnx/taste-skill.git "$TMP/ts" >/dev/null 2>&1 && git -C "$TMP/ts" fetch --depth 1 origin 12af471f627f866411b4bd785b19646d3672784c >/dev/null 2>&1 && git -C "$TMP/ts" checkout -q 12af471f627f866411b4bd785b19646d3672784c >/dev/null 2>&1; then
   [ -d "$TMP/ts/skills/taste-skill" ] && { rm -rf "${SK:?}/taste-skill"; cp -R "$TMP/ts/skills/taste-skill" "$SK/taste-skill"; }
 fi
 
 # --- 9) ui-ux-pro-max (Next Level Builder, MIT) — local-data UI/UX intel -----
-if git clone --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git "$TMP/ux" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git "$TMP/ux" >/dev/null 2>&1 && git -C "$TMP/ux" fetch --depth 1 origin 28b3b8dee8c976df4fa3e94aed4e092ad43fcb03 >/dev/null 2>&1 && git -C "$TMP/ux" checkout -q 28b3b8dee8c976df4fa3e94aed4e092ad43fcb03 >/dev/null 2>&1; then
   [ -d "$TMP/ux/.claude/skills/ui-ux-pro-max" ] && { rm -rf "${SK:?}/ui-ux-pro-max"; cp -R "$TMP/ux/.claude/skills/ui-ux-pro-max" "$SK/ui-ux-pro-max"; }
 fi
 
 # --- 10) awesome-design-md brand reference pack (VoltAgent, MIT) -----------
-if git clone --depth 1 https://github.com/VoltAgent/awesome-design-md.git "$TMP/ad" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/VoltAgent/awesome-design-md.git "$TMP/ad" >/dev/null 2>&1 && git -C "$TMP/ad" fetch --depth 1 origin 3b605329240ce735b510037cca322f1831fdd7f8 >/dev/null 2>&1 && git -C "$TMP/ad" checkout -q 3b605329240ce735b510037cca322f1831fdd7f8 >/dev/null 2>&1; then
   D="$SK/awesome-design-md"; rm -rf "${D:?}"; mkdir -p "$D"
   cp -R "$TMP/ad/design-md" "$D/design-md"
   cp "$TMP/ad/README.md" "$D/COLLECTION-README.md" 2>/dev/null || true
@@ -120,7 +120,7 @@ SK_EOF
 fi
 
 # --- 11) design-motion-principles (Kyle Zantos, MIT) -----------------------
-if git clone --depth 1 https://github.com/kylezantos/design-motion-principles.git "$TMP/mo" >/dev/null 2>&1; then
+if git clone --depth 1 https://github.com/kylezantos/design-motion-principles.git "$TMP/mo" >/dev/null 2>&1 && git -C "$TMP/mo" fetch --depth 1 origin 4a9ca879f24a361f4dca4174fe2da0f67b5ddee3 >/dev/null 2>&1 && git -C "$TMP/mo" checkout -q 4a9ca879f24a361f4dca4174fe2da0f67b5ddee3 >/dev/null 2>&1; then
   [ -d "$TMP/mo/skills/design-motion-principles" ] && { rm -rf "${SK:?}/design-motion-principles"; cp -R "$TMP/mo/skills/design-motion-principles" "$SK/design-motion-principles"; }
 fi
 
@@ -137,21 +137,26 @@ if command -v scrapling-mcp >/dev/null 2>&1; then
 fi
 
 # --- 13) scrapling-official agent skill (D4Vinci/Scrapling, BSD-3) ----------
-if git clone --depth 1 --filter=blob:none --sparse https://github.com/D4Vinci/Scrapling.git "$TMP/scr" >/dev/null 2>&1; then
-  git -C "$TMP/scr" sparse-checkout set agent-skill/Scrapling-Skill >/dev/null 2>&1 || true
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/D4Vinci/Scrapling.git "$TMP/scr" >/dev/null 2>&1 && git -C "$TMP/scr" sparse-checkout set agent-skill/Scrapling-Skill >/dev/null 2>&1 && git -C "$TMP/scr" fetch --depth 1 origin 063feb0cd37025a5127e83f54e055b8bc50b095a >/dev/null 2>&1 && git -C "$TMP/scr" checkout -q 063feb0cd37025a5127e83f54e055b8bc50b095a >/dev/null 2>&1; then
   [ -d "$TMP/scr/agent-skill/Scrapling-Skill" ] && { rm -rf "$SK/scrapling-official"; cp -R "$TMP/scr/agent-skill/Scrapling-Skill" "$SK/scrapling-official"; }
 fi
 
 # --- 14) vercel-react-best-practices (vercel-labs/agent-skills, MIT) --------
-if git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel-labs/agent-skills.git "$TMP/va" >/dev/null 2>&1; then
-  git -C "$TMP/va" sparse-checkout set skills/react-best-practices >/dev/null 2>&1 || true
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/vercel-labs/agent-skills.git "$TMP/va" >/dev/null 2>&1 && git -C "$TMP/va" sparse-checkout set skills/react-best-practices >/dev/null 2>&1 && git -C "$TMP/va" fetch --depth 1 origin 063bee94c3f4df8453406c830b0a7df0f2860278 >/dev/null 2>&1 && git -C "$TMP/va" checkout -q 063bee94c3f4df8453406c830b0a7df0f2860278 >/dev/null 2>&1; then
   [ -d "$TMP/va/skills/react-best-practices" ] && { rm -rf "$SK/vercel-react-best-practices"; cp -R "$TMP/va/skills/react-best-practices" "$SK/vercel-react-best-practices"; }
 fi
 
 # --- 15) orca-cli skill (stablyai/orca, MIT; large repo -> sparse fetch) ----
-if git clone --depth 1 --filter=blob:none --sparse https://github.com/stablyai/orca.git "$TMP/orca" >/dev/null 2>&1; then
-  git -C "$TMP/orca" sparse-checkout set skills/orca-cli >/dev/null 2>&1 || true
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/stablyai/orca.git "$TMP/orca" >/dev/null 2>&1 && git -C "$TMP/orca" sparse-checkout set skills/orca-cli >/dev/null 2>&1 && git -C "$TMP/orca" fetch --depth 1 origin ce4e0579ce64960a6af52e30022fd09343b139f3 >/dev/null 2>&1 && git -C "$TMP/orca" checkout -q ce4e0579ce64960a6af52e30022fd09343b139f3 >/dev/null 2>&1; then
   [ -d "$TMP/orca/skills/orca-cli" ] && { rm -rf "$SK/orca-cli"; cp -R "$TMP/orca/skills/orca-cli" "$SK/orca-cli"; }
 fi
+
+# --- 16) Agent Reach: read-only social/web reach (skill + CLI) -------------
+#     Reddit, X/Twitter, YouTube, Instagram, GitHub, LinkedIn jobs, etc.
+#     Read-only: no posting, no logging in on your behalf.
+if git clone --depth 1 --filter=blob:none --sparse https://github.com/Panniantong/Agent-Reach.git "$TMP/ar" >/dev/null 2>&1 && git -C "$TMP/ar" sparse-checkout set agent_reach/skill >/dev/null 2>&1 && git -C "$TMP/ar" fetch --depth 1 origin 14c213405669414492bda0f8d52cc6531d062c45 >/dev/null 2>&1 && git -C "$TMP/ar" checkout -q 14c213405669414492bda0f8d52cc6531d062c45 >/dev/null 2>&1; then
+  [ -d "$TMP/ar/agent_reach/skill" ] && { rm -rf "$SK/agent-reach"; cp -R "$TMP/ar/agent_reach/skill" "$SK/agent-reach"; }
+fi
+command -v uv >/dev/null 2>&1 && uv tool install "git+https://github.com/Panniantong/Agent-Reach@14c213405669414492bda0f8d52cc6531d062c45" >/dev/null 2>&1 || true
 
 echo "[account-bootstrap] done: $(ls "$SK" | wc -l) skills, $(ls "$AG" 2>/dev/null | wc -l) agents"
