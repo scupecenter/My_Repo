@@ -68,6 +68,8 @@ export interface TaskSummaryDto {
   admin_override: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
   lock_reasons: { kind: string; ref_code: string | null; message: string; count: number | null }[];
+  /** Only in the Site Register task grid: register-owned fields shown read-through, editable through the source register (spec 2.7). */
+  register_fields?: Record<string, unknown>[];
   version: number;
 }
 

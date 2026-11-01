@@ -8,6 +8,7 @@ import { problems } from '../common/problem';
 import { oneParam } from '../common/query';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { RegistersService } from '../registers/registers.service';
 import { TaskSummaryDto, TaskViewService, taskSelect } from '../workflow/task-view.service';
 
 /**
@@ -127,6 +128,7 @@ export class SitesService {
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly view: TaskViewService,
+    private readonly registers: RegistersService,
   ) {}
 
   private intList(q: Record<string, unknown>, key: string, min: number, max: number): number[] {
@@ -533,7 +535,6 @@ export class SitesService {
     if (stream !== undefined) await this.requireGroup('stream', stream, site.workflow_id);
     const view = oneParam(q, 'view');
     if (view !== undefined) await this.requireGroup('view', view, site.workflow_id);
-    void auth;
     const stages = await this.db.tx.$queryRaw<{ id: string; code: string; stream_code: string | null; name_en: string; name_ar: string | null }[]>(Prisma.sql`
       SELECT id::text AS id, code, stream_code, name_en, name_ar FROM stage_definitions
       WHERE workflow_id = ${site.workflow_id}::uuid AND is_active ${stream ? Prisma.sql`AND stream_code = ${stream}` : Prisma.empty} ${stageInView(view, 'stage_definitions.id')} ORDER BY seq`);
@@ -542,6 +543,7 @@ export class SitesService {
       Prisma.sql`ORDER BY st.seq, td.sort_order, td.code`,
     ));
     const summaries = await this.view.withLockReasons(rows);
+    await this.attachRegisterFields(auth, site.id, site.region_id, summaries);
     const byStage = new Map<string, TaskSummaryDto[]>();
     for (const t of summaries) {
       const list = byStage.get(t.stage_code) ?? [];
@@ -556,5 +558,63 @@ export class SitesService {
       views,
       stages: stages.map((st) => ({ code: st.code, stream_code: st.stream_code, name_en: st.name_en, name_ar: st.name_ar, tasks: byStage.get(st.code) ?? [] })),
     };
+  }
+  /**
+   * Write-through fields (spec 2.7, migration 0029): the register fields a task row shows. The value is read from the current record of the source
+   * register (the view keeps no copy) and the descriptor says how to edit it: with the register's own endpoints, so permissions, the Entry / Review /
+   * Approve path and the audit are the register's. A register the caller cannot view is left out.
+   */
+  private async attachRegisterFields(auth: AuthContext, siteId: string, region: number, tasks: TaskSummaryDto[]): Promise<void> {
+    const codes = [...new Set(tasks.map((t) => t.task_code))];
+    if (codes.length === 0) return;
+    const src = await this.db.tx.$queryRaw<{ task_code: string; register_key: string; record_type: string | null; field_code: string; master_col: string | null; label_en: string | null;
+      label_ar: string | null; f_label_en: string | null; f_label_ar: string | null; f_type: string | null; f_options: unknown; module_key: string }[]>(Prisma.sql`
+      SELECT x.task_code, x.register_key, x.record_type, x.field_code, x.master_col, x.label_en, x.label_ar, f.label_en AS f_label_en, f.label_ar AS f_label_ar,
+        f.field_type AS f_type, f.options AS f_options, d.module_key
+      FROM task_field_sources x JOIN register_definitions d ON d.register_key = x.register_key AND d.is_active AND d.enabled
+      LEFT JOIN register_fields f ON f.register_key = x.register_key AND f.code = x.field_code AND f.is_active
+      WHERE x.is_active AND x.task_code = ANY(${codes}::text[]) ORDER BY x.task_code, x.sort_order`);
+    if (src.length === 0) return;
+    const records = new Map<string, Record<string, unknown>[]>();
+    const canCreate = new Map<string, boolean>();
+    for (const key of new Set(src.map((r) => r.register_key))) {
+      const module = src.find((r) => r.register_key === key)?.module_key as string;
+      if (!(await this.access.hasGrant(auth, module, 'view'))) continue;
+      const list = (await this.registers.listRecords(auth, key, { site_id: siteId, limit: '50' })).items as Record<string, unknown>[];
+      records.set(key, list.filter((r) => r.state !== 'voided'));
+      const create = await this.access.regions(module, 'create');
+      canCreate.set(key, create === null || create.includes(region));
+    }
+    for (const t of tasks) {
+      const fields = src.filter((r) => r.task_code === t.task_code && records.has(r.register_key)).map((r) => {
+        const rec = records.get(r.register_key)?.find((x) => (r.record_type === null || x.record_type === r.record_type)) ?? null;
+        const actions = (rec?.allowed_actions as string[] | undefined) ?? [];
+        const party = r.field_code === 'external_party_id';
+        const value = rec ? (party ? ((rec.external_party as { name?: string } | undefined)?.name ?? null) : ((rec.data as Record<string, unknown>)[r.field_code] ?? null)) : null;
+        const editVia = !rec ? (canCreate.get(r.register_key) ? 'create' : 'none') : actions.includes('edit') ? 'patch' : actions.includes('new_version') ? 'new_version' : 'none';
+        return {
+          code: r.field_code,
+          label_en: r.label_en ?? r.f_label_en ?? r.field_code,
+          label_ar: r.label_ar ?? r.f_label_ar,
+          type: party ? 'party' : (r.f_type === 'external_team' ? 'text' : (r.f_type ?? 'text')),
+          ...(Array.isArray(r.f_options) ? { options: (r.f_options as string[]).map((v) => ({ value: v, label_en: v })) } : {}),
+          master_column: r.master_col,
+          value,
+          editable: editVia !== 'none',
+          edit_via: editVia,
+          source: {
+            register_key: r.register_key,
+            record_type: r.record_type,
+            site_id: siteId,
+            record_id: rec ? (rec.id as string) : null,
+            entity_id: rec ? (rec.entity_id as string) : null,
+            record_state: rec ? (rec.state as string) : null,
+            record_version: rec ? (rec.version as number) : null,
+            field: party ? 'external_party_id' : `data.${r.field_code}`,
+          },
+        };
+      });
+      if (fields.length > 0) t.register_fields = fields;
+    }
   }
 }

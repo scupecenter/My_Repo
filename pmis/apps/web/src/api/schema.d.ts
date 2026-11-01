@@ -5060,7 +5060,47 @@ export interface components {
             idle_working_days?: number | null;
             /** @description Why the task is locked (empty when it is not), so "Why locked?" needs no extra call. */
             lock_reasons?: components["schemas"]["LockReason"][];
+            /** @description 0.4.9. Only in the Site Register task grid. Register-owned fields shown read-through; edit them in the source register (Q73, Q99). */
+            register_fields?: components["schemas"]["TaskRegisterField"][];
             version: number;
+        };
+        TaskRegisterField: {
+            /** @description The register field code, or `external_party_id` (the contractor of the record). */
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            type: "text" | "number" | "date" | "list" | "yes_no" | "user" | "party";
+            options?: {
+                value: string;
+                label_en: string;
+            }[];
+            /** @description The Master column this field replaces (for example BU, EF, FO, FT). */
+            master_column?: string | null;
+            /** @description Read from the source record; null when there is no record yet. For `party`, the party name. */
+            value: unknown;
+            /** @description A hint: the caller may use `edit_via`. The register decides again on every call. */
+            editable: boolean;
+            /**
+             * @description `patch` the record (in entry); `new_version` of an approved record, then patch; `create` a record (no record yet); `none` not now.
+             * @enum {string}
+             */
+            edit_via: "patch" | "new_version" | "create" | "none";
+            source: {
+                register_key: string;
+                record_type?: string | null;
+                /** Format: uuid */
+                site_id: string;
+                /** Format: uuid */
+                record_id?: string | null;
+                /** Format: uuid */
+                entity_id?: string | null;
+                record_state?: string | null;
+                /** @description The If-Match value of the record. */
+                record_version?: number | null;
+                /** @description `data.<code>` or `external_party_id`: where the value sits in the record body. */
+                field: string;
+            };
         };
         DocumentFile: {
             /** Format: uuid */
