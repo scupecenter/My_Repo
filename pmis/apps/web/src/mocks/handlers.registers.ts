@@ -71,6 +71,14 @@ function check(def: RegisterDefinition, data: Record<string, unknown>, site: num
   const issues = validateRecord(def, data, site === null ? null : siteIdOf(site), TODAY);
   return Object.entries(issues).map(([code, i]) => ({ path: code === 'site_id' ? '/site_id' : `/data/${code}`, code: i.code }));
 }
+/** The Dismantle rules of the database trigger (0021): same paths and codes. The mock answers them as a 422 `validation_failed`, like the API. */
+function dismantleErrors(d: Record<string, unknown>) {
+  const out: { path: string; code: string; message: string }[] = [];
+  if (!d.rfd_date) for (const k of Object.keys(d)) if (k !== 'rfd_document_ref') out.push({ path: `/data/${k}`, code: 'rfd_required', message: 'The RFD date must be entered before any later step.' });
+  if (d.work_start_date && d.work_end_date && String(d.work_end_date) < String(d.work_start_date)) out.push({ path: '/data/work_end_date', code: 'end_before_start', message: 'The work end is before the work start.' });
+  if (d.closed === true && !String(d.closing_rn_ref ?? '').trim()) out.push({ path: '/data/closing_rn_ref', code: 'rn_required', message: 'A part closes only with the reference of its signed RN.' });
+  return out;
+}
 const invalid = (errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 
 export const registerHandlers = [
@@ -102,6 +110,12 @@ export const registerHandlers = [
     const si = b.site_id ? siteIndex(b.site_id) : null;
     if (def.site_scoped && (si === null || si < 0 || si >= SITE_COUNT)) return invalid([{ path: '/site_id', code: b.site_id ? 'site_not_found' : 'site_required' }]);
     if (!viewer() || !(viewer()!.key === 'pm' || userHolds(def.register_key, 1, viewer()!.employee_id))) return problem(403, 'forbidden', 'Not allowed');
+    if (def.register_key === 'dismantle') {
+      if (!b.record_type) return invalid([{ path: '/record_type', code: 'required' }]);
+      const errs = dismantleErrors(visibleData(def, b.data ?? {})); if (errs.length) return invalid(errs);
+      if (R().records.some((r) => r.register_key === 'dismantle' && r.site_index === si && r.record_type === b.record_type && r.state !== 'voided' && r.version_no === 1))
+        return problem(409, 'duplicate', `This site already has a ${b.record_type.toUpperCase()} Dismantle record: create a new version of it.`);
+    }
     if (!def.multiple_per_site && R().records.some((r) => r.register_key === def.register_key && r.site_index === si && r.state !== 'voided' && r.version_no === 1))
       return problem(409, 'duplicate', 'This site already has a row; a new request is a new version of it (Q55)');
     const data = visibleData(def, b.data ?? {});
@@ -130,7 +144,9 @@ export const registerHandlers = [
     // a key that is sent applies, an explicit null clears it (as the API does); read-only fields cannot be typed (Q45)
     const merged: Record<string, unknown> = { ...r.data };
     for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
-    r.data = visibleData(def, merged);
+    const next = visibleData(def, merged);
+    if (def.register_key === 'dismantle') { const errs = dismantleErrors(next); if (errs.length) return invalid(errs); }
+    r.data = next;
     if (b.data && !hasExpiry(r.data)) delete r.data.valid_to;
     step(r, 'edit', 1);
     touch(r); save();

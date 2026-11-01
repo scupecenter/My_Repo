@@ -639,12 +639,15 @@ Owner decision 2026-10-31 (plan §1), amends the earlier one-row layout. Dismant
 - **Rules** (owner decision 2026-10-31):
   - The RFD must exist before any later step.
   - A part closes only when its RN is received in the Warehouse register with a signed scan.
+  - *(owner decisions 2026-11-01, Q101)* The work start date must be on or after the RFD date (422 `start_before_rfd`). Once a part is closed (its approved, current version has `closed` = true) no new version of that part can be created (422 `part_closed`). Both are enforced in the database (migration 0022, trigger `dismantle_rules`).
+  - *(owner decision 2026-11-01, Q101)* Until the Warehouse register exists, a part closes with the `closed` flag plus `closing_rn_ref`. **Planned follow-up, not built:** when the Warehouse register is built, `closed` and `closing_rn_ref` are replaced by a link to the real RN record.
+  - *(owner decision 2026-11-01, Q101)* The dismantle reason list (Swap, Relocation, Cancellation, Other) is accepted as the seed and stays admin-editable.
   - `ProcurementRecord.scope` must accept the Dismantle scopes "CW Dismantle" and "TE Dismantle". It is documented today as CW or TE only (contract). This is a request to tech-lead.
 - **Links:**
   - E1 (FN, FS RFD) → E2 (FO / FT contractor, FP / FU planned, FQ / FV actual; SLA S-5 Cold Swap from DP to FV, Master DH) → E3 (FR / FW RN date; WH CW RN / TE RN; Q50).
   - Permits Access - Dismantle and PTW - Dismantle (Q64). PR-PO scopes CW Dismantle and TE Dismantle (Q52).
   - Readiness P Legacy Handover (Swap). Dashboard Swap & Relocation "CW / TE Dismantle overdue" (row 118).
-- **Built (migration 0021):** the register runs on the generic framework (record types `cw` and `te`, fields `rfd_date`, `rfd_document_ref`, `dismantle_reason`, `supervising_engineer`, `work_start_date`, `work_end_date`, `closing_rn_ref`, `closed`; rules in the trigger `dismantle_rules`). The RFD document is a reference text until the document section exists. **Not built yet:** a typed Dismantle table for the Master export, the close-by-RN link to Warehouse (Q101) and the screens.
+- **Built (migration 0021):** the register runs on the generic framework (record types `cw` and `te`, fields `rfd_date`, `rfd_document_ref`, `dismantle_reason`, `supervising_engineer`, `work_start_date`, `work_end_date`, `closing_rn_ref`, `closed`; rules in the trigger `dismantle_rules`, extended by migration 0022 with the start-after-RFD and closed-part rules). The RFD document is a reference text until the document section exists. **Not built yet:** a typed Dismantle table for the Master export, the close-by-RN link to Warehouse (planned, Q101) and the screens.
 - **Template:** `TPL-DSM` (ASSUMPTION). Columns Site ID, FN:FW (typed columns only).
 - **Form sections:** RFD and reason · CW dismantle (FN:FR) · TE dismantle (FS:FW) · Read-only links to Procurement, Permits & HSE and Warehouse · Legacy handover (read-only link to Readiness P).
 - **Validation:** an actual date needs RFD = Yes. The RN date needs a received RN in WH for the site (ASSUMPTION; Q50). Dismantle start needs typed confirmation and step-up MFA (CLAUDE.md "Typed confirmation … dismantle").

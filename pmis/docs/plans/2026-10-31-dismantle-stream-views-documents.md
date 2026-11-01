@@ -82,3 +82,33 @@ A separate O&M module, built in a later phase.
 2. Contract and migration for the Dismantle register, O&M role, handover engineer, write-through edits.
 3. Screens: Dismantle register, CW/TE/O&M tabs, document type settings.
 4. Refresh `HANDOVER.md`.
+
+## Status (updated 2026-11-01)
+
+| # | Item | State | Where |
+|---|---|---|---|
+| 1 | Spec and open questions match this plan | Done | PR #51, changelog 43 (new Q98, Q99, Q100) |
+| 2a | Dismantle register (CW/TE parts, RFD first, end >= start, closed needs RN ref) | Done | PR #52, migration 0021, changelog 44 |
+| 2b | Dismantle rules: work start >= RFD date; no new version of a closed part | Done | migration 0022, changelog 45 |
+| 2c | O&M role | Not started | needs contract + migration |
+| 2d | Handover engineer field (HOTO, delegated by the TE lead) | Not started | needs contract + migration |
+| 2e | Write-through edits from the work views to the source register | Not started | needs design + contract |
+| 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Not started (Q99 answered) | depends on 2e |
+| 3a | Dismantle register screen | Done (no Excel template yet) | web, generic register page, changelog 45 |
+| 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Not started (unblocked, Q98 answered) | next |
+| 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |
+| 4 | `HANDOVER.md` current | Ongoing | updated with every PR |
+| 5 | Document section: `.eml` and `.msg` in the ADR 0008 allow-list; no `.html` / `.mht` uploads | Not started (Q100 answered) | ADR 0008 amendment |
+| 6 | CPE / end-user installation module | Later phase | section 5 |
+
+Owner decisions 2026-11-01 (Q101):
+- A Dismantle part closes with the `closed` flag plus the RN reference now. It links to the real Warehouse RN record when the Warehouse register is built.
+- The reason list Swap, Relocation, Cancellation, Other is accepted as the seed; it stays admin-editable.
+- Work start must be on or after the RFD date, and a closed part cannot get a new version.
+
+Owner answers 2026-11-01: Q98 (streams stay the filter, three views as tabs), Q99 (move BU, EF, FO/FT now; DN/RN dates with Warehouse; CD with Contractors), Q100 (PDF and images by default; `.eml` and `.msg` for e-mail types; no `.html` / `.mht` uploads). No open question blocks the items above.
+
+Known follow-ups:
+- Warehouse register: needed for the RN link (Q101) and for DN/RN stock posting.
+- `matrix.test.ts` (MS9 `task_counts`): race with other suites on the shared test database; fixed in changelog 45.
+- Dismantle approved Excel template: not built.

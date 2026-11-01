@@ -61,7 +61,21 @@ const permits: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
-export const REGISTER_DEFS: RegisterDefinition[] = [procurement, gecol, hlc, permits];
+// Dismantle (migration 0021): two parts per site, record types cw and te; fields and sections as seeded in register_fields.
+const dismantle: RegisterDefinition = {
+  register_key: 'dismantle', name_en: 'Dismantle', name_ar: 'الفك', module_key: 'dismantle', site_scoped: true, multiple_per_site: true, record_types: ['cw', 'te'], approval_levels: 3,
+  fields: [
+    F('rfd_date', 'RFD Date', 'تاريخ طلب الفك (RFD)', 'date', 'RFD', { required: true, in_list: true }),
+    F('rfd_document_ref', 'RFD Document Reference', 'مرجع مستند طلب الفك', 'text', 'RFD'),
+    F('dismantle_reason', 'Dismantle Reason', 'سبب الفك', 'list', 'Reason', { in_list: true, options: ['Swap', 'Relocation', 'Cancellation', 'Other'] }),
+    F('supervising_engineer', 'Supervising Engineer', 'مهندس الإشراف', 'user', 'Supervision and work'),
+    F('work_start_date', 'Work Start Date', 'تاريخ بدء العمل', 'date', 'Supervision and work', { in_list: true }),
+    F('work_end_date', 'Work End Date', 'تاريخ انتهاء العمل', 'date', 'Supervision and work', { in_list: true }),
+    F('closing_rn_ref', 'Closing RN Reference', 'مرجع إيصال الإرجاع (RN)', 'text', 'Close'),
+    F('closed', 'Part Closed', 'الجزء مغلق', 'yes_no', 'Close', { in_list: true }),
+  ],
+};
+export const REGISTER_DEFS: RegisterDefinition[] = [procurement, gecol, hlc, permits, dismantle];
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PO': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PRM': 'permits_hse' };
 
 export type MockRecord = {
@@ -104,6 +118,8 @@ export function initRegisters() {
     rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: '2027-03-10' }),
     rec('permits_hse', null, 2, 'entry', { permit_type: 'PTW - CW', applied_date: '2026-10-10', status: 'Applied', has_expiry: true, jsa_tra: 'Done', stop_work: false }),
     rec('permits_hse', null, 3, 'approved', { permit_type: 'Civil Aviation Authority Permit', applied_date: '2026-08-01', status: 'Approved', valid_from: '2026-08-15', has_expiry: false }),
+    rec('dismantle', 'cw', 0, 'approved', { rfd_date: '2026-09-15', dismantle_reason: 'Swap', work_start_date: '2026-09-20', work_end_date: '2026-09-24', closing_rn_ref: 'RN-2026-0042', closed: true }),
+    rec('dismantle', 'te', 1, 'entry', { rfd_date: '2026-10-05', dismantle_reason: 'Relocation' }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

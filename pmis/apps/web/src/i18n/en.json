@@ -30,6 +30,7 @@
     "gecol": "GECOL",
     "hlc": "HLC Fiber",
     "permits_hse": "Permits & HSE",
+    "dismantle": "Dismantle",
     "group_registers": "Registers",
     "registers_soon": "More registers (coming soon)",
     "reg_contractors": "Contractors",
@@ -1364,6 +1365,10 @@
     "na": "Not applicable",
     "ptw": "Permit-to-work checks",
     "stop": "Stop work",
+    "rfd": "RFD",
+    "reason": "Reason",
+    "supervision_and_work": "Supervision and work",
+    "close": "Close",
     "details": "Details"
   },
   "registers": {
@@ -1398,7 +1403,8 @@
     "owner_procurement": "Procurement enters the purchase requests for civil works here. The GECOL team and the HLC team enter their own requests in their registers.",
     "owner_gecol": "The GECOL team enters its own purchase request and the power steps here, one row per site.",
     "owner_hlc": "The HLC team enters its own request here, one row per site. The request counts as a purchase request.",
-    "owner_permits": "One record per permit, renewals included. Choose whether the permit has an expiry date."
+    "owner_permits": "One record per permit, renewals included. Choose whether the permit has an expiry date.",
+    "owner_dismantle": "One record per site for each part, CW or TE. Enter the RFD first; a part closes only with the reference of its signed RN."
   },
   "regErrors": {
     "required": "{{field}} is required.",
@@ -1408,6 +1414,11 @@
     "future_date": "{{field}} cannot be in the future.",
     "not_in_list": "{{field}} must be one of the listed values.",
     "before_earlier": "{{field}} cannot be earlier than {{other}}.",
+    "rfd_required": "Enter the RFD date before any later step.",
+    "end_before_start": "The work end is before the work start.",
+    "rn_required": "A part closes only with the reference of its signed RN.",
+    "start_before_rfd": "The work start is before the RFD date.",
+    "part_closed": "This part is closed; it cannot get a new version.",
     "in_house_with_pr": "An in-house order has no purchase request. Clear the PR number.",
     "po_without_pr": "An outsourced order needs its PR number first.",
     "no_pr_po": "TE Installation has no PR, PO or WO. Clear those fields.",

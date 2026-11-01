@@ -7,8 +7,8 @@ import { G, approveAll, patch, post, recPath, team } from "./reg-helpers";
 import { actor, plainAdmin } from "./wf-helpers";
 
 /**
- * Migration 0021: Dismantle on the generic register framework. Two parts per site (record types cw and te), the RFD first, work end not
- * before work start, no future actual dates, a closed part needs its RN reference (Q101). Regions 3 and 4 are used by this suite only
+ * Migrations 0021 and 0022: Dismantle on the generic register framework. Two parts per site (record types cw and te), the RFD first, work start
+ * not before the RFD, work end not before work start, no future actual dates, a closed part needs its RN reference and gets no new version (Q101). Regions 3 and 4 are used by this suite only
  * (the registers suite writes the cells of regions 6 and 7), so the suites can run in parallel on one database.
  */
 let app: NestExpressApplication;
@@ -331,6 +331,45 @@ describe("rules enforced in the database", () => {
     });
   });
 
+  it("refuses a work start before the RFD date (the same day is fine), on create and on edit (0022 a)", async () => {
+    const t = await team(app, db, KEY, "dismantle", R);
+    const early = await t.entry.api.call("post", recPath(KEY), {
+      site_id: t.site.id,
+      record_type: "cw",
+      data: { ...RFD, work_start_date: "2026-01-31" },
+    });
+    expect(early.status).toBe(422);
+    expect(early.body.errors).toEqual([
+      expect.objectContaining({
+        path: "/data/work_start_date",
+        code: "start_before_rfd",
+      }),
+    ]);
+    const rec = await t.entry.api.call("post", recPath(KEY), {
+      site_id: t.site.id,
+      record_type: "cw",
+      data: { ...RFD, work_start_date: "2026-02-01" },
+    });
+    expect(rec.status).toBe(201);
+    const moveRfd = await patch(
+      t.entry.api,
+      KEY,
+      rec.body.id,
+      rec.body.version,
+      { data: { rfd_date: "2026-02-02" } },
+    );
+    expect(moveRfd.status).toBe(422);
+    expect(moveRfd.body.errors[0].code).toBe("start_before_rfd");
+    const moveStart = await patch(
+      t.entry.api,
+      KEY,
+      rec.body.id,
+      rec.body.version,
+      { data: { work_start_date: "2026-01-15" } },
+    );
+    expect(moveStart.body.errors[0].code).toBe("start_before_rfd");
+  });
+
   it("closes a part only with its RN reference, then runs the 3-level approval; the supervising engineer must be a user; no custom fields", async () => {
     const t = await team(app, db, KEY, "dismantle", R);
     const rec = await t.entry.api.call("post", recPath(KEY), {
@@ -395,7 +434,48 @@ describe("rules enforced in the database", () => {
     });
     const approved = await approveAll(t, rec.body.id, closed.body.version);
     expect(approved).toMatchObject({ state: "approved", is_current: true });
-    // an approved part is corrected by a new version, which keeps the same rules
+    // 0022 (b): a closed part is final, a new version is refused with a clear 422
+    const v2 = await post(
+      t.entry.api,
+      KEY,
+      rec.body.id,
+      "versions",
+      approved.version,
+    );
+    expect(v2.status).toBe(422);
+    expect(v2.body.errors).toEqual([
+      expect.objectContaining({ path: "/data/closed", code: "part_closed" }),
+    ]);
+    // permission denied: without the edit grant the refusal is the usual 403, not the rule
+    const viewOnly = await actor(app, db, {
+      grants: G("dismantle", "view"),
+      regions: [R],
+      modules: null,
+    });
+    expect(
+      (
+        await post(viewOnly.api, KEY, rec.body.id, "versions", approved.version)
+      ).status,
+    ).toBe(403);
+    const au = await db.query(
+      `SELECT after FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_approve'`,
+      [rec.body.id],
+    );
+    expect(au.rows[0].after.data.closing_rn_ref).toBe("TE-RN-0001");
+  });
+});
+
+describe("a closed part is final (0022 b)", () => {
+  it("allows a new version of an approved part that is not closed, and the version can close the part; then no more versions", async () => {
+    const t = await team(app, db, KEY, "dismantle", R);
+    const rec = await t.entry.api.call("post", recPath(KEY), {
+      site_id: t.site.id,
+      record_type: "cw",
+      data: { ...RFD, work_start_date: "2026-02-10" },
+    });
+    expect(rec.status).toBe(201);
+    const approved = await approveAll(t, rec.body.id, rec.body.version);
+    expect(approved.state).toBe("approved");
     const v2 = await post(
       t.entry.api,
       KEY,
@@ -404,16 +484,33 @@ describe("rules enforced in the database", () => {
       approved.version,
     );
     expect(v2.status).toBe(201);
-    const reopen = await patch(t.entry.api, KEY, v2.body.id, v2.body.version, {
-      data: { closing_rn_ref: null },
+    // the new version keeps the date rules
+    const bad = await patch(t.entry.api, KEY, v2.body.id, v2.body.version, {
+      data: { work_start_date: "2026-01-01" },
     });
-    expect(reopen.status).toBe(422);
-    expect(reopen.body.errors[0].code).toBe("rn_required");
-    const au = await db.query(
-      `SELECT after FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_approve'`,
-      [rec.body.id],
+    expect(bad.body.errors[0].code).toBe("start_before_rfd");
+    const closed = await patch(t.entry.api, KEY, v2.body.id, v2.body.version, {
+      data: { closed: true, closing_rn_ref: "CW-RN-0007" },
+    });
+    expect(closed.status).toBe(200);
+    const approved2 = await approveAll(t, v2.body.id, closed.body.version);
+    expect(approved2).toMatchObject({ state: "approved", is_current: true });
+    const v3 = await post(
+      t.entry.api,
+      KEY,
+      v2.body.id,
+      "versions",
+      approved2.version,
     );
-    expect(au.rows[0].after.data.closing_rn_ref).toBe("TE-RN-0001");
+    expect(v3.status).toBe(422);
+    expect(v3.body.errors[0]).toMatchObject({ code: "part_closed" });
+    // the database keeps the promise without the API
+    await expect(
+      db.query(
+        `INSERT INTO register_records (entity_id, version_no, supersedes_id, register_key, record_type, site_id, region_id, data) SELECT entity_id, 3, id, register_key, record_type, site_id, region_id, data FROM register_records WHERE id = $1`,
+        [v2.body.id],
+      ),
+    ).rejects.toThrow(/part_closed/);
   });
 });
 

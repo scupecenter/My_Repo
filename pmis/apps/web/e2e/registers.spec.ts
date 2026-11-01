@@ -41,6 +41,19 @@ for (const c of CASES) {
       await expect(page.locator('[data-testid^="reg-row-"][data-state="approved"]')).toHaveCount(1);
     });
 
+    test('dismantle: a closed part without its RN reference shows the server rule', async ({ page }) => {
+      await page.getByTestId('nav-dismantle').click();
+      await expect(page.getByTestId('page-register-dismantle')).toBeVisible();
+      await page.getByTestId('register-new').click();
+      await page.getByTestId('reg-site-search').fill('WM103');
+      await page.getByTestId('reg-site-opt-WM103').click();
+      await page.getByTestId('reg-record-type').selectOption('te');
+      await page.getByTestId('reg-field-rfd_date').fill('2026-09-01');
+      await page.getByTestId('reg-field-closed').check();
+      await page.getByTestId('reg-save').click();
+      await expect(page.getByTestId('reg-error-closing_rn_ref')).toBeVisible();
+    });
+
     test('permits: the expiry switch hides the date and marks the permit permanent', async ({ page }) => {
       await page.getByTestId('nav-permits_hse').click();
       await page.getByTestId('register-new').click();

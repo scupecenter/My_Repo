@@ -6,7 +6,7 @@ import type { RegisterDefinition, RegisterField } from '@/api/types';
  * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
  * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
-export const REGISTER_KEYS_LIVE = ['procurement', 'gecol', 'hlc', 'permits_hse'] as const;
+export const REGISTER_KEYS_LIVE = ['procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle'] as const;
 export const REGISTER_KEYS_SOON = ['contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings'] as const;
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
 
@@ -71,7 +71,7 @@ export function patchData(def: RegisterDefinition, before: Data, after: Data): D
 }
 
 /** Who enters what (Q56): the note shown under the title of each register. */
-export const OWNER_NOTE: Record<string, string> = { procurement: 'registers.owner_procurement', gecol: 'registers.owner_gecol', hlc: 'registers.owner_hlc', permits_hse: 'registers.owner_permits' };
+export const OWNER_NOTE: Record<string, string> = { procurement: 'registers.owner_procurement', gecol: 'registers.owner_gecol', hlc: 'registers.owner_hlc', permits_hse: 'registers.owner_permits', dismantle: 'registers.owner_dismantle' };
 
 /** Values a new form starts with. Q63c: the permit type gives the default of the expiry switch; the Setting is not in the contract, so Yes. */
 export const defaultsFor = (key: string): Data => (key === 'permits_hse' ? { has_expiry: true } : {});
@@ -79,7 +79,7 @@ export const defaultsFor = (key: string): Data => (key === 'permits_hse' ? { has
 export const DATE_MIN = '2020-01-01';
 export const DATE_MAX = '2035-12-31';
 /** Actual dates may not lie in the future (V2): the fields the server marks `is_actual`. The date of a task source is checked by the server at submit. */
-const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date', 'stop_lifted_date'] };
+const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date', 'stop_lifted_date'], dismantle: ['rfd_date', 'work_start_date', 'work_end_date'] };
 /** later >= earlier: the chronology rules the server enforces (spec §3; Q96 lists what is not enforced). */
 const ORDER: Record<string, [string, string][]> = {
   procurement: [['pr_date', 'po_wo_date']],
@@ -88,7 +88,8 @@ const ORDER: Record<string, [string, string][]> = {
   permits_hse: [['valid_from', 'valid_to']],
 };
 
-export type FieldIssue = { code: string; params?: Record<string, string> };
+/** `message` is the server's own sentence: shown when the code has no translation (rules the client does not know). */
+export type FieldIssue = { code: string; params?: Record<string, string>; message?: string };
 
 /** Mirrors the register rules of spec §1.2 and §3 so Submit stays off until they pass; the server repeats every check. */
 export function validateRecord(def: RegisterDefinition, data: Data, siteId: string | null, today: string): Record<string, FieldIssue> {

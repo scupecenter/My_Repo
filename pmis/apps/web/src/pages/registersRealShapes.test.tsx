@@ -185,3 +185,54 @@ describe('register drawer with the real record shape', () => {
     expect(latest.items.filter((r) => r.entity_id === recId(1)).map((r) => r.version_no)).toEqual([2]);   // the list shows the latest version of each logical record
   });
 });
+
+describe('Dismantle register (migration 0021): CW / TE parts and the server rules shown as they come', () => {
+  const site = (code: string) => api.get<{ items: { id: string }[] }>('/sites', { query: { q: code } }).then((r) => r.items[0]!.id);
+
+  it('serves the two parts and the 0021 fields; the page lists the seeded rows with their part', async () => {
+    await signIn('pm');
+    const defs = await api.get<{ items: RegisterDefinition[] }>('/registers');
+    const d = defs.items.find((x) => x.register_key === 'dismantle')!;
+    expect(d.record_types).toEqual(['cw', 'te']);
+    expect(d.fields.map((f) => f.code)).toEqual(['rfd_date', 'rfd_document_ref', 'dismantle_reason', 'supervising_engineer', 'work_start_date', 'work_end_date', 'closing_rn_ref', 'closed']);
+    renderApp(<Routed />, at('dismantle'));
+    expect(await screen.findByTestId('page-register-dismantle')).toBeInTheDocument();
+    expect(await screen.findByTestId(`reg-row-${recId(12)}`)).toHaveTextContent('CW');
+    expect(screen.getByTestId(`reg-row-${recId(13)}`)).toHaveTextContent('TE');
+  });
+
+  it('answers the 422 rules with /data/<code> paths: RFD first, end after start, closed needs the RN', async () => {
+    await signIn('pm');
+    const site_id = await site('TR101');
+    const fail = (data: Record<string, unknown>) => api.post('/registers/dismantle/records', { body: { site_id, record_type: 'te', data } }).then(() => [], (e) => (e.problem.errors as { path: string; code: string }[]).map((x) => `${x.path}:${x.code}`));
+    expect(await fail({ work_start_date: '2026-10-01' })).toEqual(['/data/work_start_date:rfd_required']);
+    expect(await fail({ rfd_date: '2026-09-01', work_start_date: '2026-10-05', work_end_date: '2026-10-01' })).toEqual(['/data/work_end_date:end_before_start']);
+    expect(await fail({ rfd_date: '2026-09-01', closed: true })).toEqual(['/data/closing_rn_ref:rn_required']);
+  });
+
+  it('shows the server sentence under the field, translated when the code is known and as sent when it is not', async () => {
+    await signIn('pm');
+    server.use(http.post(`${API_BASE}/registers/dismantle/records`, () => HttpResponse.json({ type: 'x', title: 'Bad', status: 422, code: 'validation_failed', errors: [
+      { path: '/data/work_end_date', code: 'end_before_start', message: 'The work end is before the work start.' },
+      { path: '/data/work_start_date', code: 'before_rfd', message: 'Work cannot start before the RFD date.' },
+    ] }, { status: 422 })));
+    renderApp(<Routed />, at('dismantle'));
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('register-new'));
+    await u.type(await screen.findByTestId('reg-site-search'), 'WM103');
+    await u.click(await screen.findByTestId('reg-site-opt-WM103'));
+    await u.selectOptions(screen.getByTestId('reg-record-type'), 'cw');
+    await u.type(screen.getByTestId('reg-field-rfd_date'), '2026-09-01');
+    await u.click(screen.getByTestId('reg-save'));
+    expect(await screen.findByTestId('reg-error-work_end_date')).toHaveTextContent('The work end is before the work start.');
+    expect(screen.getByTestId('reg-error-work_start_date')).toHaveTextContent('Work cannot start before the RFD date.');
+  });
+
+  it('refuses a second first-version CW part on a site that has one (TR101 is seeded) with 409 duplicate', async () => {
+    await signIn('pm');
+    const site_id = await site('TR101');
+    const body = { site_id, record_type: 'cw', data: { rfd_date: '2026-09-01' } };
+    const code = await api.post('/registers/dismantle/records', { body }).then(() => '', (e) => `${e.status}:${e.code}`);
+    expect(code).toBe('409:duplicate');
+  });
+});

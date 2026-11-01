@@ -10,7 +10,7 @@ export const fieldLabel = (f: RegisterField, lang: string) => (lang === 'ar' && 
 
 /** Plain sentence for one field problem (client check or server 422). */
 export function issueText(t: ReturnType<typeof useTranslation>['t'], label: string, i: FieldIssue, other?: (code: string) => string) {
-  return t(`regErrors.${i.code}`, { field: label, other: other?.(i.params?.other ?? '') ?? '', min: i.params?.min, max: i.params?.max, defaultValue: t('regErrors.invalid', { field: label }) });
+  return t(`regErrors.${i.code}`, { field: label, other: other?.(i.params?.other ?? '') ?? '', min: i.params?.min, max: i.params?.max, defaultValue: i.message || t('regErrors.invalid', { field: label }) });
 }
 
 type Person = { id: string; display_name: string; employee_id?: string | null };
