@@ -8,3 +8,7 @@ pmis/apps/web/node_modules/
 pmis/apps/web/dist/
 pmis/apps/web/test-results/
 pmis/apps/web/playwright-report/
+
+# Plugin session state (local only)
+.anchor/
+.claude-flow/

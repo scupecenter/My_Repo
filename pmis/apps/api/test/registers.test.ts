@@ -37,7 +37,7 @@ describe('catalogue and read access', () => {
     expect(res.body.items[0].fields.map((f: { code: string }) => f.code)).toContain('power_on_date');
     const admin = await plainAdmin(app, db);
     const all = await admin.api.call('get', '/registers');
-    expect(all.body.items.map((i: { register_key: string }) => i.register_key).sort()).toEqual(['gecol', 'hlc', 'permits_hse', 'procurement']);
+    expect(all.body.items.map((i: { register_key: string }) => i.register_key).sort()).toEqual(['dismantle', 'gecol', 'hlc', 'permits_hse', 'procurement']);
     const permits = all.body.items.find((i: { register_key: string }) => i.register_key === 'permits_hse');
     expect(permits.fields.find((f: { code: string }) => f.code === 'permit_type').options.map((o: { value: string }) => o.value)).toContain('Access - CW');
     expect(permits.fields.find((f: { code: string }) => f.code === 'na_approved_by').read_only).toBe(true);
