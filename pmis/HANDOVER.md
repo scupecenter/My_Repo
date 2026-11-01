@@ -38,6 +38,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 **Not verified in this refresh:** the number of operations in the contract, the current model count, and the state of every web screen. Check them in the code before quoting them. No server URL is recorded here: ask the owner or IT for the deployment address.
 
 ## 3. How to run what exists
+- **Developer setup (one command):** `bash pmis/tools/dev-setup.sh` starts PostgreSQL 16 with the CI test password, runs `npm ci` for api and web, and installs the scan tools. The same text can be pasted into the cloud environment's Setup script.
 - **Database:**
   ```
   createdb pmis_dev
