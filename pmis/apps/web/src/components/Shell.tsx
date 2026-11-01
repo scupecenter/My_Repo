@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, ShoppingCart, Zap, Cable, HardHat, Wrench, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, ShoppingCart, Zap, Cable, HardHat, Wrench, Users2, Warehouse, BadgeCheck, CircleAlert, TriangleAlert, GitPullRequest, Rocket, Ruler, CalendarDays, Radio, Landmark, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -12,7 +12,6 @@ import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
-import { REGISTER_KEYS_SOON } from '@/lib/registerForms';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
 
 export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'registers' | 'data' | 'admin' }[] = [
@@ -26,6 +25,17 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'r
   { key: 'hlc', to: '/registers/hlc', icon: <Cable size={18} />, group: 'registers' },
   { key: 'permits_hse', to: '/registers/permits_hse', icon: <HardHat size={18} />, group: 'registers' },
   { key: 'dismantle', to: '/registers/dismantle', icon: <Wrench size={18} />, group: 'registers' },
+  { key: 'contractors', to: '/registers/contractors', icon: <Users2 size={18} />, group: 'registers' },
+  { key: 'warehouse', to: '/warehouse', icon: <Warehouse size={18} />, group: 'registers' },
+  { key: 'quality', to: '/registers/quality', icon: <BadgeCheck size={18} />, group: 'registers' },
+  { key: 'issues', to: '/registers/issues', icon: <CircleAlert size={18} />, group: 'registers' },
+  { key: 'risks', to: '/registers/risks', icon: <TriangleAlert size={18} />, group: 'registers' },
+  { key: 'change_control', to: '/registers/change_control', icon: <GitPullRequest size={18} />, group: 'registers' },
+  { key: 'readiness', to: '/registers/readiness_handover', icon: <Rocket size={18} />, group: 'registers' },
+  { key: 'as_built', to: '/registers/as_built', icon: <Ruler size={18} />, group: 'registers' },
+  { key: 'meetings', to: '/registers/meetings', icon: <CalendarDays size={18} />, group: 'registers' },
+  { key: 'rf_design', to: '/registers/rf_design', icon: <Radio size={18} />, group: 'registers' },
+  { key: 'acquisition', to: '/registers/acquisition', icon: <Landmark size={18} />, group: 'registers' },
   { key: 'templates', to: '/templates', icon: <FileText size={18} />, group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: <Users size={18} />, group: 'admin' },
   { key: 'admin.roles', to: '/admin/roles', icon: <KeyRound size={18} />, group: 'admin' },
@@ -39,9 +49,6 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'r
   { key: 'announcements', to: '/admin/announcements', icon: <Megaphone size={18} />, group: 'admin' },
   { key: 'audit', to: '/audit', icon: <Eye size={18} />, group: 'admin' },
 ];
-
-/** The registers that are not built yet show as "coming soon" entries; `VITE_REGISTERS_SOON=false` hides them. */
-const SHOW_SOON = import.meta.env.VITE_REGISTERS_SOON !== 'false';
 
 /** Entries opened by a grant rather than by the server's module list (security log, online now). */
 const BY_GRANT: Record<string, string> = { 'admin.security_log': 'view_security_log', 'admin.online': 'manage_users' };
@@ -106,16 +113,6 @@ export function Shell() {
                       {n.key === 'messages' && unread > 0 && <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>}
                     </NavLink>
                   ))}
-                  {g === 'registers' && SHOW_SOON && (
-                    <details className="mt-1" data-testid="registers-soon">
-                      <summary className="cursor-pointer px-2 py-1 text-xs text-mute">{t('nav.registers_soon')}</summary>
-                      {REGISTER_KEYS_SOON.map((k) => (
-                        <NavLink key={k} to={`/registers/${k}`} data-testid={`nav-soon-${k}`} className={({ isActive }) => `flex items-center gap-3 rounded-md px-2 py-1.5 text-sm text-mute ${isActive ? 'bg-sideOn' : 'hover:bg-hover'}`}>
-                          <span className="flex-1">{t(`nav.reg_${k}`)}</span><span className="chip bg-lockBg text-lockInk">{t('common.soon_chip')}</span>
-                        </NavLink>
-                      ))}
-                    </details>
-                  )}
                 </div>
               );
             })}

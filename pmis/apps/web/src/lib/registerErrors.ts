@@ -11,6 +11,8 @@ export function registerErrorMessage(t: TFunction, e: unknown): string {
     if (e.status === 413) return t('regErrors.too_large');
     if (e.status === 404) return t('regErrors.not_found');
     if (e.code === 'duplicate') return t('regErrors.duplicate');
+    if (e.code === 'insufficient_stock') return t('regErrors.insufficient_stock');
+    if (e.code === 'item_in_use') return t('regErrors.item_in_use');
     if (e.code === 'freeze_active') return t('regErrors.freeze_active');
   }
   return taskErrorMessage(t, e);
