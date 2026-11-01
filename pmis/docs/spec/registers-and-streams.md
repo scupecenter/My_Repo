@@ -79,7 +79,7 @@ Source: CLAUDE.md "Site Register and streams". Stage numbers and tasks: cat; see
 | `DESIGN_ACQ` | Design & Acquisition / التصميم والاستحواذ | 1 | MS1 Site Release (V) | none | A1, A2, A3, A4, A5 |
 | `CW` | Civil Works / الأعمال المدنية | 2–4 | MS2 PRE-CW Completion (AW), MS3 CW Completion (BP), MS4 Site RFI (BZ) | G2 (W), G3 (AX), G4 (BQ) | B1–B7, B8–B11, B13, C1–C4 |
 | `TE` | Installation (TE) / التركيبات | 5–8 | MS5 TE Completion (CU), MS6 On-Air (DP), MS7 TE PAC (EL), MS8 KPI Acceptance (ES) | G5 (CA), G6 (CV), G7 (DQ), G8 (EM) | D1–D4, D4b, D5, D6, D7–D9, D10a, D10b, D10, D11–D16, F1, F2 (stage 8: Q39) |
-| `CLOSURE` | Handover & Closure / التسليم والإغلاق | 9–10 | MS9 HOTO (EY), MS10 Final Closure (FM) | G9 (ET), G10 (EZ) | D17, B14, B15, D18, Z1 (FAC holders: Q40); E1–E3 by seed placement (Q41) |
+| `CLOSURE` | Handover & Closure / التسليم والإغلاق | 9–10 | MS9 HOTO (EY), MS10 Final Closure (FM) | G9 (ET), G10 (EZ) | D17, B14, B15, D18, Z1 (FAC holders: Q40). *(owner decision 2026-10-31)* HOTO (MS9, G9, D17) is owned by the TE Team Lead and shown in the TE view (§2.6); FAC stays with the stream holders until the O&M team is assigned (Q40); Z1 stays with the Project Manager. E1–E3 are no longer placed here: Dismantle is its own register outside the stream mapping (Q41, §3.16) |
 
 Rules:
 - **SR-R1:** each stage belongs to exactly one stream in a workflow version. Changing the mapping is a light change, applied without migrating sites, because it changes the display only and not the gates (ASSUMPTION; CLAUDE.md "Milestones and phase gates are configurable": light vs structural). A gate is shown in the stream of the stage it opens (cat `stage_no` of the gate row).
@@ -96,7 +96,7 @@ Rules:
   - `Done`: the stream's last applicable milestone is achieved. CW ends at MS4, or at MS2 when RFI is N/A and CW is N/A. TE ends at MS8. CLOSURE ends at MS10.
   - `On Hold` and `Cancelled` from Overall Status (FZ) show as an overlay.
 - **SR-R4, the current step** is the first task of the stream that applies and is not approved, in catalogue order. Its state is one of Locked, Pending, Ongoing, Submitted, In review, Rejected (BP §03 "step states").
-- **SR-R5, editing in a sub-section** is limited to the stream's tasks. Fields of other streams appear read-only (identity, scope, the entry milestone of the previous stream). A matrix holder edits only the tasks of the stages they hold (CLAUDE.md Matrix; MX-01).
+- **SR-R5, editing in a sub-section** is limited to the stream's tasks. Fields of other streams appear read-only (identity, scope, the entry milestone of the previous stream). *(owner decision 2026-10-31)* Data owned by another register is editable from the view as a write-through edit to that register (§2.7). A matrix holder edits only the tasks of the stages they hold (CLAUDE.md Matrix; MX-01).
 - **SR-R6, the stream filter** in the main Site Register view keeps the columns of the chosen streams, plus Identity, Scope and Status. With no filter, all Master column groups show in Master order (BP §07 "site grid").
 - **Entry milestone of the next stream:** the TE sub-section shows the Site RFI date (or Site Release where RFI is N/A) read-only as its start condition. G5 opens from it (Master CA; D-1 SLA start, CLAUDE.md).
 - **Dashboard independence:** the Dashboard keeps its D67 blocks (CW block of 7 milestones; TE block of 6 milestones including HOTO and Final Closure) whatever the stream mapping. The stream KPIs below are sub-section headers, not the D67 tables.
@@ -232,7 +232,8 @@ In the grid the columns are grouped as in Master row 1. "Task" names the task (c
 | FK | Contractual Obligations Closure Date | calc | Readiness Q → Z1 |
 | FL, FM | Baseline, Milestone Final Closure | calc | Readiness U (Final Closure) |
 
-**Dismantle (Track E; stream placement open, Q41)**
+**Dismantle (Track E; outside the stream mapping, owner decision 2026-10-31, Q41)**
+The columns FN:FW are written from the Dismantle register and from the registers that hold the data (§3.16, §2.7). They are not entered in a stream sub-section.
 
 | Col | Field | Type | Task |
 |---|---|---|---|
@@ -280,6 +281,29 @@ Pattern for counts (D67): Scope = Done + Pending (its turn has come, including u
 | | D-17 and E2E-D2 within Max %; B06, B07 planning links | SLA sheet AO, AQ; D39 |
 | | Project Status activity 8 (HOTO item 8.2) | Project Status row 25 |
 | | DLP ending in the next 30 days (ASSUMPTION, uses the Expiring alert of D13) | Setting B8 |
+
+### 2.6 Work views CW / TE / O&M (owner decision 2026-10-31)
+Source: `docs/plans/2026-10-31-dismantle-stream-views-documents.md` §2; CLAUDE.md. Site Register shows all work per site. Under it are three views, and each view shows only its own steps.
+
+| View | Starts | Ends | Owner |
+|---|---|---|---|
+| CW Register | Site Release | Site RFI and CW acceptances | CW Team Lead |
+| TE Register | Site RFI | HOTO (includes stage 8 Cluster Optimization / KPI acceptance) | TE Team Lead |
+| O&M | after HOTO | FAC | O&M team |
+
+- **HOTO** is owned by the TE Team Lead, who can delegate a **handover engineer** (a new field on the HOTO task; the seed role "HOTO Engineer" exists). This changes Q37: HOTO is no longer in Closure.
+- The **O&M view and an O&M role are built now**. O&M users are added later.
+- **FAC:** until the O&M team is assigned, CW FAC stays with the CW Team Lead and TE FAC with the TE Team Lead (Q40). After the assignment, O&M follows DLP and FAC.
+- **Final Closure (Z1)** stays with the Project Manager.
+- The four-stream table in §2.2 stays the seed mapping of stages to streams. How the three views replace or sit beside it, where stage 1 (Design & Acquisition) and Z1 are shown, and how the sub-sections of §2.2 and the KPIs of §2.5 map to the views are not decided: Q98. The Dashboard D67 blocks are unchanged.
+
+### 2.7 Source of truth and write-through editing (owner decision 2026-10-31, option 2)
+Source: plan §4; Q73.
+- Each register (Procurement, Permits & HSE, Warehouse, Dismantle, GECOL, HLC, ...) is the source of truth for its data.
+- The work views (Site Register, CW, TE, O&M) **read** from the registers and show progress per site.
+- A user may also **edit from a work view**. The change is saved to the **source register**, with the same permission checks, approvals and audit log as an edit made in the register. **The view never keeps its own copy.**
+- Master columns that are typed in tasks today (BU, EF, FO/FT, see §4 gaps) move to their source register under this rule: BU and EF to As-Built (Q68), FO and FT to Dismantle / Procurement (Q49–Q52). The exact moves of other typed columns (for example CD, DN and RN dates) are not decided: Q99.
+- This replaces the stream-only edit scope of SR-R5 where it conflicts: a field owned by another register is editable from the view through that register's rules, not read-only. ASSUMPTION: it still needs the holder's permission on that register's matrix row.
 
 ---
 
@@ -597,13 +621,32 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 - **Validation:** Date and Title are required. An action item needs an owner and a due date.
 
 ### 3.16 Dismantle (`dismantle`) — Master FN:FW and DH; own matrix row (B11)
-- **Key:** Site ID, with a CW part and a TE part. **One row per site** in the Master.
+Owner decision 2026-10-31 (plan §1), amends the earlier one-row layout. Dismantle is its own register with **two parts: CW Dismantle and TE Dismantle**. It stays outside the stream mapping (Q41).
+- **Key:** Site ID + part (CW or TE). *(owner decision 2026-10-31)* Each site has up to one CW part and one TE part. The Master keeps one row per site (FN:FW), so the PMIS writes the two parts to the CW and TE column groups.
+- **Flow** (each part runs these 8 steps; data that belongs to another register stays there, §2.7):
+
+| Step | Data | Source of truth |
+|---|---|---|
+| 1. RFD (Request For Dismantle), trigger | RFD date, uploaded RFD document (usually an e-mail from Design & Acquisition) | Dismantle register (FN / FS) |
+| 2. Reason | dismantle reason (list, editable in settings) | Dismantle register |
+| 3. Assignment mode | In-House or Outsourced | Procurement register (`delivery`) |
+| 4. PR | PR number, PR date | Procurement register |
+| 5. PO/WO or internal team | PO/WO number and date, company name; or internal team and assignment date | Procurement register (scopes "CW Dismantle" / "TE Dismantle", Q24, Q52) |
+| 6. Permits | dismantle permit from the owner authority, other permits | Permits & HSE register (Access / PTW - Dismantle, Q64) |
+| 7. Supervision and work | supervising engineer, start and end dates, other work data | Dismantle register (FP:FQ, FU:FV) |
+| 8. Close | CW part: signed **CW RN** (civil and tower materials). TE part: signed **TE RN** (equipment) | Warehouse register; the RN record closes its part (FR / FW) |
+
+- **Rules** (owner decision 2026-10-31):
+  - The RFD must exist before any later step.
+  - A part closes only when its RN is received in the Warehouse register with a signed scan.
+  - `ProcurementRecord.scope` must accept the Dismantle scopes "CW Dismantle" and "TE Dismantle". It is documented today as CW or TE only (contract). This is a request to tech-lead.
 - **Links:**
   - E1 (FN, FS RFD) → E2 (FO / FT contractor, FP / FU planned, FQ / FV actual; SLA S-5 Cold Swap from DP to FV, Master DH) → E3 (FR / FW RN date; WH CW RN / TE RN; Q50).
   - Permits Access - Dismantle and PTW - Dismantle (Q64). PR-PO scopes CW Dismantle and TE Dismantle (Q52).
   - Readiness P Legacy Handover (Swap). Dashboard Swap & Relocation "CW / TE Dismantle overdue" (row 118).
+- **Not built yet** (plan §1): the Dismantle table in `schema.prisma`, the RFD upload, the reason list, the supervising engineer, the close-by-RN link and the screens.
 - **Template:** `TPL-DSM` (ASSUMPTION). Columns Site ID, FN:FW (typed columns only).
-- **Form sections:** CW dismantle (FN:FR) · TE dismantle (FS:FW) · Legacy handover (read-only link to Readiness P).
+- **Form sections:** RFD and reason · CW dismantle (FN:FR) · TE dismantle (FS:FW) · Read-only links to Procurement, Permits & HSE and Warehouse · Legacy handover (read-only link to Readiness P).
 - **Validation:** an actual date needs RFD = Yes. The RN date needs a received RN in WH for the site (ASSUMPTION; Q50). Dismantle start needs typed confirmation and step-up MFA (CLAUDE.md "Typed confirmation … dismantle").
 
 ### 3.17 Deliverables Log (Project Status `tblProgressLog`) — not in the register list (Q71)
@@ -629,7 +672,14 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 | Risk Register | 0 (project) | none (issues on materialization) |
 | As-Built | 1 | Master R, CZ; B13 (BU), D15 (EF) |
 | Meetings | 0 (multi-site) | none |
-| Dismantle | 1 (CW + TE parts) | E1, E2, E3 |
+| Dismantle | up to 2 (CW part, TE part) | E1, E2, E3 |
+
+### 3.19 Document section (owner decision 2026-10-31)
+Source: plan §3; CLAUDE.md "Document Library"; `stories-document-library-and-uploads.md`; ADR 0008.
+- One document section is the **single place for every upload**. It is fully configurable from settings, with no fixed values in code.
+- An admin can: add, edit or retire a **document type**; set **where each type appears** (register, stage, task, field); set the **file naming rule** per type (for example site code, type, date); set the **allowed formats** per type (PDF, images, e-mail: `.eml`, `.msg`, `.html` / `.htm`, `.mht` / `.mhtml`, others).
+- Allowed formats per type are **decided later** with the owner. Keep the options open (Q100).
+- ADR 0008 checks formats by magic bytes. Its allow-list needs entries for the e-mail formats. The spec exists; the build is not verified (plan §3).
 
 ---
 
@@ -1094,5 +1144,7 @@ Gaps found while tracing (each one is a question):
 
 ## 6. Notes for other agents (outside `docs/spec/`)
 - The contract enum `RegisterKey` (contracts/openapi.yaml) has no `rf_design` and no `acquisition`, which became registers on 2026-10-29. It uses `readiness_handover`, while the seed module key is `readiness`. This is for tech-lead.
-- The seed attaches E1–E3 to stage 10, so by default Dismantle falls in the CLOSURE stream (Q41).
+- The seed still attaches E1–E3 to stage 10. *(owner decision 2026-10-31)* Dismantle is outside the stream mapping (Q41), so the seed placement must change (tech-lead).
+- `ProcurementRecord.scope` must accept "CW Dismantle" and "TE Dismantle" (§3.16). The Dismantle table, the O&M role, the handover engineer field and write-through edits are not in the schema or the contract yet.
+- ADR 0008 checks formats by magic bytes; its allow-list needs entries for the e-mail formats of §3.19 (.eml, .msg, .html/.htm, .mht/.mhtml).
 - No stream entity exists in the seed or the contract yet. The stream mapping needs a table versioned with `workflow_definitions` (SR-R1).
