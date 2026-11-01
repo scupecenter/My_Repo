@@ -240,6 +240,8 @@
     "empty": "No site matches these filters.",
     "streams_label": "Streams",
     "stream_all": "All",
+    "views_label": "Views",
+    "view_all": "All work",
     "show_na": "Show N/A sites ({{count}})",
     "na_hint": "The stream does not apply to this site.",
     "stream_status": "Stream status",

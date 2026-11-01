@@ -95,9 +95,11 @@ A separate O&M module, built in a later phase.
 | 2e | Write-through edits from the work views to the source register | Not started | needs design + contract |
 | 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Not started (Q99 answered) | depends on 2e |
 | 3a | Dismantle register screen | Done (no Excel template yet) | web, generic register page, changelog 45 |
-| 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Not started (unblocked, Q98 answered) | next |
+| 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Done | contract 0.4.7, migration 0023, web tabs, changelog 46 |
 | 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |
 | 4 | `HANDOVER.md` current | Ongoing | updated with every PR |
+| 7 | Settings screen for `views.om_team_assigned` (O&M team switch) | Not started | Q102; with document type settings |
+| 8 | Export buttons pass the `view` filter | Not started | check the export filter accepts `view` |
 | 5 | Document section: `.eml` and `.msg` in the ADR 0008 allow-list; no `.html` / `.mht` uploads | Not started (Q100 answered) | ADR 0008 amendment |
 | 6 | CPE / end-user installation module | Later phase | section 5 |
 

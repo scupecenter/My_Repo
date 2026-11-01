@@ -95,6 +95,66 @@ describe('Site Register: streams', () => {
   });
 });
 
+describe('Site Register: views (contract 0.4.7)', () => {
+  it('offers All work, CW, TE and O&M as tabs named by the API, in EN and AR, and keeps the streams', async () => {
+    await signIn('pm');
+    renderApp(<Sites />, { route: '/sites' });
+    await waitFor(() => expect(within(screen.getByTestId('view-tabs')).getAllByRole('tab').map((x) => x.textContent)).toEqual(['All work', 'CW Register', 'TE Register', 'O&M']));
+    expect(screen.getByTestId('view-tabs')).toHaveAttribute('role', 'tablist');
+    expect(screen.getByTestId('stream-tabs')).toBeInTheDocument();
+  });
+
+  it('shows the Arabic names', async () => {
+    await signIn('pm');
+    renderApp(<Sites />, { route: '/sites', locale: 'ar' });
+    await waitFor(() => expect(within(screen.getByTestId('view-tabs')).getAllByRole('tab').map((x) => x.textContent)).toEqual(['كل الأعمال', 'سجل الأعمال المدنية', 'سجل التركيبات', 'التشغيل والصيانة']));
+  });
+
+  it('passes view to GET /sites, combines it with the stream, and moves between tabs with the arrow keys', async () => {
+    await signIn('pm');
+    const seen: string[] = [];
+    server.events.on('request:start', ({ request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/sites') && u.searchParams.get('view')) seen.push(u.search); });
+    renderApp(<Sites />, { route: '/sites?stream=CW' });
+    const tab = await screen.findByTestId('view-tabs-CW');
+    await userEvent.click(tab);
+    await waitFor(() => expect(seen.some((q) => q.includes('view=CW') && q.includes('stream=CW'))).toBe(true));
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+    tab.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByTestId('view-tabs-TE')).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByTestId('sites-empty')).toBeInTheDocument(); // stream CW and view TE share no task
+    await userEvent.click(screen.getByTestId('view-tabs-CW'));
+    expect(await screen.findByTestId('site-row-TR101')).toHaveAttribute('href', expect.stringMatching(/stream=CW&view=CW/));
+  });
+
+  it('the real 0.4.7 shapes: B15 in CW, D18 in TE, B14 in OM (O&M not assigned); stage 1 and Z1 only in All work', async () => {
+    await signIn('pm');
+    const id = siteIdOf(0);
+    const codes = async (view?: string) => (await api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { view } })).stages.flatMap((st) => st.tasks.map((x) => x.task_code));
+    const [cw, te, om, all] = await Promise.all([codes('CW'), codes('TE'), codes('OM'), codes()]);
+    expect(cw).toContain('B15'); expect(cw).not.toContain('D18'); expect(cw).not.toContain('B14'); expect(cw).not.toContain('A1');
+    expect(te).toContain('D18'); expect(te).not.toContain('B15');
+    expect(om).toEqual(['B14']);
+    expect(all).toEqual(expect.arrayContaining(['A1', 'B14', 'B15', 'D18']));
+    const grid = await api.get<SiteTasks>(`/sites/${id}/tasks`);
+    expect(grid.views?.map((v) => v.code)).toEqual(['CW', 'TE', 'OM']);
+    const list = await api.get<Page<SiteListItem>>('/sites', { query: { view: 'OM', limit: 3 } });
+    expect(list.items[0].views?.map((v) => v.code)).toEqual(['CW', 'TE', 'OM']);
+    await expect(api.get('/sites', { query: { view: 'NOPE' } })).rejects.toMatchObject({ status: 422 });
+  });
+
+  it('the site page grid follows the view and the stream together (intersection)', async () => {
+    await signIn('pm');
+    renderApp(<SiteAt />, { route: `/sites/${siteIdOf(0)}?view=TE` });
+    expect(await screen.findByTestId('grid-stage-te_installation')).toBeInTheDocument();
+    expect(screen.queryByTestId('grid-stage-cw')).toBeNull();
+    await userEvent.click(await screen.findByTestId('site-view-tabs-OM'));
+    await waitFor(() => expect(screen.queryByTestId('grid-stage-te_installation')).toBeNull());
+    await userEvent.click(screen.getByTestId('site-view-tabs-ALL'));
+    expect(await screen.findByTestId('grid-stage-cw')).toBeInTheDocument();
+  });
+});
+
 describe('Task actions on the real endpoints', () => {
   const asReviewer = async () => {
     await signIn('reviewer');

@@ -3,8 +3,9 @@ import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useRegions, useSites, useStreams, type SiteFilters } from '@/api/sites';
+import { useRegions, useSites, useStreams, useViews, type SiteFilters } from '@/api/sites';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
+import { ViewTabs } from '@/components/ViewTabs';
 import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
@@ -30,20 +31,23 @@ export function Sites() {
   const { t, i18n } = useTranslation();
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
-  const [f, setF] = useState<Omit<SiteFilters, 'stream'>>({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' });
+  const view = sp.get('view') ?? '';
+  const [f, setF] = useState<Omit<SiteFilters, 'stream' | 'view'>>({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' });
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
+  const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
   const regions = useRegions();
+  const viewsQ = useViews();
   const streamsQ = useStreams();
   const tabs = withDismantle(streamsQ.data);
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
-  const q = useSites({ ...f, ...(real ? { stream } : {}) }, !dismantle);
+  const q = useSites({ ...f, ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, stage_code: '' }, real);
+  const allQ = useSites({ ...f, stage_code: '', ...(view ? { view } : {}) }, real);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -61,7 +65,7 @@ export function Sites() {
   const ncols = real
     ? 'grid grid-cols-[80px_minmax(130px,1.3fr)_90px_120px_150px_90px_70px_110px] items-center gap-3 px-4'
     : 'grid grid-cols-[90px_minmax(140px,1.4fr)_100px_110px_120px_150px_90px] items-center gap-3 px-4';
-  const linkTo = (s: SiteListItem) => `/sites/${s.id}${real ? `?stream=${stream}` : ''}`;
+  const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
 
   return (
     <div data-testid="page-sites">
@@ -73,6 +77,7 @@ export function Sites() {
             className={`px-4 py-2 text-sm font-semibold ${stream === s.code ? 'border-b-2 border-accent text-accentText' : 'text-mute hover:text-ink'}`}>{s.label}</button>
         ))}
       </div>
+      <ViewTabs views={viewsQ.data} value={view} onChange={setView} testid="view-tabs" />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />

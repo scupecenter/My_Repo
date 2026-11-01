@@ -53,3 +53,36 @@ for (const c of CASES) {
     await expect(page.getByTestId('stream-dismantle-todo')).toBeVisible();
   });
 }
+
+// View tabs (Q98, contract 0.4.7): All work, CW, TE, O&M beside the streams.
+const VIEW_CASES = [
+  { locale: 'en', theme: 'light', all: 'All work', names: ['CW Register', 'TE Register', 'O&M'] },
+  { locale: 'ar', theme: 'dark', all: 'كل الأعمال', names: ['سجل الأعمال المدنية', 'سجل التركيبات', 'التشغيل والصيانة'] },
+] as const;
+
+for (const c of VIEW_CASES) {
+  test(`view tabs on the Site Register and the site grid (${c.locale}/${c.theme})`, async ({ page }) => {
+    await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [c.locale, c.theme]);
+    await login(page, 'pm');
+    await page.getByTestId('nav-sites').click();
+    const tabs = page.getByTestId('view-tabs').getByRole('tab');
+    await expect(tabs).toHaveCount(4);
+    await expect(tabs).toHaveText([c.all, ...c.names]);
+
+    // the request carries view=TE; keyboard: arrow keys move between tabs (mirrored in RTL)
+    const req = page.waitForRequest((r) => r.url().includes('/sites?') && r.url().includes('view=TE'));
+    await page.getByTestId('view-tabs-ALL').focus();
+    await page.keyboard.press(c.locale === 'ar' ? 'ArrowLeft' : 'ArrowRight');
+    await page.keyboard.press(c.locale === 'ar' ? 'ArrowLeft' : 'ArrowRight');
+    await req;
+    await expect(page.getByTestId('view-tabs-TE')).toHaveAttribute('aria-selected', 'true');
+
+    // the site page keeps the view; the O&M view holds only B14
+    await page.getByTestId('site-row-TR101').click();
+    await expect(page.getByTestId('site-view-tabs-TE')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('grid-stage-te_installation')).toBeVisible();
+    await page.getByTestId('site-view-tabs-OM').click();
+    await expect(page.getByTestId('grid-stage-final_closure')).toBeVisible();
+    await expect(page.getByTestId('grid-stage-te_installation')).toHaveCount(0);
+  });
+}

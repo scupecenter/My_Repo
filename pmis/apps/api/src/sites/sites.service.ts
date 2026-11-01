@@ -68,6 +68,13 @@ export interface StreamDto {
   sort_order: number;
 }
 
+export type ViewRefDto = StreamDto;
+
+export interface ViewDto extends ViewRefDto {
+  stage_codes: string[];
+  task_codes: string[];
+}
+
 export interface StreamStatusDto extends StreamDto {
   state: 'not_started' | 'in_progress' | 'done' | 'na';
   current_stage: string | null;
@@ -77,8 +84,25 @@ export interface StreamStatusDto extends StreamDto {
   milestone_date: string | null;
 }
 
-/** Aggregates of one stage of one site. Used for the filters and, again, for the page that is returned. */
-const STAGE_AGG = Prisma.sql`
+/** The O&M team is assigned (setting views.om_team_assigned, default false, Q102): CW FAC and TE FAC then move to the O&M view. */
+const OM_ASSIGNED = Prisma.sql`((calc_setting('views.om_team_assigned', 'false'::jsonb) #>> '{}') = 'true')`;
+
+/** The tasks (id, stage_id) of a view in the workflow version of the stage they are joined to: whole stages, or single tasks, as the view's members say. */
+const viewTasks = (view: string): Prisma.Sql => Prisma.sql`
+  SELECT vtd.id, vtd.stage_id FROM task_definitions vtd JOIN stage_definitions vst ON vst.id = vtd.stage_id
+  JOIN workflow_view_members vm ON vm.workflow_id = vst.workflow_id AND vm.view_code = ${view}
+    AND ((vm.member_kind = 'stage' AND vm.member_code = vst.code) OR (vm.member_kind = 'task' AND vm.member_code = vtd.code))
+    AND (vm.om_assigned IS NULL OR vm.om_assigned = ${OM_ASSIGNED})
+  WHERE vtd.is_active AND vst.is_active`;
+/** `AND <task def column> IN (tasks of the view)`; column is an alias written in this file, never user input. */
+const inView = (view: string | undefined, col: string): Prisma.Sql =>
+  view ? Prisma.sql`AND ${Prisma.raw(col)} IN (SELECT v.id FROM (${viewTasks(view)}) v)` : Prisma.empty;
+/** `AND st.id IN (stages that have a task of the view)`. */
+const stageInView = (view: string | undefined, col = 'st.id'): Prisma.Sql =>
+  view ? Prisma.sql`AND ${Prisma.raw(col)} IN (SELECT v.stage_id FROM (${viewTasks(view)}) v)` : Prisma.empty;
+
+/** Aggregates of one stage of one site (over the tasks of a view, when given). Used for the filters and, again, for the page that is returned. */
+const stageAgg = (view?: string): Prisma.Sql => Prisma.sql`
   LEFT JOIN LATERAL (
     SELECT count(*) FILTER (WHERE td.counts_toward_milestone AND NOT t.is_na AND t.state NOT IN ('na', 'skipped')) AS total,
       count(*) FILTER (WHERE td.counts_toward_milestone AND t.state = 'approved') AS done,
@@ -91,7 +115,7 @@ const STAGE_AGG = Prisma.sql`
       (max(t.actual_date) FILTER (WHERE td.is_milestone_task AND t.state = 'approved'))::text AS ms_date,
       min(t.due_date) FILTER (WHERE t.state NOT IN ('approved', 'na', 'skipped')) AS next_due
     FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id
-    WHERE t.site_id = s.id AND td.stage_id = st.id
+    WHERE t.site_id = s.id AND td.stage_id = st.id ${inView(view, 'td.id')}
   ) a ON true`;
 
 const stageDone = (r: StageRow): boolean => r.ms_done || (!r.has_ms && Number(r.total) > 0 && Number(r.done) >= Number(r.total));
@@ -129,6 +153,21 @@ export class SitesService {
     return out;
   }
 
+  /** The views of the workflow versions with the stages and tasks in force now (members that wait for the O&M assignment are left out until it is made). */
+  private async viewsOf(workflowIds: string[]): Promise<Map<string, ViewDto[]>> {
+    const out = new Map<string, ViewDto[]>();
+    if (workflowIds.length === 0) return out;
+    const rows = await this.db.tx.$queryRaw<(ViewDto & { workflow_id: string })[]>(Prisma.sql`
+      SELECT v.workflow_id::text AS workflow_id, v.code, v.name_en, v.name_ar, v.sort_order,
+        coalesce(array_agg(m.member_code ORDER BY length(m.member_code), m.member_code) FILTER (WHERE m.member_kind = 'stage'), '{}') AS stage_codes,
+        coalesce(array_agg(m.member_code ORDER BY length(m.member_code), m.member_code) FILTER (WHERE m.member_kind = 'task'), '{}') AS task_codes
+      FROM workflow_views v
+      LEFT JOIN workflow_view_members m ON m.workflow_id = v.workflow_id AND m.view_code = v.code AND (m.om_assigned IS NULL OR m.om_assigned = ${OM_ASSIGNED})
+      WHERE v.workflow_id = ANY(${workflowIds}::uuid[]) GROUP BY v.workflow_id, v.code, v.name_en, v.name_ar, v.sort_order ORDER BY v.sort_order`);
+    for (const { workflow_id, ...v } of rows) out.set(workflow_id, [...(out.get(workflow_id) ?? []), v]);
+    return out;
+  }
+
   // ------------------------------------------------------------------ GET /sites
   async list(auth: AuthContext, q: Record<string, unknown>): Promise<unknown> {
     const regions = await this.access.requireRegions('sites', 'view');
@@ -146,6 +185,7 @@ export class SitesService {
     const batch = oneParam(q, 'delivery_batch');
     const wfv = oneParam(q, 'workflow_version');
     const stream = oneParam(q, 'stream');
+    const view = oneParam(q, 'view');
     const sort = oneParam(q, 'sort') ?? 'site_code';
     const regionIds = this.intList(q, 'region_id', 1, 7);
     if (scenario !== undefined && !SCENARIOS.includes(scenario)) throw problems.validation([{ path: '/scenario', code: 'invalid', message: 'Unknown delivery scenario.' }]);
@@ -153,7 +193,8 @@ export class SitesService {
     if (!(BUCKETS as readonly string[]).includes(bucket)) throw problems.validation([{ path: '/bucket', code: 'invalid', message: 'Unknown bucket.' }]);
     if (!(SORTS as readonly string[]).includes(sort)) throw problems.validation([{ path: '/sort', code: 'invalid', message: 'Unknown sort.' }]);
     if (wfv !== undefined && !/^[0-9]{1,6}$/.test(wfv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
-    if (stream !== undefined) await this.requireStream(stream);
+    if (stream !== undefined) await this.requireGroup('stream', stream);
+    if (view !== undefined) await this.requireGroup('view', view);
 
     const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
     if (regions !== null) where.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
@@ -171,13 +212,13 @@ export class SitesService {
 
     const post: Prisma.Sql[] = [];
     if (stageCode) post.push(Prisma.sql`ss.cur_stage = ${stageCode}`);
-    if (stream) post.push(Prisma.sql`coalesce(ss.has_work, false)`);
+    if (stream || view) post.push(Prisma.sql`coalesce(ss.has_work, false)`);
     if (bucket === 'late') post.push(Prisma.sql`coalesce(ss.late, 0) > 0`);
     else if (bucket === 'waiting_approval') post.push(Prisma.sql`coalesce(ss.waiting, 0) > 0`);
     else if (bucket === 'closed') post.push(Prisma.sql`(vis.overall_status = 'completed' OR (coalesce(ss.all_done, false) AND coalesce(ss.has_work, false)))`);
     else if (bucket === 'mine') {
       post.push(Prisma.sql`EXISTS (SELECT 1 FROM task_instances tt JOIN task_definitions tdd ON tdd.id = tt.task_def_id JOIN stage_definitions stt ON stt.id = tdd.stage_id
-        WHERE tt.site_id = vis.id AND tt.state IN ('open', 'entry', 'in_review', 'in_approval') ${stream ? Prisma.sql`AND stt.stream_code = ${stream}` : Prisma.empty}
+        WHERE tt.site_id = vis.id AND tt.state IN ('open', 'entry', 'in_review', 'in_approval') ${stream ? Prisma.sql`AND stt.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'tdd.id')}
         AND (tt.ball_in_court_user_id = ${auth.user.id}::uuid OR wf_is_eligible(tt.id,
               wf_kind(CASE WHEN tt.path_frozen_at IS NULL THEN wf_levels_live(tt.id) ELSE tt.levels_required END, greatest(tt.current_level, 1)), ${auth.user.id}::uuid)))`);
     }
@@ -200,8 +241,8 @@ export class SitesService {
           (a.ms_done OR (NOT a.has_ms AND a.total > 0 AND a.done >= a.total)) AS is_done,
           ((a.has_ms AND a.ms_na AND NOT a.ms_done) OR (NOT a.has_ms AND a.total = 0)) AS is_na
         FROM vis AS s
-        JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty}
-        ${STAGE_AGG}
+        JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${stageInView(view)}
+        ${stageAgg(view)}
       ), ss AS (
         SELECT site_id, (array_agg(code ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_stage,
           (array_agg(seq ORDER BY seq) FILTER (WHERE NOT is_done AND NOT is_na))[1] AS cur_seq,
@@ -218,7 +259,7 @@ export class SitesService {
       LIMIT ${limit + 1} OFFSET ${offset}`);
 
     const page = rows.slice(0, limit);
-    const items = await this.listItems(page, stream);
+    const items = await this.listItems(page, stream, view);
     return {
       items,
       page: {
@@ -240,34 +281,40 @@ export class SitesService {
     });
   }
 
-  private async requireStream(code: string, workflowId?: string): Promise<void> {
-    if (!/^[A-Z][A-Z0-9_]{1,30}$/.test(code)) throw problems.validation([{ path: '/stream', code: 'invalid', message: 'stream is a stream code such as CW.' }]);
-    const rows = workflowId
-      ? await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*) AS n FROM workflow_streams WHERE code = ${code} AND workflow_id = ${workflowId}::uuid`)
-      : await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`SELECT count(*) AS n FROM workflow_streams WHERE code = ${code}`);
-    if (Number(rows[0]?.n ?? 0) === 0) throw problems.validation([{ path: '/stream', code: 'unknown_stream', message: `There is no stream ${code}.` }]);
+  /** 422 for a stream or view code that is malformed or that no workflow version (or the given one) has. */
+  private async requireGroup(kind: 'stream' | 'view', code: string, workflowId?: string): Promise<void> {
+    if (!/^[A-Z][A-Z0-9_]{1,30}$/.test(code)) throw problems.validation([{ path: `/${kind}`, code: 'invalid', message: `${kind} is a ${kind} code such as CW.` }]);
+    const table = Prisma.raw(kind === 'stream' ? 'workflow_streams' : 'workflow_views');
+    const rows = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+      SELECT count(*) AS n FROM ${table} WHERE code = ${code} ${workflowId ? Prisma.sql`AND workflow_id = ${workflowId}::uuid` : Prisma.empty}`);
+    if (Number(rows[0]?.n ?? 0) === 0) throw problems.validation([{ path: `/${kind}`, code: `unknown_${kind}`, message: `There is no ${kind} ${code}.` }]);
   }
 
   /** Per-site items for a page (or one site): the stage rows of the site's whole workflow are read once, then rail and streams are built from them. */
-  private async listItems(page: SiteRow[], stream: string | undefined): Promise<Record<string, unknown>[]> {
+  private async listItems(page: SiteRow[], stream: string | undefined, view: string | undefined): Promise<Record<string, unknown>[]> {
     if (page.length === 0) return [];
     const ids = page.map((p) => p.id);
-    const stages = await this.db.tx.$queryRaw<StageRow[]>(Prisma.sql`
+    const stageRows = (v?: string): Promise<StageRow[]> => this.db.tx.$queryRaw<StageRow[]>(Prisma.sql`
       SELECT s.id::text AS site_id, st.code, st.seq, st.stream_code, st.name_en, st.name_ar,
         a.total, a.done, a.late, a.waiting, a.started, a.has_ms, a.ms_done, a.ms_na, a.ms_date
       FROM sites s
-      JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active
-      ${STAGE_AGG}
+      JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active ${stageInView(v)}
+      ${stageAgg(v)}
       WHERE s.id = ANY(${ids}::uuid[]) ORDER BY s.id, st.seq`);
-    const streams = await this.streamsOf([...new Set(page.map((p) => p.workflow_id))]);
+    const stages = await stageRows();
+    const inScope = view ? await stageRows(view) : stages; // a view counts only its own tasks, so its stage rows are read again
+    const workflowIds = [...new Set(page.map((p) => p.workflow_id))];
+    const streams = await this.streamsOf(workflowIds);
+    const views = await this.viewsOf(workflowIds);
     return page.map((site) => {
       const all = stages.filter((r) => r.site_id === site.id);
-      const scope = stream ? all.filter((r) => r.stream_code === stream) : all;
-      return this.siteItem(site, all, scope, streams.get(site.workflow_id) ?? []);
+      const mine = inScope.filter((r) => r.site_id === site.id);
+      const scope = stream ? mine.filter((r) => r.stream_code === stream) : mine;
+      return this.siteItem(site, all, scope, streams.get(site.workflow_id) ?? [], (views.get(site.workflow_id) ?? []).map((v) => ({ code: v.code, name_en: v.name_en, name_ar: v.name_ar, sort_order: v.sort_order })));
     });
   }
 
-  private siteItem(site: SiteRow, all: StageRow[], scope: StageRow[], streams: StreamDto[]): Record<string, unknown> {
+  private siteItem(site: SiteRow, all: StageRow[], scope: StageRow[], streams: StreamDto[], views: ViewRefDto[]): Record<string, unknown> {
     const open = scope.filter((r) => !stageDone(r) && !stageNa(r));
     const current = open[0];
     const doneRows = scope.filter(stageDone);
@@ -291,6 +338,7 @@ export class SitesService {
       waiting_approval_count: scope.reduce((n, r) => n + Number(r.waiting), 0),
       rail,
       streams: streams.map((s) => this.streamStatus(s, all.filter((r) => r.stream_code === s.code))),
+      views,
     };
   }
 
@@ -331,7 +379,7 @@ export class SitesService {
     const regions = await this.access.requireRegions('sites', 'view');
     const site = await this.siteRow(regions, id);
     if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
-    const [item] = await this.listItems([site], undefined);
+    const [item] = await this.listItems([site], undefined, undefined);
     if (!item) throw problems.notFound();
 
     const nodes = await this.pipeline(site);
@@ -407,7 +455,7 @@ export class SitesService {
       SELECT s.id::text AS site_id, st.code, st.seq, st.stream_code, st.name_en, st.name_ar,
         a.total, a.done, a.late, a.waiting, a.started, a.has_ms, a.ms_done, a.ms_na, a.ms_date
       FROM sites s JOIN stage_definitions st ON st.workflow_id = s.workflow_version_id AND st.is_active
-      ${STAGE_AGG}
+      ${stageAgg()}
       WHERE s.id = ${site.id}::uuid ORDER BY st.seq`);
     // gate_eval (migration 0017): the gate date (previous milestone date, later when a required permit starts later, shifted by Change Control) and why it is closed
     const gates = await this.db.tx.$queryRaw<{ link_code: string; seq: number; name_en: string; name_ar: string | null; from_code: string; to_code: string;
@@ -482,13 +530,15 @@ export class SitesService {
     const site = await this.siteRow(regions, id);
     if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
     const stream = oneParam(q, 'stream');
-    if (stream !== undefined) await this.requireStream(stream, site.workflow_id);
+    if (stream !== undefined) await this.requireGroup('stream', stream, site.workflow_id);
+    const view = oneParam(q, 'view');
+    if (view !== undefined) await this.requireGroup('view', view, site.workflow_id);
     void auth;
     const stages = await this.db.tx.$queryRaw<{ id: string; code: string; stream_code: string | null; name_en: string; name_ar: string | null }[]>(Prisma.sql`
       SELECT id::text AS id, code, stream_code, name_en, name_ar FROM stage_definitions
-      WHERE workflow_id = ${site.workflow_id}::uuid AND is_active ${stream ? Prisma.sql`AND stream_code = ${stream}` : Prisma.empty} ORDER BY seq`);
+      WHERE workflow_id = ${site.workflow_id}::uuid AND is_active ${stream ? Prisma.sql`AND stream_code = ${stream}` : Prisma.empty} ${stageInView(view, 'stage_definitions.id')} ORDER BY seq`);
     const rows = await this.view.rows(taskSelect(
-      Prisma.sql`t.site_id = ${site.id}::uuid ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty}`,
+      Prisma.sql`t.site_id = ${site.id}::uuid ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'td.id')}`,
       Prisma.sql`ORDER BY st.seq, td.sort_order, td.code`,
     ));
     const summaries = await this.view.withLockReasons(rows);
@@ -499,9 +549,11 @@ export class SitesService {
       byStage.set(t.stage_code, list);
     }
     const streams = (await this.streamsOf([site.workflow_id])).get(site.workflow_id) ?? [];
+    const views = (await this.viewsOf([site.workflow_id])).get(site.workflow_id) ?? [];
     return {
       workflow_version: site.workflow_version,
       streams,
+      views,
       stages: stages.map((st) => ({ code: st.code, stream_code: st.stream_code, name_en: st.name_en, name_ar: st.name_ar, tasks: byStage.get(st.code) ?? [] })),
     };
   }

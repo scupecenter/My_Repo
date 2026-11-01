@@ -1,4 +1,5 @@
 import type { DocumentSlot, PipelineNode, SiteDetail, SiteListItem, SiteTasks, StreamStatus } from '@/api/types';
+import type { View } from '@/api/types';
 import { db, toSummary, type MockTask } from './db';
 import { STAGE_CODES } from './matrixData';
 
@@ -27,6 +28,7 @@ const DEFS: [number, string, string, string, [number, number] | null, string | n
   [7, 'F1', 'Cluster optimization', 'تحسين المجموعة', null, 'Optimization Report', 'TPL-SITE'],
   [8, 'D17', 'HOTO package', 'حزمة HOTO', [3, 5], 'HOTO', 'TPL-SITE'],
   [9, 'B15', 'CW FAC', 'FAC الأعمال المدنية', [3, 10], 'CW FAC', 'TPL-SITE'], [9, 'D18', 'TE FAC', 'FAC لـ TE', [3, 10], 'TE FAC', 'TPL-SITE'],
+  [9, 'B14', 'CW DLP', 'فترة ضمان الأعمال المدنية', null, null, 'TPL-SITE'], // appended last so the ids of the other tasks do not move
 ];
 
 /** Default streams (CLAUDE.md) and the stage -> stream mapping of the mock stage codes. The API has no DISMANTLE stream yet, so the mock has none either. */
@@ -37,6 +39,17 @@ export const STREAMS = [
   { code: 'CLOSURE', name_en: 'Handover & Closure', name_ar: 'التسليم والإغلاق', sort_order: 4 },
 ];
 const STREAM_OF = ['DESIGN_ACQ', 'CW', 'CW', 'CW', 'TE', 'TE', 'TE', 'TE', 'CLOSURE', 'CLOSURE'];
+/** The views of contract 0.4.7 with the seed membership (migration 0023) while `views.om_team_assigned` is false: B15 in CW, D18 in TE, B14 in OM. Stage 1 and Z1 are in no view. */
+export const VIEWS: View[] = [
+  { code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', sort_order: 1, stage_codes: [STAGE_CODES[1], STAGE_CODES[2], STAGE_CODES[3]], task_codes: ['B15'] },
+  { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', sort_order: 2, stage_codes: STAGE_CODES.slice(4, 9), task_codes: ['D18'] },
+  { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sort_order: 3, stage_codes: [], task_codes: ['B14'] },
+];
+export const VIEW_REFS = VIEWS.map(({ code, name_en, name_ar, sort_order }) => ({ code, name_en, name_ar, sort_order }));
+const inView = (t: { stage_code: string; task_code: string }, view?: string) => {
+  const v = VIEWS.find((x) => x.code === view);
+  return !view || (!!v && (v.stage_codes.includes(t.stage_code) || v.task_codes.includes(t.task_code)));
+};
 export const streamOfStage = (code: string) => STREAM_OF[STAGE_CODES.indexOf(code as never)] ?? null;
 
 const pad = (n: number, w = 12) => String(n).padStart(w, '0');
@@ -118,8 +131,8 @@ export function pipelineOf(i: number): PipelineNode[] {
 const bad = (p: PipelineNode[]) => p.map((n) => ({ code: n.code, state: n.state === 'locked' || n.state === 'awaiting_confirmation' ? 'planned' : n.state }));
 
 /** The status of one site in each stream, with the real shape of `StreamStatus` (stages and counting tasks of the stream only). */
-export function streamStatuses(i: number): StreamStatus[] {
-  const tasks = siteTasks(i);
+export function streamStatuses(i: number, view?: string): StreamStatus[] {
+  const tasks = siteTasks(i).filter((t) => inView(t, view));
   return STREAMS.map((s) => {
     const stages = STAGE_CODES.filter((c) => streamOfStage(c) === s.code);
     const own = tasks.filter((t) => stages.includes(t.stage_code as never) && t.state !== 'na');
@@ -134,16 +147,19 @@ export function streamStatuses(i: number): StreamStatus[] {
   });
 }
 
-export function listItem(i: number, stream?: string): SiteListItem {
-  const m = siteMeta(i), pipe = pipelineOf(i).filter((n) => !stream || streamOfStage(n.code) === stream);
-  const tasks = siteTasks(i).filter((t) => !stream || streamOfStage(t.stage_code) === stream);
+/** Tasks of a site in the stream and the view (an intersection, contract 0.4.7). */
+export const scopedTasks = (i: number, stream?: string, view?: string) => siteTasks(i).filter((t) => (!stream || streamOfStage(t.stage_code) === stream) && inView(t, view));
+
+export function listItem(i: number, stream?: string, view?: string): SiteListItem {
+  const m = siteMeta(i), tasks = scopedTasks(i, stream, view);
+  const pipe = pipelineOf(i).filter((n) => (!stream || streamOfStage(n.code) === stream) && (!view || tasks.some((t) => t.stage_code === n.code)));
   const cur = pipe.find((n) => n.state === 'current' || n.state === 'late');
   return {
     id: m.id, site_code: m.code, name: m.name, region_id: m.region_id as SiteListItem['region_id'], cluster_code: m.cluster, delivery_scenario: m.scenario, overall_status: m.status,
     current_milestone: cur?.code ?? null, next_milestone: pipe.find((n) => n.state === 'planned')?.code ?? null, workflow_version: 1,
     late_task_count: tasks.filter((t) => t.sla?.colour === 'red' && t.state !== 'approved').length,
     waiting_approval_count: tasks.filter((t) => t.state === 'in_review' || t.state === 'in_approval').length, rail: bad(pipe) as SiteListItem['rail'],
-    streams: streamStatuses(i),
+    streams: streamStatuses(i, view), views: VIEW_REFS,
   };
 }
 
@@ -156,12 +172,12 @@ export function detail(i: number): SiteDetail {
   } as SiteDetail;
 }
 
-export function gridOf(i: number, stream?: string): SiteTasks {
-  const tasks = siteTasks(i);
+export function gridOf(i: number, stream?: string, view?: string): SiteTasks {
+  const tasks = siteTasks(i).filter((t) => inView(t, view));
   return {
     workflow_version: 1,
-    streams: STREAMS,
+    streams: STREAMS, views: VIEWS,
     stages: STAGE_CODES.map((code, s) => ({ code, stream_code: STREAM_OF[s], name_en: STAGE_EN[s], name_ar: STAGE_AR[s], tasks: tasks.filter((t) => t.stage_code === code).map(toSummary) }))
-      .filter((st) => !stream || st.stream_code === stream),
+      .filter((st) => (!stream || st.stream_code === stream) && (!view || st.tasks.length)),
   };
 }

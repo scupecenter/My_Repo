@@ -693,6 +693,7 @@ model WorkflowDefinition {
   tasks   TaskDefinition[]
   sites   Site[]
   streams WorkflowStream[]
+  views   WorkflowView[]
 
   @@index([status, effective_from])
   @@map("workflow_definitions")
@@ -740,6 +741,36 @@ model WorkflowStream {
   @@id([workflow_id, code])
   @@unique([workflow_id, sort_order])
   @@map("workflow_streams")
+}
+
+// A view groups tasks for the CW / TE / O&M tabs of the Site Register (owner decision 2026-10-31, Q98; migration 0023). Versioned with the workflow definition.
+model WorkflowView {
+  workflow_id String  @db.Uuid
+  code        String
+  name_en     String
+  name_ar     String?
+  sort_order  Int
+
+  workflow WorkflowDefinition   @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  members  WorkflowViewMember[]
+
+  @@id([workflow_id, code])
+  @@unique([workflow_id, sort_order])
+  @@map("workflow_views")
+}
+
+// Membership by stage code or task code. om_assigned: null = always, false = only while the O&M team is not assigned (setting views.om_team_assigned), true = only after.
+model WorkflowViewMember {
+  workflow_id String   @db.Uuid
+  view_code   String
+  member_kind String // stage | task
+  member_code String
+  om_assigned Boolean?
+
+  view WorkflowView @relation(fields: [workflow_id, view_code], references: [workflow_id, code], onDelete: Cascade)
+
+  @@id([workflow_id, view_code, member_kind, member_code])
+  @@map("workflow_view_members")
 }
 
 model TaskDefinition {
