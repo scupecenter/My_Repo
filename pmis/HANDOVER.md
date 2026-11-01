@@ -1,6 +1,6 @@
 # GSDN PMIS: Handover to the implementation developer
 
-> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.6، الهجرات حتى 0021)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرة 0021) والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
+> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.6، الهجرات حتى 0022)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرتان 0021 و0022) وشاشته في الويب والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
 
 Status on 2026-10-31: **main is at PR #48.** Phase P0 (Foundations) is complete and P1 (Core) is under way. Everything below is on `main` of this repository. Section 4 below was written in P0 and still says local passwords are deferred; local sign-in exists since migration 0010, so check the code and `CHANGELOG.md` before relying on it.
 The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream-views-documents.md`. They are **decided, not yet built**.
@@ -18,13 +18,13 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 
 | Area | Path | State |
 |---|---|---|
-| Data model | `apps/api/prisma/schema.prisma` | Prisma schema (75 models at P0; the registers and matrix migrations 0016 to 0021 add more) |
-| Migrations | `apps/api/prisma/migrations/0001`–`0021` | 0001 init to 0021 Dismantle register. Each mirrors a file in `db/sql/` where one exists; keep both copies identical. |
+| Data model | `apps/api/prisma/schema.prisma` | Prisma schema (75 models at P0; the registers and matrix migrations 0016 to 0022 add more) |
+| Migrations | `apps/api/prisma/migrations/0001`–`0022` | 0001 init to 0022 Dismantle rules. Each mirrors a file in `db/sql/` where one exists; keep both copies identical. |
 | Row-level security, identity writes | `db/sql/002`–`008` | Region RLS, config write checks, `idm_*` functions. Read ADR 0003 before touching them. |
 | ERD, seed plan | `db/erd.md`, `db/seed-plan.md` | |
 | Seeds | `db/seed/holidays-2026-2027.csv`, `db/seed/staff-registry.draft.csv` | Synthetic or tentative data. Real data comes from the owner later. |
 | Master import mapping | `tools/master-import/mapping.csv` | 187 Master columns mapped to fields |
-| API | `apps/api` | Built. Local sign-in (0010), approval engine (0015), Site Register streams (0016), SLA calendar and gates (0017, 0018), first four registers Procurement, GECOL, HLC and Permits & HSE (0019), Responsibility Matrix (0020), Dismantle register on the generic register framework (0021). |
+| API | `apps/api` | Built. Local sign-in (0010), approval engine (0015), Site Register streams (0016), SLA calendar and gates (0017, 0018), first four registers Procurement, GECOL, HLC and Permits & HSE (0019), Responsibility Matrix (0020), Dismantle register on the generic register framework (0021, rules 0022). |
 | API contract | `contracts/openapi.yaml` | OpenAPI 3.1 **v0.4.6**. Amendments 0.2.1 to 0.2.6 are in `docs/adr/0011-contract-v0.2.md`; later ones are in `CHANGELOG.md`. **Contract first:** no endpoint without it. |
 | Web app | `apps/web` | React app, wired to the real API for the matrix (changelog entry 42); the rest was built on MSW mocks generated from the contract. Run: `cd apps/web && npm install && npm run dev`. Tests: `npm test`, `npm run e2e`. Scripts in `apps/web/package.json`. |
 | CI | `.github/workflows/ci.yml` | Four jobs: `api` (typecheck, lint, build, tests on PostgreSQL 16), `web` (typecheck, lint, unit tests, build, Playwright e2e), `contract` (Redocly lint of `openapi.yaml`), `installer` (bash syntax and shellcheck). Runs on pull requests to `main` and on pushes to `main`. |
@@ -100,7 +100,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):
 1. Update `docs/spec/registers-and-streams.md` to match the plan (stream and stage boundary, O&M view, Dismantle flow, document section, write-through editing). Done (changelog 43). Q37, Q40, Q41 and Q73 in `open-questions.md` already carry the owner updates.
 2. Add `CHANGELOG.md` entry (43) for these documentation updates and the owner decisions. Done (changelog 43).
-3. Dismantle register: **done in the API (migration 0021, changelog 44; no contract change, it uses the generic register paths, contract stays 0.4.6)**. Still open: the Warehouse RN link that really closes a part (Q101), the O&M role, the handover engineer field and write-through edits.
-4. Screens: Dismantle register, CW, TE and O&M tabs, document type settings.
+3. Dismantle register: **done in the API (migrations 0021 and 0022, changelog 44 and 45) and in the web (generic register page)**. Owner decisions on Q101 recorded. Still open: the Warehouse RN link that closes a part (Q101), an approved Excel template, the O&M role, the handover engineer field and write-through edits. Full status: the "Status" section of `docs/plans/2026-10-31-dismantle-stream-views-documents.md`.
+4. Screens: CW, TE and O&M tabs (blocked by Q98) and document type settings (blocked by Q100).
 5. Document section: configurable types, placement, naming and formats (including e-mail `.eml`, `.msg`, `.html`, `.mht`); add the e-mail formats to the ADR 0008 magic-byte allow-list.
 6. Later phase, not now: the CPE / end-user installation module (plan section 5).

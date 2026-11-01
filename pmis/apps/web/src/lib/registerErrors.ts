@@ -19,5 +19,5 @@ export function registerErrorMessage(t: TFunction, e: unknown): string {
 /** Field problems of a 422, keyed by field code, to show under the inputs. */
 export function serverFieldIssues(e: unknown): Record<string, FieldIssue> {
   if (!(e instanceof ApiError)) return {};
-  return Object.fromEntries((e.problem.errors ?? []).map((x) => [pathToField(x.path), { code: x.code }]));
+  return Object.fromEntries((e.problem.errors ?? []).map((x) => [pathToField(x.path), { code: x.code, message: x.message }]));
 }

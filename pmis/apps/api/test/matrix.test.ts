@@ -10,7 +10,8 @@ import { Actor, actor, etag, groupWith, makeSite, makeTask } from './wf-helpers'
  * The Responsibility Matrix API (P1-BE-12): read shape, self-skip and self-approval preview, edit with step-up, If-Match, reason and audit,
  * empty_cell, the effect of a level-count change on tasks not yet submitted and on tasks in flight (B7), permissions per write.
  * No test depends on the weekday: dates are fixed past dates and the day count is never asserted.
- * Each test works on its own matrix row (a register row, or stage MS9 whose tasks no other suite uses), so parallel suites do not meet.
+ * Each test works on its own matrix row (a register row, or stage MS9 for the level-count test), so parallel suites do not meet. Other suites do add MS9 tasks (D17 via allLocked) to the shared database,
+ * so the task_counts of MS9 are never compared for equality between two reads.
  */
 let app: NestExpressApplication;
 let db: PgClient;
@@ -508,8 +509,12 @@ describe('a level-count change applies to new transitions only (B7)', () => {
     const res = await patchMatrix(api, etag(set), { reason: 'Stage 9 needs two levels now', stage_levels: [{ stage_code: 'MS9', approval_levels: 2 }] });
     expect(res.status).toBe(200);
     expect(rowOf(res.body, 'MS9')).toMatchObject({ approval_levels: 2, used_levels: [1, 3] });
-    expect(rowOf(res.body, 'MS9').task_counts!.not_submitted).toBe(rowOf(before, 'MS9').task_counts!.not_submitted);
-    expect(rowOf(res.body, 'MS9').task_counts!.in_flight).toBe(rowOf(before, 'MS9').task_counts!.in_flight);
+    // The counts cover the whole shared database (other suites add D17 tasks, e.g. allLocked), so no exact equality: this test's own two tasks
+    // must keep their bucket (not moved by the level change) and still be counted.
+    expect(rowOf(res.body, 'MS9').task_counts!.not_submitted).toBeGreaterThanOrEqual(1);
+    expect(rowOf(res.body, 'MS9').task_counts!.in_flight).toBeGreaterThanOrEqual(1);
+    const frozen = await db.query('SELECT id, path_frozen_at IS NOT NULL AS frozen FROM task_instances WHERE id = ANY($1)', [[tNew, tOld]]);
+    expect(Object.fromEntries(frozen.rows.map((x) => [x.id, x.frozen]))).toEqual({ [tNew]: false, [tOld]: true });
     // the review cell is kept (it still serves the tasks in flight), shown as not in use
     expect(cellOf(res.body, 'MS9', 2)).toMatchObject({ used: false });
     expect(cellOf(res.body, 'MS9', 2).assignees.map((x) => x.ref_id)).toEqual([r.user.id]);

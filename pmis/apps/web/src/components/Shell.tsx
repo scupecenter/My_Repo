@@ -1,6 +1,6 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, ShoppingCart, Zap, Cable, HardHat, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
+import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, ShoppingCart, Zap, Cable, HardHat, Wrench, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -25,6 +25,7 @@ export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'r
   { key: 'gecol', to: '/registers/gecol', icon: <Zap size={18} />, group: 'registers' },
   { key: 'hlc', to: '/registers/hlc', icon: <Cable size={18} />, group: 'registers' },
   { key: 'permits_hse', to: '/registers/permits_hse', icon: <HardHat size={18} />, group: 'registers' },
+  { key: 'dismantle', to: '/registers/dismantle', icon: <Wrench size={18} />, group: 'registers' },
   { key: 'templates', to: '/templates', icon: <FileText size={18} />, group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: <Users size={18} />, group: 'admin' },
   { key: 'admin.roles', to: '/admin/roles', icon: <KeyRound size={18} />, group: 'admin' },
