@@ -75,7 +75,20 @@ const dismantle: RegisterDefinition = {
     F('closed', 'Part Closed', 'الجزء مغلق', 'yes_no', 'Close', { in_list: true }),
   ],
 };
-export const REGISTER_DEFS: RegisterDefinition[] = [procurement, gecol, hlc, permits, dismantle];
+// The registers enabled by migration 0025 (contract 0.4.8): a few synthetic fields each; the form is built from them like any other register.
+// rf_design and acquisition are served by the API but missing from the contract's RegisterKey enum (reported to tech-lead), hence the cast.
+const more = (register_key: string, name_en: string, name_ar: string, module_key: string, site_scoped: boolean, record_types?: string[]): RegisterDefinition => ({
+  register_key: register_key as RegisterDefinition['register_key'], name_en, name_ar, module_key, site_scoped, multiple_per_site: true, approval_levels: 3, ...(record_types ? { record_types } : {}),
+  fields: [F('title', 'Title', 'العنوان', 'text', 'Details', { required: true, in_list: true }), F('remark', 'Remark', 'ملاحظات', 'text', 'Details')],
+});
+export const REGISTER_DEFS: RegisterDefinition[] = [
+  procurement, more('contractors', 'Contractors', 'المقاولون', 'contractors', false, ['company', 'team']), gecol, hlc, permits,
+  more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
+  more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
+  more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
+  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), more('meetings', 'Meetings', 'الاجتماعات', 'meetings', false),
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
+];
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PO': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PRM': 'permits_hse' };
 
 export type MockRecord = {

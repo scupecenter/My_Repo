@@ -152,3 +152,7 @@ export type Template = S['Template'];
 export type ImportBatch = S['ImportBatch'];
 export type ImportRow = S['ImportRow'];
 export type ImportDecisionRequest = S['ImportDecisionRequest'];
+export type WarehouseItem = S['WarehouseItem'];
+export type StockLevel = S['StockLevel'];
+export type StockMovement = S['StockMovement'];
+export type AsBuiltItem = S['AsBuiltItem'];

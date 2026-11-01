@@ -6,8 +6,7 @@ import type { RegisterDefinition, RegisterField } from '@/api/types';
  * `GET /registers`, and `RegisterField.section` (contract 0.4.6) gives the section of each base field. The checks below
  * mirror the rules the server repeats at submit (V1 to V6), so Submit stays off until they pass.
  */
-export const REGISTER_KEYS_LIVE = ['procurement', 'gecol', 'hlc', 'permits_hse', 'dismantle'] as const;
-export const REGISTER_KEYS_SOON = ['contractors', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings'] as const;
+export const REGISTER_KEYS_LIVE = ['procurement', 'contractors', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness_handover', 'as_built', 'meetings', 'rf_design', 'acquisition', 'dismantle'] as const;
 export const isLive = (k: string): k is (typeof REGISTER_KEYS_LIVE)[number] => (REGISTER_KEYS_LIVE as readonly string[]).includes(k);
 
 type Data = Record<string, unknown>;

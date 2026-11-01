@@ -47,9 +47,9 @@ describe('Register list', () => {
     expect(link.getAttribute('href')).toMatch(/^\/sites\/.+\?task=/);
   });
 
-  it('shows the coming-soon page for a register that is not built yet', async () => {
+  it('shows the coming-soon page for a key that is not a register', async () => {
     await signIn('pm');
-    renderApp(<Routed />, at('warehouse'));
+    renderApp(<Routed />, at('nothing'));
     expect(await screen.findByTestId('page-register-soon')).toBeInTheDocument();
   });
 });

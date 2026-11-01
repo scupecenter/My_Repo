@@ -3558,6 +3558,51 @@ export interface paths {
         patch: operations["updateNumberSequence"];
         trace?: never;
     };
+    "/as-built/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The As-Built item list (CW quantities and TE items) */
+        get: operations["listAsBuiltItems"];
+        put?: never;
+        /**
+         * Add an item (System Admin, or a delegate of `fields.edit`)
+         * @description The item becomes a number field `q_<code>` of the As-Built register at once (form, records, templates, Master-format export). Audited with a reason.
+         */
+        post: operations["createAsBuiltItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/as-built/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description As-Built item. */
+                item_id: components["parameters"]["AsBuiltItemId"];
+            };
+            cookie?: never;
+        };
+        /** One item */
+        get: operations["getAsBuiltItem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, edit, relink or deactivate (never deleted)
+         * @description The unit of an item that records already hold values for cannot change (422 `item_in_use`). A deactivated item leaves the form; the values already entered are kept.
+         */
+        patch: operations["updateAsBuiltItem"];
+        trace?: never;
+    };
     "/warehouse/items": {
         parameters: {
             query?: never;
@@ -3625,8 +3670,11 @@ export interface paths {
         get: operations["listStockMovements"];
         put?: never;
         /**
-         * Create a pending issue or return and reserve the stock
-         * @description Reserved stock cannot be issued twice (422 `insufficient_stock`). It posts to the site when the DN or RN is approved.
+         * Create a warehouse document (DN, RN, PL, OPEN or ADJ) with its lines
+         * @description The document is a record of the Warehouse register in entry state; submit, review and approve it through `/registers/warehouse/records/{register_record_id}/...`.
+         *     A pending DN (or negative ADJ) reserves its stock, which cannot be issued twice (422 `insufficient_stock`); an RN cannot return more than the site holds
+         *     (DN minus RN). The stock, the serials and the site quantity post on the final approval. A serial-tracked item on a PL, DN or RN line needs one serial per unit.
+         *     Duplicate Doc No. answers 409.
          */
         post: operations["createStockMovement"];
         delete?: never;
@@ -4195,7 +4243,7 @@ export interface components {
             existing_id?: string;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -4798,7 +4846,7 @@ export interface components {
         View: components["schemas"]["ViewRef"] & {
             /** @description Stages whose tasks are all in the view. */
             stage_codes: string[];
-            /** @description Single tasks in the view. A task that depends on the O&M assignment (CW FAC B15, TE FAC D18) is listed only where it applies now (setting `views.om_team_assigned`). */
+            /** @description Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after (setting `views.om_team_assigned`); only the tasks that apply now are listed. */
             task_codes: string[];
         };
         /** @description The status of one site within one stream (only the tasks and stages of that stream). */
@@ -6759,6 +6807,12 @@ export interface components {
             uom?: string;
             category?: string | null;
             serial_tracked?: boolean;
+            manufacturer?: string | null;
+            contract_qty?: number | null;
+            /** Format: date */
+            planned_delivery_date?: string | null;
+            /** @description The Project Status item code the received quantity feeds (D65). */
+            progress_item_code?: string | null;
             need_rules?: components["schemas"]["NeedRule"][];
             is_active?: boolean;
         };
@@ -6766,6 +6820,8 @@ export interface components {
             /** Format: uuid */
             id: string;
             code: string;
+            /** @description The As-Built item linked to this item (Q74). */
+            readonly as_built_item_code?: string | null;
             version: number;
         };
         WarehouseItemInput: components["schemas"]["WarehouseItemFields"] & components["schemas"]["WithReason"] & {
@@ -6796,22 +6852,43 @@ export interface components {
             item_id: string;
             description?: string;
             uom?: string;
+            readonly item_code?: string;
+            /** @description Dispatched (DN), returned (RN) or received (PL, OPEN). An ADJ may be negative; every other quantity is above zero. Whole numbers for pcs and sets. */
             qty: number;
+            /** @description DN form: Qty Approved, not below the dispatched quantity. */
+            qty_approved?: number | null;
+            /**
+             * @description RN form: the condition of the returned item.
+             * @enum {string|null}
+             */
+            condition?: "Good" | "Faulty" | "Damaged" | null;
+            /** @description One serial per unit for a serial-tracked item on PL, DN and RN lines. */
             serials?: string[];
         };
         StockMovement: {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "issue" | "return";
+            kind: "issue" | "return" | "receipt" | "adjustment";
+            /** @enum {string} */
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
+            doc_no?: string | null;
+            /**
+             * Format: uuid
+             * @description The record of the Warehouse register: submit, review, approve and void go through /registers/warehouse/records/{id}.
+             */
+            register_record_id?: string | null;
             /**
              * @description pending = shown as "pending issue" or "pending return"; posted when the DN or RN is approved.
              * @enum {string}
              */
             status: "pending" | "posted" | "cancelled";
-            /** Format: uuid */
-            site_id: string;
-            site_code?: string;
+            /**
+             * Format: uuid
+             * @description null for PL, OPEN and ADJ.
+             */
+            site_id: string | null;
+            site_code?: string | null;
             /** Format: uuid */
             form_id?: string | null;
             lines: components["schemas"]["StockMovementLine"][];
@@ -6825,12 +6902,54 @@ export interface components {
             version: number;
         };
         StockMovementInput: {
-            /** @enum {string} */
-            kind: "issue" | "return";
+            /**
+             * @description DN and RN need a site; PL, OPEN and ADJ have none.
+             * @enum {string}
+             */
+            record_type: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
             /** Format: uuid */
-            site_id: string;
+            site_id?: string;
+            /** @description Unique (Duplicate Doc No. answers 409). */
+            doc_no?: string;
+            /** Format: date */
+            doc_date?: string;
+            /** @enum {string} */
+            txn_status?: "Approved" | "Dispatched" | "Received" | "Cancelled";
+            /** @enum {string} */
+            condition?: "Good" | "Faulty" | "Damaged";
+            /** @description A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle). */
+            reason?: string;
+            remark?: string;
             lines: components["schemas"]["StockMovementLine"][];
         };
+        AsBuiltItemFields: {
+            name_en?: string;
+            name_ar?: string | null;
+            /** @description m, m3, pcs, set ... Whole numbers are required for pcs and sets. */
+            unit?: string;
+            /** @description The Master As-Built column, kept for the Master-format export. */
+            master_column?: string | null;
+            /** @description The Warehouse item this item is linked to (Q74); one As-Built item per Warehouse item. */
+            warehouse_item_code?: string | null;
+            sort_order?: number;
+            is_active?: boolean;
+        };
+        AsBuiltItem: components["schemas"]["AsBuiltItemFields"] & {
+            /** Format: uuid */
+            id: string;
+            code: string;
+            /** @enum {string} */
+            section: "cw" | "te";
+            /** @description The number field of the As-Built register that holds the quantity (q_<code>). */
+            field_code: string;
+            version: number;
+        };
+        AsBuiltItemInput: components["schemas"]["AsBuiltItemFields"] & components["schemas"]["WithReason"] & {
+            code: string;
+            /** @enum {string} */
+            section: "cw" | "te";
+        };
+        AsBuiltItemPatch: components["schemas"]["AsBuiltItemFields"] & components["schemas"]["WithReason"] & Record<string, never>;
         SnagType: {
             /** Format: uuid */
             id: string;
@@ -7568,6 +7687,8 @@ export interface components {
         WarehouseItemId: string;
         /** @description Stock movement. */
         MovementId: string;
+        /** @description As-Built item. */
+        AsBuiltItemId: string;
         /** @description Snag type. */
         SnagTypeId: string;
         /** @description Snag. */
@@ -14250,6 +14371,128 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listAsBuiltItems: {
+        parameters: {
+            query?: {
+                section?: "cw" | "te";
+                q?: string;
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Items in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["AsBuiltItem"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createAsBuiltItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsBuiltItemInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsBuiltItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAsBuiltItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description As-Built item. */
+                item_id: components["parameters"]["AsBuiltItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Item. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsBuiltItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateAsBuiltItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description As-Built item. */
+                item_id: components["parameters"]["AsBuiltItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AsBuiltItemPatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AsBuiltItem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listWarehouseItems: {
         parameters: {
             query?: {
@@ -14413,7 +14656,7 @@ export interface operations {
         parameters: {
             query?: {
                 site_id?: string;
-                kind?: "issue" | "return";
+                kind?: "issue" | "return" | "receipt" | "adjustment";
                 status?: "pending" | "posted" | "cancelled";
                 item_id?: string;
                 limit?: components["parameters"]["Limit"];

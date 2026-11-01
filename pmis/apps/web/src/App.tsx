@@ -17,6 +17,8 @@ import { MatrixPage } from '@/pages/Matrix';
 import { MyWork } from '@/pages/MyWork';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
+import { AsBuiltItems } from '@/pages/AsBuiltItems';
+import { Warehouse } from '@/pages/Warehouse';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
 import { Absence } from '@/pages/Absence';
@@ -63,6 +65,8 @@ function gated(session: Session) {
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="registers/:key" element={<RegisterPage />} />
+        <Route path="warehouse" element={<Warehouse />} />
+        <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="absence" element={<Absence />} />
         <Route path="messages" element={<Messages />} />

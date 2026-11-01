@@ -1,7 +1,7 @@
 import { Download, FileDown, FileUp, Plus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { downloadFile } from '@/api/client';
 import { useRegisterDefs, useRegisterRecords, useTemplates, useUploadBatch, type RecordFilters } from '@/api/registers';
 import { useRegions } from '@/api/sites';
@@ -75,6 +75,8 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         <button className="btn" data-testid="register-template-download" disabled={!tpl} onClick={() => void down()}><FileDown size={16} />{t('registers.template_download')}</button>
         <button className="btn" data-testid="register-template-upload" disabled={!tpl || upload.isPending} onClick={() => file.current?.click()}><FileUp size={16} />{t('registers.template_upload')}</button>
         <input ref={file} type="file" accept=".xlsx" hidden data-testid="register-template-file" onChange={(e) => { up(e.target.files?.[0]); e.target.value = ''; }} />
+        {key === 'as_built' && <Link className="btn" data-testid="register-asbuilt-items" to="/as-built/items">{t('asb.items_link')}</Link>}
+        {key === 'warehouse' && <Link className="btn" data-testid="register-warehouse-screen" to="/warehouse">{t('wh.title')}</Link>}
         <ExportViewButton testid="register-export" source={key} filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={['site_code', 'region', 'record_type', 'state', ...cols.map((c) => c.code)]} />
       </div>
       <div className="card overflow-x-auto">
@@ -108,7 +110,7 @@ export function RegisterPage() {
   const { t } = useTranslation();
   const { key = '' } = useParams();
   const defs = useRegisterDefs();
-  if (!isLive(key)) return <RegisterSoon name={t(`nav.reg_${key}`, { defaultValue: key })} />;
+  if (!isLive(key)) return <RegisterSoon name={key} />;
   if (defs.isLoading) return <p className="text-mute">{t('common.loading')}</p>;
   const def = defs.data?.find((d) => d.register_key === key);
   if (!def) return defs.isError ? <p role="alert" className="text-lateInk">{t('errors.generic')}</p> : <Navigate to="/my-work" replace />;

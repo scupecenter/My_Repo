@@ -6,4 +6,5 @@ import { orgHandlers } from './handlers.org';
 import { settingsHandlers } from './handlers.settings';
 import { siteHandlers } from './handlers.sites';
 import { registerHandlers } from './handlers.registers';
-export const server = setupServer(...registerHandlers, ...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);
+import { warehouseHandlers } from './handlers.warehouse';
+export const server = setupServer(...registerHandlers, ...warehouseHandlers, ...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);
