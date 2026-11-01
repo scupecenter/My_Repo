@@ -92,8 +92,8 @@ A separate O&M module, built in a later phase.
 | 2b | Dismantle rules: work start >= RFD date; no new version of a closed part | Done | migration 0022, changelog 45 |
 | 2c | O&M role | Not started | needs contract + migration |
 | 2d | Handover engineer field (HOTO, delegated by the TE lead) | Not started | needs contract + migration |
-| 2e | Write-through edits from the work views to the source register | Next (owner: in this batch) | needs design + contract |
-| 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Not started (Q99 answered) | depends on 2e |
+| 2e | Write-through edits from the work views to the source register | Done (API) | migration 0029, contract 0.4.9, changelog 50; web screen pending |
+| 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Done (API; FO/FT in Dismantle) | migration 0029, Q113 |
 | 3a | Dismantle register screen | Done (no Excel template yet) | web, generic register page, changelog 45 |
 | 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Done | contract 0.4.7, migration 0023, web tabs, changelog 46 |
 | 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |

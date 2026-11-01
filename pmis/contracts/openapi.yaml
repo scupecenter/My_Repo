@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.8
+  version: 0.4.9
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.9 (2026-11-01): additive. Write-through edits from the work views (spec registers-and-streams.md 2.7; Q73, Q99). `TaskSummary.register_fields` (only in `GET /sites/{site_id}/tasks`) lists the register-owned fields a task row shows: the value is read from the current record of the source register (the view keeps no copy), `source` points to the register record and `edit_via` says how to edit it with the existing register endpoints (`patch`: `PATCH /registers/{register_key}/records/{id}`; `new_version`: `POST .../versions` first; `create`: `POST /registers/{register_key}/records`). Permissions, the Entry / Review / Approve path and the audit are those of the register, so there is no new endpoint. A register the caller cannot view is left out. BU and EF move to the As-Built register (new fields `cw_as_built_submitted`, `as_built_date`; tasks B13 and D15) and FO / FT to the Dismantle register (the contractor of the `cw` and `te` parts; task E2), Q99. Migration 0029.
     - 0.4.8 (2026-11-01): additive. (1) The remaining registers are enabled on the generic `/registers/{register_key}/...` paths: `contractors` (record types `company` and `team`; an approved one becomes an external party or team), `quality` (`qc`, `snag`, `itp`, `ncr`), `issues`, `risks`, `change_control`, `readiness_handover`, `meetings`, `rf_design`, `acquisition`, `as_built` and `warehouse` (record types `te_dn`, `cw_dn`, `te_rn`, `cw_rn`, `pl`, `open`, `adj`; the last three have no site). Their fields are those of the spec; `Deliverables` stays disabled (Q71). (2) Warehouse in full: `StockMovement` becomes the DN / RN / PL / OPEN / ADJ document with lines (`record_type`, `doc_no`, `register_record_id`, line `qty_approved`, `condition`, `serials`, kinds `receipt` and `adjustment`); a movement is created with `POST /warehouse/movements` (reserves the stock, 422 `insufficient_stock`), is submitted, reviewed and approved through its register record and posts the stock on the final approval; `StockMovementInput` now takes `record_type` (replacing `kind`), the header fields and the lines. The item master carries `manufacturer`, `contract_qty`, `planned_delivery_date`, `progress_item_code` and the read-only `as_built_item_code`; new error code `item_in_use` (422: unit and serial tracking of an item with movements are fixed, an item with a pending movement cannot be deactivated). (3) New tag `as-built` and the editable As-Built item list, linked to Warehouse codes (Q74): `GET` and `POST /as-built/items`, `GET` and `PATCH /as-built/items/{item_id}`; every active item is a number field `q_<code>` of the As-Built register. (4) Correction of the CW / TE / O&M views (Q102 answered): CW DLP (B14) and CW FAC (B15) are always in the CW view; TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after; the O&M view lists only D18.
     - 0.4.7 (2026-11-01): additive. CW / TE / O&M views as tabs of the Site Register (Q98, owner decision 2026-11-01): `view` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks` (a view groups tasks, not whole stages; the four streams stay the filter and can be combined with a view, the result is the tasks in both), `views` in the task grid (`View`: code, name EN/AR, order, the stage and task codes in force) and on each `SiteListItem` (`ViewRef`). View definitions are seed data versioned with the workflow, like streams. CW FAC (B15) and TE FAC (D18) belong to the CW and TE view until the O&M team is assigned (setting `views.om_team_assigned`, default false, Q102) and to the O&M view after.
     - 0.4.6 (2026-10-30): additive. Responsibility Matrix administration (P1-BE-12). `GET /matrix` rows carry `used_levels`, `region_ids_with_cells`, `task_counts` (B7: tasks that follow a new level count and tasks in flight that keep theirs) and `preview` (`MatrixPreview`: where one person holds consecutive levels, the self-skip, and where that reaches the last level, the B5 self-approval, so the screen warns in advance); cells carry `level_kind`, `used` and `updated_at`; assignees of kind role or group carry `member_count`. `Matrix.stages[].register_key` is a `MatrixRowKey` (the register keys plus `rf_design`, `acquisition` and `deliverables`, which have their own matrix rows, Q44 and Q71). `PATCH /matrix` also edits the register and Dismantle rows (`stage_code` is then the row code), answers `empty_cell` with the cells that miss a holder (`Problem.cells`), refuses `rule: all_members` on the Entry level (`entry_rule_fixed`) and needs `matrix.edit` (all-regions for a cell without a region and for a level count). `RegisterField.section` (the form section of a base field, English, in field order) lets the register form follow the server's field definitions. The register rows of the matrix are the register's own rows: cells are keyed by `register_key` and the level count is `RegisterDefinition.approval_levels`, one source for the matrix screen and the register engine.
@@ -8054,7 +8055,33 @@ components:
         holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
         lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' }, description: 'Why the task is locked (empty when it is not), so "Why locked?" needs no extra call.' }
+        register_fields: { type: array, items: { $ref: '#/components/schemas/TaskRegisterField' }, description: '0.4.9. Only in the Site Register task grid. Register-owned fields shown read-through; edit them in the source register (Q73, Q99).' }
         version: { type: integer }
+    TaskRegisterField:
+      type: object
+      required: [code, label_en, type, value, editable, edit_via, source]
+      properties:
+        code: { type: string, description: 'The register field code, or `external_party_id` (the contractor of the record).' }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        type: { type: string, enum: [text, number, date, list, yes_no, user, party] }
+        options: { type: array, items: { type: object, required: [value, label_en], properties: { value: { type: string }, label_en: { type: string } } } }
+        master_column: { type: [string, 'null'], description: 'The Master column this field replaces (for example BU, EF, FO, FT).' }
+        value: { description: 'Read from the source record; null when there is no record yet. For `party`, the party name.' }
+        editable: { type: boolean, description: 'A hint: the caller may use `edit_via`. The register decides again on every call.' }
+        edit_via: { type: string, enum: [patch, new_version, create, none], description: '`patch` the record (in entry); `new_version` of an approved record, then patch; `create` a record (no record yet); `none` not now.' }
+        source:
+          type: object
+          required: [register_key, site_id, field]
+          properties:
+            register_key: { type: string }
+            record_type: { type: [string, 'null'] }
+            site_id: { type: string, format: uuid }
+            record_id: { type: [string, 'null'], format: uuid }
+            entity_id: { type: [string, 'null'], format: uuid }
+            record_state: { type: [string, 'null'] }
+            record_version: { type: [integer, 'null'], description: 'The If-Match value of the record.' }
+            field: { type: string, description: '`data.<code>` or `external_party_id`: where the value sits in the record body.' }
     DocumentFile:
       type: object
       required: [id, file_group_id, version, is_current, original_name, download_name, size_bytes, uploaded_at]
