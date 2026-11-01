@@ -384,6 +384,14 @@
     "template_rejected": "The template was rejected (wrong ID or version).",
     "keys": "Keyboard: arrows move, Enter edits a date or opens the task, Esc cancels."
   },
+  "regFields": {
+    "title": "Register fields",
+    "from": "from {{register}}",
+    "read_only": "Read-only here",
+    "edit": "Edit in the register",
+    "saved": "Saved in the register",
+    "new_version_note": "Saving creates a new version"
+  },
   "drawer": {
     "mandatory": "Mandatory",
     "drop": "Drop a file or click to upload",

@@ -259,3 +259,57 @@ describe('Approvals on the real shapes', () => {
     expect(await screen.findByTestId('bulk-report')).toHaveTextContent('Another holder has already claimed this level.');
   });
 });
+
+describe('Task register fields (contract 0.4.9)', () => {
+  const open = async (locale: 'en' | 'ar', site: number, idx: number) => {
+    renderApp(<SiteAt />, { route: `/sites/${siteIdOf(site)}?task=${taskIdOf(site, idx)}`, locale });
+    return screen.findByTestId('task-register-fields');
+  };
+  it('patches a record in entry through the register endpoint and refetches the tasks (B2, site 3)', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const sec = await open('en', 2, 5);
+    const row = within(sec).getByTestId('regfield-po_wo_no');
+    expect(within(row).getByTestId('regfield-po_wo_no-source')).toHaveTextContent(/^from /);
+    expect(within(row).getByTestId('regfield-po_wo_no-source').getAttribute('href')).toMatch(/^\/registers\/procurement\?record=/);
+    await u.click(within(row).getByTestId('regfield-po_wo_no-edit'));
+    const input = within(row).getByTestId('regfield-po_wo_no-input');
+    await u.clear(input); await u.type(input, 'WO-2026-099');
+    await u.click(within(row).getByTestId('regfield-po_wo_no-save'));
+    await waitFor(() => expect(within(screen.getByTestId('regfield-po_wo_no')).getByTestId('regfield-po_wo_no-value')).toHaveTextContent('WO-2026-099'));
+  });
+  it('creates a new version of an approved record, then patches it (B1, site 1)', async () => {
+    await signIn('pm');
+    const u = userEvent.setup();
+    const sec = await open('en', 0, 4);
+    const row = within(sec).getByTestId('regfield-pr_no');
+    expect(row).toHaveAttribute('data-edit-via', 'new_version');
+    await u.click(within(row).getByTestId('regfield-pr_no-edit'));
+    const input = within(row).getByTestId('regfield-pr_no-input');
+    await u.clear(input); await u.type(input, 'PR-NEW-1');
+    await u.click(within(row).getByTestId('regfield-pr_no-save'));
+    await waitFor(() => expect(screen.getByTestId('regfield-pr_no')).toHaveAttribute('data-edit-via', 'patch'));
+    expect(screen.getByTestId('regfield-pr_no-value')).toHaveTextContent('PR-NEW-1');
+  });
+  it('is read-only when edit_via is none (HLC record in review), with the Arabic label and source', async () => {
+    await signIn('pm');
+    const sec = await open('ar', 1, 14);
+    const row = within(sec).getByTestId('regfield-fiber_status');
+    expect(row).toHaveAttribute('data-edit-via', 'none');
+    expect(within(row).queryByTestId('regfield-fiber_status-edit')).toBeNull();
+    expect(within(row).getByTestId('regfield-fiber_status-readonly')).toBeInTheDocument();
+    expect(within(row).getByText('حالة الألياف')).toBeInTheDocument();
+    expect(within(row).getByTestId('regfield-fiber_status-source').textContent).toMatch(/^من /);
+  });
+  it('shows the register error in plain words when the register refuses (permission denied)', async () => {
+    await signIn('pm');
+    server.use(http.patch(`${API_BASE}/registers/procurement/records/:id`, () => HttpResponse.json({ type: 'about:blank', title: 'Forbidden', status: 403, code: 'not_eligible_holder' }, { status: 403, headers: { 'Content-Type': 'application/problem+json' } })));
+    const u = userEvent.setup();
+    const sec = await open('en', 2, 5);
+    await u.click(within(sec).getByTestId('regfield-po_wo_no-edit'));
+    await u.type(within(sec).getByTestId('regfield-po_wo_no-input'), 'x');
+    await u.click(within(sec).getByTestId('regfield-po_wo_no-save'));
+    expect(await screen.findByText(i18n.t('taskErrors.not_eligible_holder'))).toBeInTheDocument();
+    expect(within(sec).getByTestId('regfield-po_wo_no-save')).toBeInTheDocument();
+  });
+});

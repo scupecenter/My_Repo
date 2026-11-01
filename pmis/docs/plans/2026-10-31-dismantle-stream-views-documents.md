@@ -99,7 +99,8 @@ A separate O&M module, built in a later phase.
 | 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |
 | 9 | Remaining registers, Warehouse (DN/RN, stock), As-Built items, O&M view fix (Q102) | Done (API and web; movement creation screen pending) | migrations 0024-0028, contract 0.4.8, changelog 47-49 |
 | 4 | `HANDOVER.md` current | Ongoing | updated with every PR |
-| 7 | Settings screen for `views.om_team_assigned` (O&M team switch) | Not started | Q102; with document type settings |
+| 7 | Settings screen for `views.om_team_assigned` (O&M team switch: who acts on TE FAC, no longer what is shown) | Not started | Q102 final; with document type settings |
+| 10 | O&M view final membership: D18 and Z1 always in O&M, D18 out of TE | Done (API) | migration 0030, changelog 52 |
 | 8 | Export buttons pass the `view` filter | Not started | check the export filter accepts `view` |
 | 5 | Document section: `.eml` and `.msg` in the ADR 0008 allow-list; no `.html` / `.mht` uploads | Not started (Q100 answered) | ADR 0008 amendment |
 | 6 | CPE / end-user installation module | Later phase | section 5 |

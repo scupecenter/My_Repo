@@ -7866,7 +7866,7 @@ components:
           required: [stage_codes, task_codes]
           properties:
             stage_codes: { type: array, items: { type: string }, description: 'Stages whose tasks are all in the view.' }
-            task_codes: { type: array, items: { type: string }, description: 'Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after (setting `views.om_team_assigned`); only the tasks that apply now are listed.' }
+            task_codes: { type: array, items: { type: string }, description: 'Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. The O&M view always lists TE FAC (D18) and Final Closure (Z1); the TE view ends at HOTO (owner decision 2026-11-01, migration 0030). `views.om_team_assigned` decides who acts, not where the task shows; only the tasks that apply now are listed.' }
     StreamStatus:
       description: The status of one site within one stream (only the tasks and stages of that stream).
       allOf:
