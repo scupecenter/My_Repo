@@ -10,18 +10,5 @@
         "repo": "anthropics/claude-plugins-official"
       }
     }
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/playwright-cli-setup.sh\"",
-            "timeout": 120
-          }
-        ]
-      }
-    ]
   }
 }

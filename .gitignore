@@ -12,3 +12,8 @@ pmis/apps/web/playwright-report/
 # Plugin session state (local only)
 .anchor/
 .claude-flow/
+
+# Generated outputs (regenerate locally)
+pmis/design/src/ar.json
+pmis/design/forms/out/
+pmis/tools/capacity-sizer/screenshot-*.png
