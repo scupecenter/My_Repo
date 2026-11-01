@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.7
+  version: 0.4.8
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.8 (2026-11-01): additive. (1) The remaining registers are enabled on the generic `/registers/{register_key}/...` paths: `contractors` (record types `company` and `team`; an approved one becomes an external party or team), `quality` (`qc`, `snag`, `itp`, `ncr`), `issues`, `risks`, `change_control`, `readiness_handover`, `meetings`, `rf_design`, `acquisition`, `as_built` and `warehouse` (record types `te_dn`, `cw_dn`, `te_rn`, `cw_rn`, `pl`, `open`, `adj`; the last three have no site). Their fields are those of the spec; `Deliverables` stays disabled (Q71). (2) Warehouse in full: `StockMovement` becomes the DN / RN / PL / OPEN / ADJ document with lines (`record_type`, `doc_no`, `register_record_id`, line `qty_approved`, `condition`, `serials`, kinds `receipt` and `adjustment`); a movement is created with `POST /warehouse/movements` (reserves the stock, 422 `insufficient_stock`), is submitted, reviewed and approved through its register record and posts the stock on the final approval; `StockMovementInput` now takes `record_type` (replacing `kind`), the header fields and the lines. The item master carries `manufacturer`, `contract_qty`, `planned_delivery_date`, `progress_item_code` and the read-only `as_built_item_code`; new error code `item_in_use` (422: unit and serial tracking of an item with movements are fixed, an item with a pending movement cannot be deactivated). (3) New tag `as-built` and the editable As-Built item list, linked to Warehouse codes (Q74): `GET` and `POST /as-built/items`, `GET` and `PATCH /as-built/items/{item_id}`; every active item is a number field `q_<code>` of the As-Built register. (4) Correction of the CW / TE / O&M views (Q102 answered): CW DLP (B14) and CW FAC (B15) are always in the CW view; TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after; the O&M view lists only D18.
     - 0.4.7 (2026-11-01): additive. CW / TE / O&M views as tabs of the Site Register (Q98, owner decision 2026-11-01): `view` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks` (a view groups tasks, not whole stages; the four streams stay the filter and can be combined with a view, the result is the tasks in both), `views` in the task grid (`View`: code, name EN/AR, order, the stage and task codes in force) and on each `SiteListItem` (`ViewRef`). View definitions are seed data versioned with the workflow, like streams. CW FAC (B15) and TE FAC (D18) belong to the CW and TE view until the O&M team is assigned (setting `views.om_team_assigned`, default false, Q102) and to the O&M view after.
     - 0.4.6 (2026-10-30): additive. Responsibility Matrix administration (P1-BE-12). `GET /matrix` rows carry `used_levels`, `region_ids_with_cells`, `task_counts` (B7: tasks that follow a new level count and tasks in flight that keep theirs) and `preview` (`MatrixPreview`: where one person holds consecutive levels, the self-skip, and where that reaches the last level, the B5 self-approval, so the screen warns in advance); cells carry `level_kind`, `used` and `updated_at`; assignees of kind role or group carry `member_count`. `Matrix.stages[].register_key` is a `MatrixRowKey` (the register keys plus `rf_design`, `acquisition` and `deliverables`, which have their own matrix rows, Q44 and Q71). `PATCH /matrix` also edits the register and Dismantle rows (`stage_code` is then the row code), answers `empty_cell` with the cells that miss a holder (`Problem.cells`), refuses `rule: all_members` on the Entry level (`entry_rule_fixed`) and needs `matrix.edit` (all-regions for a cell without a region and for a level count). `RegisterField.section` (the form section of a base field, English, in field order) lets the register form follow the server's field definitions. The register rows of the matrix are the register's own rows: cells are keyed by `register_key` and the level count is `RegisterDefinition.approval_levels`, one source for the matrix screen and the register engine.
     - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register. A record that is the source of a task is checked again at every submit and just before the task is closed: when its data no longer matches the task source, or the source date is empty, `task` is dropped and the record is approved on the register row only (the task stays open); a source date in the future is refused with 422 `validation_failed` (`errors[].code` `future_date`), as for a date typed on the task.
@@ -147,7 +148,9 @@ tags:
   - name: forms
     description: "Generated forms DN, RN, PAC, FAC and snag list: template versions, numbering, PDFs."
   - name: warehouse
-    description: "Item master, stock levels and pending or reserved movements."
+    description: "Item master, stock levels and movements (DN, RN, PL, OPEN, ADJ documents with lines and serials; reserved while pending, posted on approval)."
+  - name: as-built
+    description: "The editable As-Built item list (CW quantities and TE items), linked to Warehouse item codes (Q74)."
   - name: qc
     description: "Snag types, snags and QC photos."
   - name: custom-fields
@@ -5713,6 +5716,104 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /as-built/items:
+    get:
+      tags: [as-built]
+      operationId: listAsBuiltItems
+      summary: The As-Built item list (CW quantities and TE items)
+      parameters:
+      - name: section
+        in: query
+        schema: {type: string, enum: [cw, te]}
+      - name: q
+        in: query
+        schema: {type: string}
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Items in order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/AsBuiltItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [as-built]
+      operationId: createAsBuiltItem
+      summary: Add an item (System Admin, or a delegate of `fields.edit`)
+      description: The item becomes a number field `q_<code>` of the As-Built register at once (form, records, templates, Master-format export). Audited with a reason.
+      x-db-path: admin_save_as_built_item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AsBuiltItemInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AsBuiltItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /as-built/items/{item_id}:
+    parameters:
+    - {$ref: '#/components/parameters/AsBuiltItemId'}
+    get:
+      tags: [as-built]
+      operationId: getAsBuiltItem
+      summary: One item
+      responses:
+        '200':
+          description: Item.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AsBuiltItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [as-built]
+      operationId: updateAsBuiltItem
+      summary: Rename, edit, relink or deactivate (never deleted)
+      description: The unit of an item that records already hold values for cannot change (422 `item_in_use`). A deactivated item leaves the form; the values already entered are kept.
+      x-db-path: admin_save_as_built_item
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/AsBuiltItemPatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AsBuiltItem'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/items:
     get:
       tags: [warehouse]
@@ -5860,7 +5961,7 @@ paths:
         in: query
         schema:
           type: string
-          enum: [issue, return]
+          enum: [issue, return, receipt, adjustment]
       - name: status
         in: query
         schema:
@@ -5889,8 +5990,12 @@ paths:
     post:
       tags: [warehouse]
       operationId: createStockMovement
-      summary: Create a pending issue or return and reserve the stock
-      description: Reserved stock cannot be issued twice (422 `insufficient_stock`). It posts to the site when the DN or RN is approved.
+      summary: Create a warehouse document (DN, RN, PL, OPEN or ADJ) with its lines
+      description: |
+        The document is a record of the Warehouse register in entry state; submit, review and approve it through `/registers/warehouse/records/{register_record_id}/...`.
+        A pending DN (or negative ADJ) reserves its stock, which cannot be issued twice (422 `insufficient_stock`); an RN cannot return more than the site holds
+        (DN minus RN). The stock, the serials and the site quantity post on the final approval. A serial-tracked item on a PL, DN or RN line needs one serial per unit.
+        Duplicate Doc No. answers 409.
       x-db-path: wh_create_movement
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
@@ -6910,6 +7015,12 @@ components:
       required: true
       description: Stock movement.
       schema: {type: string, format: uuid}
+    AsBuiltItemId:
+      name: item_id
+      in: path
+      required: true
+      description: As-Built item.
+      schema: {type: string, format: uuid}
     SnagTypeId:
       name: snag_type_id
       in: path
@@ -7090,6 +7201,7 @@ components:
         - account_locked
         - freeze_active
         - insufficient_stock
+        - item_in_use
         - role_in_use
         - export_expired
         - confirmation_mismatch
@@ -7753,7 +7865,7 @@ components:
           required: [stage_codes, task_codes]
           properties:
             stage_codes: { type: array, items: { type: string }, description: 'Stages whose tasks are all in the view.' }
-            task_codes: { type: array, items: { type: string }, description: 'Single tasks in the view. A task that depends on the O&M assignment (CW FAC B15, TE FAC D18) is listed only where it applies now (setting `views.om_team_assigned`).' }
+            task_codes: { type: array, items: { type: string }, description: 'Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after (setting `views.om_team_assigned`); only the tasks that apply now are listed.' }
     StreamStatus:
       description: The status of one site within one stream (only the tasks and stages of that stream).
       allOf:
@@ -9645,6 +9757,10 @@ components:
         uom: { type: string }
         category: { type: [string, 'null'] }
         serial_tracked: { type: boolean }
+        manufacturer: { type: [string, 'null'] }
+        contract_qty: { type: [number, 'null'], minimum: 0 }
+        planned_delivery_date: { type: [string, 'null'], format: date }
+        progress_item_code: { type: [string, 'null'], description: 'The Project Status item code the received quantity feeds (D65).' }
         need_rules: { type: array, items: { $ref: '#/components/schemas/NeedRule' } }
         is_active: { type: boolean }
     WarehouseItem:
@@ -9655,6 +9771,7 @@ components:
           properties:
             id: { type: string, format: uuid }
             code: { type: string }
+            as_built_item_code: { type: [string, 'null'], readOnly: true, description: 'The As-Built item linked to this item (Q74).' }
             version: { type: integer }
     WarehouseItemInput:
       allOf:
@@ -9691,17 +9808,23 @@ components:
         item_id: { type: string, format: uuid }
         description: { type: string }
         uom: { type: string }
-        qty: { type: number, exclusiveMinimum: 0 }
-        serials: { type: array, items: { type: string } }
+        item_code: { type: string, readOnly: true }
+        qty: { type: number, description: 'Dispatched (DN), returned (RN) or received (PL, OPEN). An ADJ may be negative; every other quantity is above zero. Whole numbers for pcs and sets.' }
+        qty_approved: { type: [number, 'null'], exclusiveMinimum: 0, description: 'DN form: Qty Approved, not below the dispatched quantity.' }
+        condition: { type: [string, 'null'], enum: [Good, Faulty, Damaged, null], description: 'RN form: the condition of the returned item.' }
+        serials: { type: array, items: { type: string }, description: 'One serial per unit for a serial-tracked item on PL, DN and RN lines.' }
     StockMovement:
       type: object
       required: [id, kind, status, site_id, lines, version]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [issue, return] }
+        kind: { type: string, enum: [issue, return, receipt, adjustment] }
+        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj] }
+        doc_no: { type: [string, 'null'] }
+        register_record_id: { type: [string, 'null'], format: uuid, description: 'The record of the Warehouse register: submit, review, approve and void go through /registers/warehouse/records/{id}.' }
         status: { type: string, enum: [pending, posted, cancelled], description: 'pending = shown as "pending issue" or "pending return"; posted when the DN or RN is approved.' }
-        site_id: { type: string, format: uuid }
-        site_code: { type: string }
+        site_id: { type: [string, 'null'], format: uuid, description: 'null for PL, OPEN and ADJ.' }
+        site_code: { type: [string, 'null'] }
         form_id: { type: [string, 'null'], format: uuid }
         lines: { type: array, items: { $ref: '#/components/schemas/StockMovementLine' } }
         reserved: { type: boolean }
@@ -9712,11 +9835,53 @@ components:
         version: { type: integer }
     StockMovementInput:
       type: object
-      required: [kind, site_id, lines]
+      required: [record_type, lines]
       properties:
-        kind: { type: string, enum: [issue, return] }
+        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj], description: 'DN and RN need a site; PL, OPEN and ADJ have none.' }
         site_id: { type: string, format: uuid }
-        lines: { type: array, minItems: 1, items: { $ref: '#/components/schemas/StockMovementLine' } }
+        doc_no: { type: string, description: 'Unique (Duplicate Doc No. answers 409).' }
+        doc_date: { type: string, format: date }
+        txn_status: { type: string, enum: [Approved, Dispatched, Received, Cancelled] }
+        condition: { type: string, enum: [Good, Faulty, Damaged] }
+        reason: { type: string, description: 'A return note needs a reason before it is submitted (Faulty or Damaged, Relocation, Cancellation, Other, Dismantle).' }
+        remark: { type: string }
+        lines: { type: array, minItems: 1, maxItems: 500, items: { $ref: '#/components/schemas/StockMovementLine' } }
+    AsBuiltItemFields:
+      type: object
+      properties:
+        name_en: { type: string, minLength: 2 }
+        name_ar: { type: [string, 'null'] }
+        unit: { type: string, description: 'm, m3, pcs, set ... Whole numbers are required for pcs and sets.' }
+        master_column: { type: [string, 'null'], pattern: '^[A-Z]{1,3}$', description: 'The Master As-Built column, kept for the Master-format export.' }
+        warehouse_item_code: { type: [string, 'null'], description: 'The Warehouse item this item is linked to (Q74); one As-Built item per Warehouse item.' }
+        sort_order: { type: integer, minimum: 0 }
+        is_active: { type: boolean }
+    AsBuiltItem:
+      allOf:
+        - $ref: '#/components/schemas/AsBuiltItemFields'
+        - type: object
+          required: [id, code, section, name_en, unit, field_code, is_active, version]
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string }
+            section: { type: string, enum: [cw, te] }
+            field_code: { type: string, description: 'The number field of the As-Built register that holds the quantity (q_<code>).' }
+            version: { type: integer }
+    AsBuiltItemInput:
+      allOf:
+        - $ref: '#/components/schemas/AsBuiltItemFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [code, section, name_en]
+          properties:
+            code: { type: string, pattern: '^[A-Z0-9][A-Z0-9_]{1,29}$' }
+            section: { type: string, enum: [cw, te] }
+    AsBuiltItemPatch:
+      allOf:
+        - $ref: '#/components/schemas/AsBuiltItemFields'
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
     # ---------------------------------------------------------- QC snags
     SnagType:
       type: object

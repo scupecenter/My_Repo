@@ -1,6 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Client as PgClient } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { allLocked, open, q, taskId, taskRow } from './calc-helpers';
 import { makeTask } from './wf-helpers';
 import { startApp, superDb } from './helpers';
@@ -18,6 +18,13 @@ let db: PgClient;
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+});
+// The matrix, warehouse and catalog suites rewrite cells and level counts of register rows too: one test at a time (same lock).
+beforeEach(async () => {
+  await db.query('SELECT pg_advisory_lock(770101)');
+});
+afterEach(async () => {
+  await db.query('SELECT pg_advisory_unlock(770101)');
 });
 afterAll(async () => {
   await db.end();
@@ -37,7 +44,7 @@ describe('catalogue and read access', () => {
     expect(res.body.items[0].fields.map((f: { code: string }) => f.code)).toContain('power_on_date');
     const admin = await plainAdmin(app, db);
     const all = await admin.api.call('get', '/registers');
-    expect(all.body.items.map((i: { register_key: string }) => i.register_key).sort()).toEqual(['dismantle', 'gecol', 'hlc', 'permits_hse', 'procurement']);
+    expect(all.body.items.map((i: { register_key: string }) => i.register_key).sort()).toEqual(['acquisition', 'as_built', 'change_control', 'contractors', 'dismantle', 'gecol', 'hlc', 'issues', 'meetings', 'permits_hse', 'procurement', 'quality', 'readiness_handover', 'rf_design', 'risks', 'warehouse']);
     const permits = all.body.items.find((i: { register_key: string }) => i.register_key === 'permits_hse');
     expect(permits.fields.find((f: { code: string }) => f.code === 'permit_type').options.map((o: { value: string }) => o.value)).toContain('Access - CW');
     expect(permits.fields.find((f: { code: string }) => f.code === 'na_approved_by').read_only).toBe(true);
@@ -50,7 +57,7 @@ describe('catalogue and read access', () => {
     const denied = await nobody.api.call('get', recPath('procurement'));
     expect(denied.status).toBe(403);
     expect(denied.body.code).toBe('module_forbidden');
-    expect((await nobody.api.call('get', recPath('quality'))).status).toBe(404);   // a register that is not enabled yet
+    expect((await nobody.api.call('get', recPath('deliverables'))).status).toBe(404);   // a register that is not enabled yet
     expect((await nobody.api.call('get', recPath('nope'))).status).toBe(404);
   });
 });
@@ -809,11 +816,10 @@ describe('region scope (B3) and rows without a site (Q69)', () => {
   });
 
   it('lets a row without a site be seen by anyone who holds the module, whatever their regions (framework, Q69)', async () => {
-    // no enabled register is global yet: the database rule is tested directly with a global row and a region-limited session
+    // a global row (risks) and a region-limited session
     const reg = await db.query(`SELECT 1 FROM register_definitions WHERE register_key = 'risks'`);
     expect(reg.rowCount).toBe(1);
-    await db.query(`UPDATE register_definitions SET enabled = true WHERE register_key = 'risks'`);
-    try {
+    {
       const u = await actor(app, db, { level: 'entry', grants: G('risks', 'view', 'create'), regions: [6], modules: null });
       // migration 0020 seeds a global entry cell for this row (the Matrix suite reads it): add the holder to it and take only that holder away again
       const existed = await q<{ id: string }>(db, `SELECT id FROM matrix_cells WHERE register_key = 'risks' AND level = 1 AND region_id IS NULL`);
@@ -829,8 +835,6 @@ describe('region scope (B3) and rows without a site (Q69)', () => {
       expect((await nobody.api.call('get', recPath('risks', made.body.id))).status).toBe(403);
       await db.query('DELETE FROM matrix_cell_assignees WHERE cell_id = $1 AND kind = $2::"AssigneeKind" AND ref_id = $3', [cell[0]!.id, 'user', u.user.id]);
       if (existed.length === 0) await db.query(`DELETE FROM matrix_cells WHERE id = $1`, [cell[0]!.id]);
-    } finally {
-      await db.query(`UPDATE register_definitions SET enabled = false WHERE register_key = 'risks'`);
     }
   });
 });

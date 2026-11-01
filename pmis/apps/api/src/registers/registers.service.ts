@@ -114,7 +114,11 @@ interface FieldRow {
   section: string | null;
 }
 
-const FIELD_ENTITY: Record<string, string> = { procurement: 'procurement', gecol: 'gecol', hlc: 'hlc', permits_hse: 'permit' };
+const FIELD_ENTITY: Record<string, string> = {
+  procurement: 'procurement', gecol: 'gecol', hlc: 'hlc', permits_hse: 'permit',
+  quality: 'quality', issues: 'issue', risks: 'risk', change_control: 'change_request', readiness_handover: 'readiness',
+  as_built: 'as_built', meetings: 'meeting', rf_design: 'rf_design', acquisition: 'acquisition', contractors: 'external_party',
+};
 
 @Injectable()
 export class RegistersService {

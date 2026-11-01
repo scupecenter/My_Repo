@@ -86,3 +86,18 @@ export async function approveAll(t: Team, id: string, version: number): Promise<
   if (res.status !== 200) throw new Error(`approve failed: ${res.status} ${JSON.stringify(res.body)}`);
   return res.body as Record<string, any>;
 }
+
+/** Like approveAll, but follows the record's own level count (a parallel suite may change the level count of a register row). */
+export async function approveFlex(t: Team, id: string, version: number): Promise<Record<string, any>> {
+  let res = await post(t.entry.api, t.key, id, 'submit', version);
+  if (res.status !== 200) throw new Error(`submit failed: ${res.status} ${JSON.stringify(res.body)}`);
+  for (let i = 0; i < 4 && res.body.state !== 'approved'; i++) {
+    if (res.body.state === 'in_review') res = await post(t.review.api, t.key, id, 'review', res.body.version);
+    else {
+      await t.approve.api.stepUp(t.approve.user.password);
+      res = await post(t.approve.api, t.key, id, 'approve', res.body.version);
+    }
+    if (res.status !== 200) throw new Error(`${i}: transition failed: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  return res.body as Record<string, any>;
+}

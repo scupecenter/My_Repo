@@ -89,6 +89,12 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'step_up_required':
       return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+    case 'insufficient_stock':
+    case 'item_in_use':
+      return new ProblemException(422, m[1], {
+        detail: detail ?? (m[1] === 'item_in_use' ? 'The item is in use.' : 'Not enough stock.'),
+        errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

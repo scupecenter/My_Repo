@@ -7,7 +7,7 @@ export type ErrorCode =
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'password_change_required' | 'weak_password' | 'internal_error'
-  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell';
+  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use';
 
 export interface FieldError {
   path: string;
