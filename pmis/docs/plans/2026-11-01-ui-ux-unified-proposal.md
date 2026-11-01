@@ -97,7 +97,7 @@ The constraints in §7 do not change.
 | DD3 | Resize the sidebar and drawer splitters | P | Adopt |
 | DD4 | Drop files on the right document slot: target highlight, progress, errors | D | Adopt (polish what exists) |
 | DD5 | Multi-file drop: type suggested from the file name, then confirmed | D | Adopt |
-| DD6 | Board drag between columns | D | Adapt: the Board starts read-only. A drop opens the normal action dialog (submit, approve, or reject with a note, plus step-up). Nothing changes silently. |
+| DD6 | Board drag between columns = a real workflow action (owner decision 2026-11-01) | D | Adopt: dropping a card on Reviewed/Approved/Returned performs that action **only when the user holds that level** (server-checked as for the button). Columns the user may not drop on are shown disabled. A rejection/return opens the mandatory-note box; step-up opens when the action needs it; mandatory documents and validations are checked by the server and a refused drop snaps back with the reason. Approvals are sent after a 5-second "Undo" window (the request is not sent before it ends), so Undo is real. Every drop is audited like the button, with `via: drag`. Bulk drag of several selected cards follows the batch rules. |
 | DD7 | Drag dates in Calendar or Gantt | D | Later, under the same rule (opens the edit form; SLA, approval and audit apply) |
 | — | Every drag has a button, menu or keyboard alternative; valid targets shown; Esc cancels; the item snaps back on failure | — | Adopt (rule) |
 
@@ -170,7 +170,7 @@ Build two variants on the same data: **A**, refined rings, and **B**, a flat seg
 | # | Form | Where | Decision |
 |---|---|---|---|
 | L1 | Table/List | Everywhere | Adopt |
-| L2 | Board (columns: stage or approval state) | Site Register, My Work, registers | Adopt, read-only first (DD6) |
+| L2 | Board (columns: stage or approval state) | Site Register, My Work, Approvals, registers | Adopt, drag = workflow action under DD6 |
 | L3 | Calendar (due dates, SLA, PAC/FAC, DLP ends) | Site Register, Warehouse | Adopt, read-only |
 | L4 | Timeline/Gantt (baseline vs actual) | Site page, project | Later |
 | — | The functional view (CW/TE/O&M), the view form, and the stream filter are three separate controls | — | Adopt (rule) |
@@ -233,6 +233,25 @@ Checked in every phase:
   - Success is shown only after the server confirms. Optimistic updates apply to personal preferences only.
 - **Settings layers:** system default › shared view › personal view › unsaved session. Reset goes back one layer.
 
+### 2.15 Additional functional features (owner decision 2026-11-01: add all that keep the rules)
+| # | Feature | Source | Needs | Phase |
+|---|---|---|---|---|
+| X1 | Notification inbox: everything for me in one place, mark read, snooze until a date | Linear | A+M (`notifications.read_at`, `snooze_until`) | 4b |
+| X2 | Follow (watch) a site or record: get its change notifications without holding it | ClickUp / Linear | A+M `watches` | 4b |
+| X3 | @mentions in comments, with a notification to the person named (only people who can see the record) | both | A | 4b |
+| X4 | Time in each state: how long a task sat at entry / review / approve, per person and team | ClickUp | A (from the audit log) | 4b |
+| X5 | Workload view: open and late tasks per holder, opens the existing reassign action (B12b) | ClickUp | A | 4b |
+| X6 | "Blocked by" chain: why a task is locked and which gate, permit or task it waits for | Linear | A (gates exist) | 4b |
+| X7 | Weekly status update per region or team: the lead writes a summary and sets on track / at risk / off track | Linear | A+M `status_updates` | 4b |
+| X8 | Personal reminder on a task ("remind me Sunday") | ClickUp | A+M `reminders` | 8 |
+| X9 | Email a saved view on a schedule (daily or weekly), limited to the recipient's own scope | ClickUp | A + job | 8 |
+| X10 | Admin notification rules ("task late 3 days → alert the team lead"); notify only, never change state, holder or date | ClickUp Automations | A+M, settings | 8 |
+| X11 | Site activity timeline in plain language (from the audit log, read-scoped) | both | A | 8 |
+| X12 | Triage queue for new issues and uploads waiting for classification and assignment | Linear Triage | W (+A filter) | 8 |
+| X13 | Personal checklist inside a task: helper notes only, never a condition for approval and never changes the task definition | ClickUp | A+M | 8 |
+
+Excluded because they break the rules: free custom statuses, free task creation outside the admin's task definitions, guests and public sharing, automations that change state, holder or dates.
+
 ## 3. Data, contract and migrations
 All changes are additive. No existing endpoint, table, grant or rule changes.
 | Need | For | Contract | Migration |
@@ -253,8 +272,10 @@ All changes are additive. No existing endpoint, table, grant or rule changes.
 | 3 | Tables and drawers: columns, density, sticky header, selection and bulk bar, URL filters and chips, quick filters, empty states, drawer resize/tabs/next-prev/preview; write-through field editing (web) | additive params | L |
 | 4 | Saved views (personal and shared), server-side preferences and favourites, global search, AND/OR filters, export with view | `user_prefs`, `saved_views`, `/search` | L |
 | 5 | Pipeline A/B (the owner picks one), My Work sections, Approvals list with preview and bulk | none | M |
-| 6 | Board (read-only; a drop opens the action dialog) and Calendar (read-only) | none | M |
+| 6 | Board with drag-to-review/approve/return (DD6) and Calendar (read-only) | additive `via` field in action audit | M |
+| 4b | Inbox, follow, @mentions, time in state, workload, blocked-by chain, weekly status updates (X1-X7) | additive API + tables | L |
 | 7 | Timeline/Gantt; date dragging through the edit form | later | L |
+| 8 | Reminders, scheduled view e-mails, notification rules, site activity timeline, triage queue, task checklists (X8-X13) | additive API + tables + jobs | L |
 
 Phase 3 starts after the open work on `Site.tsx`/`TaskGrid.tsx`, because both touch the same files. That work is the O&M final view membership (migration 0030) and the web editing of write-through fields.
 
