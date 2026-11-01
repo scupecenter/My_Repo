@@ -1,4 +1,4 @@
-/* GSDN PMIS design tokens
+/* GSDN PMIS design tokens. SINGLE SOURCE: this file. design/tokens.css is a generated copy: run `npm run sync:tokens` in apps/web after editing.
    Source: frappe-ui@1.0.2 (MIT), tailwind/tokens.js + tokens/{colors,effects,radius,typography}.js; Figma file kMYnZ9ougpSSQBdjZCgtdX
    Colors, radius, shadows, focus rings and type sizes are taken from the package, not from memory.
    Layer 1 (frappe raw): --surface-*, --ink-*, --outline-* (oklch). Layer 2 (semantic): --bg --card --ink --accent --done ...
@@ -306,6 +306,24 @@
   --shadow-md:inset 0px 0.25px 1.5px 0px #ffffff29, 0px 0px 1.5px 0px #00000026, 0px 0px 6px 2px #0000000a, 0px 6px 12px -2px #00000014;
   --shadow-lg:inset 0px 0.25px 1.5px 0px #ffffff29, 0px 0px 1.5px 0px #0000002e, 0px 0px 6px 3px #00000008, 0px 18px 22px -6px #0000001a;
   --shadow-xl:inset 0px 0.25px 1.5px 0px #ffffff29, 0px 0px 1px 0px #00000033, 0px 0px 10px 2px #0000000a, 0px 24px 30px -8px #0000001a;
+  --state-done-fg:var(--ink-green-8);
+  --state-done-bg:var(--surface-green-2);
+  --state-done-border:var(--outline-green-3);
+  --state-progress-fg:var(--ink-blue-8);
+  --state-progress-bg:var(--surface-blue-2);
+  --state-progress-border:var(--outline-blue-3);
+  --state-late-fg:var(--ink-red-8);
+  --state-late-bg:var(--surface-red-2);
+  --state-late-border:var(--outline-red-3);
+  --state-locked-fg:var(--ink-gray-6);
+  --state-locked-bg:var(--surface-gray-2);
+  --state-locked-border:var(--outline-gray-3);
+  --state-na-fg:var(--ink-gray-6);
+  --state-na-bg:var(--surface-gray-1);
+  --state-na-border:var(--outline-gray-3);
+  --state-planned-fg:var(--ink-violet-8);
+  --state-planned-bg:var(--surface-violet-2);
+  --state-planned-border:var(--outline-violet-3);
   --focus:2px solid #c9c9c9e5;
   --font:"Cairo","Segoe UI",system-ui,sans-serif;
   --text-2xs:11px;
@@ -320,6 +338,7 @@
   --text-4xl:24px;
   --text-5xl:26px;
   --lh-text:1.5;--lh-ar:1.7;
+  --type-1:12px;--type-2:13px;--type-3:14px;--type-4:16px;--type-5:18px;--type-6:22px;--type-7:28px;
   color-scheme:light;
 }
 [data-theme=dark]{
@@ -597,6 +616,24 @@
   --shadow-md:inset 0px 0.5px 0.5px 0.5px #ffffff08, 0px 0px 16px 2px #00000033, 0px 6px 12px -2px #00000099;
   --shadow-lg:inset 0px 0.5px 1.5px 0.5px #ffffff0a, 0px 0px 16px 0px #0000001a, 0px 18px 20px -8px #00000085;
   --shadow-xl:inset 0px 0.5px 1.5px 0.5px #ffffff0a, 0px 0px 14px 2px #0000001f, 0px 26px 34px -6px #0000006b;
+  --state-done-fg:var(--ink-green-7);
+  --state-done-bg:var(--surface-green-2);
+  --state-done-border:var(--outline-green-4);
+  --state-progress-fg:var(--ink-blue-7);
+  --state-progress-bg:var(--surface-blue-2);
+  --state-progress-border:var(--outline-blue-4);
+  --state-late-fg:var(--ink-red-7);
+  --state-late-bg:var(--surface-red-2);
+  --state-late-border:var(--outline-red-4);
+  --state-locked-fg:var(--ink-gray-6);
+  --state-locked-bg:var(--surface-gray-2);
+  --state-locked-border:var(--outline-gray-4);
+  --state-na-fg:var(--ink-gray-6);
+  --state-na-bg:var(--surface-gray-1);
+  --state-na-border:var(--outline-gray-4);
+  --state-planned-fg:var(--ink-violet-7);
+  --state-planned-bg:var(--surface-violet-2);
+  --state-planned-border:var(--outline-violet-4);
   --focus:3px solid #464646cc;
   color-scheme:dark;
 }

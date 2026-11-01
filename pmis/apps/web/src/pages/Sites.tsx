@@ -6,6 +6,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { useRegions, useSites, useStreams, useViews, type SiteFilters } from '@/api/sites';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { ViewTabs } from '@/components/ViewTabs';
+import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
@@ -35,6 +37,7 @@ export function Sites() {
   const [f, setF] = useState<Omit<SiteFilters, 'stream' | 'view'>>({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' });
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
+  const activeFilters = Object.values(f).filter(Boolean).length;
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
@@ -69,8 +72,7 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <h1 className="text-2xl font-bold">{t('sites.title')}</h1>
-      <p className="mb-3 text-mute">{t('sites.subtitle')}</p>
+      <PageHeader title={t('sites.title')} subtitle={t('sites.subtitle')} />
       <div role="tablist" aria-label={t('sites.streams_label')} className="mb-3 flex flex-wrap gap-1 border-b border-line" data-testid="stream-tabs">
         {[{ code: '', label: t('sites.stream_all') }, ...tabs.map((s) => ({ code: s.code, label: streamName(t, i18n.language, s) }))].map((s) => (
           <button key={s.code || 'ALL'} role="tab" aria-selected={stream === s.code} data-testid={`stream-tab-${s.code || 'ALL'}`} onClick={() => setStream(s.code)}
@@ -78,7 +80,8 @@ export function Sites() {
         ))}
       </div>
       <ViewTabs views={viewsQ.data} value={view} onChange={setView} testid="view-tabs" />
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
+        filters={<>
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />
         <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />
@@ -90,10 +93,12 @@ export function Sites() {
             <span data-testid="sites-show-na-label">{t('sites.show_na', { count: naItems.length })}</span>
           </label>
         )}
-        <span className="ms-auto text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>
+        </>}
+        count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>}
+        tools={<>
         <button className="btn" data-testid="sites-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
         <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
-      </div>
+        </>} />
       {dismantle ? (
         <p className="card p-6 text-mute" data-testid="stream-dismantle-todo">{t('sites.dismantle_todo')}</p>
       ) : (
@@ -133,7 +138,7 @@ export function Sites() {
                 );
               })}
             </div>
-            {q.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="sites-empty">{t('sites.empty')}</p>}
+            {q.isSuccess && !items.length && (activeFilters ? <NoResults testid="sites-empty" onClear={() => setF({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' })} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
           </div>
         </div>
       )}

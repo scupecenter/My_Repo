@@ -1,57 +1,25 @@
 import * as Popover from '@radix-ui/react-popover';
 import { useQueryClient } from '@tanstack/react-query';
-import { Bell, Check, Inbox, LayoutGrid, Home, BarChart3, FileText, Users, Table2, Settings, Download, KeyRound, UsersRound, UserX, ShieldCheck, Eye, Activity, ScrollText, MessageSquare, Megaphone, ShoppingCart, Zap, Cable, HardHat, Wrench, Users2, Warehouse, BadgeCheck, CircleAlert, TriangleAlert, GitPullRequest, Rocket, Ruler, CalendarDays, Radio, Landmark, Menu, Moon, Search, Sun, LogOut, Lock } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { Bell, Check, Download, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun, LogOut, Lock, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useUnreadTotal } from '@/api/msg';
 import { hasGrant } from '@/lib/perm';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
+import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
+import { BY_GRANT, NAV } from './navItems';
+import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
 
-export const NAV: { key: string; to: string; icon: ReactNode; group: 'work' | 'registers' | 'data' | 'admin' }[] = [
-  { key: 'my_work', to: '/my-work', icon: <Home size={18} />, group: 'work' },
-  { key: 'approvals', to: '/approvals', icon: <Inbox size={18} />, group: 'work' },
-  { key: 'sites', to: '/sites', icon: <LayoutGrid size={18} />, group: 'work' },
-  { key: 'dashboard', to: '/dashboard', icon: <BarChart3 size={18} />, group: 'work' },
-  { key: 'messages', to: '/messages', icon: <MessageSquare size={18} />, group: 'work' },
-  { key: 'procurement', to: '/registers/procurement', icon: <ShoppingCart size={18} />, group: 'registers' },
-  { key: 'gecol', to: '/registers/gecol', icon: <Zap size={18} />, group: 'registers' },
-  { key: 'hlc', to: '/registers/hlc', icon: <Cable size={18} />, group: 'registers' },
-  { key: 'permits_hse', to: '/registers/permits_hse', icon: <HardHat size={18} />, group: 'registers' },
-  { key: 'dismantle', to: '/registers/dismantle', icon: <Wrench size={18} />, group: 'registers' },
-  { key: 'contractors', to: '/registers/contractors', icon: <Users2 size={18} />, group: 'registers' },
-  { key: 'warehouse', to: '/warehouse', icon: <Warehouse size={18} />, group: 'registers' },
-  { key: 'quality', to: '/registers/quality', icon: <BadgeCheck size={18} />, group: 'registers' },
-  { key: 'issues', to: '/registers/issues', icon: <CircleAlert size={18} />, group: 'registers' },
-  { key: 'risks', to: '/registers/risks', icon: <TriangleAlert size={18} />, group: 'registers' },
-  { key: 'change_control', to: '/registers/change_control', icon: <GitPullRequest size={18} />, group: 'registers' },
-  { key: 'readiness', to: '/registers/readiness_handover', icon: <Rocket size={18} />, group: 'registers' },
-  { key: 'as_built', to: '/registers/as_built', icon: <Ruler size={18} />, group: 'registers' },
-  { key: 'meetings', to: '/registers/meetings', icon: <CalendarDays size={18} />, group: 'registers' },
-  { key: 'rf_design', to: '/registers/rf_design', icon: <Radio size={18} />, group: 'registers' },
-  { key: 'acquisition', to: '/registers/acquisition', icon: <Landmark size={18} />, group: 'registers' },
-  { key: 'templates', to: '/templates', icon: <FileText size={18} />, group: 'data' },
-  { key: 'admin.users', to: '/admin/users', icon: <Users size={18} />, group: 'admin' },
-  { key: 'admin.roles', to: '/admin/roles', icon: <KeyRound size={18} />, group: 'admin' },
-  { key: 'admin.groups', to: '/admin/groups', icon: <UsersRound size={18} />, group: 'admin' },
-  { key: 'admin.delegation', to: '/admin/delegation', icon: <ShieldCheck size={18} />, group: 'admin' },
-  { key: 'absence', to: '/absence', icon: <UserX size={18} />, group: 'work' },
-  { key: 'admin.matrix', to: '/admin/matrix', icon: <Table2 size={18} />, group: 'admin' },
-  { key: 'admin.settings', to: '/admin/settings', icon: <Settings size={18} />, group: 'admin' },
-  { key: 'admin.security_log', to: '/admin/security-log', icon: <ScrollText size={18} />, group: 'admin' },
-  { key: 'admin.online', to: '/admin/online', icon: <Activity size={18} />, group: 'admin' },
-  { key: 'announcements', to: '/admin/announcements', icon: <Megaphone size={18} />, group: 'admin' },
-  { key: 'audit', to: '/audit', icon: <Eye size={18} />, group: 'admin' },
-];
-
-/** Entries opened by a grant rather than by the server's module list (security log, online now). */
-const BY_GRANT: Record<string, string> = { 'admin.security_log': 'view_security_log', 'admin.online': 'manage_users' };
+export { NAV };
+const WIDTH_KEY = 'pmis.nav.width';
+const ICONS_KEY = 'pmis.nav.icons';
 
 export function Shell() {
   const { t } = useTranslation();
@@ -62,7 +30,15 @@ export function Shell() {
   const loc = useLocation();
   const qc = useQueryClient();
   const logout = useLogout();
-  const [side, setSide] = useState(true);
+  const [compact, setCompact] = useState<boolean>(() => loadPref<boolean>(ICONS_KEY, false) === true);
+  const [width, setWidth] = useState<number>(() => { const w = Number(loadPref(WIDTH_KEY, SIDEBAR_DEFAULT)); return Number.isFinite(w) ? Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, w)) : SIDEBAR_DEFAULT; });
+  // The drawer is tied to the page it was opened on, so it closes by itself on navigation.
+  const here = loc.pathname + loc.search;
+  const [drawerAt, setDrawerAt] = useState<string | null>(null);
+  const drawer = drawerAt === here;
+  const setDrawer = (o: boolean) => setDrawerAt(o ? here : null);
+  const asideRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
   const [palette, setPalette] = useState(false);
   const [exp, setExp] = useState(false);
   const [theme, setTheme] = useState(currentTheme());
@@ -89,41 +65,62 @@ export function Shell() {
   const current = inPeople ? NAV.find((n) => n.key === 'admin.users') : NAV.find((n) => loc.pathname.startsWith(n.to));
   const savePref = (p: { locale?: 'en' | 'ar'; theme?: 'light' | 'dark' }) => void api.patch('/me/preferences', { body: p }).catch(() => {});
 
+  const resize = (w: number) => { setWidth(w); storePref(WIDTH_KEY, w); };
+  const toggleCompact = () => setCompact((c) => { storePref(ICONS_KEY, !c); return !c; });
+  useEffect(() => {
+    if (!drawer) return;
+    closeRef.current?.focus();
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') setDrawerAt(null); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [drawer]);
+  const activeKey = current && sideItems.some((i) => i.key === current.key) ? current.key : undefined;
+  const view = loc.pathname.startsWith('/sites') ? new URLSearchParams(loc.search).get('view') : null;
+  const groupFirst = current ? sideItems.find((i) => i.group === current.group) : undefined;
+  const brand = (
+    <div className="flex items-center gap-2 px-4 py-4 font-bold">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-accent text-accentInk">G</span>{!compact && t('app.name')}
+    </div>
+  );
+
   const switchLang = () => { const l = lang === 'en' ? 'ar' : 'en'; applyLocale(l); setLang(l); savePref({ locale: l }); };
   const switchTheme = () => { const n = theme === 'light' ? 'dark' : 'light'; applyTheme(n); setTheme(n); savePref({ theme: n }); };
 
   return (
     <div className="flex min-h-screen">
-      {side && (
-        <aside data-testid="sidebar" className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-e border-line bg-side">
-          <div className="flex items-center gap-2 px-4 py-4 font-bold">
-            <span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}
+      <aside ref={asideRef} data-testid="sidebar" aria-label={t('nav.sidebar_label')} style={{ width: compact ? 56 : width }}
+        className="sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
+        {brand}
+        <SidebarBody items={sideItems} compact={compact} unread={unread} activeKey={activeKey} />
+        {!compact && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
+        {!compact && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
+      </aside>
+      {drawer && (
+        <div className="fixed inset-0 z-50 md:hidden" data-testid="sidebar-drawer-root">
+          <button className="absolute inset-0 bg-scrim" aria-label={t('nav.close_menu')} tabIndex={-1} onClick={() => setDrawer(false)} />
+          <div role="dialog" aria-modal="true" aria-label={t('nav.sidebar_label')} data-testid="sidebar-drawer" className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-line bg-card">
+            <div className="flex items-center justify-between pe-2">
+              <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
+              <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
+            </div>
+            <SidebarBody items={sideItems} compact={false} unread={unread} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
           </div>
-          <nav className="flex-1 overflow-y-auto px-2">
-            {(['work', 'registers', 'data', 'admin'] as const).map((g) => {
-              const list = sideItems.filter((i) => i.group === g);
-              if (!list.length) return null;
-              return (
-                <div key={g} className="mb-3">
-                  <div className="px-2 py-1 text-xs font-semibold text-mute">{t(`nav.group_${g}`)}</div>
-                  {list.map((n) => (
-                    <NavLink key={n.key} to={n.to} data-testid={`nav-${n.key}`}
-                      className={({ isActive }) => `flex items-center gap-3 rounded-md px-2 py-2 text-sm ${isActive || (n.key === 'admin.users' && inPeople) ? 'border-s-2 border-accent bg-sideOn font-semibold' : 'hover:bg-hover'}`}>
-                      {n.icon}<span className="flex-1">{t(`nav.${n.key}`)}</span>
-                      {n.key === 'messages' && unread > 0 && <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>}
-                    </NavLink>
-                  ))}
-                </div>
-              );
-            })}
-          </nav>
-          <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>
-        </aside>
+        </div>
       )}
       <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-card px-4 py-2">
-          <button className="btn" aria-label={t('nav.open_menu')} onClick={() => setSide((s) => !s)}><Menu size={16} /></button>
-          <div className="text-sm text-mute">{t('app.name')} / <b className="text-ink">{current ? t(`nav.${current.key}`) : ''}</b></div>
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-2 border-b border-line bg-card px-4 py-2">
+          <button className="btn min-h-11 min-w-11 md:hidden" data-testid="topbar-menu" aria-label={t('nav.open_menu')} aria-expanded={drawer} onClick={() => setDrawer(true)}><Menu size={16} aria-hidden /></button>
+          <button className="btn hidden md:inline-flex" data-testid="topbar-collapse" aria-label={t(compact ? 'nav.full_menu' : 'nav.icons_only')} title={t(compact ? 'nav.full_menu' : 'nav.icons_only')} aria-pressed={compact} onClick={toggleCompact}>{compact ? <PanelLeftOpen size={16} aria-hidden className="rtl:-scale-x-100" /> : <PanelLeftClose size={16} aria-hidden className="rtl:-scale-x-100" />}</button>
+          <nav aria-label="breadcrumb" data-testid="breadcrumb" className="min-w-0 text-sm text-mute">
+            <ol className="flex flex-wrap items-center gap-1">
+              <li><Link className="hover:text-ink" to="/my-work">{t('app.name')}</Link></li>
+              {current && groupFirst && <li className="flex gap-1"><span aria-hidden>/</span><Link className="hover:text-ink" to={groupFirst.to}>{t(`nav.group_${current.group}`)}</Link></li>}
+              {current && <li className="flex gap-1"><span aria-hidden>/</span>{view
+                ? <Link className="hover:text-ink" to={sideItems.find((i) => i.key === current.key)?.to ?? current.to}>{t(`nav.${current.key}`)}</Link>
+                : <b className="text-ink" aria-current="page">{t(`nav.${current.key}`)}</b>}</li>}
+              {current && view && <li className="flex gap-1"><span aria-hidden>/</span><b className="text-ink" aria-current="page">{view}</b></li>}
+            </ol>
+          </nav>
           <div className="flex-1" />
           <button className="btn min-w-60 justify-start font-normal text-mute" data-testid="topbar-search" onClick={() => setPalette(true)}>
             <Search size={16} /><span className="flex-1 text-start">{t('top.search')}</span><kbd className="mono rounded border border-line px-1 text-xs">Ctrl K</kbd>

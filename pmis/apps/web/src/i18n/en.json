@@ -42,7 +42,24 @@
     "as_built": "As-Built",
     "meetings": "Meetings",
     "rf_design": "RF Design",
-    "acquisition": "Acquisition"
+    "acquisition": "Acquisition",
+    "favourites": "Favourites",
+    "recent": "Recent",
+    "search": "Filter menu",
+    "pin": "Add to favourites",
+    "unpin": "Remove from favourites",
+    "move_up": "Move up",
+    "move_down": "Move down",
+    "resize": "Resize sidebar",
+    "icons_only": "Icons only",
+    "full_menu": "Full menu",
+    "sidebar_label": "Main menu",
+    "close_menu": "Close menu",
+    "home": "Home",
+    "views": "Site Register views",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "no_match": "No menu item matches"
   },
   "top": {
     "search": "Search or jump to…",
@@ -1568,5 +1585,13 @@
     "edit_title": "Edit As-Built item",
     "deactivate_title": "Deactivate this item?",
     "back": "Back to the register"
+  },
+  "states": {
+    "no_results": "No results match these filters",
+    "clear_filters": "Clear filters",
+    "no_permission": "You do not have access to this",
+    "no_permission_hint": "Ask a System Admin if you need it.",
+    "retry": "Retry",
+    "filters": "Filters:"
   }
 }
