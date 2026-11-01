@@ -289,13 +289,13 @@ Source: `docs/plans/2026-10-31-dismantle-stream-views-documents.md` §2; CLAUDE.
 |---|---|---|---|
 | CW Register | Site Release | Site RFI and CW acceptances | CW Team Lead |
 | TE Register | Site RFI | HOTO (includes stage 8 Cluster Optimization / KPI acceptance) | TE Team Lead |
-| O&M | after HOTO | FAC | O&M team |
+| O&M | after HOTO | TE DLP / TE FAC and Final Closure | O&M team (see Responsibility below) |
 
 - **HOTO** is owned by the TE Team Lead, who can delegate a **handover engineer** (a new field on the HOTO task; the seed role "HOTO Engineer" exists). This changes Q37: HOTO is no longer in Closure.
 - The **O&M view and an O&M role are built now**. O&M users are added later.
-- **FAC:** until the O&M team is assigned, CW FAC stays with the CW Team Lead and TE FAC with the TE Team Lead (Q40). After the assignment, O&M follows DLP and FAC.
-- **Final Closure (Z1)** stays with the Project Manager.
-- The four-stream table in §2.2 stays the seed mapping of stages to streams and the Site Register filter (owner decision 2026-11-01, Q98). The three views are tabs beside it (contract 0.4.7 `view`, migration 0023 `workflow_views`): CW = stages 2-4 plus CW DLP (B14) and CW FAC (B15); TE = stages 5-9 including KPI and HOTO, plus TE FAC (D18) while the O&M team is not assigned; O&M = D18 once it is. Stage 1 (Design & Acquisition) and Z1 show only in the all-work view. CW FAC and TE FAC stay in the CW and TE views until the setting `views.om_team_assigned` is true, then move to O&M (Q102). Stream and view combine as an intersection. The Dashboard D67 blocks are unchanged.
+- **FAC (responsibility, not display):** until the O&M team is assigned (`views.om_team_assigned` = false), CW FAC stays with the CW Team Lead and TE FAC with the TE Team Lead, who acts on TE FAC from the O&M tab (Q40). After the assignment, O&M acts on TE FAC. The matrix holders are not changed by the switch.
+- **Final Closure (Z1)** is always approved by the Project Manager (B2) and is shown in the O&M view.
+- The four-stream table in §2.2 stays the seed mapping of stages to streams and the Site Register filter (owner decision 2026-11-01, Q98). The three views are tabs beside it (contract 0.4.7 `view`, migration 0023 `workflow_views`): CW = stages 2-4 plus CW DLP (B14) and CW FAC (B15); TE = stages 5-9 through TE PAC, KPI acceptance and HOTO (TE FAC is not in TE); O&M = always everything after HOTO: TE DLP / TE FAC (D18) and Final Closure (Z1). O&M membership is fixed (migration 0030) and does not depend on `views.om_team_assigned`; that setting only decides who acts on TE FAC (Q102 final, owner decision 2026-11-01). Stage 1 (Design & Acquisition) shows only in the all-work view. Stream and view combine as an intersection. The Dashboard D67 blocks are unchanged.
 
 ### 2.7 Source of truth and write-through editing (owner decision 2026-10-31, option 2)
 Source: plan §4; Q73.

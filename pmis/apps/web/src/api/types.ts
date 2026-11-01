@@ -7,6 +7,7 @@ export type Me = S['Me'];
 export type UserRef = S['UserRef'];
 export type TaskSummary = S['TaskSummary'];
 export type TaskDetail = S['TaskDetail'];
+export type TaskRegisterField = S['TaskRegisterField'];
 export type ApprovalItem = S['ApprovalItem'];
 export type BulkResult = S['BulkResult'];
 export type StaffCard = S['StaffCard'];

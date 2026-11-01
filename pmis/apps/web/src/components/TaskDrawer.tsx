@@ -5,8 +5,9 @@ import { useTranslation } from 'react-i18next';
 import { useTask } from '@/api/hooks';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, useUpload, type TaskOp } from '@/api/sites';
-import type { DocumentSlot, TaskDetail } from '@/api/types';
+import type { DocumentSlot, TaskDetail, TaskRegisterField } from '@/api/types';
 import { Holders } from './HolderChip';
+import { TaskRegisterFields } from './TaskRegisterFields';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -64,7 +65,7 @@ function Thread({ task }: { task: TaskDetail }) {
   );
 }
 
-function Body({ task }: { task: TaskDetail }) {
+function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterField[] }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const op = useTaskOp(task.site_id), date = useDatePatch(task.site_id), up = useUpload(task);
@@ -120,6 +121,8 @@ function Body({ task }: { task: TaskDetail }) {
           {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={!dirty.length || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}
         </section>
 
+        <TaskRegisterFields fields={regFields} siteId={task.site_id} />
+
         <section aria-label={t('grid.docs')}>
           <h3 className="mb-1 font-semibold">{t('approvals.documents', { count: task.slots.length })}</h3>
           <ul className="space-y-2" data-testid="slot-list">
@@ -147,7 +150,8 @@ function Body({ task }: { task: TaskDetail }) {
   );
 }
 
-export function TaskDrawer({ taskId, onClose }: { taskId: string | null; onClose: () => void }) {
+/** `registerFields` come from the Site Register grid (contract 0.4.9: only the grid carries them). */
+export function TaskDrawer({ taskId, onClose, registerFields = [] }: { taskId: string | null; onClose: () => void; registerFields?: TaskRegisterField[] }) {
   const { t } = useTranslation();
   const q = useTask(taskId);
   return (
@@ -155,7 +159,7 @@ export function TaskDrawer({ taskId, onClose }: { taskId: string | null; onClose
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-[60] bg-scrim/50" />
         <Dialog.Content data-testid="task-drawer" aria-describedby={undefined} className="fixed inset-y-0 end-0 z-[60] w-[min(560px,100vw)] border-s border-line bg-card shadow-lg">
-          {q.data ? <Body key={q.data.id} task={q.data} /> : <div className="p-4"><Dialog.Title className="font-bold">{t('common.loading')}</Dialog.Title></div>}
+          {q.data ? <Body key={q.data.id} task={q.data} regFields={registerFields} /> : <div className="p-4"><Dialog.Title className="font-bold">{t('common.loading')}</Dialog.Title></div>}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

@@ -1,6 +1,6 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { Matrix, MatrixPatch } from '@/api/types';
+import type { Matrix, MatrixPatch, SiteTasks, TaskRegisterField } from '@/api/types';
 import { levelKind, usedLevels } from '@/lib/matrixLevels';
 import { canAct, canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
 import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handlers';
@@ -16,6 +16,25 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const validDate = (s: unknown) => s === null || (typeof s === 'string' && ISO.test(s) && !Number.isNaN(Date.parse(s)));
 const tagged = (t: MockTask) => HttpResponse.json(toDetail(t), { headers: { ETag: `"${t.version}"` } });
 const invalid = (path: string, code: string, title = 'Validation failed') => problem(422, code === 'invalid_date' ? 'validation_failed' : code, title, { errors: [{ path, code }] });
+
+/** Register-owned fields on three mock tasks (contract 0.4.9), read live from the register records so edit_via follows the record state. */
+const REG_FIELDS: Record<string, { key: string; type: string | null; code: string; en: string; ar: string; kind: 'text' | 'date' }> = {
+  B1: { key: 'procurement', type: 'pr', code: 'pr_no', en: 'PR number', ar: 'رقم طلب الشراء', kind: 'text' },
+  B2: { key: 'procurement', type: 'wo', code: 'po_wo_no', en: 'PO / WO number', ar: 'رقم أمر الشراء', kind: 'text' },
+  C4: { key: 'hlc', type: null, code: 'fiber_status', en: 'Fiber status', ar: 'حالة الألياف', kind: 'text' },
+  C2: { key: 'gecol', type: null, code: 'power_on_date', en: 'Power-on date', ar: 'تاريخ التشغيل', kind: 'date' },
+};
+function withRegisterFields(grid: SiteTasks, site: number): SiteTasks {
+  const recs = db().reg.records;
+  const fieldOf = (code: string, siteId: string): TaskRegisterField[] => {
+    const d = REG_FIELDS[code]; if (!d) return [];
+    const r = recs.filter((x) => x.register_key === d.key && x.site_index === site && x.record_type === d.type && x.state !== 'voided').sort((a, b) => b.version_no - a.version_no)[0];
+    const via = !r ? 'create' : r.state === 'entry' ? 'patch' : r.state === 'approved' ? 'new_version' : 'none';
+    return [{ code: d.code, label_en: d.en, label_ar: d.ar, type: d.kind, value: r?.data[d.code] ?? null, editable: via !== 'none', edit_via: via,
+      source: { register_key: d.key, record_type: d.type, site_id: siteId, record_id: r?.id ?? null, entity_id: r?.entity_id ?? null, record_state: r?.state ?? null, record_version: r?.version ?? null, field: `data.${d.code}` } }];
+  };
+  return { ...grid, stages: grid.stages.map((st) => ({ ...st, tasks: st.tasks.map((t) => ({ ...t, register_fields: fieldOf(t.task_code, t.site_id) })) })) };
+}
 
 export const siteHandlers = [
   http.get(`${B}/regions`, () => (viewer() ? HttpResponse.json({ items: REGIONS.map(([en, ar], i) => ({ id: i + 1, code: en, name_en: en, name_ar: ar, visible: true })) }) : problem(401, 'unauthenticated', 'Sign in required'))),
@@ -49,7 +68,7 @@ export const siteHandlers = [
     const stream = new URL(request.url).searchParams.get('stream'), view = new URL(request.url).searchParams.get('view');
     if (view && !VIEWS.some((x) => x.code === view)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/view', code: 'unknown_view' }] });
     if (stream && !STREAMS.some((x) => x.code === stream)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/stream', code: 'unknown_stream' }] });
-    return i >= 0 && i < SITE_COUNT ? HttpResponse.json(gridOf(i, stream ?? undefined, view ?? undefined)) : problem(404, 'not_found', 'Site not found');
+    return i >= 0 && i < SITE_COUNT ? HttpResponse.json(withRegisterFields(gridOf(i, stream ?? undefined, view ?? undefined), i)) : problem(404, 'not_found', 'Site not found');
   }),
 
   http.patch(`${B}/tasks/:id`, async ({ params, request }) => {

@@ -81,7 +81,7 @@ export function Site() {
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
         : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} onOpen={(id) => setParam('task', id)} />}
       <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>
-      <TaskDrawer taskId={taskId} onClose={() => setParam('task', null)} />
+      <TaskDrawer registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />
     </div>
   );
 }

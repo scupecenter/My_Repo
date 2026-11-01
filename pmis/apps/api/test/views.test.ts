@@ -52,10 +52,10 @@ describe('view definitions: seed data versioned with the workflow', () => {
     expect(res.body.views.map((v: { code: string }) => v.code)).toEqual(['CW', 'TE', 'OM']);
     const by = Object.fromEntries(res.body.views.map((v: { code: string }) => [v.code, v]));
     expect(by.CW).toMatchObject({ name_en: 'CW Register', sort_order: 1, stage_codes: ['MS2', 'MS3', 'MS4'], task_codes: ['B14', 'B15'] });
-    expect(by.TE).toMatchObject({ name_en: 'TE Register', stage_codes: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'], task_codes: ['D18'] });
-    expect(by.OM).toMatchObject({ name_en: 'O&M', stage_codes: [], task_codes: [] }); // O&M lists D18 only once the O&M team is assigned
+    expect(by.TE).toMatchObject({ name_en: 'TE Register', stage_codes: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'], task_codes: [] }); // TE FAC (D18) is not TE work any more (Q102 final)
+    expect(by.OM).toMatchObject({ name_en: 'O&M', stage_codes: [], task_codes: ['Z1', 'D18'] }); // O&M always lists everything after HOTO, whatever the switch says
     expect(by.CW.name_ar).toBeTruthy();
-    // stage 1 and Final Closure (stage 10) are in no view
+    // stage 1 and Final Closure (stage 10) are in no view as stages: Z1 is an O&M task member
     const members = [...by.CW.stage_codes, ...by.TE.stage_codes, ...by.OM.stage_codes];
     expect(members).not.toContain('MS1');
     expect(members).not.toContain('MS10');
@@ -83,7 +83,7 @@ describe('view definitions: seed data versioned with the workflow', () => {
 });
 
 describe('the task grid by view, and FAC before and after the O&M team is assigned (Q98)', () => {
-  it('shows each view with its own tasks only; CW FAC and TE FAC are in the CW and TE view until the O&M switch is on', async () => {
+  it('shows each view with its own tasks only; the O&M view always has TE FAC and Final Closure, whatever the O&M switch says', async () => {
     try {
       await setOm(false);
       const s = await fullSite();
@@ -92,10 +92,10 @@ describe('the task grid by view, and FAC before and after the O&M team is assign
       expect(cw.status).toBe(200);
       expect(grid(cw.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [], MS10: ['B14', 'B15'] });
       const te = await admin.api.call('get', `/sites/${s.id}/tasks?view=TE`);
-      expect(grid(te.body.stages)).toEqual({ MS5: ['D1'], MS6: [], MS7: [], MS8: ['F1'], MS9: ['D17'], MS10: ['D18'] });
+      expect(grid(te.body.stages)).toEqual({ MS5: ['D1'], MS6: [], MS7: [], MS8: ['F1'], MS9: ['D17'] });
       const om = await admin.api.call('get', `/sites/${s.id}/tasks?view=OM`);
-      expect(grid(om.body.stages)).toEqual({});
-      // stage 1 and Z1 show only in the all-work grid
+      expect(grid(om.body.stages)).toEqual({ MS10: ['D18', 'Z1'] });
+      // stage 1 shows only in the all-work grid
       const all = grid((await admin.api.call('get', `/sites/${s.id}/tasks`)).body.stages);
       expect(all.MS1).toEqual(['A1']);
       expect(all.MS10).toEqual(['B14', 'B15', 'D18', 'Z1']);
@@ -105,9 +105,9 @@ describe('the task grid by view, and FAC before and after the O&M team is assign
       expect(grid(cw2.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [], MS10: ['B14', 'B15'] });
       expect(grid((await admin.api.call('get', `/sites/${s.id}/tasks?view=TE`)).body.stages)).not.toHaveProperty('MS10');
       const om2 = await admin.api.call('get', `/sites/${s.id}/tasks?view=OM`);
-      expect(grid(om2.body.stages)).toEqual({ MS10: ['D18'] });
+      expect(grid(om2.body.stages)).toEqual({ MS10: ['D18', 'Z1'] }); // same membership after the assignment
       const defs = Object.fromEntries(om2.body.views.map((v: { code: string }) => [v.code, v]));
-      expect(defs.OM.task_codes).toEqual(['D18']);
+      expect(defs.OM.task_codes).toEqual(['Z1', 'D18']);
       expect(defs.CW.task_codes).toEqual(['B14', 'B15']);
     } finally {
       await setOm(false);
@@ -119,13 +119,13 @@ describe('the task grid by view, and FAC before and after the O&M team is assign
     const s = await fullSite();
     const admin = await plainAdmin(app, db);
     const res = await admin.api.call('get', `/sites/${s.id}/tasks?view=TE&stream=CLOSURE`);
-    expect(grid(res.body.stages)).toEqual({ MS9: ['D17'], MS10: ['D18'] });
+    expect(grid(res.body.stages)).toEqual({ MS9: ['D17'] });
     expect(grid((await admin.api.call('get', `/sites/${s.id}/tasks?view=TE&stream=CW`)).body.stages)).toEqual({});
   });
 });
 
 describe('GET /sites?view=: rail, late and waiting counts are computed over the view', () => {
-  it('lists the sites with work in the view and counts only its tasks; FAC moves with the switch', async () => {
+  it('lists the sites with work in the view and counts only its tasks; TE FAC is O&M work with the switch off and on', async () => {
     try {
       await setOm(false);
       const own = `${PREFIX}L`; // this test counts the sites of its own prefix, so the other tests' sites are not in the lists
@@ -147,11 +147,14 @@ describe('GET /sites?view=: rail, late and waiting counts are computed over the 
       expect(item(cw, s.code)).toMatchObject({ late_task_count: 2, waiting_approval_count: 1, next_milestone: 'MS2' }); // B3 and B15; B3 is in review
 
       const te = (await admin.api.call('get', `/sites?${q}&view=TE`)).body;
-      expect(codes(te)).toEqual(expect.arrayContaining([s.code, facOnly.code]));
+      expect(codes(te)).toContain(s.code);
+      expect(codes(te)).not.toContain(facOnly.code); // TE FAC is O&M work
       expect(item(te, s.code)).toMatchObject({ late_task_count: 1, waiting_approval_count: 0 }); // F1 only: the CW late tasks are not counted
-      expect(item(te, facOnly.code).rail.map((n) => n.code)).toContain('MS10');
-      expect(codes((await admin.api.call('get', `/sites?${q}&view=OM`)).body)).not.toContain(facOnly.code);
-      expect(codes((await admin.api.call('get', `/sites?${q}&view=TE&bucket=late`)).body)).toEqual(expect.arrayContaining([s.code, facOnly.code]));
+      const om0 = (await admin.api.call('get', `/sites?${q}&view=OM`)).body;
+      expect(codes(om0)).toEqual(expect.arrayContaining([s.code, facOnly.code]));
+      expect(item(om0, facOnly.code)).toMatchObject({ late_task_count: 1 });
+      expect(item(om0, facOnly.code).rail.map((n) => n.code)).toContain('MS10');
+      expect(codes((await admin.api.call('get', `/sites?${q}&view=TE&bucket=late`)).body)).toEqual([s.code]);
       expect(codes((await admin.api.call('get', `/sites?${q}&view=CW&bucket=waiting_approval`)).body)).toEqual([s.code]);
       expect(codes((await admin.api.call('get', `/sites?${q}&view=TE&bucket=waiting_approval`)).body)).toEqual([]);
       // the view and the stream filter together
@@ -164,7 +167,7 @@ describe('GET /sites?view=: rail, late and waiting counts are computed over the 
       const om = (await admin.api.call('get', `/sites?${q}&view=OM`)).body;
       expect(codes(om)).toEqual(expect.arrayContaining([s.code, facOnly.code]));
       expect(item(om, facOnly.code)).toMatchObject({ late_task_count: 1 });
-      expect(item(om, s.code)).toMatchObject({ late_task_count: 0 }); // only D18 (locked, not late); B14 and B15 are CW work
+      expect(item(om, s.code)).toMatchObject({ late_task_count: 0 }); // D18 and Z1 are locked, not late; B14 and B15 are CW work
     } finally {
       await setOm(false);
     }

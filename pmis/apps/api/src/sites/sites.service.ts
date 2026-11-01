@@ -85,7 +85,7 @@ export interface StreamStatusDto extends StreamDto {
   milestone_date: string | null;
 }
 
-/** The O&M team is assigned (setting views.om_team_assigned, default false, Q102): CW FAC and TE FAC then move to the O&M view. */
+/** The O&M team is assigned (setting views.om_team_assigned, default false, Q102). Since 0030 no seeded view member depends on it (O&M membership is fixed); it only matters for members an admin marks om_assigned. */
 const OM_ASSIGNED = Prisma.sql`((calc_setting('views.om_team_assigned', 'false'::jsonb) #>> '{}') = 'true')`;
 
 /** The tasks (id, stage_id) of a view in the workflow version of the stage they are joined to: whole stages, or single tasks, as the view's members say. */
