@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src e2e --max-warnings 0",
     "test": "vitest run",
+    "sync:tokens": "cp src/styles/tokens.css ../../design/tokens.css",
     "gen:api": "openapi-typescript ../../contracts/openapi.yaml -o src/api/schema.d.ts",
     "e2e": "playwright test"
   },

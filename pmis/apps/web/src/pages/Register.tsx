@@ -11,6 +11,8 @@ import { Holders } from '@/components/HolderChip';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
 import { useToast } from '@/components/Toast';
+import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { EmptyState, ErrorState, LoadingSkeleton, NoResults } from '@/components/States';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { isLive, OWNER_NOTE } from '@/lib/registerForms';
 
@@ -31,6 +33,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const key = def.register_key;
   const recordId = sp.get('record');
   const [f, setF] = useState<RecordFilters>({ q: '', region_id: '', state: '', record_type: '' });
+  const activeFilters = Object.values(f).filter(Boolean).length;
   const set = (k: keyof RecordFilters) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const regions = useRegions();
   const list = useRegisterRecords(key, f);
@@ -55,9 +58,10 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
 
   return (
     <div data-testid={`page-register-${key}`}>
-      <h1 className="text-2xl font-bold">{name}</h1>
+      <PageHeader title={name} />
       {OWNER_NOTE[key] && <p className="mb-3 text-mute" data-testid="register-owner-note">{t(OWNER_NOTE[key])}</p>}
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+      <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
+        filters={<>
         <input className="input max-w-64" data-testid="register-search" placeholder={t('registers.search')} aria-label={t('registers.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <select className="input w-auto" aria-label={t('sites.all_regions')} data-testid="register-filter-region" value={f.region_id} onChange={(e) => set('region_id')(e.target.value)}>
           <option value="">{t('sites.all_regions')}</option>{(regions.data ?? []).map((r) => <option key={r.id} value={r.id}>{(i18n.language === 'ar' && r.name_ar) || r.name_en}</option>)}
@@ -70,15 +74,17 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
             <option value="">{t('registers.all_types')}</option>{def.record_types.map((x) => <option key={x} value={x}>{x.toUpperCase()}</option>)}
           </select>
         )}
-        <span className="ms-auto text-sm text-mute" data-testid="register-count">{t('sites.count', { count: total })}</span>
-        <button className="btn btn-primary" data-testid="register-new" onClick={() => setRecord('new')}><Plus size={16} />{t('registers.new')}</button>
+        </>}
+        count={<span className="text-sm text-mute" data-testid="register-count">{t('sites.count', { count: total })}</span>}
+        primary={<button className="btn btn-primary" data-testid="register-new" onClick={() => setRecord('new')}><Plus size={16} />{t('registers.new')}</button>}
+        tools={<>
         <button className="btn" data-testid="register-template-download" disabled={!tpl} onClick={() => void down()}><FileDown size={16} />{t('registers.template_download')}</button>
         <button className="btn" data-testid="register-template-upload" disabled={!tpl || upload.isPending} onClick={() => file.current?.click()}><FileUp size={16} />{t('registers.template_upload')}</button>
         <input ref={file} type="file" accept=".xlsx" hidden data-testid="register-template-file" onChange={(e) => { up(e.target.files?.[0]); e.target.value = ''; }} />
         {key === 'as_built' && <Link className="btn" data-testid="register-asbuilt-items" to="/as-built/items">{t('asb.items_link')}</Link>}
         {key === 'warehouse' && <Link className="btn" data-testid="register-warehouse-screen" to="/warehouse">{t('wh.title')}</Link>}
         <ExportViewButton testid="register-export" source={key} filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={['site_code', 'region', 'record_type', 'state', ...cols.map((c) => c.code)]} />
-      </div>
+        </>} />
       <div className="card overflow-x-auto">
         <div className="min-w-[860px]">
           <div className={`${ncols} border-b border-line bg-card2 py-2 text-sm font-semibold text-mute`} role="row" style={gtc}>
@@ -95,8 +101,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 <span>{r.ball_in_court && (r.state === 'in_review' || r.state === 'in_approval') ? <Holders holders={r.ball_in_court.holders} /> : '—'}</span>
               </div>
             ))}
-            {list.isSuccess && !items.length && <p className="p-6 text-center text-mute" data-testid="register-empty">{t('registers.empty')}</p>}
-            {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
+            {list.isLoading && <LoadingSkeleton />}
+            {list.isSuccess && !items.length && (activeFilters ? <NoResults testid="register-empty" onClear={() => setF({ q: '', region_id: '', state: '', record_type: '' })} /> : <EmptyState testid="register-empty" title={t('registers.empty')} />)}
+            {list.isError && <ErrorState onRetry={() => void list.refetch()} />}
           </div>
         </div>
       </div>

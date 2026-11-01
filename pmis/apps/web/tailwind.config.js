@@ -1,5 +1,7 @@
 // All colours come from design/tokens.css variables (light + [data-theme=dark]).
 const v = (n) => `var(--${n})`;
+const STATES = ['done', 'progress', 'late', 'locked', 'na', 'planned'];
+const stateColors = Object.fromEntries(STATES.flatMap((s) => ['fg', 'bg', 'border'].map((k) => [`state-${s}-${k}`, v(`state-${s}-${k}`)])));
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -12,6 +14,7 @@ export default {
         open: v('open'), openBg: v('openBg'), openInk: v('openInk'),
         wait: v('wait'), waitBg: v('waitBg'), waitInk: v('waitInk'),
         late: v('late'), lateBg: v('lateBg'), lateInk: v('lateInk'),
+        ...stateColors,
         lock: v('lock'), lockBg: v('lockBg'), lockInk: v('lockInk'), scrim: v('scrim'),
       },
       fontFamily: { sans: v('font') },
