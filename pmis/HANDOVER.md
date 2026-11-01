@@ -1,6 +1,6 @@
 # GSDN PMIS: Handover to the implementation developer
 
-> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.8، الهجرات حتى 0027)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرتان 0021 و0022) وشاشته في الويب والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
+> **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.8، الهجرات حتى 0028)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرتان 0021 و0022) وشاشته في الويب والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
 
 Status on 2026-10-31: **main is at PR #48.** Phase P0 (Foundations) is complete and P1 (Core) is under way. Everything below is on `main` of this repository. Section 4 below was written in P0 and still says local passwords are deferred; local sign-in exists since migration 0010, so check the code and `CHANGELOG.md` before relying on it.
 The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream-views-documents.md`. They are **decided, not yet built**.
@@ -18,7 +18,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 
 | Area | Path | State |
 |---|---|---|
-| Data model | `apps/api/prisma/schema.prisma` | Prisma schema (75 models at P0; the registers and matrix migrations 0016 to 0027 add more) |
+| Data model | `apps/api/prisma/schema.prisma` | Prisma schema (75 models at P0; the registers and matrix migrations 0016 to 0028 add more) |
 | Migrations | `apps/api/prisma/migrations/0001`–`0023` | 0001 init to 0023 CW/TE/O&M views. Each mirrors a file in `db/sql/` where one exists; keep both copies identical. |
 | Row-level security, identity writes | `db/sql/002`–`008` | Region RLS, config write checks, `idm_*` functions. Read ADR 0003 before touching them. |
 | ERD, seed plan | `db/erd.md`, `db/seed-plan.md` | |
