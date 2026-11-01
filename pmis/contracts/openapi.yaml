@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.6
+  version: 0.4.7
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.7 (2026-11-01): additive. CW / TE / O&M views as tabs of the Site Register (Q98, owner decision 2026-11-01): `view` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks` (a view groups tasks, not whole stages; the four streams stay the filter and can be combined with a view, the result is the tasks in both), `views` in the task grid (`View`: code, name EN/AR, order, the stage and task codes in force) and on each `SiteListItem` (`ViewRef`). View definitions are seed data versioned with the workflow, like streams. CW FAC (B15) and TE FAC (D18) belong to the CW and TE view until the O&M team is assigned (setting `views.om_team_assigned`, default false, Q102) and to the O&M view after.
     - 0.4.6 (2026-10-30): additive. Responsibility Matrix administration (P1-BE-12). `GET /matrix` rows carry `used_levels`, `region_ids_with_cells`, `task_counts` (B7: tasks that follow a new level count and tasks in flight that keep theirs) and `preview` (`MatrixPreview`: where one person holds consecutive levels, the self-skip, and where that reaches the last level, the B5 self-approval, so the screen warns in advance); cells carry `level_kind`, `used` and `updated_at`; assignees of kind role or group carry `member_count`. `Matrix.stages[].register_key` is a `MatrixRowKey` (the register keys plus `rf_design`, `acquisition` and `deliverables`, which have their own matrix rows, Q44 and Q71). `PATCH /matrix` also edits the register and Dismantle rows (`stage_code` is then the row code), answers `empty_cell` with the cells that miss a holder (`Problem.cells`), refuses `rule: all_members` on the Entry level (`entry_rule_fixed`) and needs `matrix.edit` (all-regions for a cell without a region and for a level count). `RegisterField.section` (the form section of a base field, English, in field order) lets the register form follow the server's field definitions. The register rows of the matrix are the register's own rows: cells are keyed by `register_key` and the level count is `RegisterDefinition.approval_levels`, one source for the matrix screen and the register engine.
     - 0.4.5 (2026-10-30): additive. The register framework and its first four registers (`procurement`, `gecol`, `hlc`, `permits_hse`) are implemented on the generic paths of 0.2. New: `POST /registers/{register_key}/records/{record_id}/claim` and `/release`, `GET .../history`, `GET .../versions` and `POST .../versions` (a new version of an approved record: GECOL and HLC requests, Q55; corrections, R9). `GET /registers/{register_key}/records` accepts `entity_id` and `all_versions` (by default the latest version of each logical record). `RegisterRecord` gains `entity_id`, `version_no`, `supersedes_id`, `is_current`, `task` (the task it is the source of, Q43), `self_approval`, `approved_by`, `approved_at`, `source` and `last_transition`; `allowed_actions` also lists `claim`, `release` and `new_version`. Final approval of a register record needs step-up, as for tasks. A `duplicate` 409 carries `existing_id`. Field-level error codes of records: `wrong_register` (Q56), `scope_conflict`, `field_read_only` (Q45) and the rules of each register. A record that is the source of a task is checked again at every submit and just before the task is closed: when its data no longer matches the task source, or the source date is empty, `task` is dropped and the record is approved on the register row only (the task stays open); a source date in the future is refused with 422 `validation_failed` (`errors[].code` `future_date`), as for a date typed on the task.
     - 0.4.4 (2026-10-30): owner answers Q76 to Q84 (minor, additive). `TaskSummary.sla.negative` (boolean): true when an approved task closed its SLA clock at an actual date before the start (a negative duration, data-quality alert, Q82). `SlaStartEvent` also accepts `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting, `sla.dlp_days.cw`, default 90; used by B-15 CW FAC, Q80). `LockReason` `gate_closed` is now returned for the tasks of the stage behind a closed gate (`ref_code` = the gate code, followed by the gate's own reasons), because a gate locks the tasks of the next stage until it opens, except the tasks in the setting `calc.gate_lock_exempt_tasks` (Q81). No endpoint was added or removed.
@@ -1788,6 +1789,7 @@ paths:
           in: query
           description: 'Stream code (for example `CW`). Shows each site''s status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code.'
           schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
+        - $ref: '#/components/parameters/ViewCode'
         - { name: bucket, in: query, schema: { type: string, enum: [all, mine, late, waiting_approval, closed], default: all } }
         - { name: cluster_code, in: query, schema: { type: string } }
         - { name: delivery_batch, in: query, schema: { type: string } }
@@ -1844,6 +1846,7 @@ paths:
           in: query
           description: Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have.
           schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
+        - $ref: '#/components/parameters/ViewCode'
       responses:
         '200':
           description: Stages with their tasks.
@@ -1855,6 +1858,7 @@ paths:
                 properties:
                   workflow_version: { type: integer }
                   streams: { type: array, items: { $ref: '#/components/schemas/Stream' }, description: 'The streams of the site''s workflow version, in order.' }
+                  views: { type: array, items: { $ref: '#/components/schemas/View' }, description: '0.4.7. The views of the site''s workflow version, in order, with the stages and tasks in force.' }
                   stages:
                     type: array
                     items:
@@ -6801,6 +6805,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    ViewCode:
+      name: view
+      in: query
+      description: '0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view''s tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site''s workflow version does not have). Region and module scope are unchanged.'
+      schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
     SiteId:
       name: site_id
       in: path
@@ -7728,6 +7737,23 @@ components:
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
         sort_order: { type: integer }
+    ViewRef:
+      type: object
+      description: '0.4.7. A view of the Site Register (CW, TE, OM): a tab that shows only its own tasks. Seed data, admin-configurable and versioned with the workflow, like a stream.'
+      required: [code, name_en, sort_order]
+      properties:
+        code: { type: string, description: 'Stable code, for example CW, TE, OM.' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        sort_order: { type: integer }
+    View:
+      allOf:
+        - $ref: '#/components/schemas/ViewRef'
+        - type: object
+          required: [stage_codes, task_codes]
+          properties:
+            stage_codes: { type: array, items: { type: string }, description: 'Stages whose tasks are all in the view.' }
+            task_codes: { type: array, items: { type: string }, description: 'Single tasks in the view. A task that depends on the O&M assignment (CW FAC B15, TE FAC D18) is listed only where it applies now (setting `views.om_team_assigned`).' }
     StreamStatus:
       description: The status of one site within one stream (only the tasks and stages of that stream).
       allOf:
@@ -7759,6 +7785,7 @@ components:
         waiting_approval_count: { type: integer }
         rail: { type: array, items: { $ref: '#/components/schemas/RailNode' } }
         streams: { type: array, items: { $ref: '#/components/schemas/StreamStatus' }, description: 'One entry per stream of the site''s workflow version, in order.' }
+        views: { type: array, items: { $ref: '#/components/schemas/ViewRef' }, description: '0.4.7. One entry per view of the site''s workflow version, in order (the tabs). The stages and tasks of each view are in `GET /sites/{site_id}/tasks`.' }
         custom: { $ref: '#/components/schemas/CustomValues' }
     PipelineNode:
       type: object

@@ -4787,6 +4787,20 @@ export interface components {
             name_ar?: string | null;
             sort_order: number;
         };
+        /** @description 0.4.7. A view of the Site Register (CW, TE, OM): a tab that shows only its own tasks. Seed data, admin-configurable and versioned with the workflow, like a stream. */
+        ViewRef: {
+            /** @description Stable code, for example CW, TE, OM. */
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            sort_order: number;
+        };
+        View: components["schemas"]["ViewRef"] & {
+            /** @description Stages whose tasks are all in the view. */
+            stage_codes: string[];
+            /** @description Single tasks in the view. A task that depends on the O&M assignment (CW FAC B15, TE FAC D18) is listed only where it applies now (setting `views.om_team_assigned`). */
+            task_codes: string[];
+        };
         /** @description The status of one site within one stream (only the tasks and stages of that stream). */
         StreamStatus: components["schemas"]["Stream"] & {
             /**
@@ -4825,6 +4839,8 @@ export interface components {
             rail: components["schemas"]["RailNode"][];
             /** @description One entry per stream of the site's workflow version, in order. */
             streams?: components["schemas"]["StreamStatus"][];
+            /** @description 0.4.7. One entry per view of the site's workflow version, in order (the tabs). The stages and tasks of each view are in `GET /sites/{site_id}/tasks`. */
+            views?: components["schemas"]["ViewRef"][];
             custom?: components["schemas"]["CustomValues"];
         };
         PipelineNode: {
@@ -7519,6 +7535,8 @@ export interface components {
         SessionId: string;
         UserId: string;
         GroupId: string;
+        /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
+        ViewCode: string;
         SiteId: string;
         TaskId: string;
         WorkflowVersionNo: number;
@@ -9508,6 +9526,8 @@ export interface operations {
                 overall_status?: components["schemas"]["OverallStatus"];
                 /** @description Stream code (for example `CW`). Shows each site's status within that stream only: rail, late and waiting counts, `stage_code` and `bucket` are then computed over the stages of the stream. Sites with no task in the stream are left out. 422 `validation_failed` for an unknown code. */
                 stream?: string;
+                /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
+                view?: components["parameters"]["ViewCode"];
                 bucket?: "all" | "mine" | "late" | "waiting_approval" | "closed";
                 cluster_code?: string;
                 delivery_batch?: string;
@@ -9571,6 +9591,8 @@ export interface operations {
             query?: {
                 /** @description Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have. */
                 stream?: string;
+                /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
+                view?: components["parameters"]["ViewCode"];
             };
             header?: never;
             path: {
@@ -9590,6 +9612,8 @@ export interface operations {
                         workflow_version: number;
                         /** @description The streams of the site's workflow version, in order. */
                         streams?: components["schemas"]["Stream"][];
+                        /** @description 0.4.7. The views of the site's workflow version, in order, with the stages and tasks in force. */
+                        views?: components["schemas"]["View"][];
                         stages: {
                             code: string;
                             stream_code?: string | null;

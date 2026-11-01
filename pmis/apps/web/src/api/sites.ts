@@ -1,8 +1,8 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteListItem, SiteTasks, Stream, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
-export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string };
+export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string };
 
 export const useRegions = () => useQuery({ queryKey: ['regions'], staleTime: Infinity, queryFn: () => api.get<{ items: Region[] }>('/regions').then((r) => r.items) });
 
@@ -15,12 +15,15 @@ export const useSites = (f: SiteFilters, enabled = true) =>
   });
 
 /** The streams of the workflow version, read from the first site (one tiny call); the tabs fall back to the seed list. */
-export const useStreams = () =>
-  useQuery({ queryKey: ['streams'], staleTime: 300_000, queryFn: () => api.get<Page<SiteListItem>>('/sites', { query: { limit: 1 } }).then((r) => r.items[0]?.streams as Stream[] | undefined) });
+const useFirstSite = <T,>(select: (s: SiteListItem | undefined) => T) =>
+  useQuery({ queryKey: ['streams'], staleTime: 300_000, queryFn: () => api.get<Page<SiteListItem>>('/sites', { query: { limit: 1 } }).then((r) => r.items[0] ?? null), select: (s) => select(s ?? undefined) });
+export const useStreams = () => useFirstSite((s) => s?.streams as Stream[] | undefined);
+/** The view tabs (0.4.7), from the same call. */
+export const useViews = () => useFirstSite((s) => s?.views as ViewRef[] | undefined);
 
 export const useSite = (id: string) => useQuery({ queryKey: ['site', id], queryFn: () => api.get<SiteDetail>(`/sites/${id}`) });
-export const useSiteTasks = (id: string, stream?: string | null, enabled = true) =>
-  useQuery({ queryKey: ['site-tasks', id, stream ?? ''], enabled, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream } }) });
+export const useSiteTasks = (id: string, stream?: string | null, enabled = true, view?: string | null) =>
+  useQuery({ queryKey: ['site-tasks', id, stream ?? '', view ?? ''], enabled, queryFn: () => api.get<SiteTasks>(`/sites/${id}/tasks`, { query: { stream, view } }) });
 export const useHistory = (id: string) => useQuery({ queryKey: ['task-history', id], queryFn: () => api.get<Page<WorkflowStep>>(`/tasks/${id}/history`) });
 export const useComments = (id: string) => useQuery({ queryKey: ['task-comments', id], queryFn: () => api.get<Page<Comment>>(`/tasks/${id}/comments`) });
 

@@ -3,6 +3,7 @@ import { ArrowLeft, Layers } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useRegions, useSite, useSiteTasks } from '@/api/sites';
+import { ViewTabs } from '@/components/ViewTabs';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
@@ -20,16 +21,18 @@ export function Site() {
   const { siteId = '' } = useParams();
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
+  const view = sp.get('view') ?? '';
   const site = useSite(siteId), regions = useRegions();
   const s = site.data;
   const tabs = withDismantle(s?.streams);
   const real = !!stream && isRealStream(stream, s?.streams);
   const dismantle = stream === DISMANTLE_CODE && !real;
-  const grid = useSiteTasks(siteId, real ? stream : null, !dismantle);
+  const grid = useSiteTasks(siteId, real ? stream : null, !dismantle, view || null);
   const stage = sp.get('stage');
   const taskId = sp.get('task');
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
+  const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
   const region = regions.data?.find((r) => r.id === s?.region_id);
   const cp = s?.cluster_progress;
   if (site.isError) return <p role="alert" data-testid="site-error" className="text-lateInk">{t('site.not_found')}</p>;
@@ -41,7 +44,7 @@ export function Site() {
 
   return (
     <div data-testid="page-site">
-      <Link to={`/sites${stream ? `?stream=${stream}` : ''}`} className="mb-2 inline-flex items-center gap-1 text-sm text-link"><ArrowLeft size={14} className="rtl:rotate-180" />{t('site.back')}</Link>
+      <Link to={`/sites${new URLSearchParams([...(stream ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`} className="mb-2 inline-flex items-center gap-1 text-sm text-link"><ArrowLeft size={14} className="rtl:rotate-180" />{t('site.back')}</Link>
       {s && (
         <>
           <div className="flex flex-wrap items-start gap-3">
@@ -58,6 +61,7 @@ export function Site() {
                 className={`px-4 py-2 text-sm font-semibold ${stream === x.code ? 'border-b-2 border-accent text-accentText' : 'text-mute hover:text-ink'} ${x.na ? 'opacity-60' : ''}`}>{x.label}</button>
             ))}
           </div>
+          <ViewTabs views={s.views} value={view} onChange={setView} testid="site-view-tabs" />
           {st && (
             <div className="mb-3 flex flex-wrap items-center gap-3 text-sm" data-testid="site-stream-summary" data-state={st.state}>
               <span className={`chip ${STREAM_TONE[st.state]}`}>{t(`streamState.${st.state}`)}</span>
@@ -75,7 +79,7 @@ export function Site() {
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
-        : <TaskGrid key={`${stream}|${stage ?? 'all'}`} siteId={siteId} stages={stages} onOpen={(id) => setParam('task', id)} />}
+        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} onOpen={(id) => setParam('task', id)} />}
       <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>
       <TaskDrawer taskId={taskId} onClose={() => setParam('task', null)} />
     </div>

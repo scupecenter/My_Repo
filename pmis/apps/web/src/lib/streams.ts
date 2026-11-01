@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import type { Stream, StreamStatus } from '@/api/types';
+import type { Stream, StreamStatus, ViewRef } from '@/api/types';
 
 /**
  * Default streams (CLAUDE.md "Site Register and streams"). The API sends the real list in `streams[]`; this one only
@@ -35,3 +35,12 @@ export const statusOf = (streams: StreamStatus[] | undefined, code: string) => s
 
 /** A stream that the API does not know yet (Dismantle) has nothing to fetch. */
 export const isRealStream = (code: string, streams: Stream[] | undefined) => code !== DISMANTLE_CODE || !!streams?.some((s) => s.code === code);
+
+/** Seed views (migration 0023), only until the API answers. */
+export const DEFAULT_VIEWS: ViewRef[] = [
+  { code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', sort_order: 1 },
+  { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', sort_order: 2 },
+  { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sort_order: 3 },
+];
+/** View name from the API (EN/AR), as the admin configured it. */
+export const viewName = (lang: string, v: Pick<ViewRef, 'name_en' | 'name_ar'>) => (lang === 'ar' && v.name_ar) || v.name_en;
