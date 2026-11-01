@@ -54,7 +54,7 @@ describe('Matrix page with a 2-level row', () => {
     expect(cw.cells.find((c) => c.level === 3)!.assignees.map((a) => a.employee_id)).toContain('1210');
     expect(cw.cells.find((c) => c.level === 2)!.used).toBe(false);               // kept for tasks in flight
     expect(await screen.findByTestId('matrix-cell-cw-3')).toBeInTheDocument();
-  });
+  }, 15_000); // ~3.5 s of user steps when idle; over the 5 s default under CI's parallel workers
 
   it('shows the skip between entry and approve of a 2-level row (the same person holds cells 1 and 3)', async () => {
     await signIn('pm');
