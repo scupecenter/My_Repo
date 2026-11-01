@@ -92,11 +92,12 @@ A separate O&M module, built in a later phase.
 | 2b | Dismantle rules: work start >= RFD date; no new version of a closed part | Done | migration 0022, changelog 45 |
 | 2c | O&M role | Not started | needs contract + migration |
 | 2d | Handover engineer field (HOTO, delegated by the TE lead) | Not started | needs contract + migration |
-| 2e | Write-through edits from the work views to the source register | Not started | needs design + contract |
+| 2e | Write-through edits from the work views to the source register | Next (owner: in this batch) | needs design + contract |
 | 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Not started (Q99 answered) | depends on 2e |
 | 3a | Dismantle register screen | Done (no Excel template yet) | web, generic register page, changelog 45 |
 | 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Done | contract 0.4.7, migration 0023, web tabs, changelog 46 |
 | 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |
+| 9 | Remaining registers, Warehouse (DN/RN, stock), As-Built items, O&M view fix (Q102) | Done in API; web next | migrations 0024-0027, contract 0.4.8, changelog 47 |
 | 4 | `HANDOVER.md` current | Ongoing | updated with every PR |
 | 7 | Settings screen for `views.om_team_assigned` (O&M team switch) | Not started | Q102; with document type settings |
 | 8 | Export buttons pass the `view` filter | Not started | check the export filter accepts `view` |
@@ -111,6 +112,6 @@ Owner decisions 2026-11-01 (Q101):
 Owner answers 2026-11-01: Q98 (streams stay the filter, three views as tabs), Q99 (move BU, EF, FO/FT now; DN/RN dates with Warehouse; CD with Contractors), Q100 (PDF and images by default; `.eml` and `.msg` for e-mail types; no `.html` / `.mht` uploads). No open question blocks the items above.
 
 Known follow-ups:
-- Warehouse register: needed for the RN link (Q101) and for DN/RN stock posting.
+- Warehouse register: built in the API (migration 0026); the Dismantle RN link to the real RN record is still to wire.
 - `matrix.test.ts` (MS9 `task_counts`): race with other suites on the shared test database; fixed in changelog 45.
 - Dismantle approved Excel template: not built.

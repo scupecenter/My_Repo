@@ -7,6 +7,9 @@ import { AssignmentsController } from './assignments/assignments.controller';
 import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
+import { AsBuiltItemsService } from './warehouse/as-built-items.service';
+import { AsBuiltItemsController, WarehouseController } from './warehouse/warehouse.controller';
+import { WarehouseService } from './warehouse/warehouse.service';
 import { RegistersController } from './registers/registers.controller';
 import { RegistersService } from './registers/registers.service';
 import { SlaController } from './sla/sla.controller';
@@ -61,14 +64,14 @@ export function appModuleFor(config: AppConfig) {
     controllers: [
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController,
+      DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService,
+      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

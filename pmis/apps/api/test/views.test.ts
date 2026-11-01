@@ -51,9 +51,9 @@ describe('view definitions: seed data versioned with the workflow', () => {
     expect(res.status).toBe(200);
     expect(res.body.views.map((v: { code: string }) => v.code)).toEqual(['CW', 'TE', 'OM']);
     const by = Object.fromEntries(res.body.views.map((v: { code: string }) => [v.code, v]));
-    expect(by.CW).toMatchObject({ name_en: 'CW Register', sort_order: 1, stage_codes: ['MS2', 'MS3', 'MS4'], task_codes: ['B15'] });
+    expect(by.CW).toMatchObject({ name_en: 'CW Register', sort_order: 1, stage_codes: ['MS2', 'MS3', 'MS4'], task_codes: ['B14', 'B15'] });
     expect(by.TE).toMatchObject({ name_en: 'TE Register', stage_codes: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'], task_codes: ['D18'] });
-    expect(by.OM).toMatchObject({ name_en: 'O&M', stage_codes: [], task_codes: ['B14'] });
+    expect(by.OM).toMatchObject({ name_en: 'O&M', stage_codes: [], task_codes: [] }); // O&M lists D18 only once the O&M team is assigned
     expect(by.CW.name_ar).toBeTruthy();
     // stage 1 and Final Closure (stage 10) are in no view
     const members = [...by.CW.stage_codes, ...by.TE.stage_codes, ...by.OM.stage_codes];
@@ -75,7 +75,7 @@ describe('view definitions: seed data versioned with the workflow', () => {
       const v = await db.query('SELECT code FROM workflow_views WHERE workflow_id = $1 ORDER BY sort_order', [w.rows[0].id]);
       expect(v.rows.map((r) => r.code)).toEqual(['CW', 'TE', 'OM']);
       const m = await db.query('SELECT count(*)::int AS n FROM workflow_view_members WHERE workflow_id = $1', [w.rows[0].id]);
-      expect(m.rows[0].n).toBe(13);
+      expect(m.rows[0].n).toBe(12);
     } finally {
       await db.query('DELETE FROM workflow_definitions WHERE id = $1', [w.rows[0].id]);
     }
@@ -90,11 +90,11 @@ describe('the task grid by view, and FAC before and after the O&M team is assign
       const admin = await plainAdmin(app, db);
       const cw = await admin.api.call('get', `/sites/${s.id}/tasks?view=CW`);
       expect(cw.status).toBe(200);
-      expect(grid(cw.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [], MS10: ['B15'] });
+      expect(grid(cw.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [], MS10: ['B14', 'B15'] });
       const te = await admin.api.call('get', `/sites/${s.id}/tasks?view=TE`);
       expect(grid(te.body.stages)).toEqual({ MS5: ['D1'], MS6: [], MS7: [], MS8: ['F1'], MS9: ['D17'], MS10: ['D18'] });
       const om = await admin.api.call('get', `/sites/${s.id}/tasks?view=OM`);
-      expect(grid(om.body.stages)).toEqual({ MS10: ['B14'] });
+      expect(grid(om.body.stages)).toEqual({});
       // stage 1 and Z1 show only in the all-work grid
       const all = grid((await admin.api.call('get', `/sites/${s.id}/tasks`)).body.stages);
       expect(all.MS1).toEqual(['A1']);
@@ -102,13 +102,13 @@ describe('the task grid by view, and FAC before and after the O&M team is assign
 
       await setOm(true);
       const cw2 = await admin.api.call('get', `/sites/${s.id}/tasks?view=CW`);
-      expect(grid(cw2.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [] });
+      expect(grid(cw2.body.stages)).toEqual({ MS2: ['B3'], MS3: [], MS4: [], MS10: ['B14', 'B15'] });
       expect(grid((await admin.api.call('get', `/sites/${s.id}/tasks?view=TE`)).body.stages)).not.toHaveProperty('MS10');
       const om2 = await admin.api.call('get', `/sites/${s.id}/tasks?view=OM`);
-      expect(grid(om2.body.stages)).toEqual({ MS10: ['B14', 'B15', 'D18'] });
+      expect(grid(om2.body.stages)).toEqual({ MS10: ['D18'] });
       const defs = Object.fromEntries(om2.body.views.map((v: { code: string }) => [v.code, v]));
-      expect(defs.OM.task_codes).toEqual(['B14', 'B15', 'D18']);
-      expect(defs.CW.task_codes).toEqual([]);
+      expect(defs.OM.task_codes).toEqual(['D18']);
+      expect(defs.CW.task_codes).toEqual(['B14', 'B15']);
     } finally {
       await setOm(false);
     }
@@ -160,11 +160,11 @@ describe('GET /sites?view=: rail, late and waiting counts are computed over the 
       await setOm(true);
       expect(codes((await admin.api.call('get', `/sites?${q}&view=TE`)).body)).not.toContain(facOnly.code);
       expect(codes((await admin.api.call('get', `/sites?${q}&view=CW`)).body)).toEqual([s.code]);
-      expect(item((await admin.api.call('get', `/sites?${q}&view=CW`)).body, s.code)).toMatchObject({ late_task_count: 1 });
+      expect(item((await admin.api.call('get', `/sites?${q}&view=CW`)).body, s.code)).toMatchObject({ late_task_count: 2 });
       const om = (await admin.api.call('get', `/sites?${q}&view=OM`)).body;
       expect(codes(om)).toEqual(expect.arrayContaining([s.code, facOnly.code]));
       expect(item(om, facOnly.code)).toMatchObject({ late_task_count: 1 });
-      expect(item(om, s.code)).toMatchObject({ late_task_count: 1 }); // B15 only
+      expect(item(om, s.code)).toMatchObject({ late_task_count: 0 }); // only D18 (locked, not late); B14 and B15 are CW work
     } finally {
       await setOm(false);
     }

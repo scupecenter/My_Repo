@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Client as PgClient } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { Api, adminApi, delegate, loggedIn, makeAdmin, makeRole, makeUser, startApp, superDb, superDbCalc } from './helpers';
 import { Actor, actor, etag, groupWith, makeSite, makeTask } from './wf-helpers';
 
@@ -19,6 +19,13 @@ let db: PgClient;
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+});
+// The warehouse and register suites rewrite the cells and level counts of the same Matrix rows (contractors, risks, warehouse ...): one test at a time.
+beforeEach(async () => {
+  await db.query('SELECT pg_advisory_lock(770101)');
+});
+afterEach(async () => {
+  await db.query('SELECT pg_advisory_unlock(770101)');
 });
 afterAll(async () => {
   // MS9 is changed by the B7 test: leave it as the seed has it
