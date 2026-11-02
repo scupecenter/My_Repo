@@ -118,4 +118,19 @@ SELECT ann_respond((SELECT value::uuid FROM secsuite_ids WHERE name = 'ANN_A'), 
 -- Region-scoped rows for the row-level security cases: one cluster in Tripoli, one in Benghazi (seeding path).
 INSERT INTO clusters (cluster_code, region_id, is_global) VALUES ('SEC-TRI-01', 1, false), ('SEC-BEN-01', 5, false);
 
+-- Template batches (migration 0037) for the visibility and ownership cases: one Benghazi batch uploaded by Bob (a row of Benghazi and an error row with no
+-- region) and one Tripoli batch uploaded by Carol.
+INSERT INTO import_batches (id, template_version_id, file_name, file_sha256, uploaded_by, region_scope, register_key, status, rows_total)
+SELECT '00000000-0000-4000-8000-0000000b0001', v.id, 'sec-ben.xlsx', 'x', '00000000-0000-4000-8000-00000000a003', ARRAY[5], 'gecol', 'in_approval', 2
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-GECOL' AND v.is_current;
+INSERT INTO import_batches (id, template_version_id, file_name, file_sha256, uploaded_by, region_scope, register_key, status, rows_total)
+SELECT '00000000-0000-4000-8000-0000000b0002', v.id, 'sec-tri.xlsx', 'x', '00000000-0000-4000-8000-00000000a004', ARRAY[1], 'gecol', 'in_approval', 1
+FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-GECOL' AND v.is_current;
+INSERT INTO import_batch_rows (id, batch_id, row_no, region_id, target_entity, action, payload, decision) VALUES
+  ('00000000-0000-4000-8000-0000000b1001', '00000000-0000-4000-8000-0000000b0001', 2, 5, 'gecol', 'create', '{}', 'pending'),
+  ('00000000-0000-4000-8000-0000000b1002', '00000000-0000-4000-8000-0000000b0001', 3, NULL, 'gecol', 'error', '{}', 'pending'),
+  ('00000000-0000-4000-8000-0000000b1003', '00000000-0000-4000-8000-0000000b0002', 2, 1, 'gecol', 'create', '{}', 'pending');
+INSERT INTO secsuite_ids VALUES ('BATCH_BEN', '00000000-0000-4000-8000-0000000b0001'), ('BATCH_TRI', '00000000-0000-4000-8000-0000000b0002'),
+  ('BATCH_ROW_BEN', '00000000-0000-4000-8000-0000000b1001');
+
 RESET app.user_id;

@@ -44,6 +44,15 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 | R9 | Approved values are never overwritten silently. A later change is a new version that goes through approval again. A change to an approved Site Register value that drives a gate or milestone needs Change Control when it is a scope change (AA:AF, Z, relocation). | BP §03 "scope change"; D53 |
 | R10 | Registers keep the CLAUDE.md custom-field rules: an admin-added field can appear in templates and exports with a Master export column. A field change issues a new template version, and old versions are rejected with a clear message. | CLAUDE.md "Custom fields" |
 
+**Built (migration 0037, contract 0.7.0) for the registers:**
+- R4: the template is a `.xlsx` with the sheet `Data` (locked headers in Master order, the custom fields that appear in templates, then `Record ID`), drop-downs from the register's lists and the Setting lists, grey locked columns for calculated values, and a very-hidden `_tpl` sheet (`template_id`, `version`, `register_key`, `header_checksum`, `field_set_hash`, issuer and time).
+- R5 and V7: a calculated column is shown in a pre-filled copy and never read on upload.
+- R6: the upload is staged by the database with the manual-entry rules and a per-cell diff. A blank cell never clears a value.
+- R7: `Record ID` (the logical record) first, then the natural key of the register (`template_definitions.match_keys`: GECOL, HLC, RF & Design, Readiness, As-Built and Dismantle by Site ID (Dismantle with the part); Procurement by Site ID + Scope + PR No., else PO / WO No.; Permits by Site ID + Type + Valid From; Acquisition by Site ID + Candidate; Warehouse by Doc No.; Risks, Change Control and Quality by their ID; Issues by Site ID + the pending issue; Meetings by date + title; Contractors by name).
+- R8: a rejection (no `_tpl`, unknown or inactive template, a retired version, a changed header row, macros, too large) writes the System Log (`source = template-check`) and makes no batch.
+- R1, R2 and RE-06/RE-07: a batch is an entry into the normal flow. The uploader (L1 Data Entry) sends it and each valid row becomes a register record submitted through `reg_save_record`, `reg_new_version` and `reg_transition_record`; L2 then approves rows one by one or all at once, or returns them to L1 with a note. An update is a new version (R9). A row whose record has an open version is held "pending previous approval" and "approve all" leaves it. The audit and the history show "via batch".
+- Not built yet: the Site Register stream templates and the full Master template (SR-09 to SR-11), and undo of an applied batch (TI-06).
+
 ### 1.2 Validation applied to every register
 | # | Check | Source |
 |---|---|---|

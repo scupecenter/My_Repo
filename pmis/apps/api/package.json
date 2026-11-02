@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "description": "GSDN PMIS API (NestJS, Prisma, PostgreSQL 16): local sign-in and user/group admin",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "postinstall": "prisma generate",
     "build": "prisma generate && tsc -p tsconfig.build.json",
@@ -19,6 +21,8 @@
     "@nestjs/platform-express": "^11.2.8",
     "@prisma/client": "^6.19.3",
     "argon2": "^0.45.1",
+    "exceljs": "^4.4.0",
+    "multer": "^2.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^3.25.76"
@@ -27,6 +31,7 @@
     "@eslint/js": "^9.39.5",
     "@swc/core": "^1.16.20",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.3.0",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
     "@types/supertest": "^7.2.1",

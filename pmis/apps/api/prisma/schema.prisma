@@ -1253,13 +1253,26 @@ model SnagPhoto {
 // 6. TEMPLATES AND IMPORT BATCHES
 // ============================================================================
 
+// Migration 0037: one template per register (kind = register), later per stream and the full Master. The version rows carry the field-set hash;
+// exactly one version is current, older ones are retired. Written only by tpl_sync / tpl_sync_all (SECURITY DEFINER).
 model TemplateDefinition {
-  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  template_id      String  @unique // embedded in hidden sheet _tpl
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_id      String   @unique // embedded in hidden sheet _tpl
   name             String
   target_entity    String // sites, task_dates, procurement ...
-  is_master_format Boolean @default(false)
-  is_active        Boolean @default(true)
+  is_master_format Boolean  @default(false)
+  is_active        Boolean  @default(true)
+  kind             String   @default("register") // register, stream, master
+  register_key     String?
+  stream_code      String?
+  name_ar          String?
+  module_key       String?
+  current_version  Int      @default(1)
+  match_keys       Json     @default("[]") // natural keys of a register row, tried in order
+  custom_entity    String? // FieldEntityType of the custom fields that appear in the template
+  sort_order       Int      @default(0)
+  created_at       DateTime @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime @default(now()) @db.Timestamptz(6)
 
   versions TemplateVersion[]
 
@@ -1267,16 +1280,19 @@ model TemplateDefinition {
 }
 
 model TemplateVersion {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  template_def_id   String   @db.Uuid
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_def_id   String    @db.Uuid
   version           Int
   header_checksum   String // sha256 of the header row; mismatch rejects the upload
-  field_set_version Int      @default(1) // field_set_versions.version of the target entity when built; older = rejected on upload
+  field_set_version Int       @default(1) // field_set_versions.version of the target entity when built
   columns           Json // ordered column spec and validation
   storage_key       String?
-  is_current        Boolean  @default(true)
-  published_by      String?  @db.Uuid
-  published_at      DateTime @default(now()) @db.Timestamptz(6)
+  is_current        Boolean   @default(true)
+  published_by      String?   @db.Uuid
+  published_at      DateTime  @default(now()) @db.Timestamptz(6)
+  field_set_hash    String? // sha256 of the ordered column specification: a different hash issues the next version
+  retired_at        DateTime? @db.Timestamptz(6)
+  reason            String?
 
   template TemplateDefinition @relation(fields: [template_def_id], references: [id])
   batches  ImportBatch[]
@@ -1285,20 +1301,30 @@ model TemplateVersion {
   @@map("template_versions")
 }
 
+// status: parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed, discarded (a CHECK, 0037).
+// Written only by imp_stage_batch, imp_submit_batch and imp_decide_batch.
 model ImportBatch {
-  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  template_version_id String      @db.Uuid
-  source              String      @default("upload") // upload, master_import
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  template_version_id String    @db.Uuid
+  source              String    @default("template") // template, master_import
   file_name           String
   file_sha256         String
-  status              BatchStatus @default(uploaded)
-  uploaded_by         String      @db.Uuid
+  status              String    @default("validated")
+  uploaded_by         String    @db.Uuid
   region_scope        Int[] // regions touched, for RLS
-  rows_total          Int         @default(0)
-  rows_error          Int         @default(0)
+  rows_total          Int       @default(0)
+  rows_error          Int       @default(0)
   approve_mode        String? // row_by_row or all_at_once
-  created_at          DateTime    @default(now()) @db.Timestamptz(6)
-  approved_at         DateTime?   @db.Timestamptz(6)
+  created_at          DateTime  @default(now()) @db.Timestamptz(6)
+  approved_at         DateTime? @db.Timestamptz(6)
+  register_key        String?
+  task_id             String?   @db.Uuid
+  site_id             String?   @db.Uuid
+  version             Int       @default(1)
+  note                String?
+  submitted_at        DateTime? @db.Timestamptz(6)
+  submitted_by        String?   @db.Uuid
+  closed_at           DateTime? @db.Timestamptz(6)
 
   template_version TemplateVersion  @relation(fields: [template_version_id], references: [id])
   rows             ImportBatchRow[]
@@ -1308,22 +1334,32 @@ model ImportBatch {
   @@map("import_batches")
 }
 
+// action: create, update, unchanged, error. decision: pending, approved, rejected, pending_previous_approval (CHECKs, 0037).
 model ImportBatchRow {
-  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  batch_id      String      @db.Uuid
-  row_no        Int
-  site_code     String?
-  region_id     Int?
-  target_entity String
-  target_id     String?     @db.Uuid
-  action        RowAction   @default(create)
-  payload       Json // parsed row
-  diff          Json? // field -> {old, new}
-  errors        Json?
-  decision      RowDecision @default(pending)
-  decided_by    String?     @db.Uuid
-  decided_at    DateTime?   @db.Timestamptz(6)
-  decision_note String?
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batch_id           String    @db.Uuid
+  row_no             Int
+  site_code          String?
+  region_id          Int?
+  target_entity      String
+  target_id          String?   @db.Uuid
+  action             String    @default("create")
+  payload            Json // parsed row: { data, custom }
+  diff               Json? // field code -> {old, new}
+  errors             Json?
+  decision           String    @default("pending")
+  decided_by         String?   @db.Uuid
+  decided_at         DateTime? @db.Timestamptz(6)
+  decision_note      String?
+  sheet              String    @default("Data")
+  row_key            String?
+  site_id            String?   @db.Uuid
+  record_type        String?
+  matched_entity_id  String?   @db.Uuid // the logical record the row was matched to
+  base_record_id     String?   @db.Uuid // the version the diff was built against
+  register_record_id String?   @db.Uuid // the register record created when the batch was sent
+  hold_reason        String?
+  decided_role       String?
 
   batch ImportBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
 

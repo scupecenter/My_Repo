@@ -128,6 +128,7 @@ export interface TaskRow {
   votes_done: bigint | null;
   slots_filled: bigint;
   slots_required: bigint;
+  template_id: string | null;
 }
 
 interface AssigneeRow {
@@ -168,7 +169,10 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       (SELECT count(*) FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id
          WHERE ds.task_id = t.id AND dt.is_mandatory AND ds.status IN ('uploaded', 'in_review', 'approved')) AS slots_filled,
       (SELECT count(*) FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id
-         WHERE ds.task_id = t.id AND dt.is_mandatory) AS slots_required
+         WHERE ds.task_id = t.id AND dt.is_mandatory) AS slots_required,
+      -- the approved template that enters this task's register (0037): the task's own register source, if it has one
+      (SELECT tpl.template_id FROM register_task_sources rts JOIN template_definitions tpl ON tpl.register_key = rts.register_key AND tpl.is_active
+         WHERE rts.task_code = td.code AND rts.is_active ORDER BY rts.sort_order LIMIT 1) AS template_id
     FROM task_instances t
     JOIN sites s ON s.id = t.site_id
     JOIN workflow_definitions wd ON wd.id = s.workflow_version_id
@@ -275,7 +279,7 @@ export class TaskViewService {
         },
         slots_filled: Number(r.slots_filled),
         slots_required: Number(r.slots_required),
-        template_id: null,
+        template_id: r.template_id,
         return_count: r.return_count,
         last_return_note: r.last_return_note,
         admin_override: r.admin_override,

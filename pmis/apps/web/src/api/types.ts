@@ -159,6 +159,9 @@ export type Template = S['Template'];
 export type ImportBatch = S['ImportBatch'];
 export type ImportRow = S['ImportRow'];
 export type ImportDecisionRequest = S['ImportDecisionRequest'];
+export type ImportBatchOutcome = S['ImportBatchOutcome'];
+/** A batch answered by a send or a decision carries what the call did. */
+export type ImportBatchResult = ImportBatch & { outcome?: ImportBatchOutcome };
 export type WarehouseItem = S['WarehouseItem'];
 export type StockLevel = S['StockLevel'];
 export type StockMovement = S['StockMovement'];

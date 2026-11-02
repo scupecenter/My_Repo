@@ -95,6 +95,12 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? (m[1] === 'item_in_use' ? 'The item is in use.' : 'Not enough stock.'),
         errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
       });
+    case 'template_rejected':
+      return new ProblemException(422, 'template_rejected', {
+        detail: detail ?? 'This file is not an approved template.',
+        extra: typeof extra.reason === 'string' ? { reason: extra.reason } : undefined,
+        commit: true,
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

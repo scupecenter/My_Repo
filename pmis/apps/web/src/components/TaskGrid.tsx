@@ -2,11 +2,13 @@ import * as Popover from '@radix-ui/react-popover';
 import { ChevronDown, ChevronRight, Download, FileText, Lock, Upload, UserX } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, downloadFile } from '@/api/client';
+import { ApiError } from '@/api/client';
+import { downloadTemplate, useUploadBatch } from '@/api/registers';
 import { useDatePatch } from '@/api/sites';
 import type { SiteTasks, TaskSummary } from '@/api/types';
 import { taskErrorMessage } from '@/lib/taskErrors';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { registerErrorMessage } from '@/lib/registerErrors';
 import type { ColDef } from '@/lib/tablePrefs';
 import { Holders } from './HolderChip';
 import { MoreMenu } from './PageHeader';
@@ -51,14 +53,18 @@ function WhyLocked({ task }: { task: TaskSummary }) {
 function TemplateButtons({ task }: { task: TaskSummary }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const nav = useNavigate();
   const file = useRef<HTMLInputElement>(null);
-  const fail = (e: unknown) => toast(e instanceof ApiError && e.code === 'template_rejected' ? t('grid.template_rejected') : t('errors.generic'), 'err');
-  const down = () => downloadFile(`/templates/${task.template_id}/download`, { task_id: task.id }).then((n) => toast(t('grid.downloaded', { name: n })), fail);
+  const upload = useUploadBatch();
+  const fail = (e: unknown) => toast(e instanceof ApiError && (e.code === 'template_rejected' || e.status === 413) ? registerErrorMessage(t, e) : t('errors.generic'), 'err');
+  const down = () => downloadTemplate(task.template_id ?? '', { taskId: task.id }).then((n) => toast(t('grid.downloaded', { name: n })), fail);
   const up = (f?: File) => {
     if (!f) return;
-    const fd = new FormData();
-    fd.append('file', f); fd.append('template_id', task.template_id ?? ''); fd.append('task_id', task.id);
-    api.post('/import-batches', { body: fd, idempotencyKey: crypto.randomUUID() }).then(() => toast(t('grid.uploaded')), fail);
+    // the file is staged at once; a batch of a register opens its review (the Entry then L2 flow decides the rows)
+    upload.mutate({ file: f, template_id: task.template_id ?? '', task_id: task.id }, {
+      onSuccess: (b) => { toast(t('grid.uploaded')); if (b.register_key) nav(`/registers/${b.register_key}/batches/${b.id}`); },
+      onError: fail,
+    });
   };
   return (
     <span className="flex gap-1">
@@ -192,7 +198,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
   const chips = quick.map((q) => ({ key: `tf-${q}`, label: `${t(`table.${q === 'docs' ? 'missing_docs' : 'late'}`)} ${t('table.loaded_only')}`, onRemove: () => setQuick(quick.filter((x) => x !== q)) }));
   const copy = () => { void navigator.clipboard?.writeText(pickedTasks.map((x) => x.task_code).join('\n')); toast(t('table.copied', { count: pickedTasks.length })); };
   const downloads = pickedTasks.filter((x) => x.template_id);
-  const downAll = async () => { let n = 0; for (const x of downloads) { try { await downloadFile(`/templates/${x.template_id}/download`, { task_id: x.id }); n += 1; } catch { toast(t('errors.generic'), 'err'); break; } } if (n) toast(t('table.tpl_done', { count: n })); };
+  const downAll = async () => { let n = 0; for (const x of downloads) { try { await downloadTemplate(x.template_id ?? '', { taskId: x.id }); n += 1; } catch { toast(t('errors.generic'), 'err'); break; } } if (n) toast(t('table.tpl_done', { count: n })); };
 
   return (
     <div data-testid="task-grid-wrap">

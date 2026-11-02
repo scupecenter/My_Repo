@@ -89,7 +89,12 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), more('meetings', 'Meetings', 'الاجتماعات', 'meetings', false),
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
 ];
+/** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PO': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PRM': 'permits_hse' };
+export const TEMPLATE_OF_REGISTER: Record<string, string> = {
+  procurement: 'TPL-PO', contractors: 'TPL-CTR', rf_design: 'TPL-RF', acquisition: 'TPL-ACQ', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PRM', warehouse: 'TPL-WH',
+  quality: 'TPL-QLT', issues: 'TPL-ISS', risks: 'TPL-RSK', change_control: 'TPL-CHG', readiness_handover: 'TPL-RDY', as_built: 'TPL-ASB', meetings: 'TPL-MTG', dismantle: 'TPL-DIS',
+};
 
 export type MockRecord = {
   id: string; register_key: RegisterKey; record_type: string | null; site_index: number | null; state: 'entry' | 'in_review' | 'in_approval' | 'approved' | 'voided';
@@ -99,10 +104,20 @@ export type MockRecord = {
   entity_id: string; version_no: number; supersedes_id?: string | null;
   /** Q43: the task this record is the source of, set at the first submission (or by the seed for an approved one). */
   task?: { id: string; task_code: string } | null;
+  /** Entered through a template batch (contract 0.7.0): the import row the version came from. */
+  source?: 'manual' | 'template'; batch_row_id?: string;
 };
+export type MockBatchRow = {
+  id: string; row_no: number; key: string; action: 'create' | 'update' | 'unchanged' | 'error'; decision: 'pending' | 'approved' | 'rejected' | 'pending_previous_approval';
+  payload: Record<string, unknown>; site_index: number | null; errors: { column?: string; field?: string; code: string; message?: string }[];
+  diff: Record<string, { old?: unknown; new?: unknown }>;
+  /** The approved version an update is built on, the open version that holds a row, and the record created when the batch is sent. */
+  base_id?: string; hold_reason?: 'open_version'; hold_record_id?: string; record_id?: string; note?: string | null;
+};
+/** `status`: validated (staged), sent (in the flow; the shown status follows the rows) or discarded. */
 export type MockBatch = {
-  id: string; register_key: RegisterKey; template_id: string; file_name: string; status: string; current_level: number; levels_required: number; version: number; created: number;
-  uploaded_by: string; uploaded_at: string; rows: { id: string; row_no: number; key: string; action: 'create' | 'update' | 'unchanged' | 'error'; decision: 'pending' | 'approved' | 'rejected' | 'pending_previous_approval'; payload: Record<string, unknown>; site_index: number | null; errors: { column?: string; code: string; message?: string }[]; diff: Record<string, { old?: unknown; new?: unknown }> }[];
+  id: string; register_key: RegisterKey; template_id: string; file_name: string; status: 'validated' | 'sent' | 'discarded'; version: number; created: number;
+  uploaded_by: string; uploaded_at: string; note?: string | null; rows: MockBatchRow[];
 };
 
 const pad = (n: number) => String(n).padStart(12, '0');

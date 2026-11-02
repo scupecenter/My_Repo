@@ -7,11 +7,12 @@ import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handl
 import { uid } from './ids';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
+import { REGISTER_DEFS, TEMPLATE_OF_REGISTER } from './registersData';
 import { detail, gridOf, listItem, scopedTasks, siteIndex, SITE_COUNT, siteMeta, STREAMS, TODAY, VIEWS } from './sites';
 
 const B = API_BASE;
 const REGIONS = [['Tripoli', 'طرابلس'], ['Middle', 'الوسطى'], ['WM', 'الجبل الغربي'], ['Zawia', 'الزاوية'], ['Benghazi', 'بنغازي'], ['GM', 'الجبل الأخضر'], ['Sebha', 'سبها']];
-const TEMPLATES = [['TPL-SITE', 'Site tasks (dates and statuses)', 'مهام الموقع (التواريخ والحالات)'], ['TPL-ACQ', 'Acquisition', 'الاستحواذ'], ['TPL-RF', 'RF & Design', 'RF والتصميم'], ['TPL-PO', 'Procurement', 'المشتريات'], ['TPL-PRM', 'Permits', 'التصاريح'], ['TPL-GECOL', 'GECOL', 'GECOL'], ['TPL-HLC', 'HLC', 'HLC']];
+const TEMPLATES = [['TPL-SITE', 'Site tasks (dates and statuses)', 'مهام الموقع (التواريخ والحالات)']];
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const validDate = (s: unknown) => s === null || (typeof s === 'string' && ISO.test(s) && !Number.isNaN(Date.parse(s)));
 const tagged = (t: MockTask) => HttpResponse.json(toDetail(t), { headers: { ETag: `"${t.version}"` } });
@@ -176,19 +177,21 @@ export const siteHandlers = [
     return HttpResponse.json(f, { status: 201 });
   }),
 
-  http.get(`${B}/templates`, () => (viewer() ? HttpResponse.json({ items: TEMPLATES.map(([id, en, ar]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', current_version: 1, is_active: true })) }) : problem(401, 'unauthenticated', 'Sign in required'))),
+  // contract 0.7.0: one template per register (issued by the database), so the catalogue follows the registers the viewer may use
+  http.get(`${B}/templates`, () => {
+    const v = viewer();
+    if (!v) return problem(401, 'unauthenticated', 'Sign in required');
+    const issued = '2026-10-21T08:00:00Z', versions = [{ version: 1, issued_at: issued, reason: 'first version' }];
+    const registers = REGISTER_DEFS.filter((d) => v.nav.includes(d.module_key)).map((d) => ({ template_id: TEMPLATE_OF_REGISTER[d.register_key], name_en: d.name_en, name_ar: d.name_ar, kind: 'data_import', module_key: d.module_key, register_key: d.register_key, current_version: 1, issued_at: issued, is_active: true, versions }));
+    const legacy = TEMPLATES.map(([id, en, ar]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', register_key: null, current_version: 1, issued_at: issued, is_active: true, versions }));
+    return HttpResponse.json({ items: [...registers, ...legacy] } as never);
+  }),
   http.get(`${B}/templates/:id/download`, ({ params, request }) => {
     const g = guard(); if (g) return g;
-    const task = new URL(request.url).searchParams.get('task_id');
+    const u = new URL(request.url).searchParams, task = u.get('task_id'), prefill = u.get('prefill') === 'true' || !!u.get('site_ids');
     return new HttpResponse(new Uint8Array([0x50, 0x4b, 3, 4]), {
-      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="${params.id}_v1${task ? '_task' : ''}.xlsx"` },
+      headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Content-Disposition': `attachment; filename="${params.id}_v1${task ? '_task' : prefill ? '_prefilled' : ''}.xlsx"` },
     });
-  }),
-  http.post(`${B}/import-batches`, async ({ request }) => {
-    const g = guard(); if (g) return g;
-    const f = (await request.formData()).get('file');
-    if (!f || typeof f === 'string' || !f.name.endsWith('.xlsx')) return problem(422, 'template_rejected', 'Not an approved template', { reason: 'tpl_missing' } as never);
-    return HttpResponse.json({ id: crypto.randomUUID(), template_id: 'TPL-SITE', template_version: 1, status: 'parsing', counts: {}, version: 1, file_name: f.name }, { status: 202 });
   }),
 
   http.get(`${B}/matrix`, ({ request }) => {

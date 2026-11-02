@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.6.1
+  version: 0.7.0
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.7.0 (2026-11-02): additive. Approved-template entry for the registers (CLAUDE.md "Approved templates only", "Two entry ways everywhere"; migration 0037). (1) `GET /templates` lists one template per register (`TPL-PO`, `TPL-GECOL`, `TPL-HLC`, `TPL-PRM` and the other registers) that the caller may use; a template version is issued by the database whenever the fields or the custom fields of its register change, and `Template` gains `register_key` and `stream`. (2) `GET /templates/{template_id}/download` builds the xlsx: locked headers in Master order, drop-downs for list fields, a very-hidden `_tpl` sheet (template_id, version, register_key, header checksum, issuer and time), a visible instructions sheet; new query parameters `prefill` and `region_id` (a pre-filled copy holds the records in force inside the caller's regions, with a `Record ID` column); every download is audited. (3) `POST /import-batches` now reads the file (multipart, size limit, `.xlsx` only, no macros, no formulas) and stages it in the database: each row is matched to a record by `Record ID` or by the register's natural key and classified `create`, `update`, `unchanged` or `error` with the reasons per cell (`ImportRow.errors[].column` is the header of the column, `field` its code), against the same rules as manual entry. A file without a valid `_tpl`, of a retired version, with a changed header row, with macros or too large answers 422 `template_rejected` with `reason` (new values `not_xlsx`, `macros_not_allowed`, `tpl_invalid`) or 413, writes a System Log row (source `template-check`) and creates no batch. (4) The batch is an entry into the normal flow, not a shortcut: `POST /import-batches/{batch_id}/submit` (the uploader) creates every valid row as a register record and submits it (L1 Data Entry), so the record waits for L2 Data Reviewer & Approver of its Matrix row; `POST /import-batches/{batch_id}/decisions` approves rows one by one or all at once, returns rows to the uploader with a note (the record goes back to L1), or discards a batch that was not sent (`action` gains `discard`). A row whose logical record still has an open version is held `pending_previous_approval`; "approve all" never touches held rows and lists them in `outcome.held`. Both calls answer the batch plus `outcome`. `ImportBatch` gains `register_key`, `note`, `counts.held` and the status `discarded`; `ImportRow` gains `site_code`, `record_type`, `record_id` (the register record created for the row) and `hold_reason`. The audit rows and the record history show "via batch". `GET /import-batches` accepts `register_key`. Not built yet: `POST /import-batches/{batch_id}/undo`, the stream templates (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`, Q73) and `TPL-MASTER`; the catalogue, the version rule and the batch tables are ready for them.
     - 0.6.1 (2026-11-02): breaking only for the level count, which no client may set any more. Two fixed approval levels (owner decision 2026-11-01, CLAUDE.md "Two approval levels", migration 0032): **L1 = Data Entry** and **L2 = Data Reviewer & Approver**, for every stage, register and Dismantle; one person may hold both (a self-approval, B5). (1) `GET /matrix`: `approval_levels` is always 2 and `used_levels` is always `[1, 3]` (L1 is cell level 1, L2 is cell level 3; cell level 2 is a leftover kept only for tasks and records already submitted on a 3-level snapshot, `used = false`); `MatrixCell.level_code` (`L1` or `L2`); `MatrixSkipCase.from_level_code` and `skipped_level_codes`; `MatrixPreview.single_level` is always false. (2) `PATCH /matrix`: `stage_levels[].approval_levels` accepts only 2 (any other value is 422 `validation_failed`, path `/stage_levels/{i}/approval_levels`); saving 2 is a no-op that writes nothing. (3) `RegisterDefinition.approval_levels` and `TaskDefinition.approval_levels` are 2 (or null for a task); `levels_required` of a task or record is 2 for everything submitted since the migration and 1 to 3 only on an older snapshot (B7). (4) The permission level `review` is folded into `approve` (= L2): it is still accepted on input and is stored and returned as `approve`; `entry` is L1; naming one person at both L1 and L2 is how a person is granted both levels. `PATCH /matrix` `empty_cell` now lists only L1 and L2 cells. (5) New `DELETE /matrix/cells/{cell_id}` (owner answer Q86): deletes a region or task override cell (step-up, `If-Match`, `reason` query parameter, audited; a row default is refused with `row_default`); the row default applies again. (6) Default holders (owner answers Q85 and Q90, migration 0035): L1 = the owning team, L2 = the stream Team Lead (Contractors, Risks and Deliverables: the Project Manager; Procurement, GECOL, HLC and Permits & HSE: the Team Lead of CW, and TE for TE permits), seeded only where the cell is missing or empty, or still the untouched legacy seed.
     - 0.6.0 (2026-11-02): one-time enrolment code, so a password alone can never enrol a phone (owner decision 2026-11-02, ADR 0014 amendment). Not purely additive: `POST /auth/local/2fa/enrol/start` now needs a request body with `enrol_code`, and `POST /auth/local/2fa/enrol/confirm` needs `enrol_code` beside `code`. (1) `PUT /users/{user_id}/two-factor` (turning it on) and `POST /users/{user_id}/two-factor/reset` return a new one-time `enrol_code` (8 characters, shown as XXXX-XXXX) and `enrol_code_expires_at` in `TwoFactorState`, once; (2) new `POST /users/{user_id}/two-factor/enrol-code` issues a new code for a user who is waiting for enrolment (the old code stops working; reason, step-up, audited); (3) the enrolment calls need the code, a wrong code counts toward the same lock as a wrong TOTP code; (4) `User.two_factor_enrol_code_expires_at` (when the outstanding code ends, never the code); (5) error codes `invalid_enrol_code` and `enrol_code_expired`; (6) the setting `two_factor.enrol_code_hours` (default 72) is how long a code lasts.
     - 0.5.0 (2026-11-02): additive. Two-factor authentication (TOTP) for local accounts (owner decision 2026-11-02, ADR 0014). (1) `POST /auth/local/login` may answer 200 with `PendingSignIn` (`authenticated: false`, `next` = `two_factor` or `enrol`) and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use) instead of a session; (2) `POST /auth/local/2fa` completes the sign-in with a TOTP code or one recovery code; (3) `POST /auth/local/2fa/enrol/start` and `/enrol/confirm` enrol a user whose two-factor is on and not set up yet (otpauth URI for the QR code, manual key, 10 one-time recovery codes shown once); (4) `POST /auth/local/2fa/recovery-codes` makes new recovery codes (needs a valid TOTP code); (5) `POST /auth/local/step-up` takes `code` or `recovery_code` when the user's two-factor is on, and `Problem.step_up_method` gains `password_totp`; (6) `PUT /users/{user_id}/two-factor` turns it on or off and `POST /users/{user_id}/two-factor/reset` resets it (System Admin or a delegate holding the new delegable right `users.two_factor`; reason and step-up; nobody changes their own); (7) `User.two_factor` (off, pending_enrolment, on), `Session.two_factor` (enabled and remaining recovery codes) and `Session.mfa` is true for a session that passed a code; error code `invalid_code`.
@@ -5479,16 +5480,29 @@ paths:
       tags: [templates]
       operationId: downloadTemplate
       summary: Download the current version (hidden `_tpl` sheet holds template_id and version)
-      description: Audited. For a pre-filled copy pass `task_id` or `site_ids`. Only the current version can be downloaded, and only the current version is accepted on upload.
+      description: |
+        Audited. Needs `download_documents` on `templates` and `view` on the register's module. Only the current version can be downloaded, and only the current version is accepted on upload.
+        The data sheet `Data` has the locked header row (Master order, then the custom fields that appear in templates, then `Record ID`), drop-downs for the list fields, and grey locked columns for calculated values (never read on upload).
+        The very-hidden `_tpl` sheet holds `template_id`, `version`, `kind`, `register_key`, `stream`, `header_checksum`, `field_set_hash`, `issued_by` and `issued_at`.
+        For a pre-filled copy pass `prefill=true`, `task_id` (the task's site; the task must use this template, else 422 `template_rejected` with `wrong_template`) or `site_ids`: the records in force inside the caller's regions, with their `Record ID`.
       parameters:
       - name: task_id
         in: query
         schema: {type: string, format: uuid}
       - name: site_ids
         in: query
+        description: Repeated, or a comma separated list. At most 500.
         schema:
           type: array
           items: {type: string, format: uuid}
+      - name: prefill
+        in: query
+        description: Pre-fill with the current records of the register (at most 5000 rows).
+        schema: {type: boolean, default: false}
+      - name: region_id
+        in: query
+        description: Limit a pre-filled copy to one region (inside the caller's regions).
+        schema: {type: integer}
       responses:
         '200':
           description: The xlsx file.
@@ -5501,6 +5515,7 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /import-batches:
     get:
       tags: [templates]
@@ -5513,11 +5528,14 @@ paths:
       - name: template_id
         in: query
         schema: {type: string}
+      - name: register_key
+        in: query
+        schema: {type: string}
       - {$ref: '#/components/parameters/Limit'}
       - {$ref: '#/components/parameters/Cursor'}
       responses:
         '200':
-          description: Batches.
+          description: Batches. Those the caller uploaded, and those of registers whose module the caller may view (inside the caller's regions).
           content:
             application/json:
               schema:
@@ -5534,9 +5552,11 @@ paths:
       tags: [templates]
       operationId: uploadImportBatch
       summary: 'Upload a filled template: validate and create a batch'
-      description: 'Checks in order: size and rows, `_tpl` present, known and active template, current version, the template selected, header checksum, `import` right (ADR 0005 §4). The first failure answers 422 `template_rejected` with `reason`
-        = TemplateRejectReason and a System Log row. A file that passes returns 202 and parses as a job. Nothing reaches target tables until rows are approved.'
-      x-db-path: imp_create_batch
+      description: |
+        Needs `import` on `templates` (403 otherwise, before the file is read). Then, in order: the form (one file, size limit 5 MB, 2000 data rows; larger answers 413 or 422 `size_or_rows_exceeded`), a plain `.xlsx` package without macros, embedded objects or external links (`not_xlsx`, `macros_not_allowed`), the hidden `_tpl` sheet (`tpl_missing`, `tpl_invalid`), a known and active template (`template_unknown_or_inactive`), the current version (`outdated_version`; the message names both versions), the template the user selected (`wrong_template`), the header checksum (`checksum_mismatch`), and the caller's right to create or edit in the register (`import_not_allowed`).
+        The first failure answers 422 `template_rejected` with `reason` = TemplateRejectReason, writes a System Log row (`source = template-check`, the reason, the file name and hash) and creates no batch.
+        A file that passes is read as values (a formula or a text starting with `=` is a cell error), staged by the database and answered 202 with the batch in status `validated`: each row is resolved inside the caller's regions, matched to a record by `Record ID` or by the register's natural key, validated with the same rules as manual entry, and classified. Rows with errors stay in the batch as `error` and never go on. Nothing reaches the register until the uploader sends the batch and the rows are approved.
+      x-db-path: imp_stage_batch
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -5552,7 +5572,9 @@ paths:
                 task_id: {type: string, format: uuid, description: 'Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.'}
       responses:
         '202':
-          description: Accepted; poll the job or the batch.
+          description: Accepted. The file is parsed and staged in the request, so the batch is already `validated` (`job_id` stays null; `parsing` is kept for a future background parse).
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ImportBatch'}
@@ -5566,7 +5588,7 @@ paths:
     get:
       tags: [templates]
       operationId: getImportBatch
-      summary: One batch
+      summary: One batch (status and counts follow the rows and the records they created)
       responses:
         '200':
           description: Batch.
@@ -5620,17 +5642,26 @@ paths:
     post:
       tags: [templates]
       operationId: submitImportBatch
-      summary: Send the validated batch to review
+      summary: Send the validated batch into the normal flow (L1 Data Entry)
+      description: |
+        Only the uploader (403 `not_eligible_holder` for anyone else, an admin too: the records are entered as L1 in the uploader's name only). Each valid row (`create` or `update`) becomes a register record, and is submitted as the uploader through the same functions as manual entry (`reg_save_record`, `reg_new_version`, `reg_transition_record`, with the import row so that the audit and the history show "via batch"), so it follows the Matrix row of its register: L2 Data Reviewer & Approver decides next. An update is a new version of the record in force; the version in force stays until the new one is approved (R9).
+        A row whose logical record has an open version is held `pending_previous_approval` and listed in `outcome.held`; send the batch again after that version is decided and the row is released. A row that the register refuses at submit becomes an `error` row (listed in `outcome.failed`) and nothing of it is kept. When the caller also holds L2, the submission is a self-approval and needs a step-up (401 `step_up_required`, nothing is created).
+      x-db-path: imp_submit_batch
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       responses:
         '200':
-          description: Submitted.
+          description: Sent.
           headers:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportBatch'}
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/ImportBatch'}
+                - type: object
+                  properties:
+                    outcome: {$ref: '#/components/schemas/ImportBatchOutcome'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -5644,9 +5675,12 @@ paths:
     post:
       tags: [templates]
       operationId: decideImportBatch
-      summary: 'Review, approve or reject: row by row, or all at once'
-      description: Follows the batch's own 3-level path and the self-skip rule. `scope=all` decides every undecided valid row. Approving the last level applies the rows. A final approval by someone who holds every level needs step-up (B5).
-      x-step-up: when the caller holds every level (self-approval, B5)
+      summary: 'Approve, return or discard: row by row, or all at once'
+      description: |
+        A row is decided by the same transition a person makes on the record it created (`reg_transition_record`), with the same grid right (`approve` on the register's module for L2), the same holders of the Matrix row and the same step-up for a final approval (401 `step_up_required`); nothing here is a shortcut.
+        `approve` (or `review`, for a record still at a legacy middle level) with `scope=all` decides every open row; with `scope=rows` the rows listed. `reject` returns the rows to the uploader with a note (mandatory, 422 `note_required`): the record goes back to L1 Data Entry, the row is `rejected`. `discard` (uploader or System Admin) closes a batch that was not sent; nothing was created.
+        Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
+      x-step-up: when an approval is final (L2 approve) or a self-approval (B5); not for a return or a discard
       x-db-path: imp_decide_batch
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5663,7 +5697,12 @@ paths:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
             application/json:
-              schema: {$ref: '#/components/schemas/ImportBatch'}
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/ImportBatch'}
+                - type: object
+                  properties:
+                    outcome: {$ref: '#/components/schemas/ImportBatchOutcome'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -5678,6 +5717,7 @@ paths:
       tags: [templates]
       operationId: undoImportBatch
       summary: Undo an applied batch (admin override, reversible)
+      description: Not built yet (0.7.0). With records entering through the register flow, an undo is a new version of each record that restores its before values, reviewed like any other.
       x-step-up: true
       x-db-path: imp_undo_batch
       parameters:
@@ -9853,7 +9893,9 @@ components:
         name_ar: { type: [string, 'null'] }
         kind: { type: string, enum: [data_import, assignment_import, config_import, master] }
         module_key: { $ref: '#/components/schemas/ModuleKey' }
-        current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload.' }
+        register_key: { type: [string, 'null'], description: 'The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER.' }
+        stream: { type: [string, 'null'], description: 'The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. Not built yet.' }
+        current_version: { type: integer, minimum: 1, description: 'Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register''s fields or custom fields change.' }
         field_set_version: { type: [integer, 'null'], description: 'Custom-field set the current version was built from (ADR 0009 §4).' }
         issued_at: { type: string, format: date-time }
         is_active: { type: boolean }
@@ -9869,7 +9911,37 @@ components:
     TemplateRejectReason:
       type: string
       description: Closed list returned as `reason` on 422 `template_rejected`. Each rejection is also written to the System Log (`source = template-check`).
-      enum: [size_or_rows_exceeded, tpl_missing, template_unknown_or_inactive, outdated_version, wrong_template, checksum_mismatch, import_not_allowed]
+      enum: [size_or_rows_exceeded, tpl_missing, template_unknown_or_inactive, outdated_version, wrong_template, checksum_mismatch, import_not_allowed, not_xlsx, macros_not_allowed, tpl_invalid]
+    ImportBatchOutcome:
+      type: object
+      description: What a send or a decision did. `held` lists the rows held `pending_previous_approval`; `failed` the rows that could not be sent or decided.
+      properties:
+        submitted: { type: integer, description: Rows sent into the flow (submit only). }
+        decided: { type: integer }
+        approved: { type: integer }
+        rejected: { type: integer }
+        held:
+          type: array
+          items:
+            type: object
+            required: [row_id, row_no, reason]
+            properties:
+              row_id: { type: string, format: uuid }
+              row_no: { type: integer }
+              key: { type: [string, 'null'] }
+              reason: { type: string, enum: [open_version] }
+              record_id: { type: [string, 'null'], format: uuid, description: The open version that blocks the row. }
+        failed:
+          type: array
+          items:
+            type: object
+            required: [row_id, row_no, code]
+            properties:
+              row_id: { type: string, format: uuid }
+              row_no: { type: integer }
+              key: { type: [string, 'null'] }
+              code: { type: string }
+              message: { type: string }
     ImportBatch:
       type: object
       required: [id, template_id, template_version, status, counts, version]
@@ -9879,9 +9951,16 @@ components:
         template_version: { type: integer }
         source: { type: string, enum: [template, master_import, legacy_master] }
         file_name: { type: string }
-        status: { type: string, enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed] }
-        current_level: { type: integer }
-        levels_required: { type: integer }
+        status:
+          type: string
+          enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed, discarded]
+          description: |
+            `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
+            The status follows the rows and the records they created, so an approval made in the register screen counts too. `in_review`, `applied` and `undone` are not used for registers (two fixed levels; undo is not built).
+        current_level: { type: integer, description: '1 while the batch waits for the uploader (L1 Data Entry), 2 once it is sent (L2 Data Reviewer & Approver).' }
+        levels_required: { type: integer, description: Always 2. }
+        register_key: { type: [string, 'null'] }
+        note: { type: [string, 'null'], description: The last note of a return. }
         counts:
           type: object
           properties:
@@ -9892,6 +9971,7 @@ components:
             pending: { type: integer }
             approved: { type: integer }
             rejected: { type: integer }
+            held: { type: integer, description: Rows held `pending_previous_approval`. }
         job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
@@ -9906,10 +9986,13 @@ components:
         sheet: { type: string }
         row_no: { type: integer }
         key: { type: [string, 'null'], description: 'Human key (site code, employee ID, date).' }
+        site_code: { type: [string, 'null'], description: The Site ID typed in the row. }
+        record_type: { type: [string, 'null'] }
+        record_id: { type: [string, 'null'], format: uuid, description: 'The register record created for the row once the batch was sent (read it with GET /registers/{register_key}/records/{id}).' }
         action: { type: string, enum: [create, update, unchanged, error] }
         diff:
           type: object
-          description: Field to old/new values.
+          description: 'Field code to old/new values. A `create` row lists every value with `old` null.'
           additionalProperties:
             type: object
             properties:
@@ -9921,17 +10004,19 @@ components:
             type: object
             required: [code]
             properties:
-              column: { type: string }
-              code: { type: string }
+              column: { type: string, description: The header of the column in the file. }
+              field: { type: string, description: The code of the field. }
+              code: { type: string, description: 'For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`, or a register rule (`in_house_with_pr`).' }
               message: { type: string }
         decision: { type: string, enum: [pending, approved, rejected, pending_previous_approval] }
+        hold_reason: { type: string, enum: [open_version], description: Why a row is held `pending_previous_approval`. }
         decided_by: { $ref: '#/components/schemas/UserRef' }
         note: { type: [string, 'null'] }
     ImportDecisionRequest:
       type: object
       required: [action, scope]
       properties:
-        action: { type: string, enum: [review, approve, reject], description: 'The level action of the caller on the batch.' }
+        action: { type: string, enum: [review, approve, reject, discard], description: 'The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note) or `discard` (a batch that was not sent).' }
         scope: { type: string, enum: [all, rows], description: '`all` decides every undecided valid row at once; `rows` uses `rows[]`.' }
         rows:
           type: array
