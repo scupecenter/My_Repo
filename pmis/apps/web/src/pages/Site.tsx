@@ -1,5 +1,6 @@
 import type { TasksExportColumnCode } from '@/api/types';
 import { ArrowLeft, Layers } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useRegions, useSite, useSiteTasks } from '@/api/sites';
@@ -30,6 +31,7 @@ export function Site() {
   const grid = useSiteTasks(siteId, real ? stream : null, !dismantle, view || null);
   const stage = sp.get('stage');
   const taskId = sp.get('task');
+  const [ids, setIds] = useState<string[]>([]);
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
@@ -79,9 +81,9 @@ export function Site() {
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
-        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} onOpen={(id) => setParam('task', id)} />}
+        : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
       <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>
-      <TaskDrawer registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />
+      <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />
     </div>
   );
 }

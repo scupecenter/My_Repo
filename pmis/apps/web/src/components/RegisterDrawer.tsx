@@ -12,6 +12,7 @@ import { cellLevel } from '@/lib/matrixLevels';
 import { defaultsFor, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
+import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
 import { Holders } from './HolderChip';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -37,6 +38,8 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   const [server, setServer] = useState<Record<string, FieldIssue>>({});
   const [rejecting, setRejecting] = useState(false);
   const [voiding, setVoiding] = useState(false);
+  const [tab, setTab] = useState('data');
+  useReportDirty(dirty);
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
@@ -102,7 +105,9 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
         </div>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="reg-close"><X size={16} /></button></Dialog.Close>
       </header>
+      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div {...panelProps('data', tab)} className="space-y-4">
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
           <p className="flex items-center gap-2 rounded-md bg-openBg p-3 text-sm text-openInk" data-testid="reg-source">
@@ -166,9 +171,10 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
             </section>
           ))}
         </form>
+        </div>
 
         {record && (
-          <section aria-labelledby="rg-history">
+          <section {...panelProps('history', tab)}>
             <h3 id="rg-history" className="mb-1 flex items-center gap-1 font-semibold"><Clock size={14} />{t('drawer.history')}</h3>
             <ol data-testid="reg-history" className="space-y-1 text-sm">
               {hist.data?.items.map((x) => <li key={x.id}>{t(`step.${x.action}`, { defaultValue: x.action })} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}</li>)}
@@ -199,21 +205,16 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   );
 }
 
-/** `recordId`: an id opens that record, 'new' opens an empty form, null is closed. */
-export function RegisterDrawer({ def, recordId, onClose, onOpen }: { def: RegisterDefinition; recordId: string | null; onClose: () => void; onOpen: (id: string) => void }) {
+/** `recordId`: an id opens that record, 'new' opens an empty form, null is closed. `nav` = the ids of the list shown behind, for next/previous. */
+export function RegisterDrawer({ def, recordId, onClose, onOpen, nav }: { def: RegisterDefinition; recordId: string | null; onClose: () => void; onOpen: (id: string) => void; nav?: string[] }) {
   const { t } = useTranslation();
   const isNew = recordId === 'new';
   const q = useRegisterRecord(def.register_key, isNew ? null : recordId);
   return (
-    <Dialog.Root open={!!recordId} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[60] bg-scrim/50" />
-        <Dialog.Content data-testid="register-drawer" aria-describedby={undefined} className="fixed inset-y-0 end-0 z-[60] w-[min(640px,100vw)] border-s border-line bg-card shadow-lg">
-          {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
-            : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
-              : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    <DrawerFrame name="register" testid="register-drawer" wide={640} open={!!recordId} onClose={onClose} nav={nav && !isNew ? { ids: nav, current: recordId, onGo: onOpen } : undefined}>
+      {isNew ? <Body key="new" def={def} record={null} onCreated={onOpen} />
+        : q.data ? <Body key={`${q.data.id}`} def={def} record={q.data} onCreated={onOpen} />
+          : <div className="p-4"><Dialog.Title className="font-bold">{q.isError ? t('regErrors.not_found') : t('common.loading')}</Dialog.Title></div>}
+    </DrawerFrame>
   );
 }

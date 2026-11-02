@@ -188,6 +188,7 @@ describe('Template entry', () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement'));
     const u = userEvent.setup();
+    await u.click(await screen.findByTestId('more-menu')); // secondary tools live in "More" (plan T3)
     await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
     expect(screen.getByTestId('register-template-download')).toBeEnabled();
     fireEvent.change(screen.getByTestId('register-template-file'), { target: { files: [new File(['x'], 'filled.xlsx')] } });
@@ -210,6 +211,7 @@ describe('Template entry', () => {
   it('rejects an old template version with a plain reason', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement'));
+    await userEvent.click(await screen.findByTestId('more-menu'));
     await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
     fireEvent.change(screen.getByTestId('register-template-file'), { target: { files: [new File(['retired'], 'old_template.xlsx')] } });
     await waitFor(() => expect(screen.getByTestId('toast')).toHaveTextContent('This template version is retired'));

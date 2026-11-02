@@ -1,6 +1,6 @@
 # Plan: unified UI/UX upgrade (calm Linear look, ClickUp-style interaction)
 
-Status: reviewed 2026-11-01. Phases 1 and 2 done (CHANGELOG 53, previews in `design/previews/ui-phase2/`); next phase 3. The owner approved a full visual and interaction upgrade on the condition that no functional rule or relationship changes. Delivery is by phase; each phase is its own PR.
+Status: reviewed 2026-11-01. Phases 1 and 2 done (CHANGELOG 53, previews in `design/previews/ui-phase2/`); phase 3 done (CHANGELOG 58); next phases 4 and 4b. The owner approved a full visual and interaction upgrade on the condition that no functional rule or relationship changes. Delivery is by phase; each phase is its own PR.
 Source: owner proposal `GSDN_PMIS_Unified_UI_UX_Proposal_AR.md` (sections 1-20).
 Base: main after PR #57. PR #58 (write-through) is open.
 Legend:

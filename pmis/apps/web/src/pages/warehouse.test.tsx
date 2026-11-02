@@ -196,6 +196,6 @@ describe('Registers reachable from the navigation', () => {
     await signIn('pm');
     show(`/registers/${key}`);
     expect(await screen.findByTestId(`page-register-${key}`)).toBeInTheDocument();
-    if (key === 'as_built') expect(screen.getByTestId('register-asbuilt-items')).toHaveAttribute('href', '/as-built/items');
+    if (key === 'as_built') { await userEvent.click(screen.getByTestId('more-menu')); expect(await screen.findByTestId('register-asbuilt-items')).toBeInTheDocument(); }
   });
 });

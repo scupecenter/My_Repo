@@ -1,18 +1,25 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
-import { Download } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, RotateCcw } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
-import { useRegions, useSites, useStreams, useViews, type SiteFilters } from '@/api/sites';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useRegions, useSites, useStreams, useViews } from '@/api/sites';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { ViewTabs } from '@/components/ViewTabs';
-import { PageHeader, Toolbar } from '@/components/PageHeader';
+import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
+import { ActiveChips, BulkBar, ColumnMenu, Empty, HeaderRow, pin, QuickFilter, SelectBox, tracks, totalWidth, Trunc, useTablePrefs } from '@/components/TableKit';
+import { useToast } from '@/components/Toast';
+import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
 
-const ROW = 52;
+const ROWS = { comfortable: 52, compact: 38 } as const;
+const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }];
+const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
+const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone' };
+const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // ExportColumnCode values (stable codes of the `sites` part).
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
@@ -34,11 +41,19 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
-  const [f, setF] = useState<Omit<SiteFilters, 'stream' | 'view'>>({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' });
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
-  const activeFilters = Object.values(f).filter(Boolean).length;
-  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
+  const f = { q: sp.get('q') ?? '', region_id: sp.get('region_id') ?? '', scenario: sp.get('scenario') ?? '', overall_status: sp.get('overall_status') ?? '', stage_code: sp.get('stage_code') ?? '' };
+  const bucket = sp.get('bucket') ?? '';
+  const sel = sp.get('sel') ?? '';
+  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0);
+  const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
+  const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', sel: '' });
+  const toast = useToast();
+  const nav = useNavigate();
+  const [picked, setPicked] = useState<Set<string>>(new Set());
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
   const regions = useRegions();
@@ -48,9 +63,9 @@ export function Sites() {
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
-  const q = useSites({ ...f, ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle);
+  const q = useSites({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, stage_code: '', ...(view ? { view } : {}) }, real);
+  const allQ = useSites({ ...f, stage_code: '', ...(bucket ? { bucket } : {}), ...(view ? { view } : {}) }, real);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -59,16 +74,57 @@ export function Sites() {
   const total = (q.data?.pages[0]?.page.total ?? inStream.length) + (showNa && real ? naItems.length : 0);
   const stageOptions = (inStream[0] ?? q.data?.pages[0]?.items[0])?.rail.map((r) => r.code) ?? [];
 
+  const tbl = useTablePrefs(real ? 'sites-stream' : 'sites', real ? DEFS_STREAM : DEFS_ALL);
+  const ROW = ROWS[tbl.density];
   const viewport = Math.max(320, (typeof window === 'undefined' ? 800 : window.innerHeight) - 380);
   const v = useVirtual(items.length, ROW, viewport);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
   useEffect(() => { if (hasNextPage && !isFetchingNextPage && v.end >= inStream.length - 20) void fetchNextPage(); }, [v.end, inStream.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
+  const scroller = useRef<HTMLDivElement>(null);
+  const restored = useRef(false);
+  const scrollKey = `pmis.scroll.sites.${stream || 'ALL'}`;
+  useLayoutEffect(() => { // back from a site: the list comes back where it was
+    const el = scroller.current;
+    if (!el || restored.current || !items.length) return;
+    restored.current = true;
+    const y = Number(sessionStorage.getItem(scrollKey) ?? 0);
+    if (y) el.scrollTop = y;
+  }, [items.length, scrollKey]);
   const rname = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || String(id); };
   const stageName = (code?: string | null) => (code ? t(`stage.${code}`, { defaultValue: code }) : '—');
-  const ncols = real
-    ? 'grid grid-cols-[80px_minmax(130px,1.3fr)_90px_120px_150px_90px_70px_110px] items-center gap-3 px-4'
-    : 'grid grid-cols-[90px_minmax(140px,1.4fr)_100px_110px_120px_150px_90px] items-center gap-3 px-4';
+  const label = (id: string) => t(LABEL[id]);
+  const cols = tbl.cols, W = totalWidth(cols, true);
   const linkTo = (s: SiteListItem) => `/sites/${s.id}${new URLSearchParams([...(real ? [['stream', stream]] : []), ...(view ? [['view', view]] : [])]).toString().replace(/^(?=.)/, '?')}`;
+  const flip = (code: string) => setPicked((p) => { const n = new Set(p); if (n.has(code)) n.delete(code); else n.add(code); return n; });
+  const allCodes = items.map((s) => s.site_code), allPicked = allCodes.length > 0 && allCodes.every((c) => picked.has(c));
+  const chips = [
+    ...(f.q ? [{ key: 'q', label: t('table.filter_q', { v: f.q }), onRemove: () => set('q')('') }] : []),
+    ...(f.region_id ? [{ key: 'region_id', label: t('table.filter_region', { v: rname(Number(f.region_id)) }), onRemove: () => set('region_id')('') }] : []),
+    ...(f.scenario ? [{ key: 'scenario', label: t('table.filter_scenario', { v: t(`scenario.${f.scenario}`) }), onRemove: () => set('scenario')('') }] : []),
+    ...(f.overall_status ? [{ key: 'overall_status', label: t('table.filter_status', { v: t(`status.${f.overall_status}`) }), onRemove: () => set('overall_status')('') }] : []),
+    ...(f.stage_code ? [{ key: 'stage_code', label: t('table.filter_stage', { v: stageName(f.stage_code) }), onRemove: () => set('stage_code')('') }] : []),
+    ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
+  ];
+
+  const cell = (id: string, s: SiteListItem) => {
+    const st = statusOf(s.streams, stream);
+    switch (id) {
+      case 'code': return <b className="mono">{s.site_code}</b>;
+      case 'name': return <Trunc text={s.name} />;
+      case 'region': return <Trunc text={rname(s.region_id)} />;
+      case 'stream_status': return <span className={`chip ${STREAM_TONE[st?.state ?? 'na']}`} data-testid={`stream-state-${s.site_code}`}>{t(`streamState.${st?.state ?? 'na'}`)}</span>;
+      case 'stage': return <span data-testid={`stream-stage-${s.site_code}`}><Trunc text={stageName(st?.current_stage)} /></span>;
+      case 'progress': return <span className="mono" data-testid={`stream-progress-${s.site_code}`}>{st ? `${st.done_tasks}/${st.total_tasks}` : <Empty />}</span>;
+      case 'milestone': return <span className="mono" data-testid={`stream-ms-${s.site_code}`}>{st?.milestone_date ?? <Empty />}</span>;
+      case 'scenario': return s.delivery_scenario ? <Trunc text={t(`scenario.${s.delivery_scenario}`)} /> : <Empty />;
+      case 'status': return <span className={`chip ${TONE[s.overall_status]}`}>{t(`status.${s.overall_status}`)}</span>;
+      case 'pipeline': return <MiniRail rail={s.rail} />;
+      default: { // late
+        const n = real ? st?.late_count : s.late_task_count;
+        return n ? <span className="chip bg-lateBg text-lateInk" data-testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</span> : <Empty />;
+      }
+    }
+  };
 
   return (
     <div data-testid="page-sites">
@@ -87,6 +143,8 @@ export function Sites() {
         <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />
         <Select id="status" value={f.overall_status} onChange={set('overall_status')} all={t('sites.all_statuses')} options={STATUSES.map((s) => [s, t(`status.${s}`)])} />
         <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={stageOptions.map((s) => [s, stageName(s)])} />
+        <QuickFilter testid="sites-quick-mine" on={bucket === 'mine'} onClick={() => setParams({ bucket: bucket === 'mine' ? '' : 'mine', sel: '' })}>{t('table.mine')}</QuickFilter>
+        <QuickFilter testid="sites-quick-late" on={bucket === 'late'} onClick={() => setParams({ bucket: bucket === 'late' ? '' : 'late', sel: '' })}>{t('table.late')}</QuickFilter>
         {real && (
           <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
             <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
@@ -96,52 +154,43 @@ export function Sites() {
         </>}
         count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>}
         tools={<>
-        <button className="btn" data-testid="sites-export" onClick={() => setExp(true)}><Download size={16} />{t('export.open')}</button>
-        <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
+        <ColumnMenu api={tbl} label={label} />
+        <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
+        <MoreMenu items={[
+          { id: 'export', label: t('export.open'), icon: <Download size={16} />, testid: 'sites-export', onSelect: () => setExp(true) },
+          { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'sites-reset-cols', onSelect: tbl.reset },
+        ]} />
         </>} />
+      <ActiveChips chips={chips} onClear={clearAll} />
       {dismantle ? (
         <p className="card p-6 text-mute" data-testid="stream-dismantle-todo">{t('sites.dismantle_todo')}</p>
       ) : (
-        <div className="card overflow-hidden" data-stream={stream || 'ALL'}>
-          <div className={`${ncols} border-b border-line bg-card2 py-2 text-sm font-semibold text-mute`} role="row">
-            <span>{t('sites.code')}</span><span>{t('sites.name')}</span><span>{t('sites.region')}</span>
-            {real ? <><span>{t('sites.stream_status')}</span><span>{t('sites.current_stage')}</span><span>{t('sites.progress')}</span><span>{t('sites.late')}</span><span>{t('sites.milestone')}</span></>
-              : <><span>{t('sites.scenario')}</span><span>{t('sites.status')}</span><span>{t('sites.pipeline')}</span><span>{t('sites.late')}</span></>}
-          </div>
-          <div data-testid="sites-list" role="list" className="relative overflow-y-auto" style={{ height: viewport }} onScroll={v.onScroll}>
-            <div style={{ height: v.total }}>
+        <div className="card overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
+          <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
+            <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
+            <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
               {items.slice(v.start, v.end).map((s, k) => {
                 const st = statusOf(s.streams, stream);
-                const na = real && st?.state === 'na';
+                const na = real && st?.state === 'na', on = picked.has(s.site_code), cur = sel === s.site_code;
                 return (
-                  <Link key={s.id} to={linkTo(s)} role="listitem" data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} className={`${ncols} absolute inset-x-0 border-b border-line text-sm hover:bg-hover ${na ? 'opacity-60' : ''}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
-                    <b className="mono">{s.site_code}</b>
-                    <span className="truncate">{s.name}</span>
-                    <span>{rname(s.region_id)}</span>
-                    {real ? (
-                      <>
-                        <span><span className={`chip ${STREAM_TONE[st?.state ?? 'na']}`} data-testid={`stream-state-${s.site_code}`}>{t(`streamState.${st?.state ?? 'na'}`)}</span></span>
-                        <span data-testid={`stream-stage-${s.site_code}`}>{stageName(st?.current_stage)}</span>
-                        <span className="mono" data-testid={`stream-progress-${s.site_code}`}>{st ? `${st.done_tasks}/${st.total_tasks}` : '—'}</span>
-                        <span>{st?.late_count ? <span className="chip bg-lateBg text-lateInk" data-testid={`stream-late-${s.site_code}`}>{st.late_count}</span> : '—'}</span>
-                        <span className="mono" data-testid={`stream-ms-${s.site_code}`}>{st?.milestone_date ?? '—'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>{s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : '—'}</span>
-                        <span><span className={`chip ${TONE[s.overall_status]}`}>{t(`status.${s.overall_status}`)}</span></span>
-                        <MiniRail rail={s.rail} />
-                        <span>{s.late_task_count ? <span className="chip bg-lateBg text-lateInk">{s.late_task_count}</span> : '—'}</span>
-                      </>
-                    )}
-                  </Link>
+                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} className={`absolute inset-x-0 border-b border-line text-sm ${on ? 'bg-accentSoft' : 'bg-card hover:bg-hover'} ${cur ? 'ring-2 ring-inset ring-accent' : ''} ${na ? 'opacity-60' : ''}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                    <span className="absolute inset-y-0 start-0 z-20 flex w-9 items-center justify-center"><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span>
+                    <Link to={linkTo(s)} data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} onClick={() => setParams({ sel: s.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
+                      <span aria-hidden />
+                      {cols.map((c) => { const p = pin(c, true); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
+                    </Link>
+                  </div>
                 );
               })}
+              {q.isSuccess && !items.length && (activeFilters ? <NoResults testid="sites-empty" onClear={clearAll} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
             </div>
-            {q.isSuccess && !items.length && (activeFilters ? <NoResults testid="sites-empty" onClear={() => setF({ q: '', region_id: '', scenario: '', overall_status: '', stage_code: '' })} /> : <EmptyState testid="sites-empty" title={t('sites.empty')} />)}
           </div>
         </div>
       )}
+      <BulkBar testid="sites-bulk" count={picked.size} loaded={items.length} total={total} onClear={() => setPicked(new Set())}>
+        {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
+        <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
+      </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
     </div>
   );

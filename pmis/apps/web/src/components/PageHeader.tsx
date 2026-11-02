@@ -1,4 +1,8 @@
-import type { ReactNode } from 'react';
+import * as Popover from '@radix-ui/react-popover';
+import { Ellipsis } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Tip } from './Tip';
 
 /** Page header (plan T1): title + context chip, optional subtitle, then the page's own tabs go below it. */
 export function PageHeader({ title, subtitle, context, testid }: { title: string; subtitle?: string; context?: ReactNode; testid?: string }) {
@@ -22,5 +26,27 @@ export function Toolbar({ filters, activeFilters = 0, count, primary, tools, act
         {tools}
       </span>
     </div>
+  );
+}
+
+export type MoreItem = { id: string; label: string; icon?: ReactNode; onSelect: () => void; disabled?: boolean; testid: string };
+/** "More" overflow (plan T3): secondary tools live here; the primary action never does. Items keep their own data-testid. */
+export function MoreMenu({ items }: { items: MoreItem[] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Tip text={t('table.more')}>
+        <Popover.Trigger asChild><button type="button" className="btn" data-testid="more-menu" aria-label={t('table.more')}><Ellipsis size={16} /></button></Popover.Trigger>
+      </Tip>
+      <Popover.Portal>
+        <Popover.Content align="end" sideOffset={6} role="menu" className="card z-50 min-w-48 p-1 shadow-lg" data-testid="more-panel">
+          {items.map((i) => (
+            <button key={i.id} type="button" role="menuitem" disabled={i.disabled} data-testid={i.testid} className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-start text-sm hover:bg-hover disabled:opacity-50" onClick={() => { setOpen(false); i.onSelect(); }}>{i.icon}{i.label}</button>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
