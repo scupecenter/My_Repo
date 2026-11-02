@@ -66,20 +66,16 @@ describe('BU on B13 and EF on D15 are As-Built fields (Q99)', () => {
     // the task itself keeps no copy
     expect((await db.query(`SELECT values FROM task_instances WHERE site_id = $1`, [site.id])).rows[0].values ?? {}).not.toHaveProperty('cw_as_built_submitted');
 
-    // Entry -> Review -> Approve, then a new version is the only way to change it
+    // L1 Data Entry -> L2 Data Reviewer & Approver, then a new version is the only way to change it
     const sub = await post(editor.api, 'as_built', created.body.id, 'submit', upd.body.version);
     expect(sub.status).toBe(200);
     f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0]).toMatchObject({ editable: false, edit_via: 'none', source: { record_state: 'in_review' } });
+    expect(f[0]).toMatchObject({ editable: false, edit_via: 'none', source: { record_state: 'in_approval' } });
     const rejectedEdit = await patch(editor.api, 'as_built', created.body.id, sub.body.version, { data: { cw_as_built_submitted: 'N/A' } });
     expect(rejectedEdit.status).toBe(409);
-    let res = await post(t.review.api, 'as_built', created.body.id, 'review', sub.body.version);
+    await t.approve.api.stepUp(t.approve.user.password);
+    const res = await post(t.approve.api, 'as_built', created.body.id, 'approve', sub.body.version);
     expect(res.status).toBe(200);
-    for (let i = 0; i < 2 && res.body.state !== 'approved'; i++) {
-      await t.approve.api.stepUp(t.approve.user.password);
-      res = await post(t.approve.api, 'as_built', created.body.id, res.body.state === 'in_review' ? 'review' : 'approve', res.body.version);
-      expect(res.status).toBe(200);
-    }
     expect(res.body.state).toBe('approved');
     f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
     expect(f[0]).toMatchObject({ value: 'Yes', edit_via: 'new_version', source: { record_state: 'approved' } });

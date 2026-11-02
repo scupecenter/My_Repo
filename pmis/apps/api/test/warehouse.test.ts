@@ -78,9 +78,6 @@ async function prepare(): Promise<void> {
   await globalCell("entry", t.entry.user.id);
   await globalCell("review", t.review.user.id);
   await globalCell("approve", t.approve.user.id);
-  await db.query(
-    `UPDATE register_definitions SET approval_levels = 3 WHERE register_key = 'warehouse'`,
-  );
   // a region cell of another suite would win over the global cells above
   await db.query(
     `DELETE FROM matrix_cells WHERE register_key = 'warehouse' AND region_id = $1`,

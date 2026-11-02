@@ -18,9 +18,14 @@ export interface MatrixAssigneeDto {
   account_status?: 'active' | 'deactivated' | 'deleted';
 }
 
+/** L1 = Data Entry, L2 = Data Reviewer & Approver (owner decision 2026-11-01). The old middle level, still met on tasks submitted before migration 0032, is part of L2. */
+export type LevelCode = 'L1' | 'L2';
+export const levelCode = (kind: string): LevelCode => (kind === 'entry' ? 'L1' : 'L2');
+
 export interface BallInCourtDto {
   level: number;
   level_kind: 'entry' | 'review' | 'approve';
+  level_code: LevelCode;
   holders: MatrixAssigneeDto[];
   rule: 'any_one' | 'all_members';
   claimed_by?: UserRefDto;
@@ -283,6 +288,7 @@ export class TaskViewService {
         dto.ball_in_court = {
           level: Math.max(r.current_level, 1),
           level_kind: r.kind as BallInCourtDto['level_kind'],
+          level_code: levelCode(r.kind),
           holders: r.cell_id ? (byCell.get(r.cell_id) ?? []) : [],
           rule: (r.rule as BallInCourtDto['rule']) ?? 'any_one',
           no_eligible_holder: r.has_holder === false,

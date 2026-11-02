@@ -11,6 +11,7 @@ import { ProblemException, problems } from '../common/problem';
 import { TS_TEXT, boolParam, oneParam } from '../common/query';
 import { parse } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { setVia, viaSchema } from '../common/via';
 import { TaskViewService, UserRefDto, taskSelect } from './task-view.service';
 import { WorkflowService } from './workflow.service';
 
@@ -19,6 +20,7 @@ const bulkSchema = z
     action: z.enum(['pass', 'approve']),
     items: z.array(z.object({ id: z.string().uuid(), version: z.number().int().min(1) }).strict()).min(1).max(200),
     note: z.string().max(2000).optional(),
+    via: viaSchema.optional(), // DD6: 'bulk' unless a board drag of several cards says 'drag'
   })
   .strict();
 
@@ -131,6 +133,7 @@ export class ApprovalsService {
       const item: Record<string, unknown> = {
         task,
         level_kind: x?.kind === 'approve' ? 'approve' : 'review',
+        level_code: 'L2',
         waiting_since: x?.waiting_since ?? new Date(),
         will_self_skip: x?.will_self_skip ?? false,
         documents_summary: slotRows
@@ -169,6 +172,7 @@ export class ApprovalsService {
     const body = parse(bulkSchema, raw);
     await this.access.requireRegions('approvals', 'view');
     await this.stepUp.require(auth);
+    await setVia(this.db.tx, body.via ?? 'bulk');
     return this.idem.run(auth.user.id, 'bulkApprovals', idempotencyKey, body, async () => {
       const result: BulkResultDto = { bulk_action_id: randomUUID(), done: [], skipped: [], failed: [] };
       const seen = new Set<string>();

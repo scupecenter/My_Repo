@@ -11,7 +11,10 @@ import { ProblemException, problems } from '../common/problem';
 import { TS_TEXT, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
-import { MatrixAssigneeDto, TaskViewService, UserRefDto, accountStatus } from '../workflow/task-view.service';
+import { setVia, viaSchema } from '../common/via';
+import { resolveMentions } from '../common/mentions';
+import { WorkflowService } from '../workflow/workflow.service';
+import { MatrixAssigneeDto, TaskViewService, UserRefDto, accountStatus, levelCode } from '../workflow/task-view.service';
 
 export type RegisterTransition = 'submit' | 'review' | 'approve' | 'reject';
 
@@ -43,7 +46,8 @@ const patchSchema = z
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
-const noteSchema = z.object({ note: z.string().max(2000).optional() }).strict();
+const noteSchema = z.object({ note: z.string().max(2000).optional(), via: viaSchema.optional() }).strict();
+const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() }).strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
 
 interface RecordRow {
@@ -127,6 +131,7 @@ export class RegistersService {
     private readonly access: AccessService,
     private readonly stepUp: StepUpService,
     private readonly view: TaskViewService,
+    private readonly workflow: WorkflowService,
   ) {}
 
   // ------------------------------------------------------------------ catalogue
@@ -420,6 +425,7 @@ export class RegistersService {
         dto.ball_in_court = {
           level: Math.max(r.current_level, 1),
           level_kind: r.kind,
+          level_code: levelCode(r.kind),
           holders: r.cell_id ? (byCell.get(r.cell_id) ?? []) : [],
           rule: r.rule ?? 'any_one',
           no_eligible_holder: r.has_holder === false,
@@ -515,6 +521,7 @@ export class RegistersService {
       throw new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     }
     await this.rowFor(auth, key, id);
+    await setVia(this.db.tx, body.via);
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const info = await this.call<TransitionInfo>(
       auth,
@@ -540,5 +547,31 @@ export class RegistersService {
     await this.stepUp.require(auth);
     await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_void_record(${id}::uuid, ${version}::int, ${body.reason}::text)) v`);
     return this.get(auth, key, id);
+  }
+
+  // ------------------------------------------------------------------ comments (X3)
+  async comments(auth: AuthContext, key: string, id: string, q: Record<string, unknown>) {
+    const { row } = await this.rowFor(auth, key, id);
+    const limit = parseLimit(oneParam(q, 'limit'));
+    const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
+    const after = cursor ? Prisma.sql`AND (c.created_at, c.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
+    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; ts: string }[]>(Prisma.sql`
+      SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts
+      FROM comments c JOIN register_records r ON r.id = ${row.id}::uuid
+      WHERE c.entity_type = 'register_record' AND c.entity_id = r.entity_id ${after} ORDER BY c.created_at, c.id LIMIT ${limit + 1}`);
+    const page = rows.slice(0, limit);
+    const last = page[page.length - 1];
+    return { items: await this.workflow.commentDtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
+  }
+
+  async addComment(auth: AuthContext, key: string, id: string, rawBody: unknown) {
+    const body = parse(commentSchema, rawBody);
+    const { row } = await this.rowFor(auth, key, id);
+    const mentions = await resolveMentions(this.db.tx, body.body, body.mention_user_ids);
+    const cid = await this.call<string>(auth, Prisma.sql`SELECT reg_add_comment(${key}::text, ${row.id}::uuid, ${body.body}::text, ${mentions}::uuid[])::text AS r`);
+    const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]>(
+      Prisma.sql`SELECT id::text AS id, author_id::text AS author_id, body, is_rejection_note, created_at FROM comments WHERE id = ${cid}::uuid`);
+    const [dto] = await this.workflow.commentDtos(rows);
+    return dto;
   }
 }

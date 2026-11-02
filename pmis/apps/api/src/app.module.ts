@@ -12,6 +12,14 @@ import { AsBuiltItemsController, WarehouseController } from './warehouse/warehou
 import { WarehouseService } from './warehouse/warehouse.service';
 import { RegistersController } from './registers/registers.controller';
 import { RegistersService } from './registers/registers.service';
+import { FollowController } from './follow/follow.controller';
+import { FollowService } from './follow/follow.service';
+import { InsightsController } from './insights/insights.controller';
+import { InsightsService } from './insights/insights.service';
+import { NotificationsController } from './notifications/notifications.controller';
+import { NotificationsService } from './notifications/notifications.service';
+import { StatusUpdatesController } from './status-updates/status-updates.controller';
+import { StatusUpdatesService } from './status-updates/status-updates.service';
 import { SlaController } from './sla/sla.controller';
 import { SlaService } from './sla/sla.service';
 import { AuthController } from './auth/auth.controller';
@@ -65,6 +73,7 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -72,6 +81,7 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

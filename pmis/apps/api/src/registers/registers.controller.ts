@@ -105,4 +105,15 @@ export class RegistersController {
   async newVersion(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Res({ passthrough: true }) res: Response) {
     return this.tag(res, await this.registers.newVersion(auth, key, id, ifMatch));
   }
+
+  @Get(':key/records/:id/comments')
+  comments(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Query() q: Record<string, unknown>) {
+    return this.registers.comments(auth, key, id, q);
+  }
+
+  @Post(':key/records/:id/comments')
+  @HttpCode(201)
+  addComment(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Body() body: unknown) {
+    return this.registers.addComment(auth, key, id, body);
+  }
 }

@@ -27,10 +27,12 @@ interface Flow {
   taskId: string;
 }
 
-/** A task of the site in the given state with the holders of the three levels. */
-async function flow(code: string, holders: { entry: Actor[]; review: Actor[]; approve: Actor[] }, state = 'open', actualDate: string | null = '2026-01-05'): Promise<Flow> {
+/** A task of the site in the given state with the holders of the levels (L1 entry, L2 approve; review only for a 3-level snapshot). */
+async function flow(code: string, holders: { entry: Actor[]; review: Actor[]; approve: Actor[] }, state = 'open', actualDate: string | null = '2026-01-05', snapshot?: number): Promise<Flow> {
   const site = await makeSite(db, REGION);
   const taskId = await makeTask(db, site, code, state, { actualDate });
+  // a task submitted before migration 0032 carries a snapshot of 1 to 3 levels (B7); the engine reads exactly these marks
+  if (snapshot !== undefined) await db.query('UPDATE task_instances SET levels_required = $2, path_frozen_at = now() WHERE id = $1', [taskId, snapshot]);
   for (const kind of ['entry', 'review', 'approve'] as const) {
     await setCell(db, code, REGION, kind, { user: holders[kind].map((h) => h.user.id) });
   }
@@ -41,12 +43,66 @@ const get = async (a: Actor, id: string) => (await a.api.call('get', `/tasks/${i
 const act = (a: Actor, id: string, verb: string, version: number | string, body: unknown = {}) =>
   a.api.call('post', `/tasks/${id}/${verb}`, body, { 'If-Match': `"${version}"` });
 
-describe('three levels with three different people', () => {
+describe('two levels with two different people', () => {
+  it('start, submit and approve; approval needs step-up; the successors unlock; the audit rows carry via', async () => {
+    const e = await actor(app, db, { level: 'entry' });
+    const a = await actor(app, db, { level: 'approve', stepUp: false });
+    const f = await flow('A1', { entry: [e], review: [], approve: [a] });
+    const site = f.site;
+    const a2 = await makeTask(db, site, 'A2', 'locked');
+    await setCell(db, 'A2', REGION, 'entry', { user: [e.user.id] });
+    const a3 = await makeTask(db, site, 'A3', 'locked');
+    const a4 = await makeTask(db, site, 'A4', 'locked');
+
+    const t = await get(e, f.taskId);
+    expect(t.state).toBe('open');
+    expect(t.levels_required).toBe(2);
+    expect(t.ball_in_court).toMatchObject({ level_kind: 'entry', level_code: 'L1' });
+
+    let res = await act(e, f.taskId, 'start', t.version, { via: 'button' });
+    expect(res.status).toBe(200);
+    res = await act(e, f.taskId, 'submit', res.body.task.version, { note: 'ready', via: 'drag' });
+    expect(res.status).toBe(200);
+    expect(res.body.task.state).toBe('in_approval');
+    expect(res.body.task.current_level).toBe(2);
+    expect(res.body.task.levels_required).toBe(2);
+    expect(res.body.task.ball_in_court).toMatchObject({ level_kind: 'approve', level_code: 'L2' });
+    expect(res.body.task.approval_path.map((l: { level_code: string }) => l.level_code)).toEqual(['L1', 'L2']);
+    expect(res.body.skipped_levels).toEqual([]);
+
+    // there is no review step; the entry holder cannot approve
+    expect((await act(e, f.taskId, 'review', res.body.task.version)).status).toBe(409);
+    expect((await act(e, f.taskId, 'approve', res.body.task.version)).status).toBe(403);
+
+    const tVer = res.body.task.version;
+    const noStep = await act(a, f.taskId, 'approve', tVer);
+    expect(noStep.status).toBe(401);
+    expect(noStep.body.code).toBe('step_up_required');
+    expect((await a.api.stepUp(a.user.password)).status).toBe(200);
+    res = await act(a, f.taskId, 'approve', tVer, { via: 'bulk' });
+    expect(res.status).toBe(200);
+    expect(res.body.task.state).toBe('approved');
+    expect(res.body.unlocked_task_ids.sort()).toEqual([a2, a3].sort());
+    expect((await get(e, a4)).state).toBe('locked');
+    expect((await get(e, a4)).lock_reasons[0].ref_code).toBe('A2');
+
+    const hist = await e.api.call('get', `/tasks/${f.taskId}/history`);
+    expect(hist.body.items.map((x: { action: string }) => x.action)).toEqual(['start', 'submit', 'approve']);
+    const audit = await db.query(`SELECT action, after FROM audit_log WHERE entity_type = 'task' AND entity_id = $1 ORDER BY id`, [f.taskId]);
+    expect(audit.rows.map((x) => x.action)).toEqual(['task_start', 'task_submit', 'sla_negative_duration', 'task_approve']);
+    expect(audit.rows.filter((x) => x.action !== 'sla_negative_duration').map((x) => x.after.via)).toEqual(['button', 'drag', 'bulk']);
+    // the unlock of a successor is not a user action: it carries no via
+    const unlock = await db.query(`SELECT after FROM audit_log WHERE action = 'task_unlock' AND entity_id = $1`, [a2]);
+    expect(unlock.rows[0].after.via).toBeUndefined();
+  });
+});
+
+describe('a task submitted on a 3-level snapshot (before migration 0032) finishes on it', () => {
   it('start, submit, review and approve; approval needs step-up; the successors unlock', async () => {
     const e = await actor(app, db, { level: 'entry' });
     const r = await actor(app, db, { level: 'review' });
     const a = await actor(app, db, { level: 'approve', stepUp: false });
-    const f = await flow('A1', { entry: [e], review: [r], approve: [a] });
+    const f = await flow('A1', { entry: [e], review: [r], approve: [a] }, 'open', '2026-01-05', 3);
     const site = f.site;
     const a2 = await makeTask(db, site, 'A2', 'locked');
     await setCell(db, 'A2', REGION, 'entry', { user: [e.user.id] });
@@ -194,10 +250,10 @@ describe('three levels with three different people', () => {
 });
 
 describe('self-skip and self-approval (B5)', () => {
-  it('skips the review level when the submitter also holds it, logs the skip and goes to the approver', async () => {
+  it('skips the middle level of a 3-level snapshot when the submitter also holds it, logs the skip and goes to the approver', async () => {
     const p = await actor(app, db, { level: 'review' });
     const q = await actor(app, db, { level: 'approve' });
-    const f = await flow('A1', { entry: [p], review: [p], approve: [q] }, 'entry');
+    const f = await flow('A1', { entry: [p], review: [p], approve: [q] }, 'entry', '2026-01-05', 3);
     const t = await get(p, f.taskId);
     const submit = t.allowed_actions.find((x: { action: string }) => x.action === 'submit');
     expect(submit.will_skip_to).toBe(3);
@@ -218,9 +274,31 @@ describe('self-skip and self-approval (B5)', () => {
     expect(audit.rows[0].after.level).toBe(2);
   });
 
-  it('a person who holds every level approves with their submission: step-up, flagged as self-approval', async () => {
+  it('a person who holds L1 and L2 approves with their submission: step-up, flagged as self-approval', async () => {
     const p = await actor(app, db, { level: 'approve', stepUp: false });
-    const f = await flow('A1', { entry: [p], review: [p], approve: [p] }, 'entry');
+    const f = await flow('A1', { entry: [p], review: [], approve: [p] }, 'entry');
+    const t = await get(p, f.taskId);
+    expect(t.levels_required).toBe(2);
+    expect(t.allowed_actions.find((x: { action: string }) => x.action === 'submit')).toMatchObject({ final: true, step_up: true });
+    const blocked = await act(p, f.taskId, 'submit', t.version);
+    expect(blocked.status).toBe(401);
+    expect(blocked.body.code).toBe('step_up_required');
+    expect((await get(p, f.taskId)).state).toBe('entry'); // nothing happened
+    await p.api.stepUp(p.user.password);
+    const res = await act(p, f.taskId, 'submit', t.version);
+    expect(res.status).toBe(200);
+    expect(res.body.task.state).toBe('approved');
+    expect(res.body.skipped_levels).toEqual([2]);
+    const hist = await p.api.call('get', `/tasks/${f.taskId}/history`);
+    expect(hist.body.items.map((x: { action: string }) => x.action)).toEqual(['submit', 'auto_skip']);
+    expect(hist.body.items.every((x: { self_approval: boolean }) => x.self_approval)).toBe(true);
+    const audit = await db.query(`SELECT after FROM audit_log WHERE entity_id = $1 AND action = 'task_submit'`, [f.taskId]);
+    expect(audit.rows[0].after.self_approval_flag).toBe(true);
+  });
+
+  it('a person who holds every level of a 3-level snapshot approves with their submission: step-up, flagged as self-approval', async () => {
+    const p = await actor(app, db, { level: 'approve', stepUp: false });
+    const f = await flow('A1', { entry: [p], review: [p], approve: [p] }, 'entry', '2026-01-05', 3);
     const t = await get(p, f.taskId);
     const submit = t.allowed_actions.find((x: { action: string }) => x.action === 'submit');
     expect(submit).toMatchObject({ final: true, step_up: true });
@@ -246,10 +324,10 @@ describe('self-skip and self-approval (B5)', () => {
     expect(audit.rows[0].after.state).toBe('approved');
   });
 
-  it('the reviewer who also holds the approve level completes the task with the review: step-up, flagged', async () => {
+  it('the middle holder of a 3-level snapshot who also holds the approve level completes the task with the review: step-up, flagged', async () => {
     const e = await actor(app, db, { level: 'entry' });
     const p = await actor(app, db, { level: 'approve', stepUp: false });
-    const f = await flow('A1', { entry: [e], review: [p], approve: [p] }, 'in_review');
+    const f = await flow('A1', { entry: [e], review: [p], approve: [p] }, 'in_review', '2026-01-05', 3);
     const t = await get(p, f.taskId);
     expect(t.allowed_actions.find((x: { action: string }) => x.action === 'review')).toMatchObject({ final: true, step_up: true });
     const blocked = await act(p, f.taskId, 'review', t.version);
@@ -264,31 +342,63 @@ describe('self-skip and self-approval (B5)', () => {
     expect(hist.body.items.map((x: { action: string; self_approval: boolean }) => `${x.action}:${x.self_approval}`)).toEqual(['review:true', 'auto_skip:true']);
   });
 
-  it('a one-level task: the submission is the final approval and needs step-up', async () => {
+  it('a task submitted on a one-level snapshot: the submission is the final approval and needs step-up', async () => {
     const p = await actor(app, db, { level: 'approve' });
-    const f = await flow('A3', { entry: [p], review: [], approve: [] }, 'entry');
-    await db.query(`UPDATE task_definitions SET approval_levels = 1 WHERE code = 'A3' AND workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1)`);
-    try {
-      const t = await get(p, f.taskId);
-      expect(t.levels_required).toBe(1);
-      const res = await act(p, f.taskId, 'submit', t.version);
-      expect(res.status).toBe(200);
-      expect(res.body.task.state).toBe('approved');
-      expect(res.body.task.self_approval).toBeUndefined();
-      const row = await db.query('SELECT self_approval, levels_required FROM task_instances WHERE id = $1', [f.taskId]);
-      expect(row.rows[0]).toEqual({ self_approval: true, levels_required: 1 });
-    } finally {
-      await db.query(`UPDATE task_definitions SET approval_levels = NULL WHERE code = 'A3' AND workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1)`);
-    }
+    const f = await flow('A3', { entry: [p], review: [], approve: [] }, 'entry', '2026-01-05', 1);
+    const t = await get(p, f.taskId);
+    expect(t.levels_required).toBe(1);
+    const res = await act(p, f.taskId, 'submit', t.version);
+    expect(res.status).toBe(200);
+    expect(res.body.task.state).toBe('approved');
+    const row = await db.query('SELECT self_approval, levels_required FROM task_instances WHERE id = $1', [f.taskId]);
+    expect(row.rows[0]).toEqual({ self_approval: true, levels_required: 1 });
   });
 });
 
-describe('rejection one level back (B6)', () => {
-  it('needs a note, goes one level back to the person who acted, and keeps the note in the comment thread', async () => {
+describe('rejection back to L1 (B6)', () => {
+  it('needs a note, returns to L1 (the person who acted), and keeps the note in the comment thread', async () => {
+    const e = await actor(app, db, { level: 'entry' });
+    const a = await actor(app, db, { level: 'approve' });
+    const f = await flow('A1', { entry: [e], review: [], approve: [a] }, 'entry');
+    let t = await get(e, f.taskId);
+    t = (await act(e, f.taskId, 'submit', t.version)).body.task;
+    expect(t.state).toBe('in_approval');
+
+    const noNote = await act(a, f.taskId, 'reject', t.version, {});
+    expect(noNote.status).toBe(422);
+    expect(noNote.body.code).toBe('note_required');
+    expect((await act(a, f.taskId, 'reject', t.version, { note: '   ' })).status).toBe(422);
+    // the entry holder cannot reject at L2
+    expect((await act(e, f.taskId, 'reject', t.version, { note: 'x' })).status).toBe(403);
+
+    const rej = await act(a, f.taskId, 'reject', t.version, { note: 'date does not match the SAR', via: 'drag' });
+    expect(rej.status).toBe(200);
+    expect(rej.body.returned_to_level).toBe(1);
+    expect(rej.body.task.state).toBe('entry');
+    expect(rej.body.task.return_count).toBe(1);
+    expect(rej.body.task.last_return_note).toBe('date does not match the SAR');
+    expect(rej.body.task.ball_in_court.claimed_by.id).toBe(e.user.id);
+    // L1 cannot be rejected
+    expect((await act(e, f.taskId, 'reject', rej.body.task.version, { note: 'x' })).status).toBe(409);
+
+    const comments = await e.api.call('get', `/tasks/${f.taskId}/comments`);
+    expect(comments.body.items).toHaveLength(1);
+    expect(comments.body.items[0]).toMatchObject({ body: 'date does not match the SAR', is_rejection_note: true });
+    expect(comments.body.items[0].author.id).toBe(a.user.id);
+    const notif = await db.query(`SELECT user_id FROM notifications WHERE task_id = $1 AND kind = 'task_rejected' ORDER BY created_at`, [f.taskId]);
+    expect(notif.rows.map((n) => n.user_id)).toEqual([e.user.id]);
+    const audit = await db.query(`SELECT before, after, reason FROM audit_log WHERE entity_id = $1 AND action = 'task_reject' ORDER BY id`, [f.taskId]);
+    expect(audit.rows[0].before.state).toBe('in_approval');
+    expect(audit.rows[0].after.state).toBe('entry');
+    expect(audit.rows[0].after.via).toBe('drag');
+    expect(audit.rows[0].reason).toBe('date does not match the SAR');
+  });
+
+  it('a 3-level snapshot goes one level back at a time to the person who acted', async () => {
     const e = await actor(app, db, { level: 'entry' });
     const r = await actor(app, db, { level: 'review' });
     const a = await actor(app, db, { level: 'approve' });
-    const f = await flow('A1', { entry: [e], review: [r], approve: [a] }, 'entry');
+    const f = await flow('A1', { entry: [e], review: [r], approve: [a] }, 'entry', '2026-01-05', 3);
     let t = await get(e, f.taskId);
     t = (await act(e, f.taskId, 'submit', t.version)).body.task;
     t = (await act(r, f.taskId, 'review', t.version)).body.task;
@@ -329,11 +439,11 @@ describe('rejection one level back (B6)', () => {
     expect(audit.rows[0].reason).toBe('date does not match the SAR');
   });
 
-  it('after a skip the rejection returns to the person who actually acted, who resubmits; the skip is applied and logged again', async () => {
+  it('after a skip on a 3-level snapshot the rejection returns to the person who actually acted, who resubmits; the skip is applied and logged again', async () => {
     const p = await actor(app, db, { level: 'review' }); // holds entry and review
     const colleague = await actor(app, db, { level: 'entry' }); // also an entry holder, must not receive the task
     const q = await actor(app, db, { level: 'approve' });
-    const f = await flow('A1', { entry: [p, colleague], review: [p], approve: [q] }, 'entry');
+    const f = await flow('A1', { entry: [p, colleague], review: [p], approve: [q] }, 'entry', '2026-01-05', 3);
     let t = await get(p, f.taskId);
     let res = await act(p, f.taskId, 'submit', t.version);
     expect(res.body.skipped_levels).toEqual([2]);
@@ -367,62 +477,55 @@ describe('rejection one level back (B6)', () => {
 });
 
 describe('the level path is snapshotted at the first submission (B7)', () => {
-  it('a change of the number of levels reaches tasks not yet submitted, not the one in flight, also after a rejection', async () => {
+  it('the number of levels is fixed at 2 and cannot be set to 1 or 3; a task submitted on an older snapshot keeps it, also after a rejection', async () => {
     const e = await actor(app, db, { level: 'entry' });
-    const r = await actor(app, db, { level: 'review' });
+    const r = await actor(app, db, { level: 'approve' });
     const a = await actor(app, db, { level: 'approve' });
-    const f = await flow('A2', { entry: [e], review: [r], approve: [a] }, 'entry');
+    const f = await flow('A2', { entry: [e], review: [r], approve: [a] }, 'entry', '2026-01-05', 3); // submitted before migration 0032
     const g = await flow('A4', { entry: [e], review: [r], approve: [a] }, 'entry');
-    const set = (v: number | null) =>
-      db.query(`UPDATE task_definitions SET approval_levels = $1 WHERE code IN ('A2', 'A4') AND workflow_id = (SELECT id FROM workflow_definitions WHERE version = 1)`, [v]);
-    try {
-      let t = await get(e, f.taskId);
-      expect(t.levels_required).toBe(3);
-      t = (await act(e, f.taskId, 'submit', t.version)).body.task; // snapshot: 3 levels
-      expect(t.levels_required).toBe(3);
-
-      await set(2); // the admin changes the stage to two levels
-      const inFlight = await get(r, f.taskId);
-      expect(inFlight.levels_required).toBe(3);
-      expect(inFlight.approval_path).toHaveLength(3);
-      const notSubmitted = await get(e, g.taskId);
-      expect(notSubmitted.levels_required).toBe(2);
-      expect(notSubmitted.approval_path.map((l: { kind: string }) => l.kind)).toEqual(['entry', 'approve']);
-
-      // the task in flight still goes through review
-      t = (await act(r, f.taskId, 'review', inFlight.version)).body.task;
-      expect(t.state).toBe('in_approval');
-      // a rejection back to entry and a resubmission keep the snapshot
-      let rej = await act(a, f.taskId, 'reject', t.version, { note: 'again' });
-      rej = await act(r, f.taskId, 'reject', rej.body.task.version, { note: 'again please' });
-      expect(rej.body.task.state).toBe('entry');
-      const again = await act(e, f.taskId, 'submit', rej.body.task.version);
-      expect(again.body.task.state).toBe('in_review');
-      expect(again.body.task.levels_required).toBe(3);
-
-      // the not-yet-submitted task takes the new path: entry then approve, no review
-      const sub = await act(e, g.taskId, 'submit', notSubmitted.version);
-      expect(sub.body.task.state).toBe('in_approval');
-      expect(sub.body.task.levels_required).toBe(2);
-      expect((await act(r, g.taskId, 'review', sub.body.task.version)).status).toBe(409); // the approve level has no review
-    } finally {
-      await set(null);
+    for (const n of [1, 3]) {
+      await expect(db.query(`UPDATE task_definitions SET approval_levels = ${n} WHERE code IN ('A2', 'A4')`)).rejects.toThrow(/two_levels/);
     }
+
+    let t = await get(e, f.taskId);
+    expect(t.levels_required).toBe(3);
+    t = (await act(e, f.taskId, 'submit', t.version)).body.task;
+    expect(t.state).toBe('in_review');
+    expect(t.levels_required).toBe(3);
+    expect(t.approval_path).toHaveLength(3);
+    t = (await act(r, f.taskId, 'review', t.version)).body.task;
+    expect(t.state).toBe('in_approval');
+    // a rejection back to entry and a resubmission keep the snapshot
+    let rej = await act(a, f.taskId, 'reject', t.version, { note: 'again' });
+    rej = await act(r, f.taskId, 'reject', rej.body.task.version, { note: 'again please' });
+    expect(rej.body.task.state).toBe('entry');
+    const again = await act(e, f.taskId, 'submit', rej.body.task.version);
+    expect(again.body.task.state).toBe('in_review');
+    expect(again.body.task.levels_required).toBe(3);
+
+    // a task not yet submitted follows the fixed path: L1 then L2, no middle level
+    const notSubmitted = await get(e, g.taskId);
+    expect(notSubmitted.levels_required).toBe(2);
+    expect(notSubmitted.approval_path.map((l: { kind: string }) => l.kind)).toEqual(['entry', 'approve']);
+    const sub = await act(e, g.taskId, 'submit', notSubmitted.version);
+    expect(sub.body.task.state).toBe('in_approval');
+    expect(sub.body.task.levels_required).toBe(2);
+    expect((await act(r, g.taskId, 'review', sub.body.task.version)).status).toBe(409); // L2 has no middle step
   });
 });
 
 describe('a level with no eligible holder (B10)', () => {
   it('goes to the System Admins as "no holder" and is never skipped', async () => {
-    const p = await actor(app, db, { level: 'review' });
+    const p = await actor(app, db, { level: 'approve' });
     const admin = await plainAdmin(app, db);
-    // the approve cell names a user who cannot hold it (no assignment): nobody can act
+    // the L2 cell names a user who cannot hold it (no assignment): nobody can act
     const nobody = await actor(app, db, { level: 'view', regions: [1] });
-    const f = await flow('A1', { entry: [p], review: [p], approve: [nobody] }, 'entry');
+    const f = await flow('A1', { entry: [p], review: [], approve: [nobody] }, 'entry');
     let t = await get(p, f.taskId);
     const res = await act(p, f.taskId, 'submit', t.version);
     t = res.body.task;
-    // the review level was skipped (same person), the approve level has no holder: not skipped, waits
-    expect(res.body.skipped_levels).toEqual([2]);
+    // L2 has no holder: it is not skipped, the task waits
+    expect(res.body.skipped_levels).toEqual([]);
     expect(t.state).toBe('in_approval');
     expect(t.ball_in_court.no_eligible_holder).toBe(true);
 
@@ -515,13 +618,13 @@ describe('group levels', () => {
     expect(again.body.claimed_by).toMatchObject({ id: winner.user.id, display_name: winner.user.name });
   });
 
-  it('under "all members must approve" every member votes; one rejection rejects the task', async () => {
+  it('under "all members must approve" every member votes (a 3-level snapshot, middle level); one rejection rejects the task', async () => {
     const e = await actor(app, db, { level: 'entry' });
     const m1 = await actor(app, db, { level: 'review' });
     const m2 = await actor(app, db, { level: 'review' });
     const a = await actor(app, db, { level: 'approve' });
     const group = await groupWith(db, [m1.user.id, m2.user.id]);
-    const f = await flow('A1', { entry: [e], review: [], approve: [a] }, 'in_review');
+    const f = await flow('A1', { entry: [e], review: [], approve: [a] }, 'in_review', '2026-01-05', 3);
     await setCell(db, 'A1', REGION, 'review', { group: [group] }, 'all_members');
     // the level was opened before the cell existed in this fixture: open the round with its voters the way the engine does
     await db.query(`INSERT INTO task_level_voters (task_id, level, round, user_id) VALUES ($1, 2, 1, $2), ($1, 2, 1, $3)`, [f.taskId, m1.user.id, m2.user.id]);
@@ -546,7 +649,7 @@ describe('group levels', () => {
     expect(v2.body.task.state).toBe('in_approval');
 
     // one rejection from a member rejects (new task)
-    const g = await flow('A1', { entry: [e], review: [], approve: [a] }, 'in_review');
+    const g = await flow('A1', { entry: [e], review: [], approve: [a] }, 'in_review', '2026-01-05', 3);
     await setCell(db, 'A1', REGION, 'review', { group: [group] }, 'all_members');
     await db.query(`INSERT INTO task_level_voters (task_id, level, round, user_id) VALUES ($1, 2, 1, $2), ($1, 2, 1, $3)`, [g.taskId, m1.user.id, m2.user.id]);
     t = await get(m2, g.taskId);

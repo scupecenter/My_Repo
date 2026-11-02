@@ -17,3 +17,6 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON holidays, work_calendars, sla_rules, 
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON site_gate_state FROM pmis_app;  -- 0018: written only by calc_gate_watch (the calculation layer, owner pmis_definer)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON matrix_cells, matrix_cell_assignees, matrix_state FROM pmis_app;  -- 0020: the Responsibility Matrix is written only through matrix_save (audited, with a reason, If-Match)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON wh_movements, wh_movement_lines, warehouse_item_need_rules, warehouse_items, warehouse_serials, warehouse_site_qty, as_built_items FROM pmis_app;  -- 0026, 0027: warehouse and As-Built items only through admin_save_* and wh_* / reg_* functions
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON notifications FROM pmis_app;  -- 0031: rows are created only by the definer functions; the owner of a row changes only read_at and snoozed_until (RLS limits them to their own rows)
+GRANT UPDATE (read_at, snoozed_until) ON notifications TO pmis_app;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON watches, status_updates FROM pmis_app;  -- 0031: only through x_follow, x_unfollow, x_status_post and x_status_edit

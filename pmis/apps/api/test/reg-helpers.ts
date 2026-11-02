@@ -75,12 +75,10 @@ export async function createRec(t: Team, data: Record<string, unknown>, extra: R
   return res.body as Record<string, any>;
 }
 
-/** Submits, reviews and approves a record through the team's three holders (3 levels). Returns the final body. */
+/** Submits and approves a record through the team's holders of L1 (Data Entry) and L2 (Data Reviewer & Approver). Returns the final body. */
 export async function approveAll(t: Team, id: string, version: number): Promise<Record<string, any>> {
   let res = await post(t.entry.api, t.key, id, 'submit', version);
   if (res.status !== 200) throw new Error(`submit failed: ${res.status} ${JSON.stringify(res.body)}`);
-  res = await post(t.review.api, t.key, id, 'review', res.body.version);
-  if (res.status !== 200) throw new Error(`review failed: ${res.status} ${JSON.stringify(res.body)}`);
   await t.approve.api.stepUp(t.approve.user.password);
   res = await post(t.approve.api, t.key, id, 'approve', res.body.version);
   if (res.status !== 200) throw new Error(`approve failed: ${res.status} ${JSON.stringify(res.body)}`);
