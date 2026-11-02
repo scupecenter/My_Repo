@@ -129,3 +129,24 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | C3 (HLC request) | Closed by the approved Procurement record of scope HLC, on the **HLC approval date**. The C-3 SLA measures PR issue → HLC approval. |
 | C4 (fiber done) | Closed on the **in-service (operation) date** of the HLC record (replaces "TX Link Tested" of Q54 for HLC). The test date must not be before installation, and operation not before the test. |
 | GECOL | Unchanged (Q56: the GECOL team enters its request in the GECOL register; C1/C2 per Q91/Q54). |
+
+## Dashboard, documents and open items (Q118–Q134 and two earlier questions), answered 2026-11-02
+
+| Q | Answer |
+|---|---|
+| Three-level paths → L1/L2 | **The old final approver becomes L2** (the old review level is dropped) when an older 3-level path is converted. |
+| Who enters permits (L1) | **Each stream's team:** CW permits by the CW team, TE permits by the TE team (L2 = that stream's Team Lead, Q90). |
+| Q118 | Central Project Status items get a **manual percentage** entered by the Project Manager (with date and reason, audited) and count in the headline figure by their weight. |
+| Q119 | The current item-to-task mapping (4.1, 4.3, 4.5 → B11; one unit per task for per-system items) is **confirmed**. |
+| Q120 | Plan basis: 1.1 against **MS1**, 7.1–7.5 against **MS7**. |
+| Q121 | Health index factors D (approved mandatory documents) and I (open hold points and NCRs flagged blocking) are **approved**; the "draft" label is removed. |
+| Q122 | **Build attribution periods** (from, to, party) on a task, entered by the reviewer; suspension periods are subtracted from the delay. |
+| Q123 | Final Closure base = sites with HOTO; FAC age from the DLP end. **Confirmed.** |
+| Q124 | Issue age buckets 0–7, 8–15, 16–30, >30 working days; only approved issue versions count. **Confirmed.** |
+| Q125 / Q126 | SLA classes as built (last working day on or before the reference date) **confirmed**; add a **view filter** (CW / TE / O&M) beside the stream filter. |
+| Q127 | Export as **Excel**; the weekly snapshot every **Sunday**; plus a **month-end** snapshot on the last day of each month. |
+| Q128 | The 39 draft documents of stages 4–10 are sent to the owner as a list to mark (task, mandatory, format, issuer) before they are published. |
+| Q129 | Documents stay on the real task codes (STA/ST report on B5; the others on B6–B9); CLAUDE.md is corrected to match. **Confirmed.** |
+| Q130 | Add a yes/no site field **near_airport** (Site Register), and B1 reads the delivery type from the Procurement register, so both conditional documents appear by themselves. |
+| Q131 / Q132 | Build document slots for register records and QC snag photos **now**; the snag photo date check allows **one day** of tolerance (EXIF has no time zone). |
+| Q133 / Q134 | The draft file name `SITE_TASK_DOC_DRAFT-<upload date>.ext` is **confirmed**; build the storage protection: encryption at rest, virus scan (ClamAV), automatic clean-up of expired zip files and a backup of stored files. |
