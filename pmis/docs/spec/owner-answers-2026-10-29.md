@@ -102,3 +102,19 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q80 | **Owner decision:** the SLA of B-15 (CW FAC) and B06 starts from the DLP end counted as in the Master, PAC date + 90 calendar days (for CW). This applies to these SLA start events only; the printed DLP and `dlp.months.cw` stay 3 months (Q27). |
 | Q83 | Default: holidays and weekend days are changed by a System Admin or a delegate holding `calendars.edit` for all regions. |
 | Q84 | Default: build a daily job (also run at start-up) that applies future-dated SLA versions and sends the 14-day reminder for tentative holidays. |
+
+## Register questions (Q85–Q97), answered 2026-11-02
+
+| Q | Answer |
+|---|---|
+| Q85 | Default: matrix rows of the other registers and Dismantle (two levels): L1 Data Entry = the owning team (Project Support, Inventory Supervisor, Site Engineers, HOTO Engineer, RF / Acquisition roles); L2 Reviewer & Approver = the Team Lead of the stream (CW, TE, or RF & Design / Acquisition); Contractors, Risks and Deliverables are approved by the Project Manager. All editable in the Matrix screen. |
+| Q86 | Default: a region or task override of a matrix cell can be deleted (reason, step-up, audit); the row default then applies again. |
+| Q90 | Default: L2 Reviewer & Approver of Procurement, GECOL, HLC and the CW permits = the CW Team Lead; TE permits = the TE Team Lead. |
+| Q91 | **Owner decision (differs from the default):** an approved GECOL request closes C1 and an approved HLC request closes C3 (with the request date), like C2 and C4, so the date is entered once. |
+| Q92 | Default: submitting a record whose source task is still locked is refused (409 with the task code) until the task opens; the draft is kept. |
+| Q93 | Default: the first record of the site that is submitted while the task is open (and no other record is in review) is the source; the others are ordinary register records. |
+| Q94 | Default: only a draft or in-review record can be voided; an approved record is corrected by a new version that goes through approval. |
+| Q95 | Default: ProcStatus, FiberStatus and the PTW checks stay free text until the owner fixes the values in Settings (register field options). |
+| Q96 | Default: only the two date rules block (C-2 not negative; TX link test not before installation); the rest of the GECOL / HLC order shows as a warning to the reviewer. |
+| Q97 | Default: Procurement checks that the contractor team's specialization matches the order scope, through a match table in Settings (editable by the admin); a mismatch is refused. |
+| Gate lock exempt list | **Owner decision:** add D1 (TE access permission), the DLP / FAC tasks B14, B15 and D18, and the dismantle tasks E2 and E3 to `calc.gate_lock_exempt_tasks`, beside C1–C4. (The owner also ticked "nothing"; read as adding the three groups, to be confirmed if wrong.) |
