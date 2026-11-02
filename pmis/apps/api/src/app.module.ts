@@ -43,6 +43,11 @@ import { APP_CONFIG, AppConfig } from './config/config';
 import { DbService } from './db/db.service';
 import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
+import { DashboardController } from './dashboard/dashboard.controller';
+import { DashboardService } from './dashboard/dashboard.service';
+import { ProjectStatusService } from './dashboard/project-status.service';
+import { WeightsController } from './dashboard/weights.controller';
+import { WeightsService } from './dashboard/weights.service';
 import { DelegationsController } from './delegations/delegations.controller';
 import { DelegationsService } from './delegations/delegations.service';
 import { DepartmentsController } from './departments/departments.controller';
@@ -79,6 +84,7 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController,
+      DashboardController, WeightsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -87,6 +93,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor,
+      DashboardService, ProjectStatusService, WeightsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

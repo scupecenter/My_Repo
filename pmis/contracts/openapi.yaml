@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.7.1
+  version: 0.7.2
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.7.2 (2026-11-02): additive. The main dashboard (owner request 2026-11-02, Q34 to Q36, `docs/spec/dashboard-kpis.md`). (1) `GET /dashboard`: one call for the headline KPIs (sites by Overall Status, milestones reached against the baseline, on-air, the Final Closure KPI, Project Status), the pipeline, the streams with Dismantle, SLA per stage and the top late tasks, blocked gates with reasons, issues per owner and age (issues counted, sites for "sites with an open issue"), the health index (draft, bands from the setting `dashboard.health_bands`), delay attribution (draft) and a region breakdown; filters `region_id`, `cluster_code`, `scenario`, `stream` and the reference date `ref_date` (default today; a past date is read from the weekly snapshot of that date when one exists, otherwise computed from dated facts, and `basis.source` says which); every figure is limited to the caller's `dashboard.view` regions (B3, VI-04). (2) `GET /dashboard/export`: the current view as CSV (`dashboard.export`, audited). (3) The five `/dashboard/*` reads of 0.1 (`milestone-pipeline`, `by-region`, `delay-attribution`, `health-index`, `final-closure`) are superseded by `GET /dashboard` and are marked deprecated; they are not built. (4) Built: `GET /project-status` and `/project-status/snapshots` (now also `planned_pct`, `spi`, `plan_coverage_pct`, `central_items_hidden`, `sites_in_scope`, item-level `measured`/`reason`; `rows[].planned_pct`; snapshots carry `planned_pct`, `spi`, `health_index`), and the weight-set endpoints of 0.2.6 (`/settings/weight-sets`, `.../{set_id}`, `.../preview`, `.../publish`; they need `weights.edit`, reads need the Settings screen). `WeightItem.measure_rule` now has a grammar (a JSON object as text). Weekly snapshots are taken by the daily job (`dashboard.snapshot_every_days`, default 7) and kept as saved.
     - 0.7.1 (2026-11-02): review fixes for UI plan 4b (X1 to X7), migration 0036. (1) Inbox (X1): a notification that points at a task or a register record is shown only while the caller can still read that module in that region (a region or a module taken away later hides it, its count and its title; `POST .../read`, `.../unread`, `.../snooze` on a hidden one answer 404, `read-all` leaves it alone); `GET /notifications` answers 422 for an unknown `kind` and 400 for a cursor that is not ours. (2) Mentions and followers (X3, X2): one rule, a person is mentioned or notified only if their own grant grid gives `view` on the module for the item's region now (assignment or delegation, account active); a duplicate mention makes one notification and the audit row lists only the people actually mentioned. `GET/POST /tasks/{task_id}/comments`, `GET/POST /registers/{register_key}/records/{record_id}/comments`, `GET /status-updates` answer 400 for a forged cursor. (3) Follow (X2): `DELETE /sites/{site_id}/follow` and `DELETE /registers/{register_key}/records/{record_id}/follow` need only a session (they remove the caller's own follow, also one the caller can no longer read), so they no longer answer 403. (4) Status updates (X7): `PATCH /status-updates/{update_id}` asks for the lead right again (403 `action_forbidden` for an author who is no longer a lead of the region); a `week_start` or report date that is not a real calendar day is 422. (5) `Me.effective.nav` gains `inbox` (every active user), `status_updates` (with `sites`) and `workload` (with `sites` and `reports`). No endpoint was added or removed.
     - 0.7.0 (2026-11-02): additive. Approved-template entry for the registers (CLAUDE.md "Approved templates only", "Two entry ways everywhere"; migration 0037). (1) `GET /templates` lists one template per register (`TPL-PO`, `TPL-GECOL`, `TPL-HLC`, `TPL-PRM` and the other registers) that the caller may use; a template version is issued by the database whenever the fields or the custom fields of its register change, and `Template` gains `register_key` and `stream`. (2) `GET /templates/{template_id}/download` builds the xlsx: locked headers in Master order, drop-downs for list fields, a very-hidden `_tpl` sheet (template_id, version, register_key, header checksum, issuer and time), a visible instructions sheet; new query parameters `prefill` and `region_id` (a pre-filled copy holds the records in force inside the caller's regions, with a `Record ID` column); every download is audited. (3) `POST /import-batches` now reads the file (multipart, size limit, `.xlsx` only, no macros, no formulas) and stages it in the database: each row is matched to a record by `Record ID` or by the register's natural key and classified `create`, `update`, `unchanged` or `error` with the reasons per cell (`ImportRow.errors[].column` is the header of the column, `field` its code), against the same rules as manual entry. A file without a valid `_tpl`, of a retired version, with a changed header row, with macros or too large answers 422 `template_rejected` with `reason` (new values `not_xlsx`, `macros_not_allowed`, `tpl_invalid`) or 413, writes a System Log row (source `template-check`) and creates no batch. (4) The batch is an entry into the normal flow, not a shortcut: `POST /import-batches/{batch_id}/submit` (the uploader) creates every valid row as a register record and submits it (L1 Data Entry), so the record waits for L2 Data Reviewer & Approver of its Matrix row; `POST /import-batches/{batch_id}/decisions` approves rows one by one or all at once, returns rows to the uploader with a note (the record goes back to L1), or discards a batch that was not sent (`action` gains `discard`). A row whose logical record still has an open version is held `pending_previous_approval`; "approve all" never touches held rows and lists them in `outcome.held`. Both calls answer the batch plus `outcome`. `ImportBatch` gains `register_key`, `note`, `counts.held` and the status `discarded`; `ImportRow` gains `site_code`, `record_type`, `record_id` (the register record created for the row) and `hold_reason`. The audit rows and the record history show "via batch". `GET /import-batches` accepts `register_key`. Not built yet: `POST /import-batches/{batch_id}/undo`, the stream templates (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`, Q73) and `TPL-MASTER`; the catalogue, the version rule and the batch tables are ready for them.
     - 0.6.1 (2026-11-02): breaking only for the level count, which no client may set any more. Two fixed approval levels (owner decision 2026-11-01, CLAUDE.md "Two approval levels", migration 0032): **L1 = Data Entry** and **L2 = Data Reviewer & Approver**, for every stage, register and Dismantle; one person may hold both (a self-approval, B5). (1) `GET /matrix`: `approval_levels` is always 2 and `used_levels` is always `[1, 3]` (L1 is cell level 1, L2 is cell level 3; cell level 2 is a leftover kept only for tasks and records already submitted on a 3-level snapshot, `used = false`); `MatrixCell.level_code` (`L1` or `L2`); `MatrixSkipCase.from_level_code` and `skipped_level_codes`; `MatrixPreview.single_level` is always false. (2) `PATCH /matrix`: `stage_levels[].approval_levels` accepts only 2 (any other value is 422 `validation_failed`, path `/stage_levels/{i}/approval_levels`); saving 2 is a no-op that writes nothing. (3) `RegisterDefinition.approval_levels` and `TaskDefinition.approval_levels` are 2 (or null for a task); `levels_required` of a task or record is 2 for everything submitted since the migration and 1 to 3 only on an older snapshot (B7). (4) The permission level `review` is folded into `approve` (= L2): it is still accepted on input and is stored and returned as `approve`; `entry` is L1; naming one person at both L1 and L2 is how a person is granted both levels. `PATCH /matrix` `empty_cell` now lists only L1 and L2 cells. (5) New `DELETE /matrix/cells/{cell_id}` (owner answer Q86): deletes a region or task override cell (step-up, `If-Match`, `reason` query parameter, audited; a row default is refused with `row_default`); the row default applies again. (6) Default holders (owner answers Q85 and Q90, migration 0035): L1 = the owning team, L2 = the stream Team Lead (Contractors, Risks and Deliverables: the Project Manager; Procurement, GECOL, HLC and Permits & HSE: the Team Lead of CW, and TE for TE permits), seeded only where the cell is missing or empty, or still the untouched legacy seed.
@@ -3485,7 +3486,7 @@ paths:
       operationId: updateSlaRuleSetDraft
       summary: Change rules in the draft
       description: |
-        Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+        Only for `status = draft` (else 409 `invalid_transition`). Needs `weights.edit`. `If-Match` is the ETag of the draft (a hash of its activities). A light change (B9): allowed during the structural freeze.
         Each item of `rules` replaces the whole rule of its `task_code` (the base min and max, the start event, the calendar and all its overrides). Tasks not listed keep the rule copied from the version in force.
         **Validation (422 `validation_failed`, closed schema, `errors[].path` is a JSON pointer into the body):** `min_working_days` must not exceed `max_working_days`, in the base rule and in every override (`code` = `min_exceeds_max`, path of `max_working_days`); `unknown_task_code`; `unknown_start_event`; `unknown_calendar`; `duplicate_task_code`; `duplicate_override` (same scenario and region twice).
         Rule found for a task: most specific override wins (scenario and region, then region, then scenario, then the base rule).
@@ -3550,7 +3551,7 @@ paths:
       operationId: publishSlaRuleSet
       summary: Publish the draft as a new SLA version
       description: |
-        Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+        Needs `weights.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
         Tasks opened on or after `effective_date` use the new version. **A task keeps the SLA version in force when it opened**, so past KPIs and closed tasks never change. Only when `apply_to_open_tasks` is true are the SLA rule and due date of the open (not approved) tasks switched to the new version, by a `sla_recalculation` job that runs at once when `effective_date` is today and on that date otherwise; the start date of each task is not changed.
         A regional delegate can apply it only to open tasks in their delegated regions (403 `action_forbidden` otherwise).
         **Validation (422 `validation_failed`):** the same as the draft; `effective_date_in_past` (path `/effective_date`, earlier than today in Africa/Tripoli); `effective_date_not_after_current` (not later than the `effective_from` of the latest published version); a draft equal to the version in force is `no_changes`.
@@ -3599,12 +3600,13 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/WeightSet' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [settings]
       operationId: createWeightSetDraft
       summary: Create a draft weight set (a copy of the set in force, or of an older one)
       description: |
-        Needs the `settings` permission or a delegation of it (`settings.edit`). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
+        Needs `weights.edit` (the System Admin or a delegation of it; the Settings screen reads). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
         `base_set_id` copies another set of the same `code` (for example an older set to go back to it); omitted means the set in force.
       x-db-path: admin_save_weight_set
       requestBody:
@@ -3687,7 +3689,7 @@ paths:
       operationId: previewWeightSetPublish
       summary: Check the 100% rule and show the effect of the draft on current progress
       description: |
-        Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `settings.edit`.
+        Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `weights.edit`.
         `progress_current_pct` is the project progress with the set in force and `progress_new_pct` with the draft. Saved weekly snapshots are not part of the preview and never change.
       parameters:
         - $ref: '#/components/parameters/WeightSetId'
@@ -3710,10 +3712,10 @@ paths:
         Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
         **100% rule, per level (422 `validation_failed`):** the activity weights of the set must total 100, and the items of every activity that has items must total 100 (tolerance 0.001). Each level that fails gives one `errors[]` entry with `code` = `weights_must_total_100`, `path` = `/activities` for the set level or `/activities/<index>/items` for the items of one activity, and the actual total in `message`.
         Other 422 codes in `errors[].code`: `effective_date_in_past` (earlier than today in Africa/Tripoli), `effective_date_not_after_current` (not later than the `effective_from` of the latest published set of the same `code`), `no_changes`.
-        The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Current progress is recalculated with the new set by a `progress_recalculation` job (at once when the date is today, otherwise on that date). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
+        The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Progress is computed on every read with the set in force on the date, so there is nothing to recalculate (`recalculation_job_id` is null). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
         Audited with before and after values, the effective date and the reason.
       x-step-up: true
-      x-db-path: admin_publish_weight_set (app_actor_is_admin('settings.edit'))
+      x-db-path: admin_publish_weight_set (app_actor_is_admin('weights.edit'))
       parameters:
         - $ref: '#/components/parameters/WeightSetId'
         - $ref: '#/components/parameters/IfMatch'
@@ -7324,6 +7326,8 @@ paths:
     get:
       tags: [dashboard]
       operationId: getMilestonePipeline
+      deprecated: true
+      description: 'Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller''s regions with more detail. Not built.'
       summary: Milestone pipeline (counts per milestone, active workflow version per site)
       parameters:
       - name: region_id
@@ -7349,6 +7353,8 @@ paths:
     get:
       tags: [dashboard]
       operationId: getKpiByRegion
+      deprecated: true
+      description: 'Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller''s regions with more detail. Not built.'
       summary: Progress by region
       parameters:
       - name: scenario
@@ -7371,6 +7377,8 @@ paths:
     get:
       tags: [dashboard]
       operationId: getDelayAttribution
+      deprecated: true
+      description: 'Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller''s regions with more detail. Not built.'
       summary: Delay attribution by responsible party (weight set `delay_attribution`)
       parameters:
       - name: region_id
@@ -7396,6 +7404,8 @@ paths:
     get:
       tags: [dashboard]
       operationId: getHealthIndex
+      deprecated: true
+      description: 'Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller''s regions with more detail. Not built.'
       summary: Project health index (weight set `health_index`)
       parameters:
       - name: region_id
@@ -7421,6 +7431,8 @@ paths:
     get:
       tags: [dashboard]
       operationId: getFinalClosureKpi
+      deprecated: true
+      description: 'Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller''s regions with more detail. Not built.'
       summary: 'Final Closure KPI: sites closed, % closed, pending CW FAC and TE FAC with age'
       parameters:
       - name: region_id
@@ -7442,6 +7454,74 @@ paths:
               schema: {$ref: '#/components/schemas/FinalClosureKpi'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard:
+    get:
+      tags: [dashboard]
+      operationId: getDashboard
+      summary: The main dashboard, limited to the caller's regions and modules (0.7.2)
+      description: |
+        One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
+        Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
+        **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
+        **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Delay attribution** (rules.md section 8) is a draft too and has no attribution periods yet. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
+        **Streams** are the stream codes of the workflow plus `DISMANTLE` (Q41). The `stream` filter keeps the sites the stream applies to (for `DISMANTLE` the sites with a Dismantle part) and limits the pipeline and the SLA to its stages.
+      parameters:
+      - name: ref_date
+        in: query
+        schema: {type: string, format: date}
+        description: Reference date, today or earlier. Default today (Africa/Tripoli).
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+        description: One region. A region outside the caller's regions gives an empty view, not the other region.
+      - name: cluster_code
+        in: query
+        schema: {type: string, minLength: 1, maxLength: 40}
+      - name: scenario
+        in: query
+        schema: {$ref: '#/components/schemas/DeliveryScenario'}
+      - name: stream
+        in: query
+        schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
+        description: A stream code from `filters.streams`. An unknown one is 422 `unknown_stream`.
+      - name: exclude_overrides
+        in: query
+        schema: {type: boolean}
+        description: Leave out tasks closed by an admin override. Default is the setting `dashboard.exclude_overrides` (true). The number left out is `meta.override_flagged_count`.
+      responses:
+        '200':
+          description: The dashboard.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Dashboard'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /dashboard/export:
+    get:
+      tags: [dashboard]
+      operationId: exportDashboard
+      summary: Export exactly the current dashboard view as a CSV file (0.7.2)
+      description: |
+        Same query as `GET /dashboard`. The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+      parameters:
+      - {name: ref_date, in: query, schema: {type: string, format: date}}
+      - {name: region_id, in: query, schema: {$ref: '#/components/schemas/RegionId'}}
+      - {name: cluster_code, in: query, schema: {type: string, minLength: 1, maxLength: 40}}
+      - {name: scenario, in: query, schema: {$ref: '#/components/schemas/DeliveryScenario'}}
+      - {name: stream, in: query, schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}}
+      - {name: exclude_overrides, in: query, schema: {type: boolean}}
+      responses:
+        '200':
+          description: The file `GSDN_Dashboard_<ref_date>.csv`.
+          headers:
+            Content-Disposition: {schema: {type: string}}
+          content:
+            text/csv:
+              schema: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /project-status:
     get:
       tags: [project-status]
@@ -9469,7 +9549,7 @@ components:
         name_ar: { type: [string, 'null'], maxLength: 200 }
         weight: { type: number, minimum: 0, maximum: 100, description: 'Percent inside the activity, at most 3 decimals. 0 means not weighted.' }
         unit: { type: [string, 'null'], maxLength: 40 }
-        measure_rule: { type: [string, 'null'], maxLength: 500, description: 'How the item is measured (method and source columns).' }
+        measure_rule: { type: [string, 'null'], maxLength: 500, description: 'How the item is measured, as a JSON object in text (0.7.2): `{"method":"tasks","tasks":["A2"],"plan":"MS1"}` counts the approved and the applicable instances of those task codes (a milestone task has the code of its milestone, MS1 to MS10) and plans against the baseline of the milestone `plan`; `{"method":"none","central":true}` is a project-wide item with no data in the PMIS yet: it is left out and its weight redistributed. Any other text is kept and measures nothing.' }
         source: { type: [string, 'null'], maxLength: 200 }
     WeightActivityInput:
       type: object
@@ -11394,6 +11474,7 @@ components:
         name_ar: { type: [string, 'null'] }
         weight: { type: number }
         progress_pct: { type: number }
+        measured: { type: boolean, description: 'False when no item of the activity could be measured: the activity is left out and its weight redistributed (0.7.2).' }
         items:
           type: array
           items:
@@ -11402,8 +11483,14 @@ components:
             properties:
               code: { type: string }
               name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
               weight: { type: number }
+              unit: { type: [string, 'null'] }
               progress_pct: { type: number }
+              measured: { type: boolean, description: 'False when the item is left out of the figure; see `reason` (0.7.2).' }
+              done: { type: integer }
+              applicable: { type: integer }
+              reason: { type: [string, 'null'], enum: [not_weighted, no_data, central_hidden, not_applicable, null] }
     ProjectStatus:
       description: Ends at HOTO. Final Closure has its own KPI.
       type: object
@@ -11419,6 +11506,11 @@ components:
             site_id: { type: string, format: uuid }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
         progress_pct: { type: number }
+        planned_pct: { type: [number, 'null'], description: '0.7.2. Null ("not available") until every measured item has a baseline for all its units.' }
+        spi: { type: [number, 'null'], description: '0.7.2. Actual divided by planned.' }
+        plan_coverage_pct: { type: number, description: '0.7.2. Share of the weight whose plan dates are complete.' }
+        central_items_hidden: { type: integer, description: '0.7.2. Project-wide items left out because the scope is below the whole project (VI-04).' }
+        sites_in_scope: { type: integer, description: '0.7.2. Active sites behind the figure.' }
         activities: { type: array, items: { $ref: '#/components/schemas/ProjectStatusActivity' } }
         rows:
           type: array
@@ -11430,6 +11522,7 @@ components:
               key: { type: string }
               label: { type: string }
               progress_pct: { type: number }
+              planned_pct: { type: [number, 'null'] }
               activities: { type: object, additionalProperties: { type: number }, description: 'Activity code to progress %.' }
     ProjectStatusSnapshot:
       type: object
@@ -11440,4 +11533,419 @@ components:
         scope: { type: string, enum: [project, region] }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
         progress_pct: { type: number, description: 'Value computed at the time; never recomputed.' }
+        planned_pct: { type: [number, 'null'], description: '0.7.2.' }
+        spi: { type: [number, 'null'], description: '0.7.2.' }
+        health_index: { type: [number, 'null'], description: '0.7.2. The health index of the scope at the time (draft formula).' }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
+    # ---------------------------------------------------------- main dashboard (0.7.2)
+    DashboardBasis:
+      type: object
+      required: [ref_date, today, source]
+      properties:
+        ref_date: {type: string, format: date}
+        today: {type: string, format: date}
+        source: {type: string, enum: [live, snapshot, as_of_computed]}
+        snapshot_date: {type: [string, 'null'], format: date, description: 'The snapshot read when `source` is `snapshot`.'}
+        snapshot_dates: {type: array, items: {type: string, format: date}, description: 'Dates that have a weekly snapshot (the latest 60), for the date picker.'}
+        note: {type: [string, 'null'], description: 'English sentence that says how a past date was made. Null for today.'}
+    DashboardMeta:
+      allOf:
+      - {$ref: '#/components/schemas/KpiMeta'}
+      - type: object
+        properties:
+          project_wide: {type: boolean, description: 'True when the figures are for every site of the project (every region, no filter).'}
+          central_items_hidden: {type: integer, description: 'Project Status items left out because the figures are not project-wide (VI-04).'}
+          scope_regions: {type: [array, 'null'], items: {$ref: '#/components/schemas/RegionId'}, description: 'The caller''s dashboard regions; null = every region.'}
+          health_draft: {type: boolean}
+    DashboardFilters:
+      type: object
+      required: [regions, clusters, scenarios, streams]
+      properties:
+        regions:
+          type: array
+          items:
+            type: object
+            required: [id, name_en]
+            properties:
+              id: {$ref: '#/components/schemas/RegionId'}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+        clusters: {type: array, items: {type: string}}
+        scenarios: {type: array, items: {$ref: '#/components/schemas/DeliveryScenario'}}
+        streams:
+          type: array
+          items:
+            type: object
+            required: [code, name_en]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+    DashboardMilestone:
+      description: One milestone of the pipeline for the reference date. Sites for which the milestone does not apply are counted in `not_applicable` only.
+      allOf:
+      - {$ref: '#/components/schemas/MilestonePipelineNode'}
+      - type: object
+        properties:
+          stream_code: {type: [string, 'null']}
+          blocked: {type: integer, description: 'Open, previous milestone done, and the gate holds it (live only).'}
+          plan: {type: integer, description: 'Sites whose baseline is due by the reference date.'}
+          vs_plan: {type: integer, description: '`completed` minus `plan`.'}
+          baseline_missing: {type: integer}
+          overdue_open: {type: integer, description: 'Open and past the baseline.'}
+          achieved_late: {type: integer}
+          on_time: {type: integer}
+          avg_variance_wd: {type: [number, 'null'], description: 'Average working days from the baseline to the actual date over the achieved ones that have a baseline (negative = early).'}
+          avg_delay_wd: {type: [number, 'null'], description: 'The same over the achieved-late ones only.'}
+          gate:
+            type: [object, 'null']
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+    DashboardHeadlineMilestone:
+      type: object
+      required: [code, name_en, order, applicable, done, done_pct, plan, vs_plan, baseline_missing]
+      properties:
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        order: {type: integer}
+        applicable: {type: integer}
+        done: {type: integer}
+        done_pct: {type: number}
+        plan: {type: integer}
+        vs_plan: {type: integer}
+        baseline_missing: {type: integer}
+    DashboardProjectStatusItem:
+      type: object
+      required: [code, name_en, weight, progress_pct, measured]
+      properties:
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        weight: {type: number}
+        unit: {type: [string, 'null']}
+        progress_pct: {type: number}
+        measured: {type: boolean, description: 'False when the item is left out of the figure: see `reason`.'}
+        done: {type: integer}
+        applicable: {type: integer}
+        reason: {type: [string, 'null'], enum: [not_weighted, no_data, central_hidden, not_applicable, null]}
+    DashboardProjectStatusActivity:
+      type: object
+      required: [code, name_en, weight, progress_pct, measured, items]
+      properties:
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        weight: {type: number}
+        progress_pct: {type: number}
+        measured: {type: boolean, description: 'False when no item of the activity could be measured; the activity is then left out and its weight redistributed.'}
+        items: {type: array, items: {$ref: '#/components/schemas/DashboardProjectStatusItem'}}
+    DashboardProjectStatus:
+      type: object
+      required: [progress_pct, plan_coverage_pct, activities]
+      properties:
+        progress_pct: {type: number}
+        planned_pct: {type: [number, 'null'], description: 'Null ("not available") until every measured item has a baseline for all its units.'}
+        spi: {type: [number, 'null']}
+        plan_coverage_pct: {type: number}
+        central_items_hidden: {type: integer}
+        activities: {type: array, items: {$ref: '#/components/schemas/DashboardProjectStatusActivity'}}
+    DashboardFinalClosure:
+      description: The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`.
+      type: object
+      required: [sites_total, sites_closed, closed_pct, active_sites, closed_pct_of_active, pending_cw_fac, pending_te_fac]
+      properties:
+        sites_total: {type: integer, description: 'Base: active sites with HOTO achieved (rules.md section 6.1, ASSUMPTION).'}
+        sites_closed: {type: integer}
+        closed_pct: {type: number}
+        active_sites: {type: integer}
+        closed_pct_of_active: {type: number}
+        pending_cw_fac:
+          allOf:
+          - {$ref: '#/components/schemas/FinalClosureAging'}
+          - {type: object, properties: {not_due: {type: integer}}}
+        pending_te_fac:
+          allOf:
+          - {$ref: '#/components/schemas/FinalClosureAging'}
+          - {type: object, properties: {not_due: {type: integer}}}
+    DashboardHeadline:
+      type: object
+      required: [sites_total, sites_cancelled, by_overall_status, milestones, final_closure, project_status]
+      properties:
+        sites_total: {type: integer, description: 'Active sites (cancelled ones are not counted).'}
+        sites_cancelled: {type: integer}
+        by_overall_status:
+          type: object
+          required: [not_started, in_progress, on_hold, completed, cancelled]
+          properties:
+            not_started: {type: integer}
+            in_progress: {type: integer}
+            on_hold: {type: integer}
+            completed: {type: integer}
+            cancelled: {type: integer}
+        milestones: {type: array, items: {$ref: '#/components/schemas/DashboardHeadlineMilestone'}}
+        on_air:
+          type: [object, 'null']
+          properties:
+            code: {type: string}
+            applicable: {type: integer}
+            done: {type: integer}
+            done_pct: {type: number}
+            plan: {type: integer}
+            vs_plan: {type: integer}
+        final_closure: {$ref: '#/components/schemas/DashboardFinalClosure'}
+        project_status: {$ref: '#/components/schemas/DashboardProjectStatus'}
+    DashboardStreamCounts:
+      type: object
+      properties:
+        not_due: {type: integer, description: 'The first gate of the stream is closed and nothing of it is done.'}
+        not_started: {type: integer, description: 'Dismantle only: the RFD was asked and no work has started.'}
+        in_progress: {type: integer}
+        done: {type: integer}
+        na: {type: integer, description: 'The stream does not apply to the site (Dismantle: the site has no Dismantle part).'}
+        on_hold: {type: integer, description: 'Sites that are On Hold and not done in the stream (an overlay, also counted in their status).'}
+    DashboardStream:
+      type: object
+      required: [code, name_en, sort_order, counts, by_region]
+      properties:
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        sort_order: {type: integer}
+        counts: {$ref: '#/components/schemas/DashboardStreamCounts'}
+        by_region:
+          type: array
+          items:
+            allOf:
+            - {$ref: '#/components/schemas/DashboardStreamCounts'}
+            - type: object
+              required: [region_id]
+              properties:
+                region_id: {$ref: '#/components/schemas/RegionId'}
+    DashboardSla:
+      type: object
+      required: [totals, by_stage, top_late]
+      properties:
+        totals: {$ref: '#/components/schemas/DashboardSlaCounts'}
+        by_stage:
+          type: array
+          items:
+            allOf:
+            - {$ref: '#/components/schemas/DashboardSlaCounts'}
+            - type: object
+              required: [stage_code, name_en, order]
+              properties:
+                stage_code: {type: string}
+                name_en: {type: string}
+                name_ar: {type: [string, 'null']}
+                order: {type: integer}
+                stream_code: {type: [string, 'null']}
+        top_late:
+          type: array
+          maxItems: 10
+          items:
+            type: object
+            required: [task_id, site_id, site_code, region_id, task_code, task_name, stage_code, due_date, days_late_wd]
+            properties:
+              task_id: {type: string, format: uuid}
+              site_id: {type: string, format: uuid}
+              site_code: {type: string}
+              region_id: {$ref: '#/components/schemas/RegionId'}
+              task_code: {type: string}
+              task_name: {type: string}
+              stage_code: {type: string}
+              due_date: {type: string, format: date}
+              days_late_wd: {type: integer, description: 'Working days past the due date at the reference date.'}
+              state: {type: string}
+              party: {type: [string, 'null']}
+    DashboardSlaCounts:
+      description: Open tasks are on time (green), at risk (amber) or late (red) at the reference date; completed ones are within the maximum or over it.
+      type: object
+      required: [open_on_time, open_at_risk, open_late, completed_on_time, completed_late]
+      properties:
+        open_on_time: {type: integer}
+        open_at_risk: {type: integer}
+        open_late: {type: integer}
+        completed_on_time: {type: integer}
+        completed_late: {type: integer}
+    DashboardGates:
+      type: object
+      required: [available, blocked_total, items]
+      properties:
+        available: {type: boolean, description: 'False for a past reference date: the state of a gate on a past date is not kept.'}
+        blocked_total: {type: integer}
+        by_gate:
+          type: array
+          items:
+            type: object
+            properties:
+              gate_code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              to_code: {type: string}
+              count: {type: integer}
+        items:
+          type: array
+          maxItems: 50
+          description: The longest blocked first.
+          items:
+            type: object
+            required: [site_id, site_code, region_id, gate_code, reasons]
+            properties:
+              site_id: {type: string, format: uuid}
+              site_code: {type: string}
+              region_id: {$ref: '#/components/schemas/RegionId'}
+              gate_code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              to_code: {type: string}
+              since: {type: string, format: date-time}
+              reasons: {type: array, items: {$ref: '#/components/schemas/LockReason'}}
+    DashboardIssues:
+      description: Counted by issue for the owner bars and the totals, by site for `sites_with_open_issue` (Q36). Age in working days from the raised date.
+      type: object
+      required: [available, open_total, sites_with_open_issue, by_owner, age_buckets]
+      properties:
+        available: {type: boolean}
+        open_total: {type: integer}
+        sites_with_open_issue: {type: integer}
+        blocking_total: {type: integer, description: 'Open issues linked to a gate or task.'}
+        oldest_age_wd: {type: [integer, 'null']}
+        avg_age_wd: {type: [number, 'null']}
+        by_owner:
+          type: array
+          items:
+            type: object
+            required: [owner_key, owner_kind, count, sites]
+            properties:
+              owner_key: {type: string}
+              owner_kind: {type: string, enum: [user, party, none]}
+              owner_name: {type: [string, 'null']}
+              count: {type: integer}
+              sites: {type: integer}
+              oldest_age_wd: {type: [integer, 'null']}
+              avg_age_wd: {type: [number, 'null']}
+        age_buckets:
+          type: array
+          items:
+            type: object
+            required: [key, count]
+            properties:
+              key: {type: string, enum: ['0_7', '8_15', '16_30', over_30]}
+              count: {type: integer}
+    DashboardHealth:
+      description: Project health index, formula version 1. A draft under owner review.
+      type: object
+      required: [draft, bands, score, band, components, by_region]
+      properties:
+        draft: {type: boolean}
+        formula_version: {type: integer}
+        bands:
+          type: object
+          required: [green, amber]
+          properties:
+            green: {type: number, description: 'Green from this score (setting `dashboard.health_bands`, default 85).'}
+            amber: {type: number, description: 'Amber from this score, red below (default 70).'}
+        score: {type: [number, 'null'], minimum: 0, maximum: 100}
+        band: {type: [string, 'null'], enum: [green, amber, red, null]}
+        components:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, weight, value, excluded, contribution]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              weight: {type: number}
+              value: {type: [number, 'null']}
+              excluded: {type: boolean, description: 'No data: left out and its weight redistributed.'}
+              contribution: {type: number}
+        by_region:
+          type: array
+          items:
+            type: object
+            required: [region_id, score, band]
+            properties:
+              region_id: {$ref: '#/components/schemas/RegionId'}
+              score: {type: number}
+              band: {type: string, enum: [green, amber, red]}
+    DashboardDelay:
+      description: Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party; attribution periods and suspension days are not built yet.
+      type: object
+      required: [draft, total_late_working_days, unattributed_pct, items]
+      properties:
+        draft: {type: boolean}
+        total_late_working_days: {type: integer}
+        unattributed_pct: {type: number, description: 'Share of the days on tasks with no external party and no default party type.'}
+        overlapping_periods: {type: integer}
+        periods_supported: {type: boolean}
+        items:
+          type: array
+          items:
+            type: object
+            required: [party, kind, late_tasks, late_working_days, share_pct]
+            properties:
+              party: {type: string, description: 'The external party name, the default party type of the task, or `unassigned`.'}
+              kind: {type: string, enum: [external, default_type, unassigned]}
+              external_party_id: {type: [string, 'null'], format: uuid}
+              party_type: {type: [string, 'null']}
+              late_tasks: {type: integer}
+              late_working_days: {type: integer}
+              share_pct: {type: number}
+    DashboardRegion:
+      type: object
+      required: [region_id, region_name, sites_total, by_overall_status, progress_pct]
+      properties:
+        region_id: {$ref: '#/components/schemas/RegionId'}
+        region_name: {type: string}
+        region_name_ar: {type: [string, 'null']}
+        sites_total: {type: integer}
+        completed: {type: integer}
+        in_progress: {type: integer}
+        late: {type: integer, description: 'Open tasks past their SLA maximum.'}
+        by_overall_status:
+          type: object
+          properties:
+            not_started: {type: integer}
+            in_progress: {type: integer}
+            on_hold: {type: integer}
+            completed: {type: integer}
+            cancelled: {type: integer}
+        progress_pct: {type: number}
+        health_score: {type: [number, 'null']}
+        by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
+    Dashboard:
+      type: object
+      required: [meta, basis, filters, headline, pipeline, streams, sla, gates, issues, health, delay, regions]
+      properties:
+        meta: {$ref: '#/components/schemas/DashboardMeta'}
+        basis: {$ref: '#/components/schemas/DashboardBasis'}
+        filters: {$ref: '#/components/schemas/DashboardFilters'}
+        headline: {$ref: '#/components/schemas/DashboardHeadline'}
+        pipeline:
+          type: object
+          required: [nodes]
+          properties:
+            nodes: {type: array, items: {$ref: '#/components/schemas/DashboardMilestone'}}
+        streams:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/DashboardStream'}}
+        sla: {$ref: '#/components/schemas/DashboardSla'}
+        gates: {$ref: '#/components/schemas/DashboardGates'}
+        issues:
+          oneOf:
+          - {$ref: '#/components/schemas/DashboardIssues'}
+          - {type: 'null'}
+          description: Null when the caller has no `issues.view`.
+        health: {$ref: '#/components/schemas/DashboardHealth'}
+        delay: {$ref: '#/components/schemas/DashboardDelay'}
+        regions:
+          type: object
+          required: [items]
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/DashboardRegion'}}

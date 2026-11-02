@@ -1730,6 +1730,28 @@ model ProgressSnapshot {
   @@map("progress_snapshots")
 }
 
+// Weekly snapshot per site (migration 0039): the facts the dashboard needs to show a past reference date as it was saved. Written only by
+// dash_snapshot_take; never updated (trigger). The foreign keys to sites, regions and weight_sets live in the migration.
+model SiteSnapshot {
+  snapshot_date  DateTime @db.Date
+  site_id        String   @db.Uuid
+  region_id      Int
+  cluster_code   String?
+  scenario       String?
+  weight_set_id  String?  @db.Uuid
+  overall_status String
+  ms             Json // {"MS1": {"state", "date", "baseline", "seq", "stream", "gate_open", "blocked"}, ...}
+  streams        Json // {"CW": "in_progress", ...}
+  items          Json // Project Status counts per item: [done, applicable, planned, plan_known]
+  progress_pct   Decimal? @db.Decimal(6, 3)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([snapshot_date, site_id])
+  @@index([region_id, snapshot_date])
+  @@index([site_id, snapshot_date])
+  @@map("site_snapshots")
+}
+
 // ============================================================================
 // 7c. CUSTOM FIELDS AND PERMISSION GRID (System Admin configuration)
 // ============================================================================

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PipelineNode } from '@/api/types';
 
@@ -15,7 +16,7 @@ function Ring({ p, color }: { p: number; color: string }) {
 }
 
 /** Milestone pipeline in the dashboard style: progress rings on nodes, a gradient track, hover lift. */
-export function Pipeline({ nodes, selected, onSelect }: { nodes: PipelineNode[]; selected?: string | null; onSelect?: (code: string) => void }) {
+export function Pipeline({ nodes, selected, onSelect, stats, label }: { nodes: PipelineNode[]; selected?: string | null; onSelect?: (code: string) => void; stats?: (m: PipelineNode) => ReactNode; label?: (m: PipelineNode) => string }) {
   const { t, i18n } = useTranslation();
   const ms = nodes.filter((n) => n.kind === 'milestone');
   const n = ms.length || 1;
@@ -32,7 +33,7 @@ export function Pipeline({ nodes, selected, onSelect }: { nodes: PipelineNode[];
             const p = m.progress ?? 0, cls = CLS[m.state];
             return (
               <button key={m.code} type="button" data-testid={`pipe-node-${m.code}`} data-state={m.state} className={`st ${cls} ${selected === m.code ? 'sel' : ''}`}
-                aria-pressed={selected === m.code} aria-label={`${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
+                aria-pressed={selected === m.code} aria-label={label ? label(m) : `${name}: ${t(`pipe.${m.state}`)}`} onClick={() => onSelect?.(m.code)}>
                 <div className="node">
                   {m.state !== 'planned' && m.state !== 'na' && <Ring p={p} color={COLOR[m.state] ?? 'var(--lock)'} />}
                   <b style={p >= 1 ? { fontSize: 15 } : undefined}>{m.state === 'na' ? '—' : `${Math.round(p * 100)}%`}</b>
@@ -40,7 +41,7 @@ export function Pipeline({ nodes, selected, onSelect }: { nodes: PipelineNode[];
                 </div>
                 <div className="nm">{name}</div>
                 <div className="stats">
-                  {m.actual_date ? <span className="mono">{m.actual_date.slice(5)}</span> : m.planned_date ? <>{t('grid.plan')} <span className="mono">{m.planned_date.slice(5)}</span></> : null}
+                  {stats ? stats(m) : m.actual_date ? <span className="mono">{m.actual_date.slice(5)}</span> : m.planned_date ? <>{t('grid.plan')} <span className="mono">{m.planned_date.slice(5)}</span></> : null}
                   {!!m.variance_wd && <span className={m.variance_wd > 0 ? 'late' : ''}> {m.variance_wd > 0 ? '+' : ''}{m.variance_wd} {t('approvals.wd')}</span>}
                 </div>
               </button>

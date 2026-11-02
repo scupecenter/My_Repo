@@ -344,3 +344,22 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | G-D18 | No Exceptions & Alerts endpoint |
 | G-D19 | No WH Complete Units endpoint (Need, Dispatched, Remaining Need, Shortfall per need unit) |
 | G-D20 | `HealthIndex.band` exists, but its thresholds are not defined (Q35) |
+
+## 10. Built in contract 0.7.2 (main dashboard, migration 0039)
+`GET /dashboard` answers the P3 reference for the sections below, computed in the database (`dash_overview`, SECURITY DEFINER, read-only, limited to the `dashboard.view` regions of the caller). The page is `/dashboard`. The legacy `/dashboard/*` reads of contract 0.1 are superseded and not built.
+
+| Section | Built from this spec | Notes |
+|---|---|---|
+| Headline | OV-15 (sites by Overall Status, cancelled apart), OV-04 to OV-06 (milestone done / applicable / plan / vs plan, baseline missing), OV-05 On-Air, OV-03 weighted progress with Planned and SPI ("not available"), PX-01 Final Closure | Status is derived from dated facts (rules.md section 2.4). Counts use approved data only (DF-01). |
+| Pipeline | OV-09 with `in work`, `waiting for readiness`, `blocked`, `overdue open`, `achieved late`, `on time`, average delay and variance in working days (DF-02), per stable milestone code | The blocked state is the gate state kept by the calculation layer (`site_gate_state`), live only. Closes G-D02. |
+| Streams | The four streams and Dismantle (Q37, Q41) with a region breakdown | See Q126. |
+| SLA | Open tasks on time / at risk / late and completed within / over the maximum per stage, top late tasks | Closes the SC-20 part that does not need medians (P85 and P90 are not built). See Q125. |
+| Gates | Blocked gates with the reasons of `gate_eval` | Live only. |
+| Issues | OV-08, SC-23 (counted per owner, sites for "sites with an open issue", Q36), age in working days | Needs `issues.view`. See Q124. |
+| Health index | PX-03 (formula version 1, draft), bands from the setting `dashboard.health_bands` (Q35) | See Q121. Closes G-D20. |
+| Delay attribution | PX-02 (draft) | See Q122. |
+| Regions | OV-14 reduced to counts reached per milestone, progress, health and late tasks per region | No applicable and plan counts per cell (G-D06 stays open). |
+| Reference date | Q34: default today; a past date reads the weekly snapshot dated that day, otherwise it is computed from dated facts; `basis.source` says which | The legacy "period from" is not kept. |
+| Snapshots | PX-08 and DB-12: `site_snapshots` per site, `progress_snapshots` per region and for the project (Project Status, headline, pipeline, streams, health); written by `dash_snapshot_take`, never rewritten | Month-end job not built (Q127). |
+
+Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-12 (map), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source the PMIS does not hold yet; none was invented.

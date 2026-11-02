@@ -140,6 +140,17 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/status-updates'],
   ['post', '/status-updates'],
   ['patch', '/status-updates/:id'],
+  // Contract 0.7.2: the main dashboard, Project Status and the weight sets (apps/api: dashboard; migration 0039).
+  ['get', '/dashboard'],
+  ['get', '/dashboard/export'],
+  ['get', '/project-status'],
+  ['get', '/project-status/snapshots'],
+  ['get', '/settings/weight-sets'],
+  ['post', '/settings/weight-sets'],
+  ['get', '/settings/weight-sets/:id'],
+  ['put', '/settings/weight-sets/:id'],
+  ['post', '/settings/weight-sets/:id/preview'],
+  ['post', '/settings/weight-sets/:id/publish'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

@@ -57,6 +57,13 @@ export async function superDbCalc2(): Promise<PgClient> {
 let seq = 0;
 const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).toString(36)}${randomBytes(2).toString('hex')}`;
 
+/** Superuser connection to the fifth or sixth database (the dashboard suites; see global-setup). */
+export async function superDbDash(perf = false): Promise<PgClient> {
+  const c = new PgClient({ connectionString: perf ? process.env.TEST_SUPER_URL_DASHPERF : process.env.TEST_SUPER_URL_DASH });
+  await c.connect();
+  return c;
+}
+
 export interface TestUser {
   id: string;
   email: string;

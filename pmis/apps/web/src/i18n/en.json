@@ -1992,5 +1992,157 @@
     "empty": "No status updates yet",
     "empty_lead": "Write the first update of the week.",
     "empty_hint": "Leads publish one update per region or team each week."
+  },
+  "dash": {
+    "title": "Dashboard",
+    "subtitle": "Progress of the project against the baseline, for the regions and modules you may see.",
+    "forbidden": "You cannot view the dashboard.",
+    "error": "The dashboard could not be loaded.",
+    "empty": "No site matches these filters.",
+    "ref_date": "Reference date",
+    "today": "Today",
+    "reset": "Reset filters",
+    "export": "Export view",
+    "export_done": "The file was downloaded.",
+    "snapshots": "Weekly snapshots:",
+    "central_hidden": "{{n}} project-wide Project Status items are left out because these figures are not for the whole project.",
+    "basis": {
+      "live": "Live, today {{date}}",
+      "snapshot": "Saved snapshot of {{date}}",
+      "as_of_computed": "Computed as of {{date}}"
+    },
+    "basis_note": {
+      "snapshot": "Sites, milestones, streams and Project Status come from the weekly snapshot of {{date}}. SLA, issues, delay attribution and the health index are computed as of that date from dated facts.",
+      "as_of_computed": "No snapshot exists for {{date}}, so every figure is computed as of that date from dated facts (an actual date counts when it is on or before the date). Blocked gates are kept for today only.",
+      "live": ""
+    },
+    "filters": {
+      "label": "Dashboard filters",
+      "region": "Region",
+      "cluster": "Cluster",
+      "scenario": "Scenario",
+      "stream": "Stream",
+      "all_clusters": "All clusters",
+      "all_streams": "All streams"
+    },
+    "kpi": {
+      "progress": "Weighted progress (to HOTO)",
+      "planned": "Planned",
+      "spi": "SPI",
+      "na": "not available",
+      "coverage": "Plan coverage {{n}}%",
+      "ends_hoto": "ends at HOTO",
+      "sites": "Active sites",
+      "status_chart": "Sites by Overall Status: {{list}}",
+      "cancelled_note": "{{n}} cancelled sites are not counted.",
+      "onair": "On-Air",
+      "vs_plan": "{{n}} vs plan",
+      "closure": "Final Closure",
+      "closed_of": "{{closed}} of {{base}} closed (sites with HOTO)",
+      "fac_cw": "Pending CW FAC",
+      "fac_te": "Pending TE FAC",
+      "oldest": "oldest {{n}} wd",
+      "not_due": "{{n}} not due"
+    },
+    "pipeline": {
+      "title": "Delivery pipeline",
+      "hint": "Click a milestone to open the sites at it.",
+      "done_of": "{{done}} of {{app}} sites",
+      "in_work": "{{n}} in work",
+      "waiting": "{{n}} waiting",
+      "blocked": "{{n}} blocked",
+      "overdue": "{{n}} overdue"
+    },
+    "health": {
+      "title": "Project health index",
+      "draft": "Draft, under owner review",
+      "chart": "Health index {{score}} out of 100",
+      "band": {
+        "green": "Green",
+        "amber": "Amber",
+        "red": "Red"
+      },
+      "bands": "Green from {{green}}, amber from {{amber}}, red below",
+      "excluded": "no data",
+      "note": "Six factors, each at most 100: progress, baseline adherence, SLA adherence, documentation, first-time approval, critical issues. A factor with no data is left out and its weight shared."
+    },
+    "ps": {
+      "title": "Project Status by activity",
+      "no_data": "no data yet"
+    },
+    "streams": {
+      "title": "Streams",
+      "hint": "Sites by status in each stream, Dismantle included.",
+      "chart": "Sites per stream (done / in progress / waiting): {{list}}",
+      "stream": "Stream",
+      "done": "Done",
+      "in_progress": "In progress",
+      "waiting": "Waiting",
+      "not_due": "Not due",
+      "not_started": "Not started",
+      "na": "N/A",
+      "on_hold": "On hold",
+      "by_region": "By region",
+      "triple": "Each cell: done / in progress / waiting."
+    },
+    "sla": {
+      "title": "SLA by stage",
+      "open_late": "{{n}} open tasks late",
+      "on_time": "On time",
+      "at_risk": "At risk",
+      "late": "Late",
+      "completed": "Completed within the maximum",
+      "none": "No task has a running SLA clock.",
+      "chart": "Open tasks per stage (on time / at risk / late): {{list}}",
+      "top_late": "Most overdue tasks",
+      "no_late": "No task is past its SLA maximum.",
+      "days_late": "{{n}} wd late"
+    },
+    "gates": {
+      "title": "Blocked gates",
+      "unavailable": "The state of a gate is kept for today only; pick today to see the blocked gates.",
+      "none": "No gate is blocked.",
+      "no_reason": "The calculation layer gave no reason."
+    },
+    "issues": {
+      "title": "Issues",
+      "hidden": "The Issue Log is not part of your access.",
+      "open_register": "Issue Log",
+      "open": "Open issues",
+      "sites": "Sites with an open issue",
+      "oldest": "oldest {{n}} wd",
+      "no_owner": "No owner",
+      "chart": "Open issues per owner: {{list}}",
+      "age": {
+        "0_7": "0 to 7 wd",
+        "8_15": "8 to 15 wd",
+        "16_30": "16 to 30 wd",
+        "over_30": "Over 30 wd"
+      }
+    },
+    "delay": {
+      "title": "Delay attribution",
+      "none": "No overdue task.",
+      "unassigned": "Not assigned",
+      "type": {
+        "cw_contractor": "CW contractor",
+        "te_vendor": "TE vendor",
+        "gecol": "GECOL",
+        "hlc": "HLC",
+        "supplier": "Supplier",
+        "landlord": "Landlord",
+        "other": "Other"
+      },
+      "chart": "Overdue working days per party: {{list}}",
+      "total": "{{n}} overdue working days in total, {{pct}}% on tasks with no responsible party.",
+      "note": "Attribution periods are not built yet."
+    },
+    "regions": {
+      "title": "Regions",
+      "sites": "Sites",
+      "late": "Late tasks",
+      "progress": "Progress",
+      "health": "Health"
+    }
   }
 }

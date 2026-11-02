@@ -94,6 +94,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   // settings and holidays that the other calculation suites must not meet.
   const calc2 = `${dbName}_calc2`;
   const fourth = await buildDatabase(adminUrl, calc2, appPassword);
+  // The fifth and sixth databases are for the dashboard (migration 0039): one with a small data set whose numbers are computed by hand, and one with 1000 synthetic
+  // sites for the performance check. Both count every site they hold, so no other suite may write to them.
+  const dash = `${dbName}_dash`;
+  const dashPerf = `${dbName}_dashperf`;
+  const [fifth, sixth] = await Promise.all([buildDatabase(adminUrl, dash, appPassword), buildDatabase(adminUrl, dashPerf, appPassword)]);
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
@@ -102,6 +107,10 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_SUPER_URL_CALC = third.superUrl;
   process.env.TEST_DATABASE_URL_CALC2 = fourth.appUrl;
   process.env.TEST_SUPER_URL_CALC2 = fourth.superUrl;
+  process.env.TEST_DATABASE_URL_DASH = fifth.appUrl;
+  process.env.TEST_SUPER_URL_DASH = fifth.superUrl;
+  process.env.TEST_DATABASE_URL_DASHPERF = sixth.appUrl;
+  process.env.TEST_SUPER_URL_DASHPERF = sixth.superUrl;
 
   return async () => {
     if (process.env.TEST_KEEP_DB === '1') return;
@@ -111,6 +120,8 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${solo} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${calc} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${calc2} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dash} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dashPerf} WITH (FORCE)`);
     await a.end();
   };
 }
