@@ -39,7 +39,7 @@ describe("enable and list", () => {
       register_key: KEY,
       module_key: "dismantle",
       site_scoped: true,
-      approval_levels: 3,
+      approval_levels: 2,
       record_types: ["cw", "te"],
     });
     expect(d.fields.map((f: { code: string }) => f.code)).toEqual([

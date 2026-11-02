@@ -263,7 +263,7 @@ describe('GET /sites/{id} and the task grid', () => {
     const ms1 = grid.body.stages[0];
     expect(ms1).toMatchObject({ code: 'MS1', stream_code: 'DESIGN_ACQ', name_en: 'Site Release' });
     const [a1, a2] = ms1.tasks;
-    expect(a1).toMatchObject({ task_code: 'A1', state: 'entry', stream_code: 'DESIGN_ACQ', levels_required: 3, current_level: 1, slots_required: 0 });
+    expect(a1).toMatchObject({ task_code: 'A1', state: 'entry', stream_code: 'DESIGN_ACQ', levels_required: 2, current_level: 1, slots_required: 0 });
     expect(a1.ball_in_court.level_kind).toBe('entry');
     expect(a1.ball_in_court.holders.map((h: { kind: string }) => h.kind).sort()).toEqual(['role', 'user']);
     expect(a1.ball_in_court.holders.find((h: { kind: string }) => h.kind === 'user')).toMatchObject({ user_id: e.user.id, employee_id: e.user.employeeId, account_status: 'active' });

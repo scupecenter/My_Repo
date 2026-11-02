@@ -5,7 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
-import { TaskRow, TaskSummaryDto, TaskViewService, UserRefDto, taskSelect } from './task-view.service';
+import { LevelCode, TaskRow, TaskSummaryDto, TaskViewService, UserRefDto, levelCode, taskSelect } from './task-view.service';
 
 export interface AllowedActionDto {
   action: string;
@@ -18,6 +18,7 @@ export interface AllowedActionDto {
 export interface ApprovalPathLevelDto {
   level: number;
   kind: 'entry' | 'review' | 'approve';
+  level_code: LevelCode;
   status: 'pending' | 'current' | 'done' | 'skipped' | 'returned';
   acted_by?: UserRefDto;
   acted_at?: Date | null;
@@ -191,7 +192,7 @@ export class TaskDetailService {
       if (row.state === 'approved') status = a?.how === 'skipped' ? 'skipped' : 'done';
       else if (current) status = lastStep[0]?.action === 'reject' ? 'returned' : 'current';
       else if (a) status = a.how === 'skipped' ? 'skipped' : 'done';
-      const item: ApprovalPathLevelDto = { level, kind, status };
+      const item: ApprovalPathLevelDto = { level, kind, level_code: levelCode(kind), status };
       if (a && !current) {
         const ref = refs.get(a.user_id);
         if (ref) item.acted_by = ref;

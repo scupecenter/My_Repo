@@ -10,6 +10,8 @@ import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { TS_TEXT, oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
+import { setVia, viaSchema } from '../common/via';
+import { resolveMentions } from '../common/mentions';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TaskViewService, UserRefDto } from './task-view.service';
 
@@ -31,11 +33,12 @@ const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((v) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().startsWith(v), 'not a calendar date');
-const noteSchema = z.object({ note: z.string().max(2000).optional() }).strict();
-const startSchema = z.object({ actual_start: dateSchema.optional() }).strict();
+const noteSchema = z.object({ note: z.string().max(2000).optional(), via: viaSchema.optional() }).strict();
+const startSchema = z.object({ actual_start: dateSchema.optional(), via: viaSchema.optional() }).strict();
 const rejectSchema = z
   .object({
     note: z.string().max(2000).optional(),
+    via: viaSchema.optional(),
     rejected_slots: z.array(z.object({ slot_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
   })
   .strict();
@@ -123,6 +126,7 @@ export class WorkflowService {
     const body = parse(noteSchema, rawBody ?? {});
     await this.visible(auth, taskId);
     if (action === 'approve') await this.stepUp.require(auth);
+    await setVia(this.db.tx, body.via);
     const r = await this.transitionRaw(auth, taskId, action, version, body.note ?? null);
     return this.result(auth, taskId, r);
   }
@@ -138,6 +142,7 @@ export class WorkflowService {
     const version = parseIfMatch(ifMatch);
     const body = parse(startSchema, rawBody ?? {});
     await this.visible(auth, taskId);
+    await setVia(this.db.tx, body.via);
     const r = await this.call(auth, Prisma.sql`SELECT wf_start(${taskId}::uuid, ${version}::int, ${body.actual_start ?? null}::date) AS r`);
     return this.result(auth, taskId, r);
   }
@@ -149,6 +154,7 @@ export class WorkflowService {
       throw new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     }
     await this.visible(auth, taskId);
+    await setVia(this.db.tx, body.via);
     const slots = JSON.stringify(body.rejected_slots ?? []);
     const r = await this.call(auth, Prisma.sql`SELECT wf_reject(${taskId}::uuid, ${version}::int, ${body.note}::text, ${slots}::jsonb) AS r`);
     return this.result(auth, taskId, r);
@@ -229,7 +235,7 @@ export class WorkflowService {
     };
   }
 
-  private async commentDtos(rows: { id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]): Promise<CommentDto[]> {
+  async commentDtos(rows: { id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date }[]): Promise<CommentDto[]> {
     if (rows.length === 0) return [];
     const mentions = await this.db.tx.$queryRaw<{ comment_id: string; user_id: string }[]>(
       Prisma.sql`SELECT comment_id::text AS comment_id, user_id::text AS user_id FROM comment_mentions WHERE comment_id = ANY(${rows.map((r) => r.id)}::uuid[])`);
@@ -261,10 +267,11 @@ export class WorkflowService {
   async addComment(auth: AuthContext, taskId: string, rawBody: unknown): Promise<CommentDto> {
     const body = parse(commentSchema, rawBody);
     await this.visible(auth, taskId);
+    const mentions = await resolveMentions(this.db.tx, body.body, body.mention_user_ids);
     let id: string;
     try {
       const rows = await this.db.tx.$queryRaw<{ id: string }[]>(
-        Prisma.sql`SELECT wf_add_comment(${taskId}::uuid, ${body.body}::text, ${body.mention_user_ids ?? []}::uuid[])::text AS id`);
+        Prisma.sql`SELECT wf_add_comment(${taskId}::uuid, ${body.body}::text, ${mentions}::uuid[])::text AS id`);
       id = rows[0]?.id ?? '';
     } catch (e) {
       const p = mapDbError(e);

@@ -69,25 +69,15 @@ async function globalCell(
   );
 }
 
-/** The matrix suite changes the level count of register rows and leaves it: every test of this suite starts from three levels. */
-async function threeLevels(key: string): Promise<void> {
-  await db.query(
-    "UPDATE register_definitions SET approval_levels = 3 WHERE register_key = $1",
-    [key],
-  );
-}
-
 async function teamL(
   key: string,
   module: string,
   region: number,
 ): Promise<Team> {
-  await threeLevels(key);
   return team(app, db, key, module, region);
 }
 
 async function globalTeam(key: string, module: string): Promise<Team> {
-  await threeLevels(key);
   const entry = await actor(app, db, {
     level: "entry",
     grants: G(module, "view", "create", "edit"),

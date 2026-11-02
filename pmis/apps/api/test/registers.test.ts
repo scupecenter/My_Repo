@@ -40,7 +40,7 @@ describe('catalogue and read access', () => {
     expect(res.status).toBe(200);
     const keys = res.body.items.map((i: { register_key: string }) => i.register_key);
     expect(keys).toEqual(['gecol']);                                   // only the module the caller holds
-    expect(res.body.items[0].approval_levels).toBe(3);
+    expect(res.body.items[0].approval_levels).toBe(2);
     expect(res.body.items[0].fields.map((f: { code: string }) => f.code)).toContain('power_on_date');
     const admin = await plainAdmin(app, db);
     const all = await admin.api.call('get', '/registers');
@@ -188,30 +188,26 @@ describe('submit validation (the register rules are blocking)', () => {
   });
 });
 
-describe('approval flow: 3 levels, projection, rejection, history', () => {
-  it('goes entry -> review -> approve, projects the approved values and audits every step with before and after', async () => {
+describe('approval flow: two levels, projection, rejection, history', () => {
+  it('goes L1 Data Entry -> L2 Data Reviewer & Approver, projects the approved values and audits every step with before and after', async () => {
     const t = await team(app, db, 'procurement', 'procurement', R);
     const rec = await createRec(t, { ...PROC, team_id: null });
     let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ state: 'in_review', current_level: 2, levels_required: 3 });
-    expect(res.body.ball_in_court.level_kind).toBe('review');
-    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([t.review.user.id]);
+    expect(res.body).toMatchObject({ state: 'in_approval', current_level: 2, levels_required: 2 });
+    expect(res.body.ball_in_court.level_kind).toBe('approve');
+    expect(res.body.ball_in_court.level_code).toBe('L2');
+    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([t.approve.user.id]);
     expect(res.body.last_transition.skipped_levels).toEqual([]);
     expect((await q(db, 'SELECT 1 FROM procurement_records WHERE site_id = $1', [t.site.id])).length).toBe(0);   // not approved: nothing projected
 
     // the wrong person, the wrong action and the wrong state
-    const wrong = await post(t.entry.api, 'procurement', rec.id, 'review', res.body.version);
+    const wrong = await post(t.entry.api, 'procurement', rec.id, 'approve', res.body.version);
     expect(wrong.status).toBe(403);
-    expect(wrong.body.code).toBe('not_eligible_holder');
-    expect((await post(t.review.api, 'procurement', rec.id, 'approve', res.body.version)).status).toBe(409);
-    expect((await post(t.review.api, 'procurement', rec.id, 'review', res.body.version - 1)).status).toBe(412);
-
-    res = await post(t.review.api, 'procurement', rec.id, 'review', res.body.version);
-    expect(res.body).toMatchObject({ state: 'in_approval', current_level: 3 });
-    // permission denied: the reviewer has no approve right and is not the approve holder
-    const reviewerApprove = await post(t.review.api, 'procurement', rec.id, 'approve', res.body.version);
-    expect(reviewerApprove.status).toBe(403);
+    expect(wrong.body.code).toBe('action_forbidden');   // no approve right
+    expect((await post(t.approve.api, 'procurement', rec.id, 'review', res.body.version)).status).toBe(409);   // there is no middle level
+    // permission denied: the former reviewer is not an L2 holder
+    expect((await post(t.review.api, 'procurement', rec.id, 'approve', res.body.version)).status).toBe(403);
     // the final approval needs step-up
     const noStep = await actor(app, db, { level: 'approve', grants: G('procurement', 'view', 'approve'), regions: [R], modules: null, stepUp: false });
     await regCell(db, 'procurement', R, 'approve', { user: [noStep.user.id] });
@@ -220,7 +216,8 @@ describe('approval flow: 3 levels, projection, rejection, history', () => {
     expect(needStep.body.code).toBe('step_up_required');
     await regCell(db, 'procurement', R, 'approve', { user: [t.approve.user.id] });
     await t.approve.api.stepUp(t.approve.user.password);
-    res = await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version);
+    expect((await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version - 1)).status).toBe(412);
+    res = await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version, { via: 'drag' });
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ state: 'approved', is_current: true, self_approval: false });
     expect(res.body.approved_by.id).toBe(t.approve.user.id);
@@ -231,23 +228,23 @@ describe('approval flow: 3 levels, projection, rejection, history', () => {
     expect(typed[0]).toMatchObject({ scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-1001', pr_date: '2026-01-05', order_status: 'Open', record_version: 1, rid: rec.id, id: rec.entity_id });
 
     const hist = await t.review.api.call('get', recPath('procurement', rec.id, '/history'));
-    expect(hist.body.items.map((s: { action: string }) => s.action)).toEqual(['create', 'submit', 'review', 'approve']);
-    expect(hist.body.items[3]).toMatchObject({ stepup_verified: true, after_state: 'approved' });
-    const audit = await q<{ action: string; before: { state: string }; after: { state: string } }>(
+    expect(hist.body.items.map((s: { action: string }) => s.action)).toEqual(['create', 'submit', 'approve']);
+    expect(hist.body.items[2]).toMatchObject({ stepup_verified: true, after_state: 'approved' });
+    const audit = await q<{ action: string; before: { state: string }; after: { state: string; via?: string } }>(
       db, `SELECT action, before, after FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 ORDER BY id`, [rec.id]);
-    expect(audit.map((a) => a.action)).toEqual(['register_record_create', 'register_record_submit', 'register_record_review', 'register_record_approve']);
-    expect(audit[3]!.before.state).toBe('in_approval');
-    expect(audit[3]!.after.state).toBe('approved');
+    expect(audit.map((a) => a.action)).toEqual(['register_record_create', 'register_record_submit', 'register_record_approve']);
+    expect(audit[2]!.before.state).toBe('in_approval');
+    expect(audit[2]!.after.state).toBe('approved');
+    expect(audit[2]!.after.via).toBe('drag');
     // the History of a record outside the caller's regions does not exist
     const outsider = await actor(app, db, { grants: G('procurement', 'view'), regions: [6], modules: null });
     expect((await outsider.api.call('get', recPath('procurement', rec.id, '/history'))).status).toBe(404);
   });
 
-  it('rejects one level back with a mandatory note, and the record comes back to the person who must fix it', async () => {
+  it('rejects back to L1 with a mandatory note, and the record comes back to the person who must fix it', async () => {
     const t = await team(app, db, 'procurement', 'procurement', R);
     const rec = await createRec(t, PROC);
     let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
-    res = await post(t.review.api, 'procurement', rec.id, 'review', res.body.version);
     const noNote = await post(t.approve.api, 'procurement', rec.id, 'reject', res.body.version, {});
     expect(noNote.status).toBe(422);
     expect(noNote.body.code).toBe('note_required');
@@ -255,82 +252,92 @@ describe('approval flow: 3 levels, projection, rejection, history', () => {
     expect(notHolder.status).toBe(403);
     res = await post(t.approve.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'PO number is missing' });
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ state: 'in_review', current_level: 2, return_count: 1, last_return_note: 'PO number is missing' });
-    expect(res.body.last_transition.returned_to_level).toBe(2);
-    res = await post(t.review.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'wrong scope' });
-    expect(res.body).toMatchObject({ state: 'entry', current_level: 1, return_count: 2 });
+    expect(res.body).toMatchObject({ state: 'entry', current_level: 1, return_count: 1, last_return_note: 'PO number is missing' });
+    expect(res.body.last_transition.returned_to_level).toBe(1);
     const fixed = await patch(t.entry.api, 'procurement', rec.id, res.body.version, { data: { remark: 'fixed' } });
     expect(fixed.status).toBe(200);
     res = await post(t.entry.api, 'procurement', rec.id, 'submit', fixed.body.version);
-    expect(res.body.state).toBe('in_review');
+    expect(res.body.state).toBe('in_approval');
     const hist = await t.entry.api.call('get', recPath('procurement', rec.id, '/history'));
-    expect(hist.body.items.map((s: { action: string }) => s.action)).toEqual(['create', 'submit', 'review', 'reject', 'reject', 'edit', 'submit']);
-    expect(hist.body.items[3].note).toBe('PO number is missing');
+    expect(hist.body.items.map((s: { action: string }) => s.action)).toEqual(['create', 'submit', 'reject', 'edit', 'submit']);
+    expect(hist.body.items[2].note).toBe('PO number is missing');
   });
 });
 
-describe('levels of the register row: skip (B6), self-approval (B5), 2 levels', () => {
-  it('skips a level held by the same person, logs it, and a rejection after the skip returns to the person who acted', async () => {
+describe('the two levels: one person holding both (B5), and records already submitted on an older snapshot (B7)', () => {
+  /** A record submitted before migration 0032 carries a snapshot of 1 to 3 levels; the same marks are what the engine reads. */
+  const snapshot = (id: string, levels: number) => db.query('UPDATE register_records SET levels_required = $2, path_frozen_at = now() WHERE id = $1', [id, levels]);
+
+  it('a person who holds L1 and L2 approves with the submission: step-up, flagged as self-approval, the skip is logged', async () => {
     const t = await team(app, db, 'procurement', 'procurement', R);
-    await regCell(db, 'procurement', R, 'review', { user: [t.entry.user.id] });   // the entry holder also holds the review level
+    const both = await actor(app, db, { level: 'approve', grants: G('procurement', 'view', 'create', 'edit', 'approve'), regions: [R], modules: null, stepUp: false });
+    await regCell(db, 'procurement', R, 'entry', { user: [both.user.id] });
+    await regCell(db, 'procurement', R, 'approve', { user: [both.user.id] });   // granted together: L1 and L2
+    const rec = await createRec({ ...t, entry: both }, PROC);
+    const noStep = await post(both.api, 'procurement', rec.id, 'submit', rec.version);
+    expect(noStep.status).toBe(401);
+    expect(noStep.body.code).toBe('step_up_required');
+    await both.api.stepUp(both.user.password);
+    const res = await post(both.api, 'procurement', rec.id, 'submit', rec.version);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ state: 'approved', self_approval: true, levels_required: 2 });
+    expect(res.body.last_transition.skipped_levels).toEqual([2]);
+    const hist = await both.api.call('get', recPath('procurement', rec.id, '/history'));
+    expect(hist.body.items.find((s: { action: string }) => s.action === 'submit')).toMatchObject({ self_approval: true, stepup_verified: true });
+    expect(hist.body.items.filter((s: { action: string }) => s.action === 'auto_skip')).toHaveLength(1);
+    const audit = await q(db, `SELECT 1 FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_auto_skip'`, [rec.id]);
+    expect(audit).toHaveLength(1);
+  });
+
+  it('a record submitted on 3 levels finishes on them (the middle holder reviews), and a rejection after a skip returns to the person who acted', async () => {
+    const t = await team(app, db, 'procurement', 'procurement', R);
+    await regCell(db, 'procurement', R, 'review', { user: [t.entry.user.id] });   // the entry holder also holds the middle level
     const rec = await createRec(t, PROC);
+    await snapshot(rec.id, 3);
     let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
-    expect(res.body).toMatchObject({ state: 'in_approval', current_level: 3 });
+    expect(res.body).toMatchObject({ state: 'in_approval', current_level: 3, levels_required: 3 });
     expect(res.body.last_transition.skipped_levels).toEqual([2]);
     expect(res.body.self_approval).toBe(false);
     res = await post(t.approve.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'check the PR date' });
     expect(res.body).toMatchObject({ state: 'entry', current_level: 1 });                                   // not to the skipped level
     expect(res.body.ball_in_court.claimed_by.id).toBe(t.entry.user.id);
-    expect(res.body.last_transition.returned_to_level).toBe(1);
     res = await post(t.entry.api, 'procurement', rec.id, 'submit', res.body.version);
     expect(res.body.last_transition.skipped_levels).toEqual([2]);                                           // applied again on resubmission
     const hist = await t.entry.api.call('get', recPath('procurement', rec.id, '/history'));
     expect(hist.body.items.filter((s: { action: string }) => s.action === 'auto_skip')).toHaveLength(2);
-    const audit = await q(db, `SELECT 1 FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_auto_skip'`, [rec.id]);
-    expect(audit).toHaveLength(2);
   });
 
-  it('uses the level count of the row: 2 levels skip the review cell, 1 level is a self-approval that needs step-up', async () => {
-    const t = await team(app, db, 'permits_hse', 'permits_hse', R);
-    await db.query(`UPDATE register_definitions SET approval_levels = 2 WHERE register_key = 'permits_hse'`);
-    try {
-      const rec = await createRec(t, PERMIT_CW);
-      let res = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
-      expect(res.body).toMatchObject({ state: 'in_approval', current_level: 2, levels_required: 2 });
-      await t.approve.api.stepUp(t.approve.user.password);
-      res = await post(t.approve.api, 'permits_hse', rec.id, 'approve', res.body.version);
-      expect(res.body).toMatchObject({ state: 'approved' });
-
-      await db.query(`UPDATE register_definitions SET approval_levels = 1 WHERE register_key = 'permits_hse'`);
-      const solo = await actor(app, db, { level: 'approve', grants: G('permits_hse', 'view', 'create', 'edit', 'approve'), regions: [R], modules: null, stepUp: false });
-      await regCell(db, 'permits_hse', R, 'entry', { user: [solo.user.id] });
-      const rec2 = await createRec({ ...t, entry: solo }, { ...PERMIT_CW, permit_type: 'Access - TE' });
-      const noStep = await post(solo.api, 'permits_hse', rec2.id, 'submit', rec2.version);
-      expect(noStep.status).toBe(401);
-      expect(noStep.body.code).toBe('step_up_required');
-      await solo.api.stepUp(solo.user.password);
-      const done = await post(solo.api, 'permits_hse', rec2.id, 'submit', rec2.version);
-      expect(done.body).toMatchObject({ state: 'approved', self_approval: true, levels_required: 1 });
-      const hist = await solo.api.call('get', recPath('permits_hse', rec2.id, '/history'));
-      expect(hist.body.items.find((s: { action: string }) => s.action === 'submit')).toMatchObject({ self_approval: true, stepup_verified: true });
-    } finally {
-      await db.query(`UPDATE register_definitions SET approval_levels = 3 WHERE register_key = 'permits_hse'`);
-    }
-  });
-
-  it('freezes the level path at the first submission (B7): a later change of the row applies to new records only', async () => {
+  it('a record submitted on a 3-level snapshot runs entry, review, approve; a new record has 2 levels', async () => {
     const t = await team(app, db, 'hlc', 'hlc', R);
     const rec = await createRec(t, HLC);
+    await snapshot(rec.id, 3);
     let res = await post(t.entry.api, 'hlc', rec.id, 'submit', rec.version);
-    expect(res.body.levels_required).toBe(3);
-    await db.query(`UPDATE register_definitions SET approval_levels = 2 WHERE register_key = 'hlc'`);
-    try {
-      res = await post(t.review.api, 'hlc', rec.id, 'review', res.body.version);
-      expect(res.body).toMatchObject({ state: 'in_approval', levels_required: 3 });
-      const fresh = await createRec(await otherSite(db, t), { ...HLC, request_no: 'HR-2' });
-      expect((await t.entry.api.call('get', recPath('hlc', fresh.id))).body.levels_required).toBe(2);
-    } finally {
-      await db.query(`UPDATE register_definitions SET approval_levels = 3 WHERE register_key = 'hlc'`);
+    expect(res.body).toMatchObject({ state: 'in_review', levels_required: 3 });
+    res = await post(t.review.api, 'hlc', rec.id, 'review', res.body.version);
+    expect(res.body).toMatchObject({ state: 'in_approval', levels_required: 3 });
+    const fresh = await createRec(await otherSite(db, t), { ...HLC, request_no: 'HR-2' });
+    expect((await t.entry.api.call('get', recPath('hlc', fresh.id))).body.levels_required).toBe(2);
+  });
+
+  it('a single-level snapshot is still a self-approval that needs step-up', async () => {
+    const t = await team(app, db, 'permits_hse', 'permits_hse', R);
+    const solo = await actor(app, db, { level: 'approve', grants: G('permits_hse', 'view', 'create', 'edit', 'approve'), regions: [R], modules: null, stepUp: false });
+    await regCell(db, 'permits_hse', R, 'entry', { user: [solo.user.id] });
+    const rec2 = await createRec({ ...t, entry: solo }, { ...PERMIT_CW, permit_type: 'Access - TE' });
+    await snapshot(rec2.id, 1);
+    const noStep = await post(solo.api, 'permits_hse', rec2.id, 'submit', rec2.version);
+    expect(noStep.status).toBe(401);
+    expect(noStep.body.code).toBe('step_up_required');
+    await solo.api.stepUp(solo.user.password);
+    const done = await post(solo.api, 'permits_hse', rec2.id, 'submit', rec2.version);
+    expect(done.body).toMatchObject({ state: 'approved', self_approval: true, levels_required: 1 });
+  });
+
+  it('refuses to set a level count of 1 or 3 on a register row, a stage or a task (the count is fixed at 2)', async () => {
+    for (const n of [1, 3]) {
+      await expect(db.query(`UPDATE register_definitions SET approval_levels = ${n} WHERE register_key = 'hlc'`)).rejects.toThrow(/two_levels/);
+      await expect(db.query(`UPDATE stage_definitions SET approval_levels = ${n} WHERE code = 'MS1'`)).rejects.toThrow(/two_levels/);
+      await expect(db.query(`UPDATE task_definitions SET approval_levels = ${n} WHERE code = 'A1'`)).rejects.toThrow(/two_levels/);
     }
   });
 });
@@ -361,34 +368,36 @@ describe('group levels: claim, release, all members, no holder (B10)', () => {
     expect((await post(outsider.api, 'gecol', rec.id, 'claim', claim.body.version)).body.code).toBe('not_eligible_holder');
   });
 
-  it('needs every member of an all-members level, and sends the System Admins the records nobody can act on', async () => {
+  it('needs every member of an all-members L2, and sends the System Admins the records nobody can act on', async () => {
     const t = await team(app, db, 'hlc', 'hlc', R);
-    const a = await actor(app, db, { level: 'review', grants: G('hlc', 'view'), regions: [R], modules: null });
-    const b = await actor(app, db, { level: 'review', grants: G('hlc', 'view'), regions: [R], modules: null });
-    await regCell(db, 'hlc', R, 'review', { group: [await groupWith(db, [a.user.id, b.user.id])] }, 'all_members');
+    const a = await actor(app, db, { level: 'approve', grants: G('hlc', 'view', 'approve'), regions: [R], modules: null });
+    const b = await actor(app, db, { level: 'approve', grants: G('hlc', 'view', 'approve'), regions: [R], modules: null });
+    await regCell(db, 'hlc', R, 'approve', { group: [await groupWith(db, [a.user.id, b.user.id])] }, 'all_members');
     const rec = await createRec(t, HLC);
     let res = await post(t.entry.api, 'hlc', rec.id, 'submit', rec.version);
     expect(res.body.ball_in_court).toMatchObject({ rule: 'all_members', votes_needed: 2, votes_done: 0 });
-    res = await post(a.api, 'hlc', rec.id, 'review', res.body.version);
-    expect(res.body.state).toBe('in_review');
-    expect(res.body.last_transition.votes_missing).toBe(1);
-    expect((await post(a.api, 'hlc', rec.id, 'review', res.body.version)).status).toBe(409);   // already voted
-    res = await post(b.api, 'hlc', rec.id, 'review', res.body.version);
+    await a.api.stepUp(a.user.password);
+    await b.api.stepUp(b.user.password);
+    res = await post(a.api, 'hlc', rec.id, 'approve', res.body.version);
     expect(res.body.state).toBe('in_approval');
+    expect(res.body.last_transition.votes_missing).toBe(1);
+    expect((await post(a.api, 'hlc', rec.id, 'approve', res.body.version)).status).toBe(409);   // already voted
+    res = await post(b.api, 'hlc', rec.id, 'approve', res.body.version);
+    expect(res.body.state).toBe('approved');
 
     // B10: a level with nobody goes to the System Admins and is never skipped
     const rec2 = await createRec(await otherSite(db, t), { ...HLC, request_no: 'HR-3' });
-    await regCell(db, 'hlc', R, 'review', {});
+    await regCell(db, 'hlc', R, 'approve', {});
     const sub = await post(t.entry.api, 'hlc', rec2.id, 'submit', rec2.version);
-    expect(sub.body.state).toBe('in_review');
+    expect(sub.body.state).toBe('in_approval');
     expect(sub.body.ball_in_court.no_eligible_holder).toBe(true);
-    expect((await post(t.review.api, 'hlc', rec2.id, 'review', sub.body.version)).status).toBe(403);
+    expect((await post(t.approve.api, 'hlc', rec2.id, 'approve', sub.body.version)).status).toBe(403);
     const n = await q(db, `SELECT 1 FROM notifications WHERE kind = 'no_eligible_holder' AND link = $1`, [`/registers/hlc/records/${rec2.id}`]);
     expect(n.length).toBeGreaterThan(0);
     const admin = await plainAdmin(app, db);
-    const done = await post(admin.api, 'hlc', rec2.id, 'review', sub.body.version);
+    const done = await post(admin.api, 'hlc', rec2.id, 'approve', sub.body.version);
     expect(done.status).toBe(200);
-    expect(done.body.state).toBe('in_approval');
+    expect(done.body.state).toBe('approved');
   });
 });
 
@@ -410,18 +419,18 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
   it('closes B1 and B2 with the first CW order (stage row), fills the dates, unlocks the successors; the next order uses the register row', async () => {
     const t = await team(app, db, 'procurement', 'procurement', R);
-    const { stageReview, stageApprove } = await withTasks(t, ['B1', 'B2'], ['B1']);
+    const { stageApprove } = await withTasks(t, ['B1', 'B2'], ['B1']);
     const rec = await createRec(t, PROC);
     let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
     expect(res.status).toBe(200);
     expect(res.body.task.task_code).toBe('B1');
-    expect(res.body.state).toBe('in_review');
-    // the register row's reviewer does not hold the stage row's review cell
-    const wrong = await post(t.review.api, 'procurement', rec.id, 'review', res.body.version);
+    expect(res.body.state).toBe('in_approval');
+    // the register row's approver does not hold the stage row's L2 cell
+    await t.approve.api.stepUp(t.approve.user.password);
+    const wrong = await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version);
     expect(wrong.status).toBe(403);
     expect(wrong.body.code).toBe('not_eligible_holder');
-    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([stageReview.user.id]);
-    res = await post(stageReview.api, 'procurement', rec.id, 'review', res.body.version);
+    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([stageApprove.user.id]);
     expect(res.body.state).toBe('in_approval');
     await stageApprove.api.stepUp(stageApprove.user.password);
     res = await post(stageApprove.api, 'procurement', rec.id, 'approve', res.body.version);
@@ -443,7 +452,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const v2b = await patch(t.entry.api, 'procurement', v2.body.id, v2.body.version, { data: { po_wo_no: 'PO-77', po_wo_date: '2026-01-20' } });
     res = await post(t.entry.api, 'procurement', v2.body.id, 'submit', v2b.body.version);
     expect(res.body.task.task_code).toBe('B2');
-    res = await post(stageReview.api, 'procurement', v2.body.id, 'review', res.body.version);
     res = await post(stageApprove.api, 'procurement', v2.body.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
     expect(await taskRow(db, t.site, 'B2')).toMatchObject({ state: 'approved', actual_date: '2026-01-20' });
@@ -455,8 +463,7 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const second = await createRec(t, { ...PROC, pr_no: 'PR-2002', pr_date: '2026-02-02' });
     res = await post(t.entry.api, 'procurement', second.id, 'submit', second.version);
     expect(res.body.task).toBeUndefined();
-    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([t.review.user.id]);
-    res = await post(t.review.api, 'procurement', second.id, 'review', res.body.version);
+    expect(res.body.ball_in_court.holders.map((h: { ref_id: string }) => h.ref_id)).toEqual([t.approve.user.id]);
     res = await post(t.approve.api, 'procurement', second.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
     expect((await taskRow(db, t.site, 'B1')).actual_date).toBe('2026-01-05');             // the task keeps its first date
@@ -468,12 +475,12 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
   it('drops the task link when an edit after a rejection no longer matches the task source: the record is approved on the register row, the task stays open', async () => {
     const t = await team(app, db, 'procurement', 'procurement', R);
-    const { stageReview } = await withTasks(t, ['B1'], ['B1']);
+    const { stageApprove } = await withTasks(t, ['B1'], ['B1']);
     const rec = await createRec(t, PROC);
     let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
     expect(res.body.task.task_code).toBe('B1');
     expect(await linkOf(rec.id)).not.toBeNull();
-    res = await post(stageReview.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'wrong scope' });
+    res = await post(stageApprove.api, 'procurement', rec.id, 'reject', res.body.version, { note: 'wrong scope' });
     expect(res.body.state).toBe('entry');
     // the scope no longer says CW / Tower Erection / Site Adaption: STA is not a source of B1
     const fixed = await patch(t.entry.api, 'procurement', rec.id, res.body.version, { data: { scope: 'STA' } });
@@ -484,8 +491,9 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     expect(await linkOf(rec.id)).toBeNull();
     expect(await unlinked(rec.id)).toHaveLength(1);
     // the register row's holders decide now, not the stage row's
-    expect((await post(stageReview.api, 'procurement', rec.id, 'review', res.body.version)).status).toBe(403);
-    res = await post(t.review.api, 'procurement', rec.id, 'review', res.body.version);
+    await stageApprove.api.stepUp(stageApprove.user.password);
+    expect((await post(stageApprove.api, 'procurement', rec.id, 'approve', res.body.version)).status).toBe(403);
+    await t.approve.api.stepUp(t.approve.user.password);
     res = await post(t.approve.api, 'procurement', rec.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
     expect(res.body.last_transition.unlocked_task_ids).toEqual([]);
@@ -496,11 +504,10 @@ describe('Q43: a record that is the source of a task is approved with the task\'
   it('re-checks the match just before the task is closed: data that changed, or a source date that is gone, leaves the task open and the record approved', async () => {
     for (const change of [`data = data || '{"scope": "STA"}'::jsonb`, `data = data - 'pr_date'`]) {
       const t = await team(app, db, 'procurement', 'procurement', R);
-      const { stageReview, stageApprove } = await withTasks(t, ['B1'], ['B1']);
+      const { stageApprove } = await withTasks(t, ['B1'], ['B1']);
       const rec = await createRec(t, PROC);
       let res = await post(t.entry.api, 'procurement', rec.id, 'submit', rec.version);
       expect(res.body.task.task_code).toBe('B1');
-      res = await post(stageReview.api, 'procurement', rec.id, 'review', res.body.version);
       expect(res.body.state).toBe('in_approval');
       // the data changes behind the workflow (a direct correction by the database administrator)
       await db.query(`UPDATE register_records SET ${change} WHERE id = $1`, [rec.id]);
@@ -518,7 +525,7 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
   it('refuses a future source date: at submit when a task is linked, and again when the task is closed (422 future_date)', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
-    const { stageReview, stageApprove } = await withTasks(t, ['B3'], ['B3']);
+    const { stageApprove } = await withTasks(t, ['B3'], ['B3']);
     // Valid From is not an actual date field of the register, but it is the date of task B3 now
     const rec = await createRec(t, { ...PERMIT_CW, valid_from: '2035-06-01', valid_to: '2035-12-31' });
     const early = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
@@ -530,9 +537,8 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     // a past date goes through; the date moves into the future behind the workflow: the approval is refused and nothing changes
     const ok = await patch(t.entry.api, 'permits_hse', rec.id, early.body.version ?? rec.version, { data: { valid_from: '2025-12-01' } });
     expect(ok.status).toBe(200);
-    let res = await post(t.entry.api, 'permits_hse', rec.id, 'submit', ok.body.version);
+    const res = await post(t.entry.api, 'permits_hse', rec.id, 'submit', ok.body.version);
     expect(res.body.task.task_code).toBe('B3');
-    res = await post(stageReview.api, 'permits_hse', rec.id, 'review', res.body.version);
     await db.query(`UPDATE register_records SET data = data || '{"valid_from": "2035-06-01"}'::jsonb WHERE id = $1`, [rec.id]);
     await stageApprove.api.stepUp(stageApprove.user.password);
     const late = await post(stageApprove.api, 'permits_hse', rec.id, 'approve', res.body.version);
@@ -545,7 +551,7 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
   it('refuses a submission whose task is still locked, and needs the task\'s mandatory document slots', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
-    const { stageReview, stageApprove } = await withTasks(t, ['D1'], []);                    // D1 stays locked
+    const { stageApprove } = await withTasks(t, ['D1'], []);                    // D1 stays locked
     const rec = await createRec(t, { ...PERMIT_CW, permit_type: 'Access - TE' });
     const locked = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
     expect(locked.status).toBe(409);
@@ -566,7 +572,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
       let res = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
       expect(res.status).toBe(200);
       expect((await q<{ status: string }>(db, 'SELECT status::text AS status FROM document_slots WHERE task_id = $1', [tid]))[0]!.status).toBe('in_review');
-      res = await post(stageReview.api, 'permits_hse', rec.id, 'review', res.body.version);
       await stageApprove.api.stepUp(stageApprove.user.password);
       res = await post(stageApprove.api, 'permits_hse', rec.id, 'approve', res.body.version);
       expect(res.body.state).toBe('approved');
@@ -580,12 +585,11 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
   it('closes B3 with the first approved Access - CW permit; a renewal is a record only (Q57)', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
-    const { stageReview, stageApprove } = await withTasks(t, ['B3'], ['B3']);
+    const { stageApprove } = await withTasks(t, ['B3'], ['B3']);
     // a permit that is only applied for is not yet the source of B3
     const applied = await createRec(t, { permit_type: 'Access - CW', status: 'Applied', applied_date: '2025-11-20' });
     let res = await post(t.entry.api, 'permits_hse', applied.id, 'submit', applied.version);
     expect(res.body.task).toBeUndefined();
-    res = await post(t.review.api, 'permits_hse', applied.id, 'review', res.body.version);
     await t.approve.api.stepUp(t.approve.user.password);
     res = await post(t.approve.api, 'permits_hse', applied.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
@@ -596,7 +600,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const v2b = await patch(t.entry.api, 'permits_hse', v2.body.id, v2.body.version, { data: { status: 'Approved', valid_from: '2025-12-01', valid_to: '2030-12-31' } });
     res = await post(t.entry.api, 'permits_hse', v2.body.id, 'submit', v2b.body.version);
     expect(res.body.task.task_code).toBe('B3');
-    res = await post(stageReview.api, 'permits_hse', v2.body.id, 'review', res.body.version);
     await stageApprove.api.stepUp(stageApprove.user.password);
     res = await post(stageApprove.api, 'permits_hse', v2.body.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
@@ -607,7 +610,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const v3b = await patch(t.entry.api, 'permits_hse', v3.body.id, v3.body.version, { data: { valid_from: '2026-06-01', valid_to: '2031-12-31' } });
     res = await post(t.entry.api, 'permits_hse', v3.body.id, 'submit', v3b.body.version);
     expect(res.body.task).toBeUndefined();
-    res = await post(t.review.api, 'permits_hse', v3.body.id, 'review', res.body.version);
     res = await post(t.approve.api, 'permits_hse', v3.body.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');
     expect((await taskRow(db, t.site, 'B3')).actual_date).toBe('2025-12-01');
@@ -626,7 +628,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const v2b = await patch(g.entry.api, 'gecol', v2.body.id, v2.body.version, { data: { meter_no: 'M-1', power_on_date: '2026-03-03' } });
     res = (await post(g.entry.api, 'gecol', v2.body.id, 'submit', v2b.body.version)).body;
     expect(res.task.task_code).toBe('C2');
-    res = (await post(gs.stageReview.api, 'gecol', v2.body.id, 'review', res.version)).body;
     await gs.stageApprove.api.stepUp(gs.stageApprove.user.password);
     res = (await post(gs.stageApprove.api, 'gecol', v2.body.id, 'approve', res.version)).body;
     expect(res.state).toBe('approved');
@@ -637,7 +638,6 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     const hrec = await createRec(h, { ...HLC, installation_date: '2026-02-10', tx_link_tested_date: '2026-02-15' });
     let hr = (await post(h.entry.api, 'hlc', hrec.id, 'submit', hrec.version)).body;
     expect(hr.task.task_code).toBe('C4');
-    hr = (await post(hs.stageReview.api, 'hlc', hrec.id, 'review', hr.version)).body;
     await hs.stageApprove.api.stepUp(hs.stageApprove.user.password);
     hr = (await post(hs.stageApprove.api, 'hlc', hrec.id, 'approve', hr.version)).body;
     expect(hr.state).toBe('approved');
@@ -764,7 +764,7 @@ describe('Permits & HSE: expiry choice, N/A, stop work, approver from the approv
     await post(t.entry.api, 'permits_hse', access.id, 'submit', access.version);
     expect(await refs()).toEqual(['Access - CW', 'PTW - CW']);                                         // nor a record in review
     const cur = await t.entry.api.call('get', recPath('permits_hse', access.id));
-    let res = await post(t.review.api, 'permits_hse', access.id, 'review', cur.body.version);
+    let res = cur;
     await t.approve.api.stepUp(t.approve.user.password);
     res = await post(t.approve.api, 'permits_hse', access.id, 'approve', res.body.version);
     expect(res.body.state).toBe('approved');

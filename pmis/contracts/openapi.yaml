@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.9
+  version: 0.4.10
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.4.10 (2026-11-02): additive. UI plan 4b (X1 to X7) and DD6. (1) Notification inbox (X1): `GET /notifications` gains `snoozed` (hide default, only, include) and `unread_count` counts only visible ones; `POST /notifications/{id}/unread`, `POST /notifications/{id}/snooze` (a date-time, a plain date, or null to clear); `Notification.snoozed_until`; more `NotificationKind` values (`mention`, `followed_change` and the kinds the database already wrote). (2) Follow (X2): `PUT/DELETE /sites/{site_id}/follow`, `PUT/DELETE /registers/{register_key}/records/{record_id}/follow`, `GET /me/follows`; followers get a `followed_change` notification when a task of the site or the record changes, only while they can still read it. (3) Mentions (X3): `@1234` employee-ID tokens in a comment body are resolved like `mention_user_ids`; a person who cannot read the record is neither notified nor named in the answer; `GET/POST /registers/{register_key}/records/{record_id}/comments`. (4) X4: `GET /tasks/{task_id}/time-in-state` and `GET /reports/time-in-state` (needs `reports` view). (5) X5: `GET /reports/workload` (needs `reports` view; reassignment stays `POST /tasks/reassign`). (6) X6: `GET /tasks/{task_id}/blocked-by`. (7) X7: `GET/POST /status-updates`, `PATCH /status-updates/{id}`. (8) DD6: optional `via` (`button`, `drag`, `bulk`) on `start`, `submit`, `review`, `approve`, `reject` of tasks and register records and on `POST /approvals/bulk` (default `bulk`); it is recorded in the audit row and changes no rule. Migration 0031.
     - 0.4.9 (2026-11-01): additive. Write-through edits from the work views (spec registers-and-streams.md 2.7; Q73, Q99). `TaskSummary.register_fields` (only in `GET /sites/{site_id}/tasks`) lists the register-owned fields a task row shows: the value is read from the current record of the source register (the view keeps no copy), `source` points to the register record and `edit_via` says how to edit it with the existing register endpoints (`patch`: `PATCH /registers/{register_key}/records/{id}`; `new_version`: `POST .../versions` first; `create`: `POST /registers/{register_key}/records`). Permissions, the Entry / Review / Approve path and the audit are those of the register, so there is no new endpoint. A register the caller cannot view is left out. BU and EF move to the As-Built register (new fields `cw_as_built_submitted`, `as_built_date`; tasks B13 and D15) and FO / FT to the Dismantle register (the contractor of the `cw` and `te` parts; task E2), Q99. Migration 0029.
     - 0.4.8 (2026-11-01): additive. (1) The remaining registers are enabled on the generic `/registers/{register_key}/...` paths: `contractors` (record types `company` and `team`; an approved one becomes an external party or team), `quality` (`qc`, `snag`, `itp`, `ncr`), `issues`, `risks`, `change_control`, `readiness_handover`, `meetings`, `rf_design`, `acquisition`, `as_built` and `warehouse` (record types `te_dn`, `cw_dn`, `te_rn`, `cw_rn`, `pl`, `open`, `adj`; the last three have no site). Their fields are those of the spec; `Deliverables` stays disabled (Q71). (2) Warehouse in full: `StockMovement` becomes the DN / RN / PL / OPEN / ADJ document with lines (`record_type`, `doc_no`, `register_record_id`, line `qty_approved`, `condition`, `serials`, kinds `receipt` and `adjustment`); a movement is created with `POST /warehouse/movements` (reserves the stock, 422 `insufficient_stock`), is submitted, reviewed and approved through its register record and posts the stock on the final approval; `StockMovementInput` now takes `record_type` (replacing `kind`), the header fields and the lines. The item master carries `manufacturer`, `contract_qty`, `planned_delivery_date`, `progress_item_code` and the read-only `as_built_item_code`; new error code `item_in_use` (422: unit and serial tracking of an item with movements are fixed, an item with a pending movement cannot be deactivated). (3) New tag `as-built` and the editable As-Built item list, linked to Warehouse codes (Q74): `GET` and `POST /as-built/items`, `GET` and `PATCH /as-built/items/{item_id}`; every active item is a number field `q_<code>` of the As-Built register. (4) Correction of the CW / TE / O&M views (Q102 answered): CW DLP (B14) and CW FAC (B15) are always in the CW view; TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after; the O&M view lists only D18.
     - 0.4.7 (2026-11-01): additive. CW / TE / O&M views as tabs of the Site Register (Q98, owner decision 2026-11-01): `view` query parameter on `GET /sites` and `GET /sites/{site_id}/tasks` (a view groups tasks, not whole stages; the four streams stay the filter and can be combined with a view, the result is the tasks in both), `views` in the task grid (`View`: code, name EN/AR, order, the stage and task codes in force) and on each `SiteListItem` (`ViewRef`). View definitions are seed data versioned with the workflow, like streams. CW FAC (B15) and TE FAC (D18) belong to the CW and TE view until the O&M team is assigned (setting `views.om_team_assigned`, default false, Q102) and to the O&M view after.
@@ -156,6 +157,10 @@ tags:
     description: "Snag types, snags and QC photos."
   - name: custom-fields
     description: "Admin-defined fields on sites, tasks, milestones, gates and registers (ADR 0009)."
+  - name: status-updates
+    description: "Weekly status updates per region or team (X7)."
+  - name: insights
+    description: "Time in state, workload and blocked-by (X4 to X6), read-only."
   - name: notifications
     description: "In-app notifications and channel preferences."
   - name: system-log
@@ -1939,6 +1944,7 @@ paths:
               type: object
               properties:
                 actual_start: { type: string, format: date, description: 'Default today (TE MOS date for D6).' }
+                via: { $ref: '#/components/schemas/WorkflowVia' }
       responses:
         '200': { $ref: '#/components/responses/TaskTransition' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1967,6 +1973,7 @@ paths:
               type: object
               properties:
                 note: { type: string, maxLength: 2000 }
+                via: { $ref: '#/components/schemas/WorkflowVia' }
       responses:
         '200': { $ref: '#/components/responses/TaskTransition' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1992,6 +1999,7 @@ paths:
               type: object
               properties:
                 note: { type: string, maxLength: 2000 }
+                via: { $ref: '#/components/schemas/WorkflowVia' }
       responses:
         '200': { $ref: '#/components/responses/TaskTransition' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -2017,6 +2025,7 @@ paths:
               type: object
               properties:
                 note: { type: string, maxLength: 2000 }
+                via: { $ref: '#/components/schemas/WorkflowVia' }
       responses:
         '200': { $ref: '#/components/responses/TaskTransition' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -2130,6 +2139,7 @@ paths:
       tags: [tasks]
       operationId: addTaskComment
       summary: Add a comment (with optional mentions)
+      description: 0.4.10 (X3). Mentions come from `mention_user_ids` and from `@1234` employee-ID tokens in the body. Only a person who can read the task is stored as mentioned and notified; anyone else is dropped silently, so the answer never shows whether a person can see the task.
       requestBody:
         required: true
         content:
@@ -2341,6 +2351,7 @@ paths:
                   maxItems: 200
                   items: { $ref: '#/components/schemas/VersionedRef' }
                 note: { type: string, maxLength: 2000 }
+                via: { description: 'Default bulk; a board drag of several cards sends drag.', $ref: '#/components/schemas/WorkflowVia' }
       responses:
         '200':
           description: Per-item result.
@@ -4724,6 +4735,10 @@ paths:
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterNoteVia'}
       responses:
         '200':
           description: Transition applied.
@@ -4751,6 +4766,10 @@ paths:
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterNoteVia'}
       responses:
         '200':
           description: Transition applied.
@@ -4779,6 +4798,10 @@ paths:
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RegisterNoteVia'}
       responses:
         '200':
           description: Transition applied.
@@ -6506,6 +6529,10 @@ paths:
       - name: unread_only
         in: query
         schema: {type: boolean, default: false}
+      - name: snoozed
+        in: query
+        description: 'hide (default): a snoozed notification is hidden until its date. only: just the snoozed ones. include: both.'
+        schema: {type: string, enum: [hide, only, include], default: hide}
       - name: kind
         in: query
         schema: {$ref: '#/components/schemas/NotificationKind'}
@@ -6544,6 +6571,327 @@ paths:
               schema: {$ref: '#/components/schemas/Notification'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /notifications/{notification_id}/unread:
+    parameters:
+    - {$ref: '#/components/parameters/NotificationId'}
+    post:
+      tags: [notifications]
+      operationId: markNotificationUnread
+      summary: Mark one as unread (0.4.10, X1)
+      description: Only the owner of the notification; anyone else gets 404. Audited.
+      responses:
+        '200':
+          description: Unread.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /notifications/{notification_id}/snooze:
+    parameters:
+    - {$ref: '#/components/parameters/NotificationId'}
+    post:
+      tags: [notifications]
+      operationId: snoozeNotification
+      summary: Hide a notification until a date (0.4.10, X1)
+      description: '`until` is a date-time, or a plain date (the start of that day in Tripoli time), in the future and within one year (else 422). `null` clears the snooze. Snoozing does not mark it read. Audited.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [until]
+              additionalProperties: false
+              properties:
+                until: {oneOf: [{type: string, format: date-time}, {type: string, format: date}, {type: 'null'}]}
+      responses:
+        '200':
+          description: Snoozed.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Notification'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /sites/{site_id}/follow:
+    parameters:
+    - {$ref: '#/components/parameters/SiteId'}
+    put:
+      tags: [notifications]
+      operationId: followSite
+      summary: Follow a site (0.4.10, X2)
+      description: Needs `view` on `sites` for the site's region (403 `module_forbidden` without the module, 404 for a site outside the caller's regions). Idempotent. The follower gets a `followed_change` notification when a task of the site changes, only while they can still read it. Audited. Follows grant no access.
+      x-db-path: x_follow
+      responses:
+        '200':
+          description: Following.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Follow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [notifications]
+      operationId: unfollowSite
+      summary: Stop following a site (0.4.10, X2)
+      x-db-path: x_unfollow
+      responses:
+        '204': {description: Not following (also when it was not followed).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /registers/{register_key}/records/{record_id}/follow:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    put:
+      tags: [notifications]
+      operationId: followRegisterRecord
+      summary: Follow a register record (0.4.10, X2)
+      description: Follows the record across its versions. Needs `view` on the register's module for the record's region (403 / 404 as for the site). Idempotent, audited. The followers of a site also hear about the register changes of that site if they can read the register.
+      x-db-path: x_follow
+      responses:
+        '200':
+          description: Following.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Follow'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      tags: [notifications]
+      operationId: unfollowRegisterRecord
+      summary: Stop following a register record (0.4.10, X2)
+      x-db-path: x_unfollow
+      responses:
+        '204': {description: Not following.}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /me/follows:
+    get:
+      tags: [notifications]
+      operationId: listMyFollows
+      summary: What I follow, limited to what I can still read (0.4.10, X2)
+      responses:
+        '200':
+          description: Follows, newest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Follow'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /registers/{register_key}/records/{record_id}/comments:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: listRegisterRecordComments
+      summary: Comment thread of a register record (0.4.10, X3)
+      description: The thread belongs to the record, so all its versions share it. Comments on a global record (no region) are not supported yet.
+      parameters:
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Comments, oldest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items: {type: array, items: {$ref: '#/components/schemas/Comment'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: addRegisterRecordComment
+      summary: Add a comment with mentions (0.4.10, X3)
+      description: Mentions come from `mention_user_ids` and from `@1234` employee-ID tokens in the body. Only a person who can read the record (module, region) is stored as mentioned and notified; anyone else is dropped silently, so the answer never shows whether a person can see the record. Audited.
+      x-db-path: reg_add_comment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              additionalProperties: false
+              properties:
+                body: {type: string, minLength: 1, maxLength: 4000}
+                mention_user_ids: {type: array, maxItems: 20, items: {type: string, format: uuid}}
+      responses:
+        '201':
+          description: Added.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Comment'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /tasks/{task_id}/time-in-state:
+    parameters:
+    - {$ref: '#/components/parameters/TaskId'}
+    get:
+      tags: [insights]
+      operationId: getTaskTimeInState
+      summary: How long the task sat at each level (0.4.10, X4)
+      description: Rebuilt from the task's audit rows. A visit is a run in the same level; it ends at the next state change. Time before the first audited change is not counted. Readable by anyone who can read the task.
+      responses:
+        '200':
+          description: Durations.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TaskTimeInState'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /tasks/{task_id}/blocked-by:
+    parameters:
+    - {$ref: '#/components/parameters/TaskId'}
+    get:
+      tags: [insights]
+      operationId: getTaskBlockedBy
+      summary: What the task waits for (0.4.10, X6)
+      description: The predecessors not yet approved (with the predecessor task), the closed gate with its conditions (permits, stop work, suspension) and the open snags. The same facts as `TaskSummary.lock_reasons`, in one place.
+      responses:
+        '200':
+          description: The chain.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BlockedBy'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reports/time-in-state:
+    get:
+      tags: [insights]
+      operationId: getTimeInStateReport
+      summary: Time in each level, per person or per team (0.4.10, X4)
+      description: Completed visits only, attributed to the person who handled them. Needs `view` on `reports` and `sites`; counts only tasks in the regions both grants cover (a System Admin sees all).
+      parameters:
+      - {name: group_by, in: query, schema: {type: string, enum: [holder, team], default: holder}}
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      - {name: stage_code, in: query, schema: {type: string}}
+      - {name: from, in: query, description: 'Visits that ended on or after this date.', schema: {type: string, format: date}}
+      - {name: to, in: query, description: 'Visits that ended on or before this date.', schema: {type: string, format: date}}
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TimeInStateReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /reports/workload:
+    get:
+      tags: [insights]
+      operationId: getWorkload
+      summary: Open and late tasks per holder (0.4.10, X5)
+      description: A claimed task counts for its claimant, an unclaimed one for everyone who could act on its level. Late = the SLA is past its maximum. A level nobody can hold is counted under `no_holder`. Needs `view` on `reports` and `sites`, limited to the regions both cover. Reassign with `POST /tasks/reassign` (B12b).
+      parameters:
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      - {name: stage_code, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Workload.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Workload'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /status-updates:
+    get:
+      tags: [status-updates]
+      operationId: listStatusUpdates
+      summary: Weekly status updates (0.4.10, X7)
+      description: Newest week first. Needs `view` on `sites`; only updates of the caller's regions, plus updates that cover all regions.
+      parameters:
+      - {name: scope, in: query, schema: {type: string, enum: [region, team]}}
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      - {name: team, in: query, schema: {type: string, enum: [cw, te]}}
+      - {name: week_start, in: query, schema: {type: string, format: date}}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Updates.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items: {type: array, items: {$ref: '#/components/schemas/StatusUpdate'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [status-updates]
+      operationId: createStatusUpdate
+      summary: Write this week's update (0.4.10, X7)
+      description: For a lead of the region, that is a holder of the `reassign` grant there, or a System Admin (403 otherwise). The week is the current working week (it opens on Sunday). A team update without `region_id` covers all regions and needs the grant for all regions. Audited.
+      x-db-path: x_status_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StatusUpdateInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusUpdate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /status-updates/{update_id}:
+    parameters:
+    - {name: update_id, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      tags: [status-updates]
+      operationId: editStatusUpdate
+      summary: Edit an update (0.4.10, X7)
+      description: Only the author, only until the end of the update's week (409 `invalid_transition` after). Never deleted; the audit row keeps before and after.
+      x-db-path: x_status_edit
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StatusUpdatePatch'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StatusUpdate'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /notifications/read-all:
     post:
       tags: [notifications]
@@ -8167,6 +8515,7 @@ components:
       required: [note]
       properties:
         note: { type: string, minLength: 1, maxLength: 2000 }
+        via: { $ref: '#/components/schemas/WorkflowVia' }
         rejected_slots:
           type: array
           items:
@@ -10249,7 +10598,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
@@ -10264,6 +10613,175 @@ components:
         link: { type: [string, 'null'], description: 'App-relative path.' }
         created_at: { type: string, format: date-time }
         read_at: { type: [string, 'null'], format: date-time }
+        snoozed_until: { type: [string, 'null'], format: date-time, description: '0.4.10. Hidden from the default list until then.' }
+    WorkflowVia:
+      type: string
+      enum: [button, drag, bulk]
+      description: '0.4.10 (DD6). How the action was started. Recorded in the audit row; it changes no rule or permission.'
+    RegisterNoteVia:
+      type: object
+      additionalProperties: false
+      properties:
+        note: {type: string, maxLength: 2000, description: 'Mandatory on reject.'}
+        via: {$ref: '#/components/schemas/WorkflowVia'}
+    Follow:
+      type: object
+      required: [id, entity_type, entity_id, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        entity_type: {type: string, enum: [site, register_record]}
+        entity_id: {type: string, format: uuid, description: 'The site id, or the record entity id (stable across versions).'}
+        register_key: {type: [string, 'null']}
+        site_id: {type: [string, 'null'], format: uuid}
+        label: {type: string, description: 'Only in GET /me/follows.'}
+        created_at: {type: string, format: date-time}
+    InStateKind:
+      type: string
+      enum: [entry, review, approve]
+      description: 'The level a task sits at.'
+    TaskTimeInState:
+      type: object
+      required: [task_id, current_state, items, segments]
+      properties:
+        task_id: {type: string, format: uuid}
+        current_state: {oneOf: [{$ref: '#/components/schemas/InStateKind'}, {type: 'null'}], description: 'The level the task sits at now; null when it is locked, approved or otherwise not at a level.'}
+        items:
+          type: array
+          description: One per level.
+          items:
+            type: object
+            required: [state, visits, total_seconds, longest_seconds, working_days]
+            properties:
+              state: {$ref: '#/components/schemas/InStateKind'}
+              visits: {type: integer}
+              total_seconds: {type: integer}
+              longest_seconds: {type: integer}
+              working_days: {type: integer, description: 'Sum of the working days of each visit (weekend Friday and Saturday, holidays).'}
+        segments:
+          type: array
+          items:
+            type: object
+            required: [state, started_at, ended_at, seconds, working_days]
+            properties:
+              state: {$ref: '#/components/schemas/InStateKind'}
+              started_at: {type: string, format: date-time}
+              ended_at: {type: [string, 'null'], format: date-time}
+              seconds: {type: integer}
+              working_days: {type: integer}
+              handled_by: {$ref: '#/components/schemas/UserRef'}
+    TimeInStateReport:
+      type: object
+      required: [group_by, items]
+      properties:
+        group_by: {type: string, enum: [holder, team]}
+        items:
+          type: array
+          items:
+            type: object
+            required: [levels]
+            properties:
+              holder: {$ref: '#/components/schemas/UserRef'}
+              team: {type: string, enum: [cw, te, both, none]}
+              levels:
+                type: object
+                description: 'Keyed by level (entry, review, approve).'
+                additionalProperties:
+                  type: object
+                  required: [visits, total_seconds, average_seconds, max_seconds, working_days]
+                  properties:
+                    visits: {type: integer}
+                    total_seconds: {type: integer}
+                    average_seconds: {type: integer}
+                    max_seconds: {type: integer}
+                    working_days: {type: integer}
+    Workload:
+      type: object
+      required: [items, no_holder]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [holder, team, open, late, by_level]
+            properties:
+              holder: {$ref: '#/components/schemas/UserRef'}
+              team: {type: string, enum: [cw, te, both, none]}
+              open: {type: integer}
+              late: {type: integer}
+              by_level:
+                type: object
+                properties:
+                  entry: {type: integer}
+                  review: {type: integer}
+                  approve: {type: integer}
+        no_holder:
+          type: object
+          required: [open, late]
+          properties:
+            open: {type: integer}
+            late: {type: integer}
+    BlockedBy:
+      type: object
+      required: [task_id, state, blocked, items]
+      properties:
+        task_id: {type: string, format: uuid}
+        state: {type: string}
+        blocked: {type: boolean}
+        items:
+          type: array
+          items:
+            type: object
+            required: [kind, message]
+            properties:
+              kind: {type: string, description: 'predecessor_not_approved, gate_closed, condition_not_met, permit, open_snags and the other kinds of lock_reasons.'}
+              ref_code: {type: [string, 'null']}
+              message: {type: string}
+              count: {type: [integer, 'null']}
+              task:
+                type: object
+                description: 'The predecessor task (only for predecessor_not_approved).'
+                properties:
+                  id: {type: string, format: uuid}
+                  task_code: {type: string}
+                  name_en: {type: string}
+                  state: {type: string}
+    StatusHealth:
+      type: string
+      enum: [on_track, at_risk, off_track]
+    StatusUpdateInput:
+      type: object
+      required: [scope, health, summary]
+      additionalProperties: false
+      properties:
+        scope: {type: string, enum: [region, team]}
+        region_id: {type: integer, minimum: 1, maximum: 7, description: 'Required for a region update; optional for a team update (omitted = all regions).'}
+        team: {type: string, enum: [cw, te], description: 'Required for a team update.'}
+        health: {$ref: '#/components/schemas/StatusHealth'}
+        summary: {type: string, minLength: 1, maxLength: 4000}
+    StatusUpdatePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        health: {$ref: '#/components/schemas/StatusHealth'}
+        summary: {type: string, minLength: 1, maxLength: 4000}
+    StatusUpdate:
+      type: object
+      required: [id, scope, region_id, team, week_start, week_end, health, summary, author, version, created_at, updated_at, editable]
+      properties:
+        id: {type: string, format: uuid}
+        scope: {type: string, enum: [region, team]}
+        region_id: {type: [integer, 'null']}
+        team: {type: [string, 'null'], enum: [cw, te, null]}
+        week_start: {type: string, format: date, description: 'The Sunday that opens the working week.'}
+        week_end: {type: string, format: date}
+        health: {$ref: '#/components/schemas/StatusHealth'}
+        summary: {type: string}
+        author: {$ref: '#/components/schemas/UserRef'}
+        version: {type: integer}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+        editable: {type: boolean, description: 'true for the author until the end of the week.'}
     NotificationPreference:
       type: object
       required: [kind, in_app, email]

@@ -16,7 +16,7 @@ const code = z.string().trim().min(1).max(60);
 
 const patchSchema = z.object({
   workflow_version: z.number().int().min(1).optional(),
-  stage_levels: z.array(z.object({ stage_code: code, approval_levels: z.number().int().min(1).max(3) }).strict()).max(100).optional(),
+  stage_levels: z.array(z.object({ stage_code: code, approval_levels: z.number().int().refine((n) => n === 2, 'The number of levels is fixed at 2: L1 Data Entry and L2 Data Reviewer & Approver.') }).strict()).max(100).optional(),
   cells: z.array(z.object({
     stage_code: code,
     task_code: code.nullish(),
@@ -36,16 +36,18 @@ interface AssigneeDto {
   user_id?: string; account_status?: 'active' | 'deactivated' | 'deleted'; member_count?: number;
 }
 interface CellDto {
-  id: string; stage_code: string; task_code: string | null; level: number; level_kind: 'entry' | 'review' | 'approve'; used: boolean; region_id: number | null;
+  id: string; stage_code: string; task_code: string | null; level: number; level_kind: 'entry' | 'review' | 'approve'; level_code: 'L1' | 'L2'; used: boolean; region_id: number | null;
   rule: 'any_one' | 'all_members'; assignees: AssigneeDto[]; skip_preview: UserRef[]; updated_at: Date | null;
 }
 type UserRef = UserRefDto;
 interface SkipCaseDto {
-  task_code: string | null; user: UserRefDto; from_level_kind: 'entry' | 'review'; skipped_level_kinds: ('review' | 'approve')[]; self_approval: boolean; region_ids: number[];
+  task_code: string | null; user: UserRefDto; from_level_kind: 'entry' | 'review'; from_level_code: 'L1' | 'L2'; skipped_level_kinds: ('review' | 'approve')[]; skipped_level_codes: 'L2'[]; self_approval: boolean; region_ids: number[];
 }
+/** Who holds what in the row's default cells: L1 only, L2 only, or both (a person holding both approves their own submission, B5). */
+export interface HolderDto { kind: 'user' | 'role' | 'group'; ref_id: string; label: string; employee_id: string | null; levels: ('L1' | 'L2')[]; both: boolean }
 export interface MatrixRowDto {
   kind: 'stage' | 'register' | 'dismantle'; register_key: string | null; code: string; name_en: string; name_ar: string | null; approval_levels: number;
-  used_levels: number[]; region_ids_with_cells: number[]; task_counts?: { not_submitted: number; in_flight: number };
+  used_levels: number[]; holders: HolderDto[]; region_ids_with_cells: number[]; task_counts?: { not_submitted: number; in_flight: number };
   preview: { single_level: boolean; skips: SkipCaseDto[] }; cells: CellDto[];
 }
 export interface MatrixDto { workflow_version: number; version: number; stages: MatrixRowDto[] }
@@ -62,6 +64,22 @@ interface PreviewRow { o_row: string; o_task: string | null; o_region: number; o
 const LEVEL_KIND = ['entry', 'review', 'approve'] as const;
 /** Entry is cell level 1, approve is cell level 3, review is cell level 2 (the engine reads them so whatever the number of levels). */
 export const usedLevels = (n: number): number[] => (n <= 1 ? [1] : n === 2 ? [1, 3] : [1, 2, 3]);
+
+/** The people, roles and groups named in the default L1 cell (level 1) and the default L2 cell (level 3), each with the levels they hold. */
+function holdersOf(defaults: CellRow[], byCell: Map<string, AssigneeDto[]>): HolderDto[] {
+  const out = new Map<string, HolderDto>();
+  for (const [level, code] of [[1, 'L1'], [3, 'L2']] as const) {
+    const cell = defaults.find((c) => c.level === level);
+    for (const a of cell ? (byCell.get(cell.id) ?? []) : []) {
+      const k = `${a.kind}:${a.ref_id}`;
+      const h = out.get(k) ?? { kind: a.kind, ref_id: a.ref_id, label: a.label, employee_id: a.employee_id, levels: [], both: false };
+      h.levels.push(code);
+      h.both = h.levels.length === 2;
+      out.set(k, h);
+    }
+  }
+  return [...out.values()];
+}
 
 /** Responsibility Matrix (contract tag `matrix`, P1-BE-12): reads follow the caller's regions; the only writer is the SECURITY DEFINER function matrix_save. */
 @Injectable()
@@ -176,7 +194,7 @@ export class MatrixService {
         const u = userRef.get(p.o_user);
         if (!u) continue;
         const key = [p.o_task ?? '', p.o_user, p.o_from, p.o_skipped.join('>'), p.o_final].join('|');
-        const e = skips.get(key) ?? { task_code: p.o_task, user: u, from_level_kind: p.o_from, skipped_level_kinds: p.o_skipped, self_approval: p.o_final, region_ids: [] };
+        const e = skips.get(key) ?? { task_code: p.o_task, user: u, from_level_kind: p.o_from, from_level_code: 'L1' as const, skipped_level_kinds: p.o_skipped, skipped_level_codes: p.o_skipped.map(() => 'L2' as const), self_approval: p.o_final, region_ids: [] };
         e.region_ids.push(p.o_region);
         skips.set(key, e);
       }
@@ -191,13 +209,13 @@ export class MatrixService {
           if (s.task_code === c.task_code && s.from_level_kind === kind && (c.region_id === null || s.region_ids.includes(c.region_id))) sp.set(s.user.id, s.user);
         }
         return {
-          id: c.id, stage_code: b.code, task_code: c.task_code, level: c.level, level_kind: kind, used: used.includes(c.level), region_id: c.region_id, rule: c.rule,
+          id: c.id, stage_code: b.code, task_code: c.task_code, level: c.level, level_kind: kind, level_code: c.level === 1 ? 'L1' : 'L2', used: used.includes(c.level), region_id: c.region_id, rule: c.rule,
           assignees: byCell.get(c.id) ?? [], skip_preview: [...sp.values()], updated_at: c.updated_at,
         };
       };
       const row: MatrixRowDto = {
         kind: b.kind, register_key: b.kind === 'stage' ? null : b.code, code: b.code, name_en: b.name_en, name_ar: b.name_ar, approval_levels: b.approval_levels,
-        used_levels: used, region_ids_with_cells: regional.find((r) => r.key === b.key)?.regions ?? [],
+        used_levels: used, holders: holdersOf(defaults, byCell), region_ids_with_cells: regional.find((r) => r.key === b.key)?.regions ?? [],
         preview: { single_level: b.approval_levels === 1, skips: skipCases },
         cells: [...defaults, ...others].map(toCell),
       };

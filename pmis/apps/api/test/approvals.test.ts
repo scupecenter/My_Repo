@@ -21,6 +21,8 @@ afterAll(async () => {
 });
 
 const site = () => makeSite(db, REGION, { prefix: PREFIX });
+/** A task submitted before migration 0032 carries a 3-level snapshot; only such a task can sit at the middle (review) level. */
+const snapshot3 = (id: string) => db.query('UPDATE task_instances SET levels_required = 3, path_frozen_at = now() WHERE id = $1', [id]);
 const ids = (body: { items: { task: { id: string } }[] }): string[] => body.items.map((i) => i.task.id);
 const ver = async (a: Actor, id: string): Promise<number> => (await a.api.call('get', `/tasks/${id}`)).body.version as number;
 
@@ -32,6 +34,7 @@ describe('GET /approvals', () => {
     const s1 = await site();
     const s2 = await site();
     const rev = await makeTask(db, s1, 'A1', 'in_review');
+    await snapshot3(rev);
     const app1 = await makeTask(db, s2, 'A1', 'in_approval');
     const other = await makeTask(db, s2, 'B1', 'in_review'); // nobody holds B1 in this region
     await setCell(db, 'A1', REGION, 'entry', { user: [e.user.id] });
@@ -82,6 +85,7 @@ describe('GET /approvals', () => {
     const group = await groupWith(db, [m1.user.id, m2.user.id]);
     const s = await site();
     const t = await makeTask(db, s, 'A1', 'in_review');
+    await snapshot3(t);
     await setCell(db, 'A1', REGION, 'review', { group: [group] });
     await setCell(db, 'A1', REGION, 'approve', { user: [m1.user.id] });
 
@@ -116,6 +120,7 @@ describe('POST /approvals/bulk', () => {
     const t2 = await makeTask(db, await site(), 'A1', 'in_approval', { actualDate: '2026-02-01' });
     const t3 = await makeTask(db, await site(), 'A1', 'in_approval', { actualDate: '2026-02-01' });
     const review = await makeTask(db, await site(), 'A1', 'in_review', { actualDate: '2026-02-01' });
+    await snapshot3(review);
     const body = (items: { id: string; version: number }[], action = 'approve') => ({ action, items });
     const items = [
       { id: t1, version: await ver(a, t1) },
@@ -164,7 +169,7 @@ describe('POST /approvals/bulk', () => {
     expect((await a.api.call('get', `/tasks/${t4}`)).body.state).toBe('in_approval');
   });
 
-  it('passes review levels in bulk, and rejects a malformed request or a bulk rejection', async () => {
+  it('passes middle levels of 3-level snapshots in bulk, and rejects a malformed request or a bulk rejection', async () => {
     const e = await actor(app, db, { level: 'entry' });
     const r = await actor(app, db, { level: 'review' });
     const a = await actor(app, db, { level: 'approve' });
@@ -172,6 +177,7 @@ describe('POST /approvals/bulk', () => {
     await setCell(db, 'A1', REGION, 'review', { user: [r.user.id] });
     await setCell(db, 'A1', REGION, 'approve', { user: [a.user.id] });
     const t1 = await makeTask(db, await site(), 'A1', 'in_review', { actualDate: '2026-02-01' });
+    await snapshot3(t1);
     const t2 = await makeTask(db, await site(), 'A1', 'in_approval', { actualDate: '2026-02-01' });
     const res = await r.api.call('post', '/approvals/bulk', { action: 'pass', items: [{ id: t1, version: await ver(r, t1) }, { id: t2, version: await ver(r, t2) }] });
     expect(res.status).toBe(200);

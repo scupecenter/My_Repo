@@ -322,7 +322,7 @@ describe('POST /assignments/bulk-update', () => {
     const people = [await pending(), await pending(), await pending()];
     await s.api.call('post', '/assignments/bulk-assign', assignBody(s, people));
     const rows = (await s.api.call('get', `/assignments?role_id=${s.role}`)).body.items as { id: string; version: number }[];
-    await s.api.call('post', '/assignments/bulk-update', { items: [{ id: rows[2]!.id, version: rows[2]!.version }], patch: { permission_level: 'review' }, reason: 'first change' });
+    await s.api.call('post', '/assignments/bulk-update', { items: [{ id: rows[2]!.id, version: rows[2]!.version }], patch: { permission_level: 'view' }, reason: 'first change' });
 
     const patch = { permission_level: 'approve', region_ids: [2, 6], module_keys: ['sites', 'warehouse'], valid_to: '2031-01-01T00:00:00Z' };
     const res = await s.api.call('post', '/assignments/bulk-update', { items: rows.map((r) => ({ id: r.id, version: r.version })), patch, reason: 'promotion' });
@@ -428,7 +428,7 @@ describe('POST /assignments/copy', () => {
     const from = await makeUser(db, { assigned: false });
     const second = await makeRole(db, { profile: s.profile });
     await s.api.call('post', '/assignments/bulk-assign', assignBody(s, [from], { region_ids: [1, 3], module_keys: ['sites'] }));
-    await s.api.call('post', '/assignments/bulk-assign', { ...assignBody(s, [from], { region_ids: [5], module_keys: ['warehouse'], permission_level: 'review' }), role_ids: [second] });
+    await s.api.call('post', '/assignments/bulk-assign', { ...assignBody(s, [from], { region_ids: [5], module_keys: ['warehouse'], permission_level: 'entry' }), role_ids: [second] });
     return { from, second };
   }
 
@@ -449,7 +449,7 @@ describe('POST /assignments/copy', () => {
     const rows = (await s.api.call('get', `/users/${targets[0]!.id}/assignments`)).body.items as { role: { id: string }; region_ids: number[]; module_keys: string[]; permission_level: string; profile_ids: string[] }[];
     expect(rows).toHaveLength(2);
     expect(rows.find((r) => r.role.id === s.role)).toMatchObject({ region_ids: [1, 3], module_keys: ['sites'], permission_level: 'entry', profile_ids: [s.profile] });
-    expect(rows.find((r) => r.role.id === second)).toMatchObject({ region_ids: [5], module_keys: ['warehouse'], permission_level: 'review' });
+    expect(rows.find((r) => r.role.id === second)).toMatchObject({ region_ids: [5], module_keys: ['warehouse'], permission_level: 'entry' });
     // the targets are no longer pending
     expect((await db.query('SELECT status FROM users WHERE id = $1', [targets[1]!.id])).rows[0].status).toBe('active');
 

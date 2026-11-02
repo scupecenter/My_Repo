@@ -1319,7 +1319,8 @@ model Notification {
   task_id    String?       @db.Uuid
   link       String?
   read_at    DateTime?     @db.Timestamptz(6)
-  sent_at    DateTime?     @db.Timestamptz(6)
+  snoozed_until DateTime?  @db.Timestamptz(6) // X1 (migration 0031): hidden from the inbox until then
+  sent_at   DateTime?     @db.Timestamptz(6)
   created_at DateTime      @default(now()) @db.Timestamptz(6)
 
   @@index([user_id, read_at])
@@ -2442,4 +2443,38 @@ model RegisterLevelVoter {
 
   @@id([record_id, level, round, user_id])
   @@map("register_level_voters")
+}
+
+// X2 (migration 0031): follow a site or a register record. Written only by x_follow / x_unfollow.
+model Watch {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  entity_type  String // site | register_record
+  entity_id    String   @db.Uuid // the site id, or register_records.entity_id
+  site_id      String?  @db.Uuid
+  register_key String?
+  region_id    Int?
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@unique([user_id, entity_type, entity_id], map: "watches_unique")
+  @@index([entity_type, entity_id])
+  @@map("watches")
+}
+
+// X7 (migration 0031): weekly status update per region or team. Written only by x_status_post / x_status_edit; never removed.
+model StatusUpdate {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope      String // region | team
+  region_id  Int?
+  team       String? // cw | te
+  week_start DateTime @db.Date // the Sunday that opens the working week
+  health     String // on_track | at_risk | off_track
+  summary    String
+  author_id  String   @db.Uuid
+  version    Int      @default(1)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([week_start(sort: Desc), region_id, team])
+  @@map("status_updates")
 }
