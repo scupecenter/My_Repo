@@ -3,7 +3,7 @@ import { Camera, Download, FileUp, History, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
-import { downloadDocument, suggestSlots, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion } from '@/api/documents';
+import { downloadDocument, suggestSlots, taskTarget, useAddSlot, useSlotUpload, useWithdrawFile, type DocumentSlot, type SlotSuggestion, type SlotTarget } from '@/api/documents';
 import type { TaskDetail } from '@/api/types';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { useToast } from './Toast';
@@ -167,12 +167,19 @@ function SuggestDialog({ task, files, slots, onClose, onUpload }: { task: string
 
 /** The Documents tab of a task: one named slot per required document (CLAUDE.md "Upload UI"). */
 export function DocSlots({ task, edit }: { task: TaskDetail; edit: boolean }) {
+  return <SlotList slots={task.slots as DocumentSlot[]} target={taskTarget(task)} edit={edit} suggestFor={task.id} />;
+}
+
+/**
+ * The named slots of a task or of a register record (Q131): drag, click or camera into a slot, versions, withdraw, "this document applies", candidates.
+ * `suggestFor`: the task whose multi-file suggestion endpoint is used (records have none: one file per slot).
+ */
+export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentSlot[]; target: SlotTarget; edit: boolean; suggestFor?: string }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const up = useSlotUpload(task), del = useWithdrawFile(task), add = useAddSlot(task);
+  const up = useSlotUpload(target), del = useWithdrawFile(target), add = useAddSlot(target);
   const [multi, setMulti] = useState<File[] | null>(null);
   const [over, setOver] = useState(false);
-  const slots = task.slots as DocumentSlot[];
   const active = slots.filter((s) => s.status !== 'not_required');
   const optional = slots.filter((s) => s.status === 'not_required');
   const uploadable = active.filter((s) => slotUploadable(s, edit));
@@ -192,7 +199,7 @@ export function DocSlots({ task, edit }: { task: TaskDetail; edit: boolean }) {
   const act = (p: Promise<unknown>) => void p.catch((e) => toast(uploadMessage(t, e), 'err'));
   return (
     <>
-      {edit && uploadable.length > 1 && (
+      {edit && suggestFor && uploadable.length > 1 && (
         <label data-testid="docs-multi-drop" onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={onDrop}
           className={`mb-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed p-3 text-sm ${over ? 'border-accent bg-accentSoft' : 'border-line text-mute hover:bg-hover'}`}>
           <FileUp size={14} />{t('docs.multi_drop')}
@@ -220,7 +227,7 @@ export function DocSlots({ task, edit }: { task: TaskDetail; edit: boolean }) {
           </ul>
         </details>
       )}
-      {multi && <SuggestDialog task={task.id} files={multi} slots={uploadable} onClose={() => setMulti(null)} onUpload={(rows) => void sendMany(rows)} />}
+      {multi && suggestFor && <SuggestDialog task={suggestFor} files={multi} slots={uploadable} onClose={() => setMulti(null)} onUpload={(rows) => void sendMany(rows)} />}
     </>
   );
 }

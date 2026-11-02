@@ -102,7 +102,9 @@ export default async function setup(): Promise<() => Promise<void>> {
   // sites for the performance check. Both count every site they hold, so no other suite may write to them.
   const dash = `${dbName}_dash`;
   const dashPerf = `${dbName}_dashperf`;
-  const [fifth, sixth] = await Promise.all([buildDatabase(adminUrl, dash, appPassword), buildDatabase(adminUrl, dashPerf, appPassword)]);
+  // dash2: the owner-answer suite of migration 0046 (manual Project Status values, delay periods, the snapshot schedule) changes the figures it reads.
+  const dash2 = `${dbName}_dash2`;
+  const [fifth, sixth, seventh] = await Promise.all([buildDatabase(adminUrl, dash, appPassword), buildDatabase(adminUrl, dashPerf, appPassword), buildDatabase(adminUrl, dash2, appPassword)]);
   // The docsDb database is for the document upload suites: the seeded Document Library stays active in it.
   const docs = `${dbName}_docs`;
   // The logs database (migration 0045): the suite breaks and restores a hash chain, changes the retention and the alert thresholds.
@@ -123,6 +125,8 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_DATABASE_URL_DASH = fifth.appUrl;
   process.env.TEST_SUPER_URL_DASH = fifth.superUrl;
   process.env.TEST_DATABASE_URL_DASHPERF = sixth.appUrl;
+  process.env.TEST_DATABASE_URL_DASH2 = seventh.appUrl;
+  process.env.TEST_SUPER_URL_DASH2 = seventh.superUrl;
   process.env.TEST_SUPER_URL_DASHPERF = sixth.superUrl;
 
   return async () => {
@@ -135,6 +139,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${calc2} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dash} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashPerf} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dash2} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${docs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${logs} WITH (FORCE)`);
     await a.end();

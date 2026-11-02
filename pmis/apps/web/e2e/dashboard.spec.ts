@@ -21,7 +21,9 @@ for (const c of CASES) {
     await expect(page.getByTestId('dash-progress-value')).toContainText('%');
     await expect(page.getByTestId('dash-basis')).toHaveText(c.basisLive);
     await expect(page.getByTestId('dash-kpi-rfi')).toContainText(c.rfi);
-    await expect(page.getByTestId('dash-health-draft')).toHaveText(c.draft);
+    // Q121: the health index is approved (no draft label); the delay attribution keeps its draft label
+    await expect(page.getByTestId('dash-health-draft')).toHaveCount(0);
+    await expect(page.getByTestId('dash-delay-draft')).toHaveText(c.draft);
     await expect(page.getByTestId('dash-stream-DISMANTLE')).toContainText(c.dismantle);
 
     // ECharts draws SVG charts (status ring, streams, SLA, owners, delay, health gauge) and they are not blank
@@ -47,10 +49,15 @@ for (const c of CASES) {
     await expect(page.getByTestId('dash-central-hidden')).toBeVisible();
     await page.getByTestId('dash-filter-stream').selectOption('TE');
     await expect(page.locator('[data-testid="dash-pipeline"] [data-testid^="pipe-node-"]')).toHaveCount(4);
+    // Q126: the view filter beside the stream filter (O&M keeps Final Closure only, so with TE nothing is left)
+    await page.getByTestId('dash-filter-stream').selectOption('');
+    await page.getByTestId('dash-filter-view').selectOption('OM');
+    await expect(page.locator('[data-testid="dash-pipeline"] [data-testid^="pipe-node-"]')).toHaveCount(1);
 
     // reference date: a saved snapshot, then back to today
     await page.getByTestId('dash-reset').click();
-    await page.getByTestId('dash-snapshot-2026-10-22').click();
+    await expect(page.getByTestId('dash-snapshot-kind-2026-10-31')).toBeVisible(); // Q127: the kind of each snapshot
+    await page.getByTestId('dash-snapshot-2026-10-25').click();
     await expect(page.getByTestId('dash-basis')).toHaveAttribute('data-source', 'snapshot');
     await expect(page.getByTestId('dash-basis-note')).toBeVisible();
     await page.getByTestId('dash-today').click();

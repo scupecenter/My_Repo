@@ -17,6 +17,8 @@ import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './Regi
 import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
 import { FollowButton } from './FollowButton';
+import { RecordDocuments } from './RecordDocuments';
+import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -82,6 +84,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
+  const recSlots = useRecordSlots(key, record?.site_id ? record.id : null);
+  const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
@@ -160,7 +164,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {record?.entity_id && <FollowButton target={{ kind: 'record', key, id: record.id }} entityId={record.entity_id} />}
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="reg-close"><X size={16} /></button></Dialog.Close>
       </header>
-      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
+      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
@@ -232,6 +236,11 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         </div>
 
         {record && (
+          <div {...panelProps('documents', tab)}>
+            {tab === 'documents' && <RecordDocuments record={record} />}
+          </div>
+        )}
+        {record && (
           <div {...panelProps('comments', tab)}>
             {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
             {record.region_id ? (
@@ -253,6 +262,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       </div>
       <footer className="space-y-2 border-t border-line p-4">
         {editable && (!record || act('submit')) && (finalSelf || skipTo) && <p className="text-sm text-waitInk" data-testid="reg-skip-note">{finalSelf ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: skipTo })}</p>}
+        {docsMissing.length > 0 && (!record || act('submit')) && <p className="text-sm text-lateInk" data-testid="reg-docs-missing">{t('recDocs.missing', { list: docsMissing.join(', ') })}</p>}
         {editable && tried && issueList.length > 0 && <p className="text-sm text-lateInk" data-testid="reg-missing">{t('registers.fix_list', { list: issueList.map((c) => (c === 'site_id' ? t('registers.site') : labelOf(c))).join(', ') })}</p>}
         <div className="flex flex-wrap gap-2">
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
@@ -261,7 +271,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           {record && mine && <button className="btn" data-testid="reg-release" disabled={busy} onClick={() => claim.mutate({ record, op: 'release' }, { onError: fail })}><UserMinus size={16} />{t('drawer.release')}</button>}
           {record && act('reject') && <button className="btn btn-danger" data-testid="reg-reject" disabled={busy} onClick={() => setRejecting(true)}><Undo2 size={16} />{t('approvals.reject')}</button>}
           {editable && <button className="btn" data-testid="reg-save" disabled={busy || (!!record && !dirty)} onClick={save}><Save size={16} />{t('registers.save_draft')}</button>}
-          {editable && (!record || act('submit')) && <button className="btn btn-primary ms-auto" data-testid="reg-submit" disabled={busy || (tried && issueList.length > 0)} onClick={submit}><Check size={16} />{finalSelf ? t('drawer.submit_final') : t('drawer.submit')}</button>}
+          {editable && (!record || act('submit')) && <button className="btn btn-primary ms-auto" data-testid="reg-submit" disabled={busy || (tried && issueList.length > 0) || docsMissing.length > 0} onClick={submit}><Check size={16} />{finalSelf ? t('drawer.submit_final') : t('drawer.submit')}</button>}
           {record && act('review') && <button className="btn btn-primary ms-auto" data-testid="reg-review" disabled={busy} onClick={() => run('review', record)}><Check size={16} />{t('approvals.pass')}</button>}
           {record && act('approve') && <button className="btn btn-primary ms-auto" data-testid="reg-approve" disabled={busy} onClick={() => run('approve', record)}><Check size={16} />{t('approvals.approve')}</button>}
         </div>

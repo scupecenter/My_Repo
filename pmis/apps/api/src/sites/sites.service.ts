@@ -3,10 +3,12 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
-import { contentVersion } from '../common/etag';
+import { z } from 'zod';
+import { checkIfMatch, contentVersion } from '../common/etag';
+import { mapDbError } from '../common/db-errors';
+import { parse, uuidSchema } from '../common/zod';
 import { problems } from '../common/problem';
 import { oneParam } from '../common/query';
-import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { RegistersService } from '../registers/registers.service';
 import { TaskSummaryDto, TaskViewService, taskSelect } from '../workflow/task-view.service';
@@ -19,7 +21,10 @@ export const TE_PAC_STAGE_CODE = 'MS7';
 const SORTS = ['site_code', '-site_code', 'region', '-region', 'stage', '-stage', 'due_date', '-due_date'] as const;
 const BUCKETS = ['all', 'mine', 'late', 'waiting_approval', 'closed'] as const;
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
+/** The ETag of a site: its last change to the millisecond (String(Date) would keep only the second, so two edits in one second shared an ETag). */
+const siteVersion = (v: unknown): number => contentVersion([v instanceof Date ? v.toISOString() : String(v)]);
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
+const patchSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().max(2000).optional() }).strict();
 
 interface SiteRow {
   id: string;
@@ -419,10 +424,44 @@ export class SitesService {
         open_issues: Number(counts[0]?.open_issues ?? 0),
         documents_missing: Number(counts[0]?.documents_missing ?? 0),
       },
-      version: contentVersion([String(site.updated_at)]),
+      version: siteVersion(site.updated_at),
     };
     if (Object.keys(custom).length > 0) detail.custom = custom;
+    detail.custom_fields = await this.customFields(auth, site.region_id);
     return detail;
+  }
+
+  /** The site's custom fields the caller may see (Q130: near_airport), with whether the caller may edit each one (sites edit in the region and the field rule). */
+  private async customFields(auth: AuthContext, region: number): Promise<Record<string, unknown>[]> {
+    const rows = await this.db.tx.$queryRaw<{ code: string; label_en: string; label_ar: string | null; data_type: string; section: string | null; required: boolean; access: string | null }[]>(Prisma.sql`
+      SELECT fd.code, fd.label_en, fd.label_ar, fd.data_type::text AS data_type, fd.section, fd.required, app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text AS access
+      FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.is_active AND fd.task_code IS NULL ORDER BY fd.sort_order, fd.code COLLATE "C"`);
+    const regions = (await this.access.hasGrant(auth, 'sites', 'edit')) ? await this.access.regions('sites', 'edit') : [];
+    const mayEdit = regions === null || regions.includes(region);
+    return rows
+      .filter((r) => r.access !== 'hidden')
+      .map((r) => ({ code: r.code, label_en: r.label_en, label_ar: r.label_ar, type: r.data_type, section: r.section, required: r.required, can_edit: mayEdit && (r.access ?? 'edit') === 'edit' }));
+  }
+
+  // ------------------------------------------------------------------ PATCH /sites/{id} (Q130: custom fields of the site, through site_save_custom)
+  async update(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const body = parse(patchSchema, raw);
+    const site = await this.siteRow(regions, id);
+    if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
+    const seen = await this.db.tx.$queryRaw<{ t: string }[]>(Prisma.sql`SELECT updated_at::text AS t FROM sites WHERE id = ${id}::uuid`);
+    checkIfMatch(ifMatch, siteVersion(site.updated_at));
+    await this.db.tx.$executeRaw`SAVEPOINT site_save`;
+    try {
+      await this.db.tx.$queryRaw(Prisma.sql`SELECT site_save_custom(${id}::uuid, ${seen[0]?.t ?? null}::timestamptz, ${JSON.stringify(body.custom)}::jsonb, ${body.reason ?? null}::text)`);
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT site_save`;
+    } catch (e) {
+      const p = mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT site_save`;
+      throw p;
+    }
+    return this.get(auth, id);
   }
 
   /** Custom field values of the site that the caller may see (field-level rules: a hidden field is left out). */

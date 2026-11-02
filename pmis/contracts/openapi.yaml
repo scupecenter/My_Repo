@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.11.2
+  version: 0.11.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,7 +30,10 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.11.4 (2026-11-02): additive. Two owner decisions, migration 0050 (CHANGELOG 79). (1) Old 3-level paths are converted to the two fixed levels in the database: the old final approver becomes L2 and the old review level is dropped (no endpoint; an open item changes `levels_required` to 2, its `version` rises, so a screen holding the old version gets 412). (2) Permits & HSE per stream (Q90): CW permits are entered by the CW team and TE permits by the TE team; `MatrixRowKey` gains `permits_hse_te` (the Matrix row of the TE stream: L1 Site Engineers (TE), L2 TE Team Lead; the `permits_hse` row covers CW). A permit of a TE type (Access - TE, PTW - TE) entered by someone who does not hold L1 of that row is refused with `not_eligible_holder`. `used_levels` of every matrix row is always [1, 3].
     - 0.11.2 (2026-11-02): additive. Storage protection (migration 0048; CHANGELOG 77; owner answer Q134). (1) Uploads (`uploadSlotFile`, blank forms, the register and log files that go through the same store) are virus-scanned before they are stored when `MALWARE_SCAN=clamd`. A refused file answers 422 `file_rejected` with `reason` = `malware` (new reason; nothing is stored, a System Log row and a security alert `malware_upload` are written). When clamd is unreachable and `SCAN_FAILURE=fail_closed` (the default) the upload answers **503** `malware_scan_unavailable` (new error code; retry later). With `SCAN_FAILURE=fail_open` the file is stored and flagged for a nightly rescan; the answer is unchanged. (2) A file that a rescan found infected answers 404 `not_found` on download (quarantined). (3) An expired zip export answers 410 `export_expired` as before; its stored object is deleted by the nightly job, so the answer is the same whether or not the object is still there. Files are stored encrypted at rest; nothing changes in the API for that. `ErrorCode` gains `malware_scan_unavailable`.
+    - 0.11.1 (2026-11-02): additive, the documents follow-up of the owner answers Q130 to Q132 (migration 0047; CHANGELOG 76). (1) Q130: `PATCH /sites/{site_id}` edits the site's custom fields (`SitePatch`, ETag / `If-Match`; `sites` edit in the site's region and the field-level rule of each field; values checked like every custom field: 422 `validation_failed` with `/custom/<code>` and `unknown_field`, `invalid`, `field_read_only`, `required`; audited with before and after). The site field `near_airport` (yes/no, seed) is a custom field of the site; `SiteDetail.custom_fields` (`SiteCustomField`) lists the site fields the caller may see with `can_edit`. The A3 civil aviation permit rule (`site.custom.near_airport`) and B1's rule (`procurement.delivery`, the delivery of the site's Procurement records whose scope is a source scope of the task: Outsourced when any is outsourced) now judge themselves; "this document applies" stays. (2) Q131: document slots on register records, keyed on the logical record (`entity_id`), so the files follow every version: `GET /registers/{register_key}/records/{record_id}/slots` (`RegisterRecordSlots`), `POST .../slots` (another candidate, or a conditional document that applies), `POST .../slots/{slot_id}/files` and `DELETE .../slots/{slot_id}/files/{file_id}`, with the same checks, versions, names and audit as a task's slots (`SITE_REGISTER_DOC_DATE.ext`). The slots come from Document Library placements whose target is `register`; `DocumentPlacement.record_type` limits one to a record type of the register (422 `unknown_record_type` otherwise). Submit of a record is refused with 422 `mandatory_slots_missing` while a mandatory slot is missing or rejected; the slot statuses move with the record as a task's do (submit: in review; approval: approved; rejection: back to uploaded, and `RejectRequest.rejected_slots` now also works on `POST /registers/{register_key}/records/{record_id}/reject`); a new version reopens the approved slots with their files. A record that is the source of a task keeps that task's slots (`task_id`). `DocumentListItem` gains `register_key` and `register_entity_id`. (3) Q132: the snag endpoints are built: `/snag-types` (GET, POST, PATCH; System Admin or a delegate of the Document Library configuration, a reason), `/sites/{site_id}/snags` (GET, POST: Quality `create`; `SnagInput.scope` CW or TE, or taken from `task_id`), `/snags/{snag_id}` (GET, PATCH), `POST /snags/{snag_id}/photos`, the new `DELETE /snags/{snag_id}/photos/{photo_id}` (withdraw before submit), `submit`, `approve`, `reject`. A snag has two levels from the Quality register's row of the Responsibility Matrix: L1 (the site engineer) uploads and submits, L2 approves (step-up; closes the snag) or rejects with a note (back to L1, the photos L2 names are `rejected`); `review` answers 409. B5: a person who holds L1 and L2 closes the snag with the submission (step-up, `self_approval`). Photo rules of the snag type: `min_count`, `shot_types` (each one needed, and the shot type of a photo must be one of them), `formats`, `max_size_mb`; a photo whose EXIF date is more than one day before the snag was raised is refused with 422 `file_rejected`, `reason` `before_snag_raised` (EXIF has no time zone); no EXIF date is accepted with `unknown_capture_date`. `Snag` gains `scope`, `self_approval`, `photos_missing`, `allowed_actions` and the state `cancelled`; `SnagPhoto.file_id` downloads through `GET /files/{file_id}/download` (audited). Open, fix submitted and in-review snags of a stream keep blocking its PAC and FAC. `NotificationKind` gains `snag_raised`, `snag_review`, `snag_rejected`, `snag_closed`.
+    - 0.11.0 (2026-11-02): dashboard follow-up of the owner answers Q118 to Q127 (migration 0046; CHANGELOG 75). Additive except the default format of `GET /dashboard/export`, which is now xlsx. (1) Q118: `GET /project-status/manual-items` and `POST /project-status/manual-items/{item_code}/values`: a manual percentage, with an effective date and a reason, for each weighted central Project Status item (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1), entered by the Project Manager (a role named in the setting `dashboard.manual_items.roles`, default PM, on an all-regions assignment), a System Admin, or anyone holding `dashboard.project_status` edit for all regions; versioned per item, the history kept, audited. The value in force on the reference date counts in every Project Status figure by its weight (`DashboardProjectStatusItem.manual`, `central`; `meta.central_items_hidden` counts only the central items without a value; `meta.manual_items_measured`). A saved snapshot keeps the values known when it was taken. (2) Q121: health factors D and I are approved: `health.draft` and `meta.health_draft` are false. (3) Q122: `GET/POST /tasks/{task_id}/delay-periods` and `POST /tasks/{task_id}/delay-periods/{period_id}/void`: periods (from, to, party `gecol`, `hlc`, `client`, `contractor`, `external` or `aljeel`, optional external party, reason) recorded by the task's reviewer (L2 holder), a System Admin or a holder of `dashboard.delay` edit in the region; never deleted, voided with a reason, audited; periods of one task may not overlap (422 `period_overlap`). Delay attribution now works day by day: Change Control suspension days are left out (`delay.suspended_working_days`), days covered by a period go to its party (`kind` `period`, `period_party`), the rest to the 0.7.2 rule; `periods_supported` is true, `period_working_days`, `periods_count`. (4) Q126: `view` (a code of `filters.views`: CW, TE, OM) on `GET /dashboard` and its export; an unknown one is 422 `unknown_view`. (5) Q127: `GET /dashboard/export` writes an Excel workbook by default (`format=xlsx`; `format=csv` keeps the CSV); text is never a formula. Snapshots are taken every Sunday (`weekly`) and on the last day of each month (`month_end`), each date once: `ProjectStatusSnapshot.kind` and `kinds`, `DashboardBasis.snapshot_kinds`.
     - 0.10.0 (2026-11-02): enterprise logging core (migration 0045; CHANGELOG 73). Additive except where noted. (1) Request context in every audit row: the API sets the transaction-local app.ip, app.user_agent, app.request_id, app.session_id, app.auth_method, app.mfa, app.stepup, app.via and app.device; a database trigger copies them into every audit row whatever function wrote it. `AuditEntry` gains `via` (`Via`: manual, template, bulk, api, job), `device` (`Device`), `user_agent`, `session_id`, `auth_method`, `job_name`, `batch_row`, `module_key` (already listed) and `chain_seq`; `mfa` and `stepup_verified` are now filled. (2) `GET /audit-log` gains the filters `region_id`, `via`, `ip`, `module_key`, `session_id` and `batch_id`, and its readers follow decision B4 (System Admins and the Project Manager: everything; a Team Lead: the modules and regions of their Team Lead assignments; anyone else: their `view_audit` grants, B3), enforced by the database; a caller who may read nothing gets 403. `POST /audit-log/exports` takes the same filters; the finished job carries `result.download_path`, served by the new `GET /audit-log/exports/{export_id}/download` (and `GET /security-log/exports/{export_id}/download`); `result_file_id` stays null for these jobs. (3) Field-level change log: `GET /audit-log/field-changes` and `GET /audit-log/field-history` (`FieldChange`): one row per changed field, nested `data.x` flattened to `x`, technical keys left out (setting `logs.field_changes.ignore_keys`); a register record is keyed by its logical `entity_id` (not the version id), a task by its task id. (4) `LogIntegrity`: the chains are sealed at commit; `breaks[].seq` may be null (kind `unsealed`), `breaks[].row_id` is new, kinds `row_missing` and `unsealed` are new, `purged_through` is new. (5) Security log: `SecurityEvent` gains `sign_in_locked`, `sign_in_rate_limited`, `session_ended`, `two_factor_passed`, `two_factor_failed`, `recovery_code_used`, `two_factor_enrolled`, `password_changed`, `password_reset`; `SecurityLogEntry` gains `device`; `GET /security-log` gains `user_id` and `ip` (System Admins only). (6) New: `GET /admin/sessions` and `POST /admin/sessions/{session_id}/end` (the logs screens' Online now, beside the existing `GET /sessions/active` and `POST /sessions/{session_id}/revoke`, which keep working), `GET /admin/job-runs`, `GET /admin/deployments`, `GET /admin/security-alerts` (with `page.total`), `POST /admin/security-alerts/{alert_id}/ack`, `GET/PUT /settings/security-alerts`, `GET /reports/activity`. (7) Requests may carry `X-PMIS-Screen` (the app route); real activity stores it as the session's current screen. (8) `NotificationKind` gains `security_alert`; `PermissionAction` values `manage_users` and `view_security_log` are now stored by the database. (9) Retention: `PUT /settings/log-retention` is built; values below the minimum are 422 before any step-up check.
     - 0.9.2 (2026-11-02): additive. The self-service "My profile" page (owner decisions 2026-11-02, ADR 0014 amendment 2, migration 0044). (1) `GET /me/profile` and `PATCH /me/profile` (ETag / `If-Match`): a user changes only their own `display_name`, `phone`, `locale` and `theme`; admin-owned fields (email, employee ID, status, roles, team, regions, department, manager) answer 403 `field_read_only`; every change is audited with before and after. (2) `POST /me/password`: the local password change from the profile (same policy, lock and session rules as `POST /auth/local/password`); an M365 session gets 403. (3) Email change is a request an admin approves: `POST /me/email-change` (new email and the password re-entered; one pending request per user; the address must be free), `DELETE /me/email-change` (cancel while pending), `GET /email-change-requests` and `POST /email-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account; only an approval changes the login email); new notification kinds `email_change_requested` (to the deciders) and `email_change_decided` (to the user). (4) Two-factor self-service: `POST /me/two-factor/enrol/start` (fresh step-up, no enrolment code), `POST /me/two-factor/enrol/confirm` (recovery codes once; the other sessions end), `POST /me/two-factor/disable` (password and a code or a recovery code; 403 `two_factor_enforced` while an admin enforces it); `PUT /users/{user_id}/two-factor/enforced` (System Admin or a delegate holding `users.two_factor`; reason, step-up, never oneself). Turning two-factor on through `PUT /users/{user_id}/two-factor` enforces it, also for a user who had turned it on themselves. (5) `User.two_factor_enforced`, `Session.two_factor.enforced`, error code `two_factor_enforced`.
     - 0.9.1 (2026-11-02): additive. (1) Gate-lock exempt list (owner decision 2026-11-02, migration 0043): the setting `calc.gate_lock_exempt_tasks` also holds D1 (TE access permission), the DLP / FAC tasks B14, B15 and D18 and the dismantle tasks E2 and E3, beside C1 to C4; the codes were merged into the current value, an admin's own edits are kept. These tasks are no longer returned with `LockReason` `gate_closed`. (2) Team specialization / scope match of Procurement (Q97): `GET /settings/team-scope-match` and `PUT /settings/team-scope-match` (`TeamScopeMatch`; reading needs the Settings screen `admin.settings`, saving needs `admin.settings` edit for all regions, a reason and `If-Match`; audited with before and after). A Procurement record that names a team (`data.team_id`) whose specialization the table does not allow for the record's scope is refused, at create, at edit and again at submit, with 422 `team_scope_mismatch` (`errors[0].path` `/data/team_id`, `order_scope`, `team_specialization`); an exempt scope (seed: HLC) is not checked, a scope missing from the table and a team without a specialization are refused. New `ErrorCode` `team_scope_mismatch`.
@@ -2436,6 +2439,36 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [sites]
+      operationId: updateSite
+      summary: Edit the site's custom fields (for example near_airport, Q130)
+      description: |
+        Needs `sites` edit in the site's region; each field follows its field-level rule (hidden, read, edit). A value is checked like every custom field
+        (type, list, validation); `null` clears it. Audited with before and after. Conditional documents whose rule reads a site field (A3 civil aviation
+        permit: `site.custom.near_airport`) follow on the next read of the task's slots.
+      x-db-path: site_save_custom
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SitePatch' }
+      responses:
+        '200':
+          description: The site after the change.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /sites/{site_id}/tasks:
     parameters:
       - $ref: '#/components/parameters/SiteId'
@@ -6041,6 +6074,121 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/slots:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: listRegisterRecordSlots
+      summary: The document slots of a register record (Q131)
+      description: |
+        Keyed on the logical record (`entity_id`): every version shows the same slots and files. Built from the Document Library placements whose target is
+        `register` (and, when the placement names one, the record type). A record not tied to a site has none. `task_id` is the task the record is the
+        source of (Q43): its documents stay on the task's slots (`GET /tasks/{task_id}/slots`).
+      responses:
+        '200':
+          description: Slots.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecordSlots'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: addRegisterRecordSlot
+      summary: Add a slot to the record (one more candidate, or a conditional document that applies)
+      description: Data Entry (L1) of the version in entry. 409 `duplicate` when a slot of that type and label exists already.
+      x-db-path: doc_add_record_slot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_code]
+              additionalProperties: false
+              properties:
+                doc_code: {type: string}
+                candidate_label: {type: [string, 'null'], maxLength: 100}
+      responses:
+        '201':
+          description: The new slot.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentSlot'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{register_key}/records/{record_id}/slots/{slot_id}/files:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    - name: slot_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    post:
+      tags: [registers]
+      operationId: uploadRegisterRecordSlotFile
+      summary: Upload a file into a slot of a register record
+      description: |
+        The same checks as `uploadSlotFile` (size 413 `file_too_large`; content by magic bytes, 422 `file_rejected` with `reason`; number of files), by Data Entry (L1) of
+        the record's version in entry and `edit` on the register's module in its region. An approved record takes no file (409): start a new version, which reopens its slots.
+      x-db-path: doc_attach_file
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, contentMediaType: application/octet-stream}
+                replaces_file_group_id: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Stored.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentFile'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/{register_key}/records/{record_id}/slots/{slot_id}/files/{file_id}:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    - name: slot_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    - name: file_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    delete:
+      tags: [registers]
+      operationId: withdrawRegisterRecordSlotFile
+      summary: Withdraw a file from a slot of a register record before submission
+      description: The file stays on record and in the audit log (`is_current` false). Data Entry (L1) of the version in entry.
+      x-db-path: doc_withdraw_file
+      responses:
+        '200':
+          description: The slot after the change.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentSlot'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /registers/{register_key}/records/{record_id}/void:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}
@@ -7551,7 +7699,8 @@ paths:
       tags: [qc]
       operationId: uploadSnagPhoto
       summary: Upload a fresh photo of the fix
-      description: Rejected with 422 `file_rejected` when the EXIF date is before the snag was raised, or the format or size breaks the snag type rules. A missing EXIF date is accepted with `unknown_capture_date`.
+      x-db-path: qc_attach_photo
+      description: By L1 (Data Entry of the Quality register row) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date is more than one day before the snag was raised (EXIF has no time zone), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
       requestBody:
         required: true
         content:
@@ -7576,6 +7725,30 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /snags/{snag_id}/photos/{photo_id}:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    - name: photo_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    delete:
+      tags: [qc]
+      operationId: withdrawSnagPhoto
+      summary: Withdraw a photo of the fix before submission (it stays on record)
+      x-db-path: qc_withdraw_photo
+      responses:
+        '200':
+          description: The snag after the change.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
   /snags/{snag_id}/submit:
     parameters:
     - {$ref: '#/components/parameters/SnagId'}
@@ -7583,7 +7756,8 @@ paths:
       tags: [qc]
       operationId: submitSnag
       summary: Submit the fix photos for review (site engineer)
-      description: Same 3-level path, skip and rejection rules as tasks.
+      description: L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules. When the caller also holds L2 (any one member) the submission closes the snag (B5, step-up, `self_approval`).
+      x-step-up: when the caller holds L1 and L2 (self-approval, B5)
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7608,8 +7782,9 @@ paths:
     post:
       tags: [qc]
       operationId: reviewSnag
-      summary: Review
-      description: Same 3-level path, skip and rejection rules as tasks.
+      summary: Review (not a step of a snag)
+      description: A snag has two levels (L1 submits, L2 approves or rejects); this answers 409 `invalid_transition`.
+      deprecated: true
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7635,8 +7810,8 @@ paths:
       tags: [qc]
       operationId: approveSnag
       summary: 'Approve: closes the snag'
-      description: Same 3-level path, skip and rejection rules as tasks.
-      x-step-up: when the caller holds every level (self-approval, B5)
+      description: L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream.
+      x-step-up: true
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7661,8 +7836,8 @@ paths:
     post:
       tags: [qc]
       operationId: rejectSnag
-      summary: Reject one level back with a note
-      description: Same 3-level path, skip and rejection rules as tasks.
+      summary: Reject back to L1 with a note
+      description: L2. The snag returns to the person who submitted it (B6) with the note; the photos named in `rejected_photos` become `rejected` and leave the set.
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7670,7 +7845,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/RejectRequest'}
+            schema: {$ref: '#/components/schemas/SnagRejectRequest'}
       responses:
         '200':
           description: Transition applied.
@@ -8423,7 +8598,7 @@ paths:
         One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
         Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
         **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
-        **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Delay attribution** (rules.md section 8) is a draft too and has no attribution periods yet. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
+        **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Health index** factors D and I are approved (0.11.0, Q121): `health.draft` is false. **Delay attribution** (rules.md section 8) uses the attribution periods of the tasks and leaves out Change Control suspension days (0.11.0, Q122). **Central items** (0.11.0, Q118) count by their weight wherever a manual value is in force on the reference date. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
         **Streams** are the stream codes of the workflow plus `DISMANTLE` (Q41). The `stream` filter keeps the sites the stream applies to (for `DISMANTLE` the sites with a Dismantle part) and limits the pipeline and the SLA to its stages.
       parameters:
       - name: ref_date
@@ -8444,6 +8619,10 @@ paths:
         in: query
         schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
         description: A stream code from `filters.streams`. An unknown one is 422 `unknown_stream`.
+      - name: view
+        in: query
+        schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
+        description: 'A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`.'
       - name: exclude_overrides
         in: query
         schema: {type: boolean}
@@ -8461,22 +8640,26 @@ paths:
     get:
       tags: [dashboard]
       operationId: exportDashboard
-      summary: Export exactly the current dashboard view as a CSV file (0.7.2)
+      summary: Export exactly the current dashboard view as an Excel workbook (0.11.0) or a CSV file
       description: |
-        Same query as `GET /dashboard`. The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+        Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (sheets `Dashboard` with the rows and `About` with the basis; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
       parameters:
       - {name: ref_date, in: query, schema: {type: string, format: date}}
       - {name: region_id, in: query, schema: {$ref: '#/components/schemas/RegionId'}}
       - {name: cluster_code, in: query, schema: {type: string, minLength: 1, maxLength: 40}}
       - {name: scenario, in: query, schema: {$ref: '#/components/schemas/DeliveryScenario'}}
       - {name: stream, in: query, schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}}
+      - {name: view, in: query, schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}, description: 'A view code (0.11.0).'}
       - {name: exclude_overrides, in: query, schema: {type: boolean}}
+      - {name: format, in: query, schema: {type: string, enum: [xlsx, csv], default: xlsx}, description: '0.11.0 (Q127). Another value is 422.'}
       responses:
         '200':
-          description: The file `GSDN_Dashboard_<ref_date>.csv`.
+          description: The file `GSDN_Dashboard_<ref_date>.xlsx` (or `.csv`).
           headers:
             Content-Disposition: {schema: {type: string}}
           content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
             text/csv:
               schema: {type: string}
         '401': {$ref: '#/components/responses/Unauthorized'}
@@ -8553,6 +8736,132 @@ paths:
                       items: {$ref: '#/components/schemas/ProjectStatusSnapshot'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /project-status/manual-items:
+    get:
+      tags: [project-status]
+      operationId: listManualProjectStatusItems
+      summary: The central Project Status items with their manual percentage and its history (0.11.0, Q118)
+      description: |
+        The central items of the Project Status weight set in force (project-wide items the PMIS holds no data for), the value in force today and every entry, newest first. Needs `dashboard.view`. `can_edit` says whether the caller may add a value: the Project Manager (a role of the setting `dashboard.manual_items.roles`, default PM, on an all-regions assignment), a System Admin, or anyone holding `dashboard.project_status` edit for all regions.
+      responses:
+        '200':
+          description: The items.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ManualItemList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /project-status/manual-items/{item_code}/values:
+    parameters:
+    - {name: item_code, in: path, required: true, schema: {type: string, pattern: '^[A-Za-z0-9._-]{1,20}$'}}
+    post:
+      tags: [project-status]
+      operationId: addManualProjectStatusValue
+      summary: Enter a manual percentage for a central item (0.11.0, Q118)
+      description: |
+        A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
+      x-db-path: ps_manual_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [value_pct, effective_date, reason]
+              properties:
+                value_pct: {type: number, minimum: 0, maximum: 100}
+                effective_date: {type: string, format: date}
+                reason: {$ref: '#/components/schemas/Reason'}
+      responses:
+        '201':
+          description: The entry.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ManualItemValue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /tasks/{task_id}/delay-periods:
+    parameters:
+    - {name: task_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [dashboard]
+      operationId: listTaskDelayPeriods
+      summary: The delay attribution periods of a task (0.11.0, Q122)
+      description: Needs `sites.view` in the task's region (otherwise 404). Voided periods are listed too. `can_edit` says whether the caller may record or void one.
+      responses:
+        '200':
+          description: The periods.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DelayPeriodList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [dashboard]
+      operationId: addTaskDelayPeriod
+      summary: Record a delay attribution period on a task (0.11.0, Q122)
+      description: |
+        By the task's reviewer (a holder of its L2 level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. From and To are inclusive; a period of the same task that overlaps an active one is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.added`).
+      x-db-path: delay_period_add
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [from_date, to_date, party, reason]
+              properties:
+                from_date: {type: string, format: date}
+                to_date: {type: string, format: date}
+                party: {$ref: '#/components/schemas/DelayParty'}
+                external_party_id: {type: [string, 'null'], format: uuid, description: 'Optional: the contractor or external party by name.'}
+                reason: {$ref: '#/components/schemas/Reason'}
+      responses:
+        '201':
+          description: The period.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DelayPeriod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /tasks/{task_id}/delay-periods/{period_id}/void:
+    parameters:
+    - {name: task_id, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: period_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [dashboard]
+      operationId: voidTaskDelayPeriod
+      summary: Void a delay attribution period, with a reason (0.11.0, Q122)
+      description: Same rights as recording one. The period stays in the history and stops counting. A period voided already is 409 `invalid_transition`. Audited (`delay_period.voided`).
+      x-db-path: delay_period_void
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {$ref: '#/components/schemas/Reason'}
+      responses:
+        '200':
+          description: The voided period.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DelayPeriod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
 
 components:
   securitySchemes:
@@ -9834,6 +10143,7 @@ components:
                 open_snags: { type: integer }
                 open_issues: { type: integer }
                 documents_missing: { type: integer }
+            custom_fields: { type: array, items: { $ref: '#/components/schemas/SiteCustomField' }, description: 'The site custom fields the caller may see (Q130: near_airport), with can_edit.' }
             version: { type: integer }
 
     # ---------------------------------------------------------- tasks
@@ -10202,8 +10512,8 @@ components:
         in_flight: { type: integer, minimum: 0, description: 'Submitted at least once and not finished: they keep the level path frozen at their first submission.' }
     MatrixRowKey:
       type: string
-      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests).'
-      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
+      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW).'
+      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
     Matrix:
       type: object
       required: [workflow_version, stages, version]
@@ -11564,6 +11874,7 @@ components:
       properties:
         target: { type: string, enum: [task, qc, register] }
         ref: { type: string, description: 'Task code, snag type code or register key.' }
+        record_type: { type: [string, 'null'], description: 'Register placements only: one record type of the register (for example ncr of Quality); null = every record of the register.' }
     FormKind:
       type: string
       enum: [dn, rn, pac, fac, snag_list]
@@ -11648,6 +11959,8 @@ components:
         site_code: { type: string }
         site_name: { type: [string, 'null'] }
         region_id: { $ref: '#/components/schemas/RegionId' }
+        register_key: { type: [string, 'null'], description: 'Set for a file of a register record slot.' }
+        register_entity_id: { type: [string, 'null'], format: uuid, description: 'The logical register record of the slot.' }
     ZipExportRequest:
       type: object
       additionalProperties: false
@@ -11996,10 +12309,14 @@ components:
         snag_type: { $ref: '#/components/schemas/SnagType' }
         title: { type: string }
         description: { type: [string, 'null'] }
-        state: { type: string, enum: [open, fix_submitted, in_review, closed] }
+        scope: { type: string, enum: [CW, TE], description: 'The stream whose PAC and FAC the open snag blocks.' }
+        state: { type: string, enum: [open, fix_submitted, in_review, closed, cancelled], description: 'open: photos missing; fix_submitted: the photos meet the rules and wait for L1 to submit; in_review: waits for L2.' }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
         photos: { type: array, items: { $ref: '#/components/schemas/SnagPhoto' } }
         photos_required: { type: integer }
+        photos_missing: { type: array, description: 'What the photos still lack against the snag type rules (same shape as Problem.errors).', items: { type: object, properties: { path: { type: string }, code: { type: string }, message: { type: string }, shot_type: { type: string } } } }
+        self_approval: { type: boolean }
+        allowed_actions: { type: array, items: { type: string, enum: [upload, edit, submit, approve, reject] } }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
         raised_by: { $ref: '#/components/schemas/UserRef' }
@@ -12012,8 +12329,48 @@ components:
       properties:
         snag_type_id: { type: string, format: uuid }
         task_id: { type: string, format: uuid }
+        scope: { type: string, enum: [CW, TE], description: 'Required unless task_id names a CW or TE task.' }
         title: { type: string, minLength: 3, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
+    SnagRejectRequest:
+      type: object
+      required: [note]
+      additionalProperties: false
+      properties:
+        note: { type: string, minLength: 1, maxLength: 2000 }
+        rejected_photos:
+          type: array
+          items:
+            type: object
+            required: [photo_id, reason]
+            properties:
+              photo_id: { type: string, format: uuid }
+              reason: { type: string, minLength: 1, maxLength: 500 }
+    SitePatch:
+      type: object
+      required: [custom]
+      additionalProperties: false
+      properties:
+        custom: { allOf: [{ $ref: '#/components/schemas/CustomValues' }], description: 'Field code -> value; null clears.' }
+        reason: { type: string, maxLength: 2000 }
+    SiteCustomField:
+      type: object
+      required: [code, label_en, type, can_edit]
+      properties:
+        code: { type: string }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        type: { type: string, enum: [text, number, date, list, multi_list, bool, user, external_party, file] }
+        section: { type: [string, 'null'] }
+        required: { type: boolean }
+        can_edit: { type: boolean }
+    RegisterRecordSlots:
+      type: object
+      required: [items, task_id, missing_for_submit]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/DocumentSlot' } }
+        task_id: { type: [string, 'null'], format: uuid, description: 'The task this record is the source of (Q43); its documents are on the task.' }
+        missing_for_submit: { type: array, items: { type: string }, description: 'Codes of the mandatory slots still missing or rejected (empty unless the version is in entry).' }
     SnagPatch:
       type: object
       minProperties: 1
@@ -12470,7 +12827,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
@@ -12867,8 +13224,99 @@ components:
         progress_pct: { type: number, description: 'Value computed at the time; never recomputed.' }
         planned_pct: { type: [number, 'null'], description: '0.7.2.' }
         spi: { type: [number, 'null'], description: '0.7.2.' }
-        health_index: { type: [number, 'null'], description: '0.7.2. The health index of the scope at the time (draft formula).' }
+        health_index: { type: [number, 'null'], description: '0.7.2. The health index of the scope at the time.' }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
+        kind: { $ref: '#/components/schemas/SnapshotKind' }
+        kinds: { type: array, items: { type: string, enum: [weekly, month_end] }, description: '0.11.0. The scheduled runs of the date (both on a Sunday that ends a month).' }
+    SnapshotKind:
+      type: string
+      enum: [weekly, month_end, manual]
+      description: '0.11.0 (Q127): `weekly` (every Sunday, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).'
+    ManualItemValue:
+      type: object
+      required: [id, item_code, version, value_pct, effective_date, reason]
+      properties:
+        id: {type: string, format: uuid}
+        item_code: {type: string}
+        version: {type: integer, minimum: 1}
+        value_pct: {type: number, minimum: 0, maximum: 100}
+        effective_date: {type: string, format: date}
+        reason: {type: string}
+        entered_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
+    ManualItemHistoryEntry:
+      type: object
+      required: [id, version, value_pct, effective_date, reason, created_at, in_force, entered_by]
+      properties:
+        id: {type: string, format: uuid}
+        version: {type: integer}
+        value_pct: {type: number}
+        effective_date: {type: string, format: date}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+        in_force: {type: boolean, description: 'The entry in force today.'}
+        entered_by: {$ref: '#/components/schemas/UserRef'}
+    ManualItem:
+      type: object
+      required: [item_code, name_en, weight, activity_code, activity_name_en, current, history]
+      properties:
+        item_code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        weight: {type: number, description: 'Weight inside its activity; 0 = not weighted (no value accepted).'}
+        activity_code: {type: string}
+        activity_name_en: {type: string}
+        activity_name_ar: {type: [string, 'null']}
+        current:
+          type: [object, 'null']
+          required: [value_pct, effective_date, version]
+          properties:
+            value_pct: {type: number}
+            effective_date: {type: string, format: date}
+            version: {type: integer}
+        history: {type: array, items: {$ref: '#/components/schemas/ManualItemHistoryEntry'}}
+    ManualItemList:
+      type: object
+      required: [as_of, can_edit, items, without_value]
+      properties:
+        as_of: {type: string, format: date}
+        can_edit: {type: boolean}
+        without_value: {type: integer, description: 'Weighted central items with no value in force today.'}
+        items: {type: array, items: {$ref: '#/components/schemas/ManualItem'}}
+    DelayParty:
+      type: string
+      enum: [gecol, hlc, client, contractor, external, aljeel]
+      description: '0.11.0 (Q122): GECOL, HLC, the client, the contractor, another external party, or Aljeel. AAT SE is never a party.'
+    DelayPeriod:
+      type: object
+      required: [id, task_id, from_date, to_date, party, reason, created_at, created_by, voided]
+      properties:
+        id: {type: string, format: uuid}
+        task_id: {type: string, format: uuid}
+        from_date: {type: string, format: date}
+        to_date: {type: string, format: date}
+        party: {$ref: '#/components/schemas/DelayParty'}
+        external_party_id: {type: [string, 'null'], format: uuid}
+        external_party_name: {type: [string, 'null']}
+        reason: {type: string}
+        created_at: {type: string, format: date-time}
+        created_by: {$ref: '#/components/schemas/UserRef'}
+        voided: {type: boolean}
+        voided_at: {type: [string, 'null'], format: date-time}
+        void_reason: {type: [string, 'null']}
+        voided_by:
+          oneOf:
+          - {$ref: '#/components/schemas/UserRef'}
+          - {type: 'null'}
+    DelayPeriodList:
+      type: object
+      required: [task_id, can_edit, parties, items]
+      properties:
+        task_id: {type: string, format: uuid}
+        due_date: {type: [string, 'null'], format: date, description: 'Delay days are the working days after it.'}
+        can_edit: {type: boolean}
+        parties: {type: array, items: {$ref: '#/components/schemas/DelayParty'}}
+        items: {type: array, items: {$ref: '#/components/schemas/DelayPeriod'}}
     # ---------------------------------------------------------- main dashboard (0.7.2)
     DashboardBasis:
       type: object
@@ -12879,6 +13327,16 @@ components:
         source: {type: string, enum: [live, snapshot, as_of_computed]}
         snapshot_date: {type: [string, 'null'], format: date, description: 'The snapshot read when `source` is `snapshot`.'}
         snapshot_dates: {type: array, items: {type: string, format: date}, description: 'Dates that have a weekly snapshot (the latest 60), for the date picker.'}
+        snapshot_kinds:
+          description: '0.11.0 (Q127): the same dates with the kind of each snapshot.'
+          type: array
+          items:
+            type: object
+            required: [date, kind, kinds]
+            properties:
+              date: {type: string, format: date}
+              kind: {$ref: '#/components/schemas/SnapshotKind'}
+              kinds: {type: array, items: {type: string, enum: [weekly, month_end]}}
         note: {type: [string, 'null'], description: 'English sentence that says how a past date was made. Null for today.'}
     DashboardMeta:
       allOf:
@@ -12886,9 +13344,10 @@ components:
       - type: object
         properties:
           project_wide: {type: boolean, description: 'True when the figures are for every site of the project (every region, no filter).'}
-          central_items_hidden: {type: integer, description: 'Project Status items left out because the figures are not project-wide (VI-04).'}
+          central_items_hidden: {type: integer, description: 'Central Project Status items left out because the figures are not project-wide (VI-04) and no manual value is in force (0.11.0: 0 once every central item has a value).'}
+          manual_items_measured: {type: integer, description: '0.11.0 (Q118): central items measured by a manual value in force on the reference date.'}
           scope_regions: {type: [array, 'null'], items: {$ref: '#/components/schemas/RegionId'}, description: 'The caller''s dashboard regions; null = every region.'}
-          health_draft: {type: boolean}
+          health_draft: {type: boolean, description: 'False since 0.11.0 (Q121).'}
     DashboardFilters:
       type: object
       required: [regions, clusters, scenarios, streams]
@@ -12905,6 +13364,16 @@ components:
         clusters: {type: array, items: {type: string}}
         scenarios: {type: array, items: {$ref: '#/components/schemas/DeliveryScenario'}}
         streams:
+          type: array
+          items:
+            type: object
+            required: [code, name_en]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+        views:
+          description: '0.11.0 (Q126): the views of the workflow (CW, TE, OM), for the `view` filter.'
           type: array
           items:
             type: object
@@ -12963,6 +13432,15 @@ components:
         done: {type: integer}
         applicable: {type: integer}
         reason: {type: [string, 'null'], enum: [not_weighted, no_data, central_hidden, not_applicable, null]}
+        central: {type: boolean, description: '0.11.0: a project-wide item measured by a manual percentage (Q118).'}
+        manual:
+          description: '0.11.0 (Q118): the manual value in force on the reference date; null when none.'
+          type: [object, 'null']
+          required: [value_pct, effective_date, version]
+          properties:
+            value_pct: {type: number}
+            effective_date: {type: string, format: date}
+            version: {type: integer}
     DashboardProjectStatusActivity:
       type: object
       required: [code, name_en, weight, progress_pct, measured, items]
@@ -12983,6 +13461,7 @@ components:
         spi: {type: [number, 'null']}
         plan_coverage_pct: {type: number}
         central_items_hidden: {type: integer}
+        manual_items_measured: {type: integer, description: '0.11.0.'}
         activities: {type: array, items: {$ref: '#/components/schemas/DashboardProjectStatusActivity'}}
     DashboardFinalClosure:
       description: The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`.
@@ -13168,7 +13647,7 @@ components:
               key: {type: string, enum: ['0_7', '8_15', '16_30', over_30]}
               count: {type: integer}
     DashboardHealth:
-      description: Project health index, formula version 1. A draft under owner review.
+      description: Project health index, formula version 1. Factors D and I approved by the owner (0.11.0, Q121); `draft` is false.
       type: object
       required: [draft, bands, score, band, components, by_region]
       properties:
@@ -13205,23 +13684,31 @@ components:
               score: {type: number}
               band: {type: string, enum: [green, amber, red]}
     DashboardDelay:
-      description: Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party; attribution periods and suspension days are not built yet.
+      description: 'Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party, day by day (0.11.0, Q122): the working days after the due date, minus the days of a Change Control suspension of the site, go to the party of the task''s attribution period that covers them, otherwise to the external party of the task, its default party type, or unassigned.'
       type: object
       required: [draft, total_late_working_days, unattributed_pct, items]
       properties:
         draft: {type: boolean}
         total_late_working_days: {type: integer}
         unattributed_pct: {type: number, description: 'Share of the days on tasks with no external party and no default party type.'}
-        overlapping_periods: {type: integer}
-        periods_supported: {type: boolean}
+        overlapping_periods: {type: integer, description: 'Always 0: overlapping periods of one task are refused at entry.'}
+        periods_supported: {type: boolean, description: 'True since 0.11.0.'}
+        suspended_working_days: {type: integer, description: '0.11.0: late working days left out because the site was suspended.'}
+        period_working_days: {type: integer, description: '0.11.0: late working days given to a party by a period.'}
+        periods_count: {type: integer, description: '0.11.0: active periods on the late tasks of the view.'}
         items:
           type: array
           items:
             type: object
             required: [party, kind, late_tasks, late_working_days, share_pct]
             properties:
-              party: {type: string, description: 'The external party name, the default party type of the task, or `unassigned`.'}
-              kind: {type: string, enum: [external, default_type, unassigned]}
+              party: {type: string, description: 'The external party name, the default party type of the task, the party of the period (its external party name when one is named), or `unassigned`.'}
+              kind: {type: string, enum: [period, external, default_type, unassigned]}
+              period_party:
+                description: '0.11.0: the party of the period when `kind` is `period`.'
+                oneOf:
+                - {$ref: '#/components/schemas/DelayParty'}
+                - {type: 'null'}
               external_party_id: {type: [string, 'null'], format: uuid}
               party_type: {type: [string, 'null']}
               late_tasks: {type: integer}

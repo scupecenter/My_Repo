@@ -175,7 +175,7 @@ export class ZipService implements OnApplicationBootstrap {
           site_code: string; task_code: string | null; doc_code: string; candidate_label: string | null; stage_code: string | null; slot_status: string;
         }[]>(Prisma.sql`
           SELECT f.id::text AS id, f.original_name, f.storage_key, f.ext, f.version, f.is_current, f.sha256, f.size_bytes, f.uploaded_at, f.approved_date::text AS approved_date,
-            si.site_code, td.code AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
+            si.site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
           ${DocumentsService.LIST_FROM}
           WHERE ${Prisma.join(this.matchFilter(job.scope, regions), ' AND ')} ORDER BY si.site_code, st.code, td.code, dt.code, f.uploaded_at, f.id`);
         if (rows.length === 0) throw new Error('no files');

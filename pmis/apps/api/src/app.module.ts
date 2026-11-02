@@ -47,10 +47,14 @@ import { StorageService } from './documents/storage.service';
 import { StorageJobsService } from './documents/storage-jobs.service';
 import { ZipService } from './documents/zip.service';
 import { DbService } from './db/db.service';
+import { SnagsController } from './qc/snags.controller';
+import { SnagsService } from './qc/snags.service';
 import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { DelayPeriodsController } from './dashboard/delay-periods.controller';
+import { DelayPeriodsService } from './dashboard/delay-periods.service';
 import { ProjectStatusService } from './dashboard/project-status.service';
 import { WeightsController } from './dashboard/weights.controller';
 import { WeightsService } from './dashboard/weights.service';
@@ -96,8 +100,8 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, EmailChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController,
-      DashboardController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
+      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -105,8 +109,8 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService,
-      DashboardService, ProjectStatusService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
+      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

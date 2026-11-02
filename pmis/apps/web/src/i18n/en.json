@@ -2062,8 +2062,8 @@
     "reset": "Reset filters",
     "export": "Export view",
     "export_done": "The file was downloaded.",
-    "snapshots": "Weekly snapshots:",
-    "central_hidden": "{{n}} project-wide Project Status items are left out because these figures are not for the whole project.",
+    "snapshots": "Saved snapshots:",
+    "central_hidden": "{{n}} project-wide Project Status items have no manual value yet and are left out because these figures are not for the whole project.",
     "basis": {
       "live": "Live, today {{date}}",
       "snapshot": "Saved snapshot of {{date}}",
@@ -2081,7 +2081,9 @@
       "scenario": "Scenario",
       "stream": "Stream",
       "all_clusters": "All clusters",
-      "all_streams": "All streams"
+      "all_streams": "All streams",
+      "view": "View",
+      "all_views": "All views"
     },
     "kpi": {
       "progress": "Weighted progress (to HOTO)",
@@ -2113,7 +2115,6 @@
     },
     "health": {
       "title": "Project health index",
-      "draft": "Draft, under owner review",
       "chart": "Health index {{score}} out of 100",
       "band": {
         "green": "Green",
@@ -2193,7 +2194,17 @@
       },
       "chart": "Overdue working days per party: {{list}}",
       "total": "{{n}} overdue working days in total, {{pct}}% on tasks with no responsible party.",
-      "note": "Attribution periods are not built yet."
+      "note": "The days of a task's attribution period go to its party; days under a Change Control suspension are left out.",
+      "draft": "Draft",
+      "suspended": "{{n}} working days left out for suspension.",
+      "period": {
+        "gecol": "GECOL",
+        "hlc": "HLC",
+        "client": "Client",
+        "contractor": "Contractor",
+        "external": "Other external party",
+        "aljeel": "Aljeel"
+      }
     },
     "regions": {
       "title": "Regions",
@@ -2201,7 +2212,18 @@
       "late": "Late tasks",
       "progress": "Progress",
       "health": "Health"
-    }
+    },
+    "snapshot_kind": {
+      "weekly": "weekly",
+      "month_end": "month-end",
+      "manual": "by hand"
+    },
+    "export_format": "Export format",
+    "format": {
+      "xlsx": "Excel (.xlsx)",
+      "csv": "CSV"
+    },
+    "manual_link": "Manual items"
   },
   "docs": {
     "err": {
@@ -2561,5 +2583,116 @@
     "r_failed": "Failed sign-ins",
     "r_sensitive": "Sensitive changes",
     "r_none": "No sensitive changes this month."
+  },
+  "siteFields": {
+    "title": "Site details",
+    "saved": "Site saved. The documents that depend on it are updated.",
+    "failed": "The site could not be saved."
+  },
+  "recDocs": {
+    "global": "A record that is not tied to a site has no document slots.",
+    "error": "The documents of this record could not be loaded.",
+    "missing": "Upload the mandatory documents before you submit: {{list}}",
+    "own": "Documents of this record",
+    "none": "No document is required for this record.",
+    "task_title": "Documents of the linked task",
+    "task_note": "This record is the source of a task; its documents stay on the task:",
+    "open_task": "open the task"
+  },
+  "snags": {
+    "tab": "QC snags",
+    "err": {
+      "before_raised": "This photo was taken before the snag was raised (EXIF date, one day of tolerance). Take a fresh photo of the fix.",
+      "format": "This photo format is not allowed for the snag type ({{formats}}).",
+      "too_large": "The photo is larger than {{mb}} MB.",
+      "min_count": "More photos of the fix are needed.",
+      "shot_type_missing": "A required shot is still missing.",
+      "unknown_shot_type": "Choose one of the shot types of the snag type.",
+      "failed": "The action failed."
+    },
+    "photo_added": "Photo added.",
+    "done_submit": "Fix submitted for approval.",
+    "done_approve": "Snag closed.",
+    "done_reject": "Returned to the site engineer.",
+    "rules": "At least {{n}} photo(s) · {{formats}} · up to {{mb}} MB",
+    "shots": "shots: {{list}}",
+    "photo": "Photo",
+    "no_photos": "No photo of the fix yet.",
+    "shot_type": "Shot type",
+    "add_photo": "Add a photo of the fix",
+    "submit": "Submit the fix",
+    "approve": "Approve and close",
+    "reject_title": "Return the snag \"{{title}}\"",
+    "raised": "Snag raised.",
+    "type": "Snag type",
+    "scope": "Stream",
+    "title": "Title",
+    "description": "Description",
+    "raise": "Raise a snag",
+    "open_count_one": "{{count}} open snag (it blocks the PAC and FAC of its stream)",
+    "open_count_other": "{{count}} open snags (they block the PAC and FAC of their stream)",
+    "load_failed": "The snags could not be loaded.",
+    "none": "No snag on this site."
+  },
+  "snagState": {
+    "open": "Open",
+    "fix_submitted": "Fix uploaded",
+    "in_review": "Waiting for L2",
+    "closed": "Closed",
+    "cancelled": "Cancelled"
+  },
+  "manual": {
+    "title": "Manual Project Status items",
+    "subtitle": "Project-wide items the PMIS holds no data for. The value in force on a date counts in Project Status by the item's weight.",
+    "back": "Back to the dashboard",
+    "without_value": "{{n}} weighted items have no value yet.",
+    "readonly": "Only the Project Manager, a System Admin or a holder of the Project Status edit right for all regions enters values.",
+    "item": "Item",
+    "activity": "Activity",
+    "weight": "Weight",
+    "current": "In force today",
+    "none": "No value",
+    "effective": "from {{date}}",
+    "add": "New value",
+    "value": "Percentage",
+    "effective_date": "Effective date",
+    "reason": "Reason",
+    "save": "Save value",
+    "saved": "The value was saved.",
+    "history": "History",
+    "version": "v{{n}}",
+    "in_force": "in force",
+    "by": "by {{name}}",
+    "cancel": "Cancel",
+    "not_weighted": "not weighted"
+  },
+  "delayp": {
+    "tab": "Delay",
+    "title": "Delay attribution periods",
+    "hint": "Working days after the due date that fall in a period go to its party in the delay attribution. Days under a suspension are left out.",
+    "due": "Due date {{date}}",
+    "no_due": "No due date yet.",
+    "from": "From",
+    "to": "To",
+    "party": "Party",
+    "reason": "Reason",
+    "add": "Add period",
+    "added": "The period was recorded.",
+    "void": "Void",
+    "void_reason": "Reason for voiding",
+    "void_confirm": "Void the period",
+    "voided": "Voided",
+    "voided_done": "The period was voided.",
+    "none": "No period recorded.",
+    "readonly": "Only the reviewer of the task records periods.",
+    "by": "by {{name}}",
+    "parties": {
+      "gecol": "GECOL",
+      "hlc": "HLC",
+      "client": "Client",
+      "contractor": "Contractor",
+      "external": "Other external party",
+      "aljeel": "Aljeel"
+    }
   }
 }

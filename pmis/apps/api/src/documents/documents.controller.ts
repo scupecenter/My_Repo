@@ -48,6 +48,33 @@ export class DocumentsController {
     return this.docs.withdraw(auth, id, slotId, fileId);
   }
 
+  // Q131: the document slots of a register record (keyed on its logical record; the same checks as a task's slots)
+  @Get('registers/:key/records/:id/slots')
+  recordSlots(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string) {
+    return this.docs.recordSlots(auth, key, id);
+  }
+
+  @Post('registers/:key/records/:id/slots')
+  @HttpCode(201)
+  addRecordSlot(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Body() body: unknown) {
+    return this.docs.addRecordSlot(auth, key, id, body);
+  }
+
+  @Post('registers/:key/records/:id/slots/:slotId/files')
+  @HttpCode(201)
+  @UseInterceptors(upload())
+  uploadRecordFile(
+    @Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Param('slotId') slotId: string, @UploadedFile() file: Uploaded,
+    @Body() body: Record<string, unknown> | undefined,
+  ) {
+    return this.docs.uploadRecord(auth, key, id, slotId, file, body);
+  }
+
+  @Delete('registers/:key/records/:id/slots/:slotId/files/:fileId')
+  withdrawRecordFile(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Param('slotId') slotId: string, @Param('fileId') fileId: string) {
+    return this.docs.withdrawRecord(auth, key, id, slotId, fileId);
+  }
+
   @Get('documents')
   list(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.docs.list(auth, q);

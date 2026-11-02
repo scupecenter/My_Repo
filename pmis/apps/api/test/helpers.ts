@@ -82,6 +82,13 @@ export async function superDbDash(perf = false): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the dashboard owner-answer database (migration 0046; see global-setup). */
+export async function superDbDash2(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_DASH2 });
+  await c.connect();
+  return c;
+}
+
 export interface TestUser {
   id: string;
   email: string;

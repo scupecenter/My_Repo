@@ -27,16 +27,31 @@ const STREAMS = [
   { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sort_order: 3 }, { code: 'CLOSURE', name_en: 'Handover & Closure', name_ar: 'التسليم والإغلاق', sort_order: 4 },
   { code: 'DISMANTLE', name_en: 'Dismantle', name_ar: 'الفك', sort_order: 99 },
 ];
-export const MOCK_SNAPSHOT_DATES = ['2026-10-22', '2026-10-15', '2026-10-08'];
+export const MOCK_SNAPSHOT_DATES = ['2026-10-31', '2026-10-25', '2026-10-18'];
+const SNAPSHOT_KINDS: Record<string, 'weekly' | 'month_end'> = { '2026-10-31': 'month_end', '2026-10-25': 'weekly', '2026-10-18': 'weekly' };
+const VIEWS = [{ code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', ms: ['MS2', 'MS3', 'MS4'] }, { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', ms: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'] },
+  { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', ms: ['MS10'] }];
+/** The central Project Status items of the seed weight set (Q118): project-wide, no data in the PMIS, a manual percentage each. */
+export const CENTRAL_ITEMS = [
+  ['1.3', 'HLD', 'التصميم عالي المستوى (HLD)', 15, 'A1'], ['1.5', 'Technical document templates', 'قوالب المستندات الفنية', 10, 'A1'],
+  ['3.2', 'BTS', 'BTS', 14.45, 'A3'], ['3.3', 'PtP', 'PtP', 14.45, 'A3'], ['3.4', 'CPE', 'CPE', 8.5, 'A3'], ['3.5', 'Battery', 'البطاريات', 17, 'A3'],
+  ['3.6', 'Cabinet', 'الخزائن', 17, 'A3'], ['3.7', 'Router', 'الموجّهات', 8.5, 'A3'], ['3.8', 'NMS', 'NMS', 3.4, 'A3'], ['3.9', 'Core server', 'الخادم الرئيسي', 1.7, 'A3'],
+  ['3.10', 'Billing', 'الفوترة', 0, 'A3'], ['6.1', 'Pilot', 'التجربة', 10, 'A6'], ['6.6', 'NMS integration', 'تكامل NMS', 10, 'A6'], ['7.7', 'NMS acceptance', 'قبول NMS', 10, 'A7'],
+  ['8.1', 'Vendor training', 'تدريب المورّد', 50, 'A8'],
+].map(([code, en, arName, weight, act]) => {
+  const a = { A1: ['Survey & Engineering', 'المسح والهندسة'], A3: ['Procurement & Supply', 'المشتريات والتوريد'], A6: ['Integration & On-Air', 'التكامل والتشغيل'], A7: ['Testing & Acceptance', 'الاختبار والقبول'], A8: ['Training & Handover', 'التدريب والتسليم'] }[act as string]!;
+  return { code: code as string, name_en: en as string, name_ar: arName as string, weight: weight as number, act: act as string, act_en: a[0]!, act_ar: a[1]! };
+});
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'] as const;
 
 const sc = (n: number, f: number): number => Math.round(n * f);
 
-export function buildDashboard(q: URLSearchParams, scope: number[] | null = null): Dashboard {
+export function buildDashboard(q: URLSearchParams, scope: number[] | null = null, manual: (code: string, on: string) => { value_pct: number } | undefined = () => undefined): Dashboard {
   const today = tripoliToday();
   const ref = q.get('ref_date') || today;
   const region = q.get('region_id');
   const stream = q.get('stream');
+  const view = VIEWS.find((v) => v.code === q.get('view'));
   const f = (q.get('scenario') ? 0.35 : 1) * (q.get('cluster_code') ? 0.2 : 1);
   const snapshot = ref !== today && MOCK_SNAPSHOT_DATES.includes(ref);
   const source = ref === today ? 'live' : snapshot ? 'snapshot' : 'as_of_computed';
@@ -58,7 +73,10 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       gate: i === 0 ? null : { code: `G${i + 1}`, name_en: `${m.en} gate`, name_ar: m.ar },
     };
   });
-  const nodes = stream && stream !== 'DISMANTLE' ? nodesAll.filter((n) => n.stream_code === stream) : nodesAll;
+  const nodes = (stream && stream !== 'DISMANTLE' ? nodesAll.filter((n) => n.stream_code === stream) : nodesAll).filter((n) => !view || view.ms.includes(n.code));
+  const wide = !region && !q.get('scenario') && !q.get('cluster_code') && !stream && !view && scope === null;
+  const measuredManual = CENTRAL_ITEMS.filter((c) => c.weight > 0 && manual(c.code, ref));
+  const hidden = wide ? 0 : CENTRAL_ITEMS.filter((c) => c.weight > 0).length - measuredManual.length;
   const progress = total ? Math.round(rs.reduce((a, r) => a + r.progress * r.sites, 0) / rs.reduce((a, r) => a + r.sites, 0) * 10) / 10 : 0;
   const score = 74.3;
   const streams = STREAMS.map((s) => {
@@ -86,16 +104,18 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
     age_buckets: [{ key: '0_7' as const, count: 8 }, { key: '8_15' as const, count: 6 }, { key: '16_30' as const, count: 6 }, { key: 'over_30' as const, count: 3 }],
   };
   return {
-    meta: { as_of: new Date().toISOString(), workflow_versions: [1], override_flagged_count: 0, overrides_excluded: true, project_wide: !region && !q.get('scenario') && !q.get('cluster_code') && !stream && scope === null,
-      central_items_hidden: scope === null && !region ? 0 : 14, scope_regions: scope, health_draft: true,
+    meta: { as_of: new Date().toISOString(), workflow_versions: [1], override_flagged_count: 0, overrides_excluded: true, project_wide: wide,
+      central_items_hidden: hidden, manual_items_measured: measuredManual.length, scope_regions: scope, health_draft: false,
       weight_set: { id: '00000000-0000-4000-8000-000000000001', code: 'project_status', version: 1, effective_from: '2024-01-01', is_active: true } },
     basis: {
       ref_date: ref, today, source, snapshot_date: snapshot ? ref : null, snapshot_dates: MOCK_SNAPSHOT_DATES,
+      snapshot_kinds: MOCK_SNAPSHOT_DATES.map((d) => ({ date: d, kind: SNAPSHOT_KINDS[d]!, kinds: [SNAPSHOT_KINDS[d]!] })),
       note: source === 'live' ? null : source === 'snapshot' ? 'Figures come from the weekly snapshot.' : 'No snapshot exists for this date: computed as of the date from dated facts.',
     },
     filters: {
       regions: REGIONS.filter((r) => scope === null || scope.includes(r.id)).map((r) => ({ id: r.id, name_en: r.name_en, name_ar: r.name_ar })),
       clusters: ['CL-TR-01', 'CL-TR-02', 'CL-BN-01'], scenarios: [...SCENARIOS], streams: STREAMS.map((s) => ({ code: s.code, name_en: s.name_en, name_ar: s.name_ar })),
+      views: VIEWS.map((v) => ({ code: v.code, name_en: v.name_en, name_ar: v.name_ar })),
     },
     headline: {
       sites_total: total, sites_cancelled: region ? 1 : 3,
@@ -108,7 +128,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
         pending_te_fac: { count: 2, not_due: 6, avg_age_days: 6, oldest_age_days: 8, sites: [] },
       },
       project_status: {
-        progress_pct: progress, planned_pct: null, spi: null, plan_coverage_pct: 42, central_items_hidden: scope === null && !region ? 0 : 14,
+        progress_pct: progress, planned_pct: null, spi: null, plan_coverage_pct: 42, central_items_hidden: hidden, manual_items_measured: measuredManual.length,
         activities: [
           { code: 'A1', name_en: 'Survey & Engineering', name_ar: 'المسح والهندسة', weight: 12, progress_pct: 82, measured: true, items: [] },
           { code: 'A2', name_en: 'Site Acquisition & Permits', name_ar: 'استحواذ الموقع والتصاريح', weight: 8, progress_pct: 74, measured: true, items: [] },
@@ -141,7 +161,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
     },
     issues,
     health: {
-      draft: true, formula_version: 1, bands: { green: 85, amber: 70 }, score, band: score >= 85 ? 'green' : score >= 70 ? 'amber' : 'red',
+      draft: false, formula_version: 1, bands: { green: 85, amber: 70 }, score, band: score >= 85 ? 'green' : score >= 70 ? 'amber' : 'red',
       components: [
         { code: 'P', name_en: 'Progress', name_ar: 'التقدم', weight: 16.666, value: progress, excluded: false, contribution: 10.2 },
         { code: 'B', name_en: 'Baseline adherence', name_ar: 'الالتزام بخط الأساس', weight: 16.666, value: 71.4, excluded: false, contribution: 11.9 },
@@ -153,8 +173,9 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       by_region: rs.map((r) => ({ region_id: r.id, score: Math.round((60 + r.progress / 4) * 10) / 10, band: 'amber' as const })),
     },
     delay: {
-      draft: true, total_late_working_days: 412, unattributed_pct: 18.5, overlapping_periods: 0, periods_supported: false,
+      draft: true, total_late_working_days: 412, unattributed_pct: 18.5, overlapping_periods: 0, periods_supported: true, suspended_working_days: 12, period_working_days: 30, periods_count: 3,
       items: [
+        { party: 'gecol', kind: 'period' as const, period_party: 'gecol' as const, external_party_id: null, party_type: null, late_tasks: 3, late_working_days: 30, share_pct: 7.3 },
         { party: 'A&T Global', kind: 'external' as const, external_party_id: '00000000-0000-4000-8000-0000000000c1', party_type: 'te_vendor', late_tasks: 41, late_working_days: 190, share_pct: 46.1 },
         { party: 'cw_contractor', kind: 'default_type' as const, late_tasks: 22, late_working_days: 98, share_pct: 23.8 },
         { party: 'unassigned', kind: 'unassigned' as const, late_tasks: 19, late_working_days: 76, share_pct: 18.5 },

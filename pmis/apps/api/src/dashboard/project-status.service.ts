@@ -4,13 +4,19 @@ import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { problems } from '../common/problem';
-import { boolParam, oneParam, Query } from '../common/query';
-import { uuidSchema } from '../common/zod';
+import { boolParam, isCalendarDate, oneParam, Query } from '../common/query';
+import { parse, uuidSchema } from '../common/zod';
+import { z } from 'zod';
 import { DbService } from '../db/db.service';
 import { DashboardService } from './dashboard.service';
 
 type Json = Record<string, unknown>;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const manualSchema = z.object({
+  value_pct: z.number().min(0).max(100).refine((n) => Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6, 'At most 3 decimals.'),
+  effective_date: z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.'),
+  reason: z.string().trim().min(3).max(1000),
+}).strict();
 
 /** Project Status (ends at HOTO): the weighted progress of rules.md section 6, computed with the weight set in force, or with one named for a comparison. */
 @Injectable()
@@ -86,6 +92,52 @@ export class ProjectStatusService {
     };
   }
 
+  // ------------------------------------------------------------------ Q118: manual percentage of the central items
+  /** GET /project-status/manual-items: the central items of the weight set in force, the value in force today and the full history of each. */
+  async manualItems(): Promise<Json> {
+    await this.access.requireRegions('dashboard', 'view');
+    const items = await this.db.tx.$queryRaw<{ item_code: string; name_en: string; name_ar: string | null; weight: string; activity_code: string; activity_name_en: string; activity_name_ar: string | null }[]>`
+      SELECT item_code, name_en, name_ar, weight::text AS weight, activity_code, activity_name_en, activity_name_ar FROM ps_central_items(cal_today()) ORDER BY sort`;
+    const hist = await this.db.tx.$queryRaw<{ id: string; item_code: string; version: number; value_pct: string; effective_date: string; reason: string; created_at: Date;
+      by_id: string; by_name: string | null; by_emp: string | null; in_force: boolean }[]>`
+      SELECT v.id::text AS id, v.item_code, v.version, v.value_pct::text AS value_pct, v.effective_date::text AS effective_date, v.reason, v.created_at,
+        v.entered_by::text AS by_id, u.display_name AS by_name, u.employee_id AS by_emp,
+        (v.id = (SELECT x.id FROM ps_manual_values x WHERE x.item_code = v.item_code AND x.effective_date <= cal_today() ORDER BY x.effective_date DESC, x.version DESC LIMIT 1)) AS in_force
+      FROM ps_manual_values v LEFT JOIN users u ON u.id = v.entered_by
+      ORDER BY v.item_code, v.version DESC`;
+    const can = await this.db.tx.$queryRaw<{ ok: boolean; today: string }[]>`SELECT ps_manual_can_edit() AS ok, cal_today()::text AS today`;
+    const out = items.map((i) => {
+      const h = hist.filter((x) => x.item_code === i.item_code).map((x) => ({
+        id: x.id, version: x.version, value_pct: Number(x.value_pct), effective_date: x.effective_date, reason: x.reason, created_at: x.created_at.toISOString(), in_force: x.in_force,
+        entered_by: { id: x.by_id, display_name: x.by_name ?? '', employee_id: x.by_emp?.trim() ?? null },
+      }));
+      const cur = h.find((x) => x.in_force);
+      return {
+        item_code: i.item_code, name_en: i.name_en, name_ar: i.name_ar, weight: Number(i.weight), activity_code: i.activity_code,
+        activity_name_en: i.activity_name_en, activity_name_ar: i.activity_name_ar,
+        current: cur ? { value_pct: cur.value_pct, effective_date: cur.effective_date, version: cur.version } : null,
+        history: h,
+      };
+    });
+    return {
+      as_of: can[0]!.today,
+      can_edit: can[0]!.ok,
+      items: out,
+      without_value: out.filter((i) => i.weight > 0 && !i.current).length,
+    };
+  }
+
+  /** POST /project-status/manual-items/{item_code}/values: one new entry (value, effective date, reason). The database checks who may and audits it. */
+  async addManualValue(_auth: AuthContext, rawItem: string, raw: unknown): Promise<Json> {
+    await this.access.requireRegions('dashboard', 'view');
+    const item = /^[A-Za-z0-9._-]{1,20}$/.test(rawItem) ? rawItem : null;
+    if (!item) throw problems.notFound('There is no such central item.');
+    const b = parse(manualSchema, raw);
+    const r = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`SELECT ps_manual_set(${item}::text, ${b.value_pct}::numeric, ${b.effective_date}::date, ${b.reason}::text) AS r`);
+    const v = r[0]!.r;
+    return { ...v, value_pct: Number(v.value_pct) };
+  }
+
   // ------------------------------------------------------------------ GET /project-status/snapshots
   async snapshots(_auth: AuthContext, q: Query): Promise<Json> {
     const regions = await this.access.requireRegions('dashboard', 'view');
@@ -100,9 +152,10 @@ export class ProjectStatusService {
     }
     // The whole-project row is a figure over every region: a caller limited to some regions sees only the rows of those regions (VI-04).
     const rows = await this.db.tx.$queryRaw<{ id: string; taken_on: string; is_global: boolean; region_id: number | null; actual_pct: string; planned_pct: string | null; spi: string | null;
-      health_index: string | null; ws_id: string }[]>(Prisma.sql`
+      health_index: string | null; ws_id: string; kinds: string[] }[]>(Prisma.sql`
       SELECT p.id::text AS id, p.snapshot_date::text AS taken_on, p.is_global, p.region_id, p.actual_pct::text AS actual_pct, p.planned_pct::text AS planned_pct, p.spi::text AS spi,
-        p.health_index::text AS health_index, p.weight_set_id::text AS ws_id
+        p.health_index::text AS health_index, p.weight_set_id::text AS ws_id,
+        coalesce((SELECT array_agg(r.kind ORDER BY r.kind) FROM dash_snapshot_runs r WHERE r.snapshot_date = p.snapshot_date), ARRAY[]::text[]) AS kinds
       FROM progress_snapshots p
       WHERE true
         ${regions === null ? Prisma.empty : Prisma.sql`AND NOT p.is_global AND p.region_id = ANY(${regions}::int[])`}
@@ -118,6 +171,9 @@ export class ProjectStatusService {
       items: page.map((r) => ({
         id: r.id,
         taken_on: r.taken_on,
+        // Q127: weekly (every Sunday), month_end (last day of the month; wins when both), manual (taken by hand, no scheduled run)
+        kind: r.kinds.includes('month_end') ? 'month_end' : r.kinds.includes('weekly') ? 'weekly' : 'manual',
+        kinds: r.kinds,
         scope: r.is_global ? 'project' : 'region',
         region_id: r.region_id,
         progress_pct: Number(r.actual_pct),

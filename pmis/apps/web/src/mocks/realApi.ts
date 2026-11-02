@@ -151,6 +151,12 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/weight-sets/:id'],
   ['post', '/settings/weight-sets/:id/preview'],
   ['post', '/settings/weight-sets/:id/publish'],
+  // Contract 0.11.0: dashboard follow-up of the owner answers (apps/api: dashboard; migration 0046). Manual Project Status values (Q118), delay periods (Q122).
+  ['get', '/project-status/manual-items'],
+  ['post', '/project-status/manual-items/:code/values'],
+  ['get', '/tasks/:id/delay-periods'],
+  ['post', '/tasks/:id/delay-periods'],
+  ['post', '/tasks/:id/delay-periods/:periodId/void'],
   // Contract 0.8.0: the document upload module (apps/api: documents; migration 0038). Slots, files, the Documents list, the bulk zip and the Document Library.
   ['get', '/tasks/:id/slots'],
   ['post', '/tasks/:id/slots'],
@@ -211,6 +217,26 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/security-alerts'],
   ['put', '/settings/security-alerts'],
   ['get', '/reports/activity'],
+  // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
+  // document slots on register records, QC snags and the photos of their fix.
+  ['patch', '/sites/:id'],
+  ['get', '/registers/:key/records/:id/slots'],
+  ['post', '/registers/:key/records/:id/slots'],
+  ['post', '/registers/:key/records/:id/slots/:slotId/files'],
+  ['delete', '/registers/:key/records/:id/slots/:slotId/files/:fileId'],
+  ['get', '/snag-types'],
+  ['post', '/snag-types'],
+  ['patch', '/snag-types/:id'],
+  ['get', '/sites/:id/snags'],
+  ['post', '/sites/:id/snags'],
+  ['get', '/snags/:id'],
+  ['patch', '/snags/:id'],
+  ['post', '/snags/:id/photos'],
+  ['delete', '/snags/:id/photos/:photoId'],
+  ['post', '/snags/:id/submit'],
+  ['post', '/snags/:id/review'],
+  ['post', '/snags/:id/approve'],
+  ['post', '/snags/:id/reject'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

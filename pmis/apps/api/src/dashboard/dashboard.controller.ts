@@ -1,11 +1,11 @@
-import { Controller, Get, Header, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { DashboardService } from './dashboard.service';
 import { ProjectStatusService } from './project-status.service';
 
-/** The main dashboard and Project Status (contract tags `dashboard` and `project-status`, 0.7.2). */
+/** The main dashboard and Project Status (contract tags `dashboard` and `project-status`, 0.7.2; 0.11.0 for the owner answers Q118 to Q127). */
 @Controller()
 export class DashboardController {
   constructor(
@@ -19,12 +19,12 @@ export class DashboardController {
   }
 
   @Get('dashboard/export')
-  @Header('Content-Type', 'text/csv; charset=utf-8')
   @Header('Cache-Control', 'no-store')
   async export(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>, @Res({ passthrough: true }) res: Response): Promise<StreamableFile> {
-    const f = await this.dash.exportCsv(auth, q);
+    const f = await this.dash.export(auth, q);
+    res.setHeader('Content-Type', f.contentType);
     res.setHeader('Content-Disposition', `attachment; filename="${f.filename}"`);
-    return new StreamableFile(Buffer.from(f.body, 'utf8'));
+    return new StreamableFile(f.body);
   }
 
   @Get('project-status')
@@ -35,5 +35,16 @@ export class DashboardController {
   @Get('project-status/snapshots')
   snapshots(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.ps.snapshots(auth, q);
+  }
+
+  @Get('project-status/manual-items')
+  manualItems() {
+    return this.ps.manualItems();
+  }
+
+  @Post('project-status/manual-items/:item_code/values')
+  @HttpCode(201)
+  addManualValue(@Auth() auth: AuthContext, @Param('item_code') item: string, @Body() body: unknown) {
+    return this.ps.addManualValue(auth, item, body);
   }
 }
