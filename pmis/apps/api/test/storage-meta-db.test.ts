@@ -35,8 +35,32 @@ describe('stored_object_meta through the storage_* functions (migration 0048)', 
     expect((await m.list(null, 1000)).some((r) => r.storage_key === key)).toBe(true);
 
     await expect(m.put(row, false)).rejects.toThrow();     // a second row for the same key is refused outside a re-encrypt
-    await m.delete(key);
-    expect(await m.get(key)).toBeNull();
+    await expect(m.delete(key)).rejects.toThrow(/quarantined/);   // an infected object's envelope is never deleted
+    const clean = `docs/2026/11/${randomUUID()}`;
+    await m.put({ ...row, storage_key: clean }, false);
+    await m.delete(clean);
+    expect(await m.get(clean)).toBeNull();
+  });
+
+  it('an infected object stays quarantined: a replace (re-encrypt) can neither clear nor overwrite it, and its envelope cannot be deleted', async () => {
+    const m = new DbMetaStore(db);
+    const key = `docs/2026/11/${randomUUID()}`;
+    const row: Envelope = {
+      storage_key: key, driver: 'local', key_id: 'k1', wrapped_key: Buffer.alloc(60, 1), nonce: Buffer.alloc(12, 2), tag: Buffer.alloc(16, 3),
+      plain_sha256: 'c'.repeat(64), size_bytes: 7, scan_status: 'pending_rescan',
+    };
+    await m.put(row, false);
+    await m.setScan(key, 'infected');
+    await expect(m.put({ ...row, scan_status: 'clean', key_id: 'k9' }, true)).rejects.toThrow(/quarantined/);
+    const after = await m.get(key);
+    expect(after).toMatchObject({ scan_status: 'infected', key_id: 'k1' });
+    await expect(m.delete(key)).rejects.toThrow(/quarantined/);
+    expect((await m.get(key))?.scan_status).toBe('infected');
+    // a replace of a pending object keeps its scan state (it is never set to clean by a replace)
+    const key2 = `docs/2026/11/${randomUUID()}`;
+    await m.put({ ...row, storage_key: key2 }, false);
+    await m.put({ ...row, storage_key: key2, scan_status: 'clean', key_id: 'k2' }, true);
+    expect(await m.get(key2)).toMatchObject({ scan_status: 'pending_rescan', key_id: 'k2' });
   });
 
   it('a new object cannot be planted as infected or clean through the function', async () => {

@@ -169,7 +169,8 @@ describe('storage protection', () => {
     const raw = await fs.readFile(rawPath());
     raw[3]! ^= 0x01;
     await fs.writeFile(rawPath(), raw);
-    await expect(readAll(await s.get(KEY))).rejects.toThrow(/integrity/);
+    // nothing is released before the tag is verified: get() itself refuses, no partial plaintext stream is handed out
+    await expect(s.get(KEY)).rejects.toThrow(/integrity/);
   });
 
   it('a changed envelope tag also fails the read', async () => {
@@ -177,7 +178,7 @@ describe('storage protection', () => {
     await s.put(KEY, Buffer.from('hello world'));
     const row = meta.rows.get(KEY) as Envelope;
     row.tag = Buffer.alloc(16, 1);
-    await expect(readAll(await s.get(KEY))).rejects.toThrow();
+    await expect(s.get(KEY)).rejects.toThrow();
   });
 
   it('a legacy plaintext object (no envelope row) stays readable', async () => {

@@ -54,8 +54,13 @@ BEGIN
     INSERT INTO public.stored_object_meta (storage_key, driver, key_id, wrapped_key, nonce, tag, plain_sha256, size_bytes, scan_status, scanned_at)
     VALUES (p_key, p_driver, p_key_id, p_wrapped, p_nonce, p_tag, p_sha256, p_size, p_scan_status, CASE WHEN p_scan_status = 'clean' THEN now() END)
     ON CONFLICT (storage_key) DO UPDATE SET driver = EXCLUDED.driver, key_id = EXCLUDED.key_id, wrapped_key = EXCLUDED.wrapped_key,
-      nonce = EXCLUDED.nonce, tag = EXCLUDED.tag, plain_sha256 = EXCLUDED.plain_sha256, size_bytes = EXCLUDED.size_bytes,
-      scan_status = EXCLUDED.scan_status, scanned_at = EXCLUDED.scanned_at;
+      nonce = EXCLUDED.nonce, tag = EXCLUDED.tag, plain_sha256 = EXCLUDED.plain_sha256, size_bytes = EXCLUDED.size_bytes
+      -- the scan state is never changed by a replace (security review of 0048): an infected or pending object keeps its status,
+      -- and an infected one cannot be replaced at all
+      WHERE public.stored_object_meta.scan_status <> 'infected';
+    IF EXISTS (SELECT 1 FROM public.stored_object_meta m WHERE m.storage_key = p_key AND m.scan_status = 'infected') THEN
+      RAISE EXCEPTION 'storage meta: an infected object stays quarantined' USING ERRCODE = 'check_violation';
+    END IF;
   ELSE
     INSERT INTO public.stored_object_meta (storage_key, driver, key_id, wrapped_key, nonce, tag, plain_sha256, size_bytes, scan_status, scanned_at)
     VALUES (p_key, p_driver, p_key_id, p_wrapped, p_nonce, p_tag, p_sha256, p_size, p_scan_status, CASE WHEN p_scan_status = 'clean' THEN now() END);
@@ -87,10 +92,15 @@ LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public STABLE AS $$
   SELECT m.* FROM public.stored_object_meta m WHERE m.storage_key > coalesce(p_after, '') ORDER BY m.storage_key LIMIT greatest(1, least(p_limit, 500));
 $$;
 
+-- An infected object's envelope is never deleted: without it the object would read as a legacy plaintext file and leave quarantine.
 CREATE OR REPLACE FUNCTION storage_meta_delete(p_key text) RETURNS void
-LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.stored_object_meta m WHERE m.storage_key = p_key AND m.scan_status = 'infected') THEN
+    RAISE EXCEPTION 'storage meta: an infected object stays quarantined' USING ERRCODE = 'check_violation';
+  END IF;
   DELETE FROM public.stored_object_meta WHERE storage_key = p_key;
-$$;
+END $$;
 
 -- Key rotation: the envelopes that are not wrapped with the active master key (rewrap only the data keys; the content is not touched).
 CREATE OR REPLACE FUNCTION storage_meta_rotation_batch(p_active_key_id text, p_limit integer) RETURNS SETOF stored_object_meta

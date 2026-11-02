@@ -313,7 +313,25 @@ export class ProtectedStorage implements ObjectStorage {
     const dec = gcmDecryptStream(dataKey, row.nonce, row.tag);
     raw.once('error', (e) => dec.destroy(e));
     raw.pipe(dec);
-    return dec;
+    // No plaintext leaves before the GCM tag is verified (security review of 0048): GCM authenticates only at the end of the stream,
+    // so the whole object is decrypted and checked first, in memory for ordinary files and through a private temp file for large ones.
+    if (Number(row.size_bytes) <= VERIFY_IN_MEMORY_BYTES) {
+      const parts: Buffer[] = [];
+      for await (const c of dec) parts.push(c as Buffer);     // throws on a wrong tag, before anything is returned
+      return Readable.from([Buffer.concat(parts)]);
+    }
+    const tmp = join(tmpdir(), `pmis-dec-${randomUUID()}`);
+    try {
+      await pipeline(dec, createWriteStream(tmp, { mode: 0o600 }));   // the tag is checked when the pipeline ends
+    } catch (e) {
+      await fs.rm(tmp, { force: true });
+      throw e;
+    }
+    const out = createReadStream(tmp);
+    const cleanup = () => { void fs.rm(tmp, { force: true }); };
+    out.once('close', cleanup);
+    out.once('error', cleanup);
+    return out;
   }
 
   async remove(key: string): Promise<void> {
@@ -447,6 +465,9 @@ export function scannerFor(scan: ScanConfig): Scanner | null {
   if (scan.mode !== 'clamd') return null;
   return new ClamdScanner({ socket: scan.socket, host: scan.host, port: scan.port, timeoutMs: scan.timeoutMs });
 }
+
+/** Objects up to this size are decrypted and verified in memory before release; larger ones go through a private temp file. */
+const VERIFY_IN_MEMORY_BYTES = 64 * 1024 * 1024;
 
 @Injectable()
 export class StorageService {
