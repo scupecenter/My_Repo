@@ -683,6 +683,156 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My profile (0.9.2)
+         * @description The signed-in user's own data for the "My profile" page: the fields they edit (`editable_fields`), the admin-owned data shown read-only
+         *     (roles, teams, regions, department, manager, employee ID, status), the two-factor state with what the user may do themselves, and the
+         *     newest email change request. Not for a pending account (403 `pending_assignment`).
+         */
+        get: operations["getMyProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change my own name, phone, language or theme (0.9.2)
+         * @description Only `display_name`, `phone` (E.164 or null, unique: 409 `duplicate`), `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+         *     `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
+         *     naming them; the email changes only through `POST /me/email-change`. Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
+         *     with the before and after values of what really changed (`profile_updated`); sending the current values changes nothing.
+         */
+        patch: operations["updateMyProfile"];
+        trace?: never;
+    };
+    "/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change my password from the profile (0.9.2)
+         * @description Same as `POST /auth/local/password` for a full session: the current password (a wrong one is 401 `invalid_credentials` and counts toward
+         *     the same lock as sign-in: 5 in a row lock the account for 15 minutes, then 429 `account_locked`), a new password that passes the
+         *     policy (422 `weak_password`), the other sessions end and this one stays. Audited (`password_changed`). Local accounts only: an M365
+         *     session gets 403 `action_forbidden` (the page shows a note instead).
+         */
+        post: operations["changeMyPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/email-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask for a new email (an admin approves it) (0.9.2)
+         * @description The new email and the password re-entered (a wrong password is 401 `invalid_credentials` and counts toward the lock). The request is
+         *     stored as `pending`; the login email does not change until an admin approves it (`POST /email-change-requests/{request_id}/decide`).
+         *     One pending request per user (409 `invalid_transition`: cancel it first). The address must be free: not the email of any account and
+         *     not asked for in another pending request (409 `duplicate`); the current email is 422. The deciders are told in the inbox
+         *     (`email_change_requested`). Audited. Local accounts only (an M365 session gets 403).
+         */
+        post: operations["requestMyEmailChange"];
+        /**
+         * Cancel my pending email change (0.9.2)
+         * @description 404 when no request is pending. Audited (`email_change_cancelled`).
+         */
+        delete: operations["cancelMyEmailChange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/two-factor/enrol/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn two-factor on myself, step 1 - a secret for the QR code (0.9.2)
+         * @description For a signed-in local user whose two-factor is off (409 otherwise). Needs a **fresh step-up of this session** (password; 401
+         *     `step_up_required` otherwise) and **no admin enrolment code**: the one-time code of 0.6.0 protects the sign-in enrolment (a password
+         *     alone at sign-in), while this path needs a live session that already passed sign-in plus a step-up, which the database checks again.
+         *     Returns the secret once (`otpauth_uri` for the QR code, `secret` as the manual key); it is stored encrypted as the pending secret of
+         *     this session for 10 minutes, and only this session can confirm it. Calling again replaces it. Never cached.
+         */
+        post: operations["startMyTwoFactorEnrolment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/two-factor/enrol/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn two-factor on myself, step 2 - confirm with a code (0.9.2)
+         * @description The first code from the app. A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code; nothing started from
+         *     this session (or older than 10 minutes) is 409. On success two-factor is on and **not enforced**, 10 recovery codes are returned once,
+         *     the user's other sessions end (they never passed a code) and this session stays, counting as having passed a code. From now on every
+         *     sign-in asks for the code. Audited (`two_factor_self_enabled`). Never cached.
+         */
+        post: operations["confirmMyTwoFactorEnrolment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/two-factor/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn two-factor off myself (0.9.2)
+         * @description Needs the password and a TOTP `code` or one `recovery_code` (missing: 422, nothing counted). **403 `two_factor_enforced` when an admin
+         *     enforces it** (`User.two_factor_enforced`), answered before anything is counted. A wrong password (401 `invalid_credentials`) or code
+         *     (401 `invalid_code`) counts toward the lock. On success the secret, the recovery codes and pending sign-ins are deleted. 409 when
+         *     two-factor is not on. Audited (`two_factor_self_disabled`).
+         */
+        post: operations["disableMyTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/tasks": {
         parameters: {
             query?: never;
@@ -850,10 +1000,83 @@ export interface paths {
          *     admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
          *     recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
          *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
-         *     The change is audited with before and after (never the secret). Users can never turn it off themselves.
+         *     The change is audited with before and after (never the secret).
+         *     **0.9.2:** turning it on also marks it **enforced by admin** (`User.two_factor_enforced`), so the user cannot turn it off; "on" for a user who
+         *     already turned it on themselves marks it enforced and returns no code. Turning it off clears the mark. A user whose two-factor is not
+         *     enforced may turn it off from the profile (`POST /me/two-factor/disable`); see also `PUT /users/{user_id}/two-factor/enforced`.
          */
         put: operations["setUserTwoFactor"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/two-factor/enforced": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Mark or unmark two-factor as enforced by an admin (0.9.2)
+         * @description While two-factor is enforced the user cannot turn it off from the profile (403 `two_factor_enforced`). Turning two-factor on through
+         *     `PUT /users/{user_id}/two-factor` enforces it already; this call marks or unmarks it on its own, for a user whose two-factor is on or
+         *     waiting for enrolment (409 `invalid_transition` while it is off). Same rights as the toggle: System Admin, or a delegate holding
+         *     `users.two_factor` (delegation grant `users.administer`, all regions); only a System Admin for an admin or a delegate; never one's own
+         *     account (403 `self_beneficiary`). Needs a reason and step-up. Setting what is set changes nothing and writes no audit row; otherwise
+         *     audited (`two_factor_enforced`, `two_factor_unenforced`) with before and after.
+         */
+        put: operations["setUserTwoFactorEnforced"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email-change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Email change requests to decide (0.9.2)
+         * @description System Admin, or a delegate holding `users.edit` for all regions (403 otherwise). `status` defaults to `pending`; `all` lists every
+         *     request. Newest first, at most 200.
+         */
+        get: operations["listEmailChangeRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/email-change-requests/{request_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject an email change (0.9.2)
+         * @description System Admin, or a delegate holding `users.edit` for all regions; a delegate never for an admin or a delegate. **Never on one's own
+         *     account** (403 `self_beneficiary`). Needs a reason and step-up. Only `approve` changes the user's login email (and so the address the
+         *     first M365 sign-in matches); uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409
+         *     `invalid_transition`. The user is told in the inbox (`email_change_decided`). Audited (`email_changed` or `email_change_rejected`) with
+         *     before and after.
+         */
+        post: operations["decideEmailChangeRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4983,7 +5206,7 @@ export interface components {
             team_specialization?: string | null;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -5221,6 +5444,8 @@ export interface components {
             two_factor?: {
                 enabled: boolean;
                 recovery_codes_remaining: number;
+                /** @description 0.9.2. An admin enforces it: the user cannot turn it off. False while it is off. */
+                enforced?: boolean;
             };
             /** Format: date-time */
             stepup_valid_until?: string | null;
@@ -5291,6 +5516,81 @@ export interface components {
         TwoFactorEnrolStart: {
             enrol_code: components["schemas"]["EnrolCodeInput"];
         };
+        /** @description 0.9.2. The signed-in user's two-factor and what they may do themselves. */
+        MyTwoFactor: {
+            state: components["schemas"]["TwoFactorLabel"];
+            /** @description An admin enforces it: the user cannot turn it off. */
+            enforced: boolean;
+            recovery_codes_remaining: number;
+            /** @description A local session whose two-factor is off. */
+            can_enable: boolean;
+            /** @description A local session whose two-factor is on and not enforced. */
+            can_disable: boolean;
+        };
+        /** @enum {string} */
+        EmailChangeStatus: "pending" | "approved" | "rejected" | "cancelled";
+        EmailChangeRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            old_email: string;
+            /** Format: email */
+            new_email: string;
+            status: components["schemas"]["EmailChangeStatus"];
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            decided_at: string | null;
+            decision_reason: string | null;
+        };
+        EmailChangeRequestAdmin: components["schemas"]["EmailChangeRequest"] & {
+            user: components["schemas"]["UserRef"];
+            decided_by: components["schemas"]["UserRef"] | null;
+        };
+        /** @description 0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. */
+        MyProfilePatch: {
+            display_name?: string;
+            /** @description E.164; a local sign-in identifier, unique. */
+            phone?: string | null;
+            /** @enum {string} */
+            locale?: "en" | "ar";
+            /** @enum {string} */
+            theme?: "light" | "dark";
+        };
+        /** @description 0.9.2. The "My profile" page. */
+        MyProfile: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            /**
+             * Format: email
+             * @description The login email. Changes only through an approved email change request.
+             */
+            email: string;
+            /** @description Admin-owned. */
+            employee_id: string | null;
+            phone: string | null;
+            /** @enum {string} */
+            locale: "en" | "ar";
+            /** @enum {string} */
+            theme: "light" | "dark";
+            status: components["schemas"]["UserStatus"];
+            /** @enum {string} */
+            auth_method: "local" | "m365" | "break_glass";
+            local_sign_in: boolean;
+            editable_fields: ("display_name" | "phone" | "locale" | "theme")[];
+            admin_owned: {
+                roles: components["schemas"]["RoleRef"][];
+                teams: components["schemas"]["TeamKind"][];
+                region_ids: "all" | number[];
+                department: components["schemas"]["DepartmentRef"] | null;
+                manager: components["schemas"]["UserRef"] | null;
+            };
+            two_factor: components["schemas"]["MyTwoFactor"];
+            /** @description The newest request, any status. */
+            email_change: components["schemas"]["EmailChangeRequest"] | null;
+            version: number;
+        };
         Me: {
             user: components["schemas"]["User"];
             assignments: components["schemas"]["Assignment"][];
@@ -5347,6 +5647,8 @@ export interface components {
              * @description 0.6.0. When the outstanding one-time enrolment code ends (a past time = expired); null when none is outstanding. Never the code itself.
              */
             two_factor_enrol_code_expires_at?: string | null;
+            /** @description 0.9.2. "Enforced by admin": an admin turned two-factor on, or marked it. The user cannot turn it off. False while it is off. */
+            two_factor_enforced?: boolean;
             /** @description Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption. */
             mfa_exempt?: boolean;
             /** Format: date-time */
@@ -8373,7 +8675,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -10262,6 +10564,243 @@ export interface operations {
             429: components["responses"]["TooManyRequests"];
         };
     };
+    getMyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Profile. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    updateMyProfile: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyProfilePatch"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    changeMyPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    current_password: string;
+                    /** Format: password */
+                    new_password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    requestMyEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    new_email: string;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Pending. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    cancelMyEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    startMyTwoFactorEnrolment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secret and URI. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorEnrolment"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    confirmMyTwoFactorEnrolment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description On. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        recovery_codes: string[];
+                        two_factor: components["schemas"]["MyTwoFactor"];
+                        other_sessions_ended: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    disableMyTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    password: string;
+                    code?: string;
+                    recovery_code?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Off. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyTwoFactor"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     listMyTasks: {
         parameters: {
             query?: {
@@ -10583,6 +11122,106 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setUserTwoFactorEnforced: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enforced: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description New state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        two_factor: components["schemas"]["TwoFactorLabel"];
+                        enforced: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listEmailChangeRequests: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "cancelled" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["EmailChangeRequestAdmin"][];
+                        page: components["schemas"]["PageInfo"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    decideEmailChangeRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "reject";
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Decided. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequestAdmin"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

@@ -38,6 +38,7 @@ import { Roles } from '@/pages/Roles';
 import { UserDetailPage } from '@/pages/UserDetail';
 import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
+import { Profile } from '@/pages/Profile';
 import { SecurityLog } from '@/pages/SecurityLog';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 
@@ -65,6 +66,7 @@ function gated(session: Session) {
       <Route element={<Shell />}>
         <Route index element={<Navigate to="/my-work" replace />} />
         <Route path="change-password" element={<ChangePassword />} />
+        <Route path="profile" element={<Profile />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.9.1
+  version: 0.9.2
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.9.2 (2026-11-02): additive. The self-service "My profile" page (owner decisions 2026-11-02, ADR 0014 amendment 2, migration 0044). (1) `GET /me/profile` and `PATCH /me/profile` (ETag / `If-Match`): a user changes only their own `display_name`, `phone`, `locale` and `theme`; admin-owned fields (email, employee ID, status, roles, team, regions, department, manager) answer 403 `field_read_only`; every change is audited with before and after. (2) `POST /me/password`: the local password change from the profile (same policy, lock and session rules as `POST /auth/local/password`); an M365 session gets 403. (3) Email change is a request an admin approves: `POST /me/email-change` (new email and the password re-entered; one pending request per user; the address must be free), `DELETE /me/email-change` (cancel while pending), `GET /email-change-requests` and `POST /email-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account; only an approval changes the login email); new notification kinds `email_change_requested` (to the deciders) and `email_change_decided` (to the user). (4) Two-factor self-service: `POST /me/two-factor/enrol/start` (fresh step-up, no enrolment code), `POST /me/two-factor/enrol/confirm` (recovery codes once; the other sessions end), `POST /me/two-factor/disable` (password and a code or a recovery code; 403 `two_factor_enforced` while an admin enforces it); `PUT /users/{user_id}/two-factor/enforced` (System Admin or a delegate holding `users.two_factor`; reason, step-up, never oneself). Turning two-factor on through `PUT /users/{user_id}/two-factor` enforces it, also for a user who had turned it on themselves. (5) `User.two_factor_enforced`, `Session.two_factor.enforced`, error code `two_factor_enforced`.
     - 0.9.1 (2026-11-02): additive. (1) Gate-lock exempt list (owner decision 2026-11-02, migration 0043): the setting `calc.gate_lock_exempt_tasks` also holds D1 (TE access permission), the DLP / FAC tasks B14, B15 and D18 and the dismantle tasks E2 and E3, beside C1 to C4; the codes were merged into the current value, an admin's own edits are kept. These tasks are no longer returned with `LockReason` `gate_closed`. (2) Team specialization / scope match of Procurement (Q97): `GET /settings/team-scope-match` and `PUT /settings/team-scope-match` (`TeamScopeMatch`; reading needs the Settings screen `admin.settings`, saving needs `admin.settings` edit for all regions, a reason and `If-Match`; audited with before and after). A Procurement record that names a team (`data.team_id`) whose specialization the table does not allow for the record's scope is refused, at create, at edit and again at submit, with 422 `team_scope_mismatch` (`errors[0].path` `/data/team_id`, `order_scope`, `team_specialization`); an exempt scope (seed: HLC) is not checked, a scope missing from the table and a team without a specialization are refused. New `ErrorCode` `team_scope_mismatch`.
     - 0.9.0 (2026-11-02): HLC fiber purchasing (owner decision 2026-11-02) and Q91, migration 0042. (1) The HLC purchase request is a Procurement record of scope `HLC`: the `scope` list gains `HLC` (no longer `wrong_register`; GECOL still is), and the Procurement fields gain `hlc_approval_date` (scope HLC only, `hlc_scope_only` otherwise; PR No. and PR date are required for scope HLC; a site whose HLC scope is N/A gives `scope_conflict`). Scope HLC has its own Responsibility Matrix row `procurement_hlc` (`MatrixRowKey`; default L1 HLC Fiber Team, L2 CW Team Lead): only its L1 holders enter scope-HLC records and only the Procurement row's holders enter the other scopes (refused with 403 `not_eligible_holder` by the database, also for a change of scope, a new version and a template row). `RegisterDefinition.entry_scopes` lists the scopes the caller may enter in a register whose scopes have their own rows (Procurement). (2) The HLC register holds execution only: new fields `link_received_date` and `in_service_date`; `request_no` and `request_date` are no longer fields (`unknown_field`; old values stay in `data`, read-only); the read-only fields `pr_no`, `hlc_approval_date` and `procurement_record_id` (the approved scope-HLC Procurement version) are filled by the server. Submit refuses `before_installation` (TX link test before installation) and `before_test` (in service before the TX link test). (3) `RegisterRecord.warnings` (items shaped like `Problem.errors`): ordering issues that do not block (Q96), for the reviewer: `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`, `approval_before_pr`. (4) Task sources: C3 closes from the approved scope-HLC Procurement record on `hlc_approval_date`, C4 from the HLC record on `in_service_date` (no longer TX Link Tested), C1 from the approved GECOL record on `request_date` (Q91); one approval also closes the next source task of the same record that it has just opened when that task has the same L2 holders. `SlaStartEvent` accepts `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope; C3 uses `PR:HLC`, so C-3 measures PR issue to HLC approval). No endpoint was added or removed.
     - 0.8.0 (2026-11-02): additive. The document upload module (owner rules "Document Library" and "Documents and QC"). (1) Slots: `DocumentSlot` gains `doc_type_id`, `form_kind`, `conditional`, `can_upload` and `expiry_tracked`, the kind `generated_form`; `DocumentFile` gains `capture_date`, `unknown_capture_date` and `superseded_by`. New: `POST /tasks/{task_id}/slots` (add a candidate slot or a conditional document that applies), `DELETE /tasks/{task_id}/slots/{slot_id}/files/{file_id}` (withdraw a file before submission; it stays on record), `POST /tasks/{task_id}/slots/suggest` (type suggested from file names). `uploadSlotFile` documents the checks and the error codes `file_too_large` (413) and `file_rejected` (422, with `reason`). (2) Download: `GET /documents` (the site Documents tab and the cross-site document list, filters, version history through `include_superseded`), `POST /exports/zip` (bulk zip per site, per stage, per document type across sites, or an explicit file list; a background job of kind `zip_export`), `GET /exports/zip/{export_id}/download`, and `GET /jobs/{job_id}` answers for it. `GET /files/{file_id}/download` also serves the blank form of a document type. Every download is audited before the first byte. (3) Document Library: `DocumentType` gains `needs_review` and `open_task_count` (what an "also open tasks" publish would reach); `GET /document-library/{doc_type_id}/versions`; `GET /document-library/{doc_type_id}/blank-form`. A generated form is a document type with `form_kind`. The seed library (stages 1 to 3 published, stages 4 to 10 as drafts to review) is data, not code. `ErrorCode` is unchanged.
@@ -1002,6 +1003,227 @@ paths:
         '202': { description: 'Notification queued (in-app and email).' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/profile:
+    get:
+      tags: [me]
+      operationId: getMyProfile
+      summary: My profile (0.9.2)
+      description: |
+        The signed-in user's own data for the "My profile" page: the fields they edit (`editable_fields`), the admin-owned data shown read-only
+        (roles, teams, regions, department, manager, employee ID, status), the two-factor state with what the user may do themselves, and the
+        newest email change request. Not for a pending account (403 `pending_assignment`).
+      responses:
+        '200':
+          description: Profile.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    patch:
+      tags: [me]
+      operationId: updateMyProfile
+      summary: Change my own name, phone, language or theme (0.9.2)
+      description: |
+        Only `display_name`, `phone` (E.164 or null, unique: 409 `duplicate`), `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+        `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
+        naming them; the email changes only through `POST /me/email-change`. Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
+        with the before and after values of what really changed (`profile_updated`); sending the current values changes nothing.
+      x-db-path: idm_update_own_profile
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MyProfilePatch' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /me/password:
+    post:
+      tags: [me]
+      operationId: changeMyPassword
+      summary: Change my password from the profile (0.9.2)
+      description: |
+        Same as `POST /auth/local/password` for a full session: the current password (a wrong one is 401 `invalid_credentials` and counts toward
+        the same lock as sign-in: 5 in a row lock the account for 15 minutes, then 429 `account_locked`), a new password that passes the
+        policy (422 `weak_password`), the other sessions end and this one stays. Audited (`password_changed`). Local accounts only: an M365
+        session gets 403 `action_forbidden` (the page shows a note instead).
+      x-db-path: auth_local_set_own_password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, format: password, maxLength: 128 }
+                new_password: { type: string, format: password, minLength: 12, maxLength: 128 }
+      responses:
+        '200':
+          description: Changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/email-change:
+    post:
+      tags: [me]
+      operationId: requestMyEmailChange
+      summary: Ask for a new email (an admin approves it) (0.9.2)
+      description: |
+        The new email and the password re-entered (a wrong password is 401 `invalid_credentials` and counts toward the lock). The request is
+        stored as `pending`; the login email does not change until an admin approves it (`POST /email-change-requests/{request_id}/decide`).
+        One pending request per user (409 `invalid_transition`: cancel it first). The address must be free: not the email of any account and
+        not asked for in another pending request (409 `duplicate`); the current email is 422. The deciders are told in the inbox
+        (`email_change_requested`). Audited. Local accounts only (an M365 session gets 403).
+      x-db-path: idm_request_email_change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [new_email, password]
+              properties:
+                new_email: { type: string, format: email, maxLength: 254 }
+                password: { type: string, format: password, maxLength: 128 }
+      responses:
+        '201':
+          description: Pending.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [me]
+      operationId: cancelMyEmailChange
+      summary: Cancel my pending email change (0.9.2)
+      description: 404 when no request is pending. Audited (`email_change_cancelled`).
+      x-db-path: idm_cancel_email_change
+      responses:
+        '204': { description: Cancelled. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/two-factor/enrol/start:
+    post:
+      tags: [me]
+      operationId: startMyTwoFactorEnrolment
+      summary: Turn two-factor on myself, step 1 - a secret for the QR code (0.9.2)
+      description: |
+        For a signed-in local user whose two-factor is off (409 otherwise). Needs a **fresh step-up of this session** (password; 401
+        `step_up_required` otherwise) and **no admin enrolment code**: the one-time code of 0.6.0 protects the sign-in enrolment (a password
+        alone at sign-in), while this path needs a live session that already passed sign-in plus a step-up, which the database checks again.
+        Returns the secret once (`otpauth_uri` for the QR code, `secret` as the manual key); it is stored encrypted as the pending secret of
+        this session for 10 minutes, and only this session can confirm it. Calling again replaces it. Never cached.
+      x-step-up: true
+      x-db-path: auth_totp_self_begin_enrol
+      responses:
+        '200':
+          description: Secret and URI.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorEnrolment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/two-factor/enrol/confirm:
+    post:
+      tags: [me]
+      operationId: confirmMyTwoFactorEnrolment
+      summary: Turn two-factor on myself, step 2 - confirm with a code (0.9.2)
+      description: |
+        The first code from the app. A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code; nothing started from
+        this session (or older than 10 minutes) is 409. On success two-factor is on and **not enforced**, 10 recovery codes are returned once,
+        the user's other sessions end (they never passed a code) and this session stays, counting as having passed a code. From now on every
+        sign-in asks for the code. Audited (`two_factor_self_enabled`). Never cached.
+      x-db-path: auth_totp_self_confirm_enrol
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, minLength: 1, maxLength: 16 }
+      responses:
+        '200':
+          description: On.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [recovery_codes, two_factor, other_sessions_ended]
+                properties:
+                  recovery_codes: { type: array, minItems: 10, maxItems: 10, items: { type: string } }
+                  two_factor: { $ref: '#/components/schemas/MyTwoFactor' }
+                  other_sessions_ended: { type: integer, minimum: 0 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/two-factor/disable:
+    post:
+      tags: [me]
+      operationId: disableMyTwoFactor
+      summary: Turn two-factor off myself (0.9.2)
+      description: |
+        Needs the password and a TOTP `code` or one `recovery_code` (missing: 422, nothing counted). **403 `two_factor_enforced` when an admin
+        enforces it** (`User.two_factor_enforced`), answered before anything is counted. A wrong password (401 `invalid_credentials`) or code
+        (401 `invalid_code`) counts toward the lock. On success the secret, the recovery codes and pending sign-ins are deleted. 409 when
+        two-factor is not on. Audited (`two_factor_self_disabled`).
+      x-db-path: auth_totp_self_disable
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, maxLength: 128 }
+                code: { type: string, maxLength: 16 }
+                recovery_code: { type: string, maxLength: 32 }
+      responses:
+        '200':
+          description: Off.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyTwoFactor' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/tasks:
     get:
       tags: [me]
@@ -1260,7 +1482,10 @@ paths:
         admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
         recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
         no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
-        The change is audited with before and after (never the secret). Users can never turn it off themselves.
+        The change is audited with before and after (never the secret).
+        **0.9.2:** turning it on also marks it **enforced by admin** (`User.two_factor_enforced`), so the user cannot turn it off; "on" for a user who
+        already turned it on themselves marks it enforced and returns no code. Turning it off clears the mark. A user whose two-factor is not
+        enforced may turn it off from the profile (`POST /me/two-factor/disable`); see also `PUT /users/{user_id}/two-factor/enforced`.
       x-step-up: true
       x-db-path: idm_set_two_factor
       parameters:
@@ -1285,6 +1510,116 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/two-factor/enforced:
+    put:
+      tags: [users]
+      operationId: setUserTwoFactorEnforced
+      summary: Mark or unmark two-factor as enforced by an admin (0.9.2)
+      description: |
+        While two-factor is enforced the user cannot turn it off from the profile (403 `two_factor_enforced`). Turning two-factor on through
+        `PUT /users/{user_id}/two-factor` enforces it already; this call marks or unmarks it on its own, for a user whose two-factor is on or
+        waiting for enrolment (409 `invalid_transition` while it is off). Same rights as the toggle: System Admin, or a delegate holding
+        `users.two_factor` (delegation grant `users.administer`, all regions); only a System Admin for an admin or a delegate; never one's own
+        account (403 `self_beneficiary`). Needs a reason and step-up. Setting what is set changes nothing and writes no audit row; otherwise
+        audited (`two_factor_enforced`, `two_factor_unenforced`) with before and after.
+      x-step-up: true
+      x-db-path: idm_set_two_factor_enforced
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enforced, reason]
+              properties:
+                enforced: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: New state.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [two_factor, enforced]
+                properties:
+                  two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
+                  enforced: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /email-change-requests:
+    get:
+      tags: [users]
+      operationId: listEmailChangeRequests
+      summary: Email change requests to decide (0.9.2)
+      description: |
+        System Admin, or a delegate holding `users.edit` for all regions (403 otherwise). `status` defaults to `pending`; `all` lists every
+        request. Newest first, at most 200.
+      x-db-path: idm_email_change_list
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, cancelled, all], default: pending }
+      responses:
+        '200':
+          description: Requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/EmailChangeRequestAdmin' } }
+                  page: { $ref: '#/components/schemas/PageInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /email-change-requests/{request_id}/decide:
+    post:
+      tags: [users]
+      operationId: decideEmailChangeRequest
+      summary: Approve or reject an email change (0.9.2)
+      description: |
+        System Admin, or a delegate holding `users.edit` for all regions; a delegate never for an admin or a delegate. **Never on one's own
+        account** (403 `self_beneficiary`). Needs a reason and step-up. Only `approve` changes the user's login email (and so the address the
+        first M365 sign-in matches); uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409
+        `invalid_transition`. The user is told in the inbox (`email_change_decided`). Audited (`email_changed` or `email_change_rejected`) with
+        before and after.
+      x-step-up: true
+      x-db-path: idm_decide_email_change
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Decided.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeRequestAdmin' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/two-factor/reset:
     post:
@@ -8274,6 +8609,7 @@ components:
         - weak_password
         - internal_error
         - team_scope_mismatch
+        - two_factor_enforced
     PageEnvelope:
       type: object
       required: [items, page]
@@ -8499,6 +8835,7 @@ components:
           properties:
             enabled: { type: boolean }
             recovery_codes_remaining: { type: integer, minimum: 0, maximum: 10 }
+            enforced: { type: boolean, description: '0.9.2. An admin enforces it: the user cannot turn it off. False while it is off.' }
         stepup_valid_until: { type: [string, 'null'], format: date-time }
         expires_at: { type: string, format: date-time }
     PendingSignIn:
@@ -8570,6 +8907,79 @@ components:
       required: [enrol_code]
       properties:
         enrol_code: { $ref: '#/components/schemas/EnrolCodeInput' }
+    MyTwoFactor:
+      type: object
+      description: '0.9.2. The signed-in user''s two-factor and what they may do themselves.'
+      required: [state, enforced, recovery_codes_remaining, can_enable, can_disable]
+      properties:
+        state: { $ref: '#/components/schemas/TwoFactorLabel' }
+        enforced: { type: boolean, description: 'An admin enforces it: the user cannot turn it off.' }
+        recovery_codes_remaining: { type: integer, minimum: 0, maximum: 10 }
+        can_enable: { type: boolean, description: 'A local session whose two-factor is off.' }
+        can_disable: { type: boolean, description: 'A local session whose two-factor is on and not enforced.' }
+    EmailChangeStatus:
+      type: string
+      enum: [pending, approved, rejected, cancelled]
+    EmailChangeRequest:
+      type: object
+      required: [id, old_email, new_email, status, requested_at, decided_at, decision_reason]
+      properties:
+        id: { type: string, format: uuid }
+        old_email: { type: string, format: email }
+        new_email: { type: string, format: email }
+        status: { $ref: '#/components/schemas/EmailChangeStatus' }
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: [string, 'null'], format: date-time }
+        decision_reason: { type: [string, 'null'] }
+    EmailChangeRequestAdmin:
+      allOf:
+        - $ref: '#/components/schemas/EmailChangeRequest'
+        - type: object
+          required: [user, decided_by]
+          properties:
+            user: { $ref: '#/components/schemas/UserRef' }
+            decided_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    MyProfilePatch:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: '0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`.'
+      properties:
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$', description: 'E.164; a local sign-in identifier, unique.' }
+        locale: { type: string, enum: [en, ar] }
+        theme: { type: string, enum: [light, dark] }
+    MyProfile:
+      type: object
+      description: '0.9.2. The "My profile" page.'
+      required: [id, display_name, email, employee_id, phone, locale, theme, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, version]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        email: { type: string, format: email, description: 'The login email. Changes only through an approved email change request.' }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: 'Admin-owned.' }
+        phone: { type: [string, 'null'] }
+        locale: { type: string, enum: [en, ar] }
+        theme: { type: string, enum: [light, dark] }
+        status: { $ref: '#/components/schemas/UserStatus' }
+        auth_method: { type: string, enum: [local, m365, break_glass] }
+        local_sign_in: { type: boolean }
+        editable_fields: { type: array, items: { type: string, enum: [display_name, phone, locale, theme] } }
+        admin_owned:
+          type: object
+          required: [roles, teams, region_ids, department, manager]
+          properties:
+            roles: { type: array, items: { $ref: '#/components/schemas/RoleRef' } }
+            teams: { type: array, items: { $ref: '#/components/schemas/TeamKind' } }
+            region_ids:
+              oneOf:
+                - { type: string, const: all }
+                - { type: array, items: { type: integer } }
+            department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }] }
+            manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        two_factor: { $ref: '#/components/schemas/MyTwoFactor' }
+        email_change: { oneOf: [{ $ref: '#/components/schemas/EmailChangeRequest' }, { type: 'null' }], description: 'The newest request, any status.' }
+        version: { type: integer }
     Me:
       type: object
       required: [user, assignments, effective]
@@ -8645,6 +9055,7 @@ components:
             must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
             two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
             two_factor_enrol_code_expires_at: { type: [string, 'null'], format: date-time, description: '0.6.0. When the outstanding one-time enrolment code ends (a past time = expired); null when none is outstanding. Never the code itself.' }
+            two_factor_enforced: { type: boolean, description: '0.9.2. "Enforced by admin": an admin turned two-factor on, or marked it. The user cannot turn it off. False while it is off.' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
@@ -11546,7 +11957,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]

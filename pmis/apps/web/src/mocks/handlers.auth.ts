@@ -101,7 +101,7 @@ const enrolProblem = (r: 'bad' | 'expired' | 'locked') => r === 'locked'
   : r === 'expired'
     ? problem(401, 'enrol_code_expired', 'This enrolment code has expired. Ask your administrator for a new one.')
     : problem(401, 'invalid_enrol_code', 'The enrolment code is not correct. Check it with your administrator, who can issue a new one.');
-const freshTf = (): NonNullable<Cred['tf']> => ({ on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0, enrolCode: newEnrolCode(), enrolExpires: Date.now() + ENROL_CODE_MS });
+const freshTf = (): NonNullable<Cred['tf']> => ({ on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0, enrolCode: newEnrolCode(), enrolExpires: Date.now() + ENROL_CODE_MS, enforced: true });
 const codeBody = (tf: NonNullable<Cred['tf']>) => ({ enrol_code: tf.enrolCode!, enrol_code_expires_at: new Date(tf.enrolExpires!).toISOString() });
 const pendingOf = (kind: 'two_factor' | 'enrol') => {
   const p = db().pending;
@@ -124,6 +124,8 @@ const whoOf = (key: string) => {
 
 const TF_NOT_ON = () => problem(409, 'invalid_transition', 'Two-factor is not on for this user: there is nothing to reset');
 const userByParam = (id: string | readonly string[] | undefined) => db().admin.users.find((x) => (x.local ? x.local.id : uid(x.employee_id)) === id);
+
+export { checkCode, codeProblem, recordFailure, GENERIC, whoOf, userByParam, needAdmin, isAdmin };
 
 export const authHandlers = [
   http.post(`${B}/auth/local/login`, async ({ request }) => {
@@ -307,6 +309,7 @@ export const authHandlers = [
     if (!c?.enabled) return problem(422, 'validation_failed', 'Two-factor needs a local account', { errors: [{ path: '/user_id', code: 'no_local_account' }] });
     const turnedOn = b.enabled && tfLabel(c) === 'off';
     if (turnedOn) c.tf = freshTf();
+    else if (b.enabled && c.tf) c.tf.enforced = true; // 0.9.2: on for a user who turned it on themselves = enforced
     if (!b.enabled) delete c.tf;
     save();
     // Turning it on returns the one-time enrolment code, once (contract 0.6.0).
@@ -323,7 +326,7 @@ export const authHandlers = [
     if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
     const c = cred(accountKeyOf(u));
     if (!c?.tf?.on) return TF_NOT_ON();
-    c.tf = freshTf();
+    c.tf = { ...freshTf(), enforced: !!c.tf.enforced };
     save();
     return HttpResponse.json({ two_factor: 'pending_enrolment', ...codeBody(c.tf) });
   }),

@@ -8,7 +8,7 @@ export type ErrorCode =
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
-  | 'file_too_large' | 'file_rejected' | 'export_expired' | 'team_scope_mismatch';
+  | 'file_too_large' | 'file_rejected' | 'export_expired' | 'team_scope_mismatch' | 'two_factor_enforced';
 
 export interface FieldError {
   path: string;
@@ -54,6 +54,8 @@ const TITLES: Record<string, string> = {
   file_rejected: 'The file is not accepted',
   export_expired: 'The export has expired',
   team_scope_mismatch: 'The team does not match the order scope',
+  two_factor_enforced: 'Two-factor is enforced by an administrator',
+  field_read_only: 'This field is managed by an administrator',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

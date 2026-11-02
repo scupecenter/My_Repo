@@ -473,7 +473,7 @@ describe('recovery codes', () => {
     const [first, second] = e.codes as [string, string];
     const a = await signIn(e, { recovery_code: first.toLowerCase() });
     expect(a.res.status).toBe(200);
-    expect(a.res.body.two_factor).toEqual({ enabled: true, recovery_codes_remaining: 9 });
+    expect(a.res.body.two_factor).toEqual({ enabled: true, recovery_codes_remaining: 9, enforced: true });
     expect((await a.api.call('get', '/auth/session')).body.two_factor.recovery_codes_remaining).toBe(9);
     // the same code a second time
     const b = await signIn(e, { recovery_code: first });
