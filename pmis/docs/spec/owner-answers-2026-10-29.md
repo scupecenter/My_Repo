@@ -118,3 +118,14 @@ Answered one by one by the product owner. "Default" means the proposed default i
 | Q96 | Default: only the two date rules block (C-2 not negative; TX link test not before installation); the rest of the GECOL / HLC order shows as a warning to the reviewer. |
 | Q97 | Default: Procurement checks that the contractor team's specialization matches the order scope, through a match table in Settings (editable by the admin); a mismatch is refused. |
 | Gate lock exempt list | **Owner decision:** add D1 (TE access permission), the DLP / FAC tasks B14, B15 and D18, and the dismantle tasks E2 and E3 to `calc.gate_lock_exempt_tasks`, beside C1–C4. (The owner also ticked "nothing"; read as adding the three groups, to be confirmed if wrong.) |
+
+## HLC fiber purchasing (owner decision 2026-11-02, replaces the HLC part of Q56 and Q54/Q91 for C3/C4)
+
+| Item | Decision |
+|---|---|
+| Where the HLC request lives | The HLC purchase request (PR to the HLC company) is a **Procurement register** record with scope **HLC** (no longer refused as `wrong_register`). It holds the PR No., PR date and the **HLC approval date** of the request. |
+| Who enters it | The **HLC Fiber Team**, inside the Procurement register, for scope HLC only (other scopes stay with the Procurement team). |
+| What the HLC register holds | Execution only, linked to the approved HLC PR: link received (handover from HLC), installation, test (TX link tested), in service (operation). One HLC record per site (Q55), each new request a new version. |
+| C3 (HLC request) | Closed by the approved Procurement record of scope HLC, on the **HLC approval date**. The C-3 SLA measures PR issue → HLC approval. |
+| C4 (fiber done) | Closed on the **in-service (operation) date** of the HLC record (replaces "TX Link Tested" of Q54 for HLC). The test date must not be before installation, and operation not before the test. |
+| GECOL | Unchanged (Q56: the GECOL team enters its request in the GECOL register; C1/C2 per Q91/Q54). |
