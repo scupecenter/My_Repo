@@ -183,4 +183,8 @@ jobs:
 
       - name: Shellcheck (errors only)
         working-directory: pmis
-        run: shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh
+        run: shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh tools/install/test-le-existing.sh
+
+      - name: TLS option 4 helpers (fake Let's Encrypt tree)
+        working-directory: pmis
+        run: bash tools/install/test-le-existing.sh

@@ -29,6 +29,8 @@ WEB_ROOT=/var/www/gsdn-pmis
 CONF_DIR=/etc/gsdn-pmis
 TLS_DIR=/etc/ssl/gsdn-pmis
 ACME_ROOT=/var/www/letsencrypt
+# Let's Encrypt's directory (certbot). Overridable only for tests on a copy of the tree; the server uses the default.
+LE_DIR=${LE_DIR:-/etc/letsencrypt}
 SITE=/etc/nginx/sites-available/gsdn-pmis
 SERVICE_USER=gsdn-pmis
 # Migrations the first installer applied without recording them (used only to adopt an older installation).
@@ -85,6 +87,87 @@ port_busy() {
   else (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; fi
 }
 
+# ---------------------------------------------------------------- existing Let's Encrypt certificate (TLS option 4)
+# The certificate stays where certbot keeps it and is renewed by certbot; nginx reads it in place (no copy).
+# BEGIN le-existing (tools/install/test-le-existing.sh extracts this block; keep the markers)
+le_names() {
+  local d n
+  for d in "$LE_DIR"/live/*/; do
+    [[ -d $d ]] || continue
+    n=$(basename "$d"); [[ $n == README ]] && continue
+    printf '%s\n' "$n"
+  done
+}
+
+# le_covers CERT HOST: true when the certificate matches HOST (a domain or an IP address)
+le_covers() {
+  local cert=$1 host=$2
+  if [[ $host =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then
+    openssl x509 -noout -checkip "$host" -in "$cert" 2>/dev/null | grep -q 'does match'
+  else
+    openssl x509 -noout -checkhost "$host" -in "$cert" 2>/dev/null | grep -q 'does match'
+  fi
+}
+
+# le_choose: sets TLS_LE_NAME. Interactive: a numbered list, then a number or a name. Non-interactive: the TLS_LE_NAME variable.
+le_choose() {
+  local names=() n i def
+  if (( NONINT_TLS )); then
+    [[ -n ${TLS_LE_NAME:-} ]] || die "Set TLS_LE_NAME to the name of the certificate under $LE_DIR/live/."
+    return 0
+  fi
+  mapfile -t names < <(le_names)
+  if (( ! AUTO )); then
+    if (( ${#names[@]} == 0 )); then
+      die "No certificates under $LE_DIR/live/. Choose option 1 (new Let's Encrypt certificate) or option 2 (your own files)."
+    fi
+    echo "Certificates under $LE_DIR/live/:"
+    i=1; for n in "${names[@]}"; do echo "  $i) $n"; i=$((i + 1)); done
+  fi
+  def=${PREV_LE_NAME:-}
+  if [[ -z $def ]] && (( ${#names[@]} > 0 )); then def=${names[0]}; fi
+  ask TLS_LE_NAME "Certificate name (a number from the list, or a name)" "$def"
+  if [[ $TLS_LE_NAME =~ ^[0-9]+$ ]] && (( TLS_LE_NAME >= 1 && TLS_LE_NAME <= ${#names[@]} )); then
+    TLS_LE_NAME=${names[TLS_LE_NAME - 1]}
+  fi
+}
+
+# le_check NAME HOST: dies unless the certificate NAME exists, is valid now, matches its key and covers HOST.
+le_check() {
+  local name=$1 host=$2 cert key
+  [[ $name =~ ^[A-Za-z0-9._-]+$ && $name != . && $name != .. ]] || die "Not a certificate name: $name"
+  cert=$LE_DIR/live/$name/fullchain.pem; key=$LE_DIR/live/$name/privkey.pem
+  [[ -r $cert && -r $key ]] || die "No fullchain.pem and privkey.pem under $LE_DIR/live/$name (the installer must run as root)."
+  openssl x509 -checkend 0 -noout -in "$cert" >/dev/null 2>&1 \
+    || die "The certificate $name has expired, or is not a certificate. Renew it first: certbot renew --cert-name $name"
+  [[ $(openssl x509 -noout -pubkey -in "$cert" 2>/dev/null) == "$(openssl pkey -pubout -in "$key" 2>/dev/null)" ]] \
+    || die "The private key $key does not belong to $cert."
+  echo "   Subject: $(openssl x509 -noout -subject -in "$cert" | sed 's/^subject= *//')"
+  echo "   SAN:     $(openssl x509 -noout -ext subjectAltName -in "$cert" 2>/dev/null | tail -n +2 | sed 's/^ *//' || true)"
+  echo "   Expires: $(openssl x509 -noout -enddate -in "$cert" | sed 's/^notAfter=//')"
+  le_covers "$cert" "$host" || die "The certificate $name does not cover $host. Choose a name that the certificate covers."
+}
+
+# le_renewal_hook: certbot runs it after each renewal so nginx reloads the new file. Never overwrites another hook.
+le_renewal_hook() {
+  local dir="$LE_DIR/renewal-hooks/deploy" body f
+  body=$'#!/bin/sh\nsystemctl reload nginx'
+  install -d "$dir"
+  for f in "$dir/reload-nginx" "$dir/reload-nginx-gsdn-pmis"; do
+    if [[ -e $f || -L $f ]]; then
+      if [[ $(cat "$f" 2>/dev/null) == "$body" ]]; then
+        chmod 755 "$f"; echo "   Renewal hook already in place: $f"; return 0
+      fi
+      continue
+    fi
+    printf '%s\n' "$body" > "$f"; chmod 755 "$f"
+    echo "   Renewal hook installed: $f (nginx is reloaded after each renewal)"
+    return 0
+  done
+  die "Both $dir/reload-nginx and $dir/reload-nginx-gsdn-pmis exist with other content. Add 'systemctl reload nginx' to one of them yourself, then run the installer again."
+}
+# END le-existing
+
 # ---------------------------------------------------------------- preflight
 [[ $EUID -eq 0 ]] || die "Run as root: sudo bash $0"
 [[ -r /etc/os-release ]] && . /etc/os-release
@@ -98,6 +181,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
 PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY=''
 PREV_STORAGE_MODE='' PREV_STORAGE_DIR='' PREV_MINIO_PORT='' PREV_MINIO_DIR='' PREV_S3_ACCESS_KEY='' PREV_S3_SECRET_KEY='' PREV_MINIO_ROOT_PASSWORD=''
+PREV_TLS_MODE='' PREV_LE_NAME=''
 if [[ -r $CONF_DIR/install.conf ]]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
@@ -109,6 +193,11 @@ if [[ -r $SITE ]]; then
   # The certificate in use is always read from the live nginx site.
   PREV_CERT_PATH=$(awk '/ssl_certificate / {gsub(";",""); print $2; exit}' "$SITE")
   PREV_KEY_PATH=$(awk '/ssl_certificate_key/ {gsub(";",""); print $2; exit}' "$SITE")
+  # A site already pointing into $LE_DIR/live/<name>/ (set by hand, or by option 1) is option 4 even without install.conf.
+  if [[ -z $PREV_TLS_MODE && $PREV_CERT_PATH == "$LE_DIR"/live/*/fullchain.pem ]]; then
+    PREV_TLS_MODE=le-existing
+    PREV_LE_NAME=${PREV_CERT_PATH#"$LE_DIR/live/"}; PREV_LE_NAME=${PREV_LE_NAME%/fullchain.pem}
+  fi
 fi
 if [[ -r $CONF_DIR/pmis.env ]]; then
   _url=$(sed -n 's/^DATABASE_URL=//p' "$CONF_DIR/pmis.env")
@@ -162,8 +251,18 @@ fi
 echo "  1) Let's Encrypt  (needs a public domain pointing to this server and port 80 reachable)"
 echo "  2) My own certificate files (for example from your internal CA)"
 echo "  3) Self-signed    (you must then install the certificate as trusted on every client PC)"
-if (( HAVE_CERT )); then DEF_TLS=0; elif (( IS_IP )); then DEF_TLS=3; else DEF_TLS=1; fi
-ask TLS_MODE "Choose" "$DEF_TLS"
+echo "  4) A Let's Encrypt certificate already on this server, used in place (no copy: certbot renewals reach the PMIS)"
+if (( HAVE_CERT )); then DEF_TLS=0; elif [[ $PREV_TLS_MODE == le-existing ]]; then DEF_TLS=4; elif (( IS_IP )); then DEF_TLS=3; else DEF_TLS=1; fi
+# Non-interactive: TLS_MODE=0..4 (or le-existing) skips this question. Option 4 also needs TLS_LE_NAME=<name>.
+# Example: sudo env TLS_MODE=le-existing TLS_LE_NAME=pmis.example.ly bash pmis/tools/install/install-ubuntu.sh
+NONINT_TLS=0
+if [[ -n ${TLS_MODE:-} ]]; then
+  NONINT_TLS=1
+  [[ $TLS_MODE == le-existing ]] && TLS_MODE=4
+  echo "Certificate choice from the environment: $TLS_MODE"
+else
+  ask TLS_MODE "Choose" "$DEF_TLS"
+fi
 case $TLS_MODE in
   0) (( HAVE_CERT )) || die "There is no current certificate to keep." ;;
   1) (( IS_IP )) && die "Let's Encrypt does not issue certificates for an IP address."
@@ -173,8 +272,25 @@ case $TLS_MODE in
      ask KEY_FILE  "Path to the private key (PEM)"
      [[ -r $CERT_FILE && -r $KEY_FILE ]] || die "Cannot read the certificate or key file." ;;
   3) ;;
+  4) le_choose
+     # server_name: asked here (default: the certificate name); unattended runs keep the domain from the question above when the certificate covers it
+     if (( AUTO )); then :
+     elif (( NONINT_TLS )); then
+       if [[ $SERVER_NAME != "$TLS_LE_NAME" ]] && le_covers "$LE_DIR/live/$TLS_LE_NAME/fullchain.pem" "$SERVER_NAME"; then :; else SERVER_NAME=$TLS_LE_NAME; fi
+     else
+       ask SERVER_NAME "Name in the site address (server_name)" "$TLS_LE_NAME"
+     fi
+     if [[ $SERVER_NAME =~ ^[0-9]+(\.[0-9]+){3}$ ]]; then IS_IP=1; else IS_IP=0; fi
+     le_check "$TLS_LE_NAME" "$SERVER_NAME" ;;
   *) die "Unknown choice: $TLS_MODE" ;;
 esac
+# What is remembered for the next run (the name only; the files stay where certbot keeps them)
+SAVED_TLS_MODE=''; SAVED_LE_NAME=''
+if [[ $TLS_MODE == 4 ]]; then
+  SAVED_TLS_MODE=le-existing; SAVED_LE_NAME=$TLS_LE_NAME
+elif [[ $TLS_MODE == 0 && $PREV_TLS_MODE == le-existing ]]; then
+  SAVED_TLS_MODE=le-existing; SAVED_LE_NAME=$PREV_LE_NAME
+fi
 
 say "3/6 Database (PostgreSQL 16, listens on localhost only)"
 # Other PostgreSQL clusters on this server are left alone; PMIS gets its own 16/main cluster.
@@ -277,7 +393,7 @@ Summary
   Address:        $SERVER_NAME
   App URL:        $APP_URL
   HTTP port:      $HTTP_PORT (redirect)
-  Certificate:    $( case $TLS_MODE in 0) echo "keep $PREV_CERT_PATH";; 1) echo "Let's Encrypt ($LE_EMAIL)";; 2) echo "$CERT_FILE";; 3) echo "self-signed";; esac )
+  Certificate:    $( case $TLS_MODE in 0) echo "keep $PREV_CERT_PATH";; 1) echo "Let's Encrypt ($LE_EMAIL)";; 2) echo "$CERT_FILE";; 3) echo "self-signed";; 4) echo "existing Let's Encrypt $TLS_LE_NAME, in place ($LE_DIR/live/$TLS_LE_NAME)";; esac )
   Database:       $DB_NAME on 127.0.0.1:$DB_PORT, role pmis_app
   API:            127.0.0.1:$API_PORT (service gsdn-pmis-api)
   Documents:      $( [[ $STORAGE_MODE == minio ]] && echo "MinIO on 127.0.0.1:$MINIO_PORT, data in $MINIO_DIR, bucket pmis" || echo "local disk, $STORAGE_DIR" )
@@ -491,6 +607,8 @@ PREV_STORAGE_MODE='$STORAGE_MODE'
 PREV_STORAGE_DIR='$STORAGE_DIR'
 PREV_MINIO_PORT='${MINIO_PORT:-}'
 PREV_MINIO_DIR='${MINIO_DIR:-}'
+PREV_TLS_MODE='$SAVED_TLS_MODE'
+PREV_LE_NAME='$SAVED_LE_NAME'
 EOF
 umask 022
 chown root:"$SERVICE_USER" "$CONF_DIR/pmis.env"; chmod 640 "$CONF_DIR/pmis.env"; chmod 600 "$CONF_DIR/install.conf"
@@ -584,11 +702,16 @@ EOF
        -subj "/CN=$SERVER_NAME" -addext "subjectAltName=$SAN" 2>/dev/null
      chmod 600 "$TLS_DIR/privkey.pem"
      CERT_PATH=$TLS_DIR/fullchain.pem; KEY_PATH=$TLS_DIR/privkey.pem ;;
+  4) CERT_PATH=$LE_DIR/live/$TLS_LE_NAME/fullchain.pem; KEY_PATH=$LE_DIR/live/$TLS_LE_NAME/privkey.pem
+     le_renewal_hook ;;
 esac
 
 # ---------------------------------------------------------------- nginx
 say "Configuring nginx"
 if (( HTTPS_PORT == 443 )); then REDIRECT_HOST='$host'; else REDIRECT_HOST="\$host:$HTTPS_PORT"; fi
+# the site as it is now, put back if nginx rejects the new one (nothing is reloaded in that case)
+SITE_BEFORE=$(mktemp)
+if [[ -f $SITE ]]; then cp -f "$SITE" "$SITE_BEFORE"; else rm -f "$SITE_BEFORE"; fi
 cat > "$SITE" <<EOF
 server {
   listen $HTTP_PORT;
@@ -635,7 +758,13 @@ rm -f /etc/nginx/sites-enabled/default
 if ! nginx -t 2>/dev/null; then
   sed -i -e '/^  http2 on;$/d' -e "s/listen $HTTPS_PORT ssl;/listen $HTTPS_PORT ssl http2;/" "$SITE"
 fi
-nginx -t
+if ! nginx -t; then
+  if [[ -s $SITE_BEFORE ]]; then cp -f "$SITE_BEFORE" "$SITE"; warn "The previous nginx site was put back ($SITE); nginx was not reloaded."
+  else rm -f "$SITE"; fi
+  rm -f "$SITE_BEFORE"
+  die "nginx rejected the new configuration (see the messages above). Fix it, then run the installer again."
+fi
+rm -f "$SITE_BEFORE"
 systemctl enable -q nginx
 systemctl reload nginx || systemctl restart nginx
 
