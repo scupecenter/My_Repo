@@ -173,6 +173,21 @@ describe('storage protection', () => {
     await expect(s.get(KEY)).rejects.toThrow(/integrity/);
   });
 
+  it('a large object is verified before release through an encrypted spool that leaves no file behind, and a tampered one is refused', async () => {
+    const s = store({ scanner: false });
+    const body = randomBytes(5 * 1024 * 1024 + 123);        // above the in-memory limit
+    await s.put(KEY, body);
+    const before = readdirSync(tmpdir()).filter((n) => n.startsWith('pmis-dec-')).length;
+    const got = await readAll(await s.get(KEY));
+    expect(got.equals(body)).toBe(true);
+    expect(readdirSync(tmpdir()).filter((n) => n.startsWith('pmis-dec-')).length).toBe(before);   // the spool is unlinked at once
+    const raw = await fs.readFile(rawPath());
+    raw[raw.length - 10]! ^= 0x01;                          // a byte near the end: GCM only notices at the tag
+    await fs.writeFile(rawPath(), raw);
+    await expect(s.get(KEY)).rejects.toThrow(/integrity/);
+    expect(readdirSync(tmpdir()).filter((n) => n.startsWith('pmis-dec-')).length).toBe(before);
+  });
+
   it('a changed envelope tag also fails the read', async () => {
     const s = store({ scanner: false });
     await s.put(KEY, Buffer.from('hello world'));

@@ -1,7 +1,7 @@
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomUUID } from 'node:crypto';
+import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from 'node:crypto';
 import { createReadStream, createWriteStream, promises as fs } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
@@ -314,23 +314,36 @@ export class ProtectedStorage implements ObjectStorage {
     raw.once('error', (e) => dec.destroy(e));
     raw.pipe(dec);
     // No plaintext leaves before the GCM tag is verified (security review of 0048): GCM authenticates only at the end of the stream,
-    // so the whole object is decrypted and checked first, in memory for ordinary files and through a private temp file for large ones.
-    if (Number(row.size_bytes) <= VERIFY_IN_MEMORY_BYTES) {
+    // so the whole object is decrypted and checked first. Small objects are checked in memory (bounded by the envelope size); larger ones
+    // are spooled to a private temp file re-encrypted under an ephemeral in-memory key (no plaintext ever touches the disk), and the file is
+    // unlinked as soon as it is reopened, so only the open descriptor keeps it.
+    const expected = Number(row.size_bytes);
+    if (expected <= VERIFY_IN_MEMORY_BYTES) {
       const parts: Buffer[] = [];
-      for await (const c of dec) parts.push(c as Buffer);     // throws on a wrong tag, before anything is returned
+      let n = 0;
+      for await (const c of dec) {                            // throws on a wrong tag, before anything is returned
+        n += (c as Buffer).length;
+        if (n > expected) { dec.destroy(); throw new Error('storage: object longer than its envelope (integrity)'); }
+        parts.push(c as Buffer);
+      }
       return Readable.from([Buffer.concat(parts)]);
     }
-    const tmp = join(tmpdir(), `pmis-dec-${randomUUID()}`);
+    const dir = await fs.mkdtemp(join(tmpdir(), 'pmis-dec-'));   // mode 0700, owned by the API user
+    const tmp = join(dir, 'spool');
+    const ek = randomBytes(32);
+    const iv = randomBytes(16);
     try {
-      await pipeline(dec, createWriteStream(tmp, { mode: 0o600 }));   // the tag is checked when the pipeline ends
+      await pipeline(dec, createCipheriv('aes-256-ctr', ek, iv), createWriteStream(tmp, { mode: 0o600, flags: 'wx' }));   // tag checked at the end
     } catch (e) {
-      await fs.rm(tmp, { force: true });
+      await fs.rm(dir, { recursive: true, force: true });
       throw e;
     }
-    const out = createReadStream(tmp);
-    const cleanup = () => { void fs.rm(tmp, { force: true }); };
-    out.once('close', cleanup);
-    out.once('error', cleanup);
+    const fh = await fs.open(tmp, 'r');
+    await fs.rm(dir, { recursive: true, force: true });       // unlinked now: only the descriptor keeps the (encrypted) spool
+    const src = fh.createReadStream();
+    const out = src.pipe(createDecipheriv('aes-256-ctr', ek, iv));
+    src.once('error', (e) => out.destroy(e));
+    out.once('close', () => { src.destroy(); });
     return out;
   }
 
@@ -466,8 +479,8 @@ export function scannerFor(scan: ScanConfig): Scanner | null {
   return new ClamdScanner({ socket: scan.socket, host: scan.host, port: scan.port, timeoutMs: scan.timeoutMs });
 }
 
-/** Objects up to this size are decrypted and verified in memory before release; larger ones go through a private temp file. */
-const VERIFY_IN_MEMORY_BYTES = 64 * 1024 * 1024;
+/** Objects up to this size are decrypted and verified in memory before release; larger ones go through an encrypted private spool file. */
+const VERIFY_IN_MEMORY_BYTES = 4 * 1024 * 1024;
 
 @Injectable()
 export class StorageService {
