@@ -3,6 +3,9 @@ import { Observable, from, lastValueFrom } from 'rxjs';
 import { DbService } from './db.service';
 import type { AuthContext } from '../auth/auth.types';
 import { ProblemException } from '../common/problem';
+import { StepUpService } from '../auth/step-up.service';
+import { applyContext, contextFromRequest } from '../logs/context';
+import type { Request } from 'express';
 
 type Outcome = { ok: true; value: unknown } | { ok: false; error: ProblemException };
 
@@ -13,19 +16,22 @@ type Outcome = { ok: true; value: unknown } | { ok: false; error: ProblemExcepti
  */
 @Injectable()
 export class TxInterceptor implements NestInterceptor {
-  constructor(private readonly db: DbService) {}
+  constructor(private readonly db: DbService, private readonly stepUp: StepUpService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req = context.switchToHttp().getRequest<{ auth?: AuthContext }>();
+    const req = context.switchToHttp().getRequest<Request & { auth?: AuthContext }>();
     const auth = req.auth;
     if (!auth) return next.handle();
-    return from(this.run(auth, next));
+    return from(this.run(req, auth, next));
   }
 
-  private async run(auth: AuthContext, next: CallHandler): Promise<unknown> {
+  private async run(req: Request, auth: AuthContext, next: CallHandler): Promise<unknown> {
+    // Migration 0045: the request context (ip, user agent, request id, session, sign-in method, MFA, step-up, device, via) reaches every audit row.
+    const ctx = contextFromRequest(req, auth, (await this.stepUp.validUntil(auth)) !== null);
     const outcome: Outcome = await this.db.client.$transaction(
       async (tx) => {
         await tx.$queryRaw`SELECT set_config('app.user_id', ${auth.user.id}, true)`;
+        await applyContext(tx, ctx);
         // System Admins see every region. Others get the union of their active assignments (empty = nothing, ADR 0003).
         await tx.$queryRaw`SELECT set_config('app.region_ids',
           CASE WHEN ${auth.state.isAdmin}::boolean THEN '*' ELSE app_resolve_region_ids(${auth.user.id}::uuid) END, true)`;

@@ -1,6 +1,6 @@
 import type { Concept } from '@/lib/icons';
 
-export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'registers' | 'data' | 'admin' }[] = [
+export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'registers' | 'data' | 'admin' | 'logs' }[] = [
   { key: 'my_work', to: '/my-work', icon: 'home', group: 'work' },
   { key: 'inbox', to: '/inbox', icon: 'inbox', group: 'work' },
   { key: 'approvals', to: '/approvals', icon: 'approval', group: 'work' },
@@ -33,12 +33,22 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'reg
   { key: 'absence', to: '/absence', icon: 'absence', group: 'work' },
   { key: 'admin.matrix', to: '/admin/matrix', icon: 'matrix', group: 'admin' },
   { key: 'admin.settings', to: '/admin/settings', icon: 'settings', group: 'admin' },
-  { key: 'admin.security_log', to: '/admin/security-log', icon: 'securityLog', group: 'admin' },
   { key: 'admin.online', to: '/admin/online', icon: 'online', group: 'admin' },
   { key: 'announcements', to: '/admin/announcements', icon: 'announcement', group: 'admin' },
-  { key: 'audit', to: '/audit', icon: 'audit', group: 'admin' },
+  { key: 'audit', to: '/audit', icon: 'audit', group: 'logs' },
+  { key: 'logs.field_changes', to: '/admin/logs/field-changes', icon: 'fieldChanges', group: 'logs' },
+  { key: 'admin.security_log', to: '/admin/security-log', icon: 'securityLog', group: 'logs' },
+  { key: 'logs.online', to: '/admin/logs/online', icon: 'online', group: 'logs' },
+  { key: 'logs.alerts', to: '/admin/logs/alerts', icon: 'alerts', group: 'logs' },
+  { key: 'logs.job_runs', to: '/admin/logs/job-runs', icon: 'jobRuns', group: 'logs' },
+  { key: 'logs.deployments', to: '/admin/logs/deployments', icon: 'deployments', group: 'logs' },
+  { key: 'logs.activity_report', to: '/admin/logs/activity-report', icon: 'report', group: 'logs' },
 ];
 
 /** Entries opened by a grant rather than by the server's module list (security log, online now). */
-export const BY_GRANT: Record<string, string> = { 'admin.security_log': 'view_security_log', 'admin.online': 'manage_users' };
+export const BY_GRANT: Record<string, string> = {
+  'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
+};
+/** Entries only a System Admin sees (the server answers 403 to anyone else). */
+export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments']);
 export type NavItem = (typeof NAV)[number];

@@ -216,8 +216,8 @@ export class DashboardService {
       add('regions', String(r.region_name), 'progress %', r.progress_pct);
     }
     const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-    await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO audit_log (action, entity_type, entity_id, after, actor_id, ip)
-      VALUES ('export', 'dashboard', ${String(basis.ref_date)}, ${JSON.stringify({ filters: q, rows: rows.length - 1 })}::jsonb, ${auth.user.id}::uuid, ${auth.ip}::text)`);
+    void auth;
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL, ${JSON.stringify({ filters: q, rows: rows.length - 1 })}::jsonb, NULL)`);
     return { filename: `GSDN_Dashboard_${String(basis.ref_date)}.csv`, body: `${String.fromCharCode(0xfeff)}${csv}\r\n` };
   }
 }

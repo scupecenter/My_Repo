@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useCreateRecord, useNewVersion, useRegisterDefs, useUpdateRecord } from '@/api/registers';
 import type { RegisterRecord, TaskRegisterField } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
+import { FieldHistory } from './logs/FieldHistory';
 import { useToast } from './Toast';
 
 const EDITABLE = ['text', 'number', 'date', 'list', 'yes_no'];
@@ -47,6 +48,7 @@ function Row({ f, siteId }: { f: TaskRegisterField; siteId: string }) {
         <b>{(ar && f.label_ar) || f.label_en}</b>
         {rid ? <Link className="chip bg-card2 text-accent" data-testid={`${id}-source`} to={`/registers/${key}?record=${rid}`}>{t('regFields.from', { register: regName })}</Link>
           : <span className="chip bg-card2" data-testid={`${id}-source`}>{t('regFields.from', { register: regName })}</span>}
+        <FieldHistory entityType="register_record" entityId={rid} field={f.source.field.replace(/^data\./, '')} label={(ar && f.label_ar) || f.label_en} />
         {!canEdit && <span className="text-mute" data-testid={`${id}-readonly`}>{t('regFields.read_only')}</span>}
       </div>
       {edit ? (

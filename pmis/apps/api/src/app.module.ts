@@ -84,6 +84,10 @@ import { TaskViewService } from './workflow/task-view.service';
 import { TasksController } from './workflow/tasks.controller';
 import { WorkflowService } from './workflow/workflow.service';
 import { UsersService } from './users/users.service';
+import { AuditLogController, LogsAdminController, SecurityLogController } from './logs/logs.controller';
+import { LogsService } from './logs/logs.service';
+import { SecurityLogService } from './logs/security-log.service';
+import { JobRunsService } from './logs/job-runs.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -92,7 +96,7 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController,
-      DashboardController, WeightsController, TeamScopeMatchController,
+      DashboardController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -101,7 +105,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService,
-      DashboardService, ProjectStatusService, WeightsService, TeamScopeMatchService,
+      DashboardService, ProjectStatusService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

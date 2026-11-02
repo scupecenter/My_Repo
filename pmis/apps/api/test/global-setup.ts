@@ -105,7 +105,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const [fifth, sixth] = await Promise.all([buildDatabase(adminUrl, dash, appPassword), buildDatabase(adminUrl, dashPerf, appPassword)]);
   // The docsDb database is for the document upload suites: the seeded Document Library stays active in it.
   const docs = `${dbName}_docs`;
-  const docsDb = await buildDatabase(adminUrl, docs, appPassword, true);
+  // The logs database (migration 0045): the suite breaks and restores a hash chain, changes the retention and the alert thresholds.
+  const logs = `${dbName}_logs`;
+  const [docsDb, logsDb] = await Promise.all([buildDatabase(adminUrl, docs, appPassword, true), buildDatabase(adminUrl, logs, appPassword)]);
+  process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
+  process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
   process.env.TEST_SUPER_URL_DOCS = docsDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
@@ -132,6 +136,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${dash} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashPerf} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${docs} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${logs} WITH (FORCE)`);
     await a.end();
   };
 }

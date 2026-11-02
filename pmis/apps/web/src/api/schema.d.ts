@@ -2259,7 +2259,7 @@ export interface paths {
         };
         /**
          * Read the Audit Log (append-only; no write endpoint exists)
-         * @description Needs `view_audit`. Rows are limited to the reader's regions; rows without a region need all regions. Newest first.
+         * @description Readers follow decision B4, enforced by the database (`log_audit_read`): System Admins and the Project Manager read everything; a Team Lead reads the rows of the modules and regions of their Team Lead assignments; anyone else reads through their `view_audit` grants, scoped like any grant (B3; a grant on the module `audit` covers every module of its assignment). Rows without a region need all regions; rows without a module need a full reader. A caller who may read nothing gets 403. Newest first. Every call writes the audit row `audit_log.read` with the filters (0.10.0).
          */
         get: operations["listAuditLog"];
         put?: never;
@@ -2279,8 +2279,68 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Export the filtered Audit Log as CSV (job; the export is itself audited) */
+        /**
+         * Export the filtered Audit Log as CSV (job; the export is itself audited)
+         * @description Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows (at most 100 000). The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
+         */
         post: operations["exportAuditLog"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit-log/exports/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a finished Audit Log export (CSV, UTF-8 with BOM; only the person who started it; audited) */
+        get: operations["downloadAuditLogExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit-log/field-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Field-level change log (one row per changed field of an audit row; append-only)
+         * @description Written by a database trigger on every audit row that carries before and after values (creates included): nested values are flattened one level (`data.x` and `custom.x` become field `x`), technical keys are left out (setting `logs.field_changes.ignore_keys`), labels come from the register fields and the custom-field definitions. A register record is identified by its logical `entity_id` (the same for every version; the version id is `record_id`); a task by its task id. Same reader rules as `GET /audit-log` (B4); every call is audited (`audit_log.field_changes_read`). Newest first.
+         */
+        get: operations["listFieldChanges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit-log/field-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History of one field of one record, newest first (at most 200 changes)
+         * @description Same keys and reader rules as `GET /audit-log/field-changes`; the three parameters are required (422 otherwise). Audited.
+         */
+        get: operations["getFieldHistory"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -2296,7 +2356,7 @@ export interface paths {
         };
         /**
          * Verify the hash chain of the Audit Log (System Admins only)
-         * @description The Audit Log is an append-only hash chain: each row stores the hash of the previous row, and the database refuses update and delete. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+         * @description The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
          */
         get: operations["getAuditLogIntegrity"];
         put?: never;
@@ -2339,7 +2399,7 @@ export interface paths {
         put?: never;
         /**
          * Export the filtered security log as CSV (job; the export is itself audited)
-         * @description Goes through the existing export service (job kind `security_export`). Needs the `export` grant and `view_security_log` (or System Admin). `ip` follows the same rule as the list.
+         * @description Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`.
          */
         post: operations["exportSecurityLog"];
         delete?: never;
@@ -2362,6 +2422,140 @@ export interface paths {
         get: operations["getSecurityLogIntegrity"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/security-log/exports/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a finished security log export (CSV; only the person who started it; audited) */
+        get: operations["downloadSecurityLogExport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Online now, for the logs screens (device, sign-in method, MFA)
+         * @description Same rights and polling rule as `GET /sessions/active` (System Admin or `manage_users`; `X-PMIS-Live: 1` never extends the idle timeout). The raw `ip` is returned to System Admins only. At most 500 live sessions, most recent activity first.
+         */
+        get: operations["listAdminSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/sessions/{session_id}/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End one session (same rules as `POST /sessions/{session_id}/revoke`)
+         * @description System Admin or `manage_users`, a reason and step-up. The person's next request answers 401. Security log `session_revoked_by_admin` (written by the database), audit row `session_revoked` with the reason. The caller's own session is 422 (`own_session`). An already ended session answers 200 with `revoked_count` 0.
+         */
+        post: operations["endAdminSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/job-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job run log (every scheduled job run, newest first)
+         * @description System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes) and `log_purge` (daily).
+         */
+        get: operations["listJobRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/deployments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deployment log (written by the installer and update.sh after migrating; newest first)
+         * @description System Admin or `view` on `admin.system_log`.
+         */
+        get: operations["listDeployments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/security-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Security alerts (newest first; `page.total` counts the matching alerts)
+         * @description System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`). Thresholds: `GET /settings/security-alerts`.
+         */
+        get: operations["listSecurityAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/security-alerts/{alert_id}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge an open alert with a note (System Admins only; audited) */
+        post: operations["ackSecurityAlert"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3173,6 +3367,27 @@ export interface paths {
          *     **Reducing** any value needs step-up and emits the mandatory alert `retention_reduced` to the System Admins (in-app and email); raising a value needs no step-up. Every change is audited with before and after values and the reason. The purge job applies the new value on its next run.
          */
         put: operations["setLogRetention"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/security-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thresholds of the security alert rules
+         * @description Reading needs the Settings screen (`admin.settings` view) or a System Admin.
+         */
+        get: operations["getSecurityAlertSettings"];
+        /** Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after) */
+        put: operations["setSecurityAlertSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -4800,6 +5015,26 @@ export interface paths {
          * @description The predecessors not yet approved (with the predecessor task), the closed gate with its conditions (permits, stop work, suspension) and the open snags. The same facts as `TaskSummary.lock_reasons`, in one place.
          */
         get: operations["getTaskBlockedBy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Monthly activity report (per-user counts and the sensitive changes of the month; JSON only)
+         * @description Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`). No xlsx variant yet.
+         */
+        get: operations["getActivityReport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6770,6 +7005,22 @@ export interface components {
             self_approval?: boolean;
             ip?: string | null;
             request_id?: string | null;
+            user_agent?: string | null;
+            device?: components["schemas"]["Device"] | null;
+            /** Format: uuid */
+            session_id?: string | null;
+            /** @enum {string|null} */
+            auth_method?: "local" | "oidc" | "break_glass" | null;
+            /** @description Null for rows written outside a request (migrations, the installer). */
+            via?: components["schemas"]["Via"] | null;
+            job_name?: string | null;
+            /** Format: uuid */
+            batch_row?: string | null;
+            /**
+             * Format: int64
+             * @description Position in the hash chain (null only for a row that bypassed sealing).
+             */
+            chain_seq?: number | null;
         };
         Setting: {
             /**
@@ -8590,7 +8841,7 @@ export interface components {
             security_log_days: number;
         };
         /** @enum {string} */
-        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "signed_out" | "session_expired" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used";
+        SecurityEvent: "sign_in_started" | "sign_in_succeeded" | "callback_account_mismatch" | "sign_in_failed" | "sign_in_locked" | "sign_in_rate_limited" | "signed_out" | "session_expired" | "session_ended" | "session_revoked_by_admin" | "mfa_exemption_granted" | "mfa_exemption_revoked" | "step_up_passed" | "step_up_failed" | "break_glass_used" | "two_factor_passed" | "two_factor_failed" | "recovery_code_used" | "two_factor_enrolled" | "password_changed" | "password_reset";
         /** @enum {string} */
         SecurityOutcome: "success" | "failure" | "info";
         SecurityLogEntry: {
@@ -8617,6 +8868,7 @@ export interface components {
             /** @description Raw IP, System Admins only; null for a reader with `view_security_log`. */
             ip?: string | null;
             user_agent?: string | null;
+            device?: components["schemas"]["Device"] | null;
             /** Format: uuid */
             session_id?: string | null;
             request_id?: string | null;
@@ -8639,14 +8891,25 @@ export interface components {
             head_hash: string | null;
             /** Format: date-time */
             checked_at: string;
+            /**
+             * Format: int64
+             * @description Security log: chain positions up to this one were purged by retention; the check starts after it.
+             */
+            purged_through?: number;
+            /** @description At most 100. */
             breaks: {
                 /**
                  * Format: int64
-                 * @description First row at which the chain no longer holds.
+                 * @description First row at which the chain no longer holds; null for `unsealed`.
                  */
-                seq: number;
+                seq: number | null;
                 /** @enum {string} */
-                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch";
+                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch" | "row_missing" | "unsealed";
+                /**
+                 * Format: int64
+                 * @description The log row (audit or security id).
+                 */
+                row_id?: number | null;
                 expected_hash?: string | null;
                 found_hash?: string | null;
             }[];
@@ -8670,12 +8933,233 @@ export interface components {
             /** @description The caller's own session. */
             is_current?: boolean;
         };
+        /**
+         * @description How the change was made (0.10.0): manual (a person in the web app, also drag and button), template (an approved-template batch row), bulk (a bulk action), api (a bearer client, later), job (a background job).
+         * @enum {string}
+         */
+        Via: "manual" | "template" | "bulk" | "api" | "job";
+        Device: {
+            /**
+             * @example Chrome
+             * @example Edge
+             * @example Firefox
+             * @example Safari
+             * @example Other
+             */
+            browser: string;
+            /**
+             * @example Windows
+             * @example macOS
+             * @example iOS
+             * @example Android
+             * @example Linux
+             * @example Other
+             */
+            os: string;
+            /** @enum {string} */
+            type: "desktop" | "mobile" | "tablet" | "bot" | "other";
+        };
+        LogActor: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            /** @description Same as display_name (the logs screens read `name`). */
+            name: string;
+            employee_id?: string | null;
+        };
+        FieldChange: {
+            /** @description Row id (a 64-bit integer as text). */
+            id: string;
+            /** Format: int64 */
+            audit_id: number;
+            /** Format: date-time */
+            at: string;
+            actor?: components["schemas"]["LogActor"] | null;
+            on_behalf_of?: components["schemas"]["LogActor"] | null;
+            action?: string;
+            entity_type: string;
+            /** @description Register record: the logical record (entity_id); task: the task id. */
+            entity_id?: string | null;
+            /** @description The id the audit row names (a register record version). */
+            record_id?: string | null;
+            /**
+             * @example GECOL · TR-0001
+             * @example B5 · TR-0001
+             */
+            entity_label?: string;
+            /** Format: uuid */
+            site_id?: string | null;
+            site_code?: string | null;
+            region_id?: components["schemas"]["RegionId"] | null;
+            module_key?: string | null;
+            /** @description Field code; nested data.x is x, a clash with a top-level key is parent.child. */
+            field: string;
+            /** @description The field code when no label is known. */
+            field_label_en: string;
+            field_label_ar: string;
+            /** @description JSON value; null when absent. */
+            old_value?: unknown;
+            /** @description JSON value; null when removed. */
+            new_value?: unknown;
+            via?: components["schemas"]["Via"] | null;
+            /** Format: uuid */
+            batch_id?: string | null;
+            ip?: string | null;
+            device?: components["schemas"]["Device"] | null;
+            user_agent?: string | null;
+            /** Format: uuid */
+            session_id?: string | null;
+            request_id?: string | null;
+            /** @enum {string|null} */
+            auth_method?: "local" | "oidc" | "break_glass" | null;
+            mfa?: boolean;
+            reason?: string | null;
+        };
+        AdminSession: {
+            /** Format: uuid */
+            session_id: string;
+            user: components["schemas"]["UserRef"];
+            /** @enum {string} */
+            status: "online" | "idle";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            last_activity_at: string;
+            /** @description System Admins only. */
+            ip?: string | null;
+            device?: components["schemas"]["Device"] | null;
+            current_screen?: string | null;
+            /** @enum {string} */
+            auth_method: "local" | "oidc" | "break_glass";
+            mfa: boolean;
+            is_current?: boolean;
+        };
+        JobRun: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** @enum {string} */
+            outcome: "running" | "ok" | "failed" | "skipped";
+            rows?: number | null;
+            error?: string | null;
+            detail?: {
+                [key: string]: unknown;
+            } | null;
+            host?: string | null;
+        };
+        Deployment: {
+            id: string;
+            /** Format: date-time */
+            at: string;
+            version: string;
+            git_sha?: string | null;
+            /** @description Migrations applied by this run. */
+            migrations: string[];
+            /** @description Who ran the installer (operating-system user). */
+            by?: string | null;
+            host?: string | null;
+        };
+        /** @enum {string} */
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "audit_integrity_failure";
+        SecurityAlert: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            rule: components["schemas"]["SecurityAlertRule"];
+            /** @enum {string} */
+            severity: "low" | "medium" | "high" | "critical";
+            summary: string;
+            /** @description One line for the list. */
+            detail?: string | null;
+            /** @description The structured facts behind the alert. */
+            data?: {
+                [key: string]: unknown;
+            } | null;
+            /** @enum {string} */
+            status: "open" | "acknowledged";
+            user?: components["schemas"]["UserRef"] | null;
+            ip?: string | null;
+            /** @description Display name of the admin who acknowledged it. */
+            ack_by?: string | null;
+            ack_by_user?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            ack_at?: string | null;
+            ack_note?: string | null;
+        };
+        SecurityAlertThreshold: {
+            count: number;
+            minutes: number;
+        };
+        SecurityAlertSettings: {
+            /** @description count 3..100 (default 5), minutes 1..1440 (default 15). */
+            failed_sign_ins: components["schemas"]["SecurityAlertThreshold"];
+            /** @description count 5..1000 (default 20), minutes 1..1440 (default 15). */
+            failed_by_ip: components["schemas"]["SecurityAlertThreshold"];
+            /** @default 5000 */
+            large_export_rows: number;
+            /** @default true */
+            new_ip: boolean;
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        SecurityAlertSettingsInput: {
+            reason: components["schemas"]["Reason"];
+            failed_sign_ins: components["schemas"]["SecurityAlertThreshold"];
+            failed_by_ip: components["schemas"]["SecurityAlertThreshold"];
+            large_export_rows: number;
+            new_ip: boolean;
+        };
+        ActivityReport: {
+            /** @example 2026-11 */
+            month: string;
+            /** Format: date-time */
+            from?: string;
+            /** Format: date-time */
+            to?: string;
+            /**
+             * @description limited = the caller reads part of the Audit Log (B4).
+             * @enum {string}
+             */
+            scope?: "all" | "limited";
+            includes_security_log?: boolean;
+            users: {
+                user: components["schemas"]["UserRef"];
+                actions: number;
+                field_changes: number;
+                approvals: number;
+                sign_ins?: number | null;
+                failed_sign_ins?: number | null;
+            }[];
+            sensitive: {
+                /** Format: int64 */
+                id: number;
+                /** Format: date-time */
+                at: string;
+                actor?: components["schemas"]["UserRef"] | null;
+                action: string;
+                entity_type: string;
+                entity_id?: string | null;
+                entity_label: string;
+                /** @enum {string} */
+                kind: "roles" | "matrix" | "settings" | "override" | "other";
+                reason?: string | null;
+                is_admin_override?: boolean;
+                summary: string;
+            }[];
+        };
         SessionRevokeResult: {
             user?: components["schemas"]["UserRef"];
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -13473,11 +13957,18 @@ export interface operations {
             query?: {
                 from?: string;
                 to?: string;
+                /** @description The actor or the person acted for. */
                 actor_id?: string;
                 site_id?: string;
+                region_id?: components["schemas"]["RegionId"];
                 entity_type?: string;
                 entity_id?: string;
                 action?: string;
+                module_key?: string;
+                via?: components["schemas"]["Via"];
+                ip?: string;
+                session_id?: string;
+                batch_id?: string;
                 bulk_action_id?: string;
                 admin_override?: boolean;
                 privileged?: boolean;
@@ -13503,8 +13994,10 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     exportAuditLog: {
@@ -13527,8 +14020,12 @@ export interface operations {
                     actor_id?: string;
                     /** Format: uuid */
                     site_id?: string;
+                    region_id?: components["schemas"]["RegionId"];
                     entity_type?: string;
+                    entity_id?: string;
                     action?: string;
+                    via?: components["schemas"]["Via"];
+                    ip?: string;
                     q?: string;
                 };
             };
@@ -13545,6 +14042,100 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    downloadAuditLogExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+        };
+    };
+    listFieldChanges: {
+        parameters: {
+            query?: {
+                entity_type?: string;
+                entity_id?: string;
+                site_id?: string;
+                field?: string;
+                actor_id?: string;
+                from?: string;
+                to?: string;
+                ip?: string;
+                via?: components["schemas"]["Via"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Field changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["FieldChange"][];
+                    };
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getFieldHistory: {
+        parameters: {
+            query: {
+                entity_type: string;
+                entity_id: string;
+                field: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Changes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FieldChange"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getAuditLogIntegrity: {
@@ -13581,6 +14172,9 @@ export interface operations {
                 /** @description One or more events, comma separated. */
                 event?: components["schemas"]["SecurityEvent"][];
                 outcome?: components["schemas"]["SecurityOutcome"];
+                user_id?: string;
+                /** @description System Admins only (ignored, matching nothing, for others). */
+                ip?: string;
                 /** @description Free text over name, employee ID, `identifier_masked` and `request_id`. */
                 q?: string;
                 limit?: components["parameters"]["Limit"];
@@ -13626,6 +14220,9 @@ export interface operations {
                     to?: string;
                     event?: components["schemas"]["SecurityEvent"][];
                     outcome?: components["schemas"]["SecurityOutcome"];
+                    /** Format: uuid */
+                    user_id?: string;
+                    ip?: string;
                     q?: string;
                 };
             };
@@ -13667,6 +14264,219 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    downloadSecurityLogExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The CSV file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
+        };
+    };
+    listAdminSessions: {
+        parameters: {
+            query?: {
+                status?: "online" | "idle";
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sessions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["AdminSession"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    endAdminSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionRevokeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listJobRuns: {
+        parameters: {
+            query?: {
+                name?: string;
+                outcome?: "running" | "ok" | "failed" | "skipped";
+                from?: string;
+                to?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["JobRun"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listDeployments: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deployments. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["Deployment"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    listSecurityAlerts: {
+        parameters: {
+            query?: {
+                status?: "open" | "acknowledged";
+                rule?: components["schemas"]["SecurityAlertRule"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: {
+                /** @description Sent as `1` by timer-driven polling (notification bell, online-now list). The server does not count the request as user activity: it neither extends the idle timeout nor updates `last_activity_at`. Only real user activity does. */
+                "X-PMIS-Live"?: components["parameters"]["LivePoll"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Alerts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SecurityAlert"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    ackSecurityAlert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                alert_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Acknowledged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAlert"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -15242,6 +16052,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getSecurityAlertSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Thresholds. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAlertSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setSecurityAlertSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecurityAlertSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityAlertSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
@@ -18504,6 +19370,31 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getActivityReport: {
+        parameters: {
+            query: {
+                month: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getTimeInStateReport: {

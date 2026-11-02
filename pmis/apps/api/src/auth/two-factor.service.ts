@@ -8,6 +8,7 @@ import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
 import { Clock, systemClock } from './rate-limiter';
 import { SyslogService } from './syslog.service';
+import { SecurityLogService } from '../logs/security-log.service';
 import { parseCookie } from './session.service';
 import {
   base32Encode, decryptSecret, encryptSecret, generateEnrolCode, generateRecoveryCodes, generateSecret, hashEnrolCode, hashRecoveryCode, matchStep,
@@ -50,6 +51,7 @@ export class TwoFactorService {
   constructor(
     private readonly db: DbService,
     private readonly syslog: SyslogService,
+    private readonly securityLog: SecurityLogService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {
     const key = parseEncKey(config.totpEncKey);
@@ -248,6 +250,9 @@ export class TwoFactorService {
   // ------------------------------------------------------------------ outcomes
   async logFailure(userId: string, reason: CodeFailure, via: string, ip: string | null, purpose: string, requestId?: string, detail?: string): Promise<void> {
     await this.syslog.write('warn', 'local_two_factor_failed', { reason, via, purpose, ip, ...(detail ? { detail } : {}) }, userId, requestId);
+    // migration 0045: every refused code (sign-in, enrolment, step-up, recovery codes) is a security log row
+    await this.securityLog.write({ event: purpose === 'step_up' ? 'step_up_failed' : 'two_factor_failed', outcome: 'failure', userId,
+      detail: { reason, via, purpose, ...(detail ? { detail } : {}) }, ctx: { ip, userAgent: null, requestId: requestId ?? null } });
   }
 
   /** The answer for a refused enrolment code. `commit` keeps the failure counter when the request runs in a transaction that would roll back. */
