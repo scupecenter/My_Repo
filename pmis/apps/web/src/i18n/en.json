@@ -230,7 +230,8 @@
     "partial_failed": "Some rows were not saved: {{count}}.",
     "invalid_code": "The code is not correct, or it was already used.",
     "account_locked": "Too many wrong codes. The account is locked for 15 minutes.",
-    "no_local_account": "This account has no local sign-in, so two-factor does not apply."
+    "no_local_account": "This account has no local sign-in, so two-factor does not apply.",
+    "team_scope_mismatch": "A team of this specialization cannot take an order of this scope (Settings, team / scope match)."
   },
   "common": {
     "cancel": "Cancel",
@@ -858,7 +859,23 @@
     "tab_notifications": "Notification policy",
     "tab_retention": "Log retention",
     "tab_staff-visibility": "Staff field visibility",
-    "tab_documents": "Document Library"
+    "tab_documents": "Document Library",
+    "tab_team-scope": "Team / scope match"
+  },
+  "scopeMatch": {
+    "title": "Team / scope match (Procurement)",
+    "note": "A Procurement order that names a team is accepted only when the team's specialization is ticked for the order scope. An exempt scope is not checked (HLC has no contractor team). A scope that is not listed, and a team without a specialization, are refused.",
+    "scope": "Scope",
+    "exempt": "Exempt",
+    "add_specialization": "Add specialization",
+    "add_scope": "Add scope",
+    "new_specialization": "New specialization",
+    "new_scope": "New scope",
+    "remove": "Remove {{name}}",
+    "cell": "{{specialization}} teams may take {{scope}} orders",
+    "save": "Save the table",
+    "unsaved": "Unsaved changes",
+    "version": "Version {{version}}"
   },
   "fieldError": {
     "required": "This field is required.",
@@ -882,7 +899,9 @@
     "weights_must_total_100": "Weights must total 100%.",
     "effective_date_in_past": "The date is in the past (Tripoli time).",
     "effective_date_not_after_current": "The date must be after the version already in force.",
-    "no_changes": "Nothing changed compared with the version in force."
+    "no_changes": "Nothing changed compared with the version in force.",
+    "unknown_specialization": "Not one of the listed specializations.",
+    "too_many": "Too many entries."
   },
   "cal": {
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",

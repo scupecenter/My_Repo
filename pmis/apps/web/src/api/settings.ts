@@ -3,7 +3,7 @@ import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
   ActiveSession, ActOnBehalfRequest, Calendar, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
-  TaskDefinition, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
+  TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
 
 const refresh = (qc: QueryClient, ...ks: string[]) => ks.forEach((k) => void qc.invalidateQueries({ queryKey: [k] }));
@@ -88,6 +88,15 @@ export const useSetIdle = () => {
     },
     onError: (_e, _v, c) => c?.rollback(),
     onSettled: () => refresh(qc, 'idle'),
+  });
+};
+
+// ---------------------------------------------------------------- team / scope match of Procurement (0.9.1, Q97)
+export const useTeamScopeMatch = () => useQuery({ queryKey: ['teamScopeMatch'], queryFn: () => api.get<TeamScopeMatch>('/settings/team-scope-match') });
+export const useSetTeamScopeMatch = () => {
+  const qc = useQueryClient();
+  return useMutation<TeamScopeMatch, ApiError, { version: number; body: TeamScopeMatchInput & { reason: string } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/team-scope-match', { version, body }), onSettled: () => refresh(qc, 'teamScopeMatch'),
   });
 };
 

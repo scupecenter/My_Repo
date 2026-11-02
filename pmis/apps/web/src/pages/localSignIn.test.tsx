@@ -278,6 +278,8 @@ describe('hybrid mode list', () => {
       'GET /files/:id/download', 'GET /documents', 'POST /exports/zip', 'GET /exports/zip/:id/download', 'GET /jobs/:id',
       'GET /document-library', 'POST /document-library', 'GET /document-library/:id', 'PATCH /document-library/:id', 'POST /document-library/:id/publish',
       'GET /document-library/:id/versions', 'GET /document-library/:id/blank-form', 'POST /document-library/:id/blank-form',
+      // contract 0.9.1: the team / scope match of Procurement (Q97)
+      'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

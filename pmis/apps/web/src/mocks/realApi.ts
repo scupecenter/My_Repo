@@ -170,6 +170,9 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/document-library/:id/versions'],
   ['get', '/document-library/:id/blank-form'],
   ['post', '/document-library/:id/blank-form'],
+  // Contract 0.9.1: the team / scope match of Procurement (apps/api: settings; migration 0043, Q97).
+  ['get', '/settings/team-scope-match'],
+  ['put', '/settings/team-scope-match'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

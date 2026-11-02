@@ -1,5 +1,5 @@
 // Synthetic state for phase 3b: calendar, rules, freeze, DLP, notification policy, retention, sessions, security log.
-import type { ActiveSession, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule, StaffVisibility, TaskDefinition, WeightSet, WorkflowGate, WorkflowMilestone } from '@/api/types';
+import type { ActiveSession, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule, StaffVisibility, TaskDefinition, TeamScopeMatch, WeightSet, WorkflowGate, WorkflowMilestone } from '@/api/types';
 import { HOLIDAYS } from './holidaysSeed';
 import { byId, uid } from './ids';
 
@@ -43,6 +43,16 @@ export function initCfg() {
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },
       { version: 1, cw_months: 3, te_months: 12, effective_from: '2026-01-01', reason: 'Seed', changed_by: ref('1001'), changed_at: '2026-01-01T08:00:00Z' }] } as DlpSettings,
     idle: { enabled: true, working_days: 2, version: 1 } as IdleTaskAlertSetting,
+    // Q97 seed of migration 0043 (D37): CW scopes and GECOL need CW, TE Installation needs TE, TE Dismantle accepts both, STA / ST none, HLC exempt.
+    scopeMatch: {
+      specializations: ['CW', 'TE'],
+      scopes: [
+        { scope: 'CW', exempt: false, allowed: ['CW'] }, { scope: 'Tower Erection', exempt: false, allowed: ['CW'] }, { scope: 'Site Adaption', exempt: false, allowed: ['CW'] },
+        { scope: 'TE Installation', exempt: false, allowed: ['TE'] }, { scope: 'CW Dismantle', exempt: false, allowed: ['CW'] }, { scope: 'TE Dismantle', exempt: false, allowed: ['CW', 'TE'] },
+        { scope: 'STA', exempt: false, allowed: [] }, { scope: 'ST', exempt: false, allowed: [] }, { scope: 'GECOL', exempt: false, allowed: ['CW'] }, { scope: 'HLC', exempt: true, allowed: [] },
+      ],
+      version: 1, updated_at: '2026-11-02T08:00:00Z', updated_by: null,
+    } as TeamScopeMatch,
     policy: {
       enabled: true, timezone: 'Africa/Tripoli', digest_hour: 8, work_days_follow_calendar: true, work_days: [0, 1, 2, 3, 4],
       thresholds: { approval_remind_hours: 48, approval_escalate_days: 5, sla_warning_days_before_max: 2, rate_cap_per_hour: 50, retention_days: 180 }, columns: COLUMNS,
