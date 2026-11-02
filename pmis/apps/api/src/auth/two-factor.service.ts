@@ -153,18 +153,19 @@ export class TwoFactorService {
 
   // ------------------------------------------------------------------ enrolment
   /** A new secret for the QR code, stored encrypted as the pending secret. The clear secret leaves only in this answer. */
-  async beginEnrol(userId: string, account: string): Promise<{ secret: string; otpauth_uri: string }> {
+  async beginEnrol(userId: string, account: string, pendingToken: string): Promise<{ secret: string; otpauth_uri: string }> {
     const raw = generateSecret();
-    await this.db.tx.$executeRaw`SELECT auth_totp_begin_enrol(${userId}::uuid, ${encryptSecret(this.key, userId, raw)})`;
+    // bound to the pending sign-in that started it: another sign-in cannot replace this QR code for 10 minutes
+    await this.db.tx.$executeRaw`SELECT auth_totp_begin_enrol(${userId}::uuid, ${encryptSecret(this.key, userId, raw)}, ${sha256Hex(pendingToken)})`;
     const secret = base32Encode(raw);
     return { secret, otpauth_uri: otpauthUri(secret, account) };
   }
 
   /** Moves the pending secret to the active one and stores new recovery codes. Returns the codes (shown once). */
-  async confirmEnrol(userId: string, step: number): Promise<string[]> {
+  async confirmEnrol(userId: string, step: number, pendingToken: string): Promise<string[]> {
     const codes = generateRecoveryCodes();
     const hashes = codes.map((c) => hashRecoveryCode(this.key, c.replace('-', '')));
-    await this.db.tx.$executeRaw`SELECT auth_totp_confirm_enrol(${userId}::uuid, ${step}::bigint, ${hashes}::text[])`;
+    await this.db.tx.$executeRaw`SELECT auth_totp_confirm_enrol(${userId}::uuid, ${step}::bigint, ${hashes}::text[], ${sha256Hex(pendingToken)})`;
     return codes;
   }
 

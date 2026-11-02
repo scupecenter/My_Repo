@@ -28,6 +28,8 @@ CREATE TABLE user_totp (
   required            BOOLEAN NOT NULL DEFAULT false,            -- two-factor is on (set by an admin)
   secret_enc          TEXT,                                      -- active secret, encrypted by the API; NULL = not enrolled yet
   pending_secret_enc  TEXT,                                      -- secret shown in the QR code, not confirmed yet
+  pending_owner       TEXT,                                      -- SHA-256 of the pending sign-in that started the enrolment
+  pending_started_at  TIMESTAMPTZ(6),
   enrolled_at         TIMESTAMPTZ(6),
   last_step           BIGINT,                                    -- replay guard: last accepted 30-second step
   failed_count        INTEGER NOT NULL DEFAULT 0 CHECK (failed_count >= 0),
@@ -35,7 +37,8 @@ CREATE TABLE user_totp (
   set_by              UUID REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
   set_at              TIMESTAMPTZ(6) NOT NULL DEFAULT now(),
   CONSTRAINT user_totp_enrolled_pair CHECK ((secret_enc IS NULL) = (enrolled_at IS NULL)),
-  CONSTRAINT user_totp_off_holds_nothing CHECK (required OR (secret_enc IS NULL AND pending_secret_enc IS NULL))
+  CONSTRAINT user_totp_off_holds_nothing CHECK (required OR (secret_enc IS NULL AND pending_secret_enc IS NULL)),
+  CONSTRAINT user_totp_pending_owned CHECK ((pending_secret_enc IS NULL) = (pending_owner IS NULL))
 );
 
 CREATE TABLE user_recovery_codes (
@@ -167,7 +170,7 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Enrolment (a user whose two-factor is on and not set up yet) and recovery codes
 -- ---------------------------------------------------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION auth_totp_begin_enrol(p_user uuid, p_secret_enc text) RETURNS void
+CREATE OR REPLACE FUNCTION auth_totp_begin_enrol(p_user uuid, p_secret_enc text, p_owner text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   IF coalesce(current_setting('app.user_id', true), '') <> p_user::text THEN
@@ -176,12 +179,19 @@ BEGIN
   IF p_secret_enc IS NULL OR p_secret_enc !~ '^v1:[A-Za-z0-9+/=_-]{20,}$' THEN
     RAISE EXCEPTION 'invalid secret envelope' USING ERRCODE = 'invalid_parameter_value';
   END IF;
-  UPDATE public.user_totp SET pending_secret_enc = p_secret_enc WHERE user_id = p_user AND required AND secret_enc IS NULL;
-  IF NOT FOUND THEN RAISE EXCEPTION 'two-factor is not waiting for enrolment' USING ERRCODE = 'insufficient_privilege'; END IF;
+  IF p_owner IS NULL OR p_owner !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'invalid pending sign-in' USING ERRCODE = 'invalid_parameter_value';
+  END IF;
+  -- The first sign-in that starts an enrolment keeps it for 10 minutes: another sign-in (even with the right password)
+  -- cannot replace the secret shown in that QR code. The same sign-in may restart it.
+  UPDATE public.user_totp SET pending_secret_enc = p_secret_enc, pending_owner = p_owner, pending_started_at = now()
+  WHERE user_id = p_user AND required AND secret_enc IS NULL
+    AND (pending_owner IS NULL OR pending_owner = p_owner OR pending_started_at < now() - interval '10 minutes');
+  IF NOT FOUND THEN RAISE EXCEPTION 'two-factor is not waiting for enrolment, or another sign-in is enrolling' USING ERRCODE = 'insufficient_privilege'; END IF;
 END $$;
 
 -- The code was checked by the API against the pending secret. Moves it to the active secret, stores the 10 recovery-code hashes.
-CREATE OR REPLACE FUNCTION auth_totp_confirm_enrol(p_user uuid, p_step bigint, p_hashes text[]) RETURNS void
+CREATE OR REPLACE FUNCTION auth_totp_confirm_enrol(p_user uuid, p_step bigint, p_hashes text[], p_owner text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 BEGIN
   IF coalesce(current_setting('app.user_id', true), '') <> p_user::text THEN
@@ -193,9 +203,9 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.local_credentials c WHERE c.user_id = p_user AND c.locked_until > now()) THEN
     RAISE EXCEPTION 'account is locked' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  UPDATE public.user_totp SET secret_enc = pending_secret_enc, pending_secret_enc = NULL, enrolled_at = now(), last_step = p_step,
-    failed_count = 0, last_success_at = now()
-    WHERE user_id = p_user AND required AND secret_enc IS NULL AND pending_secret_enc IS NOT NULL;
+  UPDATE public.user_totp SET secret_enc = pending_secret_enc, pending_secret_enc = NULL, pending_owner = NULL, pending_started_at = NULL,
+    enrolled_at = now(), last_step = p_step, failed_count = 0, last_success_at = now()
+    WHERE user_id = p_user AND required AND secret_enc IS NULL AND pending_secret_enc IS NOT NULL AND pending_owner = p_owner;
   IF NOT FOUND THEN RAISE EXCEPTION 'nothing to confirm' USING ERRCODE = 'insufficient_privilege'; END IF;
   DELETE FROM public.user_recovery_codes WHERE user_id = p_user;
   INSERT INTO public.user_recovery_codes (user_id, code_hash) SELECT p_user, h FROM unnest(p_hashes) h;
@@ -366,7 +376,7 @@ BEGIN
   IF p_enabled THEN
     IF before_label <> 'off' THEN RETURN before_label; END IF;
     INSERT INTO public.user_totp (user_id, required, set_by, set_at) VALUES (p_user, true, a, now())
-      ON CONFLICT (user_id) DO UPDATE SET required = true, secret_enc = NULL, pending_secret_enc = NULL, enrolled_at = NULL, last_step = NULL,
+      ON CONFLICT (user_id) DO UPDATE SET required = true, secret_enc = NULL, pending_secret_enc = NULL, pending_owner = NULL, pending_started_at = NULL, enrolled_at = NULL, last_step = NULL,
         failed_count = 0, last_success_at = NULL, set_by = a, set_at = now();
     UPDATE public.user_sessions SET revoked_at = now(), revoked_by = a, revoke_reason = 'two_factor_enabled'
       WHERE user_id = p_user AND revoked_at IS NULL AND auth_method = 'local';
@@ -374,7 +384,7 @@ BEGIN
   ELSE
     IF before_label = 'off' THEN RETURN before_label; END IF;
     DELETE FROM public.user_recovery_codes WHERE user_id = p_user;
-    UPDATE public.user_totp SET required = false, secret_enc = NULL, pending_secret_enc = NULL, enrolled_at = NULL, last_step = NULL,
+    UPDATE public.user_totp SET required = false, secret_enc = NULL, pending_secret_enc = NULL, pending_owner = NULL, pending_started_at = NULL, enrolled_at = NULL, last_step = NULL,
       failed_count = 0, last_success_at = NULL, set_by = a, set_at = now() WHERE user_id = p_user;
     UPDATE public.auth_pending SET used_at = now() WHERE user_id = p_user AND used_at IS NULL;
   END IF;
@@ -394,7 +404,7 @@ DECLARE a uuid := public.idm_two_factor_guard(p_user, p_reason); before_label te
 BEGIN
   IF before_label = 'off' THEN RAISE EXCEPTION 'two-factor is not on for this user: nothing to reset'; END IF;
   DELETE FROM public.user_recovery_codes WHERE user_id = p_user;
-  UPDATE public.user_totp SET secret_enc = NULL, pending_secret_enc = NULL, enrolled_at = NULL, last_step = NULL, failed_count = 0,
+  UPDATE public.user_totp SET secret_enc = NULL, pending_secret_enc = NULL, pending_owner = NULL, pending_started_at = NULL, enrolled_at = NULL, last_step = NULL, failed_count = 0,
     last_success_at = NULL, set_by = a, set_at = now() WHERE user_id = p_user;
   UPDATE public.auth_pending SET used_at = now() WHERE user_id = p_user AND used_at IS NULL;
   UPDATE public.user_sessions SET revoked_at = now(), revoked_by = a, revoke_reason = 'two_factor_reset'
@@ -421,7 +431,7 @@ BEGIN
   before_label := public.idm_two_factor_label(uid);
   IF before_label = 'off' THEN RETURN; END IF;
   DELETE FROM public.user_recovery_codes WHERE user_id = uid;
-  UPDATE public.user_totp SET required = NOT coalesce(p_disable, false), secret_enc = NULL, pending_secret_enc = NULL, enrolled_at = NULL,
+  UPDATE public.user_totp SET required = NOT coalesce(p_disable, false), secret_enc = NULL, pending_secret_enc = NULL, pending_owner = NULL, pending_started_at = NULL, enrolled_at = NULL,
     last_step = NULL, failed_count = 0, last_success_at = NULL, set_at = now() WHERE user_id = uid;
   UPDATE public.auth_pending SET used_at = now() WHERE user_id = uid AND used_at IS NULL;
   UPDATE public.user_sessions SET revoked_at = now(), revoke_reason = 'two_factor_reset' WHERE user_id = uid AND revoked_at IS NULL;
@@ -438,8 +448,8 @@ DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['auth_totp_remaining(uuid)','auth_totp_state(uuid)','auth_totp_secret(uuid)','auth_totp_note_failure(uuid)',
-    'auth_totp_result(uuid,boolean,bigint)','auth_totp_use_recovery(uuid,text)','auth_totp_begin_enrol(uuid,text)',
-    'auth_totp_confirm_enrol(uuid,bigint,text[])','auth_totp_regenerate_recovery(uuid,text[])','auth_pending_create(uuid,text,text,inet)',
+    'auth_totp_result(uuid,boolean,bigint)','auth_totp_use_recovery(uuid,text)','auth_totp_begin_enrol(uuid,text,text)',
+    'auth_totp_confirm_enrol(uuid,bigint,text[],text)','auth_totp_regenerate_recovery(uuid,text[])','auth_pending_create(uuid,text,text,inet)',
     'auth_pending_load(text)','auth_pending_consume(text,uuid)','idm_two_factor_guard(uuid,text)','idm_two_factor_label(uuid)',
     'idm_set_two_factor(uuid,boolean,text)','idm_reset_two_factor(uuid,text)','idm_installer_reset_two_factor(text,boolean)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_identity_owner', f);
@@ -448,8 +458,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     -- not granted: auth_totp_note_failure (internal), idm_two_factor_guard (internal), idm_installer_reset_two_factor (installer only)
     FOREACH f IN ARRAY ARRAY['auth_totp_remaining(uuid)','auth_totp_state(uuid)','auth_totp_secret(uuid)',
-      'auth_totp_result(uuid,boolean,bigint)','auth_totp_use_recovery(uuid,text)','auth_totp_begin_enrol(uuid,text)',
-      'auth_totp_confirm_enrol(uuid,bigint,text[])','auth_totp_regenerate_recovery(uuid,text[])','auth_pending_create(uuid,text,text,inet)',
+      'auth_totp_result(uuid,boolean,bigint)','auth_totp_use_recovery(uuid,text)','auth_totp_begin_enrol(uuid,text,text)',
+      'auth_totp_confirm_enrol(uuid,bigint,text[],text)','auth_totp_regenerate_recovery(uuid,text[])','auth_pending_create(uuid,text,text,inet)',
       'auth_pending_load(text)','auth_pending_consume(text,uuid)','idm_two_factor_label(uuid)',
       'idm_set_two_factor(uuid,boolean,text)','idm_reset_two_factor(uuid,text)'] LOOP
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_app', f);

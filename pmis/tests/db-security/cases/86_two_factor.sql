@@ -88,7 +88,7 @@ SELECT auth_totp_result('{{BOB}}', true, 1);
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 only your own enrolment
-SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA');
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('a', 64));
 -- @end
 
 -- @case TF-11

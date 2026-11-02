@@ -289,7 +289,7 @@ export class AuthService {
     return this.asUser(userId, async () => {
       const rows = await this.db.tx.$queryRaw<{ email: string }[]>`SELECT email FROM users WHERE id = ${userId}::uuid`;
       const email = rows[0]?.email ?? userId;
-      const e = await this.twoFactor.beginEnrol(userId, email);
+      const e = await this.twoFactor.beginEnrol(userId, email, pendingToken as string);
       return { ...e, issuer: TWO_FACTOR_PARAMS.issuer, account: email, algorithm: TWO_FACTOR_PARAMS.algorithm, digits: TWO_FACTOR_PARAMS.digits, period: TWO_FACTOR_PARAMS.period };
     });
   }
@@ -309,7 +309,7 @@ export class AuthService {
         await this.twoFactor.logFailure(userId, r.reason, 'totp', ip, 'enrol', requestId);
         return { fail: r.reason } as const;
       }
-      const codes = await this.twoFactor.confirmEnrol(userId, r.step);
+      const codes = await this.twoFactor.confirmEnrol(userId, r.step, pendingToken as string);
       if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
       await this.syslog.write('info', 'local_two_factor_enrolled', { ip }, userId, requestId);
       return { codes, created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;

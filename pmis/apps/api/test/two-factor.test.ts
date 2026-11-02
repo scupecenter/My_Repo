@@ -287,6 +287,27 @@ describe('enrolment is forced at the next sign-in', () => {
     expect((await api.pendingCall('/auth/local/2fa/enrol/confirm', { code: codeOf(start.body.secret) })).status).toBe(401);
   });
 
+  it('a second sign-in with the same password cannot replace or confirm an enrolment another sign-in started (10 minutes)', async () => {
+    const { api: admin } = await adminApi(app, db);
+    const u = await makeUser(db, { assigned: true });
+    await admin.call('put', `/users/${u.id}/two-factor`, { enabled: true, reason: 'policy' });
+    const first = new Api(app);
+    await first.login(u.email, u.password);
+    const start = await first.pendingCall('/auth/local/2fa/enrol/start');
+    expect(start.status).toBe(200);
+    const second = new Api(app);
+    await second.login(u.email, u.password);
+    const hijack = await second.pendingCall('/auth/local/2fa/enrol/start');
+    expect(hijack.status).toBeGreaterThanOrEqual(400);
+    // the second sign-in cannot confirm with the first QR code either
+    tick();
+    expect((await second.pendingCall('/auth/local/2fa/enrol/confirm', { code: codeOf(start.body.secret) })).status).toBeGreaterThanOrEqual(400);
+    expect((await state(u.id)).secret_enc).toBeNull();
+    // the sign-in that started it finishes it
+    const ok = await first.pendingCall('/auth/local/2fa/enrol/confirm', { code: codeOf(start.body.secret) });
+    expect(ok.status).toBe(200);
+  });
+
   it('refuses enrolment endpoints without a pending sign-in, with an expired one, and with the wrong kind', async () => {
     const none = new Api(app);
     expect((await none.pendingCall('/auth/local/2fa/enrol/start')).status).toBe(401);
