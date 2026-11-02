@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import ExcelJS from 'exceljs';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
@@ -15,6 +16,8 @@ export interface DashboardParams {
   cluster_code?: string;
   scenario?: string;
   stream?: string;
+  /** a view of workflow_views (CW, TE, OM), Q126 */
+  view?: string;
   exclude_overrides?: boolean;
 }
 
@@ -50,6 +53,11 @@ export function dashboardParams(q: Query): DashboardParams {
     if (!/^[A-Z][A-Z0-9_]{1,30}$/.test(stream)) throw problems.validation([{ path: '/stream', code: 'invalid', message: 'stream is a stream code such as CW.' }]);
     p.stream = stream;
   }
+  const view = oneParam(q, 'view');
+  if (view !== undefined) {
+    if (!/^[A-Z][A-Z0-9_]{1,30}$/.test(view)) throw problems.validation([{ path: '/view', code: 'invalid', message: 'view is a view code such as CW.' }]);
+    p.view = view;
+  }
   p.exclude_overrides = boolParam(q, 'exclude_overrides');
   return p;
 }
@@ -80,13 +88,20 @@ export class DashboardService {
     if (Number(r[0]?.n ?? 0) === 0) throw problems.validation([{ path: '/stream', code: 'unknown_stream', message: `There is no stream ${code}.` }]);
   }
 
+  /** 422 for a view code that no workflow version has (Q126). */
+  private async requireView(code: string): Promise<void> {
+    const r = await this.db.tx.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM workflow_views WHERE code = ${code}`;
+    if (Number(r[0]?.n ?? 0) === 0) throw problems.validation([{ path: '/view', code: 'unknown_view', message: `There is no view ${code}.` }]);
+  }
+
   async get(_auth: AuthContext, q: Query): Promise<Json> {
     const regions = await this.access.requireRegions('dashboard', 'view');
     const p = dashboardParams(q);
     if (p.stream) await this.requireStream(p.stream);
+    if (p.view) await this.requireView(p.view);
     const excl = await this.excludeOverrides(p);
     const rows = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
-      SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean) AS r`);
+      SELECT dash_overview(${p.ref_date ?? null}::date, ${p.region_id ?? null}::int, ${p.cluster_code ?? null}::text, ${p.scenario ?? null}::text, ${p.stream ?? null}::text, ${excl}::boolean, ${p.view ?? null}::text) AS r`);
     const r = rows[0]!.r;
     const meta = (r.meta ?? {}) as Json;
     const basis = (r.basis ?? {}) as Json;
@@ -105,8 +120,10 @@ export class DashboardService {
         ...(weightSet ? { weight_set: weightSet } : {}),
         project_wide: meta.project_wide === true,
         central_items_hidden: Number(((headline.project_status ?? {}) as Json).central_items_hidden ?? 0),
+        manual_items_measured: Number(((headline.project_status ?? {}) as Json).manual_items_measured ?? 0),
         scope_regions: regions,
-        health_draft: true,
+        // Q121: health index factors D and I are approved; the index is no longer a draft
+        health_draft: false,
       },
       basis: {
         ref_date: basis.ref_date,
@@ -114,6 +131,7 @@ export class DashboardService {
         source,
         snapshot_date: basis.snapshot_date ?? null,
         snapshot_dates: basis.snapshots ?? [],
+        snapshot_kinds: basis.snapshot_kinds ?? [],
         note: source === 'live' ? null
           : source === 'snapshot' ? 'Headline, pipeline and stream figures come from the weekly snapshot of this date; SLA, issues, delay attribution and health are computed as of the date from dated facts.'
             : 'No snapshot exists for this date: every figure is computed as of the date from dated facts (actual dates up to the date). Blocked gates are not available for a past date.',
@@ -139,7 +157,7 @@ export class DashboardService {
       health: r.health,
       delay: {
         ...delay,
-        items: ((delay.items ?? []) as Json[]).map((i) => ({ ...i, kind: i.external_party_id ? 'external' : i.party === 'unassigned' ? 'unassigned' : 'default_type' })),
+        items: ((delay.items ?? []) as Json[]).map((i) => ({ ...i, kind: i.kind ?? (i.external_party_id ? 'external' : i.party === 'unassigned' ? 'unassigned' : 'default_type') })),
         draft: true,
       },
       regions: { items: r.regions ?? [] },
@@ -163,63 +181,120 @@ export class DashboardService {
     const streams = await this.db.tx.$queryRaw<{ code: string; name_en: string; name_ar: string | null; sort_order: number }[]>`
       SELECT DISTINCT ON (ws.code) ws.code, ws.name_en, ws.name_ar, ws.sort_order FROM workflow_streams ws JOIN workflow_definitions wd ON wd.id = ws.workflow_id
       WHERE wd.status = 'published' ORDER BY ws.code, wd.version DESC`;
+    const views = await this.db.tx.$queryRaw<{ code: string; name_en: string; name_ar: string | null; sort_order: number }[]>`
+      SELECT DISTINCT ON (v.code) v.code, v.name_en, v.name_ar, v.sort_order FROM workflow_views v JOIN workflow_definitions wd ON wd.id = v.workflow_id
+      WHERE wd.status = 'published' ORDER BY v.code, wd.version DESC`;
     return {
       regions: regs,
       clusters: clusters.map((c) => c.cluster_code),
       scenarios: [...SCENARIOS],
       streams: [...streams.sort((a, b) => a.sort_order - b.sort_order).map(({ code, name_en, name_ar }) => ({ code, name_en, name_ar })), { code: 'DISMANTLE', name_en: 'Dismantle', name_ar: 'الفك' }],
+      views: views.sort((a, b) => a.sort_order - b.sort_order).map(({ code, name_en, name_ar }) => ({ code, name_en, name_ar })),
     };
   }
 
-  /** GET /dashboard/export: the current view as a CSV file (UTF-8 with a byte-order mark, so Excel opens Arabic text). Needs the `export` grant on the dashboard. */
-  async exportCsv(auth: AuthContext, q: Query): Promise<{ filename: string; body: string }> {
+  /**
+   * GET /dashboard/export: the current view as an Excel workbook (Q127, the default) or as CSV (`format=csv`, UTF-8 with a byte-order mark so Excel
+   * opens Arabic text). Needs the `export` grant on the dashboard; every export is audited.
+   */
+  async export(auth: AuthContext, q: Query): Promise<{ filename: string; body: Buffer; contentType: string }> {
     await this.access.requireRegions('dashboard', 'view');
     if (!(await this.access.hasGrant(auth, 'dashboard', 'export'))) {
       throw problems.forbidden('action_forbidden', 'You need the export right on the dashboard.');
     }
-    const d = await this.get(auth, q);
+    const format = oneParam(q, 'format') ?? 'xlsx';
+    if (format !== 'xlsx' && format !== 'csv') throw problems.validation([{ path: '/format', code: 'invalid', message: 'format is xlsx or csv.' }]);
+    const query: Query = { ...q };
+    delete query.format;
+    const d = await this.get(auth, query);
     const basis = d.basis as Json;
-    const rows: (string | number | null)[][] = [['section', 'item', 'metric', 'value']];
-    const add = (section: string, item: string, metric: string, value: unknown): void => {
-      rows.push([section, item, metric, typeof value === 'number' || typeof value === 'string' ? value : value === null || value === undefined ? null : JSON.stringify(value)]);
-    };
-    add('view', 'reference date', 'date', basis.ref_date);
-    add('view', 'source', 'basis', basis.source);
-    const h = d.headline as Json;
-    add('headline', 'sites', 'active', h.sites_total);
-    add('headline', 'sites', 'cancelled', h.sites_cancelled);
-    for (const [k, v] of Object.entries((h.by_overall_status ?? {}) as Json)) add('headline', 'overall status', k, v);
-    for (const m of ((d.pipeline as Json).nodes as Json[])) {
-      for (const k of ['sites_total', 'completed', 'in_progress', 'not_started', 'blocked', 'plan', 'vs_plan', 'overdue_open', 'achieved_late', 'baseline_missing']) add('milestones', `${m.code} ${m.name_en}`, k, m[k]);
+    const rows = exportRows(d);
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL, ${JSON.stringify({ filters: query, format, rows: rows.length - 1 })}::jsonb, NULL)`);
+    const name = `GSDN_Dashboard_${String(basis.ref_date)}`;
+    if (format === 'csv') {
+      const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+      return { filename: `${name}.csv`, body: Buffer.from(`${String.fromCharCode(0xfeff)}${csv}\r\n`, 'utf8'), contentType: 'text/csv; charset=utf-8' };
     }
-    const fc = (h.final_closure ?? {}) as Json;
-    for (const k of ['sites_total', 'sites_closed', 'closed_pct']) add('final closure', 'closure', k, fc[k]);
-    add('final closure', 'pending CW FAC', 'count', ((fc.pending_cw_fac ?? {}) as Json).count);
-    add('final closure', 'pending TE FAC', 'count', ((fc.pending_te_fac ?? {}) as Json).count);
-    for (const s of ((d.streams as Json).items as Json[])) for (const [k, v] of Object.entries((s.counts ?? {}) as Json)) add('streams', `${s.code} ${s.name_en}`, k, v);
-    for (const s of (((d.sla as Json | undefined)?.by_stage ?? []) as Json[])) {
-      for (const k of ['open_on_time', 'open_at_risk', 'open_late', 'completed_on_time', 'completed_late']) add('sla', `${s.stage_code} ${s.name_en}`, k, s[k]);
-    }
-    const iss = d.issues as Json | null;
-    if (iss) {
-      add('issues', 'issues', 'open', iss.open_total);
-      add('issues', 'sites', 'with an open issue', iss.sites_with_open_issue);
-      for (const o of (iss.by_owner as Json[])) add('issues', `owner ${o.owner_name ?? 'none'}`, 'open issues', o.count);
-    }
-    const hl = d.health as Json;
-    add('health index (draft)', 'index', 'score', hl.score);
-    add('health index (draft)', 'index', 'band', hl.band);
-    for (const c of ((hl.components ?? []) as Json[])) add('health index (draft)', `${c.code} ${c.name_en}`, 'value', c.value);
-    for (const i of (((d.delay as Json).items ?? []) as Json[])) add('delay attribution (draft)', String(i.party), 'late working days', i.late_working_days);
-    for (const r of (((d.regions as Json).items ?? []) as Json[])) {
-      add('regions', String(r.region_name), 'sites', r.sites_total);
-      add('regions', String(r.region_name), 'progress %', r.progress_pct);
-    }
-    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
-    void auth;
-    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL, ${JSON.stringify({ filters: q, rows: rows.length - 1 })}::jsonb, NULL)`);
-    return { filename: `GSDN_Dashboard_${String(basis.ref_date)}.csv`, body: `${String.fromCharCode(0xfeff)}${csv}\r\n` };
+    return { filename: `${name}.xlsx`, body: await exportWorkbook(rows, d), contentType: XLSX_TYPE };
   }
+}
+
+export const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+type Cell = string | number | null;
+
+/** The rows `section,item,metric,value` of the view (the same rows in both formats). */
+export function exportRows(d: Json): Cell[][] {
+  const basis = d.basis as Json;
+  const rows: Cell[][] = [['section', 'item', 'metric', 'value']];
+  const add = (section: string, item: string, metric: string, value: unknown): void => {
+    rows.push([section, item, metric, typeof value === 'number' || typeof value === 'string' ? value : value === null || value === undefined ? null : JSON.stringify(value)]);
+  };
+  add('view', 'reference date', 'date', basis.ref_date);
+  add('view', 'source', 'basis', basis.source);
+  const h = d.headline as Json;
+  add('headline', 'sites', 'active', h.sites_total);
+  add('headline', 'sites', 'cancelled', h.sites_cancelled);
+  for (const [k, v] of Object.entries((h.by_overall_status ?? {}) as Json)) add('headline', 'overall status', k, v);
+  const ps = (h.project_status ?? {}) as Json;
+  add('project status', 'project', 'progress %', ps.progress_pct);
+  for (const a of ((ps.activities ?? []) as Json[])) {
+    for (const i of ((a.items ?? []) as Json[])) if (i.manual) add('project status', `${String(i.code)} ${String(i.name_en)}`, 'manual %', (i.manual as Json).value_pct);
+  }
+  for (const m of ((d.pipeline as Json).nodes as Json[])) {
+    for (const k of ['sites_total', 'completed', 'in_progress', 'not_started', 'blocked', 'plan', 'vs_plan', 'overdue_open', 'achieved_late', 'baseline_missing']) add('milestones', `${String(m.code)} ${String(m.name_en)}`, k, m[k]);
+  }
+  const fc = (h.final_closure ?? {}) as Json;
+  for (const k of ['sites_total', 'sites_closed', 'closed_pct']) add('final closure', 'closure', k, fc[k]);
+  add('final closure', 'pending CW FAC', 'count', ((fc.pending_cw_fac ?? {}) as Json).count);
+  add('final closure', 'pending TE FAC', 'count', ((fc.pending_te_fac ?? {}) as Json).count);
+  for (const s of ((d.streams as Json).items as Json[])) for (const [k, v] of Object.entries((s.counts ?? {}) as Json)) add('streams', `${String(s.code)} ${String(s.name_en)}`, k, v);
+  for (const s of (((d.sla as Json | undefined)?.by_stage ?? []) as Json[])) {
+    for (const k of ['open_on_time', 'open_at_risk', 'open_late', 'completed_on_time', 'completed_late']) add('sla', `${String(s.stage_code)} ${String(s.name_en)}`, k, s[k]);
+  }
+  const iss = d.issues as Json | null;
+  if (iss) {
+    add('issues', 'issues', 'open', iss.open_total);
+    add('issues', 'sites', 'with an open issue', iss.sites_with_open_issue);
+    for (const o of (iss.by_owner as Json[])) add('issues', `owner ${String(o.owner_name ?? 'none')}`, 'open issues', o.count);
+  }
+  const hl = d.health as Json;
+  add('health index', 'index', 'score', hl.score);
+  add('health index', 'index', 'band', hl.band);
+  for (const c of ((hl.components ?? []) as Json[])) add('health index', `${String(c.code)} ${String(c.name_en)}`, 'value', c.value);
+  const dl = d.delay as Json;
+  for (const i of ((dl.items ?? []) as Json[])) add('delay attribution (draft)', String(i.party), 'late working days', i.late_working_days);
+  add('delay attribution (draft)', 'suspension', 'working days left out', dl.suspended_working_days ?? 0);
+  for (const r of (((d.regions as Json).items ?? []) as Json[])) {
+    add('regions', String(r.region_name), 'sites', r.sites_total);
+    add('regions', String(r.region_name), 'progress %', r.progress_pct);
+  }
+  return rows;
+}
+
+/**
+ * The workbook: the sheet "Dashboard" with the rows and the sheet "About" with the basis. Text is always written as a text cell (number format @), never as a
+ * formula, so a site code or a party name that starts with "=", "+", "-" or "@" stays text in Excel (no formula injection).
+ */
+export async function exportWorkbook(rows: Cell[][], d: Json): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'GSDN PMIS';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Dashboard', { views: [{ state: 'frozen', ySplit: 1 }] });
+  ws.columns = [{ width: 24 }, { width: 44 }, { width: 24 }, { width: 16 }];
+  for (const r of rows) {
+    const row = ws.addRow(r.map((c) => (c === null ? null : typeof c === 'number' ? c : String(c))));
+    row.eachCell((cell) => { if (typeof cell.value === 'string') cell.numFmt = '@'; });
+  }
+  ws.getRow(1).font = { bold: true };
+  ws.autoFilter = { from: 'A1', to: 'D1' };
+  const about = wb.addWorksheet('About');
+  const basis = d.basis as Json;
+  const meta = d.meta as Json;
+  for (const [k, v] of [['reference date', basis.ref_date], ['basis', basis.source], ['project wide', meta.project_wide], ['as of', meta.as_of]] as const) {
+    const row = about.addRow([k, v === null || v === undefined ? null : String(v)]);
+    row.eachCell((cell) => { cell.numFmt = '@'; });
+  }
+  return Buffer.from(await wb.xlsx.writeBuffer());
 }
 
 /** One CSV cell. A text that a spreadsheet would read as a formula (=, +, -, @, tab, CR) gets a leading quote; numbers stay numbers. */

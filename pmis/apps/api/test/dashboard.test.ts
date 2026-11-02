@@ -220,10 +220,10 @@ describe('Project Status weights (rules.md section 6)', () => {
   });
 });
 
-describe('health index (draft, Q35 bands)', () => {
+describe('health index (Q35 bands; approved, Q121)', () => {
   it('computes the six factors, leaves out a factor with no data and redistributes its weight', async () => {
     const h = (await get(admin)).health;
-    expect(h.draft).toBe(true);
+    expect(h.draft).toBe(false);
     const c = (code: string): J => h.components.find((x: J) => x.code === code);
     expect(c('B').value).toBeCloseTo(57.143, 2); // 4 of the 7 achieved milestones with a baseline were on time
     expect(c('S').value).toBeCloseTo(66.667, 2); // 2 of 3 completed SLA clocks within the maximum
@@ -263,10 +263,11 @@ describe('health index (draft, Q35 bands)', () => {
 });
 
 describe('delay attribution (draft)', () => {
-  it('gives overdue working days per responsible party; the shares add up to 100 and there are no attribution periods yet', async () => {
+  it('gives overdue working days per responsible party; the shares add up to 100 (no attribution period is recorded in this data set)', async () => {
     const dl = (await get(admin)).delay;
     expect(dl.draft).toBe(true);
-    expect(dl.periods_supported).toBe(false);
+    expect(dl.periods_supported).toBe(true);
+    expect(dl.periods_count).toBe(0);
     expect(dl.total_late_working_days).toBeGreaterThan(0);
     expect(dl.items.reduce((a: number, i: J) => a + i.late_working_days, 0)).toBe(dl.total_late_working_days);
     expect(dl.items.reduce((a: number, i: J) => a + i.share_pct, 0)).toBeGreaterThan(99.9);
@@ -446,22 +447,26 @@ describe('weekly snapshots', () => {
     expect(page.body.page.next_cursor).toBeTruthy();
   });
 
-  it('the daily job takes the weekly snapshot once, then waits for the next week', async () => {
+  it('the daily job takes the scheduled snapshots once (Sunday and month-end, Q127), then takes nothing more for the same dates', async () => {
     const jobs = app.get(JobsService);
+    // what is due now: the Sunday of the last 7 days, and a month end when one falls in them (computed by the database, so the weekday does not matter)
+    const due = await q<{ d: string; kind: string; taken: boolean }>(db,
+      `SELECT snapshot_date::text AS d, kind, EXISTS (SELECT 1 FROM site_snapshots s WHERE s.snapshot_date = x.snapshot_date) AS taken FROM dash_snapshot_due(cal_today()) x`);
+    expect(due.some((x) => x.kind === 'weekly')).toBe(true);
+    const fresh = new Set(due.filter((x) => !x.taken).map((x) => x.d)).size;
     const first = await jobs.runOnce();
     expect(first).not.toBeNull();
-    // the last snapshot (25 days ago) is more than 7 days old, so this run takes today's
-    expect(first!.snapshots).toBe(9);
-    expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM site_snapshots WHERE snapshot_date = cal_today()'))[0]!.n).toBe(9);
+    expect(first!.snapshots ?? 0).toBe(9 * fresh);
+    expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM dash_snapshot_due(cal_today())'))[0]!.n).toBe(0);
     const second = await jobs.runOnce();
     expect(second!.snapshots).toBeUndefined();
-    expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM progress_snapshots WHERE snapshot_date = cal_today()'))[0]!.n).toBe(8);
+    for (const x of due) expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM site_snapshots WHERE snapshot_date = $1', [x.d]))[0]!.n).toBe(9);
   });
 });
 
 describe('export of the current view', () => {
   it('downloads the view as CSV for a caller with the export right on the dashboard, and audits it', async () => {
-    const res = await exporter.api.call('get', `${DASH}/export?region_id=1`).buffer(true).parse((r, cb) => {
+    const res = await exporter.api.call('get', `${DASH}/export?region_id=1&format=csv`).buffer(true).parse((r, cb) => {
       const chunks: Buffer[] = [];
       r.on('data', (c: Buffer) => chunks.push(c));
       r.on('end', () => cb(null, Buffer.concat(chunks)));

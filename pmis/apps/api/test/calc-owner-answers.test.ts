@@ -339,7 +339,7 @@ describe('Q84: the daily job applies due SLA versions and reminds the System Adm
   it('is off in the test configuration, and loadConfig defaults it on except in tests', () => {
     expect(jobs().enabled).toBe(false);
     expect(jobs().nextRun).toBeNull();
-    const env = { DATABASE_URL: 'postgresql://x', LOG_HMAC_KEY: 'a'.repeat(32), TOTP_ENC_KEY: 'b'.repeat(64) };
+    const env = { DATABASE_URL: 'postgresql://x', LOG_HMAC_KEY: 'a'.repeat(32), TOTP_ENC_KEY: 'b'.repeat(64), FILE_ENC_KEY: 'c'.repeat(64) };
     expect(loadConfig({ ...env, NODE_ENV: 'production' }).jobsEnabled).toBe(true);
     expect(loadConfig({ ...env, NODE_ENV: 'test' }).jobsEnabled).toBe(false);
     expect(loadConfig({ ...env, NODE_ENV: 'production', JOBS_ENABLED: 'false' }).jobsEnabled).toBe(false);

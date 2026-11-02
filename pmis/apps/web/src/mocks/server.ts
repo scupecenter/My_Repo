@@ -1,6 +1,7 @@
 import { setupServer } from 'msw/node';
 import { handlers } from './handlers';
 import { documentHandlers } from './handlers.documents';
+import { qcHandlers } from './handlers.qc';
 import { adminHandlers } from './handlers.admin';
 import { authHandlers } from './handlers.auth';
 import { profileHandlers } from './handlers.profile';
@@ -13,4 +14,4 @@ import { warehouseHandlers } from './handlers.warehouse';
 import { xHandlers } from './handlers.x';
 import { logsHandlers } from './handlers.logs';
 import { logsWebHandlers } from './handlers.logsWeb';
-export const server = setupServer(...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);
+export const server = setupServer(...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);

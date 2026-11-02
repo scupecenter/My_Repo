@@ -43,8 +43,9 @@ export function nextRunAt(now: Date, tz: string = JOB_TIME_ZONE, hour: number = 
  * holidays to the System Admins (cal_tentative_reminders). It runs once at start-up and then every day at 02:00 Africa/Tripoli, only when
  * JOBS_ENABLED is on (default on, off when NODE_ENV=test). It is a plain timer inside the API process: the stack names BullMQ with Redis, which is
  * not installed on the server yet; the two database functions are idempotent, so a later move to BullMQ changes only who calls them.
- * The dashboard snapshot (dash_snapshot_weekly) is taken by the same run when the last one is at least `dashboard.snapshot_every_days` (7) old; a failure there is
- * logged and does not stop the rest.
+ * The dashboard snapshots (dash_snapshot_weekly, migration 0046, Q127) are taken by the same run: the weekly one on Sunday (setting dashboard.snapshot_weekday)
+ * and the month-end one on the last day of the month, each date once, with a catch-up of a due date missed in the last dashboard.snapshot_catchup_days (7);
+ * a failure there is logged and does not stop the rest.
  * Safe to repeat: a second run the same day finds nothing to apply and nobody left to remind. An advisory lock keeps two API processes from running it together.
  */
 @Injectable()
@@ -124,7 +125,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  /** The weekly dashboard snapshot (migration 0039); its own transaction and its own lock, so a failure leaves the other job steps alone. Returns the sites stored. */
+  /** The scheduled dashboard snapshots (migrations 0039, 0046); its own transaction and its own lock, so a failure leaves the other job steps alone. Returns the sites stored. */
   private async snapshot(): Promise<number> {
     try {
       return await this.db.client.$transaction(async (tx) => {

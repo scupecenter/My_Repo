@@ -6,7 +6,7 @@
 export type Rule = Record<string, unknown> | null;
 export type Ctx = Record<string, unknown>;
 
-const ROOTS = new Set(['site', 'task', 'scenario', 'procurement']);
+const ROOTS = new Set(['site', 'task', 'scenario', 'procurement', 'record']);
 
 function lookup(path: string, ctx: Ctx): unknown {
   let cur: unknown = ctx;

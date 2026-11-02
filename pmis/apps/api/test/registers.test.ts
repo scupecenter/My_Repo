@@ -326,6 +326,7 @@ describe('the two levels: one person holding both (B5), and records already subm
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
     const solo = await actor(app, db, { level: 'approve', grants: G('permits_hse', 'view', 'create', 'edit', 'approve'), regions: [R], modules: null, stepUp: false });
     await regCell(db, 'permits_hse', R, 'entry', { user: [solo.user.id] });
+    await regCell(db, 'permits_hse_te', R, 'entry', { user: [solo.user.id] });   // 0050: an Access - TE permit is entered on the TE stream row
     const rec2 = await createRec({ ...t, entry: solo }, { ...PERMIT_CW, permit_type: 'Access - TE' });
     await snapshot(rec2.id, 1);
     const noStep = await post(solo.api, 'permits_hse', rec2.id, 'submit', rec2.version);
@@ -555,6 +556,7 @@ describe('Q43: a record that is the source of a task is approved with the task\'
   it('refuses a submission whose task is still locked, and needs the task\'s mandatory document slots', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
     const { stageApprove } = await withTasks(t, ['D1'], []);                    // D1 stays locked
+    await regCell(db, 'permits_hse_te', R, 'entry', { user: [t.entry.user.id] });   // 0050: an Access - TE permit is entered on the TE stream row
     const rec = await createRec(t, { ...PERMIT_CW, permit_type: 'Access - TE' });
     const locked = await post(t.entry.api, 'permits_hse', rec.id, 'submit', rec.version);
     expect(locked.status).toBe(409);

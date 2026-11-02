@@ -1029,6 +1029,7 @@ model MatrixCell {
   is_global   Boolean    @default(false) // explicit global row; NULL region alone never means global
   updated_by  String?    @db.Uuid
   updated_at  DateTime   @updatedAt @db.Timestamptz(6)
+  retired_at  DateTime?  @db.Timestamptz(6) // 0050: set on every level-2 (old review) cell; two fixed levels, the data is kept for history
 
   stage     StageDefinition?     @relation(fields: [stage_id], references: [id])
   task_def  TaskDefinition?      @relation(fields: [task_def_id], references: [id])
@@ -1141,6 +1142,7 @@ model DocumentTypePlacement {
   task_def_id  String?          @db.Uuid
   snag_type_id String?          @db.Uuid
   register_key String? // e.g. permits_hse, procurement
+  record_type  String? // 0047: a register placement may name one record type of the register
 
   doc_type  DocumentType    @relation(fields: [doc_type_id], references: [id])
   task_def  TaskDefinition? @relation(fields: [task_def_id], references: [id])
@@ -1166,6 +1168,8 @@ model DocumentSlot {
   doc_type_version_id  String?  @db.Uuid // 0038: the published version the slot was built from
   conditional_declared Boolean  @default(false)
   updated_at      DateTime  @default(now()) @db.Timestamptz(6)
+  register_entity_id   String?  @db.Uuid // 0047 (Q131): a slot of a register record, keyed on its logical record (task_id is then null)
+  register_key         String?
 
   task     TaskInstance?  @relation(fields: [task_id], references: [id])
   doc_type DocumentType   @relation(fields: [doc_type_id], references: [id])
@@ -1258,6 +1262,14 @@ model DocumentBlankForm {
   @@map("document_blank_forms")
 }
 
+/// 0047 (Q131): the slot set of a logical register record was built (snapshot on open).
+model DocumentRecordSnapshot {
+  entity_id String   @id @db.Uuid
+  taken_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("document_record_snapshots")
+}
+
 model DocumentTaskSnapshot {
   task_id  String   @id @db.Uuid
   taken_at DateTime @default(now()) @db.Timestamptz(6)
@@ -1297,6 +1309,7 @@ model SnagType {
   max_size_mb                   Int      @default(20)
   blocks_preliminary_acceptance Boolean  @default(true)
   is_active                     Boolean  @default(true)
+  version                       Int      @default(1) // 0047: If-Match of admin_save_snag_type
 
   snags          Snag[]
   doc_placements DocumentTypePlacement[]
@@ -1322,6 +1335,16 @@ model Snag {
   closed_at            DateTime?     @db.Timestamptz(6)
   closed_by            String?       @db.Uuid
   responsible_party_id String?       @db.Uuid
+  // 0047 (Q132): the two-level flow of the fix photos
+  title                 String?
+  version               Int           @default(1)
+  return_count          Int           @default(0)
+  last_return_note      String?
+  ball_in_court_user_id String?       @db.Uuid
+  submitted_at          DateTime?     @db.Timestamptz(6)
+  submitted_by          String?       @db.Uuid
+  self_approval         Boolean       @default(false)
+  updated_at            DateTime      @default(now()) @db.Timestamptz(6)
   task                 TaskInstance? @relation(fields: [task_id], references: [id])
   snag_type            SnagType      @relation(fields: [snag_type_id], references: [id])
   photos               SnagPhoto[]
@@ -1353,6 +1376,10 @@ model SnagPhoto {
   uploaded_by          String         @db.Uuid
   uploaded_at          DateTime       @default(now()) @db.Timestamptz(6)
   review_note          String?
+  ext                  String? // 0047
+  withdrawn_at         DateTime?      @db.Timestamptz(6)
+  withdrawn_by         String?        @db.Uuid
+  rejected_at          DateTime?      @db.Timestamptz(6) // rejected by L2 with review_note
 
   snag Snag @relation(fields: [snag_id], references: [id], onDelete: Cascade)
 
@@ -1651,6 +1678,7 @@ model PermitType {
   has_expiry Boolean
   sort_order Int     @default(0)
   is_active  Boolean @default(true)
+  stream     String? // 0050 (Q90): CW or TE = the team that enters it (Matrix row permits_hse / permits_hse_te); NULL = no stream, on the Permits & HSE row
 
   @@map("permit_types")
 }

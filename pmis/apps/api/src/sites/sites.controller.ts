@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Patch, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -18,6 +18,16 @@ export class SitesController {
   @Get(':id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<Record<string, unknown>> {
     const site = await this.sites.get(auth, id);
+    res.setHeader('ETag', etagHeader(site.version as number));
+    return site;
+  }
+
+  /** Q130: edit the site's custom fields (near_airport and the others), through the normal custom-field rules. */
+  @Patch(':id')
+  async update(
+    @Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response,
+  ): Promise<Record<string, unknown>> {
+    const site = await this.sites.update(auth, id, ifMatch, body);
     res.setHeader('ETag', etagHeader(site.version as number));
     return site;
   }

@@ -18,7 +18,7 @@ import { sniff } from './sniff';
 import { StorageService, newObjectKey } from './storage.service';
 
 const reason = z.string().trim().min(3).max(1000);
-const placement = z.object({ target: z.enum(['task', 'qc', 'register']), ref: z.string().trim().min(1).max(60) }).strict();
+const placement = z.object({ target: z.enum(['task', 'qc', 'register']), ref: z.string().trim().min(1).max(60), record_type: z.string().trim().min(1).max(40).nullable().optional() }).strict();
 const KINDS = ['scanned_document', 'photo', 'email', 'report', 'excel_template', 'generated_form'] as const;
 const photoRules = z
   .object({

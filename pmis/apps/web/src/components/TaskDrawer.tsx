@@ -11,6 +11,7 @@ import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { CommentsPanel } from './Comments';
+import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
 import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
 import { TaskRegisterFields } from './TaskRegisterFields';
@@ -76,7 +77,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         <Link className="btn px-2 py-1 text-xs" data-testid="drawer-open-site" to={`/sites/${task.site_id}`}><ExternalLink size={12} />{t('drawer.open_site')}</Link>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="drawer-close"><X size={16} /></button></Dialog.Close>
       </header>
-      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }, { id: 'time', label: t('tis.tab') }]} />
+      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }, { id: 'time', label: t('tis.tab') }, { id: 'delay', label: t('delayp.tab') }]} />
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {task.lock_reasons?.length ? <div className="rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="drawer-locks">{task.lock_reasons.map((r, i) => <p key={i}>{r.message}</p>)}</div> : null}
         {task.lock_reasons?.length ? <BlockedByPanel taskId={task.id} siteId={task.site_id} /> : null}
@@ -116,6 +117,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         <div {...panelProps('comments', tab)}><Comments task={task} /></div>
         <div {...panelProps('history', tab)}><History task={task} /></div>
         <div {...panelProps('time', tab)}>{tab === 'time' && <TimeInStatePanel taskId={task.id} />}</div>
+        <div {...panelProps('delay', tab)}>{tab === 'delay' && <DelayPeriodsPanel taskId={task.id} />}</div>
       </div>
       <footer className="space-y-2 border-t border-line p-4">
         {submit && (final(submit) || submit.will_skip_to) && <p className="text-sm text-waitInk" data-testid="drawer-skip-note">{final(submit) ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: submit.will_skip_to })}</p>}

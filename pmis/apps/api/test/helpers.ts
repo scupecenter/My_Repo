@@ -8,12 +8,16 @@ import request from 'supertest';
 import { createApp } from '../src/app.factory';
 import type { AppConfig } from '../src/config/config';
 import { BOOTSTRAP_ADMIN } from './global-setup';
+import { parseMasterKeys } from '../src/documents/file-crypto';
+
 
 export const API = '/api/v1';
 /** Local-disk document storage of the test run (one directory per process; the object keys are random). */
 export const TEST_STORAGE_DIR = join(tmpdir(), `pmis-test-storage-${process.pid}`);
 /** 32 bytes, test only. */
 export const TEST_TOTP_ENC_KEY = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
+/** 32 bytes, test only (the envelope master key of stored files). */
+export const TEST_FILE_ENC_KEY = 'ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100';
 export const PASSWORD = 'Correct-Horse-Battery-9';
 export const NEW_PASSWORD = 'Another-Strong-Phrase-42';
 
@@ -28,6 +32,8 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     totpEncKey: TEST_TOTP_ENC_KEY,
     jobsEnabled: false,
     storage: { driver: 'local', localDir: TEST_STORAGE_DIR },
+    fileEnc: parseMasterKeys({ FILE_ENC_KEY: TEST_FILE_ENC_KEY, FILE_ENC_KEY_ID: 'k1' }),
+    scan: { mode: 'off', host: '127.0.0.1', port: 3310, timeoutMs: 5000, onFailure: 'fail_closed' },
     ...over,
   };
 }
@@ -72,6 +78,13 @@ const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).to
 /** Superuser connection to the fifth or sixth database (the dashboard suites; see global-setup). */
 export async function superDbDash(perf = false): Promise<PgClient> {
   const c = new PgClient({ connectionString: perf ? process.env.TEST_SUPER_URL_DASHPERF : process.env.TEST_SUPER_URL_DASH });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the dashboard owner-answer database (migration 0046; see global-setup). */
+export async function superDbDash2(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_DASH2 });
   await c.connect();
   return c;
 }

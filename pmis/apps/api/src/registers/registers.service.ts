@@ -13,6 +13,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
+import { DocumentsService } from '../documents/documents.service';
 import { WorkflowService } from '../workflow/workflow.service';
 import { MatrixAssigneeDto, TaskViewService, UserRefDto, accountStatus, levelCode } from '../workflow/task-view.service';
 
@@ -46,7 +47,14 @@ const patchSchema = z
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, 'send at least one field');
-const noteSchema = z.object({ note: z.string().max(2000).optional(), via: viaSchema.optional() }).strict();
+const noteSchema = z
+  .object({
+    note: z.string().max(2000).optional(),
+    via: viaSchema.optional(),
+    // Q131: a rejection may name document slots of the record, as for a task (RejectRequest.rejected_slots)
+    rejected_slots: z.array(z.object({ slot_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
+  })
+  .strict();
 const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() }).strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
 
@@ -133,6 +141,7 @@ export class RegistersService {
     private readonly stepUp: StepUpService,
     private readonly view: TaskViewService,
     private readonly workflow: WorkflowService,
+    private readonly documents: DocumentsService,
   ) {}
 
   // ------------------------------------------------------------------ catalogue
@@ -529,9 +538,16 @@ export class RegistersService {
     await this.rowFor(auth, key, id);
     await setVia(this.db.tx, body.via);
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    if (body.rejected_slots && action !== 'reject') {
+      throw problems.validation([{ path: '/rejected_slots', code: 'invalid', message: 'Slots are named only with a rejection.' }]);
+    }
+    // the conditional documents that apply now are slots before the database gate counts the missing ones (Q131)
+    if (action === 'submit') await this.documents.syncRecordById(id);
     const info = await this.call<TransitionInfo>(
       auth,
-      Prisma.sql`SELECT reg_transition_record(${id}::uuid, ${version}::int, ${action}::text, ${body.note ?? null}::text, ${stepOk}::boolean) AS r`,
+      action === 'reject' && body.rejected_slots && body.rejected_slots.length > 0
+        ? Prisma.sql`SELECT doc_record_reject(${id}::uuid, ${version}::int, ${body.note ?? null}::text, ${JSON.stringify(body.rejected_slots)}::jsonb) AS r`
+        : Prisma.sql`SELECT reg_transition_record(${id}::uuid, ${version}::int, ${action}::text, ${body.note ?? null}::text, ${stepOk}::boolean) AS r`,
     );
     return this.get(auth, key, id, info);
   }

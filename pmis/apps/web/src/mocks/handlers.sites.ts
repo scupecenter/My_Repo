@@ -7,6 +7,7 @@ import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handl
 import { uid } from './ids';
 import { resolveMentions } from './handlers.x';
 import { rejectReason } from './handlers.documents';
+import { qcSiteDetail } from './handlers.qc';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
 import { REGISTER_DEFS, TEMPLATE_OF_REGISTER } from './registersData';
@@ -64,7 +65,9 @@ export const siteHandlers = [
   http.get(`${B}/sites/:id`, ({ params }) => {
     const g = guard(); if (g) return g;
     const i = siteIndex(params.id as string);
-    return i >= 0 && i < SITE_COUNT ? HttpResponse.json(detail(i), { headers: { ETag: '"1"' } }) : problem(404, 'not_found', 'Site not found');
+    if (i < 0 || i >= SITE_COUNT) return problem(404, 'not_found', 'Site not found');
+    const d = qcSiteDetail(detail(i));
+    return HttpResponse.json(d, { headers: { ETag: `"${d.version}"` } });
   }),
   http.get(`${B}/sites/:id/tasks`, ({ params, request }) => {
     const g = guard(); if (g) return g;

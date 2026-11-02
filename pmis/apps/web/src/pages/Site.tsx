@@ -6,6 +6,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useRegions, useSite, useSiteTasks } from '@/api/sites';
 import { FollowButton } from '@/components/FollowButton';
 import { SiteDocuments } from '@/components/SiteDocuments';
+import { SiteFields } from '@/components/SiteFields';
+import { SiteSnags } from '@/components/SiteSnags';
 import { ViewTabs } from '@/components/ViewTabs';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
@@ -32,7 +34,8 @@ export function Site() {
   const dismantle = stream === DISMANTLE_CODE && !real;
   const grid = useSiteTasks(siteId, real ? stream : null, !dismantle, view || null);
   const stage = sp.get('stage');
-  const docsTab = sp.get('tab') === 'documents';
+  const section = sp.get('tab') === 'documents' || sp.get('tab') === 'snags' ? (sp.get('tab') as 'documents' | 'snags') : '';
+  const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
@@ -60,14 +63,16 @@ export function Site() {
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
+          <SiteFields site={s} />
           {cp && <div className="my-3 flex items-center gap-2 rounded-lg bg-openBg p-3 text-openInk" data-testid="cluster-progress"><Layers size={16} />{t('site.cluster', { code: cp.cluster_code, at: cp.sites_at_te_pac, total: cp.sites_total })}</div>}
           <div role="tablist" aria-label={t('site.sections')} className="mt-3 flex gap-1" data-testid="site-section-tabs">
-            {([['', t('site.tasks')], ['documents', t('docs.tab')]] as const).map(([k, label]) => (
-              <button key={k || 'tasks'} role="tab" aria-selected={k === 'documents' ? docsTab : !docsTab} data-testid={`site-section-${k || 'tasks'}`} onClick={() => setParam('tab', k || null)}
-                className={`rounded-md px-3 py-1 text-sm font-semibold ${(k === 'documents') === docsTab ? 'bg-accentSoft text-accentText' : 'text-mute hover:text-ink'}`}>{label}</button>
+            {([['', t('site.tasks')], ['documents', t('docs.tab')], ['snags', t('snags.tab')]] as const).map(([k, label]) => (
+              <button key={k || 'tasks'} role="tab" aria-selected={k === section} data-testid={`site-section-${k || 'tasks'}`} onClick={() => setParam('tab', k || null)}
+                className={`rounded-md px-3 py-1 text-sm font-semibold ${k === section ? 'bg-accentSoft text-accentText' : 'text-mute hover:text-ink'}`}>{label}{k === 'snags' && (s.counts?.open_snags ?? 0) > 0 ? ` (${s.counts?.open_snags})` : ''}</button>
             ))}
           </div>
-          {docsTab && <div className="mt-3"><SiteDocuments siteId={siteId} stages={s.pipeline ?? []} /></div>}
+          {section === 'documents' && <div className="mt-3"><SiteDocuments siteId={siteId} stages={s.pipeline ?? []} /></div>}
+          {section === 'snags' && <div className="mt-3"><SiteSnags siteId={siteId} /></div>}
           {!docsTab && <>
           <div role="tablist" aria-label={t('site.streams')} className="mb-3 mt-3 flex flex-wrap gap-1 border-b border-line" data-testid="site-stream-tabs">
             {[{ code: '', label: t('sites.stream_all'), na: false }, ...tabs.map((x) => ({ code: x.code, label: streamName(t, i18n.language, x), na: statusOf(s.streams, x.code)?.state === 'na' }))].map((x) => (

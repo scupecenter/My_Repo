@@ -1,9 +1,10 @@
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, PencilLine, RotateCcw } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
-import { downloadDashboard, useDashboard, type Dashboard as Dash, type DashboardQuery } from '@/api/dashboard';
+import { downloadDashboard, useDashboard, type Dashboard as Dash, type DashboardQuery, type ExportFormat } from '@/api/dashboard';
 import type { PipelineNode } from '@/api/types';
 import { EChart, type Palette } from '@/components/EChart';
 import { errText } from '@/components/FormDialog';
@@ -63,20 +64,21 @@ export function Dashboard() {
   const [sp, setSp] = useSearchParams();
   const me = useMe(true);
   const today = tripoliToday();
-  const q: DashboardQuery = { ref_date: sp.get('ref_date') ?? '', region_id: sp.get('region_id') ?? '', cluster_code: sp.get('cluster_code') ?? '', scenario: sp.get('scenario') ?? '', stream: sp.get('stream') ?? '' };
+  const q: DashboardQuery = { ref_date: sp.get('ref_date') ?? '', region_id: sp.get('region_id') ?? '', cluster_code: sp.get('cluster_code') ?? '', scenario: sp.get('scenario') ?? '', stream: sp.get('stream') ?? '', view: sp.get('view') ?? '' };
   const refDate = q.ref_date || today;
   const dash = useDashboard(q);
   const d = dash.data;
   const [exporting, setExporting] = useState(false);
+  const [format, setFormat] = useState<ExportFormat>('xlsx');
   const canExport = !!me.data && (!!me.data.is_system_admin || me.data.effective.grants.some((g) => g.module_key === 'dashboard' && (g.action as string) === 'export'));
   const setParam = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
-  const activeFilters = ['region_id', 'cluster_code', 'scenario', 'stream'].filter((k) => sp.get(k)).length + (q.ref_date ? 1 : 0);
+  const activeFilters = ['region_id', 'cluster_code', 'scenario', 'stream', 'view'].filter((k) => sp.get(k)).length + (q.ref_date ? 1 : 0);
   const name = (x: { name_en: string; name_ar?: string | null }) => (ar && x.name_ar ? x.name_ar : x.name_en);
 
   /** Link to the Site Register with the filters of this view and the given ones (the register reads region_id, scenario, overall_status, stage_code, bucket and stream). */
   const sites = (extra: Record<string, string> = {}): string => {
     const p = new URLSearchParams();
-    for (const k of ['region_id', 'scenario', 'stream'] as const) if (q[k]) p.set(k, q[k] as string);
+    for (const k of ['region_id', 'scenario', 'stream', 'view'] as const) if (q[k]) p.set(k, q[k] as string);
     for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
     const s = p.toString();
     return `/sites${s ? `?${s}` : ''}`;
@@ -84,7 +86,7 @@ export function Dashboard() {
 
   const doExport = () => {
     setExporting(true);
-    downloadDashboard(q).then(() => toast(t('dash.export_done')), (e) => toast(errText(e, t), 'err')).finally(() => setExporting(false));
+    downloadDashboard(q, format).then(() => toast(t('dash.export_done')), (e) => toast(errText(e, t), 'err')).finally(() => setExporting(false));
   };
 
   // ---- charts (memoised on the data; EChart redraws on theme and direction changes)
@@ -138,7 +140,7 @@ export function Dashboard() {
 
   const delayBars = useMemo(() => (p: Palette, rtl: boolean) => {
     const rows = d?.delay.items.slice(0, 8) ?? [];
-    const label = (r: (typeof rows)[number]) => (r.kind === 'unassigned' ? t('dash.delay.unassigned') : r.kind === 'default_type' ? t(`dash.delay.type.${r.party}`, { defaultValue: r.party }) : r.party);
+    const label = (r: DelayItem) => delayName(t, r);
     return {
       textStyle: { fontFamily: FONT }, tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
       grid: { left: 16, right: 24, top: 8, bottom: 8, containLabel: true },
@@ -162,6 +164,8 @@ export function Dashboard() {
       }],
     };
   }, [d]);
+
+  const delayLabel = (r: DelayItem): string => delayName(t, r);
 
   if (dash.isError && !d) {
     return (
@@ -232,21 +236,40 @@ export function Dashboard() {
             {(d?.filters.streams ?? []).map((s) => <option key={s.code} value={s.code}>{streamName(t, i18n.language, s)}</option>)}
           </select>
         </label>
+        <label className="text-sm font-semibold">{t('dash.filters.view')}
+          <select className="input mt-1 w-auto font-normal" data-testid="dash-filter-view" value={q.view} onChange={(e) => setParam({ view: e.target.value })}>
+            <option value="">{t('dash.filters.all_views')}</option>
+            {(d?.filters.views ?? []).map((v) => <option key={v.code} value={v.code}>{name(v)}</option>)}
+          </select>
+        </label>
         <label className="text-sm font-semibold">{t('dash.ref_date')}
           <input type="date" className="input mt-1 w-auto font-normal" data-testid="dash-ref-date" max={today} value={refDate}
             onChange={(e) => setParam({ ref_date: e.target.value && e.target.value < today ? e.target.value : '' })} />
         </label>
         <button className="btn" data-testid="dash-today" disabled={!q.ref_date} onClick={() => setParam({ ref_date: '' })}>{t('dash.today')}</button>
         <span className="ms-auto flex items-center gap-2">
-          {activeFilters > 0 && <button className="btn" data-testid="dash-reset" onClick={() => setParam({ ref_date: '', region_id: '', cluster_code: '', scenario: '', stream: '' })}><RotateCcw size={16} />{t('dash.reset')}</button>}
-          {canExport && <button className="btn btn-primary" data-testid="dash-export" disabled={exporting || !d} onClick={doExport}><Download size={16} />{t('dash.export')}</button>}
+          {activeFilters > 0 && <button className="btn" data-testid="dash-reset" onClick={() => setParam({ ref_date: '', region_id: '', cluster_code: '', scenario: '', stream: '', view: '' })}><RotateCcw size={16} />{t('dash.reset')}</button>}
+          <Link className="btn" to="/dashboard/manual-items" data-testid="dash-manual-link"><PencilLine size={16} />{t('dash.manual_link')}</Link>
+          {canExport && (
+            <span className="flex items-center gap-1">
+              <select className="input w-auto" aria-label={t('dash.export_format')} data-testid="dash-export-format" value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)}>
+                {(['xlsx', 'csv'] as const).map((f) => <option key={f} value={f}>{t(`dash.format.${f}`)}</option>)}
+              </select>
+              <button className="btn btn-primary" data-testid="dash-export" disabled={exporting || !d} onClick={doExport}><Download size={16} />{t('dash.export')}</button>
+            </span>
+          )}
         </span>
         {!!basis?.snapshot_dates?.length && (
           <div className="flex w-full flex-wrap items-center gap-2 text-sm" data-testid="dash-snapshots">
             <span className="text-mute">{t('dash.snapshots')}</span>
-            {basis.snapshot_dates.slice(0, 6).map((s) => (
-              <button key={s} className={`chip border border-line ${refDate === s ? 'bg-accentSoft text-accentText' : 'bg-card'}`} data-testid={`dash-snapshot-${s}`} onClick={() => setParam({ ref_date: s })}>{s}</button>
-            ))}
+            {basis.snapshot_dates.slice(0, 6).map((s) => {
+              const kind = basis.snapshot_kinds?.find((k) => k.date === s)?.kind;
+              return (
+                <button key={s} className={`chip border border-line ${refDate === s ? 'bg-accentSoft text-accentText' : 'bg-card'}`} data-testid={`dash-snapshot-${s}`} data-kind={kind ?? ''} onClick={() => setParam({ ref_date: s })}>
+                  <span className="mono">{s}</span>{kind && <span className="ms-1 text-mute" data-testid={`dash-snapshot-kind-${s}`}>· {t(`dash.snapshot_kind.${kind}`)}</span>}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -321,7 +344,7 @@ export function Dashboard() {
 
           {/* health + activities */}
           <div className="grid gap-3 lg:grid-cols-2">
-            <Card title={t('dash.health.title')} testid="dash-health" aside={<span className="chip bg-waitBg text-waitInk" data-testid="dash-health-draft">{t('dash.health.draft')}</span>}>
+            <Card title={t('dash.health.title')} testid="dash-health">
               <div className="grid items-center gap-3 sm:grid-cols-[180px_1fr]">
                 <div className="text-center">
                   <EChart build={gauge} height={150} label={t('dash.health.chart', { score: d.health.score ?? '–' })} testid="dash-health-gauge" />
@@ -444,11 +467,13 @@ export function Dashboard() {
                 </>
               )}
             </Card>
-            <Card title={t('dash.delay.title')} testid="dash-delay" aside={<span className="chip bg-waitBg text-waitInk">{t('dash.health.draft')}</span>}>
+            <Card title={t('dash.delay.title')} testid="dash-delay" aside={<span className="chip bg-waitBg text-waitInk" data-testid="dash-delay-draft">{t('dash.delay.draft')}</span>}>
               {d.delay.items.length === 0 ? <p className="text-mute">{t('dash.delay.none')}</p> : (
                 <>
-                  <EChart build={delayBars} height={Math.max(90, Math.min(8, d.delay.items.length) * 28 + 16)} label={t('dash.delay.chart', { list: d.delay.items.map((i) => `${i.party} ${i.late_working_days}`).join('; ') })} testid="dash-delay-chart" />
-                  <div className="mt-2 text-xs text-mute" data-testid="dash-delay-note">{t('dash.delay.total', { n: d.delay.total_late_working_days, pct: d.delay.unattributed_pct })} {t('dash.delay.note')}</div>
+                  <EChart build={delayBars} height={Math.max(90, Math.min(8, d.delay.items.length) * 28 + 16)} label={t('dash.delay.chart', { list: d.delay.items.map((i) => `${delayLabel(i)} ${i.late_working_days}`).join('; ') })} testid="dash-delay-chart" />
+                  <div className="mt-2 text-xs text-mute" data-testid="dash-delay-note">
+                    {t('dash.delay.total', { n: d.delay.total_late_working_days, pct: d.delay.unattributed_pct })} {(d.delay.suspended_working_days ?? 0) > 0 && <span data-testid="dash-delay-suspended">{t('dash.delay.suspended', { n: d.delay.suspended_working_days })} </span>}{t('dash.delay.note')}
+                  </div>
                 </>
               )}
             </Card>
@@ -481,3 +506,12 @@ export function Dashboard() {
 }
 
 type DashStream = NonNullable<Dash['streams']['items'][number]['counts']>;
+type DelayItem = Dash['delay']['items'][number];
+
+/** A delay party in words: the period's party (or its named external party), the default type, or "not assigned". */
+function delayName(t: TFunction, r: DelayItem): string {
+  if (r.kind === 'unassigned') return t('dash.delay.unassigned');
+  if (r.kind === 'default_type') return t(`dash.delay.type.${r.party}`, { defaultValue: r.party });
+  if (r.kind === 'period' && !r.external_party_id && r.period_party) return t(`dash.delay.period.${r.period_party}`, { defaultValue: r.party });
+  return r.party;
+}

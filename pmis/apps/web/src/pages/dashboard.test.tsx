@@ -41,10 +41,11 @@ describe('Dashboard', () => {
     expect(within(pipe).getByTestId('dash-node-MS6').textContent).toMatch(/\d+\/\d+/);
   });
 
-  it('marks the health index as a draft and shows the bands and the factors, with the excluded one named', async () => {
+  it('shows the approved health index (no draft label, Q121) with the bands and the factors, with the excluded one named', async () => {
     await signIn('pm');
     page();
-    expect(await screen.findByTestId('dash-health-draft')).toHaveTextContent('Draft');
+    await screen.findByTestId('dash-health');
+    expect(screen.queryByTestId('dash-health-draft')).toBeNull();
     expect(screen.getByTestId('dash-health-band')).toHaveAttribute('data-band', 'amber');
     expect(screen.getByTestId('dash-health-bands')).toHaveTextContent('Green from 85, amber from 70');
     expect(within(screen.getByTestId('dash-health-D')).getByText('no data')).toBeInTheDocument();
@@ -104,9 +105,9 @@ describe('Dashboard', () => {
     await screen.findByTestId('dash-progress-value');
     expect(screen.getByTestId('dash-ref-date')).toHaveAttribute('max', tripoliToday());
     expect(screen.getByTestId('dash-today')).toBeDisabled();
-    await u.click(screen.getByTestId('dash-snapshot-2026-10-22'));
+    await u.click(screen.getByTestId('dash-snapshot-2026-10-25'));
     await waitFor(() => expect(screen.getByTestId('dash-basis')).toHaveAttribute('data-source', 'snapshot'));
-    expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('weekly snapshot of 2026-10-22');
+    expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('weekly snapshot of 2026-10-25');
     fireEvent.change(screen.getByTestId('dash-ref-date'), { target: { value: '2026-09-01' } });
     await waitFor(() => expect(screen.getByTestId('dash-basis')).toHaveAttribute('data-source', 'as_of_computed'));
     expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('computed as of that date');
@@ -122,7 +123,7 @@ describe('Dashboard', () => {
     server.use(http.get(`${API_BASE}/dashboard/export`, ({ request }) => { asked.push(new URL(request.url).search); return new HttpResponse('section,item,metric,value\r\n', { headers: { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="GSDN_Dashboard_2026-10-25.csv"' } }); }));
     page('/dashboard?region_id=1');
     await u.click(await screen.findByTestId('dash-export'));
-    await waitFor(() => expect(asked).toEqual(['?region_id=1']));
+    await waitFor(() => expect(asked).toEqual(['?region_id=1&format=xlsx']));
     expect(await screen.findByText('The file was downloaded.')).toBeInTheDocument();
   });
 
@@ -145,13 +146,15 @@ describe('Dashboard', () => {
     expect(screen.queryByTestId('dash-export')).toBeNull();
   });
 
-  it('renders in Arabic (RTL), with Arabic names for milestones and regions, and the draft label', async () => {
+  it('renders in Arabic (RTL), with Arabic names for milestones, regions, views and snapshot kinds, and the draft label of the delay attribution only', async () => {
     await signIn('pm');
     page('/dashboard', 'ar');
-    expect(await screen.findByTestId('dash-health-draft')).toHaveTextContent('مسودة');
+    expect(await screen.findByTestId('dash-delay-draft')).toHaveTextContent('مسودة');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('لوحة القيادة');
     expect(document.documentElement.dir).toBe('rtl');
-    expect(screen.getByTestId('dash-health-draft')).toHaveTextContent('مسودة');
+    expect(screen.queryByTestId('dash-health-draft')).toBeNull();
+    expect(within(screen.getByTestId('dash-filter-view')).getByRole('option', { name: 'التشغيل والصيانة' })).toBeInTheDocument();
+    expect(screen.getByTestId('dash-snapshot-kind-2026-10-31')).toHaveTextContent('نهاية الشهر');
     expect(screen.getByTestId('dash-kpi-rfi')).toHaveTextContent('جاهزية الموقع للتركيب');
     expect(screen.getByTestId('dash-region-1')).toHaveTextContent('طرابلس');
     expect(screen.getByTestId('dash-stream-DISMANTLE')).toHaveTextContent('الفك');

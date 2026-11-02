@@ -1554,7 +1554,13 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Edit the site's custom fields (for example near_airport, Q130)
+         * @description Needs `sites` edit in the site's region; each field follows its field-level rule (hidden, read, edit). A value is checked like every custom field
+         *     (type, list, validation); `null` clears it. Audited with before and after. Conditional documents whose rule reads a site field (A3 civil aviation
+         *     permit: `site.custom.near_airport`) follow on the next read of the task's slots.
+         */
+        patch: operations["updateSite"];
         trace?: never;
     };
     "/sites/{site_id}/tasks": {
@@ -1807,7 +1813,7 @@ export interface paths {
          * Upload a file into a document slot (new version if the slot has files)
          * @description Streams through the API (ADR 0008). Checks, in order: the caller holds Data Entry (L1) of the task (or is a System Admin when nobody holds it) and the task is pending or ongoing;
          *     size against the slot's document-type version (413 `file_too_large`); the content type by magic bytes, never by the name or the client's content type, against the allowed formats
-         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`).
+         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`); a file the virus scan refuses (422 `file_rejected`, `reason` = `malware`); the scanner unreachable under fail_closed (503 `malware_scan_unavailable`).
          *     Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
          *     The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
          */
@@ -3796,6 +3802,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/slots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The document slots of a register record (Q131)
+         * @description Keyed on the logical record (`entity_id`): every version shows the same slots and files. Built from the Document Library placements whose target is
+         *     `register` (and, when the placement names one, the record type). A record not tied to a site has none. `task_id` is the task the record is the
+         *     source of (Q43): its documents stay on the task's slots (`GET /tasks/{task_id}/slots`).
+         */
+        get: operations["listRegisterRecordSlots"];
+        put?: never;
+        /**
+         * Add a slot to the record (one more candidate, or a conditional document that applies)
+         * @description Data Entry (L1) of the version in entry. 409 `duplicate` when a slot of that type and label exists already.
+         */
+        post: operations["addRegisterRecordSlot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/slots/{slot_id}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+                slot_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a file into a slot of a register record
+         * @description The same checks as `uploadSlotFile` (size 413 `file_too_large`; content by magic bytes, 422 `file_rejected` with `reason`; number of files), by Data Entry (L1) of
+         *     the record's version in entry and `edit` on the register's module in its region. An approved record takes no file (409): start a new version, which reopens its slots.
+         */
+        post: operations["uploadRegisterRecordSlotFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/slots/{slot_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a file from a slot of a register record before submission
+         * @description The file stays on record and in the audit log (`is_current` false). Data Entry (L1) of the version in entry.
+         */
+        delete: operations["withdrawRegisterRecordSlotFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/records/{record_id}/void": {
         parameters: {
             query?: never;
@@ -4652,10 +4743,31 @@ export interface paths {
         put?: never;
         /**
          * Upload a fresh photo of the fix
-         * @description Rejected with 422 `file_rejected` when the EXIF date is before the snag was raised, or the format or size breaks the snag type rules. A missing EXIF date is accepted with `unknown_capture_date`.
+         * @description By L1 (Data Entry of the Quality register row) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date is more than one day before the snag was raised (EXIF has no time zone), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
          */
         post: operations["uploadSnagPhoto"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snags/{snag_id}/photos/{photo_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw a photo of the fix before submission (it stays on record) */
+        delete: operations["withdrawSnagPhoto"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4675,7 +4787,7 @@ export interface paths {
         put?: never;
         /**
          * Submit the fix photos for review (site engineer)
-         * @description Same 3-level path, skip and rejection rules as tasks.
+         * @description L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules. When the caller also holds L2 (any one member) the submission closes the snag (B5, step-up, `self_approval`).
          */
         post: operations["submitSnag"];
         delete?: never;
@@ -4697,8 +4809,9 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Review
-         * @description Same 3-level path, skip and rejection rules as tasks.
+         * Review (not a step of a snag)
+         * @deprecated
+         * @description A snag has two levels (L1 submits, L2 approves or rejects); this answers 409 `invalid_transition`.
          */
         post: operations["reviewSnag"];
         delete?: never;
@@ -4721,7 +4834,7 @@ export interface paths {
         put?: never;
         /**
          * Approve: closes the snag
-         * @description Same 3-level path, skip and rejection rules as tasks.
+         * @description L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream.
          */
         post: operations["approveSnag"];
         delete?: never;
@@ -4743,8 +4856,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reject one level back with a note
-         * @description Same 3-level path, skip and rejection rules as tasks.
+         * Reject back to L1 with a note
+         * @description L2. The snag returns to the person who submitted it (B6) with the note; the photos named in `rejected_photos` become `rejected` and leave the set.
          */
         post: operations["rejectSnag"];
         delete?: never;
@@ -5307,7 +5420,7 @@ export interface paths {
          * @description One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
          *     Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
          *     **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
-         *     **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Delay attribution** (rules.md section 8) is a draft too and has no attribution periods yet. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
+         *     **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Health index** factors D and I are approved (0.11.0, Q121): `health.draft` is false. **Delay attribution** (rules.md section 8) uses the attribution periods of the tasks and leaves out Change Control suspension days (0.11.0, Q122). **Central items** (0.11.0, Q118) count by their weight wherever a manual value is in force on the reference date. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
          *     **Streams** are the stream codes of the workflow plus `DISMANTLE` (Q41). The `stream` filter keeps the sites the stream applies to (for `DISMANTLE` the sites with a Dismantle part) and limits the pipeline and the SLA to its stages.
          */
         get: operations["getDashboard"];
@@ -5327,8 +5440,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Export exactly the current dashboard view as a CSV file (0.7.2)
-         * @description Same query as `GET /dashboard`. The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+         * Export exactly the current dashboard view as an Excel workbook (0.11.0) or a CSV file
+         * @description Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (sheets `Dashboard` with the rows and `About` with the basis; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
          */
         get: operations["exportDashboard"];
         put?: never;
@@ -5370,6 +5483,97 @@ export interface paths {
         get: operations["listProjectStatusSnapshots"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/project-status/manual-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The central Project Status items with their manual percentage and its history (0.11.0, Q118)
+         * @description The central items of the Project Status weight set in force (project-wide items the PMIS holds no data for), the value in force today and every entry, newest first. Needs `dashboard.view`. `can_edit` says whether the caller may add a value: the Project Manager (a role of the setting `dashboard.manual_items.roles`, default PM, on an all-regions assignment), a System Admin, or anyone holding `dashboard.project_status` edit for all regions.
+         */
+        get: operations["listManualProjectStatusItems"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/project-status/manual-items/{item_code}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter a manual percentage for a central item (0.11.0, Q118)
+         * @description A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
+         */
+        post: operations["addManualProjectStatusValue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/delay-periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The delay attribution periods of a task (0.11.0, Q122)
+         * @description Needs `sites.view` in the task's region (otherwise 404). Voided periods are listed too. `can_edit` says whether the caller may record or void one.
+         */
+        get: operations["listTaskDelayPeriods"];
+        put?: never;
+        /**
+         * Record a delay attribution period on a task (0.11.0, Q122)
+         * @description By the task's reviewer (a holder of its L2 level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. From and To are inclusive; a period of the same task that overlaps an active one is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.added`).
+         */
+        post: operations["addTaskDelayPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/delay-periods/{period_id}/void": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Void a delay attribution period, with a reason (0.11.0, Q122)
+         * @description Same rights as recording one. The period stays in the history and stops counting. A period voided already is 409 `invalid_transition`. Audited (`delay_period.voided`).
+         */
+        post: operations["voidTaskDelayPeriod"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6301,6 +6505,8 @@ export interface components {
                 open_issues?: number;
                 documents_missing?: number;
             };
+            /** @description The site custom fields the caller may see (Q130: near_airport), with can_edit. */
+            custom_fields?: components["schemas"]["SiteCustomField"][];
             version: number;
         };
         /**
@@ -6763,10 +6969,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -8147,6 +8353,8 @@ export interface components {
             target: "task" | "qc" | "register";
             /** @description Task code, snag type code or register key. */
             ref: string;
+            /** @description Register placements only: one record type of the register (for example ncr of Quality); null = every record of the register. */
+            record_type?: string | null;
         };
         /**
          * @description CW forms issued by the system. TE forms are deferred (classification pending).
@@ -8235,6 +8443,13 @@ export interface components {
             site_code: string;
             site_name?: string | null;
             region_id: components["schemas"]["RegionId"];
+            /** @description Set for a file of a register record slot. */
+            register_key?: string | null;
+            /**
+             * Format: uuid
+             * @description The logical register record of the slot.
+             */
+            register_entity_id?: string | null;
         };
         /** @description At least one of `site_id`, `stage_code`, `doc_code` or `file_ids`. */
         ZipExportRequest: {
@@ -8605,11 +8820,28 @@ export interface components {
             snag_type: components["schemas"]["SnagType"];
             title?: string;
             description?: string | null;
-            /** @enum {string} */
-            state: "open" | "fix_submitted" | "in_review" | "closed";
+            /**
+             * @description The stream whose PAC and FAC the open snag blocks.
+             * @enum {string}
+             */
+            scope?: "CW" | "TE";
+            /**
+             * @description open: photos missing; fix_submitted: the photos meet the rules and wait for L1 to submit; in_review: waits for L2.
+             * @enum {string}
+             */
+            state: "open" | "fix_submitted" | "in_review" | "closed" | "cancelled";
             ball_in_court?: components["schemas"]["BallInCourt"];
             photos?: components["schemas"]["SnagPhoto"][];
             photos_required?: number;
+            /** @description What the photos still lack against the snag type rules (same shape as Problem.errors). */
+            photos_missing?: {
+                path?: string;
+                code?: string;
+                message?: string;
+                shot_type?: string;
+            }[];
+            self_approval?: boolean;
+            allowed_actions?: ("upload" | "edit" | "submit" | "approve" | "reject")[];
             return_count?: number;
             last_return_note?: string | null;
             raised_by?: components["schemas"]["UserRef"];
@@ -8624,8 +8856,46 @@ export interface components {
             snag_type_id: string;
             /** Format: uuid */
             task_id?: string;
+            /**
+             * @description Required unless task_id names a CW or TE task.
+             * @enum {string}
+             */
+            scope?: "CW" | "TE";
             title: string;
             description?: string;
+        };
+        SnagRejectRequest: {
+            note: string;
+            rejected_photos?: {
+                /** Format: uuid */
+                photo_id: string;
+                reason: string;
+            }[];
+        };
+        SitePatch: {
+            /** @description Field code -> value; null clears. */
+            custom: components["schemas"]["CustomValues"];
+            reason?: string;
+        };
+        SiteCustomField: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            type: "text" | "number" | "date" | "list" | "multi_list" | "bool" | "user" | "external_party" | "file";
+            section?: string | null;
+            required?: boolean;
+            can_edit: boolean;
+        };
+        RegisterRecordSlots: {
+            items: components["schemas"]["DocumentSlot"][];
+            /**
+             * Format: uuid
+             * @description The task this record is the source of (Q43); its documents are on the task.
+             */
+            task_id: string | null;
+            /** @description Codes of the mandatory slots still missing or rejected (empty unless the version is in entry). */
+            missing_for_submit: string[];
         };
         SnagPatch: {
             title?: string;
@@ -9162,7 +9432,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -9552,9 +9822,110 @@ export interface components {
             planned_pct?: number | null;
             /** @description 0.7.2. */
             spi?: number | null;
-            /** @description 0.7.2. The health index of the scope at the time (draft formula). */
+            /** @description 0.7.2. The health index of the scope at the time. */
             health_index?: number | null;
             weight_set: components["schemas"]["WeightSetRef"];
+            kind?: components["schemas"]["SnapshotKind"];
+            /** @description 0.11.0. The scheduled runs of the date (both on a Sunday that ends a month). */
+            kinds?: ("weekly" | "month_end")[];
+        };
+        /**
+         * @description 0.11.0 (Q127): `weekly` (every Sunday, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).
+         * @enum {string}
+         */
+        SnapshotKind: "weekly" | "month_end" | "manual";
+        ManualItemValue: {
+            /** Format: uuid */
+            id: string;
+            item_code: string;
+            version: number;
+            value_pct: number;
+            /** Format: date */
+            effective_date: string;
+            reason: string;
+            /** Format: uuid */
+            entered_by?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        ManualItemHistoryEntry: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            value_pct: number;
+            /** Format: date */
+            effective_date: string;
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description The entry in force today. */
+            in_force: boolean;
+            entered_by: components["schemas"]["UserRef"];
+        };
+        ManualItem: {
+            item_code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description Weight inside its activity; 0 = not weighted (no value accepted). */
+            weight: number;
+            activity_code: string;
+            activity_name_en: string;
+            activity_name_ar?: string | null;
+            current: {
+                value_pct: number;
+                /** Format: date */
+                effective_date: string;
+                version: number;
+            } | null;
+            history: components["schemas"]["ManualItemHistoryEntry"][];
+        };
+        ManualItemList: {
+            /** Format: date */
+            as_of: string;
+            can_edit: boolean;
+            /** @description Weighted central items with no value in force today. */
+            without_value: number;
+            items: components["schemas"]["ManualItem"][];
+        };
+        /**
+         * @description 0.11.0 (Q122): GECOL, HLC, the client, the contractor, another external party, or Aljeel. AAT SE is never a party.
+         * @enum {string}
+         */
+        DelayParty: "gecol" | "hlc" | "client" | "contractor" | "external" | "aljeel";
+        DelayPeriod: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            task_id: string;
+            /** Format: date */
+            from_date: string;
+            /** Format: date */
+            to_date: string;
+            party: components["schemas"]["DelayParty"];
+            /** Format: uuid */
+            external_party_id?: string | null;
+            external_party_name?: string | null;
+            reason: string;
+            /** Format: date-time */
+            created_at: string;
+            created_by: components["schemas"]["UserRef"];
+            voided: boolean;
+            /** Format: date-time */
+            voided_at?: string | null;
+            void_reason?: string | null;
+            voided_by?: components["schemas"]["UserRef"] | null;
+        };
+        DelayPeriodList: {
+            /** Format: uuid */
+            task_id: string;
+            /**
+             * Format: date
+             * @description Delay days are the working days after it.
+             */
+            due_date?: string | null;
+            can_edit: boolean;
+            parties: components["schemas"]["DelayParty"][];
+            items: components["schemas"]["DelayPeriod"][];
         };
         DashboardBasis: {
             /** Format: date */
@@ -9570,16 +9941,26 @@ export interface components {
             snapshot_date?: string | null;
             /** @description Dates that have a weekly snapshot (the latest 60), for the date picker. */
             snapshot_dates?: string[];
+            /** @description 0.11.0 (Q127): the same dates with the kind of each snapshot. */
+            snapshot_kinds?: {
+                /** Format: date */
+                date: string;
+                kind: components["schemas"]["SnapshotKind"];
+                kinds: ("weekly" | "month_end")[];
+            }[];
             /** @description English sentence that says how a past date was made. Null for today. */
             note?: string | null;
         };
         DashboardMeta: components["schemas"]["KpiMeta"] & {
             /** @description True when the figures are for every site of the project (every region, no filter). */
             project_wide?: boolean;
-            /** @description Project Status items left out because the figures are not project-wide (VI-04). */
+            /** @description Central Project Status items left out because the figures are not project-wide (VI-04) and no manual value is in force (0.11.0: 0 once every central item has a value). */
             central_items_hidden?: number;
+            /** @description 0.11.0 (Q118): central items measured by a manual value in force on the reference date. */
+            manual_items_measured?: number;
             /** @description The caller's dashboard regions; null = every region. */
             scope_regions?: components["schemas"]["RegionId"][] | null;
+            /** @description False since 0.11.0 (Q121). */
             health_draft?: boolean;
         };
         DashboardFilters: {
@@ -9591,6 +9972,12 @@ export interface components {
             clusters: string[];
             scenarios: components["schemas"]["DeliveryScenario"][];
             streams: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            /** @description 0.11.0 (Q126): the views of the workflow (CW, TE, OM), for the `view` filter. */
+            views?: {
                 code: string;
                 name_en: string;
                 name_ar?: string | null;
@@ -9645,6 +10032,15 @@ export interface components {
             applicable?: number;
             /** @enum {string|null} */
             reason?: "not_weighted" | "no_data" | "central_hidden" | "not_applicable" | null;
+            /** @description 0.11.0: a project-wide item measured by a manual percentage (Q118). */
+            central?: boolean;
+            /** @description 0.11.0 (Q118): the manual value in force on the reference date; null when none. */
+            manual?: {
+                value_pct: number;
+                /** Format: date */
+                effective_date: string;
+                version: number;
+            } | null;
         };
         DashboardProjectStatusActivity: {
             code: string;
@@ -9663,6 +10059,8 @@ export interface components {
             spi?: number | null;
             plan_coverage_pct: number;
             central_items_hidden?: number;
+            /** @description 0.11.0. */
+            manual_items_measured?: number;
             activities: components["schemas"]["DashboardProjectStatusActivity"][];
         };
         /** @description The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`. */
@@ -9811,7 +10209,7 @@ export interface components {
                 count: number;
             }[];
         };
-        /** @description Project health index, formula version 1. A draft under owner review. */
+        /** @description Project health index, formula version 1. Factors D and I approved by the owner (0.11.0, Q121); `draft` is false. */
         DashboardHealth: {
             draft: boolean;
             formula_version?: number;
@@ -9841,19 +10239,29 @@ export interface components {
                 band: "green" | "amber" | "red";
             }[];
         };
-        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party; attribution periods and suspension days are not built yet. */
+        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party, day by day (0.11.0, Q122): the working days after the due date, minus the days of a Change Control suspension of the site, go to the party of the task's attribution period that covers them, otherwise to the external party of the task, its default party type, or unassigned. */
         DashboardDelay: {
             draft: boolean;
             total_late_working_days: number;
             /** @description Share of the days on tasks with no external party and no default party type. */
             unattributed_pct: number;
+            /** @description Always 0: overlapping periods of one task are refused at entry. */
             overlapping_periods?: number;
+            /** @description True since 0.11.0. */
             periods_supported?: boolean;
+            /** @description 0.11.0: late working days left out because the site was suspended. */
+            suspended_working_days?: number;
+            /** @description 0.11.0: late working days given to a party by a period. */
+            period_working_days?: number;
+            /** @description 0.11.0: active periods on the late tasks of the view. */
+            periods_count?: number;
             items: {
-                /** @description The external party name, the default party type of the task, or `unassigned`. */
+                /** @description The external party name, the default party type of the task, the party of the period (its external party name when one is named), or `unassigned`. */
                 party: string;
                 /** @enum {string} */
-                kind: "external" | "default_type" | "unassigned";
+                kind: "period" | "external" | "default_type" | "unassigned";
+                /** @description 0.11.0: the party of the period when `kind` is `period`. */
+                period_party?: components["schemas"]["DelayParty"] | null;
                 /** Format: uuid */
                 external_party_id?: string | null;
                 party_type?: string | null;
@@ -12637,6 +13045,42 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    updateSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SitePatch"];
+            };
+        };
+        responses: {
+            /** @description The site after the change. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listSiteTasks: {
@@ -16912,6 +17356,142 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listRegisterRecordSlots: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Slots. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecordSlots"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addRegisterRecordSlot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code: string;
+                    candidate_label?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The new slot. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    uploadRegisterRecordSlotFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+                slot_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    file: string;
+                    /** Format: uuid */
+                    replaces_file_group_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentFile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    withdrawRegisterRecordSlotFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slot after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     voidRegisterRecord: {
         parameters: {
             query?: never;
@@ -18746,6 +19326,35 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    withdrawSnagPhoto: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The snag after the change. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snag"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     submitSnag: {
         parameters: {
             query?: never;
@@ -18863,7 +19472,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RejectRequest"];
+                "application/json": components["schemas"]["SnagRejectRequest"];
             };
         };
         responses: {
@@ -19812,6 +20421,8 @@ export interface operations {
                 scenario?: components["schemas"]["DeliveryScenario"];
                 /** @description A stream code from `filters.streams`. An unknown one is 422 `unknown_stream`. */
                 stream?: string;
+                /** @description A view code from `filters.views` (CW, TE, OM; 0.11.0, Q126). Keeps the sites that have a task of the view that applies, the milestones of the view (its whole stages, or for a view of single tasks such as O&M the stages of those tasks) and the tasks of the view in the SLA and the delay attribution. Combines with `stream`. An unknown one is 422 `unknown_view`. */
+                view?: string;
                 /** @description Leave out tasks closed by an admin override. Default is the setting `dashboard.exclude_overrides` (true). The number left out is `meta.override_flagged_count`. */
                 exclude_overrides?: boolean;
             };
@@ -19843,7 +20454,11 @@ export interface operations {
                 cluster_code?: string;
                 scenario?: components["schemas"]["DeliveryScenario"];
                 stream?: string;
+                /** @description A view code (0.11.0). */
+                view?: string;
                 exclude_overrides?: boolean;
+                /** @description 0.11.0 (Q127). Another value is 422. */
+                format?: "xlsx" | "csv";
             };
             header?: never;
             path?: never;
@@ -19851,13 +20466,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The file `GSDN_Dashboard_<ref_date>.csv`. */
+            /** @description The file `GSDN_Dashboard_<ref_date>.xlsx` (or `.csv`). */
             200: {
                 headers: {
                     "Content-Disposition"?: string;
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                     "text/csv": string;
                 };
             };
@@ -19927,6 +20543,164 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    listManualProjectStatusItems: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualItemList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addManualProjectStatusValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value_pct: number;
+                    /** Format: date */
+                    effective_date: string;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The entry. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualItemValue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listTaskDelayPeriods: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The periods. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelayPeriodList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addTaskDelayPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    from_date: string;
+                    /** Format: date */
+                    to_date: string;
+                    party: components["schemas"]["DelayParty"];
+                    /**
+                     * Format: uuid
+                     * @description Optional: the contractor or external party by name.
+                     */
+                    external_party_id?: string | null;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The period. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelayPeriod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    voidTaskDelayPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The voided period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelayPeriod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
 }

@@ -1,6 +1,7 @@
 import { setupWorker } from 'msw/browser';
 import { handlers } from './handlers';
 import { documentHandlers } from './handlers.documents';
+import { qcHandlers } from './handlers.qc';
 import { adminHandlers } from './handlers.admin';
 import { authHandlers } from './handlers.auth';
 import { profileHandlers } from './handlers.profile';
@@ -14,4 +15,4 @@ import { logsHandlers } from './handlers.logs';
 import { orgHandlers } from './handlers.org';
 import { realApiHandlers } from './realApi';
 import { logsWebHandlers } from './handlers.logsWeb';
-export const worker = setupWorker(...realApiHandlers(), ...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);
+export const worker = setupWorker(...realApiHandlers(), ...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);

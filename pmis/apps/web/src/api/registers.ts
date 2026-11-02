@@ -29,6 +29,8 @@ const settle = (qc: QueryClient, key: string, id?: string) => {
   void qc.invalidateQueries({ queryKey: ['register-records', key] });
   if (id) void qc.invalidateQueries({ queryKey: ['register-record', key, id] });
   void qc.invalidateQueries({ queryKey: ['register-defs'] });
+  // Q131: the record's document slots move with submit, approval and rejection
+  void qc.invalidateQueries({ queryKey: ['record-slots', key] });
 };
 
 /** Create (state `entry`): the new row shows in the list at once and is removed again if the server refuses. */

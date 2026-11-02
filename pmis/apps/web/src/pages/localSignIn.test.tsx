@@ -273,6 +273,8 @@ describe('hybrid mode list', () => {
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',
+      // contract 0.11.0: dashboard follow-up (manual Project Status values, delay periods)
+      'GET /project-status/manual-items', 'POST /project-status/manual-items/:code/values', 'GET /tasks/:id/delay-periods', 'POST /tasks/:id/delay-periods', 'POST /tasks/:id/delay-periods/:periodId/void',
       // contract 0.8.0: documents (slots, files, the Documents list, the bulk zip, the Document Library)
       'GET /tasks/:id/slots', 'POST /tasks/:id/slots', 'POST /tasks/:id/slots/suggest', 'POST /tasks/:id/slots/:slotId/files', 'DELETE /tasks/:id/slots/:slotId/files/:fileId',
       'GET /files/:id/download', 'GET /documents', 'POST /exports/zip', 'GET /exports/zip/:id/download', 'GET /jobs/:id',
@@ -286,6 +288,11 @@ describe('hybrid mode list', () => {
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
       'GET /audit-log', 'POST /audit-log/exports', 'GET /audit-log/exports/:id/download', 'GET /audit-log/field-changes', 'GET /audit-log/field-history', 'GET /audit-log/integrity', 'GET /security-log', 'POST /security-log/exports', 'GET /security-log/exports/:id/download', 'GET /security-log/integrity', 'GET /system-log', 'GET /sessions/active', 'POST /sessions/:id/revoke', 'POST /users/:id/sessions/revoke', 'GET /admin/sessions', 'POST /admin/sessions/:id/end', 'GET /admin/job-runs', 'GET /admin/deployments', 'GET /admin/security-alerts', 'POST /admin/security-alerts/:id/ack', 'GET /settings/log-retention', 'PUT /settings/log-retention', 'GET /settings/security-alerts', 'PUT /settings/security-alerts', 'GET /reports/activity',
+      // contract 0.11.1: the documents follow-up (Q130 to Q132)
+      'PATCH /sites/:id', 'GET /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots/:slotId/files',
+      'DELETE /registers/:key/records/:id/slots/:slotId/files/:fileId', 'GET /snag-types', 'POST /snag-types', 'PATCH /snag-types/:id', 'GET /sites/:id/snags', 'POST /sites/:id/snags',
+      'GET /snags/:id', 'PATCH /snags/:id', 'POST /snags/:id/photos', 'DELETE /snags/:id/photos/:photoId', 'POST /snags/:id/submit', 'POST /snags/:id/review', 'POST /snags/:id/approve',
+      'POST /snags/:id/reject',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

@@ -105,7 +105,7 @@ export class ZipService implements OnApplicationBootstrap {
     return dto;
   }
 
-  private matchFilter(scope: Scope, regions: number[] | null): Prisma.Sql[] {
+  private matchFilter(scope: Scope, regions: number[] | null, registerScope: Prisma.Sql): Prisma.Sql[] {
     const q: Record<string, unknown> = {};
     if (scope.site_id) q.site_id = scope.site_id;
     if (scope.stage_code) q.stage_code = scope.stage_code;
@@ -115,6 +115,7 @@ export class ZipService implements OnApplicationBootstrap {
     const conds = this.docs.filterSql(q, regions);
     conds.push(Prisma.sql`s.status::text <> 'not_required'`);
     if (scope.file_ids) conds.push(Prisma.sql`f.id = ANY(${scope.file_ids}::uuid[])`);
+    conds.push(registerScope);
     return conds;
   }
 
@@ -125,7 +126,7 @@ export class ZipService implements OnApplicationBootstrap {
       throw problems.validation([{ path: '/', code: 'scope_required', message: 'Choose a site, a stage, a document type or a list of files.' }]);
     }
     return this.idem.run(auth.user.id, 'startZipExport', idemKey, scope, async () => {
-      const found = await this.db.tx.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${DocumentsService.LIST_FROM} WHERE ${Prisma.join(this.matchFilter(scope, regions), ' AND ')}`);
+      const found = await this.db.tx.$queryRaw<{ n: number }[]>(Prisma.sql`SELECT count(*)::int AS n ${DocumentsService.LIST_FROM} WHERE ${Prisma.join(this.matchFilter(scope, regions, await this.docs.registerScopeSql()), ' AND ')}`);
       const n = found[0]?.n ?? 0;
       if (n === 0) throw problems.validation([{ path: '/', code: 'no_files', message: 'No file matches this scope in your regions.' }]);
       const r = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT doc_job_create(${JSON.stringify(scope)}::jsonb)::text AS id`);
@@ -175,9 +176,9 @@ export class ZipService implements OnApplicationBootstrap {
           site_code: string; task_code: string | null; doc_code: string; candidate_label: string | null; stage_code: string | null; slot_status: string;
         }[]>(Prisma.sql`
           SELECT f.id::text AS id, f.original_name, f.storage_key, f.ext, f.version, f.is_current, f.sha256, f.size_bytes, f.uploaded_at, f.approved_date::text AS approved_date,
-            si.site_code, td.code AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
+            si.site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
           ${DocumentsService.LIST_FROM}
-          WHERE ${Prisma.join(this.matchFilter(job.scope, regions), ' AND ')} ORDER BY si.site_code, st.code, td.code, dt.code, f.uploaded_at, f.id`);
+          WHERE ${Prisma.join(this.matchFilter(job.scope, regions, await this.docs.registerScopeSql(admin)), ' AND ')} ORDER BY si.site_code, st.code, td.code, dt.code, f.uploaded_at, f.id`);
         if (rows.length === 0) throw new Error('no files');
         const out = createWriteStream(tmp as string, { mode: 0o600 });
         const done = new Promise<void>((res, rej) => {

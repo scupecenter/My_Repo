@@ -83,6 +83,12 @@ export function initialMatrix(): Matrix {
     kind: 'register', register_key: 'procurement_hlc', code: 'procurement_hlc', name_en: 'Procurement - HLC scope', name_ar: 'المشتريات - نطاق HLC', approval_levels: 2,
     cells: [cell('procurement_hlc', 1, ['1207']), cell('procurement_hlc', 3, ['1203'])],
   });
+  // migration 0050 (Q90): the Matrix row of the TE stream of Permits & HSE, right after Permits & HSE (which covers CW). L1 = TE engineers (1306), L2 = the TE Team Lead (1305).
+  const pat = stages.findIndex((r) => r.code === 'permits_hse') + 1;
+  stages.splice(pat, 0, {
+    kind: 'register', register_key: 'permits_hse_te', code: 'permits_hse_te', name_en: 'Permits & HSE - TE stream', name_ar: 'التصاريح والسلامة - مسار TE', approval_levels: 2,
+    cells: [cell('permits_hse_te', 1, ['1306']), cell('permits_hse_te', 3, ['1305'])],
+  });
   // Zawia (region 4) has its own L1 for CW: a region override that the screen lists and an admin may delete (Q86)
   const cw = stages.find((r) => r.code === 'cw')!;
   cw.cells.push({ ...cell('cw', 1, ['1205']), region_id: 4 });

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { parseEncKey } from '../auth/totp';
+import { MasterKeys, parseMasterKeys } from '../documents/file-crypto';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
@@ -20,7 +21,28 @@ const schema = z.object({
   S3_SECRET_KEY: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
   STORAGE_DIR: z.string().optional(),
+  // Encryption at rest (migration 0048, ADR 0008 amendment): the active master key, its id, and the earlier keys kept while data keys are rewrapped.
+  FILE_ENC_KEY: z.string().min(1, 'FILE_ENC_KEY is required (openssl rand -hex 32)'),
+  FILE_ENC_KEY_ID: z.string().optional(),
+  FILE_ENC_OLD_KEYS: z.string().optional(),
+  // Virus scan (owner answer Q134). MALWARE_SCAN=clamd scans every upload with clamd (CLAMD_SOCKET, or CLAMD_HOST and CLAMD_PORT).
+  // SCAN_FAILURE decides what happens when clamd is unreachable: fail_closed refuses the upload (503), fail_open stores it and flags it for rescan.
+  MALWARE_SCAN: z.enum(['off', 'clamd']).optional(),
+  CLAMD_SOCKET: z.string().optional(),
+  CLAMD_HOST: z.string().optional(),
+  CLAMD_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  CLAMD_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900000).optional(),
+  SCAN_FAILURE: z.enum(['fail_closed', 'fail_open']).optional(),
 });
+
+export interface ScanConfig {
+  mode: 'off' | 'clamd';
+  socket?: string;
+  host: string;
+  port: number;
+  timeoutMs: number;
+  onFailure: 'fail_closed' | 'fail_open';
+}
 
 export interface StorageConfig {
   driver: 's3' | 'local';
@@ -42,6 +64,10 @@ export interface AppConfig {
   jobsEnabled: boolean;
   /** Where document files and zip exports are kept. */
   storage: StorageConfig;
+  /** Master keys of the envelope encryption of stored files (FILE_ENC_KEY). */
+  fileEnc: MasterKeys;
+  /** The virus scan of uploads. */
+  scan: ScanConfig;
 }
 
 function storageFrom(v: z.infer<typeof schema>): StorageConfig {
@@ -54,6 +80,26 @@ function storageFrom(v: z.infer<typeof schema>): StorageConfig {
   }
   if (endpoint && bucket && accessKey && secretKey) return { driver: 's3', localDir, s3: { endpoint, bucket, accessKey, secretKey, region: v.S3_REGION } };
   return { driver: 'local', localDir };
+}
+
+function fileEncFrom(v: z.infer<typeof schema>): MasterKeys {
+  try {
+    return parseMasterKeys({ FILE_ENC_KEY: v.FILE_ENC_KEY, FILE_ENC_KEY_ID: v.FILE_ENC_KEY_ID, FILE_ENC_OLD_KEYS: v.FILE_ENC_OLD_KEYS });
+  } catch (e) {
+    throw new Error(`Invalid configuration:\n  FILE_ENC_KEY: ${e instanceof Error ? e.message : 'invalid'}`);
+  }
+}
+
+function scanFrom(v: z.infer<typeof schema>): ScanConfig {
+  const socket = v.CLAMD_SOCKET && v.CLAMD_SOCKET.trim() !== '' ? v.CLAMD_SOCKET.trim() : undefined;
+  return {
+    mode: v.MALWARE_SCAN ?? 'off',
+    socket,
+    host: v.CLAMD_HOST && v.CLAMD_HOST.trim() !== '' ? v.CLAMD_HOST.trim() : '127.0.0.1',
+    port: v.CLAMD_PORT ?? 3310,
+    timeoutMs: v.CLAMD_TIMEOUT_MS ?? 120_000,
+    onFailure: v.SCAN_FAILURE ?? 'fail_closed',
+  };
 }
 
 /** Reads the settings from the environment only. Throws one readable error listing every problem. */
@@ -74,6 +120,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     totpEncKey: v.TOTP_ENC_KEY,
     jobsEnabled: v.JOBS_ENABLED === undefined ? v.NODE_ENV !== 'test' : v.JOBS_ENABLED === 'true',
     storage: storageFrom(v),
+    fileEnc: fileEncFrom(v),
+    scan: scanFrom(v),
   };
 }
 

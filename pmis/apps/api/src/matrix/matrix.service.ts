@@ -62,8 +62,8 @@ interface AssigneeRow {
 interface PreviewRow { o_row: string; o_task: string | null; o_region: number; o_user: string; o_from: 'entry' | 'review'; o_skipped: ('review' | 'approve')[]; o_final: boolean }
 
 const LEVEL_KIND = ['entry', 'review', 'approve'] as const;
-/** Entry is cell level 1, approve is cell level 3, review is cell level 2 (the engine reads them so whatever the number of levels). */
-export const usedLevels = (n: number): number[] => (n <= 1 ? [1] : n === 2 ? [1, 3] : [1, 2, 3]);
+/** Two fixed levels (owner decision 2026-11-01, converted in 0050): L1 is cell level 1 and L2 is cell level 3. Cell level 2 (the old review cell) is retired and only kept for history. */
+export const usedLevels = (): number[] => [1, 3];
 
 /** The people, roles and groups named in the default L1 cell (level 1) and the default L2 cell (level 3), each with the levels they hold. */
 function holdersOf(defaults: CellRow[], byCell: Map<string, AssigneeDto[]>): HolderDto[] {
@@ -201,7 +201,7 @@ export class MatrixService {
       const skipCases = [...skips.values()];
       const defaults = mine.filter((c) => c.task_code === null && c.region_id === null);
       const others = mine.filter((c) => !(c.task_code === null && c.region_id === null));
-      const used = usedLevels(b.approval_levels);
+      const used = usedLevels();
       const toCell = (c: CellRow): CellDto => {
         const kind = LEVEL_KIND[c.level - 1] ?? 'approve';
         const sp = new Map<string, UserRefDto>();

@@ -13,6 +13,7 @@ import { Inbox } from '@/pages/Inbox';
 import { StatusUpdates } from '@/pages/StatusUpdates';
 import { Workload } from '@/pages/Workload';
 import { Dashboard } from '@/pages/Dashboard';
+import { ManualItems } from '@/pages/ManualItems';
 import { ChangePassword } from '@/pages/ChangePassword';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
@@ -79,6 +80,7 @@ function gated(session: Session) {
         <Route path="workload" element={<Workload />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="dashboard/manual-items" element={<ManualItems />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="registers/:key" element={<RegisterPage />} />
