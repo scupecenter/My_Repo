@@ -1,14 +1,17 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Clock, ExternalLink, FileUp, HandMetal, MessageSquare, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
+import { Check, Clock, ExternalLink, FileUp, HandMetal, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
 import { useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTask } from '@/api/hooks';
 import { taskErrorMessage } from '@/lib/taskErrors';
+import { errText } from './FormDialog';
 import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, useUpload, type TaskOp } from '@/api/sites';
 import type { DocumentSlot, TaskDetail, TaskRegisterField } from '@/api/types';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
+import { CommentsPanel } from './Comments';
 import { Holders } from './HolderChip';
+import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
 import { TaskRegisterFields } from './TaskRegisterFields';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -42,19 +45,9 @@ function Slot({ slot, canUpload, onFile }: { slot: DocumentSlot; canUpload: bool
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
   const c = useComments(task.id), add = useAddComment(task.id);
-  const [text, setText] = useState('');
   return (
-    <section aria-labelledby="dr-comments">
-      <h3 id="dr-comments" className="mb-1 flex items-center gap-1 font-semibold"><MessageSquare size={14} />{t('drawer.comments')}</h3>
-      <ul data-testid="comment-list" className="space-y-1 text-sm">
-        {c.data?.items.map((x) => <li key={x.id} className={`rounded-md p-2 ${x.is_rejection_note ? 'bg-lateBg text-lateInk' : 'bg-card2'}`}><b>{x.author.display_name}</b> · {x.body}</li>)}
-        {c.isSuccess && !c.data.items.length && <li className="text-mute">{t('drawer.no_comments')}</li>}
-      </ul>
-      <div className="mt-2 flex gap-2">
-        <input className="input" data-testid="comment-input" aria-label={t('drawer.comment_label')} value={text} onChange={(e) => setText(e.target.value)} />
-        <button className="btn" data-testid="comment-send" disabled={!text.trim() || add.isPending} onClick={() => add.mutate(text, { onSuccess: () => setText('') })}>{t('drawer.send')}</button>
-      </div>
-    </section>
+    <CommentsPanel items={c.data?.items} loaded={c.isSuccess} pending={add.isPending} error={add.isError ? errText(add.error, t) : null}
+      onSend={(body, ids) => add.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
   );
 }
 
@@ -107,9 +100,10 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         <Link className="btn px-2 py-1 text-xs" data-testid="drawer-open-site" to={`/sites/${task.site_id}`}><ExternalLink size={12} />{t('drawer.open_site')}</Link>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="drawer-close"><X size={16} /></button></Dialog.Close>
       </header>
-      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />
+      <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: `${t('drawer.tab_documents')} (${task.slots.length})` }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }, { id: 'time', label: t('tis.tab') }]} />
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         {task.lock_reasons?.length ? <div className="rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="drawer-locks">{task.lock_reasons.map((r, i) => <p key={i}>{r.message}</p>)}</div> : null}
+        {task.lock_reasons?.length ? <BlockedByPanel taskId={task.id} siteId={task.site_id} /> : null}
         {task.last_return_note && task.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="drawer-return-note">{t('approvals.returned_note', { note: task.last_return_note })}</div>}
         {task.holder_absent && <div className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="drawer-absent"><UserX size={16} />{t('drawer.absent')}</div>}
 
@@ -145,6 +139,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         </section>
         <div {...panelProps('comments', tab)}><Comments task={task} /></div>
         <div {...panelProps('history', tab)}><History task={task} /></div>
+        <div {...panelProps('time', tab)}>{tab === 'time' && <TimeInStatePanel taskId={task.id} />}</div>
       </div>
       <footer className="space-y-2 border-t border-line p-4">
         {submit && (final(submit) || submit.will_skip_to) && <p className="text-sm text-waitInk" data-testid="drawer-skip-note">{final(submit) ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: submit.will_skip_to })}</p>}

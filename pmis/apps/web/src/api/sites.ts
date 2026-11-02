@@ -110,7 +110,8 @@ export function useUpload(task: TaskDetail) {
 
 export function useAddComment(taskId: string) {
   const qc = useQueryClient();
-  return useMutation({ mutationFn: (body: string) => api.post<Comment>(`/tasks/${taskId}/comments`, { body: { body } }), onSuccess: () => qc.invalidateQueries({ queryKey: ['task-comments', taskId] }) });
+  // `mention_user_ids` is optional (X3); the server also reads @1234 tokens in the text and keeps only the people who can read the task.
+  return useMutation<Comment, ApiError, { body: string; mention_user_ids?: string[] }>({ mutationFn: (b) => api.post<Comment>(`/tasks/${taskId}/comments`, { body: b }), onSuccess: () => qc.invalidateQueries({ queryKey: ['task-comments', taskId] }) });
 }
 
 export const useMatrix = () => useQuery({ queryKey: ['matrix'], queryFn: async () => ({ ...(await api.get<Matrix>('/matrix')) }) });

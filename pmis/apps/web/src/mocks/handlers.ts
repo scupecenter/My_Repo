@@ -179,17 +179,5 @@ export const handlers = [
     });
   }),
 
-  // ---- notifications
-  http.get(`${B}/notifications`, () => {
-    const g = guard(); if (g) return g;
-    const items = db().notifications;
-    return HttpResponse.json({ items, page: { limit: 50, next_cursor: null }, unread_count: items.filter((n) => !n.read_at).length });
-  }),
-  http.post(`${B}/notifications/read-all`, () => { db().notifications.forEach((n) => { n.read_at ??= new Date().toISOString(); }); save(); return new HttpResponse(null, { status: 204 }); }),
-  http.post(`${B}/notifications/:id/read`, ({ params }) => {
-    const n = db().notifications.find((x) => x.id === params.id);
-    if (!n) return problem(404, 'not_found', 'Not found');
-    n.read_at ??= new Date().toISOString(); save();
-    return HttpResponse.json(n);
-  }),
+  // notifications: handlers.x.ts (phase 4b)
 ];

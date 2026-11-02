@@ -3,11 +3,11 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
-import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
+import { decodeTypedCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { problems } from '../common/problem';
-import { oneParam } from '../common/query';
+import { isCalendarDate, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TaskViewService, UserRefDto } from '../workflow/task-view.service';
@@ -74,7 +74,7 @@ export class StatusUpdatesService {
   async list(auth: AuthContext, q: Record<string, unknown>) {
     const regions = await this.access.requireRegions('sites', 'view');
     const limit = parseLimit(oneParam(q, 'limit'));
-    const cursor = decodeCursor(oneParam(q, 'cursor'), 3);
+    const cursor = decodeTypedCursor(oneParam(q, 'cursor'), ['date', 'ts', 'uuid']);
     const conds: Prisma.Sql[] = [Prisma.sql`true`];
     if (regions !== null) conds.push(Prisma.sql`(u.region_id IS NULL OR u.region_id = ANY(${regions}::int[]))`);
     const scope = oneParam(q, 'scope');
@@ -94,7 +94,7 @@ export class StatusUpdatesService {
     }
     const week = oneParam(q, 'week_start');
     if (week) {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) throw problems.validation([{ path: '/week_start', code: 'invalid', message: 'week_start is a date.' }]);
+      if (!isCalendarDate(week)) throw problems.validation([{ path: '/week_start', code: 'invalid', message: 'week_start is a date.' }]);
       conds.push(Prisma.sql`u.week_start = ${week}::date`);
     }
     if (cursor) conds.push(Prisma.sql`(u.week_start, u.created_at, u.id) < (${cursor[0] as string}::date, ${cursor[1] as string}::timestamptz, ${cursor[2] as string}::uuid)`);

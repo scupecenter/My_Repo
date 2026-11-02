@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.7.0
+  version: 0.7.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.7.1 (2026-11-02): review fixes for UI plan 4b (X1 to X7), migration 0036. (1) Inbox (X1): a notification that points at a task or a register record is shown only while the caller can still read that module in that region (a region or a module taken away later hides it, its count and its title; `POST .../read`, `.../unread`, `.../snooze` on a hidden one answer 404, `read-all` leaves it alone); `GET /notifications` answers 422 for an unknown `kind` and 400 for a cursor that is not ours. (2) Mentions and followers (X3, X2): one rule, a person is mentioned or notified only if their own grant grid gives `view` on the module for the item's region now (assignment or delegation, account active); a duplicate mention makes one notification and the audit row lists only the people actually mentioned. `GET/POST /tasks/{task_id}/comments`, `GET/POST /registers/{register_key}/records/{record_id}/comments`, `GET /status-updates` answer 400 for a forged cursor. (3) Follow (X2): `DELETE /sites/{site_id}/follow` and `DELETE /registers/{register_key}/records/{record_id}/follow` need only a session (they remove the caller's own follow, also one the caller can no longer read), so they no longer answer 403. (4) Status updates (X7): `PATCH /status-updates/{update_id}` asks for the lead right again (403 `action_forbidden` for an author who is no longer a lead of the region); a `week_start` or report date that is not a real calendar day is 422. (5) `Me.effective.nav` gains `inbox` (every active user), `status_updates` (with `sites`) and `workload` (with `sites` and `reports`). No endpoint was added or removed.
     - 0.7.0 (2026-11-02): additive. Approved-template entry for the registers (CLAUDE.md "Approved templates only", "Two entry ways everywhere"; migration 0037). (1) `GET /templates` lists one template per register (`TPL-PO`, `TPL-GECOL`, `TPL-HLC`, `TPL-PRM` and the other registers) that the caller may use; a template version is issued by the database whenever the fields or the custom fields of its register change, and `Template` gains `register_key` and `stream`. (2) `GET /templates/{template_id}/download` builds the xlsx: locked headers in Master order, drop-downs for list fields, a very-hidden `_tpl` sheet (template_id, version, register_key, header checksum, issuer and time), a visible instructions sheet; new query parameters `prefill` and `region_id` (a pre-filled copy holds the records in force inside the caller's regions, with a `Record ID` column); every download is audited. (3) `POST /import-batches` now reads the file (multipart, size limit, `.xlsx` only, no macros, no formulas) and stages it in the database: each row is matched to a record by `Record ID` or by the register's natural key and classified `create`, `update`, `unchanged` or `error` with the reasons per cell (`ImportRow.errors[].column` is the header of the column, `field` its code), against the same rules as manual entry. A file without a valid `_tpl`, of a retired version, with a changed header row, with macros or too large answers 422 `template_rejected` with `reason` (new values `not_xlsx`, `macros_not_allowed`, `tpl_invalid`) or 413, writes a System Log row (source `template-check`) and creates no batch. (4) The batch is an entry into the normal flow, not a shortcut: `POST /import-batches/{batch_id}/submit` (the uploader) creates every valid row as a register record and submits it (L1 Data Entry), so the record waits for L2 Data Reviewer & Approver of its Matrix row; `POST /import-batches/{batch_id}/decisions` approves rows one by one or all at once, returns rows to the uploader with a note (the record goes back to L1), or discards a batch that was not sent (`action` gains `discard`). A row whose logical record still has an open version is held `pending_previous_approval`; "approve all" never touches held rows and lists them in `outcome.held`. Both calls answer the batch plus `outcome`. `ImportBatch` gains `register_key`, `note`, `counts.held` and the status `discarded`; `ImportRow` gains `site_code`, `record_type`, `record_id` (the register record created for the row) and `hold_reason`. The audit rows and the record history show "via batch". `GET /import-batches` accepts `register_key`. Not built yet: `POST /import-batches/{batch_id}/undo`, the stream templates (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`, Q73) and `TPL-MASTER`; the catalogue, the version rule and the batch tables are ready for them.
     - 0.6.1 (2026-11-02): breaking only for the level count, which no client may set any more. Two fixed approval levels (owner decision 2026-11-01, CLAUDE.md "Two approval levels", migration 0032): **L1 = Data Entry** and **L2 = Data Reviewer & Approver**, for every stage, register and Dismantle; one person may hold both (a self-approval, B5). (1) `GET /matrix`: `approval_levels` is always 2 and `used_levels` is always `[1, 3]` (L1 is cell level 1, L2 is cell level 3; cell level 2 is a leftover kept only for tasks and records already submitted on a 3-level snapshot, `used = false`); `MatrixCell.level_code` (`L1` or `L2`); `MatrixSkipCase.from_level_code` and `skipped_level_codes`; `MatrixPreview.single_level` is always false. (2) `PATCH /matrix`: `stage_levels[].approval_levels` accepts only 2 (any other value is 422 `validation_failed`, path `/stage_levels/{i}/approval_levels`); saving 2 is a no-op that writes nothing. (3) `RegisterDefinition.approval_levels` and `TaskDefinition.approval_levels` are 2 (or null for a task); `levels_required` of a task or record is 2 for everything submitted since the migration and 1 to 3 only on an older snapshot (B7). (4) The permission level `review` is folded into `approve` (= L2): it is still accepted on input and is stored and returned as `approve`; `entry` is L1; naming one person at both L1 and L2 is how a person is granted both levels. `PATCH /matrix` `empty_cell` now lists only L1 and L2 cells. (5) New `DELETE /matrix/cells/{cell_id}` (owner answer Q86): deletes a region or task override cell (step-up, `If-Match`, `reason` query parameter, audited; a row default is refused with `row_default`); the row default applies again. (6) Default holders (owner answers Q85 and Q90, migration 0035): L1 = the owning team, L2 = the stream Team Lead (Contractors, Risks and Deliverables: the Project Manager; Procurement, GECOL, HLC and Permits & HSE: the Team Lead of CW, and TE for TE permits), seeded only where the cell is missing or empty, or still the untouched legacy seed.
     - 0.6.0 (2026-11-02): one-time enrolment code, so a password alone can never enrol a phone (owner decision 2026-11-02, ADR 0014 amendment). Not purely additive: `POST /auth/local/2fa/enrol/start` now needs a request body with `enrol_code`, and `POST /auth/local/2fa/enrol/confirm` needs `enrol_code` beside `code`. (1) `PUT /users/{user_id}/two-factor` (turning it on) and `POST /users/{user_id}/two-factor/reset` return a new one-time `enrol_code` (8 characters, shown as XXXX-XXXX) and `enrol_code_expires_at` in `TwoFactorState`, once; (2) new `POST /users/{user_id}/two-factor/enrol-code` issues a new code for a user who is waiting for enrolment (the old code stops working; reason, step-up, audited); (3) the enrolment calls need the code, a wrong code counts toward the same lock as a wrong TOTP code; (4) `User.two_factor_enrol_code_expires_at` (when the outstanding code ends, never the code); (5) error codes `invalid_enrol_code` and `enrol_code_expired`; (6) the setting `two_factor.enrol_code_hours` (default 72) is how long a code lasts.
@@ -2381,6 +2382,7 @@ paths:
                   - type: object
                     properties:
                       items: { type: array, items: { $ref: '#/components/schemas/Comment' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     post:
@@ -6844,7 +6846,7 @@ paths:
       tags: [notifications]
       operationId: listNotifications
       summary: My in-app notifications
-      description: 'The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout.'
+      description: 'The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout. Only the caller''s own notifications; one that points at a task or a register record is left out (with its count) once the caller can no longer read that module in that region (0.6.0).'
       parameters:
       - {$ref: '#/components/parameters/LivePoll'}
       - name: unread_only
@@ -6876,7 +6878,9 @@ paths:
                 - type: object
                   properties:
                     unread_count: {type: integer}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /notifications/{notification_id}/read:
     parameters:
     - {$ref: '#/components/parameters/NotificationId'}
@@ -6957,11 +6961,12 @@ paths:
       tags: [notifications]
       operationId: unfollowSite
       summary: Stop following a site (0.4.10, X2)
+      description: 'Needs only a session (0.7.1), because it removes the caller''s own follow, also one the caller can no longer read. A malformed id is 404.'
       x-db-path: x_unfollow
       responses:
         '204': {description: Not following (also when it was not followed).}
         '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /registers/{register_key}/records/{record_id}/follow:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}
@@ -6985,11 +6990,11 @@ paths:
       tags: [notifications]
       operationId: unfollowRegisterRecord
       summary: Stop following a register record (0.4.10, X2)
+      description: 'Needs only a session (0.7.1), like stopping a site follow. A malformed id is 404.'
       x-db-path: x_unfollow
       responses:
         '204': {description: Not following.}
         '401': {$ref: '#/components/responses/Unauthorized'}
-        '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
   /me/follows:
     get:
@@ -7030,6 +7035,7 @@ paths:
                 - type: object
                   properties:
                     items: {type: array, items: {$ref: '#/components/schemas/Comment'}}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -7157,6 +7163,7 @@ paths:
                 - type: object
                   properties:
                     items: {type: array, items: {$ref: '#/components/schemas/StatusUpdate'}}
+        '400': {$ref: '#/components/responses/BadRequest'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}

@@ -10,6 +10,7 @@ import { AssignmentDto, GroupRef, UserDto, UsersRepo } from '../users/users.repo
 export const NAV_KEYS = [
   'my_work', 'approvals', 'sites', 'dashboard', 'templates', 'admin.users', 'admin.roles', 'admin.groups', 'admin.delegation',
   'absence', 'admin.matrix', 'admin.settings', 'admin.security_log', 'admin.online', 'audit', 'messages', 'announcements',
+  'inbox', 'workload', 'status_updates',
 ] as const;
 
 /** Every action of the contract's PermissionAction (a System Admin holds all of them on every module). */
@@ -140,6 +141,10 @@ export class MeService {
     }
     // Messages are for every active user; Announcements for System Admins (above) and delegates of announcements.create.
     nav.add('messages');
+    // Phase 4b: the inbox is for every active user; the status updates follow Sites; the workload and time-in-state view needs Reports as well as Sites.
+    nav.add('inbox');
+    if (nav.has('sites')) nav.add('status_updates');
+    if (nav.has('sites') && nav.has('reports')) nav.add('workload');
     if (await this.access.canSendAnnouncements()) nav.add('announcements');
     return { grants: effGrants, nav: [...nav].sort(), matrix_levels: [...levels.values()] };
   }

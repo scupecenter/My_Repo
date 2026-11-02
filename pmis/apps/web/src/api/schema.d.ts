@@ -4197,7 +4197,7 @@ export interface paths {
         };
         /**
          * My in-app notifications
-         * @description The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout.
+         * @description The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout. Only the caller's own notifications; one that points at a task or a register record is left out (with its count) once the caller can no longer read that module in that region (0.6.0).
          */
         get: operations["listNotifications"];
         put?: never;
@@ -4290,7 +4290,10 @@ export interface paths {
          */
         put: operations["followSite"];
         post?: never;
-        /** Stop following a site (0.4.10, X2) */
+        /**
+         * Stop following a site (0.4.10, X2)
+         * @description Needs only a session (0.7.1), because it removes the caller's own follow, also one the caller can no longer read. A malformed id is 404.
+         */
         delete: operations["unfollowSite"];
         options?: never;
         head?: never;
@@ -4316,7 +4319,10 @@ export interface paths {
          */
         put: operations["followRegisterRecord"];
         post?: never;
-        /** Stop following a register record (0.4.10, X2) */
+        /**
+         * Stop following a register record (0.4.10, X2)
+         * @description Needs only a session (0.7.1), like stopping a site follow. A malformed id is 404.
+         */
         delete: operations["unfollowRegisterRecord"];
         options?: never;
         head?: never;
@@ -11153,6 +11159,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -16493,7 +16500,9 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     markNotificationRead: {
@@ -16622,7 +16631,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     followRegisterRecord: {
@@ -16675,7 +16684,6 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -16731,6 +16739,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
@@ -16907,6 +16916,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];

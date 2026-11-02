@@ -1411,7 +1411,9 @@ model Notification {
   link       String?
   read_at    DateTime?     @db.Timestamptz(6)
   snoozed_until DateTime?  @db.Timestamptz(6) // X1 (migration 0031): hidden from the inbox until then
-  sent_at   DateTime?     @db.Timestamptz(6)
+  region_id  Int? // 0036: where it points (task region or record region); the inbox hides it when the caller can no longer read that
+  module_key String? // 0036: sites, or the register's module
+  sent_at    DateTime?     @db.Timestamptz(6)
   created_at DateTime      @default(now()) @db.Timestamptz(6)
 
   @@index([user_id, read_at])

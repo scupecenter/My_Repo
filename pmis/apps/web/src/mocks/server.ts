@@ -7,4 +7,5 @@ import { settingsHandlers } from './handlers.settings';
 import { siteHandlers } from './handlers.sites';
 import { registerHandlers } from './handlers.registers';
 import { warehouseHandlers } from './handlers.warehouse';
-export const server = setupServer(...registerHandlers, ...warehouseHandlers, ...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);
+import { xHandlers } from './handlers.x';
+export const server = setupServer(...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...settingsHandlers, ...handlers, ...siteHandlers, ...adminHandlers, ...orgHandlers);

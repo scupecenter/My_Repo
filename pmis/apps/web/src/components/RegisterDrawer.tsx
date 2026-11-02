@@ -6,13 +6,16 @@ import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
 import { useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
+import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
 import { defaultsFor, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
+import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { FollowButton } from './FollowButton';
 import { Holders } from './HolderChip';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -30,6 +33,8 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   const matrix = useMatrix().data;
   const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key), newVersion = useNewVersion(key);
   const hist = useRecordHistory(key, record?.id ?? null);
+  const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
+  const addComment = useAddRegisterComment(key, record?.id ?? '');
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(key));
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
@@ -103,9 +108,10 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
             {record ? <><span className={`chip ${STATE_TONE[record.state]}`} data-testid="reg-state">{t(`regState.${record.state}`)}</span>{t('drawer.level', { level: record.current_level ?? 1, total: n })}</> : t('registers.new_hint')}
           </Dialog.Description>
         </div>
+        {record?.entity_id && <FollowButton target={{ kind: 'record', key, id: record.id }} entityId={record.entity_id} />}
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="reg-close"><X size={16} /></button></Dialog.Close>
       </header>
-      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'history', label: t('drawer.history') }]} />}
+      {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
@@ -173,6 +179,15 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
         </form>
         </div>
 
+        {record && (
+          <div {...panelProps('comments', tab)}>
+            {/* a global record (no region) has no thread yet: the server answers 422, so the box is not offered */}
+            {record.region_id ? (
+              <CommentsPanel items={comments.data?.items} loaded={comments.isSuccess} pending={addComment.isPending} error={addComment.isError ? registerErrorMessage(t, addComment.error) : null}
+                onSend={(body, ids) => addComment.mutate({ body, ...(ids.length ? { mention_user_ids: ids } : {}) })} />
+            ) : <p className="text-mute" data-testid="reg-comments-global">{t('registers.comments_global')}</p>}
+          </div>
+        )}
         {record && (
           <section {...panelProps('history', tab)}>
             <h3 id="rg-history" className="mb-1 flex items-center gap-1 font-semibold"><Clock size={14} />{t('drawer.history')}</h3>

@@ -2,8 +2,11 @@ import type { Concept } from '@/lib/icons';
 
 export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'registers' | 'data' | 'admin' }[] = [
   { key: 'my_work', to: '/my-work', icon: 'home', group: 'work' },
+  { key: 'inbox', to: '/inbox', icon: 'inbox', group: 'work' },
   { key: 'approvals', to: '/approvals', icon: 'approval', group: 'work' },
   { key: 'sites', to: '/sites', icon: 'site', group: 'work' },
+  { key: 'workload', to: '/workload', icon: 'workload', group: 'work' },
+  { key: 'status_updates', to: '/status-updates', icon: 'weekly', group: 'work' },
   { key: 'dashboard', to: '/dashboard', icon: 'dashboard', group: 'work' },
   { key: 'messages', to: '/messages', icon: 'message', group: 'work' },
   { key: 'procurement', to: '/registers/procurement', icon: 'procurement', group: 'registers' },

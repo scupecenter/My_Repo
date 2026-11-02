@@ -120,6 +120,26 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/import-batches/:id/rows'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
+  // Contract 0.4.10 and 0.7.1, phase 4b (apps/api: notifications, follow, insights, status-updates; migrations 0031 and 0036).
+  ['get', '/notifications'],
+  ['post', '/notifications/read-all'],
+  ['post', '/notifications/:id/read'],
+  ['post', '/notifications/:id/unread'],
+  ['post', '/notifications/:id/snooze'],
+  ['get', '/me/follows'],
+  ['put', '/sites/:id/follow'],
+  ['delete', '/sites/:id/follow'],
+  ['put', '/registers/:key/records/:id/follow'],
+  ['delete', '/registers/:key/records/:id/follow'],
+  ['get', '/registers/:key/records/:id/comments'],
+  ['post', '/registers/:key/records/:id/comments'],
+  ['get', '/tasks/:id/time-in-state'],
+  ['get', '/tasks/:id/blocked-by'],
+  ['get', '/reports/time-in-state'],
+  ['get', '/reports/workload'],
+  ['get', '/status-updates'],
+  ['post', '/status-updates'],
+  ['patch', '/status-updates/:id'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

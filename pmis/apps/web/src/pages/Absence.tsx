@@ -11,7 +11,7 @@ import { PersonTag } from '@/components/PersonTag';
 import { useToast } from '@/components/Toast';
 
 const KINDS = ['annual', 'sick', 'emergency', 'other'] as const;
-type Decision = 'reassign' | 'act_on_behalf' | 'keep';
+export type Decision = 'reassign' | 'act_on_behalf' | 'keep';
 type Scope = 'task' | 'site' | 'person';
 
 /** B12b choice 3: the lead performs the current level through POST /tasks/{id}/act-on-behalf (reason mandatory). */
@@ -35,21 +35,26 @@ function ActDialog({ alert, onClose }: { alert: ReassignmentAlert; onClose: () =
   );
 }
 
-function CoverDialog({ alert, decision, onClose }: { alert: ReassignmentAlert; decision: Decision; onClose: () => void }) {
+/** What a lead decision is about: one task (or its site, or all the person's tasks) of a holder. `personOnly` (the Workload view, X5) offers the person's open tasks only. */
+export type CoverTarget = { holder?: ReassignmentAlert['holder']; task?: ReassignmentAlert['task'] };
+
+export function CoverDialog({ alert, decision, onClose, personOnly = false }: { alert: CoverTarget; decision: Decision; onClose: () => void; personOnly?: boolean }) {
   const { t } = useTranslation();
   const toast = useToast();
   const m = useReassign();
-  const [scope, setScope] = useState<Scope>('task');
+  const [scope, setScope] = useState<Scope>(personOnly ? 'person' : 'task');
   const [to, setTo] = useState<UserPickerItem[]>([]);
   const from = alert.holder?.id;
-  const hide = (a: ReassignmentAlert) => scope === 'task' ? a.task.id === alert.task.id : scope === 'site' ? a.task.site_id === alert.task.site_id && a.holder?.id === from : a.holder?.id === from;
-  const req = (reason: string) => ({ scope, decision, reason, ...(scope === 'task' ? { task_id: alert.task.id } : { from_user_id: from, ...(scope === 'site' ? { site_id: alert.task.site_id } : {}) }), ...(decision === 'reassign' ? { to_user_id: to[0]?.id } : {}) }) as never;
+  const hide = (a: ReassignmentAlert) => scope === 'task' ? a.task.id === alert.task?.id : scope === 'site' ? a.task.site_id === alert.task?.site_id && a.holder?.id === from : a.holder?.id === from;
+  const req = (reason: string) => ({ scope, decision, reason, ...(scope === 'task' ? { task_id: alert.task?.id } : { from_user_id: from, ...(scope === 'site' ? { site_id: alert.task?.site_id } : {}) }), ...(decision === 'reassign' ? { to_user_id: to[0]?.id } : {}) }) as never;
   return (
     <FormDialog open onClose={onClose} testid="cover-dialog" title={t(`cover.decision_${decision}`)} disabled={decision === 'reassign' && !to.length} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
       submitLabel={t(`cover.do_${decision}`)} onSubmit={(reason) => m.mutate({ req: req(reason), hide }, { onSuccess: (r) => { toast(t('cover.done', { count: r.done.length })); onClose(); } })}>
-      <fieldset data-testid="cover-scope"><legend className="text-sm font-semibold">{t('cover.scope')}</legend>
-        <div className="mt-1 flex flex-col gap-1 text-sm">{(['task', 'site', 'person'] as const).map((s) => (
-          <label key={s} className="flex items-center gap-2"><input type="radio" name="cover-scope" data-testid={`cover-scope-${s}`} checked={scope === s} onChange={() => setScope(s)} />{t(`cover.scope_${s}`)}</label>))}</div></fieldset>
+      {personOnly
+        ? <p className="text-sm" data-testid="cover-person-only">{t('cover.scope_person')}: <b>{alert.holder?.display_name}</b></p>
+        : <fieldset data-testid="cover-scope"><legend className="text-sm font-semibold">{t('cover.scope')}</legend>
+            <div className="mt-1 flex flex-col gap-1 text-sm">{(['task', 'site', 'person'] as const).map((s) => (
+              <label key={s} className="flex items-center gap-2"><input type="radio" name="cover-scope" data-testid={`cover-scope-${s}`} checked={scope === s} onChange={() => setScope(s)} />{t(`cover.scope_${s}`)}</label>))}</div></fieldset>}
       {decision === 'reassign' && <div><b className="text-sm">{t('cover.to')}</b><PeoplePicker id="cover-to" single value={to} onChange={setTo} eligible={{ from }} /><p className="mt-1 text-xs text-mute">{t('cover.eligible_only')}</p></div>}
       <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="cover-sla-note">{t('cover.sla_note')}</p>
     </FormDialog>

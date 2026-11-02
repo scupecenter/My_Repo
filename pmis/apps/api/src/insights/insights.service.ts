@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
-import { oneParam } from '../common/query';
+import { isCalendarDate, oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
 import { TaskDetailService } from '../workflow/task-detail.service';
 import { TaskViewService, UserRefDto } from '../workflow/task-view.service';
@@ -127,7 +127,7 @@ export class InsightsService {
     for (const [key, op] of [['from', '>='], ['to', '<=']] as const) {
       const d = oneParam(q, key);
       if (d === undefined) continue;
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) throw problems.validation([{ path: `/${key}`, code: 'invalid', message: `${key} is a date.` }]);
+      if (!isCalendarDate(d)) throw problems.validation([{ path: `/${key}`, code: 'invalid', message: `${key} is a date.` }]);
       conds.push(Prisma.sql`(v.end_at AT TIME ZONE 'Africa/Tripoli')::date ${Prisma.raw(op)} ${d}::date`);
     }
     const keyExpr = groupBy === 'holder' ? Prisma.sql`v.holder::text` : TEAM_OF(Prisma.sql`v.holder`);
