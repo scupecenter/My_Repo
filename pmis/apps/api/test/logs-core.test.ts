@@ -325,6 +325,30 @@ describe('security alerts', () => {
     const back = await api.call('get', '/settings/security-alerts');
     expect((await api.call('put', '/settings/security-alerts', { ...body, failed_sign_ins: { count: 5, minutes: 15 }, large_export_rows: 5000 }, { 'If-Match': String(back.headers.etag) })).status).toBe(200);
   });
+
+  it('weakening a threshold needs a fresh step-up, is audited as such and raises a high alert; tightening does not', async () => {
+    const admin = await makeAdmin(db);
+    const api = await loggedIn(app, admin);                       // signed in, no step-up yet
+    const cur = await api.call('get', '/settings/security-alerts');
+    const base = { reason: 'review', failed_sign_ins: cur.body.failed_sign_ins, failed_by_ip: cur.body.failed_by_ip, large_export_rows: cur.body.large_export_rows, new_ip: cur.body.new_ip };
+    // weaker: more failures allowed, and the new-address rule off
+    const weak = { ...base, failed_sign_ins: { ...base.failed_sign_ins, count: base.failed_sign_ins.count + 10 }, new_ip: false };
+    const refused = await api.call('put', '/settings/security-alerts', weak, { 'If-Match': String(cur.headers.etag) });
+    expect(refused.status).toBe(401);
+    expect(refused.body.code).toBe('step_up_required');
+    // tightening needs no step-up
+    const tight = { ...base, failed_sign_ins: { ...base.failed_sign_ins, count: Math.max(3, base.failed_sign_ins.count - 1) } };
+    const t = await api.call('put', '/settings/security-alerts', tight, { 'If-Match': String(cur.headers.etag) });
+    expect(t.status).toBe(200);
+    expect((await api.stepUp(admin.password)).status).toBe(200);
+    const w = await api.call('put', '/settings/security-alerts', weak, { 'If-Match': String(t.headers.etag) });
+    expect(w.status).toBe(200);
+    expect((await db.query(`SELECT 1 FROM audit_log WHERE action = 'security_alert_settings_weakened' AND actor_id = $1`, [admin.id])).rowCount).toBe(1);
+    await app.get(JobRunsService).evaluateAlerts();
+    expect((await db.query(`SELECT severity FROM security_alerts WHERE rule = 'alert_settings_weakened'`)).rows[0]).toMatchObject({ severity: 'high' });
+    // put the defaults back for the other tests
+    expect((await api.call('put', '/settings/security-alerts', base, { 'If-Match': String(w.headers.etag) })).status).toBe(200);
+  });
 });
 
 describe('retention', () => {

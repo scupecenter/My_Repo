@@ -5369,6 +5369,8 @@ paths:
       tags: [settings]
       operationId: setSecurityAlertSettings
       summary: Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after)
+      description: 'Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up.'
+      x-step-up: when a threshold is weakened
       x-db-path: log_set_alert_settings
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -12373,7 +12375,7 @@ components:
         host: { type: [string, 'null'] }
     SecurityAlertRule:
       type: string
-      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, audit_integrity_failure]
+      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure]
     SecurityAlert:
       type: object
       required: [id, at, rule, severity, summary, status]

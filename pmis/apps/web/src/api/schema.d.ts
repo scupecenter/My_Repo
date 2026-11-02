@@ -3386,7 +3386,10 @@ export interface paths {
          * @description Reading needs the Settings screen (`admin.settings` view) or a System Admin.
          */
         get: operations["getSecurityAlertSettings"];
-        /** Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after) */
+        /**
+         * Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after)
+         * @description Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up.
+         */
         put: operations["setSecurityAlertSettings"];
         post?: never;
         delete?: never;
@@ -9064,7 +9067,7 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "audit_integrity_failure";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure";
         SecurityAlert: {
             /** Format: uuid */
             id: string;

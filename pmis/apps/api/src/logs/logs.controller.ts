@@ -156,8 +156,8 @@ export class LogsAdminController {
   }
 
   @Put('settings/security-alerts')
-  async setAlertSettings(@Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
-    const r = await this.logs.setAlertSettings(ifMatch, body);
+  async setAlertSettings(@Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.logs.setAlertSettings(auth, ifMatch, body);
     res.setHeader('ETag', etagHeader(Number(r.version)));
     return r;
   }

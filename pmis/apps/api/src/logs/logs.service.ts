@@ -506,10 +506,17 @@ export class LogsService {
     return this.settingsDto(r[0]!.j);
   }
 
-  async setAlertSettings(ifMatch: string | undefined, raw: unknown) {
+  async setAlertSettings(auth: AuthContext, ifMatch: string | undefined, raw: unknown) {
     const version = parseIfMatch(ifMatch);
     const b = parse(alertInput, raw);
     const { reason, ...rest } = b;
+    // weakening any threshold is a reduction of a security control: step-up first (the database checks it again and raises an alert)
+    type Win = { count: number; minutes: number };
+    const c = (await this.db.tx.$queryRaw<{ j: { failed_sign_ins?: Win; failed_by_ip?: Win; large_export_rows?: number; new_ip?: boolean } }[]>`SELECT log_alert_settings_json() AS j`)[0]!.j;
+    const weakened = rest.failed_sign_ins.count > (c.failed_sign_ins?.count ?? Infinity) || rest.failed_sign_ins.minutes < (c.failed_sign_ins?.minutes ?? 0)
+      || rest.failed_by_ip.count > (c.failed_by_ip?.count ?? Infinity) || rest.failed_by_ip.minutes < (c.failed_by_ip?.minutes ?? 0)
+      || rest.large_export_rows > (c.large_export_rows ?? Infinity) || (c.new_ip !== false && rest.new_ip === false);
+    if (weakened) await this.stepUp.require(auth);
     const r = await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>(Prisma.sql`
       SELECT log_set_alert_settings(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
     return this.settingsDto(r[0]!.j);

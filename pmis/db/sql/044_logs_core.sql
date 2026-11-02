@@ -779,7 +779,7 @@ END $$;
 CREATE TABLE security_alerts (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at       timestamptz NOT NULL DEFAULT clock_timestamp(),
-  rule             text NOT NULL CHECK (rule IN ('failed_sign_ins', 'failed_sign_ins_ip', 'new_ip', 'large_export', 'admin_set_changed', 'retention_reduced', 'audit_integrity_failure')),
+  rule             text NOT NULL CHECK (rule IN ('failed_sign_ins', 'failed_sign_ins_ip', 'new_ip', 'large_export', 'admin_set_changed', 'retention_reduced', 'alert_settings_weakened', 'audit_integrity_failure')),
   severity         text NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
   status           text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged')),
   title            text NOT NULL,
@@ -877,7 +877,7 @@ BEGIN
   -- large exports, changes of the admin set, retention reduced
   FOR r IN
     SELECT a.* FROM public.audit_log_chain c JOIN public.audit_log a ON a.id = c.audit_id WHERE c.seq > wa AND c.seq <= ha
-      AND (a.action LIKE '%export%' OR a.action IN ('group_member_added', 'group_member_removed', 'admin_bootstrapped', 'log_retention_reduced'))
+      AND (a.action LIKE '%export%' OR a.action IN ('group_member_added', 'group_member_removed', 'admin_bootstrapped', 'log_retention_reduced', 'security_alert_settings_weakened'))
   LOOP
     IF r.action LIKE '%export%' AND coalesce(public.log_num(r.after, 'row_count'), public.log_num(r.after, 'file_count'), public.log_num(r.after, 'rows'),
          public.log_num(r.after, 'site_count'), 0) > big THEN
@@ -891,6 +891,9 @@ BEGIN
     ELSIF r.action = 'log_retention_reduced' THEN
       IF public.sec_alert_raise('retention_reduced', 'critical', 'Log retention was reduced', jsonb_build_object('audit_id', r.id, 'before', r.before, 'after', r.after),
            'retention_reduced:' || r.id::text, r.actor_id, r.ip) THEN n := n + 1; END IF;
+    ELSIF r.action = 'security_alert_settings_weakened' THEN
+      IF public.sec_alert_raise('alert_settings_weakened', 'high', 'Security alert thresholds were weakened', jsonb_build_object('audit_id', r.id, 'before', r.before, 'after', r.after),
+           'alert_settings_weakened:' || r.id::text, r.actor_id, r.ip) THEN n := n + 1; END IF;
     END IF;
   END LOOP;
 
@@ -1104,7 +1107,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION log_set_alert_settings(p jsonb, p_reason text, p_version integer) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
-DECLARE cur jsonb; errs jsonb := '[]'::jsonb; nv int; fc int; fm int; ic int; im int; big int;
+DECLARE cur jsonb; errs jsonb := '[]'::jsonb; nv int; fc int; fm int; ic int; im int; big int; weakened boolean;
 BEGIN
   IF NOT public.app_actor_is_admin('admin.settings', 'edit') THEN RAISE EXCEPTION 'alert settings: admin.settings edit required' USING ERRCODE = 'insufficient_privilege'; END IF;
   IF p_reason IS NULL OR length(trim(p_reason)) < 3 THEN errs := errs || jsonb_build_object('path', '/reason', 'code', 'required', 'message', 'A reason is required.'); END IF;
@@ -1120,12 +1123,18 @@ BEGIN
   PERFORM 1 FROM public.settings WHERE key = 'security_alerts' FOR UPDATE;
   cur := public.log_alert_settings_json();
   IF p_version IS NOT NULL AND p_version <> (cur ->> 'version')::int THEN PERFORM public.wf_err('precondition_failed', jsonb_build_object('detail', 'The settings changed since you read them.')); END IF;
+  -- weakening a threshold (more failures, a shorter window, a higher export limit, the new-address rule off) is a reduction of a security
+  -- control: like a retention reduction it needs a fresh step-up and raises a high alert (security review of 0045)
+  weakened := fc > public.log_num(cur -> 'failed_sign_ins', 'count') OR fm < public.log_num(cur -> 'failed_sign_ins', 'minutes')
+           OR ic > public.log_num(cur -> 'failed_by_ip', 'count') OR im < public.log_num(cur -> 'failed_by_ip', 'minutes')
+           OR big > public.log_num(cur, 'large_export_rows') OR (coalesce((cur ->> 'new_ip')::boolean, true) AND NOT (p ->> 'new_ip')::boolean);
+  IF weakened AND NOT public.log_actor_stepped_up() THEN PERFORM public.wf_err('step_up_required', '{}'::jsonb); END IF;
   nv := (cur ->> 'version')::int + 1;
   INSERT INTO public.settings (key, value, description, updated_by, updated_at)
   VALUES ('security_alerts', jsonb_build_object('failed_sign_ins', jsonb_build_object('count', fc, 'minutes', fm), 'failed_by_ip', jsonb_build_object('count', ic, 'minutes', im),
     'large_export_rows', big, 'new_ip', (p ->> 'new_ip')::boolean, 'version', nv), 'Security alert thresholds', public.app_actor(), now())
   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now();
-  PERFORM public.log_audit_write('security_alert_settings_set', 'setting', 'security_alerts', cur - 'updated_at' - 'updated_by',
+  PERFORM public.log_audit_write(CASE WHEN weakened THEN 'security_alert_settings_weakened' ELSE 'security_alert_settings_set' END, 'setting', 'security_alerts', cur - 'updated_at' - 'updated_by',
     public.log_alert_settings_json() - 'updated_at' - 'updated_by', p_reason);
   RETURN public.log_alert_settings_json();
 END $$;
