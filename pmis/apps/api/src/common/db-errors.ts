@@ -186,6 +186,7 @@ export function mapDbError(e: unknown): ProblemException | null {
         return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });
       }
       if (/two-factor is not on for this user/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for this user: there is nothing to reset.' });
+      if (/no enrolment code can be issued/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This user is not waiting for enrolment, so there is no enrolment code to issue. Turn two-factor on, or reset it.' });
       if (/two-factor needs a local account/i.test(msg)) {
         return new ProblemException(422, 'validation_failed', {
           detail: 'Two-factor needs a local account with sign-in on.',

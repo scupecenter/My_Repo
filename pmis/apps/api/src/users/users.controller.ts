@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import { Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { etagHeader } from '../common/etag';
-import { UserDetailDto, UsersService } from './users.service';
+import { TwoFactorChange, UserDetailDto, UsersService } from './users.service';
 import type { UserDto } from './users.repo';
 
 @Controller('users')
@@ -82,14 +82,23 @@ export class UsersController {
   }
 
   @Put(':id/two-factor')
-  setTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ two_factor: string }> {
+  async setTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<TwoFactorChange> {
+    res.setHeader('Cache-Control', 'no-store'); // the answer may carry the one-time enrolment code
     return this.users.setTwoFactor(auth, id, body);
   }
 
   @Post(':id/two-factor/reset')
   @HttpCode(200)
-  resetTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ two_factor: string }> {
+  async resetTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<TwoFactorChange> {
+    res.setHeader('Cache-Control', 'no-store');
     return this.users.resetTwoFactor(auth, id, body);
+  }
+
+  @Post(':id/two-factor/enrol-code')
+  @HttpCode(200)
+  async issueEnrolCode(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<TwoFactorChange> {
+    res.setHeader('Cache-Control', 'no-store');
+    return this.users.issueEnrolCode(auth, id, body);
   }
 
   @Post(':id/password-reset')

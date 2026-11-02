@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import { accountKeyOf, ACCOUNTS, attempts, cred, db, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer, type Cred } from './db';
-import { matchStep, newRecoveryCodes, newSecret, otpauth } from './totp';
+import { ENROL_CODE_MS, matchStep, newEnrolCode, newRecoveryCodes, newSecret, normaliseEnrolCode, otpauth } from './totp';
 import { guard, problem, stepUp } from './handlers';
 import { userOf } from './handlers.admin';
 import { uid } from './ids';
@@ -84,6 +84,25 @@ async function checkCode(c: Cred, b: CodeBody, secret: string | null): Promise<C
 const codeProblem = (r: Exclude<CodeResult, 'ok'>) => r === 'locked'
   ? problem(429, 'account_locked', 'Too many wrong codes. The account is locked for a while.', {})
   : problem(401, 'invalid_code', 'The code is not correct', { detail: r === 'replay' ? 'This code was already used. Wait for the next code and try again.' : 'The code is not correct.' });
+/** The real server matches the enrolment code in the database; a miss counts toward the same lock as a wrong code. */
+function checkEnrolCode(c: Cred, typed: string): 'ok' | 'bad' | 'expired' | 'locked' {
+  const tf = c.tf!;
+  if (c.locked_until && c.locked_until > Date.now()) return 'locked';
+  const miss = () => {
+    tf.failures += 1;
+    if (tf.failures >= LOCK_AFTER) { tf.failures = 0; c.locked_until = Date.now() + LOCK_MS; db().pending = null; }
+  };
+  if (!tf.enrolCode || normaliseEnrolCode(typed) !== normaliseEnrolCode(tf.enrolCode)) { miss(); return 'bad'; }
+  if ((tf.enrolExpires ?? 0) <= Date.now()) { miss(); return 'expired'; }
+  return 'ok';
+}
+const enrolProblem = (r: 'bad' | 'expired' | 'locked') => r === 'locked'
+  ? problem(429, 'account_locked', 'Too many wrong codes. The account is locked for a while.', {})
+  : r === 'expired'
+    ? problem(401, 'enrol_code_expired', 'This enrolment code has expired. Ask your administrator for a new one.')
+    : problem(401, 'invalid_enrol_code', 'The enrolment code is not correct. Check it with your administrator, who can issue a new one.');
+const freshTf = (): NonNullable<Cred['tf']> => ({ on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0, enrolCode: newEnrolCode(), enrolExpires: Date.now() + ENROL_CODE_MS });
+const codeBody = (tf: NonNullable<Cred['tf']>) => ({ enrol_code: tf.enrolCode!, enrol_code_expires_at: new Date(tf.enrolExpires!).toISOString() });
 const pendingOf = (kind: 'two_factor' | 'enrol') => {
   const p = db().pending;
   return p && p.kind === kind && p.until > Date.now() && cred(p.account)?.tf?.on ? p : null;
@@ -146,10 +165,15 @@ export const authHandlers = [
     return HttpResponse.json(sessionBody());
   }),
 
-  http.post(`${B}/auth/local/2fa/enrol/start`, async () => {
+  http.post(`${B}/auth/local/2fa/enrol/start`, async ({ request }) => {
     const p = pendingOf('enrol');
     if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
     const c = cred(p.account)!;
+    const b = (await request.json().catch(() => ({}))) as { enrol_code?: unknown };
+    if (typeof b.enrol_code !== 'string' || !b.enrol_code.trim()) return problem(422, 'validation_failed', 'Enter the enrolment code from your administrator.', { errors: [{ path: '/enrol_code', code: 'required' }] });
+    // No secret and no QR code without a right code.
+    const ok = checkEnrolCode(c, b.enrol_code);
+    if (ok !== 'ok') { save(); return enrolProblem(ok); }
     c.tf!.pending = newSecret();
     const email = whoOf(p.account).email ?? p.account;
     save();
@@ -160,9 +184,13 @@ export const authHandlers = [
     const p = pendingOf('enrol');
     if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
     const c = cred(p.account)!;
-    const b = (await request.json().catch(() => ({}))) as { code?: string };
+    const b = (await request.json().catch(() => ({}))) as { code?: string; enrol_code?: unknown };
+    if (typeof b.enrol_code !== 'string' || !b.enrol_code.trim()) return problem(422, 'validation_failed', 'Enter the enrolment code from your administrator.', { errors: [{ path: '/enrol_code', code: 'required' }] });
     const r = c.tf!.pending ? await checkCode(c, { code: b.code ?? '' }, c.tf!.pending) : 'bad';
     if (r !== 'ok') { save(); return codeProblem(r); }
+    const ok = checkEnrolCode(c, b.enrol_code);
+    if (ok !== 'ok') { save(); return enrolProblem(ok); }
+    c.tf!.enrolCode = null; c.tf!.enrolExpires = null; // single use
     c.tf!.secret = c.tf!.pending; c.tf!.pending = null;
     c.tf!.codes = newRecoveryCodes();
     const codes = [...c.tf!.codes];
@@ -277,10 +305,12 @@ export const authHandlers = [
     if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
     const c = cred(accountKeyOf(u));
     if (!c?.enabled) return problem(422, 'validation_failed', 'Two-factor needs a local account', { errors: [{ path: '/user_id', code: 'no_local_account' }] });
-    if (b.enabled && tfLabel(c) === 'off') c.tf = { on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0 };
+    const turnedOn = b.enabled && tfLabel(c) === 'off';
+    if (turnedOn) c.tf = freshTf();
     if (!b.enabled) delete c.tf;
     save();
-    return HttpResponse.json({ two_factor: tfLabel(c) });
+    // Turning it on returns the one-time enrolment code, once (contract 0.6.0).
+    return HttpResponse.json({ two_factor: tfLabel(c), ...(turnedOn ? codeBody(c.tf!) : {}) });
   }),
 
   http.post(`${B}/users/:id/two-factor/reset`, async ({ params, request }) => {
@@ -293,8 +323,25 @@ export const authHandlers = [
     if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
     const c = cred(accountKeyOf(u));
     if (!c?.tf?.on) return TF_NOT_ON();
-    c.tf = { on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0 };
+    c.tf = freshTf();
     save();
-    return HttpResponse.json({ two_factor: 'pending_enrolment' });
+    return HttpResponse.json({ two_factor: 'pending_enrolment', ...codeBody(c.tf) });
+  }),
+
+  http.post(`${B}/users/:id/two-factor/enrol-code`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const u = userByParam(params.id);
+    if (!u) return problem(404, 'not_found', 'User not found');
+    const b = (await request.json().catch(() => ({}))) as { reason?: string };
+    if ((b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'A reason is required', { errors: [{ path: '/reason', code: 'required' }] });
+    if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
+    const c = cred(accountKeyOf(u));
+    if (tfLabel(c) !== 'pending_enrolment') return problem(409, 'invalid_transition', 'This user is not waiting for enrolment, so there is no enrolment code to issue');
+    // The old code stops working; a half-made enrolment and the pending sign-in end.
+    c!.tf!.enrolCode = newEnrolCode(); c!.tf!.enrolExpires = Date.now() + ENROL_CODE_MS; c!.tf!.pending = null; c!.tf!.failures = 0;
+    if (db().pending?.account === accountKeyOf(u)) db().pending = null;
+    save();
+    return HttpResponse.json({ two_factor: 'pending_enrolment', ...codeBody(c!.tf!) });
   }),
 ];

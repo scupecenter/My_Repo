@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  base32Decode, base32Encode, decryptSecret, encryptSecret, generateRecoveryCodes, hashRecoveryCode, hotp, matchStep, normaliseRecoveryCode,
-  otpauthUri, parseEncKey, stepOf, totpCode,
+  base32Decode, base32Encode, decryptSecret, encryptSecret, generateEnrolCode, generateRecoveryCodes, hashEnrolCode, hashRecoveryCode, hotp, matchStep,
+  normaliseEnrolCode, normaliseRecoveryCode, otpauthUri, parseEncKey, stepOf, totpCode,
 } from '../src/auth/totp';
 
 // RFC 6238 Appendix B, HMAC-SHA-1, secret "12345678901234567890" (ASCII), 8 digits.
@@ -111,5 +111,36 @@ describe('secret envelope and recovery codes', () => {
     expect(h).toMatch(/^[0-9a-f]{64}$/);
     expect(hashRecoveryCode(key, c.replace('-', ''))).toBe(h);
     expect(hashRecoveryCode(Buffer.alloc(32, 7), c.replace('-', ''))).not.toBe(h);
+  });
+
+  it('makes enrolment codes of 8 unambiguous characters shown as XXXX-XXXX, and normalises typing variants', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const c = generateEnrolCode();
+      expect(c).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+      expect(c).not.toMatch(/[01IO]/);
+      seen.add(c);
+    }
+    expect(seen.size).toBeGreaterThan(190);
+    const c = generateEnrolCode();
+    const bare = c.replace('-', '');
+    expect(normaliseEnrolCode(c.toLowerCase())).toBe(bare);
+    expect(normaliseEnrolCode(` ${bare.slice(0, 2)} ${bare.slice(2, 4)}-${bare.slice(4)} `)).toBe(bare);
+    for (const bad of ['', 'short', 'AAAA-BBBBB', 'AAAA-BB0B', 'AAAA-BBIB', 'AAAA BB!B']) expect(normaliseEnrolCode(bad)).toBeNull();
+    expect(normaliseEnrolCode('ABCDEFGHJ')).toBeNull(); // 9 characters
+  });
+
+  it('hashes an enrolment code with a key and the user id: another user, another key or another label gives another hash', () => {
+    const u1 = '11111111-1111-4111-8111-111111111111';
+    const u2 = '22222222-2222-4222-8222-222222222222';
+    const h = hashEnrolCode(key, u1, 'ABCDEFGH');
+    expect(h).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashEnrolCode(key, u1, 'ABCDEFGH')).toBe(h);
+    expect(hashEnrolCode(key, u1.toUpperCase(), 'ABCDEFGH')).toBe(h);
+    expect(hashEnrolCode(key, u2, 'ABCDEFGH')).not.toBe(h); // the code of one user is nothing for another
+    expect(hashEnrolCode(Buffer.alloc(32, 7), u1, 'ABCDEFGH')).not.toBe(h);
+    expect(hashEnrolCode(key, u1, 'ABCDEFGJ')).not.toBe(h);
+    expect(hashEnrolCode(key, u1, null)).not.toBe(h);
+    expect(hashEnrolCode(key, u1, 'ABCDEFGH')).not.toBe(hashRecoveryCode(key, 'ABCDEFGH')); // not the recovery-code key
   });
 });

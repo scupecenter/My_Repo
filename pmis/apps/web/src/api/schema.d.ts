@@ -230,10 +230,15 @@ export interface paths {
         put?: never;
         /**
          * Enrolment step 1 - a new secret for the QR code
-         * @description Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up). Makes a new secret,
-         *     stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and returns it once: the `otpauth_uri`
-         *     (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the pending secret. The answer is
-         *     never cached. A user who is already enrolled cannot start again; an admin reset is needed.
+         * @description Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up) **and the one-time
+         *     enrolment code** (0.6.0) that an admin handed to the user (shown once when the admin turned two-factor on, reset it or issued a new code).
+         *     The code is checked in the database before anything else: without a right code no secret is made, none is stored and no QR code is shown, so
+         *     a password alone can never enrol a phone. A missing `enrol_code` is 422 and counts for nothing. A wrong code is 401 `invalid_enrol_code`, a
+         *     code past its end is 401 `enrol_code_expired`; both count toward the same lock as wrong TOTP codes (5 in a row lock the account for 15
+         *     minutes and end every pending sign-in). The code is not used up here (the QR code may be redrawn); it is used up at the confirm step.
+         *     With the right code it makes a new secret, stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and
+         *     returns it once: the `otpauth_uri` (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the
+         *     pending secret. The answer is never cached. A user who is already enrolled cannot start again; an admin reset is needed.
          */
         post: operations["startTwoFactorEnrolment"];
         delete?: never;
@@ -256,6 +261,9 @@ export interface paths {
          * @description The user types the code their app shows for the secret from step 1. On success the secret becomes active, 10 one-time recovery codes are
          *     made (stored as a keyed hash, shown once in this answer, never again), the pending sign-in is used up and the user is signed in
          *     (session cookie set). A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code.
+         *     **0.6.0:** the enrolment code is sent again in `enrol_code` and checked again in the same database step that activates the secret; it is
+         *     used up there (single use). A wrong or expired enrolment code is 401 `invalid_enrol_code` or `enrol_code_expired`, counts toward the same lock,
+         *     and activates nothing. A code replaced by an admin in the meantime is a wrong code.
          */
         post: operations["confirmTwoFactorEnrolment"];
         delete?: never;
@@ -838,7 +846,10 @@ export interface paths {
          *     reason and the acting admin's own step-up. **Nobody changes their own setting** (403 `self_beneficiary`, also for an admin). Only a
          *     System Admin changes an admin or a delegate. The user needs a local account (422 otherwise).
          *     On: the user is asked to enrol (QR code) at the next sign-in, and their local sessions end now so no session lives on without a
-         *     code. Off: the secret and the recovery codes are deleted. Setting what is already set changes nothing and writes no audit row.
+         *     code. **0.6.0:** the answer carries a one-time `enrol_code` (and `enrol_code_expires_at`), shown only in this answer and never cached: the
+         *     admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
+         *     recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
+         *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
          *     The change is audited with before and after (never the secret). Users can never turn it off themselves.
          */
         put: operations["setUserTwoFactor"];
@@ -862,8 +873,35 @@ export interface paths {
          * Reset a user's two-factor after a lost phone (0.5.0)
          * @description Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor`. Clears the secret and the recovery codes, forces a
          *     new enrolment at the next sign-in and ends all the user's sessions. 409 `invalid_transition` when two-factor is not on for the user.
+         *     **0.6.0:** returns a new one-time `enrol_code` and `enrol_code_expires_at` (shown once, never cached) that the user needs to enrol again.
          */
         post: operations["resetUserTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/two-factor/enrol-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue a new one-time enrolment code for a user who is waiting for enrolment (0.6.0)
+         * @description Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor` (System Admin, or a delegate holding `users.two_factor`;
+         *     nobody issues one for their own account, 403 `self_beneficiary`). For a user whose two-factor is on and who has not enrolled yet
+         *     (`two_factor` = `pending_enrolment`): the code was lost, has expired, or the admin does not trust it. The old code stops working at once, a
+         *     half-made enrolment is dropped and the user's pending sign-ins end. The new code is returned once (never cached); only a keyed hash is
+         *     stored, and it lasts the setting `two_factor.enrol_code_hours` (default 72). 409 `invalid_transition` when the user is not waiting for
+         *     enrolment (two-factor off, or already enrolled: use the reset). The change is audited (`two_factor_enrol_code_issued`, with whether the
+         *     old code was none, active or expired; never a code).
+         */
+        post: operations["issueUserTwoFactorEnrolCode"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4665,7 +4703,7 @@ export interface components {
             existing_id?: string;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "password_change_required" | "weak_password" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -4958,6 +4996,18 @@ export interface components {
         TwoFactorLabel: "off" | "pending_enrolment" | "on";
         TwoFactorState: {
             two_factor: components["schemas"]["TwoFactorLabel"];
+            /** @description 0.6.0. A new one-time enrolment code (8 characters, XXXX-XXXX). Present only when this call made one; shown only in this answer, never stored in clear, never cached. The admin hands it to the user in person or by phone. */
+            enrol_code?: string;
+            /**
+             * Format: date-time
+             * @description 0.6.0. When `enrol_code` stops working (setting `two_factor.enrol_code_hours`, default 72). Present with `enrol_code`.
+             */
+            enrol_code_expires_at?: string;
+        };
+        /** @description 0.6.0. The one-time enrolment code the admin handed over. Upper or lower case, with or without the dash or spaces. */
+        EnrolCodeInput: string;
+        TwoFactorEnrolStart: {
+            enrol_code: components["schemas"]["EnrolCodeInput"];
         };
         Me: {
             user: components["schemas"]["User"];
@@ -5010,6 +5060,11 @@ export interface components {
             /** @description 0.3.0. A temporary password is waiting to be changed. */
             must_change_password?: boolean;
             two_factor?: components["schemas"]["TwoFactorLabel"];
+            /**
+             * Format: date-time
+             * @description 0.6.0. When the outstanding one-time enrolment code ends (a past time = expired); null when none is outstanding. Never the code itself.
+             */
+            two_factor_enrol_code_expires_at?: string | null;
             /** @description Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption. */
             mfa_exempt?: boolean;
             /** Format: date-time */
@@ -8662,7 +8717,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorEnrolStart"];
+            };
+        };
         responses: {
             /** @description Secret and URI. */
             200: {
@@ -8674,6 +8733,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
         };
     };
@@ -8689,6 +8749,7 @@ export interface operations {
                 "application/json": {
                     /** @description The 6-digit code. Spaces are ignored. */
                     code: string;
+                    enrol_code: components["schemas"]["EnrolCodeInput"];
                 };
             };
         };
@@ -9693,6 +9754,37 @@ export interface operations {
         };
         responses: {
             /** @description New state (`pending_enrolment`). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    issueUserTwoFactorEnrolCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The new code, shown once. */
             200: {
                 headers: {
                     [name: string]: unknown;

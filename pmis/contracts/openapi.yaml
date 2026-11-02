@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.5.0
+  version: 0.6.0
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.6.0 (2026-11-02): one-time enrolment code, so a password alone can never enrol a phone (owner decision 2026-11-02, ADR 0014 amendment). Not purely additive: `POST /auth/local/2fa/enrol/start` now needs a request body with `enrol_code`, and `POST /auth/local/2fa/enrol/confirm` needs `enrol_code` beside `code`. (1) `PUT /users/{user_id}/two-factor` (turning it on) and `POST /users/{user_id}/two-factor/reset` return a new one-time `enrol_code` (8 characters, shown as XXXX-XXXX) and `enrol_code_expires_at` in `TwoFactorState`, once; (2) new `POST /users/{user_id}/two-factor/enrol-code` issues a new code for a user who is waiting for enrolment (the old code stops working; reason, step-up, audited); (3) the enrolment calls need the code, a wrong code counts toward the same lock as a wrong TOTP code; (4) `User.two_factor_enrol_code_expires_at` (when the outstanding code ends, never the code); (5) error codes `invalid_enrol_code` and `enrol_code_expired`; (6) the setting `two_factor.enrol_code_hours` (default 72) is how long a code lasts.
     - 0.5.0 (2026-11-02): additive. Two-factor authentication (TOTP) for local accounts (owner decision 2026-11-02, ADR 0014). (1) `POST /auth/local/login` may answer 200 with `PendingSignIn` (`authenticated: false`, `next` = `two_factor` or `enrol`) and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use) instead of a session; (2) `POST /auth/local/2fa` completes the sign-in with a TOTP code or one recovery code; (3) `POST /auth/local/2fa/enrol/start` and `/enrol/confirm` enrol a user whose two-factor is on and not set up yet (otpauth URI for the QR code, manual key, 10 one-time recovery codes shown once); (4) `POST /auth/local/2fa/recovery-codes` makes new recovery codes (needs a valid TOTP code); (5) `POST /auth/local/step-up` takes `code` or `recovery_code` when the user's two-factor is on, and `Problem.step_up_method` gains `password_totp`; (6) `PUT /users/{user_id}/two-factor` turns it on or off and `POST /users/{user_id}/two-factor/reset` resets it (System Admin or a delegate holding the new delegable right `users.two_factor`; reason and step-up; nobody changes their own); (7) `User.two_factor` (off, pending_enrolment, on), `Session.two_factor` (enabled and remaining recovery codes) and `Session.mfa` is true for a session that passed a code; error code `invalid_code`.
     - 0.4.10 (2026-11-02): additive. UI plan 4b (X1 to X7) and DD6. (1) Notification inbox (X1): `GET /notifications` gains `snoozed` (hide default, only, include) and `unread_count` counts only visible ones; `POST /notifications/{id}/unread`, `POST /notifications/{id}/snooze` (a date-time, a plain date, or null to clear); `Notification.snoozed_until`; more `NotificationKind` values (`mention`, `followed_change` and the kinds the database already wrote). (2) Follow (X2): `PUT/DELETE /sites/{site_id}/follow`, `PUT/DELETE /registers/{register_key}/records/{record_id}/follow`, `GET /me/follows`; followers get a `followed_change` notification when a task of the site or the record changes, only while they can still read it. (3) Mentions (X3): `@1234` employee-ID tokens in a comment body are resolved like `mention_user_ids`; a person who cannot read the record is neither notified nor named in the answer; `GET/POST /registers/{register_key}/records/{record_id}/comments`. (4) X4: `GET /tasks/{task_id}/time-in-state` and `GET /reports/time-in-state` (needs `reports` view). (5) X5: `GET /reports/workload` (needs `reports` view; reassignment stays `POST /tasks/reassign`). (6) X6: `GET /tasks/{task_id}/blocked-by`. (7) X7: `GET/POST /status-updates`, `PATCH /status-updates/{id}`. (8) DD6: optional `via` (`button`, `drag`, `bulk`) on `start`, `submit`, `review`, `approve`, `reject` of tasks and register records and on `POST /approvals/bulk` (default `bulk`); it is recorded in the audit row and changes no rule. Migration 0031.
     - 0.4.9 (2026-11-01): additive. Write-through edits from the work views (spec registers-and-streams.md 2.7; Q73, Q99). `TaskSummary.register_fields` (only in `GET /sites/{site_id}/tasks`) lists the register-owned fields a task row shows: the value is read from the current record of the source register (the view keeps no copy), `source` points to the register record and `edit_via` says how to edit it with the existing register endpoints (`patch`: `PATCH /registers/{register_key}/records/{id}`; `new_version`: `POST .../versions` first; `create`: `POST /registers/{register_key}/records`). Permissions, the Entry / Review / Approve path and the audit are those of the register, so there is no new endpoint. A register the caller cannot view is left out. BU and EF move to the As-Built register (new fields `cw_as_built_submitted`, `as_built_date`; tasks B13 and D15) and FO / FT to the Dismantle register (the contractor of the `cw` and `te` parts; task E2), Q99. Migration 0029.
@@ -417,12 +418,22 @@ paths:
       operationId: startTwoFactorEnrolment
       summary: Enrolment step 1 - a new secret for the QR code
       description: |
-        Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up). Makes a new secret,
-        stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and returns it once: the `otpauth_uri`
-        (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the pending secret. The answer is
-        never cached. A user who is already enrolled cannot start again; an admin reset is needed.
+        Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up) **and the one-time
+        enrolment code** (0.6.0) that an admin handed to the user (shown once when the admin turned two-factor on, reset it or issued a new code).
+        The code is checked in the database before anything else: without a right code no secret is made, none is stored and no QR code is shown, so
+        a password alone can never enrol a phone. A missing `enrol_code` is 422 and counts for nothing. A wrong code is 401 `invalid_enrol_code`, a
+        code past its end is 401 `enrol_code_expired`; both count toward the same lock as wrong TOTP codes (5 in a row lock the account for 15
+        minutes and end every pending sign-in). The code is not used up here (the QR code may be redrawn); it is used up at the confirm step.
+        With the right code it makes a new secret, stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and
+        returns it once: the `otpauth_uri` (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the
+        pending secret. The answer is never cached. A user who is already enrolled cannot start again; an admin reset is needed.
       x-db-path: auth_totp_begin_enrol
       security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoFactorEnrolStart' }
       responses:
         '200':
           description: Secret and URI.
@@ -430,6 +441,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/TwoFactorEnrolment' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/local/2fa/enrol/confirm:
     post:
@@ -440,6 +452,9 @@ paths:
         The user types the code their app shows for the secret from step 1. On success the secret becomes active, 10 one-time recovery codes are
         made (stored as a keyed hash, shown once in this answer, never again), the pending sign-in is used up and the user is signed in
         (session cookie set). A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code.
+        **0.6.0:** the enrolment code is sent again in `enrol_code` and checked again in the same database step that activates the secret; it is
+        used up there (single use). A wrong or expired enrolment code is 401 `invalid_enrol_code` or `enrol_code_expired`, counts toward the same lock,
+        and activates nothing. A code replaced by an admin in the meantime is a wrong code.
       x-db-path: auth_totp_confirm_enrol
       security: []
       requestBody:
@@ -449,9 +464,10 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [code]
+              required: [code, enrol_code]
               properties:
                 code: { type: string, minLength: 1, maxLength: 16, description: 'The 6-digit code. Spaces are ignored.' }
+                enrol_code: { $ref: '#/components/schemas/EnrolCodeInput' }
       responses:
         '200':
           description: Enrolled and signed in.
@@ -1231,7 +1247,10 @@ paths:
         reason and the acting admin's own step-up. **Nobody changes their own setting** (403 `self_beneficiary`, also for an admin). Only a
         System Admin changes an admin or a delegate. The user needs a local account (422 otherwise).
         On: the user is asked to enrol (QR code) at the next sign-in, and their local sessions end now so no session lives on without a
-        code. Off: the secret and the recovery codes are deleted. Setting what is already set changes nothing and writes no audit row.
+        code. **0.6.0:** the answer carries a one-time `enrol_code` (and `enrol_code_expires_at`), shown only in this answer and never cached: the
+        admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
+        recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
+        no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
         The change is audited with before and after (never the secret). Users can never turn it off themselves.
       x-step-up: true
       x-db-path: idm_set_two_factor
@@ -1266,6 +1285,7 @@ paths:
       description: |
         Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor`. Clears the secret and the recovery codes, forces a
         new enrolment at the next sign-in and ends all the user's sessions. 409 `invalid_transition` when two-factor is not on for the user.
+        **0.6.0:** returns a new one-time `enrol_code` and `enrol_code_expires_at` (shown once, never cached) that the user needs to enrol again.
       x-step-up: true
       x-db-path: idm_reset_two_factor
       parameters:
@@ -1278,6 +1298,39 @@ paths:
       responses:
         '200':
           description: New state (`pending_enrolment`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/two-factor/enrol-code:
+    post:
+      tags: [users]
+      operationId: issueUserTwoFactorEnrolCode
+      summary: Issue a new one-time enrolment code for a user who is waiting for enrolment (0.6.0)
+      description: |
+        Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor` (System Admin, or a delegate holding `users.two_factor`;
+        nobody issues one for their own account, 403 `self_beneficiary`). For a user whose two-factor is on and who has not enrolled yet
+        (`two_factor` = `pending_enrolment`): the code was lost, has expired, or the admin does not trust it. The old code stops working at once, a
+        half-made enrolment is dropped and the user's pending sign-ins end. The new code is returned once (never cached); only a keyed hash is
+        stored, and it lasts the setting `two_factor.enrol_code_hours` (default 72). 409 `invalid_transition` when the user is not waiting for
+        enrolment (two-factor off, or already enrolled: use the reset). The change is audited (`two_factor_enrol_code_issued`, with whether the
+        old code was none, active or expired; never a code).
+      x-step-up: true
+      x-db-path: idm_issue_two_factor_enrol_code
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: The new code, shown once.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TwoFactorState' }
@@ -7749,6 +7802,8 @@ components:
         - confirmation_mismatch
         - invalid_credentials
         - invalid_code
+        - invalid_enrol_code
+        - enrol_code_expired
         - password_change_required
         - weak_password
         - internal_error
@@ -8029,6 +8084,22 @@ components:
       required: [two_factor]
       properties:
         two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
+        enrol_code:
+          type: string
+          pattern: '^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$'
+          description: '0.6.0. A new one-time enrolment code (8 characters, XXXX-XXXX). Present only when this call made one; shown only in this answer, never stored in clear, never cached. The admin hands it to the user in person or by phone.'
+        enrol_code_expires_at: { type: string, format: date-time, description: '0.6.0. When `enrol_code` stops working (setting `two_factor.enrol_code_hours`, default 72). Present with `enrol_code`.' }
+    EnrolCodeInput:
+      type: string
+      minLength: 1
+      maxLength: 32
+      description: '0.6.0. The one-time enrolment code the admin handed over. Upper or lower case, with or without the dash or spaces.'
+    TwoFactorEnrolStart:
+      type: object
+      additionalProperties: false
+      required: [enrol_code]
+      properties:
+        enrol_code: { $ref: '#/components/schemas/EnrolCodeInput' }
     Me:
       type: object
       required: [user, assignments, effective]
@@ -8103,6 +8174,7 @@ components:
             department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }], description: '0.4.0.' }
             must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
             two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
+            two_factor_enrol_code_expires_at: { type: [string, 'null'], format: date-time, description: '0.6.0. When the outstanding one-time enrolment code ends (a past time = expired); null when none is outstanding. Never the code itself.' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }

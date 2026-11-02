@@ -14,12 +14,13 @@ npm run typecheck
 npm run lint           # also bans $queryRawUnsafe / $executeRawUnsafe in src (ADR 0003)
 npm test               # needs a local PostgreSQL 16, see below
 printf '%s' "$PASSWORD" | node dist/cli.js hash-password   # argon2id PHC hash for idm_bootstrap_admin (installer)
+TOTP_ENC_KEY=... node dist/cli.js enrol-code <user-uuid>      # one-time two-factor enrolment code and its keyed hash (tools/install/reset-two-factor.sh)
 ```
 
 ## Environment (see `.env.example`)
 
 `DATABASE_URL` (role `pmis_app`), `PORT` (3000), `HOST` (127.0.0.1), `COOKIE_SECURE` (true; `false` only for plain-http development),
-`LOG_HMAC_KEY` (>= 16 characters), `TOTP_ENC_KEY` (required: 32 bytes as 64 hex characters, or base64; the AES-256-GCM key of the two-factor secrets and the base of the recovery-code hash key; `openssl rand -hex 32`; the installer generates it and keeps it on update; if it is lost every enrolled user must be reset by an admin and enrol again), `NODE_ENV`, `JOBS_ENABLED` (the daily job: SLA versions that take effect and the 14-day reminder of tentative
+`LOG_HMAC_KEY` (>= 16 characters), `TOTP_ENC_KEY` (required: 32 bytes as 64 hex characters, or base64; the AES-256-GCM key of the two-factor secrets and the base of the recovery-code and enrolment-code hash keys; `openssl rand -hex 32`; the installer generates it and keeps it on update; if it is lost every enrolled user must be reset by an admin and enrol again), `NODE_ENV`, `JOBS_ENABLED` (the daily job: SLA versions that take effect and the 14-day reminder of tentative
 holidays, once at start-up and at 02:00 Africa/Tripoli; absent = on, except when `NODE_ENV=test`). Nothing else is read.
 
 ## Tests

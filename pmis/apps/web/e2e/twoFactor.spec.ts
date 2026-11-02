@@ -2,8 +2,8 @@ import { createHmac } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 import { answerAnnouncements, DEMO, login, stepUp } from './helpers';
 
-// Two-factor (TOTP) for local accounts: an admin turns it on, the user enrols at the next sign-in (QR code, recovery codes),
-// then signs in with password and code. Both languages and both themes (Arabic runs right-to-left, dark theme).
+// Two-factor (TOTP) for local accounts: an admin turns it on and gets a one-time enrolment code (shown once), the user enters that code at the
+// next sign-in before the QR code appears, enrols (QR code, recovery codes), then signs in with password and code. Both languages and both themes (Arabic runs right-to-left, dark theme).
 
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 function b32decode(s: string): Buffer {
@@ -27,6 +27,7 @@ const signOut = (page: Page) => page.getByTestId('topbar-signout').click();
 
 for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
   test(`admin turns two-factor on, the user enrols, then signs in with a code ${locale} ${theme}`, async ({ page }) => {
+    test.setTimeout(60_000); // five sign-ins and two dialogs, in a dev server
     await page.addInitScript(([l, t]) => { localStorage.setItem('pmis.locale', l); localStorage.setItem('pmis.theme', t); }, [locale, theme]);
 
     // 1. The admin turns it on for the engineer (reason and step-up).
@@ -38,7 +39,16 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
     await page.getByTestId('two-factor-dialog-reason').fill('Approver of final acceptances');
     await page.getByTestId('two-factor-dialog-submit').click();
     await stepUp(page, 'pm');
+    // The one-time enrolment code is shown once; the admin hands it to the user and confirms.
+    await expect(page.getByTestId('enrol-code-dialog')).toBeVisible();
+    const enrolCode = (await page.getByTestId('enrol-code-value').textContent())!.trim();
+    expect(enrolCode).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    await expect(page.getByTestId('enrol-code-expiry')).toBeVisible();
+    if (locale === 'ar') await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    await page.getByTestId('enrol-code-done').click();
+    await expect(page.getByTestId('enrol-code-dialog')).toHaveCount(0);
     await expect(page.getByTestId('tf-badge-1204')).toHaveAttribute('data-state', 'pending_enrolment');
+    await expect(page.getByTestId('enrol-code-status')).toHaveAttribute('data-state', 'active');
     // nobody changes their own
     await page.goto('/admin/users');
     await page.getByTestId('user-open-1001').click();
@@ -47,12 +57,22 @@ for (const [locale, theme] of [['en', 'light'], ['ar', 'dark']] as const) {
 
     // 2. The engineer is forced to enrol before anything else.
     await login(page, 'engineer');
-    await expect(page.getByTestId('enrol-form')).toBeVisible();
-    await expect(page.getByTestId('enrol-qr')).toBeVisible();
+    // The password alone shows no QR code: the enrolment code comes first.
+    await expect(page.getByTestId('enrol-code-form')).toBeVisible();
+    await expect(page.getByTestId('enrol-qr')).toHaveCount(0);
     if (locale === 'ar') {
-      await expect(page.getByTestId('enrol-form')).toContainText('إعداد التحقق الثنائي');
+      await expect(page.getByTestId('enrol-code-form')).toContainText('أدخل رمز التسجيل');
       await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
     }
+    await page.getByTestId('enrol-admin-code').fill('AAAABBBB');
+    await page.getByTestId('enrol-admin-code-submit').click();
+    await expect(page.getByTestId('enrol-admin-code-error')).toBeVisible();
+    await expect(page.getByTestId('enrol-qr')).toHaveCount(0);
+    await page.getByTestId('enrol-admin-code').fill(enrolCode);
+    await page.getByTestId('enrol-admin-code-submit').click();
+    await expect(page.getByTestId('enrol-form')).toBeVisible();
+    await expect(page.getByTestId('enrol-qr')).toBeVisible();
+    if (locale === 'ar') await expect(page.getByTestId('enrol-form')).toContainText('إعداد التحقق الثنائي');
     const key = (await page.getByTestId('enrol-key').textContent())!.replace(/\s/g, '');
     expect(key).toMatch(/^[A-Z2-7]{32}$/);
     await page.getByTestId('enrol-code').fill('000000');

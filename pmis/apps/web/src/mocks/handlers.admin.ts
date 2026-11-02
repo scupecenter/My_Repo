@@ -31,7 +31,7 @@ export const orgOf = (u: MockUser) => {
 export const userOf = (u: MockUser) => {
   const s = prof(u), c = cred(accountKeyOf(u));
   return {
-    ...uref(u), ...orgOf(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, two_factor: tfLabel(c), must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
+    ...uref(u), ...orgOf(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, two_factor: tfLabel(c), two_factor_enrol_code_expires_at: tfLabel(c) === 'pending_enrolment' && c?.tf?.enrolCode && c.tf.enrolExpires ? new Date(c.tf.enrolExpires).toISOString() : null, must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
   };
 };
 const rowsOf = (e: string, ended = false) => A().assignments.filter((a) => a.user.employee_id === e && (ended || a.is_active_now));

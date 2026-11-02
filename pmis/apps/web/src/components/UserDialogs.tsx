@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fieldErrors, useCreateLocalUser, useResetPassword, useResetTwoFactor, useSetTwoFactor } from '@/api/auth';
+import { fieldErrors, useCreateLocalUser, useIssueEnrolCode, useResetPassword, useResetTwoFactor, useSetTwoFactor } from '@/api/auth';
 import { api, ApiError } from '@/api/client';
-import type { BulkResult, TwoFactorLabel, User, UserDetail } from '@/api/types';
+import type { BulkResult, TwoFactorLabel, TwoFactorState, User, UserDetail } from '@/api/types';
+import { EnrolCodeDialog } from './EnrolCodeDialog';
 import { errText, FormDialog } from './FormDialog';
 import { useToast } from './Toast';
 import { PasswordMode, TempPasswordDialog } from './TempPassword';
@@ -35,17 +36,29 @@ export function TwoFactorBadge({ user }: { user: Pick<User, 'two_factor' | 'empl
   return <span className={`chip ${TF_TONE[state]}`} data-testid={`tf-badge-${k}`} data-state={state} title={t(`twoFactor.badge_title_${state}`)}>{t('twoFactor.badge_label')}: {t(`twoFactor.badge_${state}`)}</span>;
 }
 
-/** Admin action on a user's two-factor: turn on, turn off or reset (lost phone). Reason required; the step-up (password and code) is asked by the client. */
-export function TwoFactorDialog({ user, action, onClose }: { user: Pick<User, 'id' | 'display_name'>; action: 'on' | 'off' | 'reset'; onClose: () => void }) {
+/**
+ * Admin action on a user's two-factor: turn on, turn off, reset (lost phone) or issue a new enrolment code. Reason required; the step-up
+ * (password and code) is asked by the client. Turning on, reset and a new code return a one-time enrolment code (contract 0.6.0): it is shown
+ * once in a dialog that closes only with its button, with the date it expires.
+ */
+export function TwoFactorDialog({ user, action, onClose }: { user: Pick<User, 'id' | 'display_name'>; action: 'on' | 'off' | 'reset' | 'code'; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const set = useSetTwoFactor(user.id), reset = useResetTwoFactor(user.id);
-  const m = action === 'reset' ? reset : set;
-  const done = { onSuccess: () => { toast(t(`twoFactor.done_${action}`)); onClose(); } };
+  const set = useSetTwoFactor(user.id), reset = useResetTwoFactor(user.id), issue = useIssueEnrolCode(user.id);
+  const [shown, setShown] = useState<{ code: string; expires: string } | null>(null);
+  const m = action === 'reset' ? reset : action === 'code' ? issue : set;
+  const close = () => { set.reset(); reset.reset(); issue.reset(); setShown(null); onClose(); };
+  const done = {
+    onSuccess: (r: TwoFactorState) => {
+      if (r.enrol_code && r.enrol_code_expires_at) setShown({ code: r.enrol_code, expires: r.enrol_code_expires_at });
+      else { toast(t(`twoFactor.done_${action}`)); close(); }
+    },
+  };
+  if (shown) return <EnrolCodeDialog code={shown.code} expiresAt={shown.expires} name={user.display_name} onClose={() => { toast(t(`twoFactor.done_${action}`)); close(); }} />;
   return (
-    <FormDialog open onClose={onClose} testid="two-factor-dialog" title={t(`twoFactor.${action}_title`, { name: user.display_name })} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
-      submitLabel={t(action === 'on' ? 'twoFactor.admin_turn_on' : action === 'off' ? 'twoFactor.admin_turn_off' : 'twoFactor.admin_reset')}
-      onSubmit={(reason) => (action === 'reset' ? reset.mutate({ reason }, done) : set.mutate({ enabled: action === 'on', reason }, done))}>
+    <FormDialog open onClose={close} testid="two-factor-dialog" title={t(`twoFactor.${action}_title`, { name: user.display_name })} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
+      submitLabel={t(action === 'on' ? 'twoFactor.admin_turn_on' : action === 'off' ? 'twoFactor.admin_turn_off' : action === 'reset' ? 'twoFactor.admin_reset' : 'twoFactor.admin_new_code')}
+      onSubmit={(reason) => (action === 'reset' ? reset.mutate({ reason }, done) : action === 'code' ? issue.mutate({ reason }, done) : set.mutate({ enabled: action === 'on', reason }, done))}>
       <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="two-factor-dialog-note">{t(`twoFactor.${action}_note`)}</p>
     </FormDialog>
   );

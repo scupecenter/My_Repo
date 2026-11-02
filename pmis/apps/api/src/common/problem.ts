@@ -6,7 +6,7 @@ export type ErrorCode =
   | 'module_forbidden' | 'action_forbidden' | 'field_read_only' | 'not_eligible_holder' | 'self_beneficiary'
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
-  | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'password_change_required' | 'weak_password' | 'internal_error'
+  | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use';
 
 export interface FieldError {
@@ -43,6 +43,8 @@ const TITLES: Record<string, string> = {
   account_locked: 'Account locked',
   invalid_credentials: 'Invalid credentials',
   invalid_code: 'Invalid code',
+  invalid_enrol_code: 'Invalid enrolment code',
+  enrol_code_expired: 'Enrolment code expired',
   password_change_required: 'Password change required',
   weak_password: 'Password does not meet the policy',
   internal_error: 'Internal error',

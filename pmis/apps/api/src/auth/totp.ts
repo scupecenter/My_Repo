@@ -143,3 +143,29 @@ export function hashRecoveryCode(encKey: Buffer, code: string): string {
   const key = Buffer.from(hkdfSync('sha256', encKey, Buffer.alloc(0), 'pmis-recovery-codes', 32));
   return createHmac('sha256', key).update(code).digest('hex');
 }
+
+// Enrolment codes (ADR 0014 amendment): 8 characters from the same 32-letter alphabet (40 bits), shown as XXXX-XXXX. An admin hands one to
+// a user who has not enrolled yet; without it the password alone cannot put a phone on the account.
+export const ENROL_CODE_LENGTH = 8;
+
+export function generateEnrolCode(): string {
+  let c = '';
+  for (let i = 0; i < ENROL_CODE_LENGTH; i++) c += RC_ALPHABET[randomInt(RC_ALPHABET.length)];
+  return `${c.slice(0, 4)}-${c.slice(4)}`;
+}
+
+/** Upper case, no spaces or dashes; null when it cannot be an enrolment code. */
+export function normaliseEnrolCode(raw: string): string | null {
+  const c = raw.toUpperCase().replace(/[\s-]/g, '');
+  return new RegExp(`^[${RC_ALPHABET}]{${ENROL_CODE_LENGTH}}$`).test(c) ? c : null;
+}
+
+/**
+ * Keyed hash of an enrolment code: HMAC-SHA-256 over "<user id>:<code>" with a key derived from TOTP_ENC_KEY (its own HKDF label, so it
+ * is not the recovery-code key). The user id is part of the input: the code of one user never matches another user. The database stores and
+ * compares only this hash. A text that is not a well-formed code still gets a hash (of a fixed word), so the database counts the miss.
+ */
+export function hashEnrolCode(encKey: Buffer, userId: string, code: string | null): string {
+  const key = Buffer.from(hkdfSync('sha256', encKey, Buffer.alloc(0), 'pmis-enrol-codes', 32));
+  return createHmac('sha256', key).update(`${userId.toLowerCase()}:${code ?? 'not-a-code'}`).digest('hex');
+}
