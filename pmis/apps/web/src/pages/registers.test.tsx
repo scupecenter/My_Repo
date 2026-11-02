@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -184,37 +184,116 @@ describe('GECOL and HLC ownership (Q56, Q55)', () => {
 });
 
 describe('Template entry', () => {
-  it('downloads the template, uploads a filled one, reviews the batch row by row and approves the rest', async () => {
+  const uploadThroughDialog = async (u: ReturnType<typeof userEvent.setup>, name: string, body = 'x') => {
+    await u.click(await screen.findByTestId('more-menu')); // secondary tools live in "More" (plan T3)
+    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
+    await u.click(screen.getByTestId('register-template-upload'));
+    await u.upload(await screen.findByTestId('template-upload-file'), new File([body], name));
+    await u.click(screen.getByTestId('template-upload-submit'));
+  };
+
+  it('downloads the template (blank and pre-filled), uploads a filled one, reviews the diff, sends it into the flow and L2 decides row by row and all at once', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    renderApp(<Routed />, at('procurement'));
+    const u = userEvent.setup();
+    await u.click(await screen.findByTestId('more-menu'));
+    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
+    expect(screen.getByTestId('register-template-download')).toBeEnabled();
+    expect(screen.getByTestId('register-template-prefill')).toBeEnabled();
+    await u.keyboard('{Escape}');
+    await uploadThroughDialog(u, 'filled.xlsx');
+    await screen.findByTestId('page-register-batch');
+    await waitFor(() => expect(screen.getByTestId('batch-count-valid')).toHaveTextContent('4 valid'), { timeout: 4000 });
+    expect(screen.getByTestId('batch-status')).toHaveTextContent('Checked');
+    expect(screen.getByTestId('batch-count-invalid')).toHaveTextContent('2 invalid');
+    // the reasons per cell (the column header, then a plain sentence) and the diff per cell
+    expect(screen.getByTestId('batch-reason-7')).toHaveTextContent('Site ID: Unknown site, or a site outside your regions.');
+    expect(screen.getByTestId('batch-cell-error-7-site_code')).toBeInTheDocument();
+    expect(screen.getByTestId('batch-diff-old-4-order_status')).toHaveTextContent('Open');
+    expect(screen.getByTestId('batch-diff-new-4-order_status')).toHaveTextContent('Issued');
+    expect(screen.getByTestId('batch-diff-2-pr_no')).toHaveTextContent('PR-2026-11');
+    // nothing is a record yet: the rows wait for the uploader
+    expect(screen.queryByTestId('batch-row-approve-2')).not.toBeInTheDocument();
+    await u.click(screen.getByTestId('batch-submit'));
+    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
+    expect(screen.getByTestId('batch-steps').querySelector('[aria-current="step"]')).toHaveTextContent(/In the flow/);
+    // L2 returns one row with a note, approves another, then approves what is left
+    await u.click(await screen.findByTestId('batch-row-reject-2'));
+    await u.type(await screen.findByTestId('reject-note'), 'Wrong PR date');
+    await u.click(screen.getByTestId('reject-submit'));
+    await waitFor(() => expect(screen.getByTestId('batch-decision-2')).toHaveTextContent('Returned'));
+    expect(screen.getByTestId('batch-note-2')).toHaveTextContent('Wrong PR date');
+    await u.click(screen.getByTestId('batch-row-approve-3'));
+    await waitFor(() => expect(screen.getByTestId('batch-decision-3')).toHaveTextContent('Approved'));
+    expect(screen.getByTestId('batch-status')).toHaveTextContent('Partly approved');
+    await u.click(screen.getByTestId('batch-approve-all'));
+    await waitFor(() => expect(screen.getByTestId('batch-done')).toBeInTheDocument());
+    expect(screen.getByTestId('batch-status')).toHaveTextContent('Approved');
+    const items = (await api.get<{ items: RegisterRecord[] }>('/registers/procurement/records')).items;
+    const created = items.find((r) => r.data.pr_no === 'PR-2026-12');
+    expect(created).toMatchObject({ state: 'approved', source: 'template' });
+    expect(items.find((r) => r.data.pr_no === 'PR-2026-11')).toMatchObject({ state: 'entry', last_return_note: 'Wrong PR date' });   // back at Entry, with the note
+    const updated = items.find((r) => r.entity_id === recId(1));
+    expect(updated).toMatchObject({ version_no: 2, state: 'approved', source: 'template' });
+    expect(updated?.data.order_status).toBe('Issued');
+    // the history of the new version says it came through the batch
+    const steps = await api.get<{ items: { batch_row_id?: string }[] }>(`/registers/procurement/records/${updated!.id}/history`);
+    expect(steps.items.every((s) => !!s.batch_row_id)).toBe(true);
+  });
+
+  it('holds a row whose record has an open version, lists it, and "approve all" leaves it alone', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    await api.post(`/registers/procurement/records/${recId(1)}/versions`, { version: 1 });       // an open version of the approved record
+    renderApp(<Routed />, at('procurement'));
+    const u = userEvent.setup();
+    await uploadThroughDialog(u, 'filled.xlsx');
+    await screen.findByTestId('page-register-batch');
+    await waitFor(() => expect(screen.getByTestId('batch-count-held')).toHaveTextContent('1 held'));
+    expect(screen.getByTestId('batch-held')).toHaveTextContent('1 row(s) wait for the previous version');
+    expect(screen.getByTestId('batch-decision-5')).toHaveTextContent('Held: previous version open');
+    await u.click(screen.getByTestId('batch-submit'));
+    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
+    expect(screen.getByTestId('batch-outcome-held')).toHaveTextContent('1 row(s) are held');
+    await u.click(await screen.findByTestId('batch-approve-all'));
+    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('Partly approved'));
+    expect(screen.getByTestId('batch-decision-5')).toHaveTextContent('Held: previous version open');   // untouched
+    expect(screen.getByTestId('batch-held-5')).toBeInTheDocument();
+  });
+
+  it('shows the server reason in the dialog for an old template version, a missing _tpl and a changed header', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement'));
     const u = userEvent.setup();
-    await u.click(await screen.findByTestId('more-menu')); // secondary tools live in "More" (plan T3)
-    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
-    expect(screen.getByTestId('register-template-download')).toBeEnabled();
-    fireEvent.change(screen.getByTestId('register-template-file'), { target: { files: [new File(['x'], 'filled.xlsx')] } });
-    await screen.findByTestId('page-register-batch');
-    await waitFor(() => expect(screen.getByTestId('batch-count-valid')).toHaveTextContent('4 valid'), { timeout: 4000 });
-    expect(screen.getByTestId('batch-count-invalid')).toHaveTextContent('2 invalid');
-    expect(screen.getByTestId('batch-reason-6')).toHaveTextContent('Site ID: Site not in the Site Register.');
-    await u.click(screen.getByTestId('batch-submit'));
-    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval')); // two levels: straight to L2
-    await u.click(await screen.findByTestId('batch-row-reject-2'));
-    await waitFor(() => expect(screen.getByTestId('batch-decision-2')).toHaveTextContent('Returned'));
-    await u.click(await screen.findByTestId('batch-approve-all'));
-    await waitFor(() => expect(screen.getByTestId('batch-done')).toBeInTheDocument());
-    const items = (await api.get<{ items: RegisterRecord[] }>('/registers/procurement/records')).items;
-    expect(items.filter((r) => String(r.data.pr_no).startsWith('PR-2026-1') && r.state === 'approved' && r.id !== recId(1)).length).toBeGreaterThanOrEqual(2);
+    await uploadThroughDialog(u, 'old_template.xlsx', 'retired');
+    const err = await screen.findByTestId('template-upload-error');
+    expect(err).toHaveAttribute('data-reason', 'outdated_version');
+    expect(err).toHaveTextContent('older version of the template');
+    expect(screen.getByTestId('template-upload-detail')).toHaveTextContent('version 1 of TPL-PO; the current version is 2');
+    expect(err).toHaveTextContent('written to the System Log');
+    expect(screen.getByTestId('template-upload-dialog')).toBeInTheDocument();                       // the dialog stays open, no batch page
+    await u.upload(screen.getByTestId('template-upload-file'), new File(['notpl'], 'plain.xlsx'));
+    await u.click(screen.getByTestId('template-upload-submit'));
+    await waitFor(() => expect(screen.getByTestId('template-upload-error')).toHaveAttribute('data-reason', 'tpl_missing'));
+    await u.upload(screen.getByTestId('template-upload-file'), new File(['tampered'], 'headers.xlsx'));
+    await u.click(screen.getByTestId('template-upload-submit'));
+    await waitFor(() => expect(screen.getByTestId('template-upload-error')).toHaveAttribute('data-reason', 'checksum_mismatch'));
+    expect(screen.queryByTestId('page-register-batch')).not.toBeInTheDocument();
   });
 
-  it('rejects an old template version with a plain reason', async () => {
+  it('discards a batch that was not sent', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement'));
-    await userEvent.click(await screen.findByTestId('more-menu'));
-    await waitFor(() => expect(screen.getByTestId('register-template-upload')).toBeEnabled());
-    fireEvent.change(screen.getByTestId('register-template-file'), { target: { files: [new File(['retired'], 'old_template.xlsx')] } });
-    await waitFor(() => expect(screen.getByTestId('toast')).toHaveTextContent('This template version is retired'));
+    const u = userEvent.setup();
+    await uploadThroughDialog(u, 'filled.xlsx');
+    await u.click(await screen.findByTestId('batch-discard'));
+    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('Discarded'));
+    expect(screen.getByTestId('batch-discarded')).toBeInTheDocument();
+    expect(screen.queryByTestId('batch-submit')).not.toBeInTheDocument();
   });
 });
+
 
 describe('Matrix: self-approval and empty cell', () => {
   it('warns before publishing when one person would hold every level (B5) and shows each cell rule', async () => {

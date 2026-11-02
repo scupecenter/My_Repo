@@ -1,12 +1,12 @@
-import { Download, FileDown, FileUp, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { downloadFile } from '@/api/client';
-import { useRegisterDefs, useRegisterRecords, useTemplates, useUploadBatch, type RecordFilters } from '@/api/registers';
+import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, type RecordFilters } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { RegisterDefinition } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
+import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { Holders } from '@/components/HolderChip';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
@@ -20,8 +20,6 @@ import { isLive, OWNER_NOTE } from '@/lib/registerForms';
 
 const RF_KEYS = ['q', 'region_id', 'state', 'record_type'] as const;
 const STATES = ['entry', 'in_review', 'in_approval', 'approved', 'voided'];
-/** Template per register until the contract's Template carries a register key (it has only module_key, which the seed does not fill yet). */
-const TEMPLATE_OF: Record<string, string> = { procurement: 'TPL-PO', gecol: 'TPL-GECOL', hlc: 'TPL-HLC', permits_hse: 'TPL-PRM' };
 
 export function RegisterSoon({ name }: { name: string }) {
   const { t } = useTranslation();
@@ -45,8 +43,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const regions = useRegions();
   const list = useRegisterRecords(key, f);
   const templates = useTemplates();
-  const upload = useUploadBatch();
-  const file = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const total = list.data?.pages[0]?.page.total ?? items.length;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
@@ -54,16 +51,13 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const defs: ColDef[] = [{ id: 'site', w: 100, min: 70, pinned: true }, { id: 'region', w: 110, min: 70 }, { id: 'type', w: 80, min: 60 }, ...fieldCols.map((c, i) => ({ id: `f:${c.code}`, w: 150, min: 70, off: i >= 4 })), { id: 'state', w: 130, min: 90 }, { id: 'ball', w: 180, min: 90 }];
   const tbl = useTablePrefs(`register-${key}`, defs);
 
-  const tpl = templates.data?.find((x) => x.template_id === TEMPLATE_OF[key]) ?? templates.data?.find((x) => x.module_key === def.module_key);
+  // contract 0.7.0: every register has its own approved template (Template.register_key)
+  const tpl = templates.data?.find((x) => x.register_key === key);
   const setRecord = (id: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (id) n.set('record', id); else n.delete('record'); return n; }, { replace: true });
   const rname = (id?: number | null) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || '—'; };
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
-  const down = () => tpl && downloadFile(`/templates/${tpl.template_id}/download`).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
-  const up = (x?: File) => {
-    if (!x || !tpl) return;
-    upload.mutate({ file: x, template_id: tpl.template_id }, { onSuccess: (b) => nav(`/registers/${key}/batches/${b.id}`), onError: (e) => toast(registerErrorMessage(t, e), 'err') });
-  };
+  const down = (prefill: boolean) => tpl && downloadTemplate(tpl.template_id, { prefill, regionId: f.region_id || undefined }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
   const label = (id: string) => { const fc = fieldCols.find((c) => `f:${c.code}` === id); return fc ? fieldLabel(fc, i18n.language) : t({ site: 'sites.code', region: 'sites.region', type: 'registers.record_type', state: 'registers.state', ball: 'grid.ball' }[id] ?? id); };
   const W = totalWidth(tbl.cols, true);
   const real = items.filter((r) => !r.id.startsWith('tmp-'));
@@ -111,14 +105,17 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="register-export" source={key} filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={['site_code', 'region', 'record_type', 'state', ...tbl.cols.filter((c) => c.id.startsWith('f:')).map((c) => c.id.slice(2))]} />
         <MoreMenu items={[
-          { id: 'tpl-down', label: t('registers.template_download'), icon: <FileDown size={16} />, testid: 'register-template-download', disabled: !tpl, onSelect: () => void down() },
-          { id: 'tpl-up', label: t('registers.template_upload'), icon: <FileUp size={16} />, testid: 'register-template-upload', disabled: !tpl || upload.isPending, onSelect: () => file.current?.click() },
+          { id: 'tpl-down', label: t('registers.template_download'), icon: <FileDown size={16} />, testid: 'register-template-download', disabled: !tpl, onSelect: () => void down(false) },
+          { id: 'tpl-prefill', label: t('registers.template_prefill'), icon: <FileSpreadsheet size={16} />, testid: 'register-template-prefill', disabled: !tpl, onSelect: () => void down(true) },
+          { id: 'tpl-up', label: t('registers.template_upload'), icon: <FileUp size={16} />, testid: 'register-template-upload', disabled: !tpl, onSelect: () => setUploading(true) },
+          { id: 'tpl-batches', label: t('registers.template_batches'), icon: <ListChecks size={16} />, testid: 'register-template-batches', onSelect: () => nav(`/templates?register=${key}`) },
           ...(key === 'as_built' ? [{ id: 'items', label: t('asb.items_link'), icon: <Ruler size={16} />, testid: 'register-asbuilt-items', onSelect: () => nav('/as-built/items') }] : []),
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />
-        <input ref={file} type="file" accept=".xlsx" hidden data-testid="register-template-file" onChange={(e) => { up(e.target.files?.[0]); e.target.value = ''; }} />
         </>} />
+      {tpl && <TemplateUploadDialog open={uploading} onClose={() => setUploading(false)} templateId={tpl.template_id} templateName={`${name} · v${tpl.current_version}`}
+        onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
       <ActiveChips chips={chips} onClear={clearAll} />
       <div className="card overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">

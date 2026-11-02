@@ -10,6 +10,10 @@ import { CalendarService } from './calendar/calendar.service';
 import { AsBuiltItemsService } from './warehouse/as-built-items.service';
 import { AsBuiltItemsController, WarehouseController } from './warehouse/warehouse.controller';
 import { WarehouseService } from './warehouse/warehouse.service';
+import { ImportService } from './templates/import.service';
+import { ImportBatchesController, TemplatesController } from './templates/templates.controller';
+import { TemplatesService } from './templates/templates.service';
+import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
 import { RegistersService } from './registers/registers.service';
 import { FollowController } from './follow/follow.controller';
@@ -74,7 +78,7 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -82,7 +86,7 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

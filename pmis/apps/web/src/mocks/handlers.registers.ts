@@ -1,6 +1,7 @@
 // MSW handlers for the generic register endpoints and template import, following contracts/openapi.yaml (/registers, /import-batches).
 // The record shapes are the ones the real API answers (contract 0.4.5/0.4.6): entity_id, version_no, is_current, task (Q43), allowed_actions with claim,
-// release and new_version, history steps, and the versions of a logical record. Template import (/import-batches) is mock-only: the API does not build it yet.
+// release and new_version, history steps, and the versions of a logical record. Template entry (/templates, /import-batches, contract 0.7.0) follows the API:
+// staged at upload, sent into the flow by the uploader, decided row by row or all at once by L2, held rows listed.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { BallInCourt, ImportBatch, ImportRow, RegisterDefinition, RegisterRecord, RegisterRecordStep } from '@/api/types';
@@ -9,7 +10,7 @@ import { db, save, stepUpValid, viewer, accountStatus } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { uid } from './ids';
 import { holdersOf, rowOf } from './matrixData';
-import { REGISTER_DEFS, REGISTER_TEMPLATES, recId, type MockBatch, type MockRecord } from './registersData';
+import { REGISTER_DEFS, REGISTER_TEMPLATES, recId, type MockBatch, type MockBatchRow, type MockRecord } from './registersData';
 import { SITE_COUNT, siteIdOf, siteIndex, siteMeta, TODAY } from './sites';
 
 const B = API_BASE;
@@ -52,7 +53,7 @@ export function toRecord(r: MockRecord): RegisterRecord {
     id: r.id, register_key: r.register_key, record_type: r.record_type, site_id: m?.id ?? null, site_code: m?.code ?? null, region_id: (m?.region_id ?? null) as never, state: r.state,
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
-    entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: 'manual', ...(r.task ? { task: r.task } : {}),
+    entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: r.source ?? 'manual', ...(r.task ? { task: r.task } : {}),
   };
 }
 
@@ -61,8 +62,8 @@ const noMatch = (req: Request, r: MockRecord) => {
   if (!h) return problem(428, 'precondition_required', 'If-Match is required');
   return Number(h.replace(/"/g, '')) === r.version ? null : problem(412, 'precondition_failed', 'The record changed; reload and retry');
 };
-const step = (r: MockRecord, action: RegisterRecordStep['action'], level: number, note?: string, self = false) => {
-  r.steps.push({ id: crypto.randomUUID(), level, action, acted_by: ref(), note: note ?? null, created_at: new Date().toISOString(), self_approval: self });
+const step = (r: MockRecord, action: RegisterRecordStep['action'], level: number, note?: string, self = false, batchRow?: string) => {
+  r.steps.push({ id: crypto.randomUUID(), level, action, acted_by: ref(), note: note ?? null, created_at: new Date().toISOString(), self_approval: self, ...(batchRow ? { batch_row_id: batchRow } : {}) });
 };
 const touch = (r: MockRecord) => { r.version += 1; r.updated_at = new Date().toISOString(); };
 
@@ -245,114 +246,192 @@ export const registerHandlers = [
     return HttpResponse.json(toRecord(v), { status: 201, headers: { ETag: `"${v.version}"` } });
   }),
 
-  // ---- template import for registers; a call with `task_id` or another template falls through to the task upload mock
+
+  // ---- template entry (contract 0.7.0). The upload is staged at once (status `validated`); the uploader sends it into the flow (the rows become records
+  // waiting for L2); L2 approves rows, returns them with a note, or approves all; a row whose record has an open version is held.
+  http.get(`${B}/import-batches`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const u = new URL(request.url).searchParams;
+    const status = u.get('status'), tpl = u.get('template_id'), reg = u.get('register_key');
+    const items = R().batches.filter((b) => (!status || statusOf(b) === status) && (!tpl || b.template_id === tpl) && (!reg || b.register_key === reg)).map((b) => toBatch(b));
+    return page(items);
+  }),
   http.post(`${B}/import-batches`, async ({ request }) => {
     const g = guard(); if (g) return g;
     const fd = await request.formData();
     const tpl = String(fd.get('template_id') ?? ''), f = fd.get('file');
     const key = REGISTER_TEMPLATES[tpl];
-    if (!key || fd.get('task_id')) { // per-task upload (task grid): same answer as before
-      if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'template_rejected', 'Not an approved template', { reason: 'tpl_missing' } as never);
-      return HttpResponse.json({ id: crypto.randomUUID(), template_id: tpl || 'TPL-SITE', template_version: 1, status: 'parsing', counts: {}, version: 1, file_name: f.name }, { status: 202 });
+    const reject = (reason: string, title: string) => problem(422, 'template_rejected', title, { reason, detail: title } as never);
+    if (!key || fd.get('task_id')) { // per-task upload (task grid): the earlier answer
+      if (!f || typeof f === 'string' || f.size === 0) return reject('tpl_missing', 'The file has no template ID.');
+      return HttpResponse.json({ id: crypto.randomUUID(), template_id: tpl || 'TPL-SITE', template_version: 1, status: 'validated', counts: {}, version: 1, file_name: f.name }, { status: 202 });
     }
-    if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'template_rejected', 'Not an approved template', { reason: 'tpl_missing' } as never);
-    if ((await f.text()).includes('retired')) return problem(422, 'template_rejected', 'This template version is retired', { reason: 'outdated_version' } as never);
+    if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'validation_failed', 'The file is empty', { errors: [{ path: '/file', code: 'required' }] });
+    // (jsdom and undici have different File classes: a file that crossed the boundary may come back named "blob")
+    if (f.name !== 'blob' && !f.name.toLowerCase().endsWith('.xlsx')) return reject(f.name.toLowerCase().endsWith('.xlsm') ? 'macros_not_allowed' : 'not_xlsx', 'Only plain .xlsx workbooks are accepted.');
+    const text = await f.text();
+    if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
+    if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
+    if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
     const b = makeBatch(key, tpl, f.name);
     R().batches.unshift(b); save();
-    return HttpResponse.json(toBatch(b), { status: 202 });
+    return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
   }),
   http.get(`${B}/import-batches/:id`, ({ params }) => {
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
-    if (b.status === 'parsing' && Date.now() - b.created > 400) { b.status = 'validated'; b.version += 1; save(); }
     return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
   }),
-  http.get(`${B}/import-batches/:id/rows`, ({ params }) => {
+  http.get(`${B}/import-batches/:id/rows`, ({ params, request }) => {
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
-    return b ? page(b.rows.map(toRow)) : problem(404, 'not_found', 'Batch not found');
+    if (!b) return problem(404, 'not_found', 'Batch not found');
+    const u = new URL(request.url).searchParams, action = u.get('action'), decision = u.get('decision');
+    return page(b.rows.filter((r) => (!action || r.action === action) && (!decision || (r.action !== 'error' && r.action !== 'unchanged' && decisionOf(r) === decision))).map(toRow));
   }),
   http.post(`${B}/import-batches/:id/submit`, ({ params, request }) => {
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
-    const h = request.headers.get('If-Match');
-    if (!h) return problem(428, 'precondition_required', 'If-Match is required');
-    if (Number(h.replace(/"/g, '')) !== b.version) return problem(412, 'precondition_failed', 'The batch changed; reload');
-    if (b.status !== 'validated') return problem(409, 'invalid_transition', 'The batch is not waiting to be sent');
-    if (!b.rows.some((r) => r.action !== 'error')) return problem(422, 'validation_failed', 'No valid rows', { errors: [{ path: '/rows', code: 'no_valid_rows' }] });
-    b.status = b.levels_required <= 2 ? 'in_approval' : 'in_review'; b.current_level = b.levels_required <= 2 ? b.levels_required : 2; b.version += 1; save(); // two levels: straight to L2
-    return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
+    const bad = batchMatch(request, b); if (bad) return bad;
+    const v = viewer()!;
+    if (b.uploaded_by !== (v.employee_id ?? '9999')) return problem(403, 'not_eligible_holder', 'Only the person who uploaded the file can send it into the flow.');
+    if (!['validated', 'sent'].includes(b.status) || ['discarded'].includes(statusOf(b))) return problem(409, 'invalid_transition', 'The batch is not waiting to be sent');
+    if (!b.rows.some((r) => r.action === 'create' || r.action === 'update')) return problem(422, 'validation_failed', 'No valid rows', { errors: [{ path: '/rows', code: 'no_valid_rows' }] });
+    const key = b.register_key, selfApproval = userHolds(key, 1, v.employee_id, 2) && userHolds(key, 2, v.employee_id, 2);
+    if (selfApproval && !stepUpValid() && b.rows.some((r) => (r.action === 'create' || r.action === 'update') && r.decision === 'pending' && !r.record_id && !openVersionOf(r))) return stepUp();
+    const outcome: Outcome = { submitted: 0, held: [], failed: [] };
+    for (const row of b.rows) {
+      if ((row.action !== 'create' && row.action !== 'update') || row.record_id || row.decision === 'approved' || row.decision === 'rejected') continue;
+      const open = openVersionOf(row);
+      if (open) { row.decision = 'pending_previous_approval'; row.hold_reason = 'open_version'; row.hold_record_id = open.id; outcome.held.push({ row_id: row.id, row_no: row.row_no, key: row.key, reason: 'open_version', record_id: open.id }); continue; }
+      const rec = createRecordFor(b, row, selfApproval);
+      row.record_id = rec.id; row.decision = rec.state === 'approved' ? 'approved' : 'pending'; row.hold_reason = undefined; row.hold_record_id = undefined;
+      outcome.submitted! += 1;
+    }
+    b.status = 'sent'; b.version += 1; save();
+    return HttpResponse.json({ ...toBatch(b), outcome }, { headers: { ETag: `"${b.version}"` } });
   }),
   http.post(`${B}/import-batches/:id/decisions`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
-    const h = request.headers.get('If-Match');
-    if (!h) return problem(428, 'precondition_required', 'If-Match is required');
-    if (Number(h.replace(/"/g, '')) !== b.version) return problem(412, 'precondition_failed', 'The batch changed; reload');
-    const body = (await request.json()) as { action: 'review' | 'approve' | 'reject'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected' }[]; note?: string };
-    const reviewing = b.status === 'in_review', approving = b.status === 'in_approval';
-    if (!reviewing && !approving) return problem(409, 'invalid_transition', 'The batch is not in review');
-    if (!canAt(b.register_key, b.current_level)) return problem(403, 'not_eligible_holder', 'You do not hold this level');
-    const valid = b.rows.filter((r) => r.action !== 'error');
-    if (body.action === 'reject') {
-      if (!body.note?.trim()) return problem(422, 'note_required', 'A rejection needs a note', { errors: [{ path: '/note', code: 'required' }] });
-      valid.forEach((r) => { if (r.decision !== 'approved' || approving) r.decision = 'rejected'; });
-      b.status = 'rejected'; b.version += 1; save();
-      return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
+    const bad = batchMatch(request, b); if (bad) return bad;
+    const body = (await request.json()) as { action: 'review' | 'approve' | 'reject' | 'discard'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
+    const v = viewer()!, me = v.employee_id ?? '9999';
+    if (body.action === 'discard') {
+      if (b.uploaded_by !== me && v.key !== 'pm') return problem(403, 'not_eligible_holder', 'Only the person who uploaded the file can discard it.');
+      if (b.status !== 'validated') return problem(409, 'invalid_transition', 'Only a batch that has not been sent can be discarded. Return the rows with a note instead.');
+      b.rows.forEach((r) => { r.decision = 'rejected'; r.note = body.note ?? 'discarded'; });
+      b.status = 'discarded'; b.note = body.note ?? null; b.version += 1; save();
+      return HttpResponse.json({ ...toBatch(b), outcome: { decided: 0, approved: 0, rejected: 0, held: [], failed: [] } }, { headers: { ETag: `"${b.version}"` } });
     }
-    if ((body.action === 'review') !== reviewing) return problem(409, 'invalid_transition', 'Wrong action for this level');
-    const pending = valid.filter((r) => r.decision === 'pending');
-    if (body.scope === 'all') pending.forEach((r) => { r.decision = 'approved'; });
-    else for (const x of body.rows ?? []) { const r = pending.find((p) => p.id === x.row_id); if (!r) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: `/rows/${x.row_id}`, code: 'invalid_row' }] }); r.decision = x.decision; }
-    if (!valid.some((r) => r.decision === 'pending')) {
-      const okRows = valid.filter((r) => r.decision === 'approved');
-      const last = approving;
-      if (!okRows.length) b.status = 'rejected';
-      else if (!last) { b.status = 'in_approval'; b.current_level = b.levels_required; okRows.forEach((r) => { r.decision = 'pending'; }); }
-      else {
-        if (!stepUpValid() && b.levels_required > 0 && Array.from({ length: b.levels_required }, (_, i) => userHolds(b.register_key, i + 1, viewer()!.employee_id)).every(Boolean)) return stepUp();
-        applyBatch(b, okRows); b.status = 'applied';
+    if (b.status !== 'sent') return problem(409, 'invalid_transition', b.status === 'validated' ? 'The batch has not been sent into the flow yet.' : `The batch is ${statusOf(b)}.`);
+    if (body.action === 'reject' && body.scope === 'all' && !body.note?.trim()) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] });
+    if (!canAt(b.register_key, 2, 2)) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+    const targets = b.rows.filter((r) => (r.action === 'create' || r.action === 'update') && ['pending', 'pending_previous_approval'].includes(decisionOf(r))
+      && (body.scope === 'all' || (body.rows ?? []).some((x) => x.row_id === r.id)));
+    if (body.scope === 'rows' && !targets.length) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: '/rows', code: 'invalid_row' }] });
+    if (body.action === 'approve' && targets.some((r) => r.record_id) && !stepUpValid()) return stepUp();
+    const out: Outcome = { decided: 0, approved: 0, rejected: 0, held: [], failed: [] };
+    for (const r of targets) {
+      const one = body.scope === 'rows' ? body.rows!.find((x) => x.row_id === r.id)! : null;
+      const act = body.action === 'reject' || one?.decision === 'rejected' ? 'reject' : 'approve';
+      const note = (one?.note ?? body.note ?? '').trim();
+      if (!r.record_id) { // held: no record yet; "approve all" lists it, a return takes it back
+        if (act === 'reject') { if (!note) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] }); r.decision = 'rejected'; r.note = note; r.hold_reason = undefined; out.decided! += 1; out.rejected! += 1; }
+        else out.held.push({ row_id: r.id, row_no: r.row_no, key: r.key, reason: 'open_version', record_id: r.hold_record_id ?? null });
+        continue;
       }
+      const rec = R().records.find((x) => x.id === r.record_id)!;
+      if (act === 'reject') {
+        if (!note) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] });
+        step(rec, 'reject', 2, note, false, r.id); rec.state = 'entry'; rec.current_level = 1; rec.return_count += 1; rec.last_return_note = note; touch(rec);
+        r.decision = 'rejected'; r.note = note; out.rejected! += 1;
+      } else {
+        step(rec, 'approve', 2, undefined, false, r.id); rec.state = 'approved'; rec.current_level = 2; touch(rec);
+        r.decision = 'approved'; out.approved! += 1;
+      }
+      out.decided! += 1;
     }
-    b.version += 1; save();
-    return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
+    b.version += 1; if (body.action === 'reject' && body.note) b.note = body.note.trim(); save();
+    return HttpResponse.json({ ...toBatch(b), outcome: out }, { headers: { ETag: `"${b.version}"` } });
   }),
 ];
 
 // ---- batch helpers
+type Outcome = { submitted?: number; decided?: number; approved?: number; rejected?: number; held: { row_id: string; row_no: number; key: string | null; reason: 'open_version'; record_id?: string | null }[]; failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[] };
+const batchMatch = (req: Request, b: MockBatch) => {
+  const h = req.headers.get('If-Match');
+  if (!h) return problem(428, 'precondition_required', 'If-Match is required');
+  return Number(h.replace(/"/g, '')) === b.version ? null : problem(412, 'precondition_failed', 'The batch changed; reload');
+};
+/** The decision of a row follows its record (an approval made in the register screen counts too), as the API does. */
+function decisionOf(r: MockBatchRow): MockBatchRow['decision'] {
+  const rec = r.record_id ? R().records.find((x) => x.id === r.record_id) : undefined;
+  if (r.decision === 'pending' && rec) { if (rec.state === 'approved') return 'approved'; if (rec.state === 'voided' || (rec.state === 'entry' && rec.steps.some((s) => s.action === 'submit'))) return 'rejected'; }
+  return r.decision;
+}
+function statusOf(b: MockBatch): ImportBatch['status'] {
+  if (b.status !== 'sent') return b.status;
+  const valid = b.rows.filter((r) => r.action === 'create' || r.action === 'update'), d = (x: string) => valid.filter((r) => decisionOf(r) === x).length;
+  const open = d('pending') + d('pending_previous_approval');
+  return open > 0 ? (d('approved') + d('rejected') > 0 ? 'partially_approved' : 'in_approval') : d('approved') > 0 ? 'approved' : 'rejected';
+}
+/** The open (not yet approved) version of the record a row would change: it holds the row. */
+function openVersionOf(row: MockBatchRow): MockRecord | undefined {
+  const base = row.base_id ? R().records.find((x) => x.id === row.base_id) : undefined;
+  return base ? R().records.find((x) => x.entity_id === base.entity_id && ['entry', 'in_review', 'in_approval'].includes(x.state)) : row.hold_record_id ? R().records.find((x) => x.id === row.hold_record_id && ['entry', 'in_review', 'in_approval'].includes(x.state)) : undefined;
+}
+/** The row becomes a record in the flow (L1 done by the uploader); a person who holds L1 and L2 makes it a self-approval (B5). */
+function createRecordFor(b: MockBatch, row: MockBatchRow, self: boolean): MockRecord {
+  const now = new Date().toISOString(), id = recId(++R().seq);
+  const base = row.base_id ? R().records.find((x) => x.id === row.base_id) : undefined;
+  const rec: MockRecord = {
+    id, entity_id: base?.entity_id ?? id, version_no: base ? base.version_no + 1 : 1, supersedes_id: base?.id ?? null, register_key: b.register_key, record_type: base?.record_type ?? (b.register_key === 'procurement' ? 'pr' : null),
+    site_index: row.site_index, state: self ? 'approved' : 'in_approval', current_level: 2, levels_required: 2, data: { ...(base?.data ?? {}), ...row.payload }, version: 1, return_count: 0, last_return_note: null,
+    created_by: b.uploaded_by, created_at: now, updated_at: now, steps: [], source: 'template', batch_row_id: row.id,
+  };
+  step(rec, base ? 'new_version' : 'create', 1, undefined, false, row.id);
+  step(rec, 'edit', 1, undefined, false, row.id);
+  step(rec, 'submit', 1, undefined, self, row.id);
+  R().records.unshift(rec);
+  return rec;
+}
 function makeBatch(key: MockRecord['register_key'], template_id: string, file_name: string): MockBatch {
-  const L = levelsOf(key), def = defOf(key)!;
+  const def = defOf(key)!;
   const sample = (i: number): Record<string, unknown> => key === 'procurement' ? { scope: 'CW', delivery: 'Outsourced', pr_no: `PR-2026-1${i}`, pr_date: '2026-09-1' + i, order_status: 'Open' }
     : key === 'gecol' ? { pr_no: `GPR-2026-1${i}`, request_date: '2026-09-0' + i, survey_date: `2026-09-0${i + 1}`, meter_no: `M-9${i}00` } : key === 'hlc' ? { request_no: `HLC-2026-1${i}`, request_date: '2026-09-1' + i, fiber_status: 'Planned' }
       : { permit_type: 'Access - CW', status: 'Approved', valid_from: `2026-09-0${i + 1}`, has_expiry: true, valid_to: '2027-01-01' };
+  const change: Record<string, unknown> = key === 'procurement' ? { order_status: 'Issued' } : key === 'gecol' ? { meter_no: 'M-99999' } : key === 'hlc' ? { fiber_status: 'Installed' } : { valid_to: '2027-06-30' };
   const taken = new Set(R().records.filter((r) => r.register_key === key && !def.multiple_per_site).map((r) => r.site_index));
   const sites = [10, 11, 12, 13].map((s) => { let x = s; while (taken.has(x)) x += 7; return x; });
-  const rows: MockBatch['rows'] = sites.slice(0, 3).map((s, i) => ({ id: crypto.randomUUID(), row_no: i + 2, key: siteMeta(s).code, action: 'create' as const, decision: 'pending' as const, payload: sample(i + 1), site_index: s, errors: [], diff: Object.fromEntries(Object.entries(sample(i + 1)).slice(0, 3).map(([k, v]) => [k, { new: v }])) }));
-  rows.push({ id: crypto.randomUUID(), row_no: 5, key: siteMeta(sites[3]).code, action: 'unchanged', decision: 'pending', payload: sample(4), site_index: sites[3], errors: [], diff: {} });
-  rows.push({ id: crypto.randomUUID(), row_no: 6, key: 'XX999', action: 'error', decision: 'pending', payload: {}, site_index: null, errors: [{ column: 'Site ID', code: 'unknown_site', message: 'Site not in the Site Register' }], diff: {} });
-  rows.push({ id: crypto.randomUUID(), row_no: 7, key: siteMeta(14).code, action: 'error', decision: 'pending', payload: {}, site_index: 14, errors: [{ column: def.fields.find((f) => f.type === 'date')?.label_en ?? 'Date', code: 'date_range' }], diff: {} });
-  return { id: crypto.randomUUID(), register_key: key, template_id, file_name, status: 'parsing', current_level: 1, levels_required: L, version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
+  const rows: MockBatchRow[] = sites.slice(0, 2).map((s, i) => ({ id: crypto.randomUUID(), row_no: i + 2, key: siteMeta(s).code, action: 'create' as const, decision: 'pending' as const, payload: sample(i + 1), site_index: s, errors: [], diff: Object.fromEntries(Object.entries(sample(i + 1)).slice(0, 4).map(([k, v]) => [k, { old: null, new: v }])) }));
+  // an update of the newest approved record of the register (a new version, once approved), and a row held because its record has an open version
+  const approved = R().records.find((r) => r.register_key === key && r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r));
+  if (approved) rows.push({ id: crypto.randomUUID(), row_no: 4, key: siteMeta(approved.site_index ?? 0).code, action: 'update', decision: 'pending', payload: change, site_index: approved.site_index, errors: [], base_id: approved.id,
+    diff: Object.fromEntries(Object.entries(change).map(([k, v]) => [k, { old: approved.data[k] ?? null, new: v }])) });
+  const open = R().records.find((r) => r.register_key === key && ['entry', 'in_review', 'in_approval'].includes(r.state) && r.site_index !== null && R().records.some((x) => x.entity_id === r.entity_id && x.state === 'approved'));
+  if (open) rows.push({ id: crypto.randomUUID(), row_no: 5, key: siteMeta(open.site_index!).code, action: 'update', decision: 'pending_previous_approval', hold_reason: 'open_version', hold_record_id: open.id, payload: change, site_index: open.site_index, errors: [],
+    base_id: R().records.find((x) => x.entity_id === open.entity_id && x.state === 'approved')!.id, diff: Object.fromEntries(Object.entries(change).map(([k, v]) => [k, { old: null, new: v }])) });
+  rows.push({ id: crypto.randomUUID(), row_no: 6, key: siteMeta(sites[3]).code, action: 'unchanged', decision: 'pending', payload: sample(4), site_index: sites[3], errors: [], diff: {} });
+  rows.push({ id: crypto.randomUUID(), row_no: 7, key: 'XX999', action: 'error', decision: 'pending', payload: {}, site_index: null, errors: [{ column: 'Site ID', field: 'site_code', code: 'site_not_in_scope', message: 'Unknown site, or a site outside your regions.' }], diff: {} });
+  const dateField = def.fields.find((f) => f.type === 'date');
+  rows.push({ id: crypto.randomUUID(), row_no: 8, key: siteMeta(14).code, action: 'error', decision: 'pending', payload: {}, site_index: 14, errors: [{ column: dateField?.label_en ?? 'Date', field: dateField?.code ?? 'date', code: 'invalid_date', message: 'The date must be between 2020-01-01 and 2035-12-31.' }], diff: {} });
+  return { id: crypto.randomUUID(), register_key: key, template_id, file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
 }
-function applyBatch(b: MockBatch, rows: MockBatch['rows']) {
-  const now = new Date().toISOString();
-  for (const x of rows) {
-    if (x.action !== 'create') continue;
-    const id = recId(++R().seq);
-    R().records.unshift({ id, entity_id: id, version_no: 1, register_key: b.register_key, record_type: b.register_key === 'procurement' ? 'pr' : null, site_index: x.site_index, state: 'approved', current_level: b.levels_required, levels_required: b.levels_required, data: x.payload, version: 1, return_count: 0, last_return_note: null, created_by: b.uploaded_by, created_at: now, updated_at: now, steps: [{ id: crypto.randomUUID(), level: 1, action: 'submit', acted_by: ref(), note: `via batch ${b.id.slice(0, 8)}`, created_at: now }] });
-  }
-}
-function toRow(r: MockBatch['rows'][number]): ImportRow {
-  return { id: r.id, sheet: 'Data', row_no: r.row_no, key: r.key, action: r.action, diff: r.diff, errors: r.errors, decision: r.decision };
+function toRow(r: MockBatchRow): ImportRow {
+  const m = r.site_index !== null ? siteMeta(r.site_index) : null, rec = r.record_id ? R().records.find((x) => x.id === r.record_id) : undefined;
+  return { id: r.id, sheet: 'Data', row_no: r.row_no, key: r.key, site_code: m?.code ?? r.key, record_type: rec?.record_type ?? null, record_id: r.record_id ?? null, action: r.action, diff: r.diff, errors: r.errors, decision: decisionOf(r), ...(r.hold_reason ? { hold_reason: r.hold_reason } : {}), note: r.note ?? null };
 }
 function toBatch(b: MockBatch): ImportBatch {
-  const valid = b.rows.filter((r) => r.action !== 'error'), n = (a: string) => b.rows.filter((r) => r.action === a).length, d = (x: string) => valid.filter((r) => r.decision === x).length;
-  const ready = b.status !== 'parsing';
+  const n = (a: string) => b.rows.filter((r) => r.action === a).length;
+  const valid = b.rows.filter((r) => r.action === 'create' || r.action === 'update'), d = (x: string) => valid.filter((r) => decisionOf(r) === x).length;
+  const status = statusOf(b);
   return {
-    id: b.id, template_id: b.template_id, template_version: 1, source: 'template', file_name: b.file_name, status: b.status as ImportBatch['status'], current_level: b.current_level, levels_required: b.levels_required,
-    counts: ready ? { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected') } : {},
-    job_id: ready ? null : `job-${b.id.slice(0, 8)}`, task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
+    id: b.id, template_id: b.template_id, template_version: 1, source: 'template', file_name: b.file_name, status, current_level: b.status === 'validated' ? 1 : 2, levels_required: 2, register_key: b.register_key, note: b.note ?? null,
+    counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval') },
+    job_id: null, task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
   };
 }

@@ -96,7 +96,6 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/matrix'],
   ['patch', '/matrix'],
   // Contract 0.4.5: the register framework and its first four registers (apps/api: registers; migration 0019), every action the API implements.
-  // Template entry (`/templates`, `/import-batches`) is not built in the API yet and stays mocked.
   ['get', '/registers'],
   ['get', '/registers/:key/records'],
   ['post', '/registers/:key/records'],
@@ -112,6 +111,15 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/:key/records/:id/history'],
   ['get', '/registers/:key/records/:id/versions'],
   ['post', '/registers/:key/records/:id/versions'],
+  // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The stream templates and TPL-MASTER are not built yet.
+  ['get', '/templates'],
+  ['get', '/templates/:id/download'],
+  ['get', '/import-batches'],
+  ['post', '/import-batches'],
+  ['get', '/import-batches/:id'],
+  ['get', '/import-batches/:id/rows'],
+  ['post', '/import-batches/:id/submit'],
+  ['post', '/import-batches/:id/decisions'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

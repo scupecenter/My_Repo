@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { api, ApiError } from './client';
-import type { ImportBatch, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UserRef } from './types';
+import { api, ApiError, downloadFile } from './client';
+import type { ImportBatch, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UserRef } from './types';
 
 export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
@@ -126,44 +126,60 @@ export function useNewVersion(key: string) {
   });
 }
 
-// ---- template entry (contract: /templates, /import-batches)
-export const useTemplates = () => useQuery({ queryKey: ['templates'], staleTime: 300_000, queryFn: () => api.get<{ items: Template[] }>('/templates').then((r) => r.items) });
+// ---- template entry (contract 0.7.0: /templates, /import-batches)
+export const useTemplates = () => useQuery({ queryKey: ['templates'], staleTime: 60_000, queryFn: () => api.get<{ items: Template[] }>('/templates').then((r) => r.items) });
 
-/** The batch polls while it parses. */
+export type TemplateDownload = { prefill?: boolean; taskId?: string; siteIds?: string[]; regionId?: string };
+/** `GET /templates/{id}/download`: a blank copy, or a pre-filled one (the records in force inside the caller's regions). Returns the file name. */
+export const downloadTemplate = (templateId: string, o: TemplateDownload = {}): Promise<string> =>
+  downloadFile(`/templates/${templateId}/download`, {
+    ...(o.prefill ? { prefill: 'true' } : {}), ...(o.taskId ? { task_id: o.taskId } : {}), ...(o.siteIds?.length ? { site_ids: o.siteIds.join(',') } : {}), ...(o.regionId ? { region_id: o.regionId } : {}),
+  });
+
+/** The batch of an upload; its status follows the rows and the records they created. */
 export const useBatch = (id: string) =>
-  useQuery({ queryKey: ['import-batch', id], refetchInterval: (q) => (q.state.data?.status === 'parsing' ? 600 : false), queryFn: () => api.get<ImportBatch>(`/import-batches/${id}`) });
+  useQuery({ queryKey: ['import-batch', id], queryFn: () => api.get<ImportBatch>(`/import-batches/${id}`) });
 export const useBatchRows = (id: string, enabled: boolean) =>
   useQuery({ queryKey: ['import-batch-rows', id], enabled, queryFn: () => api.get<Page<ImportRow>>(`/import-batches/${id}/rows`, { query: { limit: 200 } }) });
 
+export type BatchFilters = { status: string; template_id: string; register_key: string };
+/** `GET /import-batches`: the batches the caller uploaded, or may see through the register's module. */
+export const useBatches = (f: BatchFilters) =>
+  useQuery({ queryKey: ['import-batches', f], queryFn: () => api.get<Page<ImportBatch>>('/import-batches', { query: { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), limit: 100 } }) });
+
+const settleBatch = (qc: QueryClient, id: string) => {
+  void qc.invalidateQueries({ queryKey: ['import-batch-rows', id] });
+  void qc.invalidateQueries({ queryKey: ['import-batches'] });
+  void qc.invalidateQueries({ queryKey: ['register-records'] });
+};
+
 export function useUploadBatch() {
-  return useMutation<ImportBatch, ApiError, { file: File; template_id: string }>({
-    mutationFn: ({ file, template_id }) => { const fd = new FormData(); fd.append('file', file); fd.append('template_id', template_id); return api.post('/import-batches', { body: fd, idempotencyKey: crypto.randomUUID() }); },
+  const qc = useQueryClient();
+  return useMutation<ImportBatch, ApiError, { file: File; template_id: string; task_id?: string }>({
+    mutationFn: ({ file, template_id, task_id }) => {
+      const fd = new FormData();
+      fd.append('file', file); fd.append('template_id', template_id);
+      if (task_id) fd.append('task_id', task_id);
+      return api.post('/import-batches', { body: fd, idempotencyKey: crypto.randomUUID() });
+    },
+    onSuccess: (b) => { qc.setQueryData(['import-batch', b.id], b); void qc.invalidateQueries({ queryKey: ['import-batches'] }); },
   });
 }
+/** The uploader sends the checked batch into the normal flow: its valid rows become records waiting for L2 (a self-approval needs the step-up dialog). */
 export function useSubmitBatch() {
   const qc = useQueryClient();
-  return useMutation<ImportBatch, ApiError, ImportBatch>({
+  return useMutation<ImportBatchResult, ApiError, ImportBatch>({
     mutationFn: (b) => api.post(`/import-batches/${b.id}/submit`, { version: b.version }),
     onSuccess: (b) => qc.setQueryData(['import-batch', b.id], b),
-    onSettled: (_d, _e, b) => { void qc.invalidateQueries({ queryKey: ['import-batch-rows', b.id] }); },
+    onSettled: (_d, _e, b) => settleBatch(qc, b.id),
   });
 }
-/** Row-by-row or all-at-once decision; the rows in the cache change at once and come back if the server refuses. */
+/** Approve, return (with a note) or discard: row by row, or all at once. The server decides every row again; the answer lists held and failed rows. */
 export function useDecideBatch() {
   const qc = useQueryClient();
-  return useMutation<ImportBatch, ApiError, { batch: ImportBatch; req: ImportDecisionRequest }, { before?: Page<ImportRow> }>({
+  return useMutation<ImportBatchResult, ApiError, { batch: ImportBatch; req: ImportDecisionRequest }>({
     mutationFn: ({ batch, req }) => api.post(`/import-batches/${batch.id}/decisions`, { version: batch.version, idempotencyKey: crypto.randomUUID(), body: req }),
-    onMutate: async ({ batch, req }) => {
-      await qc.cancelQueries({ queryKey: ['import-batch-rows', batch.id] });
-      const before = qc.getQueryData<Page<ImportRow>>(['import-batch-rows', batch.id]);
-      if (before && req.action !== 'reject') {
-        const rows = new Map((req.rows ?? []).map((r) => [r.row_id, r.decision]));
-        qc.setQueryData(['import-batch-rows', batch.id], { ...before, items: before.items.map((x) => (x.action === 'error' ? x : req.scope === 'all' && x.decision === 'pending' ? { ...x, decision: 'approved' as const } : rows.has(x.id) ? { ...x, decision: rows.get(x.id)! } : x)) });
-      }
-      return { before };
-    },
     onSuccess: (b) => qc.setQueryData(['import-batch', b.id], b),
-    onError: (_e, v, ctx) => qc.setQueryData(['import-batch-rows', v.batch.id], ctx?.before),
-    onSettled: (_d, _e, v) => { void qc.invalidateQueries({ queryKey: ['import-batch-rows', v.batch.id] }); void qc.invalidateQueries({ queryKey: ['register-records'] }); },
+    onSettled: (_d, _e, v) => settleBatch(qc, v.batch.id),
   });
 }

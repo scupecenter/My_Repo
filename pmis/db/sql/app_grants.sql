@@ -20,4 +20,5 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON wh_movements, wh_movement_lines, ware
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON notifications FROM pmis_app;  -- 0031: rows are created only by the definer functions; the owner of a row changes only read_at and snoozed_until (RLS limits them to their own rows)
 GRANT UPDATE (read_at, snoozed_until) ON notifications TO pmis_app;
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON watches, status_updates FROM pmis_app;  -- 0031: only through x_follow, x_unfollow, x_status_post and x_status_edit
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON template_definitions, template_versions, import_batches, import_batch_rows FROM pmis_app;  -- 0037: templates, versions, batches and rows are written only by tpl_sync*, imp_stage_batch, imp_submit_batch and imp_decide_batch
 REVOKE ALL ON user_totp, user_recovery_codes, auth_pending FROM pmis_app;  -- 0033: encrypted TOTP secrets, recovery-code hashes and pending sign-ins only through auth_totp_*, auth_pending_* and idm_*_two_factor
