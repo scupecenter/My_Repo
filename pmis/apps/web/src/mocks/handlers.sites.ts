@@ -5,6 +5,8 @@ import { levelKind, usedLevels } from '@/lib/matrixLevels';
 import { canAct, canEditTask, db, save, slotsOf, STAFF, stepUpValid, toDetail, viewer, skipPath, type MockTask } from './db';
 import { find, guard, ifMatch, page, problem, recordStep, stepUp } from './handlers';
 import { uid } from './ids';
+import { resolveMentions } from './handlers.x';
+import { rejectReason } from './handlers.documents';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
 import { REGISTER_DEFS, TEMPLATE_OF_REGISTER } from './registersData';
@@ -155,9 +157,9 @@ export const siteHandlers = [
     const g = guard(); if (g) return g;
     const t = find(params.id as string), v = viewer()!;
     if (!t) return problem(404, 'not_found', 'Task not found');
-    const { body } = (await request.json()) as { body?: string };
+    const { body, mention_user_ids } = (await request.json()) as { body?: string; mention_user_ids?: string[] };
     if (!body?.trim()) return invalid('/body', 'required');
-    const c = { id: crypto.randomUUID(), author: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined }, body: body.trim(), created_at: new Date().toISOString() };
+    const c = { id: crypto.randomUUID(), author: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined }, body: body.trim(), mentions: resolveMentions(body, mention_user_ids), created_at: new Date().toISOString() };
     t.comments = [...(t.comments ?? []), c];
     save();
     return HttpResponse.json(c, { status: 201 });
@@ -167,12 +169,21 @@ export const siteHandlers = [
     const t = find(params.id as string), v = viewer()!;
     const slot = t && slotsOf(t).find((s) => s.id === params.slot);
     if (!t || !slot) return problem(404, 'not_found', 'Slot not found');
-    const file = (await request.formData()).get('file');
+    const form = await request.formData();
+    const file = form.get('file');
     if (!file || typeof file === 'string') return invalid('/file', 'required'); // duck-typed: jsdom and undici have different File classes
-    if (file.size > 20 * 1024 * 1024) return problem(413, 'payload_too_large', 'File is larger than 20 MB');
-    const f = { id: crypto.randomUUID(), file_group_id: crypto.randomUUID(), version: 1, is_current: true, original_name: file.name, download_name: `${t.site_code}_${t.task_code}_${file.name}`, mime_type: file.type, size_bytes: file.size, uploaded_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name }, uploaded_at: new Date().toISOString() };
-    t.slots = slotsOf(t).map((s) => (s.id === slot.id ? { ...s, status: 'uploaded' as const, files: [...s.files, f] } : s));
-    t.slots_filled = t.slots.filter((s) => s.files.length).length;
+    if (!slot.can_upload && !(canEditTask(t) && ['missing', 'uploaded', 'rejected'].includes(slot.status))) return problem(409, 'invalid_transition', 'This slot takes no new file');
+    const limit = (slot.max_size_mb ?? 20) * 1024 * 1024;
+    if (file.size > limit) return problem(413, 'file_too_large', 'File is too large', { max_size_mb: slot.max_size_mb ?? 20 } as never);
+    const why = rejectReason(file.name, slot);
+    if (why) return problem(422, 'file_rejected', 'The file is not accepted', { reason: why, allowed: slot.formats } as never);
+    const replaces = form.get('replaces_file_group_id');
+    const prev = typeof replaces === 'string' && replaces ? slot.files.find((x) => x.file_group_id === replaces && x.is_current) : undefined;
+    if (!prev && slot.max_files != null && slot.files.filter((x) => x.is_current).length >= slot.max_files) return problem(422, 'file_rejected', 'The file is not accepted', { reason: 'too_many_files' } as never);
+    const fid = crypto.randomUUID();
+    const f = { id: fid, file_group_id: prev?.file_group_id ?? crypto.randomUUID(), version: (prev?.version ?? 0) + 1, is_current: true, original_name: file.name, download_name: `${t.site_code}_${t.task_code}_${slot.doc_code}_DRAFT-20261025.${file.name.split('.').pop()}`, mime_type: file.type, size_bytes: file.size, uploaded_by: { id: uid(v.employee_id ?? '9999'), display_name: v.name }, uploaded_at: new Date().toISOString(), approved_date: null, superseded_by: null, unknown_capture_date: slot.kind === 'photo' && !/exif/i.test(file.name), capture_date: null };
+    t.slots = slotsOf(t).map((s) => (s.id === slot.id ? { ...s, status: 'uploaded' as const, reject_reason: null, files: [...s.files.map((x) => (prev && x.id === prev.id ? { ...x, is_current: false, superseded_by: fid } : x)), f] } : s));
+    t.slots_filled = t.slots.filter((s) => s.files.some((x) => x.is_current)).length;
     save();
     return HttpResponse.json(f, { status: 201 });
   }),

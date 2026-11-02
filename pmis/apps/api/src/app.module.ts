@@ -40,9 +40,19 @@ import { UserStateService } from './auth/user-state.service';
 import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
+import { DocumentsController, LibraryController } from './documents/documents.controller';
+import { DocumentsService } from './documents/documents.service';
+import { LibraryService } from './documents/library.service';
+import { StorageService } from './documents/storage.service';
+import { ZipService } from './documents/zip.service';
 import { DbService } from './db/db.service';
 import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
+import { DashboardController } from './dashboard/dashboard.controller';
+import { DashboardService } from './dashboard/dashboard.service';
+import { ProjectStatusService } from './dashboard/project-status.service';
+import { WeightsController } from './dashboard/weights.controller';
+import { WeightsService } from './dashboard/weights.service';
 import { DelegationsController } from './delegations/delegations.controller';
 import { DelegationsService } from './delegations/delegations.service';
 import { DepartmentsController } from './departments/departments.controller';
@@ -78,7 +88,8 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController,
+      DashboardController, WeightsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -86,7 +97,8 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService,
+      DashboardService, ProjectStatusService, WeightsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

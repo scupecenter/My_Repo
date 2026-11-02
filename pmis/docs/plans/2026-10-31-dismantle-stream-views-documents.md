@@ -96,13 +96,13 @@ A separate O&M module, built in a later phase.
 | 2f | Move BU, EF (As-Built) and FO/FT (Dismantle / Procurement) to their source register | Done (API; FO/FT in Dismantle) | migration 0029, Q113 |
 | 3a | Dismantle register screen | Done (no Excel template yet) | web, generic register page, changelog 45 |
 | 3b | CW / TE / O&M views as tabs in the Site Register (streams stay the filter) | Done | contract 0.4.7, migration 0023, web tabs, changelog 46 |
-| 3c | Document type settings screen | Not started (unblocked, Q100 answered) | next |
+| 3c | Document type settings screen | Done (Settings → Document Library; draft, publish scope, versions, blank form) | contract 0.7.0, migration 0038, changelog 65 |
 | 9 | Remaining registers, Warehouse (DN/RN, stock), As-Built items, O&M view fix (Q102) | Done (API and web; movement creation screen pending) | migrations 0024-0028, contract 0.4.8, changelog 47-49 |
 | 4 | `HANDOVER.md` current | Ongoing | updated with every PR |
 | 7 | Settings screen for `views.om_team_assigned` (O&M team switch: who acts on TE FAC, no longer what is shown) | Not started | Q102 final; with document type settings |
 | 10 | O&M view final membership: D18 and Z1 always in O&M, D18 out of TE | Done (API) | migration 0030, changelog 52 |
 | 8 | Export buttons pass the `view` filter | Not started | check the export filter accepts `view` |
-| 5 | Document section: `.eml` and `.msg` in the ADR 0008 allow-list; no `.html` / `.mht` uploads | Not started (Q100 answered) | ADR 0008 amendment |
+| 5 | Document section: `.eml` and `.msg` in the ADR 0008 allow-list; no `.html` / `.mht` uploads | Done | ADR 0008 amendments 2026-11-02 |
 | 6 | CPE / end-user installation module | Later phase | section 5 |
 
 Owner decisions 2026-11-01 (Q101):

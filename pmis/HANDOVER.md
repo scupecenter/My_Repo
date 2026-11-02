@@ -4,6 +4,8 @@
 
 > **الحالة 2026-11-02 (للعمل من أي مكان):** على `main` حتى PR #63: قاعدة المستويين L1 وL2 (`CLAUDE.md`)، ومراحل الواجهة 1 و2 و3 (CHANGELOG 53 و58). **قيد العمل وغير مكتمل** على الفرع `claude/tender-wright-me9od1` (commit بعنوان WIP): المرحلة 4b من X1 إلى X7 (الهجرة 0031، المرآة `db/sql/030`، العقد 0.4.10، CHANGELOG 59 لم يُكتب بعد) والهجرة 0032 لتثبيت المستويين L1/L2 (المرآة `db/sql/031`، العقد 0.4.11، CHANGELOG 60 لم يُكتب بعد). `tsc` ناجح؛ **مجموعة اختبارات الـ API لم تُشغَّل على هذه النسخة**. الخطوة التالية: شغّل `bash tools/dev-setup.sh` ثم اختبارات الـ API، أصلح ما يفشل، تحقق من تطابق المرايا بـ `cmp`، اكتب CHANGELOG 59 و60 وحدّث هذا الملف. بعدها مراحل الواجهة 4 إلى 8 حسب `docs/plans/2026-11-01-ui-ux-unified-proposal.md`.
 
+> **المرحلة 4b (2026-11-02، CHANGELOG 66):** X1 إلى X7 مكتملة ومختبرة: الواجهة الخلفية (الهجرتان 0031 و0040، العقد 0.7.1) والواجهة (الوارد، المتابعة، الإشارات، الزمن، حمل العمل، محجوب بسبب، الحالة الأسبوعية) واختبارات الـAPI (`test/x-*.test.ts`) والويب (`phase4b.test.tsx`، `e2e/phase4b.spec.ts`) وحالات `tests/db-security/cases/88_x_features.sql`. المتبقي من خطة الواجهة: المراحل 4 و5 و6 و7 و8.
+
 Status on 2026-10-31: **main is at PR #48.** Phase P0 (Foundations) is complete and P1 (Core) is under way. Everything below is on `main` of this repository. Section 4 below was written in P0 and still says local passwords are deferred; local sign-in exists since migration 0010, so check the code and `CHANGELOG.md` before relying on it.
 The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream-views-documents.md`. They are **decided, not yet built**.
 

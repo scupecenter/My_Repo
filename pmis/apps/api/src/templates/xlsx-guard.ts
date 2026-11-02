@@ -69,6 +69,21 @@ function readSmall(buf: Buffer, e: Entry): string | null {
   }
 }
 
+/** The real inflated size of an entry, inflating at most `budget` bytes; 'too_big' past it, -1 when it cannot be read. */
+function realSize(buf: Buffer, e: Entry, budget: number): number | 'too_big' {
+  if (e.offset + 30 > buf.length || buf.readUInt32LE(e.offset) !== 0x04034b50) return -1;
+  const start = e.offset + 30 + buf.readUInt16LE(e.offset + 26) + buf.readUInt16LE(e.offset + 28);
+  if (start + e.compressed > buf.length) return -1;
+  const raw = buf.subarray(start, start + e.compressed);
+  if (e.method === 0) return raw.length;
+  if (e.method !== 8) return -1;
+  try {
+    return inflateRawSync(raw, { maxOutputLength: Math.max(1, budget) }).length;
+  } catch (err) {
+    return (err as { code?: string }).code === 'ERR_BUFFER_TOO_LARGE' ? 'too_big' : -1;
+  }
+}
+
 /** Anything in the package that can run or pull code or data from outside. */
 const FORBIDDEN_PARTS = [/vbaproject/i, /^xl\/macrosheets\//i, /^xl\/dialogsheets\//i, /^xl\/activex\//i, /^xl\/embeddings\//i, /^xl\/externallinks\//i, /^xl\/ctrlprops\//i, /^xl\/vbaprojectsignature/i];
 
@@ -86,6 +101,10 @@ export function guardXlsx(fileName: string, buf: Buffer): GuardResult {
     if (total > MAX_UNCOMPRESSED_BYTES || (e.size > 1024 * 1024 && e.compressed > 0 && e.size / e.compressed > MAX_RATIO)) {
       return { ok: false, reason: 'size_or_rows_exceeded', detail: 'The workbook expands to an unreasonable size.' };
     }
+    // The declared sizes can lie: inflate the entry for real, never past what is left of the budget, and refuse a mismatch.
+    const real = realSize(buf, e, MAX_UNCOMPRESSED_BYTES - (total - e.size));
+    if (real === 'too_big') return { ok: false, reason: 'size_or_rows_exceeded', detail: 'The workbook expands to an unreasonable size.' };
+    if (real !== e.size) return { ok: false, reason: 'not_xlsx', detail: 'The file is not a valid .xlsx workbook.' };
     if (FORBIDDEN_PARTS.some((re) => re.test(e.name))) {
       return { ok: false, reason: 'macros_not_allowed', detail: 'The workbook contains macros, embedded objects or external links, which are not accepted.' };
     }

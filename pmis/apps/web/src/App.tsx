@@ -9,6 +9,10 @@ import { AnnouncementPopup } from '@/components/AnnouncementPopup';
 import { Shell } from '@/components/Shell';
 import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
+import { Inbox } from '@/pages/Inbox';
+import { StatusUpdates } from '@/pages/StatusUpdates';
+import { Workload } from '@/pages/Workload';
+import { Dashboard } from '@/pages/Dashboard';
 import { ChangePassword } from '@/pages/ChangePassword';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
@@ -63,6 +67,10 @@ function gated(session: Session) {
         <Route path="change-password" element={<ChangePassword />} />
         <Route path="my-work" element={<MyWork />} />
         <Route path="approvals" element={<Approvals />} />
+        <Route path="inbox" element={<Inbox />} />
+        <Route path="workload" element={<Workload />} />
+        <Route path="status-updates" element={<StatusUpdates />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="sites" element={<Sites />} />
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="registers/:key" element={<RegisterPage />} />

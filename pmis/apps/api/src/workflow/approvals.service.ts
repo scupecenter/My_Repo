@@ -124,7 +124,7 @@ export class ApprovalsService {
       ? await this.db.tx.$queryRaw<{ task_id: string; slot_id: string; name: string; status: string; file_count: bigint }[]>(Prisma.sql`
           SELECT ds.task_id::text AS task_id, ds.id::text AS slot_id, dt.name_en AS name, ds.status::text AS status,
             (SELECT count(*) FROM document_files f WHERE f.slot_id = ds.id AND f.is_current) AS file_count
-          FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id WHERE ds.task_id = ANY(${ids}::uuid[]) ORDER BY dt.code, ds.id`)
+          FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id WHERE ds.task_id = ANY(${ids}::uuid[]) AND ds.status::text <> 'not_required' ORDER BY dt.code, ds.id`)
       : [];
 
     let items = summaries.map((task) => {

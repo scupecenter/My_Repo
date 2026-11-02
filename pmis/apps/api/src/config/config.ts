@@ -12,7 +12,22 @@ const schema = z.object({
   TOTP_ENC_KEY: z.string().refine((v) => parseEncKey(v) !== null, 'TOTP_ENC_KEY must be 32 bytes: 64 hex characters (openssl rand -hex 32) or base64'),
   // Daily job (owner answer Q84). Absent = on, except when NODE_ENV=test.
   JOBS_ENABLED: z.enum(['true', 'false']).optional(),
+  // Document storage (ADR 0008). S3-compatible object storage (MinIO on-prem) when all of S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY are set;
+  // otherwise a directory on local disk (small installs and tests).
+  S3_ENDPOINT: z.string().optional(),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY: z.string().optional(),
+  S3_SECRET_KEY: z.string().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  STORAGE_DIR: z.string().optional(),
 });
+
+export interface StorageConfig {
+  driver: 's3' | 'local';
+  /** Directory of the local driver (also created when it is missing). */
+  localDir: string;
+  s3?: { endpoint: string; bucket: string; accessKey: string; secretKey: string; region: string };
+}
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'production';
@@ -25,6 +40,20 @@ export interface AppConfig {
   totpEncKey: string;
   /** Runs the daily job (SLA versions due, tentative-holiday reminder) at start-up and at 02:00 Africa/Tripoli. */
   jobsEnabled: boolean;
+  /** Where document files and zip exports are kept. */
+  storage: StorageConfig;
+}
+
+function storageFrom(v: z.infer<typeof schema>): StorageConfig {
+  const localDir = v.STORAGE_DIR && v.STORAGE_DIR.trim() !== '' ? v.STORAGE_DIR : './storage';
+  const e = (x: string | undefined): string | undefined => (x && x.trim() !== '' ? x.trim() : undefined);
+  const endpoint = e(v.S3_ENDPOINT), bucket = e(v.S3_BUCKET), accessKey = e(v.S3_ACCESS_KEY), secretKey = e(v.S3_SECRET_KEY);
+  const some = [endpoint, bucket, accessKey, secretKey].filter((x) => x !== undefined).length;
+  if (some > 0 && some < 4) {
+    throw new Error('Invalid configuration:\n  S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY and S3_SECRET_KEY must all be set to use S3 storage (or none, for local disk)');
+  }
+  if (endpoint && bucket && accessKey && secretKey) return { driver: 's3', localDir, s3: { endpoint, bucket, accessKey, secretKey, region: v.S3_REGION } };
+  return { driver: 'local', localDir };
 }
 
 /** Reads the settings from the environment only. Throws one readable error listing every problem. */
@@ -44,6 +73,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     logHmacKey: v.LOG_HMAC_KEY,
     totpEncKey: v.TOTP_ENC_KEY,
     jobsEnabled: v.JOBS_ENABLED === undefined ? v.NODE_ENV !== 'test' : v.JOBS_ENABLED === 'true',
+    storage: storageFrom(v),
   };
 }
 

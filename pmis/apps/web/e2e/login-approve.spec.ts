@@ -26,7 +26,7 @@ for (const locale of ['en', 'ar'] as const) {
       await login(page, 'pm');
       await expect(page.getByTestId('page-my-work')).toBeVisible();
       await expect(page.getByTestId('my-work-count-do_now')).toHaveText('7');
-      await expect(page.getByTestId('bell-count')).toHaveText('2');
+      await expect(page.getByTestId('bell-count')).toHaveText('3'); // the seed has three unread (the phase 4b mention is the third)
 
       await page.getByTestId('my-work-go-approvals').click();
       const row = page.locator('[data-site="WM105"]');

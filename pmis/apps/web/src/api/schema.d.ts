@@ -1559,7 +1559,12 @@ export interface paths {
          */
         get: operations["listTaskSlots"];
         put?: never;
-        post?: never;
+        /**
+         * Add a slot to the task (one more candidate, or a conditional document that applies)
+         * @description For a document type placed on the task: a document that is `conditional` and whose rule the PMIS cannot evaluate yet (declare that it applies), or one more slot of the same type for another candidate
+         *     (`candidate_label`, for example each SAR candidate of A1). Allowed to Data Entry (L1) while the task is pending or ongoing. 409 `duplicate` when a slot of that type and label exists already.
+         */
+        post: operations["addTaskSlot"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1577,9 +1582,53 @@ export interface paths {
         put?: never;
         /**
          * Upload a file into a document slot (new version if the slot has files)
-         * @description Streams through the API; format by magic bytes, size and file count from the slot's document-type version (ADR 0008).
+         * @description Streams through the API (ADR 0008). Checks, in order: the caller holds Data Entry (L1) of the task (or is a System Admin when nobody holds it) and the task is pending or ongoing;
+         *     size against the slot's document-type version (413 `file_too_large`); the content type by magic bytes, never by the name or the client's content type, against the allowed formats
+         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`).
+         *     Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
+         *     The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
          */
         post: operations["uploadSlotFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/slots/{slot_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a file from a slot before the task is submitted
+         * @description The file is not deleted, it leaves the current set (`is_current` false, `superseded_by` null) and stays on record and in the audit log. Allowed to Data Entry (L1) while the task is pending or ongoing. The slot goes back to `missing` when it falls below `min_files`.
+         */
+        delete: operations["withdrawSlotFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/slots/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest the document slot of each file from its name (multi-file upload)
+         * @description The suggestion is confirmed by the user in a dropdown; nothing is stored. Matches the document code and the words of the document name against the file name, best first.
+         */
+        post: operations["suggestSlotTypes"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1630,8 +1679,74 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download a file (audited before streaming) */
+        /**
+         * Download a file (audited before streaming)
+         * @description Needs `download_documents` on the Documents screen in the file's region (404 outside the caller's regions). The audit row is written first, then the object is streamed through the API (no public bucket, no presigned URL).
+         *     `Content-Disposition: attachment` with the computed name `SITE_TASK_DOC_APPROVEDDATE.ext` (before approval `DRAFT` and the upload date replace the approved date; a superseded version adds `_v<n>`).
+         *     `Content-Type` is the type sniffed from the content when it was stored, with `X-Content-Type-Options: nosniff`. The id may also be the blank form of a document type.
+         */
         get: operations["downloadFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files of the document slots (the site Documents tab, and the cross-site list)
+         * @description Region and module scope apply as everywhere (a file outside the caller's regions is not listed). Needs `view` on the Documents screen. Newest first. Current files only unless `include_superseded` is true
+         *     (version history). `file_group_id` lists every version of one file.
+         */
+        get: operations["listDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk zip of documents, as a background job
+         * @description Scope: one `site_id`, one `stage_code` (across the sites in scope, or one site), one `doc_code` across sites, or an explicit `file_ids` list; combined with `slot_status`.
+         *     The caller needs `download_documents` and only files in the caller's regions are packed (the job runs with the requester's verified context). Layout `SITE/STAGE/NAME`, with the computed names and a `manifest.csv`
+         *     (name, original name, SHA-256, version, slot status). Superseded versions are packed only with `include_superseded`. Starting is audited with the scope and the number of files; each download of the zip is audited again.
+         *     422 `validation_failed` when the scope is empty, or no file matches. The file is kept 7 days, then 410 `export_expired`.
+         */
+        post: operations["startZipExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/zip/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a finished zip (audited before streaming) */
+        get: operations["downloadZipExport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2236,7 +2351,7 @@ export interface paths {
         head?: never;
         /**
          * Change rules in the draft
-         * @description Only for `status = draft` (else 409 `invalid_transition`). Needs `settings.edit`. A light change (B9): allowed during the structural freeze.
+         * @description Only for `status = draft` (else 409 `invalid_transition`). Needs `weights.edit`. `If-Match` is the ETag of the draft (a hash of its activities). A light change (B9): allowed during the structural freeze.
          *     Each item of `rules` replaces the whole rule of its `task_code` (the base min and max, the start event, the calendar and all its overrides). Tasks not listed keep the rule copied from the version in force.
          *     **Validation (422 `validation_failed`, closed schema, `errors[].path` is a JSON pointer into the body):** `min_working_days` must not exceed `max_working_days`, in the base rule and in every override (`code` = `min_exceeds_max`, path of `max_working_days`); `unknown_task_code`; `unknown_start_event`; `unknown_calendar`; `duplicate_task_code`; `duplicate_override` (same scenario and region twice).
          *     Rule found for a task: most specific override wins (scenario and region, then region, then scenario, then the base rule).
@@ -2277,7 +2392,7 @@ export interface paths {
         put?: never;
         /**
          * Publish the draft as a new SLA version
-         * @description Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
+         * @description Needs `weights.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
          *     Tasks opened on or after `effective_date` use the new version. **A task keeps the SLA version in force when it opened**, so past KPIs and closed tasks never change. Only when `apply_to_open_tasks` is true are the SLA rule and due date of the open (not approved) tasks switched to the new version, by a `sla_recalculation` job that runs at once when `effective_date` is today and on that date otherwise; the start date of each task is not changed.
          *     A regional delegate can apply it only to open tasks in their delegated regions (403 `action_forbidden` otherwise).
          *     **Validation (422 `validation_failed`):** the same as the draft; `effective_date_in_past` (path `/effective_date`, earlier than today in Africa/Tripoli); `effective_date_not_after_current` (not later than the `effective_from` of the latest published version); a draft equal to the version in force is `no_changes`.
@@ -2305,7 +2420,7 @@ export interface paths {
         put?: never;
         /**
          * Create a draft weight set (a copy of the set in force, or of an older one)
-         * @description Needs the `settings` permission or a delegation of it (`settings.edit`). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
+         * @description Needs `weights.edit` (the System Admin or a delegation of it; the Settings screen reads). One open draft per `code` (a second one is 409 `duplicate`). A light change (B9): allowed during the structural freeze.
          *     `base_set_id` copies another set of the same `code` (for example an older set to go back to it); omitted means the set in force.
          */
         post: operations["createWeightSetDraft"];
@@ -2351,7 +2466,7 @@ export interface paths {
         put?: never;
         /**
          * Check the 100% rule and show the effect of the draft on current progress
-         * @description Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `settings.edit`.
+         * @description Changes nothing. Always 200: `valid` is false and `errors[]` lists the problems (same shape and codes as the publish 422), so the screen can show them without an error response. Needs `weights.edit`.
          *     `progress_current_pct` is the project progress with the set in force and `progress_new_pct` with the draft. Saved weekly snapshots are not part of the preview and never change.
          */
         post: operations["previewWeightSetPublish"];
@@ -2375,7 +2490,7 @@ export interface paths {
          * @description Needs `settings.edit` and step-up. A light change (B9): allowed during the structural freeze, never 409 `freeze_active`.
          *     **100% rule, per level (422 `validation_failed`):** the activity weights of the set must total 100, and the items of every activity that has items must total 100 (tolerance 0.001). Each level that fails gives one `errors[]` entry with `code` = `weights_must_total_100`, `path` = `/activities` for the set level or `/activities/<index>/items` for the items of one activity, and the actual total in `message`.
          *     Other 422 codes in `errors[].code`: `effective_date_in_past` (earlier than today in Africa/Tripoli), `effective_date_not_after_current` (not later than the `effective_from` of the latest published set of the same `code`), `no_changes`.
-         *     The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Current progress is recalculated with the new set by a `progress_recalculation` job (at once when the date is today, otherwise on that date). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
+         *     The set takes effect on `effective_date`; the previous set gets `effective_to` = `effective_date`. Progress is computed on every read with the set in force on the date, so there is nothing to recalculate (`recalculation_job_id` is null). **Saved weekly snapshots keep the values computed at the time** and a report can be re-run with an older set (`GET /project-status?weight_set_id=`).
          *     Audited with before and after values, the effective date and the reason.
          */
         post: operations["publishWeightSet"];
@@ -3400,6 +3515,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/document-library/{doc_type_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        /** Published versions of a definition (newest first), with the reason and the publish scope */
+        get: operations["listDocumentTypeVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document-library/{doc_type_id}/blank-form": {
         parameters: {
             query?: never;
@@ -3410,7 +3545,11 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Download the blank form of a document (audited)
+         * @description Same rules as `GET /files/{file_id}/download`. 404 when the document has no blank form.
+         */
+        get: operations["downloadBlankForm"];
         put?: never;
         /** Upload the optional blank form to download */
         post: operations["uploadBlankForm"];
@@ -4197,7 +4336,7 @@ export interface paths {
         };
         /**
          * My in-app notifications
-         * @description The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout.
+         * @description The bell polls this with `X-PMIS-Live: 1`; such a call does not extend the idle timeout. Only the caller's own notifications; one that points at a task or a register record is left out (with its count) once the caller can no longer read that module in that region (0.6.0).
          */
         get: operations["listNotifications"];
         put?: never;
@@ -4290,7 +4429,10 @@ export interface paths {
          */
         put: operations["followSite"];
         post?: never;
-        /** Stop following a site (0.4.10, X2) */
+        /**
+         * Stop following a site (0.4.10, X2)
+         * @description Needs only a session (0.7.1), because it removes the caller's own follow, also one the caller can no longer read. A malformed id is 404.
+         */
         delete: operations["unfollowSite"];
         options?: never;
         head?: never;
@@ -4316,7 +4458,10 @@ export interface paths {
          */
         put: operations["followRegisterRecord"];
         post?: never;
-        /** Stop following a register record (0.4.10, X2) */
+        /**
+         * Stop following a register record (0.4.10, X2)
+         * @description Needs only a session (0.7.1), like stopping a site follow. A malformed id is 404.
+         */
         delete: operations["unfollowRegisterRecord"];
         options?: never;
         head?: never;
@@ -4564,7 +4709,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Milestone pipeline (counts per milestone, active workflow version per site) */
+        /**
+         * Milestone pipeline (counts per milestone, active workflow version per site)
+         * @deprecated
+         * @description Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller's regions with more detail. Not built.
+         */
         get: operations["getMilestonePipeline"];
         put?: never;
         post?: never;
@@ -4581,7 +4730,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Progress by region */
+        /**
+         * Progress by region
+         * @deprecated
+         * @description Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller's regions with more detail. Not built.
+         */
         get: operations["getKpiByRegion"];
         put?: never;
         post?: never;
@@ -4598,7 +4751,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Delay attribution by responsible party (weight set `delay_attribution`) */
+        /**
+         * Delay attribution by responsible party (weight set `delay_attribution`)
+         * @deprecated
+         * @description Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller's regions with more detail. Not built.
+         */
         get: operations["getDelayAttribution"];
         put?: never;
         post?: never;
@@ -4615,7 +4772,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Project health index (weight set `health_index`) */
+        /**
+         * Project health index (weight set `health_index`)
+         * @deprecated
+         * @description Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller's regions with more detail. Not built.
+         */
         get: operations["getHealthIndex"];
         put?: never;
         post?: never;
@@ -4632,8 +4793,56 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Final Closure KPI: sites closed, % closed, pending CW FAC and TE FAC with age */
+        /**
+         * Final Closure KPI: sites closed, % closed, pending CW FAC and TE FAC with age
+         * @deprecated
+         * @description Superseded by `GET /dashboard` (0.7.2), which returns the same figures for the caller's regions with more detail. Not built.
+         */
         get: operations["getFinalClosureKpi"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The main dashboard, limited to the caller's regions and modules (0.7.2)
+         * @description One call for the whole dashboard page (owner request 2026-11-02; `docs/spec/dashboard-kpis.md`). It supersedes the five `/dashboard/*` reads below, which are not built.
+         *     Needs `dashboard.view`; a caller without it is 403 `module_forbidden`. **Every figure is computed from the sites in the caller's `dashboard.view` regions** (B3, VI-04): a Tripoli user never sees a Benghazi count, and the project-wide ("central") Project Status items (1.3, 1.5, 3.2 to 3.9, 6.1, 6.6, 7.7, 8.1) are left out and reported in `meta.central_items_hidden` whenever the figures are not for the whole project. The `issues` section needs `issues.view` as well and is null without it. Cancelled sites are left out of every figure; their number is `headline.sites_cancelled`.
+         *     **Reference date (Q34).** `ref_date` defaults to today and may be any earlier date. `basis.source` says how the figures were made: `live` (today), `snapshot` (a weekly snapshot dated exactly `ref_date` exists: headline, pipeline, streams and Project Status come from it; SLA, issues, delay attribution and health are computed as of the date) or `as_of_computed` (no snapshot: everything is computed from dated facts, an actual date counts when it is on or before the date; blocked gates are not available, `gates.available` is false). A date in the future is 422 `validation_failed` with `/ref_date` `in_future`.
+         *     **Counting (Q36).** Issues are counted for the owner bars and the totals, sites for `sites_with_open_issue`; the issue age is in working days from the raised date. **Health index** (rules.md section 9, version 1) is a draft under owner review (`health.draft`); the bands are the setting `dashboard.health_bands` (green from 85, amber from 70, red below, Q35). **Delay attribution** (rules.md section 8) is a draft too and has no attribution periods yet. Working days use the default work calendar (Friday and Saturday weekend, holidays table).
+         *     **Streams** are the stream codes of the workflow plus `DISMANTLE` (Q41). The `stream` filter keeps the sites the stream applies to (for `DISMANTLE` the sites with a Dismantle part) and limits the pipeline and the SLA to its stages.
+         */
+        get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export exactly the current dashboard view as a CSV file (0.7.2)
+         * @description Same query as `GET /dashboard`. The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+         */
+        get: operations["exportDashboard"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5680,6 +5889,18 @@ export interface components {
             };
         };
         DocumentFile: {
+            /**
+             * Format: date-time
+             * @description Photos: the EXIF capture date; null when the file has none.
+             */
+            capture_date?: string | null;
+            /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
+            unknown_capture_date?: boolean;
+            /**
+             * Format: uuid
+             * @description The file that replaced this version; null for the current version (and for a withdrawn file).
+             */
+            superseded_by?: string | null;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -5705,12 +5926,20 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             /** @enum {string} */
-            kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template";
+            kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
             /** @enum {string} */
             status: "missing" | "uploaded" | "in_review" | "approved" | "rejected" | "not_required";
             reject_reason?: string | null;
             candidate_label?: string | null;
+            /** Format: uuid */
+            doc_type_id?: string;
+            form_kind?: components["schemas"]["FormKind"] | null;
+            /** @description The document has a rule: it is on the task because the rule holds, or because Data Entry declared that it applies. */
+            conditional?: boolean;
+            /** @description The caller may upload to this slot now (Data Entry of a pending or ongoing task, slot not approved or in review). */
+            can_upload?: boolean;
+            expiry_tracked?: boolean;
             formats?: string[];
             max_size_mb?: number;
             min_files?: number;
@@ -6346,7 +6575,7 @@ export interface components {
             /** @description Percent inside the activity, at most 3 decimals. 0 means not weighted. */
             weight: number;
             unit?: string | null;
-            /** @description How the item is measured (method and source columns). */
+            /** @description How the item is measured, as a JSON object in text (0.7.2): `{"method":"tasks","tasks":["A2"],"plan":"MS1"}` counts the approved and the applicable instances of those task codes (a milestone task has the code of its milestone, MS1 to MS10) and plans against the baseline of the milestone `plan`; `{"method":"none","central":true}` is a project-wide item with no data in the PMIS yet: it is left out and its weight redistributed. Any other text is kept and measures nothing. */
             measure_rule?: string | null;
             source?: string | null;
         };
@@ -7336,9 +7565,13 @@ export interface components {
             code: string;
             /** @description Row version (ETag). */
             version: number;
-            /** @description Library version tasks snapshot on open (ADR 0007 §4). */
+            /** @description Library version tasks snapshot on open (ADR 0007 §4). 0 = never published (not on any task yet). */
             published_version?: number;
             has_unpublished_changes?: boolean;
+            /** @description Seeded from the blueprint and the Master (stages 4 to 10) and not yet reviewed by the product owner; cleared by the first publish. */
+            needs_review?: boolean;
+            /** @description Only on `GET /document-library/{doc_type_id}`: pending or ongoing tasks an "also open tasks" publish would reach. */
+            open_task_count?: number;
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
@@ -7347,6 +7580,55 @@ export interface components {
             code: string;
         };
         DocumentTypePatch: components["schemas"]["DocumentTypeFields"] & components["schemas"]["WithReason"] & Record<string, never>;
+        DocumentTypeVersion: {
+            version_no: number;
+            /** Format: date-time */
+            published_at: string;
+            published_by?: components["schemas"]["UserRef"];
+            /** Format: date */
+            effective_from?: string;
+            /** @enum {string} */
+            apply_to: "new_only" | "open_too";
+            reason?: string;
+            affected_open_tasks?: number;
+            spec: components["schemas"]["DocumentTypeFields"];
+        };
+        DocumentListItem: {
+            file: components["schemas"]["DocumentFile"];
+            /** Format: uuid */
+            slot_id: string;
+            /** @enum {string} */
+            slot_status: "missing" | "uploaded" | "in_review" | "approved" | "rejected" | "not_required";
+            candidate_label?: string | null;
+            doc_code: string;
+            doc_name_en: string;
+            doc_name_ar?: string | null;
+            /** @enum {string} */
+            kind: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
+            /** Format: uuid */
+            task_id?: string | null;
+            task_code?: string | null;
+            task_name?: string | null;
+            stage_code?: string | null;
+            stage_name?: string | null;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name?: string | null;
+            region_id: components["schemas"]["RegionId"];
+        };
+        /** @description At least one of `site_id`, `stage_code`, `doc_code` or `file_ids`. */
+        ZipExportRequest: {
+            /** Format: uuid */
+            site_id?: string;
+            stage_code?: string;
+            doc_code?: string;
+            file_ids?: string[];
+            /** @enum {string} */
+            slot_status?: "uploaded" | "in_review" | "approved" | "rejected";
+            /** @default false */
+            include_superseded: boolean;
+        };
         /** @description Common publish body (ADR 0007 §1). */
         PublishRequest: components["schemas"]["WithReason"] & {
             /** Format: date */
@@ -8352,11 +8634,21 @@ export interface components {
             name_ar?: string | null;
             weight: number;
             progress_pct: number;
+            /** @description False when no item of the activity could be measured: the activity is left out and its weight redistributed (0.7.2). */
+            measured?: boolean;
             items?: {
                 code: string;
                 name_en: string;
+                name_ar?: string | null;
                 weight: number;
+                unit?: string | null;
                 progress_pct: number;
+                /** @description False when the item is left out of the figure; see `reason` (0.7.2). */
+                measured?: boolean;
+                done?: number;
+                applicable?: number;
+                /** @enum {string|null} */
+                reason?: "not_weighted" | "no_data" | "central_hidden" | "not_applicable" | null;
             }[];
         };
         /** @description Ends at HOTO. Final Closure has its own KPI. */
@@ -8371,12 +8663,23 @@ export interface components {
             };
             weight_set: components["schemas"]["WeightSetRef"];
             progress_pct: number;
+            /** @description 0.7.2. Null ("not available") until every measured item has a baseline for all its units. */
+            planned_pct?: number | null;
+            /** @description 0.7.2. Actual divided by planned. */
+            spi?: number | null;
+            /** @description 0.7.2. Share of the weight whose plan dates are complete. */
+            plan_coverage_pct?: number;
+            /** @description 0.7.2. Project-wide items left out because the scope is below the whole project (VI-04). */
+            central_items_hidden?: number;
+            /** @description 0.7.2. Active sites behind the figure. */
+            sites_in_scope?: number;
             activities: components["schemas"]["ProjectStatusActivity"][];
             /** @description Present when `group_by` is region or site. */
             rows?: {
                 key: string;
                 label: string;
                 progress_pct: number;
+                planned_pct?: number | null;
                 /** @description Activity code to progress %. */
                 activities?: {
                     [key: string]: number;
@@ -8393,7 +8696,363 @@ export interface components {
             region_id?: components["schemas"]["RegionId"] | null;
             /** @description Value computed at the time; never recomputed. */
             progress_pct: number;
+            /** @description 0.7.2. */
+            planned_pct?: number | null;
+            /** @description 0.7.2. */
+            spi?: number | null;
+            /** @description 0.7.2. The health index of the scope at the time (draft formula). */
+            health_index?: number | null;
             weight_set: components["schemas"]["WeightSetRef"];
+        };
+        DashboardBasis: {
+            /** Format: date */
+            ref_date: string;
+            /** Format: date */
+            today: string;
+            /** @enum {string} */
+            source: "live" | "snapshot" | "as_of_computed";
+            /**
+             * Format: date
+             * @description The snapshot read when `source` is `snapshot`.
+             */
+            snapshot_date?: string | null;
+            /** @description Dates that have a weekly snapshot (the latest 60), for the date picker. */
+            snapshot_dates?: string[];
+            /** @description English sentence that says how a past date was made. Null for today. */
+            note?: string | null;
+        };
+        DashboardMeta: components["schemas"]["KpiMeta"] & {
+            /** @description True when the figures are for every site of the project (every region, no filter). */
+            project_wide?: boolean;
+            /** @description Project Status items left out because the figures are not project-wide (VI-04). */
+            central_items_hidden?: number;
+            /** @description The caller's dashboard regions; null = every region. */
+            scope_regions?: components["schemas"]["RegionId"][] | null;
+            health_draft?: boolean;
+        };
+        DashboardFilters: {
+            regions: {
+                id: components["schemas"]["RegionId"];
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            clusters: string[];
+            scenarios: components["schemas"]["DeliveryScenario"][];
+            streams: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+        };
+        /** @description One milestone of the pipeline for the reference date. Sites for which the milestone does not apply are counted in `not_applicable` only. */
+        DashboardMilestone: components["schemas"]["MilestonePipelineNode"] & {
+            stream_code?: string | null;
+            /** @description Open, previous milestone done, and the gate holds it (live only). */
+            blocked?: number;
+            /** @description Sites whose baseline is due by the reference date. */
+            plan?: number;
+            /** @description `completed` minus `plan`. */
+            vs_plan?: number;
+            baseline_missing?: number;
+            /** @description Open and past the baseline. */
+            overdue_open?: number;
+            achieved_late?: number;
+            on_time?: number;
+            /** @description Average working days from the baseline to the actual date over the achieved ones that have a baseline (negative = early). */
+            avg_variance_wd?: number | null;
+            /** @description The same over the achieved-late ones only. */
+            avg_delay_wd?: number | null;
+            gate?: {
+                code?: string;
+                name_en?: string;
+                name_ar?: string | null;
+            } | null;
+        };
+        DashboardHeadlineMilestone: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            order: number;
+            applicable: number;
+            done: number;
+            done_pct: number;
+            plan: number;
+            vs_plan: number;
+            baseline_missing: number;
+        };
+        DashboardProjectStatusItem: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            weight: number;
+            unit?: string | null;
+            progress_pct: number;
+            /** @description False when the item is left out of the figure: see `reason`. */
+            measured: boolean;
+            done?: number;
+            applicable?: number;
+            /** @enum {string|null} */
+            reason?: "not_weighted" | "no_data" | "central_hidden" | "not_applicable" | null;
+        };
+        DashboardProjectStatusActivity: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            weight: number;
+            progress_pct: number;
+            /** @description False when no item of the activity could be measured; the activity is then left out and its weight redistributed. */
+            measured: boolean;
+            items: components["schemas"]["DashboardProjectStatusItem"][];
+        };
+        DashboardProjectStatus: {
+            progress_pct: number;
+            /** @description Null ("not available") until every measured item has a baseline for all its units. */
+            planned_pct?: number | null;
+            spi?: number | null;
+            plan_coverage_pct: number;
+            central_items_hidden?: number;
+            activities: components["schemas"]["DashboardProjectStatusActivity"][];
+        };
+        /** @description The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`. */
+        DashboardFinalClosure: {
+            /** @description Base: active sites with HOTO achieved (rules.md section 6.1, ASSUMPTION). */
+            sites_total: number;
+            sites_closed: number;
+            closed_pct: number;
+            active_sites: number;
+            closed_pct_of_active: number;
+            pending_cw_fac: components["schemas"]["FinalClosureAging"] & {
+                not_due?: number;
+            };
+            pending_te_fac: components["schemas"]["FinalClosureAging"] & {
+                not_due?: number;
+            };
+        };
+        DashboardHeadline: {
+            /** @description Active sites (cancelled ones are not counted). */
+            sites_total: number;
+            sites_cancelled: number;
+            by_overall_status: {
+                not_started: number;
+                in_progress: number;
+                on_hold: number;
+                completed: number;
+                cancelled: number;
+            };
+            milestones: components["schemas"]["DashboardHeadlineMilestone"][];
+            on_air?: {
+                code?: string;
+                applicable?: number;
+                done?: number;
+                done_pct?: number;
+                plan?: number;
+                vs_plan?: number;
+            } | null;
+            final_closure: components["schemas"]["DashboardFinalClosure"];
+            project_status: components["schemas"]["DashboardProjectStatus"];
+        };
+        DashboardStreamCounts: {
+            /** @description The first gate of the stream is closed and nothing of it is done. */
+            not_due?: number;
+            /** @description Dismantle only: the RFD was asked and no work has started. */
+            not_started?: number;
+            in_progress?: number;
+            done?: number;
+            /** @description The stream does not apply to the site (Dismantle: the site has no Dismantle part). */
+            na?: number;
+            /** @description Sites that are On Hold and not done in the stream (an overlay, also counted in their status). */
+            on_hold?: number;
+        };
+        DashboardStream: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            sort_order: number;
+            counts: components["schemas"]["DashboardStreamCounts"];
+            by_region: (components["schemas"]["DashboardStreamCounts"] & {
+                region_id: components["schemas"]["RegionId"];
+            })[];
+        };
+        DashboardSla: {
+            totals: components["schemas"]["DashboardSlaCounts"];
+            by_stage: (components["schemas"]["DashboardSlaCounts"] & {
+                stage_code: string;
+                name_en: string;
+                name_ar?: string | null;
+                order: number;
+                stream_code?: string | null;
+            })[];
+            top_late: {
+                /** Format: uuid */
+                task_id: string;
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                region_id: components["schemas"]["RegionId"];
+                task_code: string;
+                task_name: string;
+                stage_code: string;
+                /** Format: date */
+                due_date: string;
+                /** @description Working days past the due date at the reference date. */
+                days_late_wd: number;
+                state?: string;
+                party?: string | null;
+            }[];
+        };
+        /** @description Open tasks are on time (green), at risk (amber) or late (red) at the reference date; completed ones are within the maximum or over it. */
+        DashboardSlaCounts: {
+            open_on_time: number;
+            open_at_risk: number;
+            open_late: number;
+            completed_on_time: number;
+            completed_late: number;
+        };
+        DashboardGates: {
+            /** @description False for a past reference date: the state of a gate on a past date is not kept. */
+            available: boolean;
+            blocked_total: number;
+            by_gate?: {
+                gate_code?: string;
+                name_en?: string;
+                name_ar?: string | null;
+                to_code?: string;
+                count?: number;
+            }[];
+            /** @description The longest blocked first. */
+            items: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                region_id: components["schemas"]["RegionId"];
+                gate_code: string;
+                name_en?: string;
+                name_ar?: string | null;
+                to_code?: string;
+                /** Format: date-time */
+                since?: string;
+                reasons: components["schemas"]["LockReason"][];
+            }[];
+        };
+        /** @description Counted by issue for the owner bars and the totals, by site for `sites_with_open_issue` (Q36). Age in working days from the raised date. */
+        DashboardIssues: {
+            available: boolean;
+            open_total: number;
+            sites_with_open_issue: number;
+            /** @description Open issues linked to a gate or task. */
+            blocking_total?: number;
+            oldest_age_wd?: number | null;
+            avg_age_wd?: number | null;
+            by_owner: {
+                owner_key: string;
+                /** @enum {string} */
+                owner_kind: "user" | "party" | "none";
+                owner_name?: string | null;
+                count: number;
+                sites: number;
+                oldest_age_wd?: number | null;
+                avg_age_wd?: number | null;
+            }[];
+            age_buckets: {
+                /** @enum {string} */
+                key: "0_7" | "8_15" | "16_30" | "over_30";
+                count: number;
+            }[];
+        };
+        /** @description Project health index, formula version 1. A draft under owner review. */
+        DashboardHealth: {
+            draft: boolean;
+            formula_version?: number;
+            bands: {
+                /** @description Green from this score (setting `dashboard.health_bands`, default 85). */
+                green: number;
+                /** @description Amber from this score, red below (default 70). */
+                amber: number;
+            };
+            score: number | null;
+            /** @enum {string|null} */
+            band: "green" | "amber" | "red" | null;
+            components: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                weight: number;
+                value: number | null;
+                /** @description No data: left out and its weight redistributed. */
+                excluded: boolean;
+                contribution: number;
+            }[];
+            by_region: {
+                region_id: components["schemas"]["RegionId"];
+                score: number;
+                /** @enum {string} */
+                band: "green" | "amber" | "red";
+            }[];
+        };
+        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party; attribution periods and suspension days are not built yet. */
+        DashboardDelay: {
+            draft: boolean;
+            total_late_working_days: number;
+            /** @description Share of the days on tasks with no external party and no default party type. */
+            unattributed_pct: number;
+            overlapping_periods?: number;
+            periods_supported?: boolean;
+            items: {
+                /** @description The external party name, the default party type of the task, or `unassigned`. */
+                party: string;
+                /** @enum {string} */
+                kind: "external" | "default_type" | "unassigned";
+                /** Format: uuid */
+                external_party_id?: string | null;
+                party_type?: string | null;
+                late_tasks: number;
+                late_working_days: number;
+                share_pct: number;
+            }[];
+        };
+        DashboardRegion: {
+            region_id: components["schemas"]["RegionId"];
+            region_name: string;
+            region_name_ar?: string | null;
+            sites_total: number;
+            completed?: number;
+            in_progress?: number;
+            /** @description Open tasks past their SLA maximum. */
+            late?: number;
+            by_overall_status: {
+                not_started?: number;
+                in_progress?: number;
+                on_hold?: number;
+                completed?: number;
+                cancelled?: number;
+            };
+            progress_pct: number;
+            health_score?: number | null;
+            /** @description Sites that reached each milestone, by code. */
+            by_milestone?: {
+                [key: string]: number;
+            };
+        };
+        Dashboard: {
+            meta: components["schemas"]["DashboardMeta"];
+            basis: components["schemas"]["DashboardBasis"];
+            filters: components["schemas"]["DashboardFilters"];
+            headline: components["schemas"]["DashboardHeadline"];
+            pipeline: {
+                nodes: components["schemas"]["DashboardMilestone"][];
+            };
+            streams: {
+                items: components["schemas"]["DashboardStream"][];
+            };
+            sla: components["schemas"]["DashboardSla"];
+            gates: components["schemas"]["DashboardGates"];
+            /** @description Null when the caller has no `issues.view`. */
+            issues: components["schemas"]["DashboardIssues"] | null;
+            health: components["schemas"]["DashboardHealth"];
+            delay: components["schemas"]["DashboardDelay"];
+            regions: {
+                items: components["schemas"]["DashboardRegion"][];
+            };
         };
     };
     responses: {
@@ -11153,6 +11812,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
         };
@@ -11217,6 +11877,40 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    addTaskSlot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code: string;
+                    candidate_label?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The new slot. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     uploadSlotFile: {
         parameters: {
             query?: never;
@@ -11252,7 +11946,79 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    withdrawSlotFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slot after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    suggestSlotTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    file_names: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description One entry per file name, in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            file_name: string;
+                            /** @description Best first; empty when nothing matches. */
+                            suggestions: {
+                                /** Format: uuid */
+                                slot_id: string;
+                                doc_code: string;
+                                score: number;
+                            }[];
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -11349,6 +12115,108 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listDocuments: {
+        parameters: {
+            query?: {
+                site_id?: string;
+                region_id?: components["schemas"]["RegionId"][];
+                /** @description Milestone code of the stage, for example MS2. */
+                stage_code?: string;
+                task_code?: string;
+                doc_code?: string[];
+                kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
+                slot_status?: "uploaded" | "in_review" | "approved" | "rejected" | "missing";
+                uploaded_by?: string;
+                uploaded_from?: string;
+                uploaded_to?: string;
+                /** @description Site code, document name or the name the file was uploaded with. */
+                q?: string;
+                include_superseded?: boolean;
+                file_group_id?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Files. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["DocumentListItem"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    startZipExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZipExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Job started (`kind` = `zip_export`; the job id is the export id). On `done`, `result` carries `export_id`, `file_count` and `size_bytes`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    downloadZipExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip, `GSDN_Documents_<date>.zip`. Only the person who started it (or a System Admin) can download it. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
         };
     };
     listApprovals: {
@@ -12579,6 +13447,7 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     createWeightSetDraft: {
@@ -14789,6 +15658,61 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listDocumentTypeVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DocumentTypeVersion"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadBlankForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The blank form. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     uploadBlankForm: {
         parameters: {
             query?: never;
@@ -16493,7 +17417,9 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     markNotificationRead: {
@@ -16622,7 +17548,7 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     followRegisterRecord: {
@@ -16675,7 +17601,6 @@ export interface operations {
                 content?: never;
             };
             401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -16731,6 +17656,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
@@ -16907,6 +17833,7 @@ export interface operations {
                     };
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
@@ -17220,6 +18147,71 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboard: {
+        parameters: {
+            query?: {
+                /** @description Reference date, today or earlier. Default today (Africa/Tripoli). */
+                ref_date?: string;
+                /** @description One region. A region outside the caller's regions gives an empty view, not the other region. */
+                region_id?: components["schemas"]["RegionId"];
+                cluster_code?: string;
+                scenario?: components["schemas"]["DeliveryScenario"];
+                /** @description A stream code from `filters.streams`. An unknown one is 422 `unknown_stream`. */
+                stream?: string;
+                /** @description Leave out tasks closed by an admin override. Default is the setting `dashboard.exclude_overrides` (true). The number left out is `meta.override_flagged_count`. */
+                exclude_overrides?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    exportDashboard: {
+        parameters: {
+            query?: {
+                ref_date?: string;
+                region_id?: components["schemas"]["RegionId"];
+                cluster_code?: string;
+                scenario?: components["schemas"]["DeliveryScenario"];
+                stream?: string;
+                exclude_overrides?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file `GSDN_Dashboard_<ref_date>.csv`. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getProjectStatus: {

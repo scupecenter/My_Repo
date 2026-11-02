@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
-import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
+import { decodeCursor, decodeTypedCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -12,6 +12,7 @@ import { TS_TEXT, oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
+import { DocumentsService } from '../documents/documents.service';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TaskViewService, UserRefDto } from './task-view.service';
 
@@ -72,6 +73,7 @@ export class WorkflowService {
     private readonly stepUp: StepUpService,
     private readonly detail: TaskDetailService,
     private readonly view: TaskViewService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /**
@@ -134,6 +136,7 @@ export class WorkflowService {
   /** The database call alone (also used one by one by the bulk endpoint). */
   async transitionRaw(auth: AuthContext, taskId: string, action: TransitionAction, version: number | null, note: string | null): Promise<WfResult> {
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    if (action === 'submit') await this.documents.syncTaskById(taskId); // conditional documents that apply now are slots before the engine counts the missing ones
     const fn = action === 'submit' ? Prisma.sql`wf_submit` : action === 'review' ? Prisma.sql`wf_review` : Prisma.sql`wf_approve`;
     return this.call(auth, Prisma.sql`SELECT ${fn}(${taskId}::uuid, ${version}::int, ${note}::text, ${stepOk}::boolean) AS r`);
   }
@@ -254,7 +257,7 @@ export class WorkflowService {
   async comments(auth: AuthContext, taskId: string, q: Record<string, unknown>): Promise<{ items: CommentDto[]; page: { limit: number; next_cursor: string | null } }> {
     await this.visible(auth, taskId);
     const limit = parseLimit(oneParam(q, 'limit'));
-    const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
+    const cursor = decodeTypedCursor(oneParam(q, 'cursor'), ['ts', 'uuid']);
     const after = cursor ? Prisma.sql`AND (c.created_at, c.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; ts: string }[]>(Prisma.sql`
       SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts

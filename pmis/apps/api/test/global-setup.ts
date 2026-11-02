@@ -27,7 +27,7 @@ export const BOOTSTRAP_ADMIN = {
 const API_ROOT = resolve(__dirname, '..');
 const REPO_PMIS = resolve(API_ROOT, '..', '..');
 
-async function buildDatabase(adminUrl: string, dbName: string, appPassword: string): Promise<{ appUrl: string; superUrl: string }> {
+async function buildDatabase(adminUrl: string, dbName: string, appPassword: string, withLibrary = false): Promise<{ appUrl: string; superUrl: string }> {
   if (!/^[a-z][a-z0-9_]{2,40}$/.test(dbName)) throw new Error('TEST_DB_NAME must be a simple lower-case identifier');
   const admin = new Client({ connectionString: adminUrl });
   await admin.connect();
@@ -64,6 +64,10 @@ async function buildDatabase(adminUrl: string, dbName: string, appPassword: stri
 
   // Cheap parameters: the test hashes only have to be valid argon2id PHC strings (the API verifies whatever the string says).
   const hash = await argon2.hash(BOOTSTRAP_ADMIN.password, { type: argon2.argon2id, memoryCost: 4096, timeCost: 2, parallelism: 1 });
+  // Migration 0038 seeds the Document Library with mandatory documents on stages 1 to 3. The workflow suites of the other databases submit tasks without
+  // documents, so the seeded library is switched off there (is_active false: no slot is built and nothing blocks Submit). The documents suites run on
+  // their own database (TEST_DATABASE_URL_DOCS) with the library as the migration seeded it.
+  if (!withLibrary) await db.query('UPDATE document_types SET is_active = false WHERE lib_managed');
   await db.query('SELECT idm_bootstrap_admin($1, $2, $3, $4, $5)', [BOOTSTRAP_ADMIN.email, BOOTSTRAP_ADMIN.name, BOOTSTRAP_ADMIN.employeeId, BOOTSTRAP_ADMIN.phone, hash]);
   await db.end();
 
@@ -94,6 +98,16 @@ export default async function setup(): Promise<() => Promise<void>> {
   // settings and holidays that the other calculation suites must not meet.
   const calc2 = `${dbName}_calc2`;
   const fourth = await buildDatabase(adminUrl, calc2, appPassword);
+  // The fifth and sixth databases are for the dashboard (migration 0039): one with a small data set whose numbers are computed by hand, and one with 1000 synthetic
+  // sites for the performance check. Both count every site they hold, so no other suite may write to them.
+  const dash = `${dbName}_dash`;
+  const dashPerf = `${dbName}_dashperf`;
+  const [fifth, sixth] = await Promise.all([buildDatabase(adminUrl, dash, appPassword), buildDatabase(adminUrl, dashPerf, appPassword)]);
+  // The docsDb database is for the document upload suites: the seeded Document Library stays active in it.
+  const docs = `${dbName}_docs`;
+  const docsDb = await buildDatabase(adminUrl, docs, appPassword, true);
+  process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
+  process.env.TEST_SUPER_URL_DOCS = docsDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;
@@ -102,6 +116,10 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_SUPER_URL_CALC = third.superUrl;
   process.env.TEST_DATABASE_URL_CALC2 = fourth.appUrl;
   process.env.TEST_SUPER_URL_CALC2 = fourth.superUrl;
+  process.env.TEST_DATABASE_URL_DASH = fifth.appUrl;
+  process.env.TEST_SUPER_URL_DASH = fifth.superUrl;
+  process.env.TEST_DATABASE_URL_DASHPERF = sixth.appUrl;
+  process.env.TEST_SUPER_URL_DASHPERF = sixth.superUrl;
 
   return async () => {
     if (process.env.TEST_KEEP_DB === '1') return;
@@ -111,6 +129,9 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${solo} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${calc} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${calc2} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dash} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dashPerf} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${docs} WITH (FORCE)`);
     await a.end();
   };
 }

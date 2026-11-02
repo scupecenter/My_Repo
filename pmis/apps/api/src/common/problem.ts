@@ -7,7 +7,8 @@ export type ErrorCode =
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
-  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected';
+  | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
+  | 'file_too_large' | 'file_rejected' | 'export_expired';
 
 export interface FieldError {
   path: string;
@@ -49,6 +50,9 @@ const TITLES: Record<string, string> = {
   weak_password: 'Password does not meet the policy',
   internal_error: 'Internal error',
   template_rejected: 'The file is not an approved template',
+  file_too_large: 'The file is too large',
+  file_rejected: 'The file is not accepted',
+  export_expired: 'The export has expired',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

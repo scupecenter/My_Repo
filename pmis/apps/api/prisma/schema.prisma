@@ -129,6 +129,7 @@ enum DocStatus {
   in_review
   approved
   rejected
+  not_required
 }
 
 enum AppliesTo {
@@ -1098,9 +1099,17 @@ model DocumentType {
   version            Int       @default(1)
   created_at         DateTime  @default(now()) @db.Timestamptz(6)
   updated_at         DateTime  @updatedAt @db.Timestamptz(6)
+  // 0038: a generated form has form_kind; published_version 0 = never published; lib_managed = edited through the Document Library
+  form_kind          String?
+  published_version  Int       @default(0)
+  lib_managed        Boolean   @default(false)
+  needs_review       Boolean   @default(false)
 
   placements DocumentTypePlacement[]
   slots      DocumentSlot[]
+  versions   DocumentTypeVersion[]
+  draft      DocumentTypeDraft?
+  blank_forms DocumentBlankForm[]
 
   @@map("document_types")
 }
@@ -1134,6 +1143,9 @@ model DocumentSlot {
   reject_reason   String?
   valid_to        DateTime? @db.Date // expiry
   created_at      DateTime  @default(now()) @db.Timestamptz(6)
+  doc_type_version_id  String?  @db.Uuid // 0038: the published version the slot was built from
+  conditional_declared Boolean  @default(false)
+  updated_at      DateTime  @default(now()) @db.Timestamptz(6)
 
   task     TaskInstance?  @relation(fields: [task_id], references: [id])
   doc_type DocumentType   @relation(fields: [doc_type_id], references: [id])
@@ -1161,6 +1173,13 @@ model DocumentFile {
   uploaded_by   String    @db.Uuid
   uploaded_at   DateTime  @default(now()) @db.Timestamptz(6)
   approved_date DateTime? @db.Date
+  // 0038
+  ext                  String?
+  capture_date         DateTime? @db.Timestamptz(6)
+  unknown_capture_date Boolean   @default(false)
+  superseded_by        String?   @db.Uuid
+  withdrawn_at         DateTime? @db.Timestamptz(6)
+  withdrawn_by         String?   @db.Uuid
 
   slot DocumentSlot @relation(fields: [slot_id], references: [id])
 
@@ -1168,6 +1187,79 @@ model DocumentFile {
   @@index([slot_id, is_current])
   @@index([sha256])
   @@map("document_files")
+}
+
+// 0038: immutable published versions, the draft being edited, blank forms, the slot snapshot of a task, zip jobs.
+model DocumentTypeVersion {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doc_type_id         String   @db.Uuid
+  version_no          Int
+  spec                Json
+  is_mandatory        Boolean
+  is_active           Boolean
+  effective_from      DateTime @default(now()) @db.Date
+  apply_to            String   @default("new_only")
+  reason              String
+  affected_open_tasks Int      @default(0)
+  published_by        String?  @db.Uuid
+  published_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  doc_type DocumentType @relation(fields: [doc_type_id], references: [id])
+
+  @@unique([doc_type_id, version_no])
+  @@map("document_type_versions")
+}
+
+model DocumentTypeDraft {
+  doc_type_id String   @id @db.Uuid
+  spec        Json
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_by  String?  @db.Uuid
+
+  doc_type DocumentType @relation(fields: [doc_type_id], references: [id])
+
+  @@map("document_type_drafts")
+}
+
+model DocumentBlankForm {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doc_type_id   String   @db.Uuid
+  original_name String
+  storage_key   String
+  mime_type     String
+  ext           String
+  size_bytes    BigInt
+  sha256        String
+  uploaded_by   String   @db.Uuid
+  uploaded_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  doc_type DocumentType @relation(fields: [doc_type_id], references: [id])
+
+  @@map("document_blank_forms")
+}
+
+model DocumentTaskSnapshot {
+  task_id  String   @id @db.Uuid
+  taken_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("document_task_snapshots")
+}
+
+model DocumentExportJob {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  requested_by String    @db.Uuid
+  scope        Json
+  status       String    @default("queued")
+  progress     Decimal   @default(0)
+  file_count   Int?
+  size_bytes   BigInt?
+  storage_key  String?
+  error        String?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  finished_at  DateTime? @db.Timestamptz(6)
+  expires_at   DateTime? @db.Timestamptz(6)
+
+  @@map("document_export_jobs")
 }
 
 // ============================================================================
@@ -1411,7 +1503,9 @@ model Notification {
   link       String?
   read_at    DateTime?     @db.Timestamptz(6)
   snoozed_until DateTime?  @db.Timestamptz(6) // X1 (migration 0031): hidden from the inbox until then
-  sent_at   DateTime?     @db.Timestamptz(6)
+  region_id  Int? // 0040: where it points (task region or record region); the inbox hides it when the caller can no longer read that
+  module_key String? // 0040: sites, or the register's module
+  sent_at    DateTime?     @db.Timestamptz(6)
   created_at DateTime      @default(now()) @db.Timestamptz(6)
 
   @@index([user_id, read_at])
@@ -1726,6 +1820,28 @@ model ProgressSnapshot {
   @@index([snapshot_date, weight_set_id])
   @@index([region_id, snapshot_date])
   @@map("progress_snapshots")
+}
+
+// Weekly snapshot per site (migration 0039): the facts the dashboard needs to show a past reference date as it was saved. Written only by
+// dash_snapshot_take; never updated (trigger). The foreign keys to sites, regions and weight_sets live in the migration.
+model SiteSnapshot {
+  snapshot_date  DateTime @db.Date
+  site_id        String   @db.Uuid
+  region_id      Int
+  cluster_code   String?
+  scenario       String?
+  weight_set_id  String?  @db.Uuid
+  overall_status String
+  ms             Json // {"MS1": {"state", "date", "baseline", "seq", "stream", "gate_open", "blocked"}, ...}
+  streams        Json // {"CW": "in_progress", ...}
+  items          Json // Project Status counts per item: [done, applicable, planned, plan_known]
+  progress_pct   Decimal? @db.Decimal(6, 3)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([snapshot_date, site_id])
+  @@index([region_id, snapshot_date])
+  @@index([site_id, snapshot_date])
+  @@map("site_snapshots")
 }
 
 // ============================================================================

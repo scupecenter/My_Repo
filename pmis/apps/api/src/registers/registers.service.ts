@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { AccessService, DbAction } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
-import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
+import { decodeCursor, decodeTypedCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -553,7 +553,7 @@ export class RegistersService {
   async comments(auth: AuthContext, key: string, id: string, q: Record<string, unknown>) {
     const { row } = await this.rowFor(auth, key, id);
     const limit = parseLimit(oneParam(q, 'limit'));
-    const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
+    const cursor = decodeTypedCursor(oneParam(q, 'cursor'), ['ts', 'uuid']);
     const after = cursor ? Prisma.sql`AND (c.created_at, c.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<{ id: string; author_id: string; body: string; is_rejection_note: boolean; created_at: Date; ts: string }[]>(Prisma.sql`
       SELECT c.id::text AS id, c.author_id::text AS author_id, c.body, c.is_rejection_note, c.created_at, ${Prisma.raw(TS_TEXT('c.created_at'))} AS ts

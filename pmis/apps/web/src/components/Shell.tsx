@@ -8,6 +8,7 @@ import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useUnreadTotal } from '@/api/msg';
 import { hasGrant } from '@/lib/perm';
+import { notificationTarget } from '@/lib/x';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
 import { loadPref, savePref as storePref } from '@/lib/localPref';
@@ -160,9 +161,16 @@ function NotificationBell({ count }: { count: number }) {
   const qc = useQueryClient();
   const n = useNotifications(true);
   const nav = useNavigate();
+  const [open, setOpen] = useState(false);
   const readAll = () => api.post<void>('/notifications/read-all').then(() => qc.invalidateQueries({ queryKey: ['notifications'] }));
+  const go = (x: { id: string; read_at?: string | null; link?: string | null; entity_type?: string | null; entity_id?: string | null }) => {
+    setOpen(false);
+    if (!x.read_at) void api.post(`/notifications/${x.id}/read`).then(() => qc.invalidateQueries({ queryKey: ['notifications'] }), () => {});
+    const to = notificationTarget(x);
+    if (to) nav(to);
+  };
   return (
-    <Popover.Root>
+    <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <button className="btn relative" data-testid="topbar-bell" aria-label={t('top.notifications')}>
           <Bell size={16} />
@@ -173,9 +181,10 @@ function NotificationBell({ count }: { count: number }) {
         <Popover.Content align="end" sideOffset={6} data-testid="bell-panel" className="card z-50 w-80 p-2">
           <button className="btn mb-2 w-full" onClick={() => void readAll()}><Check size={14} />{t('top.mark_all_read')}</button>
           {(n.data?.items ?? []).length === 0 && <p className="p-2 text-mute">{t('top.no_notifications')}</p>}
-          {n.data?.items.map((x) => (
-            <button key={x.id} onClick={() => x.link && nav(x.link)} className={`block w-full rounded-md p-2 text-start text-sm hover:bg-hover ${x.read_at ? 'text-mute' : 'font-semibold'}`}>{x.title}</button>
+          {n.data?.items.slice(0, 8).map((x) => (
+            <button key={x.id} data-testid={`bell-item-${x.id}`} onClick={() => go(x)} className={`block w-full rounded-md p-2 text-start text-sm hover:bg-hover ${x.read_at ? 'text-mute' : 'font-semibold'}`}>{x.title}</button>
           ))}
+          <Link to="/inbox" data-testid="bell-open-inbox" onClick={() => setOpen(false)} className="mt-1 block rounded-md p-2 text-center text-sm font-semibold text-link hover:bg-hover">{t('top.open_inbox')}</Link>
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

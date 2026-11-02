@@ -5,6 +5,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { DocumentFileDto, DocumentSlotDto, DocumentsService } from '../documents/documents.service';
 import { LevelCode, TaskRow, TaskSummaryDto, TaskViewService, UserRefDto, levelCode, taskSelect } from './task-view.service';
 
 export interface AllowedActionDto {
@@ -25,40 +26,7 @@ export interface ApprovalPathLevelDto {
   will_skip?: boolean;
 }
 
-export interface DocumentFileDto {
-  id: string;
-  file_group_id: string;
-  version: number;
-  is_current: boolean;
-  original_name: string;
-  download_name: string;
-  mime_type: string;
-  size_bytes: number;
-  sha256: string;
-  uploaded_by?: UserRefDto;
-  uploaded_at: Date;
-  approved_date: string | null;
-}
-
-export interface DocumentSlotDto {
-  id: string;
-  doc_code: string;
-  name_en: string;
-  name_ar: string | null;
-  kind: string;
-  mandatory: boolean;
-  status: string;
-  reject_reason: string | null;
-  candidate_label: string | null;
-  formats: string[];
-  max_size_mb: number;
-  min_files: number;
-  max_files: number | null;
-  camera_only: boolean;
-  blank_form_file_id: string | null;
-  valid_to: string | null;
-  files: DocumentFileDto[];
-}
+export type { DocumentFileDto, DocumentSlotDto };
 
 export type TaskDetailDto = TaskSummaryDto & {
   baseline_date: string | null;
@@ -78,47 +46,13 @@ export type TaskDetailDto = TaskSummaryDto & {
   workflow_version: number;
 };
 
-interface SlotRow {
-  id: string;
-  doc_code: string;
-  name_en: string;
-  name_ar: string | null;
-  kind: string;
-  mandatory: boolean;
-  status: string;
-  reject_reason: string | null;
-  candidate_label: string | null;
-  formats: string[];
-  max_size_mb: number;
-  min_files: number;
-  max_files: number | null;
-  photo_rules: unknown;
-  blank_form_file_id: string | null;
-  valid_to: string | null;
-}
-
-interface FileRow {
-  id: string;
-  slot_id: string;
-  file_group_id: string;
-  version: number;
-  is_current: boolean;
-  original_name: string;
-  stored_name: string;
-  mime_type: string;
-  size_bytes: bigint;
-  sha256: string;
-  uploaded_by: string;
-  uploaded_at: Date;
-  approved_date: string | null;
-}
-
 @Injectable()
 export class TaskDetailService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
     private readonly view: TaskViewService,
+    private readonly documents: DocumentsService,
   ) {}
 
   /** Visible task row by id: region and module scope of the caller (404 outside it). */
@@ -141,7 +75,7 @@ export class TaskDetailService {
   async build(auth: AuthContext, row: TaskRow): Promise<TaskDetailDto> {
     const [summary] = await this.view.withLockReasons([row]);
     if (!summary) throw problems.notFound();
-    const [path, slots, missing, allowed] = await Promise.all([this.approvalPath(auth, row), this.slots(row.id), this.missingForSubmit(row), this.allowedActions(auth, row)]);
+    const [path, slots, missing, allowed] = await Promise.all([this.approvalPath(auth, row), this.slots(auth, row.id), this.missingForSubmit(row), this.allowedActions(auth, row)]);
     return {
       ...summary,
       baseline_date: row.baseline_date,
@@ -204,57 +138,8 @@ export class TaskDetailService {
     return out;
   }
 
-  async slots(taskId: string): Promise<DocumentSlotDto[]> {
-    const slots = await this.db.tx.$queryRaw<SlotRow[]>(Prisma.sql`
-      SELECT ds.id::text AS id, dt.code AS doc_code, dt.name_en, dt.name_ar, dt.kind::text AS kind, dt.is_mandatory AS mandatory,
-        ds.status::text AS status, ds.reject_reason, ds.candidate_label, dt.formats, dt.max_size_mb, dt.min_files, dt.max_files, dt.photo_rules,
-        dt.blank_form_file_id::text AS blank_form_file_id, ds.valid_to::text AS valid_to
-      FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id
-      WHERE ds.task_id = ${taskId}::uuid ORDER BY dt.code, ds.candidate_label NULLS FIRST, ds.id`);
-    if (slots.length === 0) return [];
-    const files = await this.db.tx.$queryRaw<FileRow[]>(Prisma.sql`
-      SELECT f.id::text AS id, f.slot_id::text AS slot_id, f.file_group_id::text AS file_group_id, f.version, f.is_current, f.original_name, f.stored_name,
-        f.mime_type, f.size_bytes, f.sha256, f.uploaded_by::text AS uploaded_by, f.uploaded_at, f.approved_date::text AS approved_date
-      FROM document_files f WHERE f.slot_id = ANY(${slots.map((s) => s.id)}::uuid[]) ORDER BY f.uploaded_at, f.id`);
-    const refs = await this.view.userRefs([...new Set(files.map((f) => f.uploaded_by))]);
-    return slots.map((s) => ({
-      id: s.id,
-      doc_code: s.doc_code,
-      name_en: s.name_en,
-      name_ar: s.name_ar,
-      kind: s.kind,
-      mandatory: s.mandatory,
-      status: s.status,
-      reject_reason: s.reject_reason,
-      candidate_label: s.candidate_label,
-      formats: s.formats,
-      max_size_mb: s.max_size_mb,
-      min_files: s.min_files,
-      max_files: s.max_files,
-      camera_only: typeof s.photo_rules === 'object' && s.photo_rules !== null && (s.photo_rules as { camera_only?: unknown }).camera_only === true,
-      blank_form_file_id: s.blank_form_file_id,
-      valid_to: s.valid_to,
-      files: files
-        .filter((f) => f.slot_id === s.id)
-        .map((f) => {
-          const u = refs.get(f.uploaded_by);
-          const dto: DocumentFileDto = {
-            id: f.id,
-            file_group_id: f.file_group_id,
-            version: f.version,
-            is_current: f.is_current,
-            original_name: f.original_name,
-            download_name: f.stored_name,
-            mime_type: f.mime_type,
-            size_bytes: Number(f.size_bytes),
-            sha256: f.sha256,
-            uploaded_at: f.uploaded_at,
-            approved_date: f.approved_date,
-          };
-          if (u) dto.uploaded_by = u;
-          return dto;
-        }),
-    }));
+  async slots(auth: AuthContext, taskId: string): Promise<DocumentSlotDto[]> {
+    return this.documents.slotsForVisibleTask(auth, taskId);
   }
 
   /**

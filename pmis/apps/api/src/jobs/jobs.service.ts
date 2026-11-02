@@ -12,6 +12,8 @@ export interface DailyJobResult {
   slaApplied: number;
   /** tentative-holiday reminders sent to the System Admins */
   reminders: number;
+  /** sites stored by the weekly dashboard snapshot of this run (absent when no snapshot was due) */
+  snapshots?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -40,6 +42,8 @@ export function nextRunAt(now: Date, tz: string = JOB_TIME_ZONE, hour: number = 
  * holidays to the System Admins (cal_tentative_reminders). It runs once at start-up and then every day at 02:00 Africa/Tripoli, only when
  * JOBS_ENABLED is on (default on, off when NODE_ENV=test). It is a plain timer inside the API process: the stack names BullMQ with Redis, which is
  * not installed on the server yet; the two database functions are idempotent, so a later move to BullMQ changes only who calls them.
+ * The dashboard snapshot (dash_snapshot_weekly) is taken by the same run when the last one is at least `dashboard.snapshot_every_days` (7) old; a failure there is
+ * logged and does not stop the rest.
  * Safe to repeat: a second run the same day finds nothing to apply and nobody left to remind. An advisory lock keeps two API processes from running it together.
  */
 @Injectable()
@@ -87,16 +91,20 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
 
   private async execute(): Promise<DailyJobResult | null> {
     try {
-      const result = await this.db.client.$transaction(async (tx) => {
+      const result: DailyJobResult | null = await this.db.client.$transaction(async (tx): Promise<DailyJobResult | null> => {
         const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.daily_job')) AS ok`;
         if (!lock[0]?.ok) return null;
         const applied = await tx.$queryRaw<{ n: number }[]>`SELECT sla_apply_due_sets() AS n`;
         const reminded = await tx.$queryRaw<{ n: number }[]>`SELECT cal_tentative_reminders(${REMINDER_DAYS}::integer) AS n`;
         return { slaApplied: Number(applied[0]?.n ?? 0), reminders: Number(reminded[0]?.n ?? 0) };
       }, { maxWait: 10_000, timeout: 60_000 });
+      if (result) {
+        const snapshots = await this.snapshot();
+        if (snapshots > 0) result.snapshots = snapshots;
+      }
       this.lastRun = { at: new Date(), result };
-      if (result && (result.slaApplied > 0 || result.reminders > 0)) {
-        await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders });
+      if (result && (result.slaApplied > 0 || result.reminders > 0 || (result.snapshots ?? 0) > 0)) {
+        await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 });
       }
       return result;
     } catch (e) {
@@ -105,6 +113,23 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       this.log.warn(`daily job failed: ${message}`);
       await this.syslog.write('error', 'daily job failed', { error: message });
       return null;
+    }
+  }
+
+  /** The weekly dashboard snapshot (migration 0039); its own transaction and its own lock, so a failure leaves the other job steps alone. Returns the sites stored. */
+  private async snapshot(): Promise<number> {
+    try {
+      return await this.db.client.$transaction(async (tx) => {
+        const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.dashboard_snapshot')) AS ok`;
+        if (!lock[0]?.ok) return 0;
+        const r = await tx.$queryRaw<{ n: number }[]>`SELECT dash_snapshot_weekly() AS n`;
+        return Number(r[0]?.n ?? 0);
+      }, { maxWait: 10_000, timeout: 120_000 });
+    } catch (e) {
+      const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
+      this.log.warn(`dashboard snapshot failed: ${message}`);
+      await this.syslog.write('error', 'dashboard snapshot failed', { error: message });
+      return 0;
     }
   }
 

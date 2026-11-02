@@ -47,8 +47,8 @@ export class FollowService {
     return this.run<FollowDto>(Prisma.sql`SELECT x_follow('site', ${id}::uuid, NULL) AS r`);
   }
 
-  async unfollowSite(auth: AuthContext, id: string): Promise<void> {
-    await this.access.requireRegions('sites', 'view');
+  /** Stopping needs no read right: it removes only the caller's own watch, also one the caller can no longer read (a region or module taken away). */
+  async unfollowSite(_auth: AuthContext, id: string): Promise<void> {
     if (!uuidSchema.safeParse(id).success) throw problems.notFound();
     await this.run<boolean>(Prisma.sql`SELECT x_unfollow('site', ${id}::uuid, NULL) AS r`);
   }
@@ -59,8 +59,7 @@ export class FollowService {
     return this.run<FollowDto>(Prisma.sql`SELECT x_follow('register_record', ${id}::uuid, ${key}::text) AS r`);
   }
 
-  async unfollowRecord(auth: AuthContext, key: string, id: string): Promise<void> {
-    await this.registerModule(auth, key);
+  async unfollowRecord(_auth: AuthContext, key: string, id: string): Promise<void> {
     if (!uuidSchema.safeParse(id).success) throw problems.notFound();
     await this.run<boolean>(Prisma.sql`SELECT x_unfollow('register_record', ${id}::uuid, ${key}::text) AS r`);
   }

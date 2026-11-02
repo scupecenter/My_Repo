@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { Calendar } from './Calendar';
+import { DocumentLibrary } from './DocumentLibrary';
 import { Notifications } from './Notifications';
 import { Retention } from './Retention';
 import { Dlp, Freeze, Idle } from './Rules';
@@ -8,7 +9,7 @@ import { SlaRules } from './SlaRules';
 import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -38,6 +39,7 @@ export function SettingsRoutes() {
         <Route path="notifications" element={<Notifications />} />
         <Route path="retention" element={<Retention />} />
         <Route path="staff-visibility" element={<StaffVisibility />} />
+        <Route path="documents" element={<DocumentLibrary />} />
       </Route>
     </Routes>
   );

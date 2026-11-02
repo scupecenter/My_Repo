@@ -7,7 +7,7 @@ import { q } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { GECOL, G, Team, approveAll, createRec, post, recPath } from './reg-helpers';
 import { CellMap, day, downloadTemplate, fillTemplate, getBinary, load, tplTeam, uploadFile } from './tpl-helpers';
-import { actor, makeSite, plainAdmin } from './wf-helpers';
+import { actor, addAssignment, makeSite, plainAdmin } from './wf-helpers';
 
 /**
  * Migration 0037: approved-template entry. Registers: GECOL (one record per site, key = Site ID), Procurement and Meetings for the version rule.
@@ -550,6 +550,14 @@ describe('batch: into the normal flow, row by row and all at once', () => {
     expect(all.body.counts).toMatchObject({ approved: 1, held: 1, pending: 0 });
     expect((await q<{ remark: string }>(db, `SELECT remark FROM gecol_records WHERE site_id = $1`, [s1.id]))[0]!.remark).toBe('v1');   // untouched
     expect((await q<{ remark: string }>(db, `SELECT remark FROM gecol_records WHERE site_id = $1`, [s2.id]))[0]!.remark).toBe('second');
+
+    // a held row is returned only by the uploader or an L2 holder: a stranger with the module rights is refused and nothing changes
+    const stranger = await actor(app, db, { level: 'approve', regions: [R], modules: null, grants: G('gecol', 'view', 'approve') });
+    await addAssignment(db, stranger.user.id, { level: 'approve', regions: [R], modules: null, grants: G('templates', 'view') });
+    await stranger.api.stepUp(stranger.user.password);
+    const sx = await stranger.api.call('post', `/import-batches/${id}/decisions`, { action: 'reject', scope: 'rows', rows: [{ row_id: held.id, decision: 'rejected', note: 'no' }] }, { 'If-Match': `"${all.body.version}"` });
+    expect(sx.status).toBe(403);
+    expect((await rowsOf(t.entry.api, id)).find((r) => r.id === held.id)).toMatchObject({ decision: 'pending_previous_approval' });
 
     // the open version is voided: the next send releases the held row into the flow
     await db.query(`UPDATE register_records SET state = 'voided' WHERE id = $1`, [nv.body.id]);

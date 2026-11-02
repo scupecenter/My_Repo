@@ -23,6 +23,8 @@ TOTP_ENC_KEY=... node dist/cli.js enrol-code <user-uuid>      # one-time two-fac
 `LOG_HMAC_KEY` (>= 16 characters), `TOTP_ENC_KEY` (required: 32 bytes as 64 hex characters, or base64; the AES-256-GCM key of the two-factor secrets and the base of the recovery-code and enrolment-code hash keys; `openssl rand -hex 32`; the installer generates it and keeps it on update; if it is lost every enrolled user must be reset by an admin and enrol again), `NODE_ENV`, `JOBS_ENABLED` (the daily job: SLA versions that take effect and the 14-day reminder of tentative
 holidays, once at start-up and at 02:00 Africa/Tripoli; absent = on, except when `NODE_ENV=test`). Optional limits of the template upload (contract 0.7.0): `PMIS_IMPORT_MAX_BYTES` (5242880) and `PMIS_IMPORT_MAX_ROWS` (2000). Nothing else is read.
 
+Document files and zip exports (ADR 0008): `STORAGE_DIR` (local disk, the default; the directory the API user writes) or all of `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` (and `S3_REGION`, default `us-east-1`) for S3-compatible storage such as MinIO (path-style, the bucket private). The installer can set MinIO up on the server. Files are stored under random keys (`docs/yyyy/mm/<uuid>`), never under the user's file name; local disk and the bucket use the same keys, so `mc mirror <STORAGE_DIR> <alias>/<bucket>` moves a local store into MinIO.
+
 ## Tests
 
 `test/global-setup.ts` creates two fresh databases (`pmis_api_test` and `pmis_api_test_solo`, names overridable with `TEST_DB_NAME`),

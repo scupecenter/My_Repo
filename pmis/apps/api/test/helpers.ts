@@ -1,6 +1,8 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import * as argon2 from 'argon2';
 import { randomBytes, randomInt } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Client as PgClient } from 'pg';
 import request from 'supertest';
 import { createApp } from '../src/app.factory';
@@ -8,6 +10,8 @@ import type { AppConfig } from '../src/config/config';
 import { BOOTSTRAP_ADMIN } from './global-setup';
 
 export const API = '/api/v1';
+/** Local-disk document storage of the test run (one directory per process; the object keys are random). */
+export const TEST_STORAGE_DIR = join(tmpdir(), `pmis-test-storage-${process.pid}`);
 /** 32 bytes, test only. */
 export const TEST_TOTP_ENC_KEY = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
 export const PASSWORD = 'Correct-Horse-Battery-9';
@@ -23,6 +27,7 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     logHmacKey: 'test-only-hmac-key-0123456789abcdef',
     totpEncKey: TEST_TOTP_ENC_KEY,
     jobsEnabled: false,
+    storage: { driver: 'local', localDir: TEST_STORAGE_DIR },
     ...over,
   };
 }
@@ -54,8 +59,22 @@ export async function superDbCalc2(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the fifth database (the document upload suites: the seeded Document Library is active there). */
+export async function superDbDocs(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_DOCS });
+  await c.connect();
+  return c;
+}
+
 let seq = 0;
 const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).toString(36)}${randomBytes(2).toString('hex')}`;
+
+/** Superuser connection to the fifth or sixth database (the dashboard suites; see global-setup). */
+export async function superDbDash(perf = false): Promise<PgClient> {
+  const c = new PgClient({ connectionString: perf ? process.env.TEST_SUPER_URL_DASHPERF : process.env.TEST_SUPER_URL_DASH });
+  await c.connect();
+  return c;
+}
 
 export interface TestUser {
   id: string;

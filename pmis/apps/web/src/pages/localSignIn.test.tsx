@@ -265,6 +265,19 @@ describe('hybrid mode list', () => {
       // contract 0.7.0: approved-template entry (templates and import batches)
       'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
+      // contract 0.4.10 and 0.7.1: phase 4b (inbox, follow, register comments, time in state, workload, blocked-by, status updates)
+      'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
+      'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
+      'GET /registers/:key/records/:id/comments', 'POST /registers/:key/records/:id/comments', 'GET /tasks/:id/time-in-state', 'GET /tasks/:id/blocked-by',
+      'GET /reports/time-in-state', 'GET /reports/workload', 'GET /status-updates', 'POST /status-updates', 'PATCH /status-updates/:id',
+      // contract 0.7.2: the main dashboard, Project Status, weight sets
+      'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
+      'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',
+      // contract 0.8.0: documents (slots, files, the Documents list, the bulk zip, the Document Library)
+      'GET /tasks/:id/slots', 'POST /tasks/:id/slots', 'POST /tasks/:id/slots/suggest', 'POST /tasks/:id/slots/:slotId/files', 'DELETE /tasks/:id/slots/:slotId/files/:fileId',
+      'GET /files/:id/download', 'GET /documents', 'POST /exports/zip', 'GET /exports/zip/:id/download', 'GET /jobs/:id',
+      'GET /document-library', 'POST /document-library', 'GET /document-library/:id', 'PATCH /document-library/:id', 'POST /document-library/:id/publish',
+      'GET /document-library/:id/versions', 'GET /document-library/:id/blank-form', 'POST /document-library/:id/blank-form',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
