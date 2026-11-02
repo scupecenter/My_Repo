@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { api, ApiError } from './client';
 import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
-export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string };
+export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string };
 
 export const useRegions = () => useQuery({ queryKey: ['regions'], staleTime: Infinity, queryFn: () => api.get<{ items: Region[] }>('/regions').then((r) => r.items) });
 
