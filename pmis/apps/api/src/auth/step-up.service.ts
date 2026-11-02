@@ -36,9 +36,15 @@ export class StepUpService {
   /** Throws 401 step_up_required unless the session was re-authenticated recently. */
   async require(auth: AuthContext): Promise<void> {
     if (await this.validUntil(auth)) return;
+    let method: 'password' | 'password_totp' | 'm365' = auth.session.authMethod === 'local' ? 'password' : 'm365';
+    if (method === 'password') {
+      // Two-factor on: the dialog asks for the password and the code together.
+      const rows = await this.db.tx.$queryRaw<{ needs: boolean }[]>`SELECT (required AND enrolled) AS needs FROM auth_totp_state(${auth.user.id}::uuid)`;
+      if (rows[0]?.needs) method = 'password_totp';
+    }
     throw new ProblemException(401, 'step_up_required', {
-      detail: 'Confirm your password to continue.',
-      step_up_method: auth.session.authMethod === 'local' ? 'password' : 'm365',
+      detail: method === 'password_totp' ? 'Confirm your password and a code from your authenticator app to continue.' : 'Confirm your password to continue.',
+      step_up_method: method,
     });
   }
 }

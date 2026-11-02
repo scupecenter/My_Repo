@@ -180,8 +180,106 @@ export interface paths {
          *     `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
          *     `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
          *     until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+         *
+         *     **Two-factor (0.5.0).** When the user's two-factor is on, a right password does not create a session: the answer is 200 `PendingSignIn`
+         *     and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use). `next` = `two_factor`
+         *     (call `POST /auth/local/2fa`) or `enrol` (the user has no authenticator yet: call the enrolment endpoints). Nothing else is reachable
+         *     with that cookie. The database refuses to create the session until a code success is recorded after the password check.
          */
         post: operations["localLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Second step of sign-in - the code from the authenticator app (or one recovery code)
+         * @description Needs the pending sign-in cookie `pmis_2fa` from `POST /auth/local/login` (kind `two_factor`). Send `code` (6 digits, RFC 6238, SHA-1,
+         *     30 seconds, one step of tolerance either side) or `recovery_code` (one of the 10 codes, each works once), not both. On success the
+         *     pending sign-in is used up, the session cookie `pmis_session` is set and `Session.mfa` is true. A time step is accepted once: the
+         *     code that signed in cannot be used again (401 `invalid_code`, the detail says it was already used). A wrong code is 401 `invalid_code`
+         *     and counts toward the lock: 5 wrong codes in a row lock the account for 15 minutes, the same lock as passwords, and end every pending
+         *     sign-in. The code counter is separate from the password counter. A missing, expired, used or wrong-kind pending cookie is 401
+         *     `unauthenticated`. Rate limited (429 `rate_limited`). Every failure is written to the security log.
+         */
+        post: operations["localTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/enrol/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrolment step 1 - a new secret for the QR code
+         * @description Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up). Makes a new secret,
+         *     stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and returns it once: the `otpauth_uri`
+         *     (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the pending secret. The answer is
+         *     never cached. A user who is already enrolled cannot start again; an admin reset is needed.
+         */
+        post: operations["startTwoFactorEnrolment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/enrol/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrolment step 2 - confirm with a valid code; get the recovery codes
+         * @description The user types the code their app shows for the secret from step 1. On success the secret becomes active, 10 one-time recovery codes are
+         *     made (stored as a keyed hash, shown once in this answer, never again), the pending sign-in is used up and the user is signed in
+         *     (session cookie set). A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code.
+         */
+        post: operations["confirmTwoFactorEnrolment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/local/2fa/recovery-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * New recovery codes (needs a valid TOTP code)
+         * @description For a signed-in local user whose two-factor is on. Needs a valid TOTP code (a recovery code is not accepted here). The old codes stop
+         *     working and 10 new ones are returned once. The number left is in `Session.two_factor.recovery_codes_remaining`. 409
+         *     `invalid_transition` when two-factor is not on for the user.
+         */
+        post: operations["regenerateRecoveryCodes"];
         delete?: never;
         options?: never;
         head?: never;
@@ -224,6 +322,10 @@ export interface paths {
          * @description A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
          *     for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
          *     (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+         *
+         *     **Two-factor (0.5.0).** When the user's two-factor is on, the 401 carries `step_up_method` = `password_totp` and this call needs `code`
+         *     (or one `recovery_code`) as well as the password; without it 422 `validation_failed` (`/code` required) and nothing is counted. The
+         *     password is checked first, then the code; a wrong or already used code is 401 `invalid_code` and counts toward the same lock as at sign-in.
          */
         post: operations["localStepUp"];
         delete?: never;
@@ -716,6 +818,52 @@ export interface paths {
          * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
          */
         post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/two-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Turn two-factor (TOTP) on or off for a user (0.5.0)
+         * @description System Admin, or a delegate holding the delegable right `users.two_factor` (delegation grant `users.administer`, all regions). Needs a
+         *     reason and the acting admin's own step-up. **Nobody changes their own setting** (403 `self_beneficiary`, also for an admin). Only a
+         *     System Admin changes an admin or a delegate. The user needs a local account (422 otherwise).
+         *     On: the user is asked to enrol (QR code) at the next sign-in, and their local sessions end now so no session lives on without a
+         *     code. Off: the secret and the recovery codes are deleted. Setting what is already set changes nothing and writes no audit row.
+         *     The change is audited with before and after (never the secret). Users can never turn it off themselves.
+         */
+        put: operations["setUserTwoFactor"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/two-factor/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset a user's two-factor after a lost phone (0.5.0)
+         * @description Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor`. Clears the secret and the recovery codes, forces a
+         *     new enrolment at the next sign-in and ends all the user's sessions. 409 `invalid_transition` when two-factor is not on for the user.
+         */
+        post: operations["resetUserTwoFactor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1349,7 +1497,10 @@ export interface paths {
         /** Comment thread */
         get: operations["listTaskComments"];
         put?: never;
-        /** Add a comment (with optional mentions) */
+        /**
+         * Add a comment (with optional mentions)
+         * @description 0.4.10 (X3). Mentions come from `mention_user_ids` and from `@1234` employee-ID tokens in the body. Only a person who can read the task is stored as mentioned and notified; anyone else is dropped silently, so the answer never shows whether a person can see the task.
+         */
         post: operations["addTaskComment"];
         delete?: never;
         options?: never;
@@ -3999,6 +4150,277 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notifications/{notification_id}/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification. */
+                notification_id: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark one as unread (0.4.10, X1)
+         * @description Only the owner of the notification; anyone else gets 404. Audited.
+         */
+        post: operations["markNotificationUnread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notification_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification. */
+                notification_id: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hide a notification until a date (0.4.10, X1)
+         * @description `until` is a date-time, or a plain date (the start of that day in Tripoli time), in the future and within one year (else 422). `null` clears the snooze. Snoozing does not mark it read. Audited.
+         */
+        post: operations["snoozeNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Follow a site (0.4.10, X2)
+         * @description Needs `view` on `sites` for the site's region (403 `module_forbidden` without the module, 404 for a site outside the caller's regions). Idempotent. The follower gets a `followed_change` notification when a task of the site changes, only while they can still read it. Audited. Follows grant no access.
+         */
+        put: operations["followSite"];
+        post?: never;
+        /** Stop following a site (0.4.10, X2) */
+        delete: operations["unfollowSite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/follow": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Follow a register record (0.4.10, X2)
+         * @description Follows the record across its versions. Needs `view` on the register's module for the record's region (403 / 404 as for the site). Idempotent, audited. The followers of a site also hear about the register changes of that site if they can read the register.
+         */
+        put: operations["followRegisterRecord"];
+        post?: never;
+        /** Stop following a register record (0.4.10, X2) */
+        delete: operations["unfollowRegisterRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/follows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What I follow, limited to what I can still read (0.4.10, X2) */
+        get: operations["listMyFollows"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Comment thread of a register record (0.4.10, X3)
+         * @description The thread belongs to the record, so all its versions share it. Comments on a global record (no region) are not supported yet.
+         */
+        get: operations["listRegisterRecordComments"];
+        put?: never;
+        /**
+         * Add a comment with mentions (0.4.10, X3)
+         * @description Mentions come from `mention_user_ids` and from `@1234` employee-ID tokens in the body. Only a person who can read the record (module, region) is stored as mentioned and notified; anyone else is dropped silently, so the answer never shows whether a person can see the record. Audited.
+         */
+        post: operations["addRegisterRecordComment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How long the task sat at each level (0.4.10, X4)
+         * @description Rebuilt from the task's audit rows. A visit is a run in the same level; it ends at the next state change. Time before the first audited change is not counted. Readable by anyone who can read the task.
+         */
+        get: operations["getTaskTimeInState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/blocked-by": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * What the task waits for (0.4.10, X6)
+         * @description The predecessors not yet approved (with the predecessor task), the closed gate with its conditions (permits, stop work, suspension) and the open snags. The same facts as `TaskSummary.lock_reasons`, in one place.
+         */
+        get: operations["getTaskBlockedBy"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Time in each level, per person or per team (0.4.10, X4)
+         * @description Completed visits only, attributed to the person who handled them. Needs `view` on `reports` and `sites`; counts only tasks in the regions both grants cover (a System Admin sees all).
+         */
+        get: operations["getTimeInStateReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/workload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open and late tasks per holder (0.4.10, X5)
+         * @description A claimed task counts for its claimant, an unclaimed one for everyone who could act on its level. Late = the SLA is past its maximum. A level nobody can hold is counted under `no_holder`. Needs `view` on `reports` and `sites`, limited to the regions both cover. Reassign with `POST /tasks/reassign` (B12b).
+         */
+        get: operations["getWorkload"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/status-updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weekly status updates (0.4.10, X7)
+         * @description Newest week first. Needs `view` on `sites`; only updates of the caller's regions, plus updates that cover all regions.
+         */
+        get: operations["listStatusUpdates"];
+        put?: never;
+        /**
+         * Write this week's update (0.4.10, X7)
+         * @description For a lead of the region, that is a holder of the `reassign` grant there, or a System Admin (403 otherwise). The week is the current working week (it opens on Sunday). A team update without `region_id` covers all regions and needs the grant for all regions. Audited.
+         */
+        post: operations["createStatusUpdate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/status-updates/{update_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                update_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit an update (0.4.10, X7)
+         * @description Only the author, only until the end of the update's week (409 `invalid_transition` after). Never deleted; the audit row keeps before and after.
+         */
+        patch: operations["editStatusUpdate"];
+        trace?: never;
+    };
     "/notifications/read-all": {
         parameters: {
             query?: never;
@@ -4211,10 +4633,10 @@ export interface components {
             /** @description Present with `step_up_required` on an M365 session. */
             step_up_url?: string;
             /**
-             * @description 0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.
+             * @description 0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`; `password_totp` (0.5.0) means the same call with `code` (or `recovery_code`) as well.
              * @enum {string}
              */
-            step_up_method?: "password" | "m365" | "totp";
+            step_up_method?: "password" | "password_totp" | "m365" | "totp";
             /** @description Closed-list reason; for `template_rejected` a TemplateRejectReason. */
             reason?: components["schemas"]["TemplateRejectReason"] | string;
             claimed_by?: components["schemas"]["UserRef"];
@@ -4243,7 +4665,7 @@ export interface components {
             existing_id?: string;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "password_change_required" | "weak_password" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "password_change_required" | "weak_password" | "internal_error";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -4445,7 +4867,7 @@ export interface components {
          * @description Closed list for partial delegation (ADR 0003 §5).
          * @enum {string}
          */
-        DelegableRight: "unlock" | "skip" | "mark_na" | "accept_without_document" | "accept_without_workflow" | "reopen" | "edit_date" | "reassign" | "users.edit" | "assignments.edit" | "groups.edit" | "matrix.edit" | "roles.edit" | "profiles.edit" | "settings.edit" | "documents.edit" | "templates.edit" | "fields.edit" | "workflow.edit" | "workflow.publish" | "workflow.migrate" | "warehouse.items.edit";
+        DelegableRight: "unlock" | "skip" | "mark_na" | "accept_without_document" | "accept_without_workflow" | "reopen" | "edit_date" | "reassign" | "users.edit" | "assignments.edit" | "groups.edit" | "matrix.edit" | "roles.edit" | "profiles.edit" | "settings.edit" | "documents.edit" | "templates.edit" | "fields.edit" | "workflow.edit" | "workflow.publish" | "workflow.migrate" | "warehouse.items.edit" | "users.two_factor";
         /** @description 1 Tripoli, 2 Middle, 3 WM, 4 Zawia, 5 Benghazi, 6 GM, 7 Sebha. */
         RegionId: number;
         EmployeeId: string;
@@ -4475,10 +4897,67 @@ export interface components {
             auth_method?: "local" | "m365" | "break_glass";
             /** @description 0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed. */
             must_change_password?: boolean;
+            /** @description 0.5.0. The signed-in user's two-factor. `enabled` means a code is asked at sign-in and at step-up. */
+            two_factor?: {
+                enabled: boolean;
+                recovery_codes_remaining: number;
+            };
             /** Format: date-time */
             stepup_valid_until?: string | null;
             /** Format: date-time */
             expires_at?: string;
+        };
+        /** @description 0.5.0. The password was right; no session exists yet. The cookie `pmis_2fa` (5 minutes, single use) says who is signing in. */
+        PendingSignIn: {
+            /** @constant */
+            authenticated: false;
+            /**
+             * @description `two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints.
+             * @enum {string}
+             */
+            next: "two_factor" | "enrol";
+            /** Format: date-time */
+            expires_at: string;
+        };
+        /** @description Exactly one of `code` and `recovery_code`. */
+        TwoFactorCode: {
+            /** @description The 6-digit code from the authenticator app. Spaces are ignored. */
+            code?: string;
+            /** @description One of the 10 recovery codes (XXXXX-XXXXX). Works once. */
+            recovery_code?: string;
+        };
+        TwoFactorEnrolment: {
+            /** @description Base32 manual key. Shown only in this answer. */
+            secret: string;
+            /** @description otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code. */
+            otpauth_uri: string;
+            /** @constant */
+            issuer: "GSDN PMIS";
+            /** @description The user's email. */
+            account: string;
+            /** @constant */
+            algorithm: "SHA1";
+            /** @constant */
+            digits: 6;
+            /** @constant */
+            period: 30;
+        };
+        TwoFactorEnrolled: {
+            session: components["schemas"]["Session"];
+            /** @description One-time codes, shown only in this answer; the server keeps a keyed hash. */
+            recovery_codes: string[];
+        };
+        RecoveryCodes: {
+            recovery_codes: string[];
+            recovery_codes_remaining: number;
+        };
+        /**
+         * @description 0.5.0. `pending_enrolment` = on, but the user has not set up an authenticator yet.
+         * @enum {string}
+         */
+        TwoFactorLabel: "off" | "pending_enrolment" | "on";
+        TwoFactorState: {
+            two_factor: components["schemas"]["TwoFactorLabel"];
         };
         Me: {
             user: components["schemas"]["User"];
@@ -4530,6 +5009,7 @@ export interface components {
             department?: components["schemas"]["DepartmentRef"] | null;
             /** @description 0.3.0. A temporary password is waiting to be changed. */
             must_change_password?: boolean;
+            two_factor?: components["schemas"]["TwoFactorLabel"];
             /** @description Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption. */
             mfa_exempt?: boolean;
             /** Format: date-time */
@@ -4846,7 +5326,7 @@ export interface components {
         View: components["schemas"]["ViewRef"] & {
             /** @description Stages whose tasks are all in the view. */
             stage_codes: string[];
-            /** @description Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after (setting `views.om_team_assigned`); only the tasks that apply now are listed. */
+            /** @description Single tasks in the view. CW DLP (B14) and CW FAC (B15) are always in the CW view. The O&M view always lists TE FAC (D18) and Final Closure (Z1); the TE view ends at HOTO (owner decision 2026-11-01, migration 0030). `views.om_team_assigned` decides who acts, not where the task shows; only the tasks that apply now are listed. */
             task_codes: string[];
         };
         /** @description The status of one site within one stream (only the tasks and stages of that stream). */
@@ -5201,6 +5681,7 @@ export interface components {
         };
         RejectRequest: {
             note: string;
+            via?: components["schemas"]["WorkflowVia"];
             rejected_slots?: {
                 /** Format: uuid */
                 slot_id: string;
@@ -7366,7 +7847,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -7383,6 +7864,172 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             read_at: string | null;
+            /**
+             * Format: date-time
+             * @description 0.4.10. Hidden from the default list until then.
+             */
+            snoozed_until?: string | null;
+        };
+        /**
+         * @description 0.4.10 (DD6). How the action was started. Recorded in the audit row; it changes no rule or permission.
+         * @enum {string}
+         */
+        WorkflowVia: "button" | "drag" | "bulk";
+        RegisterNoteVia: {
+            /** @description Mandatory on reject. */
+            note?: string;
+            via?: components["schemas"]["WorkflowVia"];
+        };
+        Follow: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            entity_type: "site" | "register_record";
+            /**
+             * Format: uuid
+             * @description The site id, or the record entity id (stable across versions).
+             */
+            entity_id: string;
+            register_key?: string | null;
+            /** Format: uuid */
+            site_id?: string | null;
+            /** @description Only in GET /me/follows. */
+            label?: string;
+            /** Format: date-time */
+            created_at: string;
+        };
+        /**
+         * @description The level a task sits at.
+         * @enum {string}
+         */
+        InStateKind: "entry" | "review" | "approve";
+        TaskTimeInState: {
+            /** Format: uuid */
+            task_id: string;
+            /** @description The level the task sits at now; null when it is locked, approved or otherwise not at a level. */
+            current_state: components["schemas"]["InStateKind"] | null;
+            /** @description One per level. */
+            items: {
+                state: components["schemas"]["InStateKind"];
+                visits: number;
+                total_seconds: number;
+                longest_seconds: number;
+                /** @description Sum of the working days of each visit (weekend Friday and Saturday, holidays). */
+                working_days: number;
+            }[];
+            segments: {
+                state: components["schemas"]["InStateKind"];
+                /** Format: date-time */
+                started_at: string;
+                /** Format: date-time */
+                ended_at: string | null;
+                seconds: number;
+                working_days: number;
+                handled_by?: components["schemas"]["UserRef"];
+            }[];
+        };
+        TimeInStateReport: {
+            /** @enum {string} */
+            group_by: "holder" | "team";
+            items: {
+                holder?: components["schemas"]["UserRef"];
+                /** @enum {string} */
+                team?: "cw" | "te" | "both" | "none";
+                /** @description Keyed by level (entry, review, approve). */
+                levels: {
+                    [key: string]: {
+                        visits: number;
+                        total_seconds: number;
+                        average_seconds: number;
+                        max_seconds: number;
+                        working_days: number;
+                    };
+                };
+            }[];
+        };
+        Workload: {
+            items: {
+                holder: components["schemas"]["UserRef"];
+                /** @enum {string} */
+                team: "cw" | "te" | "both" | "none";
+                open: number;
+                late: number;
+                by_level: {
+                    entry?: number;
+                    review?: number;
+                    approve?: number;
+                };
+            }[];
+            no_holder: {
+                open: number;
+                late: number;
+            };
+        };
+        BlockedBy: {
+            /** Format: uuid */
+            task_id: string;
+            state: string;
+            blocked: boolean;
+            items: {
+                /** @description predecessor_not_approved, gate_closed, condition_not_met, permit, open_snags and the other kinds of lock_reasons. */
+                kind: string;
+                ref_code?: string | null;
+                message: string;
+                count?: number | null;
+                /** @description The predecessor task (only for predecessor_not_approved). */
+                task?: {
+                    /** Format: uuid */
+                    id?: string;
+                    task_code?: string;
+                    name_en?: string;
+                    state?: string;
+                };
+            }[];
+        };
+        /** @enum {string} */
+        StatusHealth: "on_track" | "at_risk" | "off_track";
+        StatusUpdateInput: {
+            /** @enum {string} */
+            scope: "region" | "team";
+            /** @description Required for a region update; optional for a team update (omitted = all regions). */
+            region_id?: number;
+            /**
+             * @description Required for a team update.
+             * @enum {string}
+             */
+            team?: "cw" | "te";
+            health: components["schemas"]["StatusHealth"];
+            summary: string;
+        };
+        StatusUpdatePatch: {
+            health?: components["schemas"]["StatusHealth"];
+            summary?: string;
+        };
+        StatusUpdate: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            scope: "region" | "team";
+            region_id: number | null;
+            /** @enum {string|null} */
+            team: "cw" | "te" | null;
+            /**
+             * Format: date
+             * @description The Sunday that opens the working week.
+             */
+            week_start: string;
+            /** Format: date */
+            week_end: string;
+            health: components["schemas"]["StatusHealth"];
+            summary: string;
+            author: components["schemas"]["UserRef"];
+            version: number;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            /** @description true for the author until the end of the week. */
+            editable: boolean;
         };
         NotificationPreference: {
             kind: components["schemas"]["NotificationKind"];
@@ -7965,6 +8612,34 @@ export interface operations {
             };
         };
         responses: {
+            /** @description Signed in (`Session`), or the password was right and a code or an enrolment is still needed (`PendingSignIn`, cookie `pmis_2fa`). */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"] | components["schemas"]["PendingSignIn"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    localTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorCode"];
+            };
+        };
+        responses: {
             /** @description Signed in. */
             200: {
                 headers: {
@@ -7975,8 +8650,91 @@ export interface operations {
                     "application/json": components["schemas"]["Session"];
                 };
             };
-            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    startTwoFactorEnrolment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secret and URI. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorEnrolment"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    confirmTwoFactorEnrolment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The 6-digit code. Spaces are ignored. */
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Enrolled and signed in. */
+            200: {
+                headers: {
+                    "Set-Cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorEnrolled"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    regenerateRecoveryCodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description New codes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
             429: components["responses"]["TooManyRequests"];
         };
     };
@@ -8024,6 +8782,10 @@ export interface operations {
                 "application/json": {
                     /** Format: password */
                     password: string;
+                    /** @description 0.5.0. TOTP code, required when the user's two-factor is on. */
+                    code?: string;
+                    /** @description 0.5.0. One recovery code instead of `code`. */
+                    recovery_code?: string;
                 };
             };
         };
@@ -8880,6 +9642,70 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setUserTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description New state. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    resetUserTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description New state (`pending_enrolment`). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     resetUserPassword: {
@@ -9873,6 +10699,7 @@ export interface operations {
                      * @description Default today (TE MOS date for D6).
                      */
                     actual_start?: string;
+                    via?: components["schemas"]["WorkflowVia"];
                 };
             };
         };
@@ -9902,6 +10729,7 @@ export interface operations {
             content: {
                 "application/json": {
                     note?: string;
+                    via?: components["schemas"]["WorkflowVia"];
                 };
             };
         };
@@ -9932,6 +10760,7 @@ export interface operations {
             content: {
                 "application/json": {
                     note?: string;
+                    via?: components["schemas"]["WorkflowVia"];
                 };
             };
         };
@@ -9961,6 +10790,7 @@ export interface operations {
             content: {
                 "application/json": {
                     note?: string;
+                    via?: components["schemas"]["WorkflowVia"];
                 };
             };
         };
@@ -10355,6 +11185,8 @@ export interface operations {
                     action: "pass" | "approve";
                     items: components["schemas"]["VersionedRef"][];
                     note?: string;
+                    /** @description Default bulk; a board drag of several cards sends drag. */
+                    via?: components["schemas"]["WorkflowVia"];
                 };
             };
         };
@@ -13186,7 +14018,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RegisterNoteVia"];
+            };
+        };
         responses: {
             /** @description Transition applied. */
             200: {
@@ -13222,7 +14058,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RegisterNoteVia"];
+            };
+        };
         responses: {
             /** @description Transition applied. */
             200: {
@@ -13258,7 +14098,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RegisterNoteVia"];
+            };
+        };
         responses: {
             /** @description Transition applied. */
             200: {
@@ -15355,6 +16199,8 @@ export interface operations {
         parameters: {
             query?: {
                 unread_only?: boolean;
+                /** @description hide (default): a snoozed notification is hidden until its date. only: just the snoozed ones. include: both. */
+                snoozed?: "hide" | "only" | "include";
                 kind?: components["schemas"]["NotificationKind"];
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
@@ -15408,6 +16254,462 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    markNotificationUnread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification. */
+                notification_id: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Unread. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    snoozeNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification. */
+                notification_id: components["parameters"]["NotificationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    until: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Snoozed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    followSite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Following. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Follow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unfollowSite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not following (also when it was not followed). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    followRegisterRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Following. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Follow"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    unfollowRegisterRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Not following. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMyFollows: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Follows, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Follow"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listRegisterRecordComments: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Comments, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["Comment"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addRegisterRecordComment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    body: string;
+                    mention_user_ids?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Added. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Comment"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getTaskTimeInState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Durations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskTimeInState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTaskBlockedBy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The chain. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BlockedBy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getTimeInStateReport: {
+        parameters: {
+            query?: {
+                group_by?: "holder" | "team";
+                region_id?: number;
+                stage_code?: string;
+                /** @description Visits that ended on or after this date. */
+                from?: string;
+                /** @description Visits that ended on or before this date. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimeInStateReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getWorkload: {
+        parameters: {
+            query?: {
+                region_id?: number;
+                stage_code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Workload. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Workload"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listStatusUpdates: {
+        parameters: {
+            query?: {
+                scope?: "region" | "team";
+                region_id?: number;
+                team?: "cw" | "te";
+                week_start?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["StatusUpdate"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createStatusUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdateInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusUpdate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    editStatusUpdate: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                update_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatusUpdatePatch"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusUpdate"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     markAllNotificationsRead: {

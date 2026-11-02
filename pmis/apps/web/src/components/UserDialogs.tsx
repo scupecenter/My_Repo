@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { fieldErrors, useCreateLocalUser, useResetPassword } from '@/api/auth';
+import { fieldErrors, useCreateLocalUser, useResetPassword, useResetTwoFactor, useSetTwoFactor } from '@/api/auth';
 import { api, ApiError } from '@/api/client';
-import type { BulkResult, User, UserDetail } from '@/api/types';
+import type { BulkResult, TwoFactorLabel, User, UserDetail } from '@/api/types';
 import { errText, FormDialog } from './FormDialog';
+import { useToast } from './Toast';
 import { PasswordMode, TempPasswordDialog } from './TempPassword';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -20,6 +21,33 @@ export function LocalBadges({ user }: { user: Pick<User, 'local_sign_in' | 'must
       {user.local_sign_in && <span className="chip bg-openBg text-openInk" data-testid={`local-badge-${k}`}>{t('badges.local')}</span>}
       {user.must_change_password && <span className="chip bg-waitBg text-waitInk" data-testid={`must-change-badge-${k}`}>{t('badges.must_change')}</span>}
     </>
+  );
+}
+
+const TF_TONE: Record<TwoFactorLabel, string> = { on: 'bg-doneBg text-doneInk', pending_enrolment: 'bg-waitBg text-waitInk', off: 'bg-lockBg text-lockInk' };
+
+/** The "2FA" badge on Users & Roles: on, pending enrolment (on, not set up yet) or off. Shown for local accounts only (the field is absent otherwise). */
+export function TwoFactorBadge({ user }: { user: Pick<User, 'two_factor' | 'employee_id' | 'id' | 'local_sign_in'> }) {
+  const { t } = useTranslation();
+  const state = user.two_factor;
+  if (!state || (!user.local_sign_in && state === 'off')) return null;
+  const k = user.employee_id ?? user.id;
+  return <span className={`chip ${TF_TONE[state]}`} data-testid={`tf-badge-${k}`} data-state={state} title={t(`twoFactor.badge_title_${state}`)}>{t('twoFactor.badge_label')}: {t(`twoFactor.badge_${state}`)}</span>;
+}
+
+/** Admin action on a user's two-factor: turn on, turn off or reset (lost phone). Reason required; the step-up (password and code) is asked by the client. */
+export function TwoFactorDialog({ user, action, onClose }: { user: Pick<User, 'id' | 'display_name'>; action: 'on' | 'off' | 'reset'; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const set = useSetTwoFactor(user.id), reset = useResetTwoFactor(user.id);
+  const m = action === 'reset' ? reset : set;
+  const done = { onSuccess: () => { toast(t(`twoFactor.done_${action}`)); onClose(); } };
+  return (
+    <FormDialog open onClose={onClose} testid="two-factor-dialog" title={t(`twoFactor.${action}_title`, { name: user.display_name })} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
+      submitLabel={t(action === 'on' ? 'twoFactor.admin_turn_on' : action === 'off' ? 'twoFactor.admin_turn_off' : 'twoFactor.admin_reset')}
+      onSubmit={(reason) => (action === 'reset' ? reset.mutate({ reason }, done) : set.mutate({ enabled: action === 'on', reason }, done))}>
+      <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="two-factor-dialog-note">{t(`twoFactor.${action}_note`)}</p>
+    </FormDialog>
   );
 }
 

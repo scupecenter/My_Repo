@@ -24,6 +24,7 @@ database, runs the cases and reports.
 | `cases/70_announcement_results.sql` | A recipient reading results or other answers; answering twice; answering a notice not addressed to them. |
 | `cases/80_local_credentials.sql` | Reading hashes directly or through the functions for another user; anonymous calls. |
 | `cases/85_local_lookup.sql` | `auth_local_lookup` must never return a deleted or a disabled account. |
+| `cases/86_two_factor.sql` | Two-factor (migration 0033): `pmis_app` reading or writing the encrypted secrets, recovery hashes and pending sign-ins; another user's secret through the functions; non-admins, delegates without `users.administer` and admins on themselves turning it on, off or resetting; the session guard without a code. |
 | `cases/90_rls_and_sessions.sql` | Region RLS (a Tripoli session and Benghazi data), and session rows. Includes KNOWN LIMIT cases (below). |
 
 ## How to run

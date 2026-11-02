@@ -42,6 +42,9 @@ const orgSchema = z.object({
   reason,
 }).strict();
 
+const twoFactorSchema = z.object({ enabled: z.boolean(), reason }).strict();
+const twoFactorResetSchema = z.object({ reason }).strict();
+
 const resetSchema = z.object({ reason, temporary_password: z.string().max(1024).optional() }).strict();
 
 export interface UserDetailDto extends UserDto {
@@ -251,6 +254,35 @@ export class UsersService {
     this.states.invalidate(id);
     await this.syslog.write('info', 'password_reset_by_admin', { target_user: id }, auth.user.id);
     return { temporary_password: temporary };
+  }
+
+  /**
+   * PUT /users/{id}/two-factor: turns two-factor on or off. System Admin, or a delegate with users.two_factor; needs a reason and the
+   * actor's step-up; nobody changes their own (idm_set_two_factor). Turning it on ends the user's local sessions (they enrol at next sign-in).
+   */
+  async setTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<{ two_factor: string }> {
+    const body = parse(twoFactorSchema, raw);
+    await this.access.requireAdmin('users', 'administer');
+    await this.stepUp.require(auth);
+    if (!uuidSchema.safeParse(id).success || !(await this.repo.find(id))) throw problems.notFound();
+    const rows = await this.db.tx.$queryRaw<{ s: string }[]>`SELECT idm_set_two_factor(${id}::uuid, ${body.enabled}::boolean, ${body.reason}::text) AS s`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    this.states.invalidate(id);
+    await this.syslog.write('info', body.enabled ? 'two_factor_enabled_by_admin' : 'two_factor_disabled_by_admin', { target_user: id }, auth.user.id);
+    return { two_factor: rows[0]!.s };
+  }
+
+  /** POST /users/{id}/two-factor/reset: lost phone. Clears the secret and the recovery codes, forces a new enrolment, ends the sessions. */
+  async resetTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<{ two_factor: string }> {
+    const body = parse(twoFactorResetSchema, raw);
+    await this.access.requireAdmin('users', 'administer');
+    await this.stepUp.require(auth);
+    if (!uuidSchema.safeParse(id).success || !(await this.repo.find(id))) throw problems.notFound();
+    const rows = await this.db.tx.$queryRaw<{ s: string }[]>`SELECT idm_reset_two_factor(${id}::uuid, ${body.reason}::text) AS s`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    this.states.invalidate(id);
+    await this.syslog.write('info', 'two_factor_reset_by_admin', { target_user: id }, auth.user.id);
+    return { two_factor: rows[0]!.s };
   }
 
   private requireStrong(password: string, ctx: { email: string; employeeId: string | null; phone: string | null }, path: string): void {

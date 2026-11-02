@@ -14,9 +14,25 @@ import { StepUpService } from './step-up.service';
 import { SyslogService } from './syslog.service';
 import { UserStateService } from './user-state.service';
 import { IDLE_HOURS } from './session.service';
+import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.service';
 
 export const loginSchema = z.object({ identifier: z.string().min(1).max(254), password: z.string().min(1).max(128) }).strict();
-const stepUpSchema = z.object({ password: z.string().max(128) }).strict();
+const codeFields = {
+  code: z.string().trim().max(16).optional(),
+  recovery_code: z.string().trim().max(32).optional(),
+};
+const eitherCode = (b: { code?: string; recovery_code?: string }): boolean => (b.code === undefined) !== (b.recovery_code === undefined);
+const eitherMsg = { message: 'Send code or recovery_code, not both.', path: ['code'] };
+/** POST /auth/local/2fa: a TOTP code or one recovery code. */
+export const twoFactorSchema = z.object(codeFields).strict().refine(eitherCode, eitherMsg);
+const stepUpSchema = z.object({ password: z.string().max(128), ...codeFields }).strict();
+const confirmSchema = z.object({ code: z.string().trim().min(1).max(16) }).strict();
+
+function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | null {
+  if (b.recovery_code !== undefined) return { recovery_code: b.recovery_code };
+  if (b.code !== undefined) return { code: b.code.replace(/\s/g, '') };
+  return null;
+}
 const changePasswordSchema = z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
 
 export const LOGIN_LIMIT_PER_IP = 10;
@@ -31,6 +47,17 @@ interface LookupRow {
   status: UserStatus;
 }
 
+/** Login answer when the password was right but a code (or enrolment) is still needed. No session exists yet. */
+export interface PendingBody {
+  authenticated: false;
+  next: 'two_factor' | 'enrol';
+  expires_at: Date;
+}
+
+export type LoginResult =
+  | { kind: 'session'; token: string; body: SessionBody }
+  | { kind: 'pending'; token: string; body: PendingBody };
+
 export interface SessionBody {
   authenticated: true;
   csrf_token: string;
@@ -41,6 +68,7 @@ export interface SessionBody {
   break_glass: boolean;
   auth_method: string;
   must_change_password: boolean;
+  two_factor: { enabled: boolean; recovery_codes_remaining: number };
   stepup_valid_until: Date | null;
   expires_at: Date;
 }
@@ -67,20 +95,23 @@ export class AuthService {
     private readonly limiter: RateLimiter,
     private readonly hmac: LogHmacService,
     private readonly syslog: SyslogService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   async sessionBody(auth: AuthContext, csrf = auth.session.csrfToken): Promise<SessionBody> {
     const idleEnd = auth.session.lastActivityAt.getTime() + IDLE_HOURS * 3600_000;
+    const tf = await this.twoFactor.state(auth.user.id);
     return {
       authenticated: true,
       csrf_token: csrf,
       user: { id: auth.user.id, display_name: auth.user.displayName, employee_id: auth.user.employeeId },
       status: auth.user.status,
       needs_employee_id: false, // a local account is created with its identifiers; the M365 employee-ID link does not apply
-      mfa: false,
+      mfa: auth.session.twoFactor,
       break_glass: auth.session.authMethod === 'break_glass',
       auth_method: auth.session.authMethod,
       must_change_password: auth.state.mustChange && auth.session.authMethod === 'local',
+      two_factor: { enabled: tf.required && tf.enrolled, recovery_codes_remaining: tf.recovery_remaining },
       stepup_valid_until: await this.stepUp.validUntil(auth),
       expires_at: new Date(Math.min(auth.session.expiresAt.getTime(), idleEnd)),
     };
@@ -90,7 +121,7 @@ export class AuthService {
    * POST /auth/local/login. Every failure is the same 401: unknown identifier, wrong password, locked, local sign-in off,
    * suspended or disabled. A dummy argon2 verify runs when nothing matched so the timing does not tell them apart.
    */
-  async login(rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
+  async login(rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<LoginResult> {
     const parsed = loginSchema.safeParse(rawBody);
     if (!parsed.success) throw new ProblemException(400, 'validation_failed', { detail: 'identifier and password are required.', errors: zodErrors(parsed.error) });
     const { password } = parsed.data;
@@ -129,27 +160,48 @@ export class AuthService {
       await tx.$queryRaw`SELECT set_config('app.user_id', ${row.user_id}, true)`;
       await tx.$executeRaw`SELECT auth_local_result(${row.user_id}::uuid, ${ok}::boolean)`;
       return this.db.runIn(tx, async () => {
-        await this.syslog.write(ok ? 'info' : 'warn', ok ? 'local_sign_in_ok' : 'local_sign_in_failed',
-          { identifier_hmac: masked, reason: ok ? undefined : 'bad_password', ip }, row.user_id, requestId);
-        return ok ? this.sessions.create(row.user_id, 'local', ip, userAgent) : null;
+        const tf = ok ? await this.twoFactor.state(row.user_id) : null;
+        // Two-factor on: the password alone gives no session. A pending sign-in (5 minutes, single use) waits for the code or the enrolment.
+        const next = tf?.required ? (tf.enrolled ? ('two_factor' as const) : ('enrol' as const)) : null;
+        const pending = next ? await this.twoFactor.createPending(row.user_id, next, ip) : null;
+        await this.syslog.write(ok ? 'info' : 'warn', !ok ? 'local_sign_in_failed' : pending ? 'local_sign_in_password_ok' : 'local_sign_in_ok',
+          { identifier_hmac: masked, reason: ok ? undefined : 'bad_password', ip, ...(next ? { next } : {}) }, row.user_id, requestId);
+        if (!ok) return null;
+        if (pending && next) return { pending: true as const, token: pending.token, expiresAt: pending.expiresAt, next };
+        return { pending: false as const, ...(await this.sessions.create(row.user_id, 'local', ip, userAgent)) };
       });
     });
     this.states.invalidate(row.user_id);
     if (!created) throw problems.invalidCredentials();
+    if (created.pending) return { kind: 'pending', token: created.token, body: { authenticated: false, next: created.next, expires_at: created.expiresAt } };
 
     const found = await this.sessions.load(created.token);
     if (!found) throw new ProblemException(500, 'internal_error', {});
     const state = await this.states.get(found.user.id, found.user.email, found.user.status);
     const auth: AuthContext = { session: found.session, user: found.user, state, ip, live: false };
-    return { token: created.token, body: await this.sessionBody(auth) };
+    return { kind: 'session', token: created.token, body: await this.sessionBody(auth) };
   }
 
   /** POST /auth/local/step-up: re-enter the password. A wrong password counts toward the lockout. */
   async localStepUp(auth: AuthContext, rawBody: unknown): Promise<SessionBody> {
-    const { password } = parse(stepUpSchema, rawBody);
+    const body = parse(stepUpSchema, rawBody);
+    // Two-factor on: the password and a code (TOTP, or a recovery code once) together. Nothing is counted while the code is missing.
+    const tf = await this.twoFactor.state(auth.user.id);
+    const input = codeInput(body);
+    const needCode = tf.required && tf.enrolled;
+    if (needCode && (!input || (body.code !== undefined && body.recovery_code !== undefined))) {
+      throw problems.validation([{ path: '/code', code: 'required', message: 'Send the code from your authenticator app (or one recovery code).' }]);
+    }
     const wait = this.limiter.hit(`stepup:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
     if (wait) throw problems.rateLimited(wait);
-    await this.checkOwnPassword(auth, password, 'step_up');
+    await this.checkOwnPassword(auth, body.password, 'step_up');
+    if (needCode && input) {
+      const r = await this.twoFactor.check(auth.user.id, input);
+      if (!r.ok) {
+        await this.twoFactor.logFailure(auth.user.id, r.reason, r.via, auth.ip, 'step_up');
+        throw this.twoFactor.problem(r.reason, true);
+      }
+    }
     const at = await this.sessions.markStepUp(auth.session.id);
     const next: AuthContext = { ...auth, session: { ...auth.session, stepupAt: at, dbNow: new Date(Math.max(at.getTime(), auth.session.dbNow.getTime())) } };
     return this.sessionBody(next);
@@ -175,6 +227,116 @@ export class AuthService {
     await this.syslog.write('info', 'local_password_changed', { other_sessions_ended: ended }, auth.user.id, undefined);
     const next: AuthContext = { ...auth, state: { ...auth.state, mustChange: false } };
     return this.sessionBody(next);
+  }
+
+  /** Runs `fn` in one transaction for a user who is not signed in yet (pending sign-in): app.user_id set, ambient transaction on. */
+  private async asUser<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+    return this.db.client.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true)`;
+      return this.db.runIn(tx, fn);
+    });
+  }
+
+  /** Reads the new session back and builds its body (outside the sign-in transaction). */
+  private async sessionFor(token: string, ip: string | null): Promise<{ token: string; body: SessionBody }> {
+    const found = await this.sessions.load(token);
+    if (!found) throw new ProblemException(500, 'internal_error', {});
+    const state = await this.states.get(found.user.id, found.user.email, found.user.status);
+    const auth: AuthContext = { session: found.session, user: found.user, state, ip, live: false };
+    return { token, body: await this.sessionBody(auth) };
+  }
+
+  private async pendingOf(token: string | undefined, kind: 'two_factor' | 'enrol'): Promise<{ userId: string }> {
+    const p = token ? await this.twoFactor.loadPending(token) : null;
+    if (!p || p.kind !== kind) throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+    return { userId: p.userId };
+  }
+
+  /** POST /auth/local/2fa: the code (or one recovery code) after the password. Creates the session; the pending sign-in is single use. */
+  async twoFactorSignIn(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody }> {
+    const body = parse(twoFactorSchema, rawBody);
+    const input = codeInput(body);
+    if (!input) throw problems.validation([{ path: '/code', code: 'required' }]);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const { userId } = await this.pendingOf(pendingToken, 'two_factor');
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+
+    const out = await this.asUser(userId, async () => {
+      const r = await this.twoFactor.check(userId, input);
+      if (!r.ok) {
+        await this.twoFactor.logFailure(userId, r.reason, r.via, ip, 'sign_in', requestId);
+        return { fail: r.reason } as const;
+      }
+      if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
+      await this.syslog.write('info', 'local_sign_in_ok', { via: r.via, two_factor: true, ip }, userId, requestId);
+      return { created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
+    });
+    this.states.invalidate(userId);
+    if ('fail' in out) {
+      if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+      throw this.twoFactor.problem(out.fail as 'bad' | 'replay' | 'locked', false);
+    }
+    return this.sessionFor(out.created.token, ip);
+  }
+
+  /** POST /auth/local/2fa/enrol/start: a fresh secret and the otpauth URI for the QR code. Only for a pending enrolment. */
+  async enrolStart(pendingToken: string | undefined, ip: string | null): Promise<Record<string, unknown>> {
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const { userId } = await this.pendingOf(pendingToken, 'enrol');
+    return this.asUser(userId, async () => {
+      const rows = await this.db.tx.$queryRaw<{ email: string }[]>`SELECT email FROM users WHERE id = ${userId}::uuid`;
+      const email = rows[0]?.email ?? userId;
+      const e = await this.twoFactor.beginEnrol(userId, email);
+      return { ...e, issuer: TWO_FACTOR_PARAMS.issuer, account: email, algorithm: TWO_FACTOR_PARAMS.algorithm, digits: TWO_FACTOR_PARAMS.digits, period: TWO_FACTOR_PARAMS.period };
+    });
+  }
+
+  /** POST /auth/local/2fa/enrol/confirm: the first code. Turns two-factor on for the user, returns the recovery codes once, and signs in. */
+  async enrolConfirm(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody; recovery_codes: string[] }> {
+    const { code } = parse(confirmSchema, rawBody);
+    const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
+    if (ipWait) throw problems.rateLimited(ipWait);
+    const { userId } = await this.pendingOf(pendingToken, 'enrol');
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+
+    const out = await this.asUser(userId, async () => {
+      const r = await this.twoFactor.checkPendingSecret(userId, code.replace(/\s/g, ''));
+      if (!r.ok) {
+        await this.twoFactor.logFailure(userId, r.reason, 'totp', ip, 'enrol', requestId);
+        return { fail: r.reason } as const;
+      }
+      const codes = await this.twoFactor.confirmEnrol(userId, r.step);
+      if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
+      await this.syslog.write('info', 'local_two_factor_enrolled', { ip }, userId, requestId);
+      return { codes, created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
+    });
+    this.states.invalidate(userId);
+    if ('fail' in out) {
+      if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
+      throw this.twoFactor.problem(out.fail as 'bad' | 'replay' | 'locked', false);
+    }
+    return { ...(await this.sessionFor(out.created.token, ip)), recovery_codes: out.codes };
+  }
+
+  /** POST /auth/local/2fa/recovery-codes: new recovery codes; needs a valid TOTP code (not a recovery code). The old codes stop working. */
+  async regenerateRecoveryCodes(auth: AuthContext, rawBody: unknown): Promise<{ recovery_codes: string[]; recovery_codes_remaining: number }> {
+    const { code } = parse(confirmSchema, rawBody);
+    const tf = await this.twoFactor.state(auth.user.id);
+    if (!tf.required || !tf.enrolled) throw new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for your account.' });
+    const wait = this.limiter.hit(`2fa:regen:${auth.user.id}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    if (wait) throw problems.rateLimited(wait);
+    const r = await this.twoFactor.check(auth.user.id, { code: code.replace(/\s/g, '') });
+    if (!r.ok) {
+      await this.twoFactor.logFailure(auth.user.id, r.reason, r.via, auth.ip, 'recovery_codes');
+      throw this.twoFactor.problem(r.reason, true);
+    }
+    const codes = await this.twoFactor.regenerateRecovery(auth.user.id);
+    await this.syslog.write('info', 'local_recovery_codes_regenerated', {}, auth.user.id, undefined);
+    return { recovery_codes: codes, recovery_codes_remaining: codes.length };
   }
 
   async logout(auth: AuthContext): Promise<void> {

@@ -386,6 +386,10 @@ model User {
   credentials_set  LocalCredential[]       @relation("LocalCredentialSetBy")
   sessions         UserSession[]           @relation("SessionUser")
   sessions_revoked UserSession[]           @relation("SessionRevokedBy")
+  totp             UserTotp?               @relation("TotpUser")
+  totp_set         UserTotp[]              @relation("TotpSetBy")
+  recovery_codes   UserRecoveryCode[]
+  pending_sign_ins AuthPending[]
   manager          User?                   @relation("UserManager", fields: [manager_id], references: [id], onDelete: SetNull)
   reports          User[]                  @relation("UserManager")
   department       Department?             @relation(fields: [department_id], references: [id], onDelete: SetNull)
@@ -438,11 +442,62 @@ model UserSession {
   revoked_at       DateTime?  @db.Timestamptz(6)
   revoked_by       String?    @db.Uuid
   revoke_reason    String?
+  two_factor       Boolean    @default(false) // the session passed a code at sign-in (migration 0033)
 
   user    User  @relation("SessionUser", fields: [user_id], references: [id])
   revoker User? @relation("SessionRevokedBy", fields: [revoked_by], references: [id])
 
   @@map("user_sessions")
+}
+
+// Two-factor (TOTP) of a local account (migration 0033, ADR 0014). Not readable by pmis_app: auth_totp_*, auth_pending_* and idm_*_two_factor functions only.
+model UserTotp {
+  user_id            String    @id @db.Uuid
+  required           Boolean   @default(false) // two-factor is on (set by an admin)
+  secret_enc         String? // AES-256-GCM envelope made by the API; null = not enrolled yet
+  pending_secret_enc String? // secret shown in the QR code, not confirmed yet
+  enrolled_at        DateTime? @db.Timestamptz(6)
+  last_step          BigInt? // replay guard: last accepted 30-second step
+  failed_count       Int       @default(0)
+  last_success_at    DateTime? @db.Timestamptz(6)
+  set_by             String?   @db.Uuid
+  set_at             DateTime  @default(now()) @db.Timestamptz(6)
+
+  user   User  @relation("TotpUser", fields: [user_id], references: [id], onDelete: Cascade)
+  setter User? @relation("TotpSetBy", fields: [set_by], references: [id])
+
+  @@map("user_totp")
+}
+
+// One-time recovery codes: only a keyed hash (HMAC-SHA-256) is stored.
+model UserRecoveryCode {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id    String    @db.Uuid
+  code_hash  String    @db.Char(64)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, code_hash])
+  @@map("user_recovery_codes")
+}
+
+// A sign-in that passed the password and waits for the code or the enrolment (cookie pmis_2fa, 5 minutes, single use; only the SHA-256 is stored).
+model AuthPending {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token_hash String    @unique @db.Char(64)
+  user_id    String    @db.Uuid
+  kind       String // two_factor | enrol
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  expires_at DateTime  @db.Timestamptz(6)
+  used_at    DateTime? @db.Timestamptz(6)
+  ip         String?   @db.Inet
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, created_at])
+  @@map("auth_pending")
 }
 
 // One row = one person holding one role (main or sub-role), with its own level, scope and validity. A person can hold many rows.

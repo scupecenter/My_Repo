@@ -8,6 +8,8 @@ import type { AppConfig } from '../src/config/config';
 import { BOOTSTRAP_ADMIN } from './global-setup';
 
 export const API = '/api/v1';
+/** 32 bytes, test only. */
+export const TEST_TOTP_ENC_KEY = '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff';
 export const PASSWORD = 'Correct-Horse-Battery-9';
 export const NEW_PASSWORD = 'Another-Strong-Phrase-42';
 
@@ -19,6 +21,7 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     host: '127.0.0.1',
     cookieSecure: false,
     logHmacKey: 'test-only-hmac-key-0123456789abcdef',
+    totpEncKey: TEST_TOTP_ENC_KEY,
     jobsEnabled: false,
     ...over,
   };
@@ -214,6 +217,8 @@ let ipSeq = randomInt(1, 200);
 export class Api {
   token: string | undefined;
   csrf: string | undefined;
+  /** Pending sign-in cookie (pmis_2fa): the password was right, the code or the enrolment is still to do. */
+  pending: string | undefined;
   readonly ip: string;
 
   constructor(readonly app: NestExpressApplication, ip?: string) {
@@ -243,12 +248,27 @@ export class Api {
     if (res.status === 200) {
       this.token = tokenFromSetCookie(res);
       this.csrf = res.body.csrf_token;
+      const p = setCookies(res).find((x) => x.startsWith('pmis_2fa='));
+      if (p) this.pending = p.split(';')[0]!.slice('pmis_2fa='.length);
     }
     return res;
   }
 
-  async stepUp(password: string): Promise<request.Response> {
-    return this.call('post', '/auth/local/step-up', { password });
+  /** A call that carries the pending sign-in cookie instead of a session. */
+  pendingCall(path: string, body?: unknown, cookie: string | undefined = this.pending): request.Test {
+    const t = request(this.app.getHttpServer()).post(`${API}${path}`).set('X-Forwarded-For', this.ip);
+    if (cookie) t.set('Cookie', `pmis_2fa=${cookie}`);
+    return t.send((body ?? {}) as object);
+  }
+
+  /** Adopts the session of a successful 2FA or enrolment answer. */
+  adopt(res: request.Response, session: { csrf_token: string }): void {
+    this.token = tokenFromSetCookie(res);
+    this.csrf = session.csrf_token;
+  }
+
+  async stepUp(password: string, extra: { code?: string; recovery_code?: string } = {}): Promise<request.Response> {
+    return this.call('post', '/auth/local/step-up', { password, ...extra });
   }
 }
 

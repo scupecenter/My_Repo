@@ -1,7 +1,8 @@
 // MSW handlers for local sign-in (ADR 0012): login, change password, step-up by password, create user, admin reset. Synthetic only.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import { accountKeyOf, ACCOUNTS, attempts, cred, db, save, sessionBody, STAFF, stepUpValid, viewer } from './db';
+import { accountKeyOf, ACCOUNTS, attempts, cred, db, save, sessionBody, STAFF, stepUpValid, tfLabel, viewer, type Cred } from './db';
+import { matchStep, newRecoveryCodes, newSecret, otpauth } from './totp';
 import { guard, problem, stepUp } from './handlers';
 import { userOf } from './handlers.admin';
 import { uid } from './ids';
@@ -54,6 +55,46 @@ function recordFailure(key: string) {
   c.failures += 1;
   if (c.failures >= LOCK_AFTER) { c.locked_until = Date.now() + LOCK_MS; c.failures = 0; }
 }
+const PENDING_MS = 5 * 60_000;
+type CodeBody = { code?: string; recovery_code?: string };
+type CodeResult = 'ok' | 'bad' | 'replay' | 'locked';
+
+/** The real server counts wrong codes apart from passwords and locks the account after 5, ending the pending sign-in. */
+async function checkCode(c: Cred, b: CodeBody, secret: string | null): Promise<CodeResult> {
+  const tf = c.tf!;
+  if (c.locked_until && c.locked_until > Date.now()) return 'locked';
+  const fail = (): CodeResult => {
+    tf.failures += 1;
+    if (tf.failures >= LOCK_AFTER) { tf.failures = 0; c.locked_until = Date.now() + LOCK_MS; db().pending = null; }
+    return 'bad';
+  };
+  if (b.recovery_code !== undefined) {
+    const norm = b.recovery_code.toUpperCase().replace(/[\s-]/g, '');
+    const i = tf.codes.findIndex((x) => x.replace('-', '') === norm);
+    if (i < 0) return fail();
+    tf.codes.splice(i, 1); tf.failures = 0;
+    return 'ok';
+  }
+  const step = secret ? await matchStep(secret, (b.code ?? '').replace(/\s/g, '')) : null;
+  if (step === null) return fail();
+  if (tf.lastStep !== null && step <= tf.lastStep) { fail(); return 'replay'; }
+  tf.lastStep = step; tf.failures = 0;
+  return 'ok';
+}
+const codeProblem = (r: Exclude<CodeResult, 'ok'>) => r === 'locked'
+  ? problem(429, 'account_locked', 'Too many wrong codes. The account is locked for a while.', {})
+  : problem(401, 'invalid_code', 'The code is not correct', { detail: r === 'replay' ? 'This code was already used. Wait for the next code and try again.' : 'The code is not correct.' });
+const pendingOf = (kind: 'two_factor' | 'enrol') => {
+  const p = db().pending;
+  return p && p.kind === kind && p.until > Date.now() && cred(p.account)?.tf?.on ? p : null;
+};
+const startSession = (key: string) => {
+  const u = db().admin.users.find((x) => accountKeyOf(x) === key);
+  const employee_id = u ? u.employee_id || null : ACCOUNTS[key]?.employee_id ?? null;
+  db().session = { account: key, linked: employee_id !== null, stepupAt: null, method: 'local' };
+  db().pending = null;
+};
+
 const isAdmin = () => viewer()?.key === 'pm';
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const whoOf = (key: string) => {
@@ -61,6 +102,9 @@ const whoOf = (key: string) => {
   const s = u?.local ?? STAFF.find((x) => x.employee_id === u?.employee_id) ?? ACCOUNTS[key];
   return { email: s?.email, employee_id: u?.employee_id ?? ACCOUNTS[key]?.employee_id, phone: u?.local ? u.local.phone : STAFF.find((x) => x.employee_id === u?.employee_id)?.phone };
 };
+
+const TF_NOT_ON = () => problem(409, 'invalid_transition', 'Two-factor is not on for this user: there is nothing to reset');
+const userByParam = (id: string | readonly string[] | undefined) => db().admin.users.find((x) => (x.local ? x.local.id : uid(x.employee_id)) === id);
 
 export const authHandlers = [
   http.post(`${B}/auth/local/login`, async ({ request }) => {
@@ -77,10 +121,66 @@ export const authHandlers = [
     if (u && (u.status === 'suspended' || u.status === 'disabled')) return GENERIC();
     if (c.password !== b.password) { recordFailure(key); save(); return GENERIC(); }
     c.failures = 0; c.locked_until = null;
-    const employee_id = u ? u.employee_id || null : ACCOUNTS[key]?.employee_id ?? null;
-    db().session = { account: key, linked: employee_id !== null, stepupAt: null, method: 'local' };
+    // Two-factor on: the password alone gives no session; a pending sign-in waits for the code (or the enrolment).
+    if (c.tf?.on) {
+      const next = c.tf.secret ? 'two_factor' as const : 'enrol' as const, until = now + PENDING_MS;
+      db().pending = { account: key, kind: next, until };
+      save();
+      return HttpResponse.json({ authenticated: false, next, expires_at: new Date(until).toISOString() });
+    }
+    startSession(key);
     save();
     return HttpResponse.json(sessionBody());
+  }),
+
+  http.post(`${B}/auth/local/2fa`, async ({ request }) => {
+    const p = pendingOf('two_factor');
+    if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const b = (await request.json().catch(() => ({}))) as CodeBody;
+    if ((b.code === undefined) === (b.recovery_code === undefined)) return problem(422, 'validation_failed', 'Send code or recovery_code', { errors: [{ path: '/code', code: 'required' }] });
+    const c = cred(p.account)!;
+    const r = await checkCode(c, b, c.tf!.secret);
+    if (r !== 'ok') { save(); return codeProblem(r); }
+    startSession(p.account);
+    save();
+    return HttpResponse.json(sessionBody());
+  }),
+
+  http.post(`${B}/auth/local/2fa/enrol/start`, async () => {
+    const p = pendingOf('enrol');
+    if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const c = cred(p.account)!;
+    c.tf!.pending = newSecret();
+    const email = whoOf(p.account).email ?? p.account;
+    save();
+    return HttpResponse.json({ secret: c.tf!.pending, otpauth_uri: otpauth(c.tf!.pending, email), issuer: 'GSDN PMIS', account: email, algorithm: 'SHA1', digits: 6, period: 30 });
+  }),
+
+  http.post(`${B}/auth/local/2fa/enrol/confirm`, async ({ request }) => {
+    const p = pendingOf('enrol');
+    if (!p) return problem(401, 'unauthenticated', 'This sign-in has expired. Enter your password again.');
+    const c = cred(p.account)!;
+    const b = (await request.json().catch(() => ({}))) as { code?: string };
+    const r = c.tf!.pending ? await checkCode(c, { code: b.code ?? '' }, c.tf!.pending) : 'bad';
+    if (r !== 'ok') { save(); return codeProblem(r); }
+    c.tf!.secret = c.tf!.pending; c.tf!.pending = null;
+    c.tf!.codes = newRecoveryCodes();
+    const codes = [...c.tf!.codes];
+    startSession(p.account);
+    save();
+    return HttpResponse.json({ session: sessionBody(), recovery_codes: codes });
+  }),
+
+  http.post(`${B}/auth/local/2fa/recovery-codes`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const c = cred(db().session!.account);
+    if (!c?.tf?.on || !c.tf.secret) return problem(409, 'invalid_transition', 'Two-factor is not on for your account');
+    const b = (await request.json().catch(() => ({}))) as { code?: string };
+    const r = await checkCode(c, { code: b.code ?? '' }, c.tf.secret);
+    if (r !== 'ok') { save(); return codeProblem(r); }
+    c.tf.codes = newRecoveryCodes();
+    save();
+    return HttpResponse.json({ recovery_codes: [...c.tf.codes], recovery_codes_remaining: c.tf.codes.length });
   }),
 
   http.post(`${B}/auth/local/password`, async ({ request }) => {
@@ -101,9 +201,16 @@ export const authHandlers = [
     const s = db().session;
     if (!s) return problem(401, 'unauthenticated', 'Sign in required');
     const c = cred(s.account);
-    const b = (await request.json().catch(() => ({}))) as { password?: string };
+    const b = (await request.json().catch(() => ({}))) as { password?: string } & CodeBody;
+    const needCode = tfLabel(c) === 'on';
+    if (needCode && (b.code === undefined) === (b.recovery_code === undefined)) return problem(422, 'validation_failed', 'A code is required', { errors: [{ path: '/code', code: 'required' }] });
     if (!c || (c.locked_until && c.locked_until > Date.now()) || c.password !== b.password) { recordFailure(s.account); save(); return GENERIC(); }
-    c.failures = 0; s.stepupAt = Date.now(); save();
+    c.failures = 0;
+    if (needCode) {
+      const r = await checkCode(c, b, c.tf!.secret);
+      if (r !== 'ok') { save(); return codeProblem(r); }
+    }
+    s.stepupAt = Date.now(); save();
     return HttpResponse.json(sessionBody());
   }),
 
@@ -159,5 +266,35 @@ export const authHandlers = [
     Object.assign(c, { password: pw, must_change: true, failures: 0, locked_until: null, enabled: true });
     save();
     return HttpResponse.json({ temporary_password: pw });
+  }),
+  http.put(`${B}/users/:id/two-factor`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const u = userByParam(params.id);
+    if (!u) return problem(404, 'not_found', 'User not found');
+    const b = (await request.json().catch(() => ({}))) as { enabled?: boolean; reason?: string };
+    if (typeof b.enabled !== 'boolean' || (b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'enabled and a reason are required', { errors: [{ path: typeof b.enabled !== 'boolean' ? '/enabled' : '/reason', code: 'required' }] });
+    if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
+    const c = cred(accountKeyOf(u));
+    if (!c?.enabled) return problem(422, 'validation_failed', 'Two-factor needs a local account', { errors: [{ path: '/user_id', code: 'no_local_account' }] });
+    if (b.enabled && tfLabel(c) === 'off') c.tf = { on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0 };
+    if (!b.enabled) delete c.tf;
+    save();
+    return HttpResponse.json({ two_factor: tfLabel(c) });
+  }),
+
+  http.post(`${B}/users/:id/two-factor/reset`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const u = userByParam(params.id);
+    if (!u) return problem(404, 'not_found', 'User not found');
+    const b = (await request.json().catch(() => ({}))) as { reason?: string };
+    if ((b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'A reason is required', { errors: [{ path: '/reason', code: 'required' }] });
+    if (u.employee_id && u.employee_id === viewer()!.employee_id) return problem(403, 'self_beneficiary', 'You cannot change your own two-factor');
+    const c = cred(accountKeyOf(u));
+    if (!c?.tf?.on) return TF_NOT_ON();
+    c.tf = { on: true, secret: null, pending: null, codes: [], lastStep: null, failures: 0 };
+    save();
+    return HttpResponse.json({ two_factor: 'pending_enrolment' });
   }),
 ];

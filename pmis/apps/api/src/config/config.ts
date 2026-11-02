@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { parseEncKey } from '../auth/totp';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('production'),
@@ -7,6 +8,8 @@ const schema = z.object({
   HOST: z.string().min(1).default('127.0.0.1'),
   COOKIE_SECURE: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
   LOG_HMAC_KEY: z.string().min(16, 'LOG_HMAC_KEY must be at least 16 characters'),
+  // 32 bytes (64 hex characters or base64): AES-256-GCM key for the TOTP secrets and base of the recovery-code hash key. Generate: openssl rand -hex 32
+  TOTP_ENC_KEY: z.string().refine((v) => parseEncKey(v) !== null, 'TOTP_ENC_KEY must be 32 bytes: 64 hex characters (openssl rand -hex 32) or base64'),
   // Daily job (owner answer Q84). Absent = on, except when NODE_ENV=test.
   JOBS_ENABLED: z.enum(['true', 'false']).optional(),
 });
@@ -18,6 +21,8 @@ export interface AppConfig {
   host: string;
   cookieSecure: boolean;
   logHmacKey: string;
+  /** Raw text of TOTP_ENC_KEY (validated: 32 bytes). */
+  totpEncKey: string;
   /** Runs the daily job (SLA versions due, tentative-holiday reminder) at start-up and at 02:00 Africa/Tripoli. */
   jobsEnabled: boolean;
 }
@@ -37,6 +42,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     host: v.HOST,
     cookieSecure: v.COOKIE_SECURE,
     logHmacKey: v.LOG_HMAC_KEY,
+    totpEncKey: v.TOTP_ENC_KEY,
     jobsEnabled: v.JOBS_ENABLED === undefined ? v.NODE_ENV !== 'test' : v.JOBS_ENABLED === 'true',
   };
 }

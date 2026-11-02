@@ -94,7 +94,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 # ---------------------------------------------------------------- previous answers
 # Saved answers first; for an installation made before install.conf existed, read nginx and pmis.env.
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
-PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY=''
+PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY=''
 if [[ -r $CONF_DIR/install.conf ]]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
@@ -116,6 +116,7 @@ import sys, urllib.parse as u
 p = u.urlsplit(sys.stdin.read().strip()); print(p.port or 5432, p.path.lstrip("/"), u.unquote(p.password or ""))' <<<"$_url")
   fi
   PREV_LOG_HMAC_KEY=$(sed -n 's/^LOG_HMAC_KEY=//p' "$CONF_DIR/pmis.env")
+  PREV_TOTP_ENC_KEY=$(sed -n 's/^TOTP_ENC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_API_PORT=${PREV_API_PORT:-$(sed -n 's/^PORT=//p' "$CONF_DIR/pmis.env")}
 fi
 UPGRADE=0; [[ -n $PREV_DB_NAME ]] && UPGRADE=1
@@ -342,6 +343,8 @@ cd - >/dev/null
 install -d -m 750 -o root -g "$SERVICE_USER" "$CONF_DIR"
 DB_URL_PW=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().rstrip("\n"), safe=""))' <<<"$DB_APP_PASSWORD")
 LOG_HMAC_KEY=${PREV_LOG_HMAC_KEY:-$(openssl rand -hex 32)}
+# Two-factor secrets are encrypted with this key (32 bytes). An update keeps the existing one and creates it for an installation that lacks it. Never regenerate a key that is in use: every enrolled user would have to enrol again.
+TOTP_ENC_KEY=${PREV_TOTP_ENC_KEY:-$(openssl rand -hex 32)}
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
 # GSDN PMIS settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
@@ -352,6 +355,7 @@ PORT=$API_PORT
 COOKIE_SECURE=true
 DATABASE_URL=postgresql://pmis_app:$DB_URL_PW@127.0.0.1:$DB_PORT/$DB_NAME
 LOG_HMAC_KEY=$LOG_HMAC_KEY
+TOTP_ENC_KEY=$TOTP_ENC_KEY
 EOF
 cat > "$CONF_DIR/install.conf" <<EOF
 # Answers of the last run of install-ubuntu.sh (no secrets). They are the defaults of the next run.
@@ -404,6 +408,8 @@ if (( NEED_ADMIN )); then
     | psql_su -d "$DB_NAME" >/dev/null
   unset ADMIN_PASSWORD ADMIN_HASH
   echo "Created. Sign in with $ADMIN_EMAIL${ADMIN_EMP:+ or $ADMIN_EMP} and the password you typed."
+  echo "Two-factor (TOTP) is off for this account. Nobody turns it on or off for themselves: create a second System Admin, who can turn it on for you in Users & Roles."
+  echo "If an admin loses the authenticator and no other admin exists, reset it on the server: SELECT idm_installer_reset_two_factor('email'); (add , true to turn it off) as the database superuser."
 fi
 
 # ---------------------------------------------------------------- web app

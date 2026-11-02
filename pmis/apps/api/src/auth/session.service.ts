@@ -19,6 +19,7 @@ interface LoadedRow {
   last_activity_at: Date;
   expires_at: Date;
   stepup_at: Date | null;
+  two_factor: boolean;
   db_now: Date;
   valid: boolean;
   user_id: string;
@@ -76,7 +77,7 @@ export class SessionService {
     if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     const rows = await this.db.client.$queryRaw<LoadedRow[]>(Prisma.sql`
       SELECT s.id::text AS id, s.auth_method::text AS auth_method, s.csrf_token, s.created_at, s.last_activity_at, s.expires_at,
-             s.stepup_at, now() AS db_now,
+             s.stepup_at, s.two_factor, now() AS db_now,
              (s.revoked_at IS NULL AND s.expires_at > now() AND s.last_activity_at > now() - make_interval(hours => ${IDLE_HOURS}::int)) AS valid,
              u.id::text AS user_id, u.status::text AS user_status, u.email, u.display_name, u.employee_id, u.phone, u.locale, u.theme
       FROM user_sessions s JOIN users u ON u.id = s.user_id
@@ -86,7 +87,7 @@ export class SessionService {
     return {
       session: {
         id: r.id, authMethod: r.auth_method, csrfToken: r.csrf_token, createdAt: r.created_at, lastActivityAt: r.last_activity_at,
-        expiresAt: r.expires_at, stepupAt: r.stepup_at, dbNow: r.db_now,
+        expiresAt: r.expires_at, stepupAt: r.stepup_at, twoFactor: r.two_factor, dbNow: r.db_now,
       },
       user: {
         id: r.user_id, email: r.email, displayName: r.display_name, employeeId: r.employee_id?.trim() || null, phone: r.phone,

@@ -81,6 +81,17 @@ export class UsersController {
     return d;
   }
 
+  @Put(':id/two-factor')
+  setTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ two_factor: string }> {
+    return this.users.setTwoFactor(auth, id, body);
+  }
+
+  @Post(':id/two-factor/reset')
+  @HttpCode(200)
+  resetTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ two_factor: string }> {
+    return this.users.resetTwoFactor(auth, id, body);
+  }
+
   @Post(':id/password-reset')
   @HttpCode(200)
   reset(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ temporary_password: string }> {

@@ -28,7 +28,10 @@ export const DEMO_PASSWORDS: Record<string, string> = {
 /** First sign-in demo account: its temporary password must be changed (and it then asks for the employee ID). */
 const MUST_CHANGE_DEMO = new Set(['newbie']);
 
-export type Cred = { password: string; must_change: boolean; failures: number; locked_until: number | null; enabled: boolean };
+/** Two-factor of one account (mock): `on` = an admin turned it on; `secret` null = not enrolled yet. Codes are kept in clear here only. */
+export type TwoFactorMock = { on: boolean; secret: string | null; pending: string | null; codes: string[]; lastStep: number | null; failures: number };
+export type Cred = { password: string; must_change: boolean; failures: number; locked_until: number | null; enabled: boolean; tf?: TwoFactorMock };
+export const tfLabel = (c: Cred | null | undefined): 'off' | 'pending_enrolment' | 'on' => (!c?.tf?.on ? 'off' : c.tf.secret ? 'on' : 'pending_enrolment');
 /** Credentials of an account key ('pm', ..., 'u:<uuid>' for created users, 'e:<id>' for registry staff after a reset). Demo accounts are seeded on first use. */
 export function cred(key: string, create = false): Cred | null {
   const d = db();
@@ -86,6 +89,8 @@ const fresh = () => ({
   cfg: initCfg(),
   session: null as null | { account: string; linked: boolean; stepupAt: number | null; employee_id?: string; method?: 'local' | 'm365' },
   auth: {} as Record<string, Cred>,
+  /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
+  pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
 });
 
 export type Db = ReturnType<typeof fresh>;
@@ -140,7 +145,7 @@ export function sessionBody(): Session {
   return {
     authenticated: true, csrf_token: 'csrf-mock', auth_method: s.method ?? 'm365', must_change_password: !!cred(s.account)?.must_change && s.method === 'local', needs_employee_id: !s.linked, status: s.linked ? v.status : 'pending_assignment',
     user: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: s.linked ? v.employee_id : null },
-    mfa: true, stepup_valid_until: stepUpValid() ? new Date(s.stepupAt! + STEP_UP_SECONDS * 1000).toISOString() : null,
+    mfa: true, two_factor: { enabled: tfLabel(cred(s.account)) === 'on', recovery_codes_remaining: cred(s.account)?.tf?.codes.length ?? 0 }, stepup_valid_until: stepUpValid() ? new Date(s.stepupAt! + STEP_UP_SECONDS * 1000).toISOString() : null,
     expires_at: new Date(Date.now() + 8 * 3600e3).toISOString(),
   };
 }

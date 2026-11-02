@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.4.10
+  version: 0.5.0
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.5.0 (2026-11-02): additive. Two-factor authentication (TOTP) for local accounts (owner decision 2026-11-02, ADR 0014). (1) `POST /auth/local/login` may answer 200 with `PendingSignIn` (`authenticated: false`, `next` = `two_factor` or `enrol`) and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use) instead of a session; (2) `POST /auth/local/2fa` completes the sign-in with a TOTP code or one recovery code; (3) `POST /auth/local/2fa/enrol/start` and `/enrol/confirm` enrol a user whose two-factor is on and not set up yet (otpauth URI for the QR code, manual key, 10 one-time recovery codes shown once); (4) `POST /auth/local/2fa/recovery-codes` makes new recovery codes (needs a valid TOTP code); (5) `POST /auth/local/step-up` takes `code` or `recovery_code` when the user's two-factor is on, and `Problem.step_up_method` gains `password_totp`; (6) `PUT /users/{user_id}/two-factor` turns it on or off and `POST /users/{user_id}/two-factor/reset` resets it (System Admin or a delegate holding the new delegable right `users.two_factor`; reason and step-up; nobody changes their own); (7) `User.two_factor` (off, pending_enrolment, on), `Session.two_factor` (enabled and remaining recovery codes) and `Session.mfa` is true for a session that passed a code; error code `invalid_code`.
     - 0.4.10 (2026-11-02): additive. UI plan 4b (X1 to X7) and DD6. (1) Notification inbox (X1): `GET /notifications` gains `snoozed` (hide default, only, include) and `unread_count` counts only visible ones; `POST /notifications/{id}/unread`, `POST /notifications/{id}/snooze` (a date-time, a plain date, or null to clear); `Notification.snoozed_until`; more `NotificationKind` values (`mention`, `followed_change` and the kinds the database already wrote). (2) Follow (X2): `PUT/DELETE /sites/{site_id}/follow`, `PUT/DELETE /registers/{register_key}/records/{record_id}/follow`, `GET /me/follows`; followers get a `followed_change` notification when a task of the site or the record changes, only while they can still read it. (3) Mentions (X3): `@1234` employee-ID tokens in a comment body are resolved like `mention_user_ids`; a person who cannot read the record is neither notified nor named in the answer; `GET/POST /registers/{register_key}/records/{record_id}/comments`. (4) X4: `GET /tasks/{task_id}/time-in-state` and `GET /reports/time-in-state` (needs `reports` view). (5) X5: `GET /reports/workload` (needs `reports` view; reassignment stays `POST /tasks/reassign`). (6) X6: `GET /tasks/{task_id}/blocked-by`. (7) X7: `GET/POST /status-updates`, `PATCH /status-updates/{id}`. (8) DD6: optional `via` (`button`, `drag`, `bulk`) on `start`, `submit`, `review`, `approve`, `reject` of tasks and register records and on `POST /approvals/bulk` (default `bulk`); it is recorded in the audit row and changes no rule. Migration 0031.
     - 0.4.9 (2026-11-01): additive. Write-through edits from the work views (spec registers-and-streams.md 2.7; Q73, Q99). `TaskSummary.register_fields` (only in `GET /sites/{site_id}/tasks`) lists the register-owned fields a task row shows: the value is read from the current record of the source register (the view keeps no copy), `source` points to the register record and `edit_via` says how to edit it with the existing register endpoints (`patch`: `PATCH /registers/{register_key}/records/{id}`; `new_version`: `POST .../versions` first; `create`: `POST /registers/{register_key}/records`). Permissions, the Entry / Review / Approve path and the audit are those of the register, so there is no new endpoint. A register the caller cannot view is left out. BU and EF move to the As-Built register (new fields `cw_as_built_submitted`, `as_built_date`; tasks B13 and D15) and FO / FT to the Dismantle register (the contractor of the `cw` and `te` parts; task E2), Q99. Migration 0029.
     - 0.4.8 (2026-11-01): additive. (1) The remaining registers are enabled on the generic `/registers/{register_key}/...` paths: `contractors` (record types `company` and `team`; an approved one becomes an external party or team), `quality` (`qc`, `snag`, `itp`, `ncr`), `issues`, `risks`, `change_control`, `readiness_handover`, `meetings`, `rf_design`, `acquisition`, `as_built` and `warehouse` (record types `te_dn`, `cw_dn`, `te_rn`, `cw_rn`, `pl`, `open`, `adj`; the last three have no site). Their fields are those of the spec; `Deliverables` stays disabled (Q71). (2) Warehouse in full: `StockMovement` becomes the DN / RN / PL / OPEN / ADJ document with lines (`record_type`, `doc_no`, `register_record_id`, line `qty_approved`, `condition`, `serials`, kinds `receipt` and `adjustment`); a movement is created with `POST /warehouse/movements` (reserves the stock, 422 `insufficient_stock`), is submitted, reviewed and approved through its register record and posts the stock on the final approval; `StockMovementInput` now takes `record_type` (replacing `kind`), the header fields and the lines. The item master carries `manufacturer`, `contract_qty`, `planned_delivery_date`, `progress_item_code` and the read-only `as_built_item_code`; new error code `item_in_use` (422: unit and serial tracking of an item with movements are fixed, an item with a pending movement cannot be deactivated). (3) New tag `as-built` and the editable As-Built item list, linked to Warehouse codes (Q74): `GET` and `POST /as-built/items`, `GET` and `PATCH /as-built/items/{item_id}`; every active item is a number field `q_<code>` of the As-Built register. (4) Correction of the CW / TE / O&M views (Q102 answered): CW DLP (B14) and CW FAC (B15) are always in the CW view; TE FAC (D18) is in the TE view until the O&M team is assigned and in the O&M view after; the O&M view lists only D18.
@@ -348,6 +349,11 @@ paths:
         `pmis_session` is set (`HttpOnly`, `Secure`, `SameSite=Strict`, path `/api`). When the password was set by an admin,
         `must_change_password` is true and every call except `/auth/*` and `GET /me` answers 403 `password_change_required`
         until `POST /auth/local/password` succeeds. A suspended or disabled account gets 401 `invalid_credentials` too.
+
+        **Two-factor (0.5.0).** When the user's two-factor is on, a right password does not create a session: the answer is 200 `PendingSignIn`
+        and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use). `next` = `two_factor`
+        (call `POST /auth/local/2fa`) or `enrol` (the user has no authenticator yet: call the enrolment endpoints). Nothing else is reachable
+        with that cookie. The database refuses to create the session until a code success is recorded after the password check.
       security: []
       requestBody:
         required: true
@@ -362,14 +368,130 @@ paths:
                 password: { type: string, format: password, minLength: 1, maxLength: 128 }
       responses:
         '200':
+          description: Signed in (`Session`), or the password was right and a code or an enrolment is still needed (`PendingSignIn`, cookie `pmis_2fa`).
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Session'
+                  - $ref: '#/components/schemas/PendingSignIn'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa:
+    post:
+      tags: [auth]
+      operationId: localTwoFactor
+      summary: Second step of sign-in - the code from the authenticator app (or one recovery code)
+      description: |
+        Needs the pending sign-in cookie `pmis_2fa` from `POST /auth/local/login` (kind `two_factor`). Send `code` (6 digits, RFC 6238, SHA-1,
+        30 seconds, one step of tolerance either side) or `recovery_code` (one of the 10 codes, each works once), not both. On success the
+        pending sign-in is used up, the session cookie `pmis_session` is set and `Session.mfa` is true. A time step is accepted once: the
+        code that signed in cannot be used again (401 `invalid_code`, the detail says it was already used). A wrong code is 401 `invalid_code`
+        and counts toward the lock: 5 wrong codes in a row lock the account for 15 minutes, the same lock as passwords, and end every pending
+        sign-in. The code counter is separate from the password counter. A missing, expired, used or wrong-kind pending cookie is 401
+        `unauthenticated`. Rate limited (429 `rate_limited`). Every failure is written to the security log.
+      x-db-path: auth_totp_result
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TwoFactorCode' }
+      responses:
+        '200':
           description: Signed in.
           headers:
             Set-Cookie: { schema: { type: string } }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Session' }
-        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa/enrol/start:
+    post:
+      tags: [auth]
+      operationId: startTwoFactorEnrolment
+      summary: Enrolment step 1 - a new secret for the QR code
+      description: |
+        Needs the pending sign-in cookie with `next` = `enrol` (two-factor is on for the user and no authenticator is set up). Makes a new secret,
+        stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and returns it once: the `otpauth_uri`
+        (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the pending secret. The answer is
+        never cached. A user who is already enrolled cannot start again; an admin reset is needed.
+      x-db-path: auth_totp_begin_enrol
+      security: []
+      responses:
+        '200':
+          description: Secret and URI.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorEnrolment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa/enrol/confirm:
+    post:
+      tags: [auth]
+      operationId: confirmTwoFactorEnrolment
+      summary: Enrolment step 2 - confirm with a valid code; get the recovery codes
+      description: |
+        The user types the code their app shows for the secret from step 1. On success the secret becomes active, 10 one-time recovery codes are
+        made (stored as a keyed hash, shown once in this answer, never again), the pending sign-in is used up and the user is signed in
+        (session cookie set). A wrong code is 401 `invalid_code` and counts toward the lock like any wrong code.
+      x-db-path: auth_totp_confirm_enrol
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, minLength: 1, maxLength: 16, description: 'The 6-digit code. Spaces are ignored.' }
+      responses:
+        '200':
+          description: Enrolled and signed in.
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorEnrolled' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /auth/local/2fa/recovery-codes:
+    post:
+      tags: [auth]
+      operationId: regenerateRecoveryCodes
+      summary: New recovery codes (needs a valid TOTP code)
+      description: |
+        For a signed-in local user whose two-factor is on. Needs a valid TOTP code (a recovery code is not accepted here). The old codes stop
+        working and 10 new ones are returned once. The number left is in `Session.two_factor.recovery_codes_remaining`. 409
+        `invalid_transition` when two-factor is not on for the user.
+      x-db-path: auth_totp_regenerate_recovery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, minLength: 1, maxLength: 16 }
+      responses:
+        '200':
+          description: New codes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RecoveryCodes' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /auth/local/password:
     post:
@@ -410,6 +532,10 @@ paths:
         A 401 `step_up_required` on a local session carries `step_up_method` = `password` and no `step_up_url`; the client asks
         for the password and calls this, then retries. Sets `stepup_at`; the window is the setting `stepup_max_age_seconds`
         (default 300). A wrong password answers 401 `invalid_credentials` and counts toward the lockout.
+
+        **Two-factor (0.5.0).** When the user's two-factor is on, the 401 carries `step_up_method` = `password_totp` and this call needs `code`
+        (or one `recovery_code`) as well as the password; without it 422 `validation_failed` (`/code` required) and nothing is counted. The
+        password is checked first, then the code; a wrong or already used code is 401 `invalid_code` and counts toward the same lock as at sign-in.
       requestBody:
         required: true
         content:
@@ -420,6 +546,8 @@ paths:
               required: [password]
               properties:
                 password: { type: string, format: password, maxLength: 128 }
+                code: { type: string, maxLength: 16, description: '0.5.0. TOTP code, required when the user''s two-factor is on.' }
+                recovery_code: { type: string, maxLength: 32, description: '0.5.0. One recovery code instead of `code`.' }
       responses:
         '200':
           description: Step-up recorded.
@@ -1093,6 +1221,71 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/two-factor:
+    put:
+      tags: [users]
+      operationId: setUserTwoFactor
+      summary: Turn two-factor (TOTP) on or off for a user (0.5.0)
+      description: |
+        System Admin, or a delegate holding the delegable right `users.two_factor` (delegation grant `users.administer`, all regions). Needs a
+        reason and the acting admin's own step-up. **Nobody changes their own setting** (403 `self_beneficiary`, also for an admin). Only a
+        System Admin changes an admin or a delegate. The user needs a local account (422 otherwise).
+        On: the user is asked to enrol (QR code) at the next sign-in, and their local sessions end now so no session lives on without a
+        code. Off: the secret and the recovery codes are deleted. Setting what is already set changes nothing and writes no audit row.
+        The change is audited with before and after (never the secret). Users can never turn it off themselves.
+      x-step-up: true
+      x-db-path: idm_set_two_factor
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [enabled, reason]
+              properties:
+                enabled: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: New state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/{user_id}/two-factor/reset:
+    post:
+      tags: [users]
+      operationId: resetUserTwoFactor
+      summary: Reset a user's two-factor after a lost phone (0.5.0)
+      description: |
+        Same rights, reason, step-up and self rule as `PUT /users/{user_id}/two-factor`. Clears the secret and the recovery codes, forces a
+        new enrolment at the next sign-in and ends all the user's sessions. 409 `invalid_transition` when two-factor is not on for the user.
+      x-step-up: true
+      x-db-path: idm_reset_two_factor
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: New state (`pending_enrolment`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TwoFactorState' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/password-reset:
     post:
       tags: [users]
@@ -7492,7 +7685,7 @@ components:
               code: { type: string }
               message: { type: string }
         step_up_url: { type: string, description: 'Present with `step_up_required` on an M365 session.' }
-        step_up_method: { type: string, enum: [password, m365, totp], description: '0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`.' }
+        step_up_method: { type: string, enum: [password, password_totp, m365, totp], description: '0.3.0. With `step_up_required`: `password` means call `POST /auth/local/step-up`; `password_totp` (0.5.0) means the same call with `code` (or `recovery_code`) as well.' }
         reason: { anyOf: [{ $ref: '#/components/schemas/TemplateRejectReason' }, { type: string }], description: 'Closed-list reason; for `template_rejected` a TemplateRejectReason.' }
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         missing: { type: array, items: { type: string }, description: 'Missing slot or field names.' }
@@ -7555,6 +7748,7 @@ components:
         - export_expired
         - confirmation_mismatch
         - invalid_credentials
+        - invalid_code
         - password_change_required
         - weak_password
         - internal_error
@@ -7734,7 +7928,7 @@ components:
     DelegableRight:
       type: string
       description: Closed list for partial delegation (ADR 0003 §5).
-      enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign, users.edit, assignments.edit, groups.edit, matrix.edit, roles.edit, profiles.edit, settings.edit, documents.edit, templates.edit, fields.edit, workflow.edit, workflow.publish, workflow.migrate, warehouse.items.edit]
+      enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign, users.edit, assignments.edit, groups.edit, matrix.edit, roles.edit, profiles.edit, settings.edit, documents.edit, templates.edit, fields.edit, workflow.edit, workflow.publish, workflow.migrate, warehouse.items.edit, users.two_factor]
     RegionId:
       type: integer
       minimum: 1
@@ -7773,8 +7967,68 @@ components:
         break_glass: { type: boolean }
         auth_method: { type: string, enum: [local, m365, break_glass], description: '0.3.0. How this session signed in.' }
         must_change_password: { type: boolean, description: '0.3.0. True after a temporary password; only `/auth/*` and `GET /me` work until it is changed.' }
+        two_factor:
+          type: object
+          description: '0.5.0. The signed-in user''s two-factor. `enabled` means a code is asked at sign-in and at step-up.'
+          required: [enabled, recovery_codes_remaining]
+          properties:
+            enabled: { type: boolean }
+            recovery_codes_remaining: { type: integer, minimum: 0, maximum: 10 }
         stepup_valid_until: { type: [string, 'null'], format: date-time }
         expires_at: { type: string, format: date-time }
+    PendingSignIn:
+      type: object
+      description: '0.5.0. The password was right; no session exists yet. The cookie `pmis_2fa` (5 minutes, single use) says who is signing in.'
+      required: [authenticated, next, expires_at]
+      properties:
+        authenticated: { type: boolean, const: false }
+        next: { type: string, enum: [two_factor, enrol], description: '`two_factor`: call `POST /auth/local/2fa`. `enrol`: two-factor is on but no authenticator is set up; call the enrolment endpoints.' }
+        expires_at: { type: string, format: date-time }
+    TwoFactorCode:
+      type: object
+      description: 'Exactly one of `code` and `recovery_code`.'
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        code: { type: string, maxLength: 16, description: 'The 6-digit code from the authenticator app. Spaces are ignored.' }
+        recovery_code: { type: string, maxLength: 32, description: 'One of the 10 recovery codes (XXXXX-XXXXX). Works once.' }
+    TwoFactorEnrolment:
+      type: object
+      required: [secret, otpauth_uri, issuer, account, algorithm, digits, period]
+      properties:
+        secret: { type: string, description: 'Base32 manual key. Shown only in this answer.' }
+        otpauth_uri: { type: string, description: 'otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code.' }
+        issuer: { type: string, const: GSDN PMIS }
+        account: { type: string, description: The user's email. }
+        algorithm: { type: string, const: SHA1 }
+        digits: { type: integer, const: 6 }
+        period: { type: integer, const: 30 }
+    TwoFactorEnrolled:
+      type: object
+      required: [session, recovery_codes]
+      properties:
+        session: { $ref: '#/components/schemas/Session' }
+        recovery_codes:
+          type: array
+          minItems: 10
+          maxItems: 10
+          items: { type: string }
+          description: 'One-time codes, shown only in this answer; the server keeps a keyed hash.'
+    RecoveryCodes:
+      type: object
+      required: [recovery_codes, recovery_codes_remaining]
+      properties:
+        recovery_codes: { type: array, minItems: 10, maxItems: 10, items: { type: string } }
+        recovery_codes_remaining: { type: integer }
+    TwoFactorLabel:
+      type: string
+      enum: [off, pending_enrolment, 'on']
+      description: '0.5.0. `pending_enrolment` = on, but the user has not set up an authenticator yet.'
+    TwoFactorState:
+      type: object
+      required: [two_factor]
+      properties:
+        two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
     Me:
       type: object
       required: [user, assignments, effective]
@@ -7848,6 +8102,7 @@ components:
             manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: '0.4.0. Direct manager.' }
             department: { oneOf: [{ $ref: '#/components/schemas/DepartmentRef' }, { type: 'null' }], description: '0.4.0.' }
             must_change_password: { type: boolean, description: '0.3.0. A temporary password is waiting to be changed.' }
+            two_factor: { $ref: '#/components/schemas/TwoFactorLabel' }
             mfa_exempt: { type: boolean, description: 'Drives the "MFA exempt" badge. Detail via GET /users/{user_id}/mfa-exemption.' }
             mfa_exempt_until: { type: [string, 'null'], format: date-time }
             last_login_at: { type: [string, 'null'], format: date-time }
