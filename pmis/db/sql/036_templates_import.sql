@@ -852,6 +852,19 @@ BEGIN
     IF r.register_record_id IS NULL THEN
       IF act = 'reject' THEN
         IF rnote IS NULL THEN PERFORM public.wf_err('note_required'); END IF;
+        -- the same authority as returning a record: the uploader (taking the row back) or an L2 holder of the register row in the row's region
+        IF actor <> b.uploaded_by AND NOT EXISTS (
+             SELECT 1 FROM public.reg_eligible_cell(public.reg_cell_row(b.register_key, r.region_id, 'approve'), r.region_id, public.reg_module(b.register_key), 'approve') e
+             WHERE e.user_id = actor) THEN
+          BEGIN
+            PERFORM public.wf_err('not_eligible_holder', jsonb_build_object('detail', 'Only the uploader or an L2 holder of this register can return the row.'));
+          EXCEPTION WHEN others THEN
+            first_forbidden := coalesce(first_forbidden, SQLERRM);
+          END;
+          failed := failed || jsonb_build_array(jsonb_build_object('row_id', r.id, 'row_no', r.row_no, 'key', r.row_key, 'code', 'not_eligible_holder',
+            'message', 'Only the uploader or an L2 holder of this register can return the row.'));
+          CONTINUE;
+        END IF;
         UPDATE public.import_batch_rows SET decision = 'rejected', decided_by = actor, decided_at = now(), decision_note = rnote, hold_reason = NULL WHERE id = r.id;
         decided := decided + 1; rejected := rejected + 1;
       ELSE
