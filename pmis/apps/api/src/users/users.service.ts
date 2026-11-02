@@ -45,6 +45,7 @@ const orgSchema = z.object({
 
 const twoFactorSchema = z.object({ enabled: z.boolean(), reason }).strict();
 const twoFactorResetSchema = z.object({ reason }).strict();
+const enforcedSchema = z.object({ enforced: z.boolean(), reason }).strict();
 
 const resetSchema = z.object({ reason, temporary_password: z.string().max(1024).optional() }).strict();
 
@@ -319,6 +320,22 @@ export class UsersService {
     this.states.invalidate(user.id);
     await this.syslog.write('info', 'two_factor_enrol_code_issued_by_admin', { target_user: user.id }, auth.user.id);
     return changeOf({ s: 'pending_enrolment', e: rows[0]!.e }, fresh.code);
+  }
+
+  /**
+   * PUT /users/{id}/two-factor/enforced (0.9.2): marks or unmarks "enforced by admin". While enforced the user cannot turn two-factor off
+   * themselves (403 two_factor_enforced). Same rights, reason, step-up and self rule as the toggle (idm_set_two_factor_enforced).
+   */
+  async setTwoFactorEnforced(auth: AuthContext, id: string, raw: unknown): Promise<{ two_factor: string; enforced: boolean }> {
+    const body = parse(enforcedSchema, raw);
+    await this.access.requireAdmin('users', 'administer');
+    await this.stepUp.require(auth);
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user) throw problems.notFound();
+    const rows = await this.db.tx.$queryRaw<{ e: boolean }[]>`SELECT idm_set_two_factor_enforced(${user.id}::uuid, ${body.enforced}::boolean, ${body.reason}::text) AS e`;
+    this.states.invalidate(user.id);
+    await this.syslog.write('info', body.enforced ? 'two_factor_enforced_by_admin' : 'two_factor_unenforced_by_admin', { target_user: user.id }, auth.user.id);
+    return { two_factor: user.two_factor, enforced: rows[0]?.e === true };
   }
 
   private requireStrong(password: string, ctx: { email: string; employeeId: string | null; phone: string | null }, path: string): void {

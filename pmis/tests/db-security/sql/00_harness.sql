@@ -15,7 +15,7 @@ BEGIN
     'roles', 'role_default_regions', 'role_default_modules', 'permission_profiles', 'permission_grants', 'field_permissions',
     'local_credentials', 'user_sessions', 'departments', 'message_threads', 'message_participants', 'messages',
     'announcements', 'announcement_targets', 'announcement_recipients', 'announcement_responses', 'audit_log', 'clusters',
-    'notifications', 'watches', 'status_updates', 'comments', 'comment_mentions'
+    'notifications', 'watches', 'status_updates', 'comments', 'comment_mentions', 'email_change_requests', 'user_totp'
   ] LOOP
     tbl := t;
     EXECUTE format(

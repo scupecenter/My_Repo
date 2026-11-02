@@ -87,6 +87,11 @@ export class UsersController {
     return this.users.setTwoFactor(auth, id, body);
   }
 
+  @Put(':id/two-factor/enforced')
+  setTwoFactorEnforced(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<{ two_factor: string; enforced: boolean }> {
+    return this.users.setTwoFactorEnforced(auth, id, body);
+  }
+
   @Post(':id/two-factor/reset')
   @HttpCode(200)
   async resetTwoFactor(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<TwoFactorChange> {

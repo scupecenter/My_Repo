@@ -434,6 +434,6 @@ describe('account card: recovery codes left and new ones', () => {
     renderApp(<Routes><Route path="/change-password" element={<ChangePassword />} /></Routes>, { route: '/change-password' });
     const card = await screen.findByTestId('two-factor-card');
     expect(within(card).queryByRole('button', { name: /turn off|disable|إيقاف/i })).toBeNull();
-    expect(card).toHaveTextContent(/cannot turn two-factor off yourself/i);
+    expect(card).toHaveTextContent(/turn two-factor off in My profile unless an administrator enforces it/i); // owner decision 2026-11-02 (0.9.2): self-disable lives on the profile page
   });
 });

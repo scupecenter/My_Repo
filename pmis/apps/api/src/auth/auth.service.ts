@@ -72,7 +72,7 @@ export interface SessionBody {
   break_glass: boolean;
   auth_method: string;
   must_change_password: boolean;
-  two_factor: { enabled: boolean; recovery_codes_remaining: number };
+  two_factor: { enabled: boolean; recovery_codes_remaining: number; enforced: boolean };
   stepup_valid_until: Date | null;
   expires_at: Date;
 }
@@ -115,7 +115,7 @@ export class AuthService {
       break_glass: auth.session.authMethod === 'break_glass',
       auth_method: auth.session.authMethod,
       must_change_password: auth.state.mustChange && auth.session.authMethod === 'local',
-      two_factor: { enabled: tf.required && tf.enrolled, recovery_codes_remaining: tf.recovery_remaining },
+      two_factor: { enabled: tf.required && tf.enrolled, recovery_codes_remaining: tf.recovery_remaining, enforced: tf.required ? await this.twoFactor.enforced(auth.user.id) : false },
       stepup_valid_until: await this.stepUp.validUntil(auth),
       expires_at: new Date(Math.min(auth.session.expiresAt.getTime(), idleEnd)),
     };
@@ -370,7 +370,7 @@ export class AuthService {
    * Checks the signed-in user's own password against auth_local_own_hash and records the result (lockout counter).
    * A wrong password commits the failure first and then answers 401; a locked account answers 429.
    */
-  private async checkOwnPassword(auth: AuthContext, password: string, purpose: string): Promise<string> {
+  async checkOwnPassword(auth: AuthContext, password: string, purpose: string): Promise<string> {
     const rows = await this.db.tx.$queryRaw<{ password_hash: string; locked_until: Date | null }[]>`SELECT password_hash, locked_until FROM auth_local_own_hash(${auth.user.id}::uuid)`;
     const row = rows[0];
     if (!row) {

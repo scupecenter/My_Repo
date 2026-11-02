@@ -173,6 +173,18 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.9.1: the team / scope match of Procurement (apps/api: settings; migration 0043, Q97).
   ['get', '/settings/team-scope-match'],
   ['put', '/settings/team-scope-match'],
+  // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
+  ['get', '/me/profile'],
+  ['patch', '/me/profile'],
+  ['post', '/me/password'],
+  ['post', '/me/email-change'],
+  ['delete', '/me/email-change'],
+  ['post', '/me/two-factor/enrol/start'],
+  ['post', '/me/two-factor/enrol/confirm'],
+  ['post', '/me/two-factor/disable'],
+  ['get', '/email-change-requests'],
+  ['post', '/email-change-requests/:id/decide'],
+  ['put', '/users/:id/two-factor/enforced'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

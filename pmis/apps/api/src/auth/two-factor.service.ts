@@ -198,6 +198,53 @@ export class TwoFactorService {
     return codes;
   }
 
+  // ------------------------------------------------------------------ self-service (migration 0044, ADR 0014 amendment 2)
+  /** Enforced by an admin: the user cannot turn two-factor off themselves. False while it is off. */
+  async enforced(userId: string): Promise<boolean> {
+    const rows = await this.db.tx.$queryRaw<{ e: boolean }[]>`SELECT auth_totp_enforced(${userId}::uuid) AS e`;
+    return rows[0]?.e === true;
+  }
+
+  /**
+   * Self enrolment, step 1, for a signed-in local user whose two-factor is off: a new secret stored encrypted as the pending secret of this
+   * session (the database re-checks the session and its step-up). The clear secret leaves only in this answer.
+   */
+  async selfBeginEnrol(userId: string, sessionId: string, account: string): Promise<{ ok: true; secret: string; otpauth_uri: string } | { ok: false; reason: 'locked' }> {
+    const raw = generateSecret();
+    const r = await this.db.tx.$queryRaw<{ r: string }[]>`SELECT auth_totp_self_begin_enrol(${userId}::uuid, ${sessionId}::uuid, ${encryptSecret(this.key, userId, raw)}) AS r`;
+    if (r[0]?.r !== 'ok') return { ok: false, reason: 'locked' };
+    const secret = base32Encode(raw);
+    return { ok: true, secret, otpauth_uri: otpauthUri(secret, account) };
+  }
+
+  /** Self enrolment, step 2: the first code against this session's pending secret. A wrong code counts toward the lock. */
+  async selfCheckPending(userId: string, sessionId: string, code: string): Promise<{ ok: true; step: number } | { ok: false; reason: 'bad' | 'locked' | 'none' }> {
+    const rows = await this.db.tx.$queryRaw<{ pending_secret_enc: string | null; locked_until: Date | null }[]>`
+      SELECT pending_secret_enc, locked_until FROM auth_totp_self_pending_secret(${userId}::uuid, ${sessionId}::uuid)`;
+    const row = rows[0];
+    if (!row || !row.pending_secret_enc) return { ok: false, reason: 'none' };
+    if (row.locked_until && row.locked_until.getTime() > Date.now()) return { ok: false, reason: 'locked' };
+    const step = matchStep(decryptSecret(this.key, userId, row.pending_secret_enc), code, this.now());
+    if (step === null) {
+      const r = await this.db.tx.$queryRaw<{ r: string }[]>`SELECT auth_totp_self_enrol_failed(${userId}::uuid) AS r`;
+      return { ok: false, reason: r[0]?.r === 'locked' ? 'locked' : 'bad' };
+    }
+    return { ok: true, step };
+  }
+
+  /** Turns two-factor on (not enforced), stores new recovery codes and ends the other sessions. Returns the codes (shown once). */
+  async selfConfirmEnrol(userId: string, sessionId: string, step: number): Promise<{ codes: string[]; sessionsEnded: number }> {
+    const codes = generateRecoveryCodes();
+    const hashes = codes.map((c) => hashRecoveryCode(this.key, c.replace('-', '')));
+    const r = await this.db.tx.$queryRaw<{ n: number }[]>`SELECT auth_totp_self_confirm_enrol(${userId}::uuid, ${sessionId}::uuid, ${step}::bigint, ${hashes}::text[]) AS n`;
+    return { codes, sessionsEnded: Number(r[0]?.n ?? 0) };
+  }
+
+  /** Turns two-factor off; the password and a code were checked just before in this transaction. Refused when an admin enforces it. */
+  async selfDisable(userId: string, sessionId: string): Promise<void> {
+    await this.db.tx.$executeRaw`SELECT auth_totp_self_disable(${userId}::uuid, ${sessionId}::uuid)`;
+  }
+
   // ------------------------------------------------------------------ outcomes
   async logFailure(userId: string, reason: CodeFailure, via: string, ip: string | null, purpose: string, requestId?: string, detail?: string): Promise<void> {
     await this.syslog.write('warn', 'local_two_factor_failed', { reason, via, purpose, ip, ...(detail ? { detail } : {}) }, userId, requestId);

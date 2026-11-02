@@ -26,6 +26,8 @@ export interface UserDto extends UserRef {
   two_factor: 'off' | 'pending_enrolment' | 'on';
   /** 0.6.0: end of the outstanding one-time enrolment code (past = expired), null when none. Never the code. */
   two_factor_enrol_code_expires_at: Date | null;
+  /** 0.9.2: an admin enforces two-factor (turned it on, or marked it); the user cannot turn it off. False while it is off. */
+  two_factor_enforced: boolean;
   manager: UserRef | null;
   department: DepartmentRef | null;
   last_login_at: Date | null;
@@ -54,6 +56,7 @@ interface UserDbRow {
   tf_required: boolean;
   tf_enrolled: boolean;
   tf_code_expires_at: Date | null;
+  tf_enforced: boolean;
   manager_id: string | null;
   manager_name: string | null;
   manager_employee_id: string | null;
@@ -75,7 +78,7 @@ interface UserDbRow {
 const USER_SELECT = Prisma.sql`u.id::text AS id, u.email, u.display_name, trim(u.employee_id) AS employee_id, u.phone, u.status::text AS status,
   u.locale, u.theme, u.is_break_glass, u.last_login_at, u.created_at,
   (extract(epoch FROM u.updated_at) * 1000000)::bigint::text AS version,
-  (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change, tf.required AS tf_required, tf.enrolled AS tf_enrolled, auth_totp_enrol_code_state(u.id) AS tf_code_expires_at,
+  (l.user_id IS NOT NULL) AS local_sign_in, coalesce(l.must_change, false) AS must_change, tf.required AS tf_required, tf.enrolled AS tf_enrolled, auth_totp_enrol_code_state(u.id) AS tf_code_expires_at, auth_totp_enforced(u.id) AS tf_enforced,
   m.id::text AS manager_id, m.display_name AS manager_name, trim(m.employee_id) AS manager_employee_id,
   dp.id::text AS dept_id, dp.code AS dept_code, dp.name_en AS dept_name_en, dp.name_ar AS dept_name_ar,
   u.deleted_at, u.delete_reason, dby.id::text AS deleted_by_id, dby.display_name AS deleted_by_name, trim(dby.employee_id) AS deleted_by_employee_id`;
@@ -98,6 +101,7 @@ export const toUserDto = (r: UserDbRow): UserDto => ({
   must_change_password: r.must_change,
   two_factor: !r.tf_required ? 'off' : r.tf_enrolled ? 'on' : 'pending_enrolment',
   two_factor_enrol_code_expires_at: r.tf_required && !r.tf_enrolled ? r.tf_code_expires_at : null,
+  two_factor_enforced: r.tf_enforced === true,
   manager: r.manager_id ? { id: r.manager_id, display_name: r.manager_name ?? '', employee_id: r.manager_employee_id } : null,
   department: r.dept_id ? { id: r.dept_id, code: r.dept_code ?? '', name_en: r.dept_name_en ?? '', name_ar: r.dept_name_ar } : null,
   last_login_at: r.last_login_at,

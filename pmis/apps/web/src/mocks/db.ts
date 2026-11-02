@@ -34,6 +34,8 @@ export type TwoFactorMock = {
   on: boolean; secret: string | null; pending: string | null; codes: string[]; lastStep: number | null; failures: number;
   /** The one-time enrolment code an admin hands over (contract 0.6.0), in clear here only; null once used. */
   enrolCode?: string | null; enrolExpires?: number | null;
+  /** 0.9.2: an admin enforces it (turned it on, or marked it): the user cannot turn it off. Self-service: the pending secret of the profile flow. */
+  enforced?: boolean; selfPending?: string | null;
 };
 export type Cred = { password: string; must_change: boolean; failures: number; locked_until: number | null; enabled: boolean; tf?: TwoFactorMock };
 export const tfLabel = (c: Cred | null | undefined): 'off' | 'pending_enrolment' | 'on' => (!c?.tf?.on ? 'off' : c.tf.secret ? 'on' : 'pending_enrolment');
@@ -95,6 +97,9 @@ const fresh = () => ({
   auth: {} as Record<string, Cred>,
   /** Password right, code or enrolment still to do (the cookie pmis_2fa of the real server). */
   pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
+  /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
+  profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; email?: string; version: number }>,
+  emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null }[],
 });
 
 export type Db = ReturnType<typeof fresh>;
@@ -148,8 +153,8 @@ export function sessionBody(): Session {
   const s = db().session!;
   return {
     authenticated: true, csrf_token: 'csrf-mock', auth_method: s.method ?? 'm365', must_change_password: !!cred(s.account)?.must_change && s.method === 'local', needs_employee_id: !s.linked, status: s.linked ? v.status : 'pending_assignment',
-    user: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: s.linked ? v.employee_id : null },
-    mfa: true, two_factor: { enabled: tfLabel(cred(s.account)) === 'on', recovery_codes_remaining: cred(s.account)?.tf?.codes.length ?? 0 }, stepup_valid_until: stepUpValid() ? new Date(s.stepupAt! + STEP_UP_SECONDS * 1000).toISOString() : null,
+    user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[s.account]?.display_name ?? v.name, employee_id: s.linked ? v.employee_id : null },
+    mfa: true, two_factor: { enabled: tfLabel(cred(s.account)) === 'on', recovery_codes_remaining: cred(s.account)?.tf?.codes.length ?? 0, enforced: !!cred(s.account)?.tf?.on && !!cred(s.account)?.tf?.enforced }, stepup_valid_until: stepUpValid() ? new Date(s.stepupAt! + STEP_UP_SECONDS * 1000).toISOString() : null,
     expires_at: new Date(Date.now() + 8 * 3600e3).toISOString(),
   };
 }
@@ -157,7 +162,7 @@ export function sessionBody(): Session {
 export function meBody(): Me {
   const v = viewer()!;
   return {
-    user: { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id, email: v.email, status: v.status, locale: 'en', theme: 'light' },
+    user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light' },
     assignments: [], is_system_admin: v.key === 'pm',
     effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }] : [])], nav: v.nav },
   };

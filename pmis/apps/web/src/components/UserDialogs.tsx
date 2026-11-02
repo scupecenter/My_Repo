@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { fieldErrors, useCreateLocalUser, useIssueEnrolCode, useResetPassword, useResetTwoFactor, useSetTwoFactor } from '@/api/auth';
+import { useSetTwoFactorEnforced } from '@/api/profile';
 import { api, ApiError } from '@/api/client';
 import type { BulkResult, TwoFactorLabel, TwoFactorState, User, UserDetail } from '@/api/types';
 import { EnrolCodeDialog } from './EnrolCodeDialog';
@@ -28,12 +29,12 @@ export function LocalBadges({ user }: { user: Pick<User, 'local_sign_in' | 'must
 const TF_TONE: Record<TwoFactorLabel, string> = { on: 'bg-doneBg text-doneInk', pending_enrolment: 'bg-waitBg text-waitInk', off: 'bg-lockBg text-lockInk' };
 
 /** The "2FA" badge on Users & Roles: on, pending enrolment (on, not set up yet) or off. Shown for local accounts only (the field is absent otherwise). */
-export function TwoFactorBadge({ user }: { user: Pick<User, 'two_factor' | 'employee_id' | 'id' | 'local_sign_in'> }) {
+export function TwoFactorBadge({ user }: { user: Pick<User, 'two_factor' | 'employee_id' | 'id' | 'local_sign_in'> & { two_factor_enforced?: boolean } }) {
   const { t } = useTranslation();
   const state = user.two_factor;
   if (!state || (!user.local_sign_in && state === 'off')) return null;
   const k = user.employee_id ?? user.id;
-  return <span className={`chip ${TF_TONE[state]}`} data-testid={`tf-badge-${k}`} data-state={state} title={t(`twoFactor.badge_title_${state}`)}>{t('twoFactor.badge_label')}: {t(`twoFactor.badge_${state}`)}</span>;
+  return <span className={`chip ${TF_TONE[state]}`} data-testid={`tf-badge-${k}`} data-state={state} title={t(`twoFactor.badge_title_${state}`)}>{t('twoFactor.badge_label')}: {t(`twoFactor.badge_${state}`)}{state !== 'off' && user.two_factor_enforced ? <span data-testid={`tf-enforced-${k}`}> · {t('twoFactor.badge_enforced')}</span> : null}</span>;
 }
 
 /**
@@ -60,6 +61,20 @@ export function TwoFactorDialog({ user, action, onClose }: { user: Pick<User, 'i
       submitLabel={t(action === 'on' ? 'twoFactor.admin_turn_on' : action === 'off' ? 'twoFactor.admin_turn_off' : action === 'reset' ? 'twoFactor.admin_reset' : 'twoFactor.admin_new_code')}
       onSubmit={(reason) => (action === 'reset' ? reset.mutate({ reason }, done) : action === 'code' ? issue.mutate({ reason }, done) : set.mutate({ enabled: action === 'on', reason }, done))}>
       <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="two-factor-dialog-note">{t(`twoFactor.${action}_note`)}</p>
+    </FormDialog>
+  );
+}
+
+/** Contract 0.9.2: mark or unmark two-factor as "enforced by admin" (the user cannot turn it off). Reason; the step-up is asked by the client. */
+export function EnforceTwoFactorDialog({ user, enforce, onClose }: { user: Pick<User, 'id' | 'display_name'>; enforce: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const m = useSetTwoFactorEnforced(user.id);
+  return (
+    <FormDialog open onClose={onClose} testid="two-factor-enforce-dialog" title={t(enforce ? 'twoFactor.enforce_title' : 'twoFactor.unenforce_title', { name: user.display_name })} busy={m.isPending}
+      error={m.isError ? errText(m.error, t) : null} submitLabel={t(enforce ? 'twoFactor.enforce' : 'twoFactor.unenforce')}
+      onSubmit={(reason) => m.mutate({ enforced: enforce, reason }, { onSuccess: () => { toast(t(enforce ? 'twoFactor.done_enforce' : 'twoFactor.done_unenforce')); onClose(); } })}>
+      <p className="rounded-md bg-card2 p-2 text-sm text-mute">{t(enforce ? 'twoFactor.enforce_note' : 'twoFactor.unenforce_note')}</p>
     </FormDialog>
   );
 }

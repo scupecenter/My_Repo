@@ -463,11 +463,29 @@ model UserTotp {
   last_success_at    DateTime? @db.Timestamptz(6)
   set_by             String?   @db.Uuid
   set_at             DateTime  @default(now()) @db.Timestamptz(6)
+  enforced           Boolean   @default(false) // 0044: an admin turned it on or marked it; the user cannot turn it off
 
   user   User  @relation("TotpUser", fields: [user_id], references: [id], onDelete: Cascade)
   setter User? @relation("TotpSetBy", fields: [set_by], references: [id])
 
   @@map("user_totp")
+}
+
+// Self-service email change (migration 0044): the user asks, an admin approves or rejects with a reason; only an approval changes users.email.
+// Not readable by pmis_app: idm_request_email_change, idm_cancel_email_change, idm_decide_email_change, idm_my_email_changes, idm_email_change_list.
+model EmailChangeRequest {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id         String    @db.Uuid
+  old_email       String
+  new_email       String
+  status          String    @default("pending") // pending | approved | rejected | cancelled
+  requested_at    DateTime  @default(now()) @db.Timestamptz(6)
+  decided_at      DateTime? @db.Timestamptz(6)
+  decided_by      String?   @db.Uuid
+  decision_reason String?
+
+  @@index([user_id, requested_at(sort: Desc)], map: "email_change_requests_user")
+  @@map("email_change_requests")
 }
 
 // One-time recovery codes: only a keyed hash (HMAC-SHA-256) is stored.

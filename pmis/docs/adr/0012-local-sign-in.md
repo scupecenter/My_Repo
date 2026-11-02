@@ -2,7 +2,8 @@
 
 - Status: Accepted, 2026-10-28. Owner decision of 2026-10-28 replaces "local sign-in deferred" (ADR 0002 §10).
 - Related: ADR 0002 (authentication), ADR 0003 (authorization, `idm_*` paths), migration `0010_local_sign_in` (`db/sql/009_local_sign_in.sql`), contract 0.3.0.
-- Update 2026-11-02: the TOTP of item 3 of the context is built, see ADR 0014 (two-factor for local accounts, turned on by admins only).
+- Update 2026-11-02: the TOTP of item 3 of the context is built, see ADR 0014 (two-factor for local accounts).
+- Update 2026-11-02 (later): self-service profile (migration 0044, contract 0.9.2). The password change of item 5 is also offered on "My profile" (`POST /me/password`, same policy, lock and session rules); users may turn two-factor on themselves and off unless an admin enforced it (ADR 0014 amendment 2); the login email changes only through an email change request that an admin approves.
 
 ## Context
 - The Entra app registration is not available yet, and the owner wants people to use the PMIS now.

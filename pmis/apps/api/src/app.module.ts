@@ -63,7 +63,8 @@ import { GroupsController } from './groups/groups.controller';
 import { GroupsService } from './groups/groups.service';
 import { MatrixController } from './matrix/matrix.controller';
 import { MatrixService } from './matrix/matrix.service';
-import { MeController } from './me/me.controller';
+import { EmailChangeRequestsController, MeController } from './me/me.controller';
+import { EmailChangesService, ProfileService } from './me/profile.service';
 import { MeService } from './me/me.service';
 import { PermissionsController } from './permissions/permissions.controller';
 import { PermissionsService } from './permissions/permissions.service';
@@ -87,7 +88,7 @@ import { UsersService } from './users/users.service';
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
-      AuthController, MeController, UsersController, GroupsController, DepartmentsController, MessagesController,
+      AuthController, MeController, EmailChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController,
@@ -96,7 +97,7 @@ export function appModuleFor(config: AppConfig) {
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
-      AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
+      AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService,

@@ -128,6 +128,16 @@ export function mapDbError(e: unknown): ProblemException | null {
   const msg = info.message;
   switch (info.sqlstate) {
     case '42501': {
+      // Self-service (0044): an admin enforces two-factor; an admin-owned profile field; a step-up the database re-checks.
+      if (/two_factor_enforced/.test(msg)) {
+        return new ProblemException(403, 'two_factor_enforced', { detail: 'An administrator enforces two-factor on your account, so you cannot turn it off. Ask an administrator.' });
+      }
+      if (/cannot be changed on your own account/i.test(msg)) {
+        return new ProblemException(403, 'field_read_only', { detail: 'This field is managed by an administrator.' });
+      }
+      if (/fresh step-up of this session/i.test(msg)) {
+        return new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: 'password' });
+      }
       // Delegation rules: only a System Admin delegates (a delegate may pass on only what the admin allowed, never wider).
       if (/can create a delegation|re-delegation needs|cannot delegate (wider|more|%)|cannot delegate \S+\.\S+ ?:|cannot outlive the parent|only a System Admin or the delegator/i.test(msg)) {
         return new ProblemException(403, 'delegate_forbidden', { detail: 'A delegate cannot delegate or revoke beyond what the System Admin allowed.' });
@@ -197,6 +207,28 @@ export function mapDbError(e: unknown): ProblemException | null {
       }
       if (/already deleted|is not deleted/i.test(msg)) {
         return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });
+      }
+      // Self-service (0044)
+      if (/two-factor is already on for this account/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is already on for your account.' });
+      if (/two-factor is not on for your account/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for your account.' });
+      if (/two-factor is off for this user: turn it on first/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is off for this user: turn it on first.' });
+      if (/an email change is already pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'An email change is already waiting for approval. Cancel it first.' });
+      if (/this email change is not pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This email change is no longer waiting for a decision.' });
+      if (/email: already used by another account/i.test(msg)) {
+        return new ProblemException(409, 'duplicate', { detail: 'This email is already used or requested by another account.', errors: [{ path: '/new_email', code: 'duplicate', message: 'Already used or requested by another account.' }] });
+      }
+      if (/phone: already used by another account/i.test(msg)) {
+        return new ProblemException(409, 'duplicate', { detail: 'This phone is already used by another account.', errors: [{ path: '/phone', code: 'duplicate', message: 'Already used by another account.' }] });
+      }
+      if (/^email: |\bemail: /i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: /already your email/i.test(msg) ? 'This is already your email.' : 'The email is not valid.',
+          errors: [{ path: '/new_email', code: /already your email/i.test(msg) ? 'same_as_current' : 'invalid', message: /already your email/i.test(msg) ? 'This is already your email.' : 'Not a valid email address.' }],
+        });
+      }
+      if (/profile: /i.test(msg)) {
+        const field = /profile: (display_name|phone|locale|theme)/.exec(msg)?.[1];
+        return new ProblemException(422, 'validation_failed', { detail: 'A profile value is not valid.', errors: field ? [{ path: `/${field}`, code: 'invalid' }] : [] });
       }
       if (/two-factor is not on for this user/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for this user: there is nothing to reset.' });
       if (/no enrolment code can be issued/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This user is not waiting for enrolment, so there is no enrolment code to issue. Turn two-factor on, or reset it.' });
