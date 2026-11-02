@@ -228,6 +228,10 @@ describe('Q131: document slots on register records', () => {
     // the Documents list shows the record's file with its register
     const list = await a.api.call('get', `/documents?site_id=${site.id}`);
     expect(list.body.items).toEqual([expect.objectContaining({ doc_code: REGDOC, register_key: 'quality', register_entity_id: ncr.entity_id, task_id: null })]);
+    // the Documents grant alone does not reach a register's files: without the Quality module the file is neither listed nor downloadable
+    const docsOnly = await actor(app, db, { level: 'entry', regions: [R], grants: [['sites', 'view'], ['sites.documents', 'view'], DL] });
+    expect((await docsOnly.api.call('get', `/documents?site_id=${site.id}`)).body.items).toEqual([]);
+    expect((await docsOnly.api.call('get', `/files/${cur.id}/download`)).status).toBe(404);
   });
 
   it('withdraw before submit sends the slot back to missing; a new version of an approved record reopens the slot with its file (keyed on the logical record)', async () => {
@@ -342,6 +346,9 @@ describe('Q132: QC snag photos', () => {
     // the photo is downloadable through the same path and audited
     const dl = await a.api.call('get', `/files/${none.body.file_id}/download`);
     expect(dl.status).toBe(200);
+    // a snag photo also needs the Quality module, not only the Documents download grant
+    const docsOnly = await actor(app, db, { level: 'entry', regions: [R], grants: [['sites', 'view'], ['sites.documents', 'view'], DL] });
+    expect((await docsOnly.api.call('get', `/files/${none.body.file_id}/download`)).status).toBe(404);
     expect((await q(`SELECT 1 FROM audit_log WHERE action = 'document_file_download' AND entity_type = 'snag_photo' AND entity_id = $1`, [none.body.id]))).toHaveLength(1);
     expect((await q(`SELECT 1 FROM audit_log WHERE action = 'snag_photo_upload' AND entity_id = $1`, [id]))).toHaveLength(3);
   });

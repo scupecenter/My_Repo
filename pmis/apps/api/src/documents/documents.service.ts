@@ -597,6 +597,27 @@ export class DocumentsService {
     return { formats: pr && Array.isArray(pr.formats) && pr.formats.length > 0 ? pr.formats.map((x) => x.toUpperCase()) : null, maxMb: pr && typeof pr.max_size_mb === 'number' ? pr.max_size_mb : null };
   }
 
+  // ----------------------------------------------------------------------------------------------------------------- register scope
+  /**
+   * Files in register-record slots (Q131) are visible only to callers who also hold the register's own module (view) in the slot's
+   * region; the Documents screen grant alone is not enough (security review of 0047). Returns one SQL condition on `s`.
+   */
+  async registerScopeSql(everything = false): Promise<Prisma.Sql> {
+    if (everything) return Prisma.sql`true`;
+    const defs = await this.db.tx.$queryRaw<{ register_key: string; module_key: string }[]>(Prisma.sql`SELECT register_key, module_key FROM register_definitions`);
+    const byModule = new Map<string, string[]>();
+    for (const d of defs) byModule.set(d.module_key, [...(byModule.get(d.module_key) ?? []), d.register_key]);
+    const allKeys: string[] = [];
+    const parts: Prisma.Sql[] = [Prisma.sql`s.register_key IS NULL`];
+    for (const [module, keys] of byModule) {
+      const r = await this.access.regions(module, 'view');
+      if (r === null) allKeys.push(...keys);
+      else if (r.length > 0) parts.push(Prisma.sql`(s.register_key = ANY(${keys}::text[]) AND s.region_id = ANY(${r}::int[]))`);
+    }
+    if (allKeys.length > 0) parts.push(Prisma.sql`s.register_key = ANY(${allKeys}::text[])`);
+    return Prisma.sql`(${Prisma.join(parts, ' OR ')})`;
+  }
+
   // ----------------------------------------------------------------------------------------------------------------- download
 
   /** Download scope: `download_documents` on the Documents screen, by region. null = every region. */
@@ -614,7 +635,7 @@ export class DocumentsService {
         ${ORD} AS ord
       FROM document_files f JOIN document_slots s ON s.id = f.slot_id JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
       LEFT JOIN task_instances ti ON ti.id = s.task_id LEFT JOIN task_definitions td ON td.id = ti.task_def_id
-      WHERE f.id = ${fileId}::uuid`);
+      WHERE f.id = ${fileId}::uuid AND ${await this.registerScopeSql()}`);
     const f = rows[0] as (typeof rows)[number] & { storage_key?: string } | undefined;
     if (!f || (regions !== null && !regions.includes(f.region_id))) {
       const photo = await this.downloadSnagPhoto(fileId, regions);
@@ -639,6 +660,9 @@ export class DocumentsService {
       FROM snag_photos p JOIN snags s ON s.id = p.snag_id JOIN sites si ON si.id = s.site_id WHERE p.id = ${id}::uuid`);
     const p = rows[0];
     if (!p || (regions !== null && !regions.includes(p.region_id))) return null;
+    // a snag photo also needs the Quality module (view) in the snag's region, not only the Documents grant (security review of 0047)
+    const quality = await this.access.regions('quality', 'view');
+    if (quality !== null && !quality.includes(p.region_id)) return null;
     const name = displayName({ site_code: p.site_code, task_code: `SNAG-${p.scope}`, doc_code: p.snag_id.slice(0, 8).toUpperCase(), candidate_label: p.shot_type, approved_date: null, uploaded_at: p.uploaded_at, ext: p.ext ?? 'jpg', version: 1, is_current: true });
     await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_audit('document_file_download', 'snag_photo', ${p.id}::text, ${p.site_id}::uuid, ${p.region_id}::int,
       ${JSON.stringify({ photo_id: p.id, snag_id: p.snag_id, download_name: name, sha256: p.sha256, size_bytes: Number(p.size_bytes) })}::jsonb)`);
@@ -741,6 +765,7 @@ export class DocumentsService {
     const limit = parseLimit(q.limit);
     const cur = decodeCursor(typeof q.cursor === 'string' ? q.cursor : undefined, 2);
     const conds = this.filterSql(q, regions);
+    conds.push(await this.registerScopeSql());
     if (cur) conds.push(Prisma.sql`(f.uploaded_at, f.id) < (${cur[0]}::timestamptz, ${cur[1]}::uuid)`);
     const rows = await this.db.tx.$queryRaw<(FileRow & {
       site_id: string; region_id: number; site_code: string; site_name: string | null; task_id: string | null; task_code: string | null; task_name: string | null; stage_code: string | null;
