@@ -31,6 +31,7 @@ import { SessionGuard } from './auth/session.guard';
 import { SessionService } from './auth/session.service';
 import { StepUpService } from './auth/step-up.service';
 import { SyslogService } from './auth/syslog.service';
+import { TwoFactorService } from './auth/two-factor.service';
 import { UserStateService } from './auth/user-state.service';
 import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
@@ -77,7 +78,7 @@ export function appModuleFor(config: AppConfig) {
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
-      DbService, SyslogService, LogHmacService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
+      DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,

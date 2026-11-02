@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { fieldErrors, useChangePassword } from '@/api/auth';
 import { ApiError } from '@/api/client';
-import { useLogout } from '@/api/hooks';
+import { useLogout, useSession } from '@/api/hooks';
+import { TwoFactorCard } from '@/components/TwoFactor';
 import { ruleKey } from '@/lib/passwordRules';
 import { useToast } from '@/components/Toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -18,6 +19,7 @@ export function ChangePassword({ forced = false }: { forced?: boolean }) {
   const qc = useQueryClient();
   const logout = useLogout();
   const change = useChangePassword();
+  const session = useSession();
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [again, setAgain] = useState('');
@@ -68,7 +70,7 @@ export function ChangePassword({ forced = false }: { forced?: boolean }) {
       </div>
     </form>
   );
-  return forced ? <div className="grid min-h-screen place-items-center p-4">{form}</div> : <div className="grid place-items-start" data-testid="page-change-password">{form}</div>;
+  return forced ? <div className="grid min-h-screen place-items-center p-4">{form}</div> : <div className="grid place-items-start" data-testid="page-change-password">{form}<TwoFactorCard session={session.data} /></div>;
 }
 
 function Field({ id, label, value, onChange, auto, error, errors }: { id: string; label: string; value: string; onChange: (v: string) => void; auto: string; error?: string; errors?: string[] }) {

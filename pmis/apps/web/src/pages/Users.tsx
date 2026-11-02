@@ -9,7 +9,7 @@ import type { DeletedUser, User } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { AssignDialog } from '@/components/AssignDialog';
-import { CreateUserDialog, LocalBadges } from '@/components/UserDialogs';
+import { CreateUserDialog, LocalBadges, TwoFactorBadge } from '@/components/UserDialogs';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { OnlineNow } from '@/pages/OnlineNow';
 import { Departments } from '@/pages/Departments';
@@ -134,7 +134,7 @@ export function Users() {
                 <td className="p-2 text-mute" dir="ltr">{u.email}</td>
                 <td className="p-2" data-testid={`user-dept-${u.employee_id ?? u.id}`}>{u.department ? (ar && u.department.name_ar) || u.department.name_en : <span className="text-mute">—</span>}</td>
                 <td className="p-2"><span className={`chip ${STATUS_TONE[u.status]}`} data-testid={`user-status-${u.employee_id ?? u.id}`}>{t(`userStatus.${u.status}`)}</span></td>
-                <td className="p-2"><span className="inline-flex flex-wrap gap-1"><LocalBadges user={u} /><MfaBadge user={u} /></span></td>
+                <td className="p-2"><span className="inline-flex flex-wrap gap-1"><LocalBadges user={u} /><TwoFactorBadge user={u} /><MfaBadge user={u} /></span></td>
                 <td className="p-2 text-end"><span className="inline-flex gap-1">
                   <Link className="btn" data-testid={`user-open-${u.employee_id ?? u.id}`} to={`/admin/users/${u.id}`}>{t('users.open')}</Link>
                   {(u.status === 'suspended' || u.status === 'disabled')

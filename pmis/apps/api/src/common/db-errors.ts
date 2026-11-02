@@ -185,6 +185,13 @@ export function mapDbError(e: unknown): ProblemException | null {
       if (/already deleted|is not deleted/i.test(msg)) {
         return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });
       }
+      if (/two-factor is not on for this user/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is not on for this user: there is nothing to reset.' });
+      if (/two-factor needs a local account/i.test(msg)) {
+        return new ProblemException(422, 'validation_failed', {
+          detail: 'Two-factor needs a local account with sign-in on.',
+          errors: [{ path: '/user_id', code: 'no_local_account', message: 'This user has no local sign-in.' }],
+        });
+      }
       if (/not found/i.test(msg)) return new ProblemException(404, 'not_found', { detail: 'The resource does not exist.' });
       if (/at least one active System Admin/i.test(msg)) return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       return new ProblemException(422, 'validation_failed', { detail: 'The request is not valid.' });

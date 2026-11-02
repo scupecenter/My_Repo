@@ -1,11 +1,11 @@
-import { Building2, Copy, KeyRound, Pencil, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
+import { Building2, Copy, KeyRound, Pencil, RotateCcw, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 import { useCopyAssignments, useEditAssignments, useEndAssignments, useGroups, useMfa, useProfiles, useSetMfa, useUser } from '@/api/admin';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
-import type { Assignment, UserPickerItem } from '@/api/types';
+import type { Assignment, UserDetail, UserPickerItem } from '@/api/types';
 import { AssignDialog, LEVELS } from '@/components/AssignDialog';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { OrgDialog } from '@/components/OrgDialog';
@@ -13,7 +13,7 @@ import { PeoplePicker } from '@/components/PeoplePicker';
 import { PersonTag } from '@/components/PersonTag';
 import { MODULES, ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
-import { LocalBadges, ResetPasswordDialog, SystemAdminDialog } from '@/components/UserDialogs';
+import { LocalBadges, ResetPasswordDialog, SystemAdminDialog, TwoFactorBadge, TwoFactorDialog } from '@/components/UserDialogs';
 import { isAdmin } from '@/lib/perm';
 import { MfaBadge, STATUS_TONE } from './Users';
 
@@ -86,6 +86,31 @@ function MfaCard({ userId, isSelf }: { userId: string; isSelf: boolean }) {
   );
 }
 
+/** Two-factor card (contract 0.5.0): state, and for an admin or a delegate holding users.two_factor: turn on, turn off, reset. Nobody changes their own. */
+function TwoFactorAdminCard({ user, isSelf, canAdminister, onAction }: { user: UserDetail; isSelf: boolean; canAdminister: boolean; onAction: (a: 'on' | 'off' | 'reset') => void }) {
+  const { t } = useTranslation();
+  const state = user.two_factor ?? 'off';
+  const noLocal = !user.local_sign_in;
+  return (
+    <section className="card p-4" data-testid="two-factor-admin-card">
+      <h2 className="mb-1 flex items-center gap-2 font-bold">{state === 'off' ? <ShieldOff size={16} /> : <ShieldCheck size={16} />}{t('twoFactor.admin_title')}</h2>
+      <p className="text-sm text-mute" data-testid="two-factor-admin-state">{t(`twoFactor.admin_state_${state}`)}</p>
+      {noLocal && <p className="mt-1 text-sm text-mute">{t('twoFactor.admin_no_local')}</p>}
+      {canAdminister && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {state === 'off'
+            ? <button className="btn" data-testid="two-factor-on" disabled={isSelf || noLocal} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('on')}><ShieldCheck size={16} />{t('twoFactor.admin_turn_on')}</button>
+            : <>
+                <button className="btn" data-testid="two-factor-off" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('off')}><ShieldOff size={16} />{t('twoFactor.admin_turn_off')}</button>
+                <button className="btn" data-testid="two-factor-reset" disabled={isSelf} title={isSelf ? t('twoFactor.admin_self') : undefined} onClick={() => onAction('reset')}><RotateCcw size={16} />{t('twoFactor.admin_reset')}</button>
+              </>}
+        </div>
+      )}
+      {isSelf && <p className="mt-1 text-sm text-lateInk" data-testid="two-factor-self-note">{t('twoFactor.admin_self')}</p>}
+    </section>
+  );
+}
+
 export function UserDetailPage() {
   const { t, i18n } = useTranslation();
   const { userId = '' } = useParams();
@@ -93,7 +118,7 @@ export function UserDetailPage() {
   const me = useMe(true), q = useUser(userId), regions = useRegions(), profiles = useProfiles(), groups = useGroups();
   const end = useEndAssignments(userId);
   const [sel, setSel] = useState<Set<string>>(new Set());
-  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin' | 'org'>(null);
+  const [dlg, setDlg] = useState<null | 'assign' | 'edit' | 'end' | 'copy' | 'reset' | 'admin' | 'unadmin' | 'org' | 'tf_on' | 'tf_off' | 'tf_reset'>(null);
   const ar = i18n.language === 'ar';
   if (q.isError) return <p role="alert" data-testid="user-missing">{t('errors.generic')}</p>;
   const u = q.data;
@@ -101,6 +126,7 @@ export function UserDetailPage() {
   const isSysAdmin = (u.groups ?? []).some((g) => g.is_system_admins);
   const adminGroupId = groups.data?.find((g) => g.is_system_admins)?.id;
   const canEditOrg = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'edit' && ['users', 'admin.users'].includes(g.module_key as string));
+  const canTwoFactor = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'administer' && g.module_key === 'users');
   const rows = (u.assignments ?? []).filter((a) => a.is_active_now !== false);
   const chosen = rows.filter((a) => sel.has(a.id));
   const rn = (id: number) => { const r = regions.data?.find((x) => x.id === id); return (ar && r?.name_ar) || r?.name_en || String(id); };
@@ -115,6 +141,7 @@ export function UserDetailPage() {
         {u.employee_id && <span className="mono rounded bg-card2 px-1 text-sm">{u.employee_id}</span>}
         <span className={`chip ${STATUS_TONE[u.status]}`} data-testid="user-status">{t(`userStatus.${u.status}`)}</span>
         <LocalBadges user={u} />
+        <TwoFactorBadge user={u} />
         <MfaBadge user={u} />
         <span className="text-mute" dir="ltr">{u.email}</span>
         {isSysAdmin && <span className="chip bg-openBg text-openInk" data-testid="sysadmin-badge">{t('sysAdmin.badge')}</span>}
@@ -169,6 +196,7 @@ export function UserDetailPage() {
       </section>
       <div className="grid gap-4 md:grid-cols-2">
         <MfaCard userId={userId} isSelf={u.id === me.data?.user.id} />
+        <TwoFactorAdminCard user={u} isSelf={u.id === me.data?.user.id} canAdminister={canTwoFactor} onAction={(a) => setDlg(`tf_${a}`)} />
         <section className="card p-4"><h2 className="mb-1 font-bold">{t('users.groups')}</h2>
           {(u.groups ?? []).length ? <ul className="list-disc ps-5 text-sm">{u.groups!.map((g) => <li key={g.id}>{g.name}</li>)}</ul> : <p className="text-sm text-mute">—</p>}</section>
       </div>
@@ -176,6 +204,7 @@ export function UserDetailPage() {
       {dlg === 'edit' && <EditDialog userId={userId} rows={chosen} onClose={() => { setDlg(null); setSel(new Set()); }} />}
       {dlg === 'org' && <OrgDialog user={u} onClose={() => setDlg(null)} />}
       {dlg === 'reset' && <ResetPasswordDialog user={u} onClose={() => setDlg(null)} />}
+      {(dlg === 'tf_on' || dlg === 'tf_off' || dlg === 'tf_reset') && <TwoFactorDialog user={u} action={dlg === 'tf_on' ? 'on' : dlg === 'tf_off' ? 'off' : 'reset'} onClose={() => setDlg(null)} />}
       {(dlg === 'admin' || dlg === 'unadmin') && adminGroupId && <SystemAdminDialog user={u} adminGroupId={adminGroupId} remove={dlg === 'unadmin'} onClose={() => setDlg(null)} />}
       {dlg === 'copy' && <CopyDialog fromId={userId} onClose={() => setDlg(null)} />}
       {dlg === 'end' && (

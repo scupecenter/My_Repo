@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Problem } from '@/api/types';
 import { uid } from './ids';
-import { ACCOUNTS, STAFF, approvalsFor, canAct, cred, db, meBody, save, sessionBody, skipPath, stepUpValid, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
+import { ACCOUNTS, STAFF, approvalsFor, canAct, cred, db, meBody, save, sessionBody, skipPath, stepUpValid, tfLabel, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
 import { touch } from './sites';
 
 const B = API_BASE;
@@ -21,7 +21,7 @@ export const guard = () => {
   return null;
 };
 export const stepUp = () => db().session?.method === 'local'
-  ? problem(401, 'step_up_required', 'Re-authentication required', { step_up_method: 'password' })
+  ? problem(401, 'step_up_required', 'Re-authentication required', { step_up_method: tfLabel(cred(db().session!.account)) === 'on' ? 'password_totp' : 'password' })
   : problem(401, 'step_up_required', 'Re-authentication required', { step_up_url: '/mock-m365/step-up?return_to=%2Fstep-up-done', step_up_method: 'm365' });
 
 export function ifMatch(req: Request, t: MockTask) {

@@ -9,6 +9,8 @@ export interface SessionRow {
   lastActivityAt: Date;
   expiresAt: Date;
   stepupAt: Date | null;
+  /** The session passed a code (TOTP or recovery code) at sign-in. */
+  twoFactor: boolean;
   /** The database clock at the moment the session was read; every age check uses it. */
   dbNow: Date;
 }

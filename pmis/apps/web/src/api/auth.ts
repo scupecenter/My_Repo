@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, setCsrfToken } from './client';
-import type { LocalUserCreate, LocalUserCreated, Session, UserDetail } from './types';
+import type { LocalUserCreate, LocalUserCreated, PendingSignIn, RecoveryCodes, Session, TwoFactorEnrolled, TwoFactorEnrolment, TwoFactorState, UserDetail } from './types';
 
 /** Store a fresh session from a login or password call so the router reacts at once. */
 function useAdoptSession() {
@@ -12,11 +12,65 @@ function useAdoptSession() {
   };
 }
 
+export type LoginResult = Session | PendingSignIn;
+/** The password was right but a code (or the enrolment) is still to do: no session yet (contract 0.5.0). */
+export const isPending = (r: LoginResult): r is PendingSignIn => r.authenticated === false && 'next' in r;
+
 export function useLocalLogin() {
   const adopt = useAdoptSession();
-  return useMutation<Session, ApiError, { identifier: string; password: string }>({
-    mutationFn: (body) => api.post<Session>('/auth/local/login', { body }),
+  return useMutation<LoginResult, ApiError, { identifier: string; password: string }>({
+    mutationFn: (body) => api.post<LoginResult>('/auth/local/login', { body }),
+    onSuccess: (r) => { if (!isPending(r)) adopt(r); },
+  });
+}
+
+/** Second step of sign-in: a TOTP code or one recovery code. The pending-sign-in cookie travels by itself. */
+export function useTwoFactorSignIn() {
+  const adopt = useAdoptSession();
+  return useMutation<Session, ApiError, { code: string } | { recovery_code: string }>({
+    mutationFn: (body) => api.post<Session>('/auth/local/2fa', { body }),
     onSuccess: adopt,
+  });
+}
+
+/** Secrets must not stay in the mutation cache (`gcTime: 0`). */
+export function useEnrolStart() {
+  return useMutation<TwoFactorEnrolment, ApiError, void>({ gcTime: 0, mutationFn: () => api.post<TwoFactorEnrolment>('/auth/local/2fa/enrol/start') });
+}
+
+/** Confirms the first code. The answer carries the session (adopted here) and the recovery codes (shown once by the caller). */
+export function useEnrolConfirm() {
+  const adopt = useAdoptSession();
+  return useMutation<TwoFactorEnrolled, ApiError, { code: string }>({
+    gcTime: 0,
+    mutationFn: (body) => api.post<TwoFactorEnrolled>('/auth/local/2fa/enrol/confirm', { body }),
+    onSuccess: (r) => adopt(r.session),
+  });
+}
+
+export function useRegenerateRecoveryCodes() {
+  const qc = useQueryClient();
+  return useMutation<RecoveryCodes, ApiError, { code: string }>({
+    gcTime: 0,
+    mutationFn: (body) => api.post<RecoveryCodes>('/auth/local/2fa/recovery-codes', { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['session'] }); },
+  });
+}
+
+/** Admin: turn two-factor on or off for a user. The server asks for the step-up (password and code) through the client handler. */
+export function useSetTwoFactor(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<TwoFactorState, ApiError, { enabled: boolean; reason: string }>({
+    mutationFn: (body) => api.put<TwoFactorState>(`/users/${userId}/two-factor`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['user', userId] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export function useResetTwoFactor(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<TwoFactorState, ApiError, { reason: string }>({
+    mutationFn: (body) => api.post<TwoFactorState>(`/users/${userId}/two-factor/reset`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['user', userId] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
   });
 }
 
@@ -55,8 +109,8 @@ export function useResetPassword(userId: string) {
   });
 }
 
-/** Step-up for a local session; resolves when the password was right. */
-export const localStepUp = (password: string) => api.post<Session>('/auth/local/step-up', { body: { password } });
+/** Step-up for a local session; resolves when the password (and, when two-factor is on, the code) was right. */
+export const localStepUp = (password: string, extra: { code?: string; recovery_code?: string } = {}) => api.post<Session>('/auth/local/step-up', { body: { password, ...extra } });
 
 /** Field messages from a 422/409 `errors[]`: path `/email` becomes `email`. */
 export function fieldErrors(e: unknown): Record<string, string[]> {

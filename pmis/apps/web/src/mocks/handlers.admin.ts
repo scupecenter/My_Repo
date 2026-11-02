@@ -2,7 +2,7 @@
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Assignment, UserDetail } from '@/api/types';
-import { absentOn, accountKeyOf, accountStatus, cred, db, save, slotsOf, STAFF, stepUpValid, toSummary, viewer, type MockTask } from './db';
+import { absentOn, accountKeyOf, accountStatus, cred, db, save, slotsOf, STAFF, stepUpValid, tfLabel, toSummary, viewer, type MockTask } from './db';
 import { PROFILES, type MockProfile, type MockUser } from './adminData';
 import { O } from './orgState';
 import { find, guard, page, problem, stepUp, transition } from './handlers';
@@ -31,7 +31,7 @@ export const orgOf = (u: MockUser) => {
 export const userOf = (u: MockUser) => {
   const s = prof(u), c = cred(accountKeyOf(u));
   return {
-    ...uref(u), ...orgOf(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
+    ...uref(u), ...orgOf(u), email: s.email, phone: s.phone ?? null, local_sign_in: !!c?.enabled, two_factor: tfLabel(c), must_change_password: !!c?.must_change, status: u.status, locale: 'en' as const, mfa_exempt: u.mfa.exempt, mfa_exempt_until: u.mfa.until, last_login_at: '2026-10-24T07:00:00Z', created_at: '2026-09-01T08:00:00Z', version: u.version,
   };
 };
 const rowsOf = (e: string, ended = false) => A().assignments.filter((a) => a.user.employee_id === e && (ended || a.is_active_now));
@@ -233,7 +233,7 @@ export const adminHandlers = [
         { key: 'admin', name_en: 'Administration', screens: [{ key: 'admin.users', name_en: 'Users and roles' }, { key: 'admin.roles', name_en: 'Roles and permission profiles' }], actions: ['view', 'create', 'edit', 'delete', 'administer'] },
       ],
       actions: [...op, 'administer'],
-      delegable_rights: ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit'],
+      delegable_rights: ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit', 'users.two_factor'],
     });
   }),
   http.get(`${B}/permission-profiles`, ({ request }) => {

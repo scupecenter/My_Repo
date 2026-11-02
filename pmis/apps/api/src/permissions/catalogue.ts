@@ -108,6 +108,8 @@ export const RIGHT_GRANTS: Record<string, Grant[]> = {
   edit_date: override('edit_date'),
   reassign: override('reassign'),
   'users.edit': edit('users'),
+  // Turn two-factor on or off for a user, or reset it (idm_set_two_factor, idm_reset_two_factor check users.administer). Stored as that one grant.
+  'users.two_factor': [['users', 'administer']],
   'assignments.edit': edit('assignments'),
   'groups.edit': edit('groups'),
   'matrix.edit': edit('matrix'),

@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useLocalLogin } from '@/api/auth';
+import { isPending, useLocalLogin } from '@/api/auth';
 import { API_BASE, ApiError } from '@/api/client';
+import { CodeStep, EnrolFlow } from '@/components/TwoFactor';
 
 export const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === 'true';
 /** Microsoft 365 sign-in stays in the code but is hidden until IT registers the app (ADR 0012). */
@@ -19,7 +20,9 @@ export function Login() {
   const { t } = useTranslation();
   const [id, setId] = useState('');
   const [pw, setPw] = useState('');
-  const [err, setErr] = useState<'' | 'invalid' | 'rate' | 'other'>('');
+  const [err, setErr] = useState<'' | 'invalid' | 'rate' | 'other' | 'expired'>('');
+  // After a right password, two-factor adds a step: the code, or the first-time setup (contract 0.5.0).
+  const [step, setStep] = useState<'password' | 'code' | 'enrol'>('password');
   const [params] = useSearchParams();
   const nav = useNavigate();
   const login = useLocalLogin();
@@ -28,7 +31,10 @@ export function Login() {
     if (login.isPending) return;
     setErr('');
     login.mutate({ identifier: id.trim(), password: pw }, {
-      onSuccess: () => nav('/my-work', { replace: true }),
+      onSuccess: (r) => {
+        if (isPending(r)) { setPw(''); setStep(r.next === 'enrol' ? 'enrol' : 'code'); return; }
+        nav('/my-work', { replace: true });
+      },
       onError: (x) => {
         setPw('');
         // One generic message for every 401: it never says which part was wrong.
@@ -36,7 +42,11 @@ export function Login() {
       },
     });
   };
-  const msg = err === 'invalid' ? t('login.invalid') : err === 'rate' ? t('login.rate') : err === 'other' ? t('login.error') : params.get('error') ? t('login.error') : '';
+  const restart = (why: '' | 'expired') => { setStep('password'); setPw(''); setErr(why); };
+  const finish = () => nav('/my-work', { replace: true });
+  if (step === 'code') return <div className="grid min-h-screen place-items-center p-4"><CodeStep onDone={finish} onBack={() => restart('')} onExpired={() => restart('expired')} /></div>;
+  if (step === 'enrol') return <div className="grid min-h-screen place-items-center p-4"><EnrolFlow onDone={finish} onExpired={() => restart('expired')} /></div>;
+  const msg = err === 'expired' ? t('twoFactor.expired') : err === 'invalid' ? t('login.invalid') : err === 'rate' ? t('login.rate') : err === 'other' ? t('login.error') : params.get('error') ? t('login.error') : '';
   return (
     <div className="grid min-h-screen place-items-center p-4">
       <form onSubmit={submit} className="card w-[min(440px,100%)] space-y-4 p-6" data-testid="login-form">

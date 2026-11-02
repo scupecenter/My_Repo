@@ -11,7 +11,7 @@ import { PersonTag } from '@/components/PersonTag';
 import { ScopePicker } from '@/components/ScopePicker';
 import { useToast } from '@/components/Toast';
 
-export const RIGHTS: DelegableRight[] = ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit'];
+export const RIGHTS: DelegableRight[] = ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit', 'users.two_factor'];
 const TONE: Record<string, string> = { active: 'bg-doneBg text-doneInk', scheduled: 'bg-openBg text-openInk', expired: 'bg-lockBg text-lockInk', revoked: 'bg-lateBg text-lateInk' };
 const STATES = ['active', 'scheduled', 'expired', 'revoked', 'all'];
 

@@ -6,7 +6,7 @@ export type ErrorCode =
   | 'module_forbidden' | 'action_forbidden' | 'field_read_only' | 'not_eligible_holder' | 'self_beneficiary'
   | 'delegate_forbidden' | 'last_admin' | 'not_found' | 'already_claimed' | 'already_assigned'
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
-  | 'account_locked' | 'invalid_credentials' | 'password_change_required' | 'weak_password' | 'internal_error'
+  | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use';
 
 export interface FieldError {
@@ -42,6 +42,7 @@ const TITLES: Record<string, string> = {
   rate_limited: 'Too many requests',
   account_locked: 'Account locked',
   invalid_credentials: 'Invalid credentials',
+  invalid_code: 'Invalid code',
   password_change_required: 'Password change required',
   weak_password: 'Password does not meet the policy',
   internal_error: 'Internal error',
@@ -52,7 +53,7 @@ export const problemTitle = (code: string): string => TITLES[code] ?? code;
 export interface ProblemOptions {
   detail?: string;
   errors?: FieldError[];
-  step_up_method?: 'password' | 'm365' | 'totp';
+  step_up_method?: 'password' | 'password_totp' | 'm365' | 'totp';
   /** Extra members of the problem body (for example `missing`, `claimed_by`). */
   extra?: Record<string, unknown>;
   headers?: Record<string, string>;
