@@ -1687,9 +1687,10 @@ export interface paths {
         /**
          * Responsibility Matrix for a workflow version, with self-skip preview
          * @description One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
-         *     dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
-         *     its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
-         *     3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+         *     dismantle, `code` is the register key). Every row has exactly two levels (owner decision 2026-11-01): L1 Data Entry
+         *     (cell level 1) and L2 Data Reviewer & Approver (cell level 3); `approval_levels` is always 2 and `used_levels` is always
+         *     [1, 3]. Cell level 2 is a leftover of the old 3-level model, kept only for tasks and records already submitted on a
+         *     3-level snapshot (`used = false`). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
          *     `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
          *     to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
          *     for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
@@ -1712,11 +1713,36 @@ export interface paths {
          *     cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
          *     refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
          *     level count is audited with before and after values and the reason.
-         *     The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+         *     The change applies to new transitions only (MX-04). Who holds a level applies to tasks created later and to tasks not yet
          *     submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
-         *     rejection (decision B7). The answer shows both counts per stage in `task_counts`.
+         *     rejection (decision B7). The number of levels is fixed at 2: `stage_levels` accepts only 2 (anything else is 422).
+         *     The answer shows both counts per stage in `task_counts`.
          */
         patch: operations["updateMatrix"];
+        trace?: never;
+    };
+    "/matrix/cells/{cell_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a region or task override cell of the Responsibility Matrix (0.6.1, owner answer Q86)
+         * @description Removes one override cell (a cell with a `region_id` or a `task_code`) and its holders; the row default of that level then applies again.
+         *     A row default cannot be deleted (422 `validation_failed`, path `/cell_id`, code `row_default`): change its holders with `PATCH /matrix`. Needs System Admin
+         *     or a delegation with `matrix.edit` (for the cell's region, or for all regions when the override has no region), step-up, a reason and `If-Match` (the matrix
+         *     revision). The reason is a query parameter because DELETE has no body here. Audited as `matrix_cell_delete` with the cell's before values and the reason.
+         *     Answers with the whole matrix, as `PATCH /matrix` does, and the new `ETag`.
+         */
+        delete: operations["deleteMatrixCell"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workflow/versions": {
@@ -3103,7 +3129,7 @@ export interface paths {
         put?: never;
         /**
          * Submit for review (Entry holder)
-         * @description Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+         * @description Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
          */
         post: operations["submitRegisterRecord"];
         delete?: never;
@@ -3128,7 +3154,7 @@ export interface paths {
         put?: never;
         /**
          * Review (level 2 holder); moves to approval, or finishes at a 2-level register
-         * @description Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+         * @description Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
          */
         post: operations["reviewRegisterRecord"];
         delete?: never;
@@ -3153,7 +3179,7 @@ export interface paths {
         put?: never;
         /**
          * Approve (final level)
-         * @description Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+         * @description Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
          */
         post: operations["approveRegisterRecord"];
         delete?: never;
@@ -3178,7 +3204,7 @@ export interface paths {
         put?: never;
         /**
          * Reject one level back with a note
-         * @description Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+         * @description Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
          */
         post: operations["rejectRegisterRecord"];
         delete?: never;
@@ -4897,7 +4923,9 @@ export interface components {
          */
         PermissionAction: "view" | "create" | "edit" | "delete" | "approve" | "export" | "import" | "download_documents" | "view_audit" | "administer" | "manage_users" | "view_security_log";
         /**
-         * @description Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2).
+         * @description Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2). Since 0.6.1 `entry` = L1 (Data Entry) and `approve` = L2
+         *     (Data Reviewer & Approver); `review` (the old middle level) is folded into `approve`: it is still accepted on input and is stored and returned
+         *     as `approve`. A person (or role or group) granted both levels is named at L1 and L2 of the same matrix row.
          * @enum {string}
          */
         PermissionLevel: "view" | "entry" | "review" | "approve" | "admin";
@@ -5853,14 +5881,19 @@ export interface components {
             stage_code: string;
             /** @description null = the row default; a task code = a holder override for that task. */
             task_code?: string | null;
-            /** @description 1 entry, 2 review, 3 approve, whatever the number of levels of the row. */
+            /** @description The cell level: 1 is L1 (Data Entry), 3 is L2 (Data Reviewer & Approver). 2 is the old middle level, kept only for tasks already in flight on a 3-level snapshot (`used` false). */
             level: number;
             /**
-             * @description 0.4.6.
+             * @description 0.4.6. entry = L1, approve = L2, review = the old middle cell.
              * @enum {string}
              */
             level_kind?: "entry" | "review" | "approve";
-            /** @description 0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight). */
+            /**
+             * @description 0.6.1. L1 for cell level 1, L2 for cells 2 and 3 (the middle cell is never in use).
+             * @enum {string}
+             */
+            level_code?: "L1" | "L2";
+            /** @description 0.4.6. False for the middle cell (level 2): it is kept for tasks already in flight on a 3-level snapshot. */
             used?: boolean;
             /** @description null = every region. */
             region_id?: components["schemas"]["RegionId"] | null;
@@ -5884,12 +5917,19 @@ export interface components {
             task_code?: string | null;
             user: components["schemas"]["UserRef"];
             /**
-             * @description The level the person acts at.
+             * @description The level the person acts at. Since 0.6.1 always `entry` (L1).
              * @enum {string}
              */
             from_level_kind: "entry" | "review";
-            /** @description The levels skipped after it, in order. Each skip is logged (B6). */
+            /**
+             * @description 0.6.1. Always L1.
+             * @enum {string}
+             */
+            from_level_code?: "L1";
+            /** @description The levels skipped after it, in order. Each skip is logged (B6). Since 0.6.1 always `[approve]` (L2). */
             skipped_level_kinds: ("review" | "approve")[];
+            /** @description 0.6.1. Always [L2], one per skipped level. */
+            skipped_level_codes?: "L2"[];
             /** @description True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log. */
             self_approval: boolean;
             /** @description Regions where this holds (only regions the caller can see). */
@@ -5897,7 +5937,7 @@ export interface components {
         };
         /** @description 0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`. */
         MatrixPreview: {
-            /** @description The row has one level: every submission by its Entry holders is a self-approval (B5). */
+            /** @description Always false since 0.6.1 (every row has two levels). A person who holds L1 and L2 is a self-approval case in `skips`. */
             single_level: boolean;
             skips: components["schemas"]["MatrixSkipCase"][];
         };
@@ -5929,9 +5969,13 @@ export interface components {
                 code: string;
                 name_en: string;
                 name_ar?: string | null;
-                approval_levels: number;
-                /** @description 0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3]. */
-                used_levels?: number[];
+                /**
+                 * @description Always 2 since 0.6.1: L1 Data Entry and L2 Data Reviewer & Approver.
+                 * @constant
+                 */
+                approval_levels: 2;
+                /** @description 0.4.6. Cell levels in use. Always [1, 3] since 0.6.1 (L1 = cell 1, L2 = cell 3). */
+                used_levels?: (1 | 3)[];
                 /** @description 0.4.6. Regions that have cells of their own in this row (visible regions only). */
                 region_ids_with_cells?: components["schemas"]["RegionId"][];
                 task_counts?: components["schemas"]["MatrixTaskCounts"];
@@ -5945,7 +5989,11 @@ export interface components {
             stage_levels?: {
                 /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
                 stage_code: string;
-                approval_levels: number;
+                /**
+                 * @description Fixed at 2 since 0.6.1 (owner decision 2026-11-01); saving 2 writes nothing, any other value is 422.
+                 * @constant
+                 */
+                approval_levels: 2;
             }[];
             cells?: {
                 /** @description A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6). */
@@ -7051,8 +7099,11 @@ export interface components {
             multiple_per_site?: boolean;
             /** @description For example pr, po, wo for procurement. */
             record_types?: string[];
-            /** @description From the register row of the Responsibility Matrix. */
-            approval_levels: number;
+            /**
+             * @description Always 2 since 0.6.1 (L1 Data Entry, L2 Data Reviewer & Approver), from the register row of the Responsibility Matrix.
+             * @constant
+             */
+            approval_levels: 2;
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
@@ -11355,6 +11406,41 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    deleteMatrixCell: {
+        parameters: {
+            query: {
+                reason: components["schemas"]["Reason"];
+            };
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description The id of a `MatrixCell` that has a region or a task. */
+                cell_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Matrix"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

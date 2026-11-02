@@ -15,7 +15,7 @@ import { SITE_COUNT, siteIdOf, siteIndex, siteMeta, TODAY } from './sites';
 const B = API_BASE;
 const R = () => db().reg;
 const defOf = (key: string): RegisterDefinition | undefined => REGISTER_DEFS.find((d) => d.register_key === key);
-const levelsOf = (key: string) => rowOf(db().matrix, key)?.approval_levels ?? 3;
+const levelsOf = (key: string) => rowOf(db().matrix, key)?.approval_levels ?? 2;
 const tag = (r: MockRecord) => HttpResponse.json(toRecord(r), { headers: { ETag: `"${r.version}"` } });
 const ref = () => { const v = viewer()!; return { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? undefined }; };
 /** Position `level` (1 = entry) of a path of `n` levels: the last position is always matrix cell 3 (approve), so a 2-level path uses cells 1 and 3. */
@@ -186,7 +186,7 @@ export const registerHandlers = [
         while (next <= L && userHolds(key, next, v.employee_id, L)) next += 1;
         const skipped = Array.from({ length: next - 2 }, (_, i) => i + 2);
         if (next > L) { const e = finish(true); if (e) return e; } // the submitter holds every level they would reach: a self-approval (B5)
-        else { r.state = next === L && L >= 3 ? 'in_approval' : 'in_review'; r.current_level = next; }
+        else { r.state = next >= L ? 'in_approval' : 'in_review'; r.current_level = next; }  // the last position is L2 (approve)
         step(r, 'submit', 1, undefined, next > L);
         skipped.forEach((l) => step(r, 'auto_skip', l, `Level ${l} skipped: same person`));
         r.last_return_note = null;
@@ -199,7 +199,7 @@ export const registerHandlers = [
       } else {
         step(r, 'reject', r.current_level, body.note);
         r.return_count += 1; r.last_return_note = body.note!.trim();
-        if (r.state === 'in_approval') { r.state = 'in_review'; r.current_level = 2; } else { r.state = 'entry'; r.current_level = 1; }
+        if (r.state === 'in_approval' && L > 2) { r.state = 'in_review'; r.current_level = 2; } else { r.state = 'entry'; r.current_level = 1; }
       }
       r.claimed_by = undefined; touch(r); save();
       return tag(r);
@@ -282,7 +282,7 @@ export const registerHandlers = [
     if (Number(h.replace(/"/g, '')) !== b.version) return problem(412, 'precondition_failed', 'The batch changed; reload');
     if (b.status !== 'validated') return problem(409, 'invalid_transition', 'The batch is not waiting to be sent');
     if (!b.rows.some((r) => r.action !== 'error')) return problem(422, 'validation_failed', 'No valid rows', { errors: [{ path: '/rows', code: 'no_valid_rows' }] });
-    b.status = 'in_review'; b.current_level = 2; b.version += 1; save();
+    b.status = b.levels_required <= 2 ? 'in_approval' : 'in_review'; b.current_level = b.levels_required <= 2 ? b.levels_required : 2; b.version += 1; save(); // two levels: straight to L2
     return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
   }),
   http.post(`${B}/import-batches/:id/decisions`, async ({ params, request }) => {
@@ -309,7 +309,7 @@ export const registerHandlers = [
     else for (const x of body.rows ?? []) { const r = pending.find((p) => p.id === x.row_id); if (!r) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: `/rows/${x.row_id}`, code: 'invalid_row' }] }); r.decision = x.decision; }
     if (!valid.some((r) => r.decision === 'pending')) {
       const okRows = valid.filter((r) => r.decision === 'approved');
-      const last = b.levels_required <= 2 || approving;
+      const last = approving;
       if (!okRows.length) b.status = 'rejected';
       else if (!last) { b.status = 'in_approval'; b.current_level = b.levels_required; okRows.forEach((r) => { r.decision = 'pending'; }); }
       else {

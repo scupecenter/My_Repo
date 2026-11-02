@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.6.0
+  version: 0.6.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -29,6 +29,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.6.1 (2026-11-02): breaking only for the level count, which no client may set any more. Two fixed approval levels (owner decision 2026-11-01, CLAUDE.md "Two approval levels", migration 0032): **L1 = Data Entry** and **L2 = Data Reviewer & Approver**, for every stage, register and Dismantle; one person may hold both (a self-approval, B5). (1) `GET /matrix`: `approval_levels` is always 2 and `used_levels` is always `[1, 3]` (L1 is cell level 1, L2 is cell level 3; cell level 2 is a leftover kept only for tasks and records already submitted on a 3-level snapshot, `used = false`); `MatrixCell.level_code` (`L1` or `L2`); `MatrixSkipCase.from_level_code` and `skipped_level_codes`; `MatrixPreview.single_level` is always false. (2) `PATCH /matrix`: `stage_levels[].approval_levels` accepts only 2 (any other value is 422 `validation_failed`, path `/stage_levels/{i}/approval_levels`); saving 2 is a no-op that writes nothing. (3) `RegisterDefinition.approval_levels` and `TaskDefinition.approval_levels` are 2 (or null for a task); `levels_required` of a task or record is 2 for everything submitted since the migration and 1 to 3 only on an older snapshot (B7). (4) The permission level `review` is folded into `approve` (= L2): it is still accepted on input and is stored and returned as `approve`; `entry` is L1; naming one person at both L1 and L2 is how a person is granted both levels. `PATCH /matrix` `empty_cell` now lists only L1 and L2 cells. (5) New `DELETE /matrix/cells/{cell_id}` (owner answer Q86): deletes a region or task override cell (step-up, `If-Match`, `reason` query parameter, audited; a row default is refused with `row_default`); the row default applies again. (6) Default holders (owner answers Q85 and Q90, migration 0035): L1 = the owning team, L2 = the stream Team Lead (Contractors, Risks and Deliverables: the Project Manager; Procurement, GECOL, HLC and Permits & HSE: the Team Lead of CW, and TE for TE permits), seeded only where the cell is missing or empty, or still the untouched legacy seed.
     - 0.6.0 (2026-11-02): one-time enrolment code, so a password alone can never enrol a phone (owner decision 2026-11-02, ADR 0014 amendment). Not purely additive: `POST /auth/local/2fa/enrol/start` now needs a request body with `enrol_code`, and `POST /auth/local/2fa/enrol/confirm` needs `enrol_code` beside `code`. (1) `PUT /users/{user_id}/two-factor` (turning it on) and `POST /users/{user_id}/two-factor/reset` return a new one-time `enrol_code` (8 characters, shown as XXXX-XXXX) and `enrol_code_expires_at` in `TwoFactorState`, once; (2) new `POST /users/{user_id}/two-factor/enrol-code` issues a new code for a user who is waiting for enrolment (the old code stops working; reason, step-up, audited); (3) the enrolment calls need the code, a wrong code counts toward the same lock as a wrong TOTP code; (4) `User.two_factor_enrol_code_expires_at` (when the outstanding code ends, never the code); (5) error codes `invalid_enrol_code` and `enrol_code_expired`; (6) the setting `two_factor.enrol_code_hours` (default 72) is how long a code lasts.
     - 0.5.0 (2026-11-02): additive. Two-factor authentication (TOTP) for local accounts (owner decision 2026-11-02, ADR 0014). (1) `POST /auth/local/login` may answer 200 with `PendingSignIn` (`authenticated: false`, `next` = `two_factor` or `enrol`) and the cookie `pmis_2fa` (HttpOnly, SameSite=Strict, path `/api/v1/auth/local/2fa`, 5 minutes, single use) instead of a session; (2) `POST /auth/local/2fa` completes the sign-in with a TOTP code or one recovery code; (3) `POST /auth/local/2fa/enrol/start` and `/enrol/confirm` enrol a user whose two-factor is on and not set up yet (otpauth URI for the QR code, manual key, 10 one-time recovery codes shown once); (4) `POST /auth/local/2fa/recovery-codes` makes new recovery codes (needs a valid TOTP code); (5) `POST /auth/local/step-up` takes `code` or `recovery_code` when the user's two-factor is on, and `Problem.step_up_method` gains `password_totp`; (6) `PUT /users/{user_id}/two-factor` turns it on or off and `POST /users/{user_id}/two-factor/reset` resets it (System Admin or a delegate holding the new delegable right `users.two_factor`; reason and step-up; nobody changes their own); (7) `User.two_factor` (off, pending_enrolment, on), `Session.two_factor` (enabled and remaining recovery codes) and `Session.mfa` is true for a session that passed a code; error code `invalid_code`.
     - 0.4.10 (2026-11-02): additive. UI plan 4b (X1 to X7) and DD6. (1) Notification inbox (X1): `GET /notifications` gains `snoozed` (hide default, only, include) and `unread_count` counts only visible ones; `POST /notifications/{id}/unread`, `POST /notifications/{id}/snooze` (a date-time, a plain date, or null to clear); `Notification.snoozed_until`; more `NotificationKind` values (`mention`, `followed_change` and the kinds the database already wrote). (2) Follow (X2): `PUT/DELETE /sites/{site_id}/follow`, `PUT/DELETE /registers/{register_key}/records/{record_id}/follow`, `GET /me/follows`; followers get a `followed_change` notification when a task of the site or the record changes, only while they can still read it. (3) Mentions (X3): `@1234` employee-ID tokens in a comment body are resolved like `mention_user_ids`; a person who cannot read the record is neither notified nor named in the answer; `GET/POST /registers/{register_key}/records/{record_id}/comments`. (4) X4: `GET /tasks/{task_id}/time-in-state` and `GET /reports/time-in-state` (needs `reports` view). (5) X5: `GET /reports/workload` (needs `reports` view; reassignment stays `POST /tasks/reassign`). (6) X6: `GET /tasks/{task_id}/blocked-by`. (7) X7: `GET/POST /status-updates`, `PATCH /status-updates/{id}`. (8) DD6: optional `via` (`button`, `drag`, `bulk`) on `start`, `submit`, `review`, `approve`, `reject` of tasks and register records and on `POST /approvals/bulk` (default `bulk`); it is recorded in the audit row and changes no rule. Migration 0031.
@@ -2616,9 +2617,10 @@ paths:
       summary: Responsibility Matrix for a workflow version, with self-skip preview
       description: |
         One row per workflow stage (`kind` stage), one per register and one for Dismantle (decision B11; `kind` register or
-        dismantle, `code` is the register key). Each row has its Entry (cell level 1), Review (2) and Approve (3) cells and
-        its level count `approval_levels` (1 to 3); `used_levels` says which cells are in use (1 level = [1], 2 = [1, 3],
-        3 = [1, 2, 3]). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
+        dismantle, `code` is the register key). Every row has exactly two levels (owner decision 2026-11-01): L1 Data Entry
+        (cell level 1) and L2 Data Reviewer & Approver (cell level 3); `approval_levels` is always 2 and `used_levels` is always
+        [1, 3]. Cell level 2 is a leftover of the old 3-level model, kept only for tasks and records already submitted on a
+        3-level snapshot (`used = false`). A cell holds users, roles and groups, shown with names and employee IDs, and a rule (`any_one` or
         `all_members`). Without `region_id` the answer has the cells that apply to every region; with it, also the cells specific
         to that region (`region_ids_with_cells` lists the regions that have their own cells). Register and Dismantle rows are the same
         for every workflow version. Cells and counts are limited to the regions the caller can see (B3).
@@ -2652,9 +2654,10 @@ paths:
         cells). A role with `can_hold_matrix_levels = false`, an inactive user or group, and `all_members` on the Entry level are
         refused (422 `validation_failed` with the field path). Nothing is written when nothing changed. Every changed cell and
         level count is audited with before and after values and the reason.
-        The change applies to new transitions only (MX-04). A level-count change applies to tasks created later and to tasks not yet
+        The change applies to new transitions only (MX-04). Who holds a level applies to tasks created later and to tasks not yet
         submitted; a task that was already submitted keeps the level path it was frozen on at its first submission, also after a
-        rejection (decision B7). The answer shows both counts per stage in `task_counts`.
+        rejection (decision B7). The number of levels is fixed at 2: `stage_levels` accepts only 2 (anything else is 422).
+        The answer shows both counts per stage in `task_counts`.
       x-step-up: true
       x-db-path: matrix_save
       parameters:
@@ -2674,6 +2677,38 @@ paths:
               schema: { $ref: '#/components/schemas/Matrix' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+
+  /matrix/cells/{cell_id}:
+    delete:
+      tags: [matrix]
+      operationId: deleteMatrixCell
+      summary: Delete a region or task override cell of the Responsibility Matrix (0.6.1, owner answer Q86)
+      description: |
+        Removes one override cell (a cell with a `region_id` or a `task_code`) and its holders; the row default of that level then applies again.
+        A row default cannot be deleted (422 `validation_failed`, path `/cell_id`, code `row_default`): change its holders with `PATCH /matrix`. Needs System Admin
+        or a delegation with `matrix.edit` (for the cell's region, or for all regions when the override has no region), step-up, a reason and `If-Match` (the matrix
+        revision). The reason is a query parameter because DELETE has no body here. Audited as `matrix_cell_delete` with the cell's before values and the reason.
+        Answers with the whole matrix, as `PATCH /matrix` does, and the new `ETag`.
+      x-step-up: true
+      x-db-path: matrix_delete_cell
+      parameters:
+        - { name: cell_id, in: path, required: true, schema: { type: string, format: uuid }, description: 'The id of a `MatrixCell` that has a region or a task.' }
+        - { name: reason, in: query, required: true, schema: { $ref: '#/components/schemas/Reason' } }
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Deleted.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Matrix' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
@@ -4977,7 +5012,7 @@ paths:
       tags: [registers]
       operationId: submitRegisterRecord
       summary: Submit for review (Entry holder)
-      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      description: Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5008,7 +5043,7 @@ paths:
       tags: [registers]
       operationId: reviewRegisterRecord
       summary: Review (level 2 holder); moves to approval, or finishes at a 2-level register
-      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      description: Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5039,7 +5074,7 @@ paths:
       tags: [registers]
       operationId: approveRegisterRecord
       summary: Approve (final level)
-      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      description: Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
       x-step-up: true
       x-db-path: reg_transition_record
       parameters:
@@ -5071,7 +5106,7 @@ paths:
       tags: [registers]
       operationId: rejectRegisterRecord
       summary: Reject one level back with a note
-      description: Uses the register's own Matrix row (1 to 3 levels) and the same skip, rejection and claim rules as tasks (ADR 0004).
+      description: Uses the register's own Matrix row (two levels, L1 Data Entry and L2 Data Reviewer & Approver) and the same skip, rejection and claim rules as tasks (ADR 0004).
       x-db-path: reg_transition_record
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7979,7 +8014,10 @@ components:
     PermissionLevel:
       type: string
       enum: [view, entry, review, approve, admin]
-      description: Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2).
+      description: |
+        Ordered; each includes the lower ones. Decides matrix eligibility (ADR 0003 §2). Since 0.6.1 `entry` = L1 (Data Entry) and `approve` = L2
+        (Data Reviewer & Approver); `review` (the old middle level) is folded into `approve`: it is still accepted on input and is stored and returned
+        as `approve`. A person (or role or group) granted both levels is named at L1 and L2 of the same matrix row.
     DelegableRight:
       type: string
       description: Closed list for partial delegation (ADR 0003 §5).
@@ -8949,9 +8987,10 @@ components:
         id: { type: string, format: uuid }
         stage_code: { type: string, description: 'The row: a stage code, or the register key of a register or Dismantle row.' }
         task_code: { type: [string, 'null'], description: 'null = the row default; a task code = a holder override for that task.' }
-        level: { type: integer, minimum: 1, maximum: 3, description: '1 entry, 2 review, 3 approve, whatever the number of levels of the row.' }
-        level_kind: { type: string, enum: [entry, review, approve], description: '0.4.6.' }
-        used: { type: boolean, description: '0.4.6. False when the row has fewer levels than this cell needs (the cell is kept for tasks already in flight).' }
+        level: { type: integer, minimum: 1, maximum: 3, description: 'The cell level: 1 is L1 (Data Entry), 3 is L2 (Data Reviewer & Approver). 2 is the old middle level, kept only for tasks already in flight on a 3-level snapshot (`used` false).' }
+        level_kind: { type: string, enum: [entry, review, approve], description: '0.4.6. entry = L1, approve = L2, review = the old middle cell.' }
+        level_code: { type: string, enum: [L1, L2], description: '0.6.1. L1 for cell level 1, L2 for cells 2 and 3 (the middle cell is never in use).' }
+        used: { type: boolean, description: '0.4.6. False for the middle cell (level 2): it is kept for tasks already in flight on a 3-level snapshot.' }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }], description: 'null = every region.' }
         rule: { type: string, enum: [any_one, all_members], description: 'The Entry level is always any_one.' }
         assignees: { type: array, items: { $ref: '#/components/schemas/MatrixAssignee' } }
@@ -8967,8 +9006,10 @@ components:
       properties:
         task_code: { type: [string, 'null'], description: 'null = the row default; a task code = the override cells of that task.' }
         user: { $ref: '#/components/schemas/UserRef' }
-        from_level_kind: { type: string, enum: [entry, review], description: 'The level the person acts at.' }
-        skipped_level_kinds: { type: array, items: { type: string, enum: [review, approve] }, description: 'The levels skipped after it, in order. Each skip is logged (B6).' }
+        from_level_kind: { type: string, enum: [entry, review], description: 'The level the person acts at. Since 0.6.1 always `entry` (L1).' }
+        from_level_code: { type: string, enum: [L1], description: '0.6.1. Always L1.' }
+        skipped_level_kinds: { type: array, items: { type: string, enum: [review, approve] }, description: 'The levels skipped after it, in order. Each skip is logged (B6). Since 0.6.1 always `[approve]` (L2).' }
+        skipped_level_codes: { type: array, items: { type: string, enum: [L2] }, description: '0.6.1. Always [L2], one per skipped level.' }
         self_approval: { type: boolean, description: 'True when the last level is among them: the person finishes the task alone (B5). The final approval then needs step-up and is flagged in KPIs and the audit log.' }
         region_ids: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: 'Regions where this holds (only regions the caller can see).' }
     MatrixPreview:
@@ -8976,7 +9017,7 @@ components:
       description: '0.4.6. Self-skip and self-approval, shown in advance (B5, B6, MX-06). Computed with the engine rules: the people behind users, roles and groups; a level is skipped only when its rule is `any_one`.'
       required: [single_level, skips]
       properties:
-        single_level: { type: boolean, description: 'The row has one level: every submission by its Entry holders is a self-approval (B5).' }
+        single_level: { type: boolean, description: 'Always false since 0.6.1 (every row has two levels). A person who holds L1 and L2 is a self-approval case in `skips`.' }
         skips: { type: array, items: { $ref: '#/components/schemas/MatrixSkipCase' } }
     MatrixTaskCounts:
       type: object
@@ -9007,8 +9048,8 @@ components:
               code: { type: string }
               name_en: { type: string }
               name_ar: { type: [string, 'null'] }
-              approval_levels: { type: integer, minimum: 1, maximum: 3 }
-              used_levels: { type: array, items: { type: integer, minimum: 1, maximum: 3 }, description: '0.4.6. Cell levels in use: 1 level = [1], 2 = [1, 3], 3 = [1, 2, 3].' }
+              approval_levels: { type: integer, const: 2, description: 'Always 2 since 0.6.1: L1 Data Entry and L2 Data Reviewer & Approver.' }
+              used_levels: { type: array, items: { type: integer, enum: [1, 3] }, description: '0.4.6. Cell levels in use. Always [1, 3] since 0.6.1 (L1 = cell 1, L2 = cell 3).' }
               region_ids_with_cells: { type: array, items: { $ref: '#/components/schemas/RegionId' }, description: '0.4.6. Regions that have cells of their own in this row (visible regions only).' }
               task_counts: { $ref: '#/components/schemas/MatrixTaskCounts' }
               preview: { $ref: '#/components/schemas/MatrixPreview' }
@@ -9026,7 +9067,7 @@ components:
             required: [stage_code, approval_levels]
             properties:
               stage_code: { type: string, description: 'A stage code of the workflow version, or the code of a register or Dismantle row (0.4.6).' }
-              approval_levels: { type: integer, minimum: 1, maximum: 3 }
+              approval_levels: { type: integer, const: 2, description: 'Fixed at 2 since 0.6.1 (owner decision 2026-11-01); saving 2 writes nothing, any other value is 422.' }
         cells:
           type: array
           items:
@@ -10148,7 +10189,7 @@ components:
         site_scoped: { type: boolean, description: 'false = global rows (risks, meetings, project-wide change requests).' }
         multiple_per_site: { type: boolean }
         record_types: { type: array, items: { type: string }, description: 'For example pr, po, wo for procurement.' }
-        approval_levels: { type: integer, minimum: 1, maximum: 3, description: 'From the register row of the Responsibility Matrix.' }
+        approval_levels: { type: integer, const: 2, description: 'Always 2 since 0.6.1 (L1 Data Entry, L2 Data Reviewer & Approver), from the register row of the Responsibility Matrix.' }
         fields: { type: array, items: { $ref: '#/components/schemas/RegisterField' }, description: 'Base fields plus active custom fields visible to the caller.' }
         record_count: { type: integer }
     RegisterRecordState:

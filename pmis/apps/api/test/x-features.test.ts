@@ -547,21 +547,23 @@ describe('DD6 via', () => {
   });
 
   it('marks the bulk approval rows with bulk by default', async () => {
+    // two fixed levels (owner decision 2026-11-01): the bulk action of the L2 holder is the approval; the middle "pass" exists only for 3-level snapshots
     const e = await actor(app, db, { level: 'entry' });
-    const r = await actor(app, db, { level: 'review' });
+    const a = await actor(app, db, { level: 'approve' });
     const s = await site();
-    const tid = await makeTask(db, s, 'A1', 'in_review');
+    const tid = await makeTask(db, s, 'A1', 'in_approval', {
+      actualDate: '2026-01-05',
+    });
     await setCell(db, 'A1', REGION, 'entry', { user: [e.user.id] });
-    await setCell(db, 'A1', REGION, 'review', { user: [r.user.id] });
-    await setCell(db, 'A1', REGION, 'approve', { user: [r.user.id] });
-    const v = (await r.api.call('get', `/tasks/${tid}`)).body.version;
-    const res = await r.api.call('post', '/approvals/bulk', {
-      action: 'pass',
+    await setCell(db, 'A1', REGION, 'approve', { user: [a.user.id] });
+    const v = (await a.api.call('get', `/tasks/${tid}`)).body.version;
+    const res = await a.api.call('post', '/approvals/bulk', {
+      action: 'approve',
       items: [{ id: tid, version: v }],
     });
     expect(res.status).toBe(200);
     expect(res.body.done.map((d: { id: string }) => d.id)).toEqual([tid]);
-    const last = (await audits('task_review', tid)).at(-1);
+    const last = (await audits('task_approve', tid)).at(-1);
     expect(last?.after.via).toBe('bulk');
   });
 });
@@ -569,13 +571,12 @@ describe('DD6 via', () => {
 describe('X4 time in state', () => {
   async function submitted() {
     const e = await actor(app, db, { level: 'entry' });
-    const r = await actor(app, db, { level: 'review' });
+    const r = await actor(app, db, { level: 'approve' });
     const s = await site();
     const tid = await makeTask(db, s, 'A1', 'entry', {
       actualDate: '2026-01-05',
     });
     await setCell(db, 'A1', REGION, 'entry', { user: [e.user.id] });
-    await setCell(db, 'A1', REGION, 'review', { user: [r.user.id] });
     await setCell(db, 'A1', REGION, 'approve', { user: [r.user.id] });
     const v = (await e.api.call('get', `/tasks/${tid}`)).body.version;
     expect(
@@ -603,11 +604,13 @@ describe('X4 time in state', () => {
       'approve',
     ]);
     expect(res.body.current_state).not.toBeNull();
-    // a task made by a fixture has no audit row for the time before its first change, so the first counted visit is the review
-    const review = res.body.items[1];
-    expect(review.visits).toBe(1);
-    expect(res.body.segments[0]).toMatchObject({ state: 'review', ended_at: null });
-    expect(res.body.current_state).toBe('review');
+    // a task made by a fixture has no audit row for the time before its first change, so the first counted visit is L2 (state approve).
+    // Two levels: the submission goes straight to L2 and the task never visits the middle (review) state.
+    expect(res.body.items[1].visits).toBe(0);
+    const approve = res.body.items[2];
+    expect(approve.visits).toBe(1);
+    expect(res.body.segments[0]).toMatchObject({ state: 'approve', ended_at: null });
+    expect(res.body.current_state).toBe('approve');
     expect(
       (await r.api.call('get', `/tasks/${tid}/time-in-state`)).status,
     ).toBe(200);

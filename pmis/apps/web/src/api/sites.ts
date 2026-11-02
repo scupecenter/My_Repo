@@ -114,6 +114,19 @@ export function useAddComment(taskId: string) {
 }
 
 export const useMatrix = () => useQuery({ queryKey: ['matrix'], queryFn: async () => ({ ...(await api.get<Matrix>('/matrix')) }) });
+/** The matrix with the override cells of one region (and the task overrides): what the screen lists so an override can be deleted (Q86). */
+export const useMatrixOverrides = (regionId: number | null) => useQuery({
+  queryKey: ['matrix', 'overrides', regionId ?? 'tasks'],
+  queryFn: () => api.get<Matrix>('/matrix', { query: regionId ? { region_id: regionId } : undefined }),
+});
+/** Deletes a region or task override cell; the row default applies again (Q86). Step-up, If-Match (the matrix revision) and a reason. */
+export function useDeleteMatrixCell() {
+  const qc = useQueryClient();
+  return useMutation<Matrix, ApiError, { version: number; cellId: string; reason: string }>({
+    mutationFn: ({ version, cellId, reason }) => api.del(`/matrix/cells/${cellId}`, { version, query: { reason } }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['matrix'] }); void qc.invalidateQueries({ queryKey: ['site-tasks'] }); },
+  });
+}
 export const useRoles = () => useQuery({ queryKey: ['roles'], staleTime: 300_000, queryFn: () => api.get<{ items: Role[] }>('/roles').then((r) => r.items) });
 export const useGroups = () => useQuery({ queryKey: ['groups'], staleTime: 300_000, queryFn: () => api.get<Page<Group>>('/groups').then((r) => r.items) });
 export const usePicker = (q: string) => useQuery({ queryKey: ['picker', q], enabled: q.trim().length >= 2, queryFn: () => api.get<Page<UserPickerItem>>('/users/picker', { query: { q: q.trim() } }).then((r) => r.items) });

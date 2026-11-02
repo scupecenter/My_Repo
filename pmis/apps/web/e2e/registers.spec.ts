@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { login, withStepUp } from './helpers';
 
-// Registers: manual entry create -> submit -> review -> approve, and a Responsibility Matrix edit. EN/light and AR/dark (RTL, dark tokens).
+// Registers: manual entry create -> submit (L1) -> approve (L2), and a Responsibility Matrix edit. EN/light and AR/dark (RTL, dark tokens).
 const CASES = [
   { locale: 'en', theme: 'light', group: 'Registers', proc: 'Procurement', approved: 'Approved', matrix: 'Responsibility Matrix' },
   { locale: 'ar', theme: 'dark', group: 'السجلات', proc: 'المشتريات', approved: 'معتمد', matrix: 'مصفوفة المسؤوليات' },
@@ -16,7 +16,7 @@ for (const c of CASES) {
       if (c.theme === 'dark') await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     });
 
-    test('procurement record: create, submit, review, approve', async ({ page }) => {
+    test('procurement record: create, submit, approve (L1 then L2)', async ({ page }) => {
       await expect(page.getByTestId('sidebar')).toContainText(c.group);
       await page.getByTestId('nav-procurement').click();
       await expect(page.getByTestId('page-register-procurement')).toBeVisible();
@@ -30,9 +30,9 @@ for (const c of CASES) {
       await page.getByTestId('reg-field-order_status').fill('Open');
       await page.getByTestId('reg-field-pr_no').fill('PR-2026-E2E');
       await page.getByTestId('reg-submit').click();
-      await expect(page.getByTestId('register-drawer-body')).toHaveAttribute('data-state', 'in_review');
-      await page.getByTestId('reg-review').click();
+      // two fixed levels (owner decision 2026-11-01): the submission goes straight to L2, there is no middle review step
       await expect(page.getByTestId('register-drawer-body')).toHaveAttribute('data-state', 'in_approval');
+      await expect(page.getByTestId('reg-review')).toHaveCount(0);
       await page.getByTestId('reg-approve').click();
       await expect(page.getByTestId('register-drawer-body')).toHaveAttribute('data-state', 'approved');
       await expect(page.getByTestId('reg-state')).toHaveText(c.approved);
