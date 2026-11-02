@@ -23,20 +23,59 @@ const ref = () => { const v = viewer()!; return { id: uid(v.employee_id ?? '9999
 const userHolds = (key: string, level: number, emp?: string | null, n?: number) => holdersOf(db().matrix, key, level, n ?? levelsOf(key)).some((a) => a.kind === 'user' && a.employee_id === emp);
 /** The admin account acts at every level (as in the task mock); anyone else only where the matrix row names them. */
 const canAt = (key: string, level: number, n?: number) => { const v = viewer(); return !!v && (v.key === 'pm' || userHolds(key, level, v.employee_id, n)); };
+/** Migration 0042: a Procurement record of scope HLC is decided by the Matrix row of its scope (the HLC Fiber Team's), every other record by its register's row. */
+const SCOPE_ROWS: Record<string, Record<string, string>> = { procurement: { HLC: 'procurement_hlc' } };
+const rowKey = (key: string, data: Record<string, unknown>) => (typeof data.scope === 'string' && SCOPE_ROWS[key]?.[data.scope]) || key;
+const rk = (r: MockRecord) => rowKey(r.register_key, r.data);
+/** The scopes the viewer may enter (RegisterDefinition.entry_scopes): the scopes of the register row when they hold its L1, plus each scope whose row they hold. */
+function entryScopes(def: RegisterDefinition): string[] | undefined {
+  const rows = SCOPE_ROWS[def.register_key];
+  if (!rows) return undefined;
+  const all = def.fields.find((f) => f.code === 'scope')?.options?.map((o) => o.value) ?? [];
+  if (viewer()?.key === 'pm') return all;
+  return all.filter((s) => canAt(rows[s] ?? def.register_key, 1));
+}
+/** The approved scope-HLC order of a site, which an HLC record is linked to (derived fields, filled by the server). */
+const hlcPrOf = (site: number | null) => R().records.find((x) => x.register_key === 'procurement' && x.site_index === site && x.state === 'approved' && x.data.scope === 'HLC');
+function linkHlc(r: MockRecord) {
+  if (r.register_key !== 'hlc' || r.state !== 'entry') return;
+  const pr = hlcPrOf(r.site_index);
+  delete r.data.pr_no; delete r.data.hlc_approval_date; delete r.data.procurement_record_id;
+  if (pr) Object.assign(r.data, { procurement_record_id: pr.id, pr_no: pr.data.pr_no, ...(pr.data.hlc_approval_date ? { hlc_approval_date: pr.data.hlc_approval_date } : {}) });
+}
+/** Ordering issues that only warn the reviewer (Q96), as the server's reg_warnings. */
+function warningsOf(r: MockRecord): { path: string; code: string }[] {
+  const d = r.data as Record<string, string | undefined>, w: { path: string; code: string }[] = [];
+  if (r.register_key === 'hlc') {
+    const pr = hlcPrOf(r.site_index), ap = pr?.data.hlc_approval_date as string | undefined;
+    if (!pr) w.push({ path: '/data/pr_no', code: 'no_approved_hlc_pr' });
+    else if (!ap) w.push({ path: '/data/hlc_approval_date', code: 'hlc_not_approved' });
+    else {
+      if (d.link_received_date && d.link_received_date < ap) w.push({ path: '/data/link_received_date', code: 'before_hlc_approval' });
+      if (d.installation_date && d.installation_date < ap) w.push({ path: '/data/installation_date', code: 'before_hlc_approval' });
+    }
+    if (d.link_received_date && d.installation_date && d.installation_date < d.link_received_date) w.push({ path: '/data/installation_date', code: 'before_link_received' });
+    if (d.tx_link_tested_date && !d.installation_date) w.push({ path: '/data/installation_date', code: 'test_without_installation' });
+    if (d.in_service_date && !d.tx_link_tested_date) w.push({ path: '/data/tx_link_tested_date', code: 'in_service_without_test' });
+  } else if (r.register_key === 'procurement' && d.scope === 'HLC' && d.hlc_approval_date && d.pr_date && d.hlc_approval_date < d.pr_date) {
+    w.push({ path: '/data/hlc_approval_date', code: 'approval_before_pr' });
+  }
+  return w;
+}
 
 function ball(r: MockRecord): BallInCourt {
   const L = r.levels_required ?? levelsOf(r.register_key), level = r.state === 'entry' ? 1 : r.current_level;
-  const holders = holdersOf(db().matrix, r.register_key, level, L).map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h));
+  const holders = holdersOf(db().matrix, rk(r), level, L).map((h) => (h.employee_id ? { ...h, account_status: accountStatus(h.employee_id) } : h));
   return { level, level_kind: level === 1 ? 'entry' : level >= L ? 'approve' : 'review', holders, rule: 'any_one', ...(r.claimed_by ? { claimed_by: r.claimed_by } : {}) };
 }
 
 function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   const out: NonNullable<RegisterRecord['allowed_actions']> = [];
-  const L = r.levels_required ?? levelsOf(r.register_key);
-  if (r.state === 'entry' && canAt(r.register_key, 1, L)) out.push('edit', 'submit');
-  if (r.state === 'in_review' && canAt(r.register_key, r.current_level, L)) out.push('review', 'reject');
-  if (r.state === 'in_approval' && canAt(r.register_key, L, L)) out.push('approve', 'reject');
-  if (r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r) && canAt(r.register_key, 1, L)) out.push('new_version');
+  const L = r.levels_required ?? levelsOf(r.register_key), row = rk(r);
+  if (r.state === 'entry' && canAt(row, 1, L)) out.push('edit', 'submit');
+  if (r.state === 'in_review' && canAt(row, r.current_level, L)) out.push('review', 'reject');
+  if (r.state === 'in_approval' && canAt(row, L, L)) out.push('approve', 'reject');
+  if (r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r) && canAt(row, 1, L)) out.push('new_version');
   if (r.state !== 'voided' && viewer()?.key === 'pm') out.push('void');
   return out;
 }
@@ -54,6 +93,7 @@ export function toRecord(r: MockRecord): RegisterRecord {
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
     entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: r.source ?? 'manual', ...(r.task ? { task: r.task } : {}),
+    warnings: warningsOf(r),
   };
 }
 
@@ -86,7 +126,10 @@ export const registerHandlers = [
   http.get(`${B}/registers`, () => {
     const g = guard(); if (g) return g;
     const nav = viewer()!.nav;
-    return HttpResponse.json({ items: REGISTER_DEFS.filter((d) => nav.includes(d.module_key)).map((d) => ({ ...d, approval_levels: levelsOf(d.register_key), record_count: R().records.filter((r) => r.register_key === d.register_key).length })) });
+    return HttpResponse.json({ items: REGISTER_DEFS.filter((d) => nav.includes(d.module_key)).map((d) => {
+      const scopes = entryScopes(d);
+      return { ...d, approval_levels: levelsOf(d.register_key), record_count: R().records.filter((r) => r.register_key === d.register_key).length, ...(scopes ? { entry_scopes: scopes } : {}) };
+    }) });
   }),
 
   http.get(`${B}/registers/:key/records`, ({ params, request }) => {
@@ -110,7 +153,9 @@ export const registerHandlers = [
     const b = (await request.json()) as { site_id?: string; record_type?: string; data?: Record<string, unknown> };
     const si = b.site_id ? siteIndex(b.site_id) : null;
     if (def.site_scoped && (si === null || si < 0 || si >= SITE_COUNT)) return invalid([{ path: '/site_id', code: b.site_id ? 'site_not_found' : 'site_required' }]);
-    if (!viewer() || !(viewer()!.key === 'pm' || userHolds(def.register_key, 1, viewer()!.employee_id))) return problem(403, 'forbidden', 'Not allowed');
+    // the entry holders of the record's row: the row of its scope (0042), as the database decides
+    if (!viewer() || !(viewer()!.key === 'pm' || userHolds(rowKey(def.register_key, b.data ?? {}), 1, viewer()!.employee_id))) return problem(403, 'not_eligible_holder', 'You are not an entry holder (L1) of this row of the Matrix');
+    if (def.register_key === 'procurement' && b.data?.scope === 'GECOL') return invalid([{ path: '/data/scope', code: 'wrong_register' }]);
     if (def.register_key === 'dismantle') {
       if (!b.record_type) return invalid([{ path: '/record_type', code: 'required' }]);
       const errs = dismantleErrors(visibleData(def, b.data ?? {})); if (errs.length) return invalid(errs);
@@ -126,6 +171,7 @@ export const registerHandlers = [
     const id = recId(++R().seq);
     const r: MockRecord = { id, entity_id: id, version_no: 1, register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
     step(r, 'create', 1);
+    linkHlc(r);
     R().records.unshift(r); save();
     return HttpResponse.json(toRecord(r), { status: 201, headers: { ETag: `"${r.version}"` } });
   }),
@@ -147,7 +193,13 @@ export const registerHandlers = [
     for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
     const next = visibleData(def, merged);
     if (def.register_key === 'dismantle') { const errs = dismantleErrors(next); if (errs.length) return invalid(errs); }
+    if (rowKey(def.register_key, next) !== rk(r) && viewer()?.key !== 'pm' && !userHolds(rowKey(def.register_key, next), 1, viewer()?.employee_id)) {
+      return problem(403, 'not_eligible_holder', 'This scope is entered by another team (its own row of the Matrix)');
+    }
+    // the legacy request fields of an HLC record entered before 0042 are kept as they are (readable, never typed)
+    for (const k of ['request_no', 'request_date']) if (r.data[k] !== undefined && !(k in next)) next[k] = r.data[k];
     r.data = next;
+    linkHlc(r);
     if (b.data && !hasExpiry(r.data)) delete r.data.valid_to;
     step(r, 'edit', 1);
     touch(r); save();
@@ -235,13 +287,14 @@ export const registerHandlers = [
     const r = R().records.find((x) => x.id === params.id && x.register_key === params.key), def = defOf(params.key as string);
     if (!r || !def) return problem(404, 'not_found', 'Record not found');
     const bad = noMatch(request, r); if (bad) return bad;
-    if (!canAt(r.register_key, 1, r.levels_required ?? levelsOf(r.register_key))) return problem(403, 'not_eligible_holder', 'You do not hold this level');
+    if (!canAt(rk(r), 1, r.levels_required ?? levelsOf(r.register_key))) return problem(403, 'not_eligible_holder', 'You do not hold this level');
     if (r.state !== 'approved' || !isCurrent(r) || hasOpenVersion(r)) return problem(409, 'invalid_transition', 'Only an approved record without an open version can get a new version');
     const now = new Date().toISOString(), id = recId(++R().seq);
     const ro = new Set(def.fields.filter((f) => f.read_only).map((f) => f.code));
     const v: MockRecord = { ...r, id, version_no: r.version_no + 1, supersedes_id: r.id, state: 'entry', current_level: 1, levels_required: levelsOf(r.register_key), version: 1, return_count: 0, last_return_note: null, task: null,
       data: Object.fromEntries(Object.entries(r.data).filter(([c]) => !ro.has(c))), created_at: now, updated_at: now, created_by: viewer()!.employee_id ?? '9999', steps: [], claimed_by: undefined };
     step(v, 'new_version', 1);
+    linkHlc(v);
     R().records.unshift(v); save();
     return HttpResponse.json(toRecord(v), { status: 201, headers: { ETag: `"${v.version}"` } });
   }),

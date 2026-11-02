@@ -14,9 +14,11 @@ export const PERMIT_TYPES = ['City Council Permit', 'Civil Aviation Authority Pe
 const procurement: RegisterDefinition = {
   register_key: 'procurement', name_en: 'Procurement (PR / PO / WO)', name_ar: 'المشتريات (PR / PO / WO)', module_key: 'procurement', site_scoped: true, multiple_per_site: true, record_types: ['pr', 'po', 'wo'], approval_levels: 2,
   fields: [
-    F('scope', 'Scope', 'النطاق', 'list', 'Site and scope', { required: true, in_list: true, options: ['CW', 'Tower Erection', 'Site Adaption', 'TE Installation', 'CW Dismantle', 'TE Dismantle', 'STA', 'ST'] }),
+    F('scope', 'Scope', 'النطاق', 'list', 'Site and scope', { required: true, in_list: true, options: ['CW', 'Tower Erection', 'Site Adaption', 'TE Installation', 'CW Dismantle', 'TE Dismantle', 'STA', 'ST', 'HLC'] }),
     F('delivery', 'Delivery', 'طريقة التنفيذ', 'list', 'Site and scope', { in_list: true, options: ['Outsourced', 'In-House', 'TE Vendor'] }),
     F('pr_no', 'PR No.', 'رقم طلب الشراء', 'text', 'Request', { in_list: true }), F('pr_date', 'PR Date', 'تاريخ طلب الشراء', 'date', 'Request', { in_list: true }),
+    // migration 0042: the HLC approval date of a scope-HLC request (the HLC purchase request lives here, entered by the HLC Fiber Team)
+    F('hlc_approval_date', 'HLC Approval Date', 'تاريخ موافقة HLC', 'date', 'Request', { in_list: true }),
     F('po_wo_no', 'PO / WO No.', 'رقم أمر الشراء / العمل', 'text', 'Order', { in_list: true }), F('po_wo_date', 'PO / WO Date', 'تاريخ أمر الشراء / العمل', 'date', 'Order', { in_list: true }),
     F('team_id', 'Team', 'الفريق', 'text', 'Assignment'),
     F('order_status', 'Order Status', 'حالة الطلب', 'list', 'Status and remark', { required: true, in_list: true }),
@@ -37,13 +39,18 @@ const gecol: RegisterDefinition = {
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
+// migration 0042: execution only, linked to the approved scope-HLC Procurement record (pr_no, hlc_approval_date, procurement_record_id are filled by the server)
 const hlc: RegisterDefinition = {
   register_key: 'hlc', name_en: 'HLC fiber', name_ar: 'ألياف HLC', module_key: 'hlc', site_scoped: true, multiple_per_site: false, approval_levels: 2,
   fields: [
-    F('request_no', 'HLC Request No.', 'رقم طلب HLC', 'text', 'Request', { required: true, in_list: true }), F('request_date', 'Request Date', 'تاريخ الطلب', 'date', 'Request', { required: true, in_list: true }),
-    F('fiber_uplink', 'Fiber Uplink (Exchange / Post)', 'وصلة الألياف (مقسم / عمود)', 'text', 'Request'),
+    F('pr_no', 'HLC PR No.', 'رقم طلب شراء HLC', 'text', 'Purchase request', { in_list: true, read_only: true }),
+    F('hlc_approval_date', 'HLC Approval Date', 'تاريخ موافقة HLC', 'date', 'Purchase request', { read_only: true }),
+    F('procurement_record_id', 'Procurement record', 'سجل المشتريات', 'text', 'Purchase request', { read_only: true }),
+    F('fiber_uplink', 'Fiber Uplink (Exchange / Post)', 'وصلة الألياف (مقسم / عمود)', 'text', 'Status and team'),
     F('fiber_status', 'Fiber Status', 'حالة الألياف', 'list', 'Status and team', { in_list: true }), F('internal_fiber_team', 'Internal Fiber Team', 'فريق الألياف الداخلي', 'text', 'Status and team'),
+    F('link_received_date', 'Link Received (handover from HLC)', 'استلام الوصلة (تسليم من HLC)', 'date', 'Installation and test', { in_list: true }),
     F('installation_date', 'Installation Date', 'تاريخ التركيب', 'date', 'Installation and test', { in_list: true }), F('tx_link_tested_date', 'TX Link Tested Date', 'تاريخ فحص وصلة TX', 'date', 'Installation and test', { in_list: true }),
+    F('in_service_date', 'In Service (operation)', 'دخول الخدمة (التشغيل)', 'date', 'In service', { in_list: true }),
     F('remark', 'Remark', 'ملاحظات', 'text', 'Remark'),
   ],
 };
@@ -141,13 +148,16 @@ export function initRegisters() {
     rec('procurement', 'pr', 3, 'in_approval', { scope: 'Tower Erection', delivery: 'Outsourced', pr_no: 'PR-2026-019', pr_date: '2026-09-18', order_status: 'Open' }),
     rec('gecol', null, 0, 'approved', { pr_no: 'GPR-2026-002', request_date: '2026-08-10', survey_date: '2026-08-20', notice_date: '2026-09-01', installation_finish: '2026-09-25', meter_no: 'M-77120', power_on_date: '2026-10-02' }, { task: { id: task(0, 13), task_code: 'C2' } }),
     rec('gecol', null, 4, 'entry', { pr_no: 'GPR-2026-009', request_date: '2026-10-01', survey_date: '2026-10-01', notice_date: '2026-10-08' }),
-    rec('hlc', null, 1, 'in_review', { request_no: 'HLC-2026-044', request_date: '2026-09-10', fiber_uplink: 'Exchange Ain Zara', fiber_status: 'In Progress', internal_fiber_team: 'HLC Team 1', installation_date: '2026-10-05' }),
+    rec('hlc', null, 1, 'in_review', { pr_no: 'HPR-2026-044', hlc_approval_date: '2026-09-14', procurement_record_id: recId(14), fiber_uplink: 'Exchange Ain Zara', fiber_status: 'In Progress', internal_fiber_team: 'HLC Team 1', link_received_date: '2026-09-28', installation_date: '2026-10-05' }),
+    // entered before migration 0042: the old request fields stay readable (legacy), the request is not yet in Procurement
     rec('hlc', null, 5, 'approved', { request_no: 'HLC-2026-031', request_date: '2026-08-14', fiber_status: 'Installed', installation_date: '2026-09-02', tx_link_tested_date: '2026-09-09' }),
     rec('permits_hse', null, 0, 'approved', { permit_type: 'Access - CW', applied_date: '2026-09-01', status: 'Approved', valid_from: '2026-09-10', has_expiry: true, valid_to: '2027-03-10' }),
     rec('permits_hse', null, 2, 'entry', { permit_type: 'PTW - CW', applied_date: '2026-10-10', status: 'Applied', has_expiry: true, jsa_tra: 'Done', stop_work: false }),
     rec('permits_hse', null, 3, 'approved', { permit_type: 'Civil Aviation Authority Permit', applied_date: '2026-08-01', status: 'Approved', valid_from: '2026-08-15', has_expiry: false }),
     rec('dismantle', 'cw', 0, 'approved', { rfd_date: '2026-09-15', dismantle_reason: 'Swap', work_start_date: '2026-09-20', work_end_date: '2026-09-24', closing_rn_ref: 'RN-2026-0042', closed: true }),
     rec('dismantle', 'te', 1, 'entry', { rfd_date: '2026-10-05', dismantle_reason: 'Relocation' }),
+    // migration 0042: the HLC purchase request of site 1, entered by the HLC Fiber Team in Procurement; it closed C3 on the HLC approval date
+    rec('procurement', 'pr', 1, 'approved', { scope: 'HLC', delivery: 'Outsourced', pr_no: 'HPR-2026-044', pr_date: '2026-09-10', hlc_approval_date: '2026-09-14', order_status: 'Open' }, { task: { id: task(1, 14), task_code: 'C3' } }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

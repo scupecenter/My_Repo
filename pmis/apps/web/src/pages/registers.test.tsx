@@ -33,7 +33,7 @@ describe('Register list', () => {
     expect(screen.getByTestId(`reg-state-${recId(1)}`)).toHaveTextContent('Approved');
     expect(screen.getByTestId(`reg-state-${recId(2)}`)).toHaveTextContent('In review');
     expect(screen.getByTestId('register-export')).toBeInTheDocument();
-    expect(screen.getByTestId('register-owner-note')).toHaveTextContent(/GECOL team and the HLC team/);
+    expect(screen.getByTestId('register-owner-note')).toHaveTextContent(/HLC Fiber Team enters the HLC purchase requests here/);
     const u = userEvent.setup();
     await u.selectOptions(screen.getByTestId('register-filter-state'), 'entry');
     await waitFor(() => expect(screen.getByTestId('register-count')).toHaveTextContent('1'));
@@ -169,17 +169,21 @@ describe('GECOL and HLC ownership (Q56, Q55)', () => {
     await waitFor(() => expect(screen.getByTestId('toast')).toHaveTextContent(/already has a row/));
   });
 
-  it('counts the HLC request as a purchase request and checks the chronology', async () => {
+  it('holds the HLC execution only (the request is in Procurement) and blocks the two date rules', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('hlc'));
     const u = userEvent.setup();
-    expect(await screen.findByTestId('register-owner-note')).toHaveTextContent(/counts as a purchase request/);
+    expect(await screen.findByTestId('register-owner-note')).toHaveTextContent(/HLC purchase request is entered in Procurement/);
     await u.click(screen.getByTestId('register-new'));
     await chooseSite(u, 'WM103');
+    expect(screen.queryByTestId('reg-field-request_no')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('reg-field-procurement_record_id')).not.toBeInTheDocument();
     await u.type(screen.getByTestId('reg-field-installation_date'), '2026-10-10');
     await u.type(screen.getByTestId('reg-field-tx_link_tested_date'), '2026-10-01');
+    await u.type(screen.getByTestId('reg-field-in_service_date'), '2026-09-30');
     await u.click(screen.getByTestId('reg-submit'));
     expect(await screen.findByTestId('reg-error-tx_link_tested_date')).toHaveTextContent(/cannot be earlier than Installation Date/);
+    expect(screen.getByTestId('reg-error-in_service_date')).toHaveTextContent(/cannot be earlier than TX Link Tested Date/);
   });
 });
 

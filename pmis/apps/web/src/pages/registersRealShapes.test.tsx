@@ -164,7 +164,10 @@ describe('register forms follow the real field definitions', () => {
     expect(codes('procurement', { scope: 'CW', order_status: 'Open', delivery: 'In-House', pr_no: 'P' })).toContain('pr_no');
     expect(codes('procurement', { scope: 'CW', order_status: 'Open', delivery: 'Outsourced', po_wo_no: 'PO' })).toContain('pr_no');
     expect(codes('gecol', { pr_no: 'G', request_date: '2026-09-10', installation_finish: '2026-09-01' })).toContain('installation_finish');
-    expect(codes('hlc', { request_no: 'H', request_date: '2026-09-10', installation_date: '2026-09-20', tx_link_tested_date: '2026-09-10' })).toContain('tx_link_tested_date');
+    expect(codes('hlc', { installation_date: '2026-09-20', tx_link_tested_date: '2026-09-10' })).toContain('tx_link_tested_date');
+    expect(codes('hlc', { tx_link_tested_date: '2026-09-10', in_service_date: '2026-09-09' })).toEqual(['in_service_date']);    // 0042: operation not before the test
+    expect(codes('hlc', { link_received_date: '2026-09-20', installation_date: '2026-09-10' })).toEqual([]);                   // any other order only warns (Q96)
+    expect(codes('procurement', { scope: 'HLC', order_status: 'Open' })).toEqual(expect.arrayContaining(['pr_no', 'pr_date']));   // 0042: an HLC request needs its PR
     expect(codes('permits_hse', { permit_type: 'Access - CW', status: 'Approved' })).toEqual(expect.arrayContaining(['valid_from', 'valid_to']));
     expect(codes('permits_hse', { permit_type: 'Access - CW', status: 'Applied' })).toEqual([]);
     expect(codes('gecol', { pr_no: 'G', request_date: '2026-12-31' })).toContain('request_date');   // an actual date in the future

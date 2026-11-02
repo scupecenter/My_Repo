@@ -1453,7 +1453,9 @@
     "reason": "Reason",
     "supervision_and_work": "Supervision and work",
     "close": "Close",
-    "details": "Details"
+    "details": "Details",
+    "purchase_request": "Purchase request",
+    "in_service": "In service"
   },
   "registers": {
     "new": "New record",
@@ -1484,14 +1486,23 @@
     "template_download": "Download template",
     "template_upload": "Upload filled template",
     "soon_body": "This register is coming in a later phase.",
-    "owner_procurement": "Procurement enters the purchase requests for civil works here. The GECOL team and the HLC team enter their own requests in their registers.",
+    "owner_procurement": "Procurement enters the purchase requests here. The HLC Fiber Team enters the HLC purchase requests here too (scope HLC). The GECOL team enters its request in the GECOL register.",
     "owner_gecol": "The GECOL team enters its own purchase request and the power steps here, one row per site.",
-    "owner_hlc": "The HLC team enters its own request here, one row per site. The request counts as a purchase request.",
+    "owner_hlc": "The HLC Fiber Team enters the fiber execution here, one row per site: link received, installation, TX link test and in service. The HLC purchase request is entered in Procurement (scope HLC).",
     "owner_permits": "One record per permit, renewals included. Choose whether the permit has an expiry date.",
     "owner_dismantle": "One record per site for each part, CW or TE. Enter the RFD first; a part closes only with the reference of its signed RN.",
     "template_prefill": "Download pre-filled template",
     "template_batches": "Uploads of this register",
-    "comments_global": "A record that covers all regions has no comment thread yet."
+    "comments_global": "A record that covers all regions has no comment thread yet.",
+    "hlc_pr_title": "HLC purchase request",
+    "hlc_pr_link": "Open the purchase request {{pr}} in Procurement",
+    "hlc_pr_approved": "HLC approval: {{date}}",
+    "hlc_pr_not_approved": "HLC has not approved it yet.",
+    "hlc_pr_missing": "No approved HLC purchase request in Procurement for this site yet.",
+    "hlc_legacy_title": "Request entered before the move to Procurement",
+    "hlc_legacy_body": "Request {{no}} of {{date}}. Read only: the HLC purchase request is now entered in Procurement (scope HLC).",
+    "warnings_title": "For the reviewer (not blocking)",
+    "scope_hlc_only": "You may enter scope HLC only (HLC Fiber Team)."
   },
   "regErrors": {
     "required": "{{field}} is required.",
@@ -1552,7 +1563,12 @@
     "row_failed": "The row could not be read.",
     "invalid_row": "This row is not open for a decision.",
     "invalid_transition": "The record is not at the level for this action.",
-    "not_eligible_holder": "You do not hold the level this row is at."
+    "not_eligible_holder": "You do not hold the level this row is at.",
+    "wrong_register": "Enter this request in its own register.",
+    "hlc_scope_only": "The HLC approval date belongs to scope HLC only.",
+    "before_installation": "The TX link test cannot be before the installation date.",
+    "before_test": "The in-service date cannot be before the TX link test.",
+    "scope_conflict": "The site scope says N/A for this register."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -2314,5 +2330,14 @@
         "immutable": "The code never changes."
       }
     }
+  },
+  "regWarnings": {
+    "no_approved_hlc_pr": "The site has no approved HLC purchase request in Procurement yet.",
+    "hlc_not_approved": "The HLC purchase request has no HLC approval date yet.",
+    "before_hlc_approval": "{{field}} is before the HLC approval date.",
+    "before_link_received": "The installation is before the link was received from HLC.",
+    "test_without_installation": "A TX link test without an installation date.",
+    "in_service_without_test": "In service without a TX link test date.",
+    "approval_before_pr": "The HLC approval date is before the PR date."
   }
 }

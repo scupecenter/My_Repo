@@ -38,10 +38,11 @@ interface Cell { id: string; level: number; level_kind: string; used: boolean; r
 interface Row { kind: string; code: string; register_key: string | null; approval_levels: number; used_levels: number[]; region_ids_with_cells: number[]; cells: Cell[]; task_counts?: { not_submitted: number; in_flight: number }; preview: { single_level: boolean; skips: { user: { id: string }; from_level_kind: string; skipped_level_kinds: string[]; self_approval: boolean; region_ids: number[]; task_code: string | null }[] } }
 interface MatrixBody { workflow_version: number; version: number; stages: Row[] }
 
-const REGISTER_CODES = ['procurement', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control',
+const REGISTER_CODES = ['procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control',
   'readiness_handover', 'as_built', 'meetings', 'deliverables'];
-/** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders. */
-const BUILT = ['procurement', 'gecol', 'hlc', 'permits_hse'];
+/** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders.
+ *  procurement_hlc: the Matrix row of the Procurement scope HLC (migration 0042, owner decision 2026-11-02), seeded on two levels from the start. */
+const BUILT = ['procurement', 'procurement_hlc', 'gecol', 'hlc', 'permits_hse'];
 const NOT_BUILT = [...REGISTER_CODES.filter((c) => !BUILT.includes(c)), 'dismantle'];
 
 const getMatrix = (api: Api, qs = '') => api.call('get', `/matrix${qs}`);
@@ -77,7 +78,7 @@ describe('GET /matrix', () => {
     expect(codes.slice(0, 10)).toEqual(['MS1', 'MS2', 'MS3', 'MS4', 'MS5', 'MS6', 'MS7', 'MS8', 'MS9', 'MS10']);
     expect(codes.slice(10)).toEqual([...REGISTER_CODES, 'dismantle']);
     expect(m.stages.slice(0, 10).every((r) => r.kind === 'stage' && r.register_key === null)).toBe(true);
-    expect(m.stages.slice(10, 26).every((r) => r.kind === 'register' && r.register_key === r.code)).toBe(true);
+    expect(m.stages.slice(10, 10 + REGISTER_CODES.length).every((r) => r.kind === 'register' && r.register_key === r.code)).toBe(true);
     expect(rowOf(m, 'dismantle')).toMatchObject({ kind: 'dismantle', register_key: 'dismantle' });
 
     for (const r of m.stages) {
@@ -119,7 +120,7 @@ describe('GET /matrix', () => {
   it('shows the four registers of migration 0019 with the defaults of Q56 and Q90 (migration 0035): entry cells for Procurement, GECOL and HLC, L2 = the Team Lead', async () => {
     const { api } = await adminApi(app, db);
     const m = (await getMatrix(api)).body as MatrixBody;
-    for (const [code, role] of [['procurement', 'Project Procurement Team'], ['gecol', 'GECOL Power Team'], ['hlc', 'HLC Fiber Team']] as const) {
+    for (const [code, role] of [['procurement', 'Project Procurement Team'], ['procurement_hlc', 'HLC Fiber Team'], ['gecol', 'GECOL Power Team'], ['hlc', 'HLC Fiber Team']] as const) {
       expect(cellOf(m, code, 1).assignees.map((a) => a.label), code).toEqual([role]);
       expect(cellOf(m, code, 2), code).toBeUndefined(); // no middle cell: they were never on three levels
       expect(cellOf(m, code, 3).assignees.map((a) => a.label), code).toEqual(['CW Team Lead']); // Q90
@@ -861,7 +862,7 @@ describe('the seed of the register rows', () => {
       await calc.query(seed);
 
       const rows = await calc.query(`SELECT count(*)::int AS n FROM register_definitions WHERE register_key = ANY($1::text[])`, [[...REGISTER_CODES, 'dismantle']]);
-      expect(rows.rows[0].n).toBe(17);
+      expect(rows.rows[0].n).toBe(18);
       const back = await calc.query(`SELECT count(*)::int AS n FROM matrix_cells c JOIN matrix_cell_assignees a ON a.cell_id = c.id WHERE c.register_key = 'deliverables'`);
       expect(back.rows[0].n).toBeGreaterThanOrEqual(3);
       const kept = await calc.query(`SELECT (SELECT count(*)::int FROM matrix_cell_assignees a JOIN matrix_cells c ON c.id = a.cell_id WHERE c.register_key = 'warehouse' AND c.level = 1) AS emptied,
@@ -875,7 +876,7 @@ describe('the seed of the register rows', () => {
       const n1 = (await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n;
       await calc.query(seed);
       expect((await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n).toBe(n1);
-      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(17);
+      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(18);
     } finally {
       await calc.end();
     }

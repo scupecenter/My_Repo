@@ -65,7 +65,9 @@ export const patch = (api: Api, key: string, id: string, version: number, body: 
 
 export const PROC = { scope: 'CW', delivery: 'Outsourced', pr_no: 'PR-1001', pr_date: '2026-01-05', order_status: 'Open' };
 export const GECOL = { pr_no: 'GP-1', request_date: '2026-01-05' };
-export const HLC = { request_no: 'HR-1', request_date: '2026-01-05' };
+/** Migration 0042: the HLC register holds execution only (the request is a Procurement record of scope HLC, HLC_PR). */
+export const HLC = { link_received_date: '2026-01-05', fiber_status: 'Exchange' };
+export const HLC_PR = { scope: 'HLC', delivery: 'Outsourced', pr_no: 'HPR-1', pr_date: '2026-01-05', hlc_approval_date: '2026-01-12', order_status: 'Open' };
 export const PERMIT_CW = { permit_type: 'Access - CW', status: 'Approved', valid_from: '2025-12-01', valid_to: '2034-12-31' };
 
 /** Creates a record as the team's entry holder and returns its body. */

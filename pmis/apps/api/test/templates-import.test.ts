@@ -190,8 +190,14 @@ describe('upload: rejections are logged and make no batch', () => {
     // the headers are right but the _tpl checksum was edited
     const forged = await fillTemplate(dl.buffer, [], { edit: (wb) => { wb.getWorksheet('_tpl')!.getRow(6).getCell(2).value = 'f'.repeat(64); } });
     expect((await uploadFile(t.entry.api, forged)).body).toMatchObject({ reason: 'checksum_mismatch' });
-    // a _tpl that names another template: the headers do not match it, and the selected template is checked first
-    const other = await fillTemplate(dl.buffer, [], { edit: (wb) => { wb.getWorksheet('_tpl')!.getRow(1).getCell(2).value = 'TPL-HLC'; } });
+    // a _tpl that names another template (with that template's current version): the headers do not match it, and the selected template is checked first
+    const hlcVersion = (await t.entry.api.call('get', '/templates')).body.items.find((i: { template_id: string }) => i.template_id === 'TPL-HLC')?.current_version
+      ?? (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-HLC'`))[0]!.v;
+    const other = await fillTemplate(dl.buffer, [], { edit: (wb) => {
+      const s = wb.getWorksheet('_tpl')!;
+      s.getRow(1).getCell(2).value = 'TPL-HLC';
+      s.eachRow((r) => { if (String(r.getCell(1).value) === 'version') r.getCell(2).value = hlcVersion; });
+    } });
     res = await uploadFile(t.entry.api, other, 'x.xlsx', { template_id: 'TPL-GECOL' });
     expect(res.body).toMatchObject({ code: 'template_rejected', reason: 'wrong_template' });
     res = await uploadFile(t.entry.api, other);

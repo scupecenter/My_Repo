@@ -103,7 +103,10 @@ describe('create and edit (entry ownership, validation, If-Match)', () => {
       return r.body.errors.map((e: { code: string }) => e.code);
     };
     expect(await codes({ ...PROC, scope: 'GECOL' })).toEqual(['wrong_register']);      // Q56: the GECOL team enters it in the GECOL register
-    expect(await codes({ ...PROC, scope: 'HLC' })).toEqual(['wrong_register']);
+    // 0042: scope HLC is a Procurement scope now, but it belongs to the HLC Fiber Team's row of the Matrix (hlc-procurement.test.ts)
+    const hlc = await t.entry.api.call('post', recPath('procurement'), { site_id: t.site.id, data: { ...PROC, scope: 'HLC' } });
+    expect(hlc.status).toBe(403);
+    expect(hlc.body.code).toBe('not_eligible_holder');
     expect(await codes({ colour: 'red' })).toEqual(['unknown_field']);
     expect(await codes({ pr_date: '2026-13-40' })).toEqual(['invalid_date']);
     expect(await codes({ pr_date: '2019-12-31' })).toEqual(['invalid_date']);
@@ -315,7 +318,7 @@ describe('the two levels: one person holding both (B5), and records already subm
     expect(res.body).toMatchObject({ state: 'in_review', levels_required: 3 });
     res = await post(t.review.api, 'hlc', rec.id, 'review', res.body.version);
     expect(res.body).toMatchObject({ state: 'in_approval', levels_required: 3 });
-    const fresh = await createRec(await otherSite(db, t), { ...HLC, request_no: 'HR-2' });
+    const fresh = await createRec(await otherSite(db, t), { ...HLC, remark: 'HR-2' });
     expect((await t.entry.api.call('get', recPath('hlc', fresh.id))).body.levels_required).toBe(2);
   });
 
@@ -386,7 +389,7 @@ describe('group levels: claim, release, all members, no holder (B10)', () => {
     expect(res.body.state).toBe('approved');
 
     // B10: a level with nobody goes to the System Admins and is never skipped
-    const rec2 = await createRec(await otherSite(db, t), { ...HLC, request_no: 'HR-3' });
+    const rec2 = await createRec(await otherSite(db, t), { ...HLC, remark: 'HR-3' });
     await regCell(db, 'hlc', R, 'approve', {});
     const sub = await post(t.entry.api, 'hlc', rec2.id, 'submit', rec2.version);
     expect(sub.body.state).toBe('in_approval');
@@ -617,12 +620,16 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     expect(permit[0]).toMatchObject({ valid_to: '2031-12-31', record_version: 3 });
   });
 
-  it('closes C2 on the GECOL Power-On date and C4 on the HLC TX Link Tested date', async () => {
+  it('closes C1 on the GECOL request date (Q91), C2 on the Power-On date and C4 on the HLC in-service date (0042)', async () => {
     const g = await team(app, db, 'gecol', 'gecol', R);
-    const gs = await withTasks(g, ['C2'], ['C2']);
+    const gs = await withTasks(g, ['C1', 'C2'], ['C1']);
     const rec = await createRec(g, { ...GECOL, installation_finish: '2026-02-01' });
-    let res = await approveAll(g, rec.id, rec.version);                                     // request only: the register row approves
-    expect(res.task).toBeUndefined();
+    let res = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;      // the request: the source of C1 (Q91)
+    expect(res.task.task_code).toBe('C1');
+    await gs.stageApprove.api.stepUp(gs.stageApprove.user.password);
+    res = (await post(gs.stageApprove.api, 'gecol', rec.id, 'approve', res.version)).body;
+    expect(res.state).toBe('approved');
+    expect(await taskRow(db, g.site, 'C1')).toMatchObject({ state: 'approved', actual_date: '2026-01-05' });
     expect((await taskRow(db, g.site, 'C2')).state).toBe('open');
     const v2 = await post(g.entry.api, 'gecol', rec.id, 'versions', res.version);
     const v2b = await patch(g.entry.api, 'gecol', v2.body.id, v2.body.version, { data: { meter_no: 'M-1', power_on_date: '2026-03-03' } });
@@ -635,13 +642,13 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
     const h = await team(app, db, 'hlc', 'hlc', R);
     const hs = await withTasks(h, ['C4'], ['C4']);
-    const hrec = await createRec(h, { ...HLC, installation_date: '2026-02-10', tx_link_tested_date: '2026-02-15' });
+    const hrec = await createRec(h, { ...HLC, installation_date: '2026-02-10', tx_link_tested_date: '2026-02-15', in_service_date: '2026-02-20' });
     let hr = (await post(h.entry.api, 'hlc', hrec.id, 'submit', hrec.version)).body;
     expect(hr.task.task_code).toBe('C4');
     await hs.stageApprove.api.stepUp(hs.stageApprove.user.password);
     hr = (await post(hs.stageApprove.api, 'hlc', hrec.id, 'approve', hr.version)).body;
     expect(hr.state).toBe('approved');
-    expect(await taskRow(db, h.site, 'C4')).toMatchObject({ state: 'approved', actual_date: '2026-02-15' });
+    expect(await taskRow(db, h.site, 'C4')).toMatchObject({ state: 'approved', actual_date: '2026-02-20' });
   });
 });
 
@@ -685,11 +692,11 @@ describe('GECOL and HLC: one logical record per site, new requests are versions 
     const cur = await q<{ version_no: number }>(db, 'SELECT version_no FROM register_records WHERE entity_id = $1 AND is_current', [rec.entity_id]);
     expect(cur).toEqual([{ version_no: 2 }]);
 
-    // the GECOL and HLC requests count as purchase requests (Q56)
+    // the GECOL request counts as a purchase request (Q56); the HLC register holds execution only since 0042 (its request is a Procurement record)
     const h = await team(app, db, 'hlc', 'hlc', R);
     await approveAll(h, (await createRec(h, HLC)).id, 1);
     const prs = await q<{ register_key: string }>(db, `SELECT register_key FROM v_purchase_requests WHERE site_id = ANY($1::uuid[]) ORDER BY register_key`, [[t.site.id, h.site.id]]);
-    expect(prs.map((p) => p.register_key)).toEqual(['gecol', 'hlc']);
+    expect(prs.map((p) => p.register_key)).toEqual(['gecol']);
   });
 
   it('frees the slot of a site when the first version is voided, and lets only a holder of delete (with step-up) void', async () => {
@@ -703,7 +710,7 @@ describe('GECOL and HLC: one logical record per site, new requests are versions 
     expect(voided.status).toBe(200);
     expect(voided.body.state).toBe('voided');
     expect((await createRec(t, HLC)).state).toBe('entry');                                           // the site can have a request again
-    const second = await t.entry.api.call('post', recPath('hlc'), { site_id: t.site.id, data: { ...HLC, request_no: 'HR-9' } });
+    const second = await t.entry.api.call('post', recPath('hlc'), { site_id: t.site.id, data: { ...HLC, remark: 'HR-9' } });
     expect(second.status).toBe(409);                                                                 // but only one open request
     const other = await team(app, db, 'hlc', 'hlc', R);
     const ap = await approveAll(other, (await createRec(other, HLC)).id, 1);

@@ -2051,6 +2051,7 @@ model ProcurementRecord {
   custom       Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
   register_record_id String? @db.Uuid // 0019: the approved version that produced this row
   record_version     Int?
+  hlc_approval_date  DateTime? @db.Date // 0042: scope HLC only, closes C3
 
   @@index([site_id])
   @@index([region_id, order_status])
@@ -2093,8 +2094,8 @@ model HlcRecord {
   site_id             String    @unique @db.Uuid
   region_id           Int
   site                Site      @relation(fields: [site_id, region_id], references: [id, region_id], onUpdate: Cascade)
-  request_no          String?
-  request_date        DateTime? @db.Date
+  request_no          String? // legacy since 0042: the HLC request is a Procurement record of scope HLC
+  request_date        DateTime? @db.Date // legacy since 0042
   fiber_uplink        String?
   fiber_status        String?
   internal_fiber_team String?
@@ -2105,6 +2106,9 @@ model HlcRecord {
   custom              Json      @default("{}") @db.JsonB // admin-defined fields, validated by trigger
   register_record_id  String?   @db.Uuid // 0019
   record_version      Int?
+  link_received_date  DateTime? @db.Date // 0042: handover from HLC
+  in_service_date     DateTime? @db.Date // 0042: operation, closes C4
+  procurement_record_id String? @db.Uuid // 0042: the approved scope-HLC Procurement version
 
   @@index([region_id, status])
   @@index([custom], type: Gin)

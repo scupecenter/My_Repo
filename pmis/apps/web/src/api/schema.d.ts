@@ -6223,10 +6223,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -6484,7 +6484,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
         SlaStartEvent: string;
         /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
         SlaRuleOverride: {
@@ -7465,6 +7465,8 @@ export interface components {
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
+            /** @description 0.9.0. Only for a register whose scopes have their own Matrix rows (Procurement: scope HLC is entered by the HLC Fiber Team). The values of the `scope` list the caller may enter (empty = none). The server decides again on every write. */
+            entry_scopes?: string[];
         };
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
@@ -7513,6 +7515,13 @@ export interface components {
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. Empty when there is none. */
+            warnings?: {
+                /** @description JSON pointer of the field, as in `Problem.errors`. */
+                path: string;
+                code: string;
+                message?: string;
+            }[];
             /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
             last_transition?: {
                 step_ids?: string[];

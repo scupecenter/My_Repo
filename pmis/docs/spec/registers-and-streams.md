@@ -412,11 +412,12 @@ Template IDs follow the existing `TPL-*` codes (`rules.md` §10). New codes are 
 - **Key:** none in the Master (one row per order). *Natural key (ASSUMPTION):* Site ID + Scope + PR No., or Site ID + Scope + PO / WO No. when there is no PR (In-House). **Several rows per site** (one per order and scope).
 - **Links:**
   - CW scopes (CW, Tower Erection, Site Adaption) feed B1 (G PR Date → Master AH, SLA CQ = MIN PR), B2 (I PO / WO Date → Master AI, AW = MAX PO / WO, SLA CR; J Contractor, K Team → Master AJ, AK, the first matching order), B01 and E2E-B (start = PR if Outsourced, else PO / WO, SLA DC).
-  - Scope GECOL feeds C1 (PR Date → SLA CS, C-2 start; GECOL sheet E, F), and B02 / B03 start from the CW PR / WO (D38).
+  - Scope GECOL feeds C1 (PR Date → SLA CS, C-2 start; GECOL sheet E, F), and B02 / B03 start from the CW PR / WO (D38). *(Since Q91 / migration 0042 the approved GECOL record closes C1 on its request date.)*
   - Scope TE Installation feeds D2 (Team → Master CE).
   - Scopes CW Dismantle and TE Dismantle feed E2 (Q52).
   - Scopes STA and ST (the analysis provider) belong to B5. They are excluded from AJ, AK and AW.
-  - Several CW orders for one site: Q53. Who enters the GECOL PR: Q56.
+  - Scope HLC (owner decision 2026-11-02, migration 0042): the HLC purchase request. It holds PR No., PR date and HLC Approval Date (`hlc_approval_date`, scope HLC only) and feeds C3 (closed on the HLC approval date; the C-3 SLA runs from the PR date, start event `PR:HLC`). It is entered only by the HLC Fiber Team: scope HLC has its own Matrix row `procurement_hlc` (default L1 HLC Fiber Team, L2 CW Team Lead), and the database refuses any other writer; every other scope stays with the Procurement team's row.
+  - Several CW orders for one site: Q53. Who enters the GECOL PR: Q56 (the GECOL register; scope GECOL here is still refused as `wrong_register`).
   - It reads Contractors (J, K, the Check column) and Setting ScopeMatch.
 - **Fields:** B Site ID ref · C Site Name calc · D Scope list:ProcScope · E Delivery list:Delivery (Outsourced / In-House / TE Vendor) · F PR No. text · G PR Date date · H PO / WO No. text · I PO / WO Date date · J Contractor party · K Team ref:Team · L Order Status list:ProcStatus · M Remark text · N PR→PO (wd) calc · O Check calc.
 - **Template:** `TPL-PO`. Columns B, D:M.
@@ -462,8 +463,9 @@ Template IDs follow the existing `TPL-*` codes (`rules.md` §10). New codes are 
 
 ### 3.6 HLC fiber (`hlc`) — sheet HLC, `tblFiber` (13 columns, D52)
 - **Key:** Site ID. **One row per site with AD = Yes** (Guide row 16; Status needs exactly one row, `HLC!L`).
+- **Owner decision 2026-11-02 (migration 0042):** the HLC register holds the execution only, linked to the approved scope-HLC Procurement record (the HLC purchase request, §3.3). E Request No. and F Request Date are no longer entered here; old values stay readable (legacy) and are not copied into Procurement (Q139). New fields: Link Received (handover from HLC) and In Service (operation). The link (`pr_no`, `hlc_approval_date`, `procurement_record_id`) is filled by the system. C4 closes on the in-service date. Blocking: TX Link Tested not before Installation, In Service not before TX Link Tested; every other order is a reviewer warning (Q96).
 - **Links:**
-  - C3 uses F Request Date (SLA C-4 start, SLA CU). C4 uses J Installation Date (C-4 end, SLA CV; Status Done) and K TX Link Tested Date (RFI condition, Master BZ). See Q54.
+  - C3 uses F Request Date (SLA C-4 start, SLA CU). C4 uses J Installation Date (C-4 end, SLA CV; Status Done) and K TX Link Tested Date (RFI condition, Master BZ). See Q54. *(Superseded by the owner decision above: C3 closes from Procurement scope HLC, C4 on the in-service date; the C-4 SLA end stays the installation date, Q136.)*
   - L Status → Master BX. Project Status 4.6.
   - It reads Master AD.
 - **Fields:** B Site ID ref · C, D Site Name, Region calc · E HLC Request No. text · F Request Date date · G Fiber Uplink (Exchange / Post) text (D52) · H Fiber Status list:FiberStatus · I Internal Fiber Team ref:Team · J Installation Date date · K TX Link Tested Date date · L Status calc · M Remark text.
