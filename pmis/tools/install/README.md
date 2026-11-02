@@ -57,3 +57,15 @@ update) and the renewal hook (created, idempotent, foreign hooks left alone). It
     bash pmis/tools/install/test-le-existing.sh
 
 CI checks the scripts with `bash -n` and `shellcheck --severity=error` ("Installer scripts (syntax and shellcheck)").
+
+## Stored files: encryption, virus scan and backup (ADR 0008, Q134)
+
+- `FILE_ENC_KEY` (the master key of the encrypted stored files) is generated on the first run and kept on every update, like `TOTP_ENC_KEY`.
+  Keep a copy offline: without it the stored files cannot be read.
+- **ClamAV virus scan** (optional, asked at the end of the installer; `install-clamav.sh` can also be run alone): installs `clamav-daemon` and
+  `clamav-freshclam`, sets `MALWARE_SCAN=clamd` and `SCAN_FAILURE=fail_closed` in `pmis.env`, and makes the API start after clamd.
+- **Backup of the stored files** (optional; `install-file-backup.sh`): installs restic, asks for the repository (another building: an absolute
+  path on another disk, or `sftp:`), creates the repository password file once, and installs the nightly timer `gsdn-pmis-files-backup` at 02:30
+  (retention 14 daily, 8 weekly, 12 monthly).
+
+The steps and the commands of the owner after an update are in `infra/RUNBOOK.md` (sections 2 to 6).

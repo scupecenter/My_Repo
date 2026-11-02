@@ -7,7 +7,9 @@ The workflow is `.github/workflows/ci.yml` at the repository root. It runs on pu
 | `api` | Node 22, PostgreSQL 16 service container. Creates role `pmis_app`, then `npm ci`, typecheck, lint, build, test | See "API" below |
 | `web` | Node 22. `npm ci`, typecheck, lint, unit tests, build, Playwright e2e (Chromium) | See "Web" below |
 | `contract` | `npx @redocly/cli@1 lint contracts/openapi.yaml`, fails on errors only | `cd pmis && npx -y @redocly/cli@1 lint contracts/openapi.yaml --config contracts/redocly.yaml` |
-| `installer` | `bash -n` and `shellcheck --severity=error` on the installer and update scripts | `cd pmis && bash -n tools/install/install-ubuntu.sh tools/install/update.sh && shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh` |
+| `installer` | `bash -n` and `shellcheck --severity=error` on the installer, update, ClamAV, file backup and restore scripts (add every new script here) | `cd pmis && bash -n tools/install/install-ubuntu.sh tools/install/update.sh tools/install/install-clamav.sh tools/install/install-file-backup.sh infra/backup/files-backup.sh infra/backup/files-restore.sh && shellcheck --severity=error tools/install/install-ubuntu.sh tools/install/update.sh tools/install/install-clamav.sh tools/install/install-file-backup.sh infra/backup/files-backup.sh infra/backup/files-restore.sh` |
+
+Storage protection (encryption at rest, virus scan, backup of the stored files) is described in `infra/RUNBOOK.md`; the drill record is `infra/restore-drill.md`.
 
 The PostgreSQL passwords in the workflow are CI-only test values for a service container that lives for one job. They are not secrets and must not be reused anywhere else. Real values come from the environment or a vault and are never committed.
 

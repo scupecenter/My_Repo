@@ -1807,7 +1807,7 @@ export interface paths {
          * Upload a file into a document slot (new version if the slot has files)
          * @description Streams through the API (ADR 0008). Checks, in order: the caller holds Data Entry (L1) of the task (or is a System Admin when nobody holds it) and the task is pending or ongoing;
          *     size against the slot's document-type version (413 `file_too_large`); the content type by magic bytes, never by the name or the client's content type, against the allowed formats
-         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`).
+         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`); a file the virus scan refuses (422 `file_rejected`, `reason` = `malware`); the scanner unreachable under fail_closed (503 `malware_scan_unavailable`).
          *     Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
          *     The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
          */

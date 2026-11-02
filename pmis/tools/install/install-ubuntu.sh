@@ -7,6 +7,7 @@
 #   - the first System Admin (asked here, only while none exists)
 #   - document storage: a directory on local disk (default) or, optionally, a MinIO server on this machine (installed here, with its bucket
 #     and a bucket-only user), see "Document storage" below
+#   - optional: ClamAV virus scan of uploads, and a nightly encrypted backup of the stored files (install-clamav.sh, install-file-backup.sh)
 #   - the web app (apps/web) served by nginx over HTTPS. Sign-in and users talk to the API; the other screens still
 #     use sample data (MSW) until their API is built.
 #
@@ -179,7 +180,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 # ---------------------------------------------------------------- previous answers
 # Saved answers first; for an installation made before install.conf existed, read nginx and pmis.env.
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
-PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY=''
+PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY='' PREV_FILE_ENC_KEY=''
 PREV_STORAGE_MODE='' PREV_STORAGE_DIR='' PREV_MINIO_PORT='' PREV_MINIO_DIR='' PREV_S3_ACCESS_KEY='' PREV_S3_SECRET_KEY='' PREV_MINIO_ROOT_PASSWORD=''
 PREV_TLS_MODE='' PREV_LE_NAME=''
 if [[ -r $CONF_DIR/install.conf ]]; then
@@ -209,6 +210,7 @@ p = u.urlsplit(sys.stdin.read().strip()); print(p.port or 5432, p.path.lstrip("/
   fi
   PREV_LOG_HMAC_KEY=$(sed -n 's/^LOG_HMAC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_TOTP_ENC_KEY=$(sed -n 's/^TOTP_ENC_KEY=//p' "$CONF_DIR/pmis.env")
+  PREV_FILE_ENC_KEY=$(sed -n 's/^FILE_ENC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_API_PORT=${PREV_API_PORT:-$(sed -n 's/^PORT=//p' "$CONF_DIR/pmis.env")}
   PREV_S3_ACCESS_KEY=$(sed -n 's/^S3_ACCESS_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_S3_SECRET_KEY=$(sed -n 's/^S3_SECRET_KEY=//p' "$CONF_DIR/pmis.env")
@@ -596,6 +598,12 @@ DB_URL_PW=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.s
 LOG_HMAC_KEY=${PREV_LOG_HMAC_KEY:-$(openssl rand -hex 32)}
 # Two-factor secrets are encrypted with this key (32 bytes). An update keeps the existing one and creates it for an installation that lacks it. Never regenerate a key that is in use: every enrolled user would have to enrol again.
 TOTP_ENC_KEY=${PREV_TOTP_ENC_KEY:-$(openssl rand -hex 32)}
+# Stored files are encrypted with this key (32 bytes, ADR 0008 amendment). Kept on update; never regenerate a key in use (the stored files
+# could not be read). Settings of the optional steps (virus scan, key id, old keys) are kept from the previous file as they are.
+FILE_ENC_KEY=${PREV_FILE_ENC_KEY:-$(openssl rand -hex 32)}
+KEEP_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(FILE_ENC_KEY_ID|FILE_ENC_OLD_KEYS|MALWARE_SCAN|CLAMD_SOCKET|CLAMD_HOST|CLAMD_PORT|CLAMD_TIMEOUT_MS|SCAN_FAILURE)=' "$CONF_DIR/pmis.env" || true )
+grep -q '^FILE_ENC_KEY_ID=' <<<"$KEEP_LINES" || KEEP_LINES="${KEEP_LINES:+$KEEP_LINES
+}FILE_ENC_KEY_ID=k1"
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
 # GSDN PMIS settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
@@ -607,6 +615,8 @@ COOKIE_SECURE=true
 DATABASE_URL=postgresql://pmis_app:$DB_URL_PW@127.0.0.1:$DB_PORT/$DB_NAME
 LOG_HMAC_KEY=$LOG_HMAC_KEY
 TOTP_ENC_KEY=$TOTP_ENC_KEY
+FILE_ENC_KEY=$FILE_ENC_KEY
+$KEEP_LINES
 $S3_LINES
 EOF
 cat > "$CONF_DIR/install.conf" <<EOF
@@ -670,6 +680,13 @@ if (( NEED_ADMIN )); then
   echo "Two-factor (TOTP) is off for this account. Nobody turns it on or off for themselves: create a second System Admin, who can turn it on for you in Users & Roles."
   echo "If an admin loses the authenticator and no other admin exists, reset it on the server: sudo bash $PMIS_DIR/tools/install/reset-two-factor.sh <email> (add --disable to turn it off). A reset prints a one-time enrolment code for the user."
 fi
+
+# ---------------------------------------------------------------- optional: virus scan and backup of the stored files (owner answer Q134)
+# Each step asks once; an update keeps the answer (the settings it wrote stay in pmis.env and backup.env).
+if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1; elif (( AUTO )); then CLAM_ON=0; elif ask_yes "Install the ClamAV virus scan for uploads (needs about 1 GB of disk and an internet connection for the signatures)?"; then CLAM_ON=1; else CLAM_ON=0; fi
+if (( CLAM_ON )); then say "Setting up the ClamAV virus scan"; bash "$PMIS_DIR/tools/install/install-clamav.sh"; fi
+if [[ -r $CONF_DIR/backup.env ]]; then BACKUP_ON=1; elif (( AUTO )); then BACKUP_ON=0; elif ask_yes "Back up the stored files every night with restic (encrypted, 14 daily, 8 weekly, 12 monthly)?"; then BACKUP_ON=1; else BACKUP_ON=0; fi
+if (( BACKUP_ON )); then say "Setting up the nightly backup of the stored files"; bash "$PMIS_DIR/tools/install/install-file-backup.sh"; fi
 
 # ---------------------------------------------------------------- web app
 say "Building the web app"

@@ -44,6 +44,7 @@ import { DocumentsController, LibraryController } from './documents/documents.co
 import { DocumentsService } from './documents/documents.service';
 import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
+import { StorageJobsService } from './documents/storage-jobs.service';
 import { ZipService } from './documents/zip.service';
 import { DbService } from './db/db.service';
 import { JobsService } from './jobs/jobs.service';
@@ -104,7 +105,7 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService,
       DashboardService, ProjectStatusService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
