@@ -101,6 +101,13 @@ export function mapWfError(message: string): ProblemException | null {
         extra: typeof extra.reason === 'string' ? { reason: extra.reason } : undefined,
         commit: true,
       });
+    case 'team_scope_mismatch':
+      // Q97 (migration 0043): the team's specialization does not match the Procurement order scope in the Settings match table
+      return new ProblemException(422, 'team_scope_mismatch', {
+        detail: detail ?? 'The team does not match the order scope.',
+        errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
+        extra: { order_scope: typeof extra.scope === 'string' ? extra.scope : null, team_specialization: typeof extra.specialization === 'string' ? extra.specialization : null },
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

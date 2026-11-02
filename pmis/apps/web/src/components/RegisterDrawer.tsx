@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { AlertTriangle, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -10,7 +10,7 @@ import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
-import { defaultsFor, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
+import { defaultsFor, forEntry, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
@@ -24,10 +24,56 @@ export const STATE_TONE: Record<string, string> = { entry: 'bg-lockBg text-lockI
 type Data = Record<string, unknown>;
 type SiteSel = { id: string; code: string; region_id?: number } | null;
 
-function Body({ def, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
+/**
+ * Migration 0042: the HLC record is linked to the approved HLC purchase request of the site (a Procurement record of scope HLC, filled by the server), and a
+ * record entered before the move keeps its old request fields as a read-only block.
+ */
+function HlcPurchaseRequest({ record }: { record: RegisterRecord }) {
+  const { t } = useTranslation();
+  const d = record.data as Record<string, string | undefined>;
+  return (
+    <>
+      <section className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-hlc-pr" aria-label={t('registers.hlc_pr_title')}>
+        <div className="mb-1 flex items-center gap-1 font-semibold"><Link2 size={14} />{t('registers.hlc_pr_title')}</div>
+        {d.procurement_record_id ? (
+          <>
+            <Link className="font-semibold underline" data-testid="reg-hlc-pr-link" to={`/registers/procurement?record=${d.procurement_record_id}`}>{t('registers.hlc_pr_link', { pr: d.pr_no ?? '' })}</Link>
+            <p className="text-mute" data-testid="reg-hlc-pr-approval">{d.hlc_approval_date ? t('registers.hlc_pr_approved', { date: d.hlc_approval_date }) : t('registers.hlc_pr_not_approved')}</p>
+          </>
+        ) : <p className="text-mute" data-testid="reg-hlc-pr-missing">{t('registers.hlc_pr_missing')}</p>}
+      </section>
+      {(d.request_no || d.request_date) && (
+        <section className="rounded-md border border-line p-3 text-sm" data-testid="reg-hlc-legacy" aria-label={t('registers.hlc_legacy_title')}>
+          <div className="font-semibold">{t('registers.hlc_legacy_title')}</div>
+          <p className="text-mute">{t('registers.hlc_legacy_body', { no: d.request_no ?? '—', date: d.request_date ?? '—' })}</p>
+        </section>
+      )}
+    </>
+  );
+}
+
+/** Ordering issues that do not block (Q96): shown to everyone, meant for the reviewer. */
+function Warnings({ record, labelOf }: { record: RegisterRecord; labelOf: (code: string) => string }) {
+  const { t } = useTranslation();
+  const list = record.warnings ?? [];
+  if (!list.length) return null;
+  return (
+    <section className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-warnings" aria-label={t('registers.warnings_title')}>
+      <div className="mb-1 flex items-center gap-1 font-semibold"><AlertTriangle size={14} />{t('registers.warnings_title')}</div>
+      <ul className="list-disc ps-5">
+        {list.map((w, i) => {
+          const field = w.path.replace(/^\/data\//, '');
+          return <li key={`${w.code}-${i}`} data-testid={`reg-warning-${w.code}`}>{t(`regWarnings.${w.code}`, { field: labelOf(field), defaultValue: w.message ?? w.code })}</li>;
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; record: RegisterRecord | null; onCreated: (id: string) => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const key = def.register_key;
+  const key = rawDef.register_key;
   const lang = i18n.language;
   const session = useSession().data;
   const matrix = useMatrix().data;
@@ -35,7 +81,7 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
-  const [data, setData] = useState<Data>(record?.data ?? defaultsFor(key));
+  const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
   const [rtype, setRtype] = useState<string>(record?.record_type ?? '');
   const [dirty, setDirty] = useState(false);
@@ -48,6 +94,8 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
+  // 0042: the form offers only the scopes the caller may enter (the HLC Fiber Team: scope HLC); a read-only view shows the record as it is
+  const def = editable ? forEntry(rawDef) : rawDef;
   const issues = { ...validateRecord(def, data, site?.id ?? null, tripoliToday()), ...server };
   const issueList = Object.keys(issues);
   const labelOf = (code: string) => { const f = def.fields.find((x) => x.code === code); return f ? fieldLabel(f, lang) : code; };
@@ -121,6 +169,8 @@ function Body({ def, record, onCreated }: { def: RegisterDefinition; record: Reg
             <Link className="font-semibold underline" data-testid="reg-source-link" to={`/sites/${record.site_id}?task=${src.id}`}>{src.task_code}</Link>
           </p>
         )}
+        {record && key === 'hlc' && <HlcPurchaseRequest record={record} />}
+        {record && <Warnings record={record} labelOf={labelOf} />}
         {record?.last_return_note && record.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="reg-return-note">{t('approvals.returned_note', { note: record.last_return_note })}</div>}
         {record && record.state !== 'entry' && record.state !== 'approved' && record.state !== 'voided' && (
           <section aria-label={t('grid.ball')}>

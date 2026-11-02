@@ -8,7 +8,7 @@ export type ErrorCode =
   | 'invalid_transition' | 'note_required' | 'role_in_use' | 'precondition_failed' | 'precondition_required' | 'duplicate' | 'rate_limited'
   | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
-  | 'file_too_large' | 'file_rejected' | 'export_expired';
+  | 'file_too_large' | 'file_rejected' | 'export_expired' | 'team_scope_mismatch';
 
 export interface FieldError {
   path: string;
@@ -53,6 +53,7 @@ const TITLES: Record<string, string> = {
   file_too_large: 'The file is too large',
   file_rejected: 'The file is not accepted',
   export_expired: 'The export has expired',
+  team_scope_mismatch: 'The team does not match the order scope',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

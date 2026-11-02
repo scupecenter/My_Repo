@@ -77,6 +77,12 @@ export function initialMatrix(): Matrix {
     kind: key === 'dismantle' ? 'dismantle' : 'register', register_key: key as Row['register_key'], code: key, name_en: en, name_ar: ar, approval_levels: 2,
     cells: [cell(key, 1, [['1509', '1204', '1407', '1408', '1508'][i % 5]]), cell(key, 2, ['1102']), cell(key, 3, ['1102'])], // L2 is cell 3; the middle cell is a leftover
   }));
+  // migration 0042: the Matrix row of the Procurement scope HLC, right after Procurement. L1 = the HLC Fiber Team (Nadia Hamed, 1207), L2 = the CW Team Lead (Q90).
+  const at = stages.findIndex((r) => r.code === 'procurement') + 1;
+  stages.splice(at, 0, {
+    kind: 'register', register_key: 'procurement_hlc', code: 'procurement_hlc', name_en: 'Procurement - HLC scope', name_ar: 'المشتريات - نطاق HLC', approval_levels: 2,
+    cells: [cell('procurement_hlc', 1, ['1207']), cell('procurement_hlc', 3, ['1203'])],
+  });
   // Zawia (region 4) has its own L1 for CW: a region override that the screen lists and an admin may delete (Q86)
   const cw = stages.find((r) => r.code === 'cw')!;
   cw.cells.push({ ...cell('cw', 1, ['1205']), region_id: 4 });

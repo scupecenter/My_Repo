@@ -8,8 +8,9 @@ import { Dlp, Freeze, Idle } from './Rules';
 import { SlaRules } from './SlaRules';
 import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
+import { TeamScopeMatch } from './TeamScopeMatch';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -40,6 +41,7 @@ export function SettingsRoutes() {
         <Route path="retention" element={<Retention />} />
         <Route path="staff-visibility" element={<StaffVisibility />} />
         <Route path="documents" element={<DocumentLibrary />} />
+        <Route path="team-scope" element={<TeamScopeMatch />} />
       </Route>
     </Routes>
   );

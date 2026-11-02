@@ -15,7 +15,7 @@ type Data = Record<string, unknown>;
 const SECTION_ID: Record<string, string> = {
   'Site and scope': 'site_scope', Request: 'request', Order: 'order', Assignment: 'assignment', 'Status and remark': 'status_remark', 'Survey and layout': 'survey',
   'Notice and works': 'notice', Acceptance: 'acceptance', 'Meter and power-on': 'meter', Remark: 'remark', 'Status and team': 'fiber_status', 'Installation and test': 'install',
-  Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop',
+  Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop', 'Purchase request': 'purchase_request', 'In service': 'in_service',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
 
@@ -43,8 +43,17 @@ export function sectionsFor(def: RegisterDefinition, data: Data): FormSection[] 
   return out;
 }
 
-/** A field that is not shown is not sent: `valid_to` of a permanent permit, N/A fields on other rows, PTW fields on other permit types. */
+/** Migration 0042: the scope whose purchase request is entered by the HLC Fiber Team in Procurement. */
+export const HLC_SCOPE = 'HLC';
+const isHlcScope = (d: Data) => d.scope === HLC_SCOPE;
+
+/**
+ * A field that is not shown is not sent: `valid_to` of a permanent permit, N/A fields on other rows, PTW fields on other permit types,
+ * the HLC approval date on a Procurement scope other than HLC, and the HLC record's pointer to its purchase request (shown as a link instead).
+ */
 export function isHidden(key: string, code: string, d: Data) {
+  if (key === 'procurement') return code === 'hlc_approval_date' && !isHlcScope(d);
+  if (key === 'hlc') return code === 'procurement_record_id';
   if (key !== 'permits_hse') return false;
   if (code === 'valid_to') return !hasExpiry(d);
   if (code === 'na_reason' || code === 'na_approved_by') return !isNa(d);
@@ -72,18 +81,36 @@ export function patchData(def: RegisterDefinition, before: Data, after: Data): D
 /** Who enters what (Q56): the note shown under the title of each register. */
 export const OWNER_NOTE: Record<string, string> = { procurement: 'registers.owner_procurement', gecol: 'registers.owner_gecol', hlc: 'registers.owner_hlc', permits_hse: 'registers.owner_permits', dismantle: 'registers.owner_dismantle' };
 
-/** Values a new form starts with. Q63c: the permit type gives the default of the expiry switch; the Setting is not in the contract, so Yes. */
-export const defaultsFor = (key: string): Data => (key === 'permits_hse' ? { has_expiry: true } : {});
+/**
+ * Values a new form starts with. Q63c: the permit type gives the default of the expiry switch; the Setting is not in the contract, so Yes.
+ * 0042: when the caller may enter one scope only (the HLC Fiber Team in Procurement: `entry_scopes` = ["HLC"]), that scope is preset.
+ */
+export const defaultsFor = (key: string, def?: RegisterDefinition): Data => {
+  if (key === 'permits_hse') return { has_expiry: true };
+  const scopes = def?.entry_scopes;
+  return scopes && scopes.length === 1 ? { scope: scopes[0] } : {};
+};
+
+/**
+ * The definition as the form offers it to the caller: in a register whose scopes have their own Matrix rows, the scope list holds only the scopes the
+ * caller may enter (`entry_scopes`, contract 0.9.0). An empty or missing list leaves the field as it is (the server decides, and says why).
+ */
+export function forEntry(def: RegisterDefinition): RegisterDefinition {
+  const scopes = def.entry_scopes;
+  if (!scopes || !scopes.length) return def;
+  return { ...def, fields: def.fields.map((f) => (f.code === 'scope' && f.options ? { ...f, options: f.options.filter((o) => scopes.includes(o.value)) } : f)) };
+}
 
 export const DATE_MIN = '2020-01-01';
 export const DATE_MAX = '2035-12-31';
 /** Actual dates may not lie in the future (V2): the fields the server marks `is_actual`. The date of a task source is checked by the server at submit. */
-const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date', 'stop_lifted_date'], dismantle: ['rfd_date', 'work_start_date', 'work_end_date'] };
+const NO_FUTURE: Record<string, string[] | 'all-dates'> = { procurement: ['pr_date', 'po_wo_date', 'hlc_approval_date'], gecol: 'all-dates', hlc: 'all-dates', permits_hse: ['applied_date', 'stop_lifted_date'], dismantle: ['rfd_date', 'work_start_date', 'work_end_date'] };
 /** later >= earlier: the chronology rules the server enforces (spec §3; Q96 lists what is not enforced). */
 const ORDER: Record<string, [string, string][]> = {
   procurement: [['pr_date', 'po_wo_date']],
   gecol: [['request_date', 'installation_finish']],
-  hlc: [['installation_date', 'tx_link_tested_date']],
+  // 0042: the two blocking date rules of the HLC record (owner decision 2026-11-02); every other order only warns the reviewer (Q96, RegisterRecord.warnings)
+  hlc: [['installation_date', 'tx_link_tested_date'], ['tx_link_tested_date', 'in_service_date']],
   permits_hse: [['valid_from', 'valid_to']],
 };
 
@@ -117,6 +144,8 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
     if (is(data.delivery, 'In-House') && hasPr) fail('pr_no', 'in_house_with_pr');
     if (is(data.delivery, 'Outsourced') && hasPo && !hasPr) fail('pr_no', 'po_without_pr');
     if (is(data.scope, 'TE Installation') && (hasPr || hasPo)) fail('scope', 'no_pr_po');
+    // 0042: an HLC purchase request needs its PR No. and PR date
+    if (isHlcScope(data)) { if (!data.pr_no) fail('pr_no', 'required'); if (!data.pr_date) fail('pr_date', 'required'); }
   }
   if (key === 'permits_hse') {
     if (isApproved(data) && !data.valid_from) fail('valid_from', 'approved_needs_valid_from');

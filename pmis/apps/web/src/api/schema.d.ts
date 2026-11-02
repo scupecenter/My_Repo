@@ -2850,6 +2850,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/team-scope-match": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Team specialization / scope match of Procurement (Q97)
+         * @description 0.9.1. The rows are the order scopes, the columns the team specializations, each cell allowed yes / no. A scope marked `exempt` is not checked
+         *     (seed: HLC, whose request has no contractor team). Reading needs the Settings screen (`admin.settings` view).
+         */
+        get: operations["getTeamScopeMatch"];
+        /**
+         * Replace the team specialization / scope match (reason, If-Match, audited)
+         * @description 0.9.1. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. Field-level errors: `unknown_key`,
+         *     `duplicate` (a specialization or a scope listed twice; specializations compare case-insensitively), `unknown_specialization` (an allowed value
+         *     that is not one of the columns), `invalid`, `too_many`. Records already approved are not re-checked; drafts are checked again at submit.
+         */
+        put: operations["setTeamScopeMatch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/notification-policy": {
         parameters: {
             query?: never;
@@ -4950,9 +4977,13 @@ export interface components {
              * @description 0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).
              */
             existing_id?: string;
+            /** @description 0.9.1. With `team_scope_mismatch`: the scope of the Procurement order. */
+            order_scope?: string | null;
+            /** @description 0.9.1. With `team_scope_mismatch`: the specialization of the team (null when the team has none). */
+            team_specialization?: string | null;
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -6192,10 +6223,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -6453,7 +6484,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
         SlaStartEvent: string;
         /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
         SlaRuleOverride: {
@@ -7233,6 +7264,29 @@ export interface components {
             absence?: components["schemas"]["Absence"] | null;
             idle_working_days?: number | null;
         };
+        TeamScopeMatchRow: {
+            /** @description An order scope of Procurement (the scope list), for example CW or TE Installation. */
+            scope: string;
+            /**
+             * @description true = no team check for this scope (seed: HLC).
+             * @default false
+             */
+            exempt: boolean;
+            /** @description The specializations whose teams may take an order of this scope. Empty = no team is accepted. */
+            allowed: string[];
+        };
+        TeamScopeMatchInput: {
+            /** @description The columns, in order: the team specializations of the Contractors register (compared trimmed and case-insensitively). */
+            specializations: string[];
+            scopes: components["schemas"]["TeamScopeMatchRow"][];
+        };
+        /** @description 0.9.1 (Q97). Seed: CW, Tower Erection, Site Adaption, CW Dismantle and GECOL allow CW; TE Installation allows TE; TE Dismantle allows CW and TE; STA and ST allow none; HLC is exempt. */
+        TeamScopeMatch: components["schemas"]["TeamScopeMatchInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
         IdleTaskAlertSetting: {
             enabled: boolean;
             /** @description Default 2. */
@@ -7411,6 +7465,8 @@ export interface components {
             /** @description Base fields plus active custom fields visible to the caller. */
             fields: components["schemas"]["RegisterField"][];
             record_count?: number;
+            /** @description 0.9.0. Only for a register whose scopes have their own Matrix rows (Procurement: scope HLC is entered by the HLC Fiber Team). The values of the `scope` list the caller may enter (empty = none). The server decides again on every write. */
+            entry_scopes?: string[];
         };
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
@@ -7459,6 +7515,13 @@ export interface components {
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. Empty when there is none. */
+            warnings?: {
+                /** @description JSON pointer of the field, as in `Problem.errors`. */
+                path: string;
+                code: string;
+                message?: string;
+            }[];
             /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
             last_transition?: {
                 step_ids?: string[];
@@ -14344,6 +14407,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getTeamScopeMatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The table. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamScopeMatch"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setTeamScopeMatch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["TeamScopeMatchInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamScopeMatch"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

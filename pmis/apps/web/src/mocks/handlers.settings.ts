@@ -2,17 +2,19 @@
 // staff visibility, security log, integrity, online now. Synthetic data; validation mirrors the contract.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, WeightSet } from '@/api/types';
+import type { Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatchInput, WeightSet } from '@/api/types';
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
-import { CALENDAR_CODES, CATALOGUE, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
+import { CALENDAR_CODES, CATALOGUE, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
 const C = () => db().cfg;
+/** A mock store saved before 0.9.1 has no match table: start it from the seed. */
+const SM = () => (C().scopeMatch ??= initCfg().scopeMatch);
 const isAdmin = () => viewer()?.key === 'pm';
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
@@ -38,6 +40,31 @@ function dateErrs(d: string | undefined, kind: 'sla' | 'weights', code?: string)
   if (d! < tripoliToday()) return [{ path: '/effective_date', code: 'effective_date_in_past' }];
   const last = (kind === 'sla' ? C().slaSets : C().weightSets.filter((w) => w.code === code)).filter((s) => s.status === 'published').map((s) => s.effective_from!).sort().pop();
   return last && d! <= last ? [{ path: '/effective_date', code: 'effective_date_not_after_current' }] : [];
+}
+
+/** The field rules of PUT /settings/team-scope-match (as admin_save_team_scope_match of migration 0043). Exported for unit tests. */
+export function validateScopeMatch(b: Partial<TeamScopeMatchInput> & Record<string, unknown>) {
+  const errs: { path: string; code: string }[] = [];
+  for (const k of Object.keys(b)) if (!['reason', 'specializations', 'scopes'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+  const specs: string[] = [];
+  if (!Array.isArray(b.specializations)) errs.push({ path: '/specializations', code: 'required' });
+  else b.specializations.forEach((x, i) => {
+    const v = typeof x === 'string' ? x.trim() : '';
+    if (!v || v.length > 60) errs.push({ path: `/specializations/${i}`, code: 'invalid' });
+    else if (specs.some((s) => s.toLowerCase() === v.toLowerCase())) errs.push({ path: `/specializations/${i}`, code: 'duplicate' });
+    else specs.push(v);
+  });
+  const seen = new Set<string>();
+  if (!Array.isArray(b.scopes)) errs.push({ path: '/scopes', code: 'required' });
+  else b.scopes.forEach((row, i) => {
+    const v = typeof row?.scope === 'string' ? row.scope.trim() : '';
+    if (!v || v.length > 60) errs.push({ path: `/scopes/${i}/scope`, code: 'invalid' });
+    else if (seen.has(v)) errs.push({ path: `/scopes/${i}/scope`, code: 'duplicate' });
+    seen.add(v);
+    if (!Array.isArray(row?.allowed)) errs.push({ path: `/scopes/${i}/allowed`, code: 'required' });
+    else row.allowed.forEach((a, j) => { if (typeof a !== 'string' || !specs.some((s) => s.toLowerCase() === a.trim().toLowerCase())) errs.push({ path: `/scopes/${i}/allowed/${j}`, code: 'unknown_specialization' }); });
+  });
+  return errs;
 }
 
 /** Closed-schema validation of SLA rule items; `min_exceeds_max` sits on the max_working_days path. Exported for unit tests. */
@@ -428,6 +455,26 @@ export const settingsHandlers = [
     if (errs.length) return fields(...errs);
     C().idle = { enabled: b.enabled!, working_days: b.working_days!, version: C().idle.version + 1, updated_by: me() }; db().admin.idleDays = b.working_days!; save();
     return HttpResponse.json(C().idle, tag(C().idle.version));
+  }),
+
+
+  // ------------------------------------------------------------------ team / scope match of Procurement (0.9.1, Q97)
+  http.get(`${B}/settings/team-scope-match`, () => { const g = guard(); if (g) return g; return HttpResponse.json(SM(), tag(SM().version)); }),
+  http.put(`${B}/settings/team-scope-match`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
+    const p = ver(request, SM().version); if (p) return p;
+    const b = await body<TeamScopeMatchInput & { reason?: string } & Record<string, unknown>>(request);
+    const r = reasonErr(b.reason); if (r) return r;
+    const errs = validateScopeMatch(b);
+    if (errs.length) return fields(...errs);
+    C().scopeMatch = {
+      specializations: b.specializations.map((x) => x.trim()),
+      scopes: b.scopes.map((x) => ({ scope: x.scope.trim(), exempt: x.exempt ?? false, allowed: b.specializations.map((sp) => sp.trim()).filter((sp) => x.allowed.some((a) => a.trim().toLowerCase() === sp.toLowerCase())) })),
+      version: SM().version + 1, updated_at: new Date().toISOString(), updated_by: me(),
+    };
+    save();
+    return HttpResponse.json(C().scopeMatch, tag(C().scopeMatch.version));
   }),
 
   // ------------------------------------------------------------------ notification policy

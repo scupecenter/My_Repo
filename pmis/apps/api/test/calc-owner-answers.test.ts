@@ -194,7 +194,8 @@ describe('Q81: a gate locks the tasks of the next stage until it opens', () => {
   });
 
   it('does not lock the GECOL and HLC tasks (C1 to C4), and the exempt list is a setting', async () => {
-    expect(await setting('calc.gate_lock_exempt_tasks')).toEqual(['C1', 'C2', 'C3', 'C4']);
+    // C1 to C4 (0018), plus D1, B14, B15, D18, E2 and E3 since the owner decision of 2026-11-02 (0043)
+    expect(await setting('calc.gate_lock_exempt_tasks')).toEqual(['C1', 'C2', 'C3', 'C4', 'D1', 'B14', 'B15', 'D18', 'E2', 'E3']);
     const site = await newSite(db);
     const b1 = await makeTask(db, site, 'B1', 'approved', { actualDate: await wd(db, -4) });
     const c1 = await makeTask(db, site, 'C1', 'locked');
@@ -208,13 +209,14 @@ describe('Q81: a gate locks the tasks of the next stage until it opens', () => {
     const ms4Site = await newSite(db);
     const ms4 = await makeTask(db, ms4Site, 'MS4', 'approved', { actualDate: await wd(db, -3) });
     const d1 = await makeTask(db, ms4Site, 'D1', 'locked');
-    expect(await unlock(ms4)).toEqual([]);                                   // G5 needs the TE permits
-    await setSetting('calc.gate_lock_exempt_tasks', ['C*', 'D1']);
+    await setSetting('calc.gate_lock_exempt_tasks', ['C1', 'C2', 'C3', 'C4']);   // D1 out of the list for this check
     try {
+      expect(await unlock(ms4)).toEqual([]);                                 // G5 needs the TE permits
+      await setSetting('calc.gate_lock_exempt_tasks', ['C*', 'D1']);
       expect(await unlock(ms4)).toEqual([d1]);
       expect((await taskRow(db, ms4Site, 'D1')).state).toBe('open');
     } finally {
-      await setSetting('calc.gate_lock_exempt_tasks', ['C1', 'C2', 'C3', 'C4']);
+      await setSetting('calc.gate_lock_exempt_tasks', ['C1', 'C2', 'C3', 'C4', 'D1', 'B14', 'B15', 'D18', 'E2', 'E3']);
     }
   });
 

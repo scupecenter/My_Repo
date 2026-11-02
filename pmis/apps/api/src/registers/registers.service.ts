@@ -90,6 +90,7 @@ interface RecordRow {
   votes_done: bigint | null;
   entry_holder: boolean;
   has_open: boolean;
+  warnings: unknown[] | null;
   total: bigint | null;
   ts: string;
 }
@@ -154,6 +155,8 @@ export class RegistersService {
       if (!(await this.access.hasGrant(auth, d.module_key, 'view'))) continue;
       const fields = await this.fieldsOf(d.register_key);
       const regs = await this.access.regions(d.module_key, 'view');
+      // 0042: a register whose scopes have their own Matrix rows (Procurement, scope HLC) tells the caller which scopes they may enter
+      const scopes = await this.db.tx.$queryRaw<{ s: string[] | null }[]>(Prisma.sql`SELECT reg_entry_scopes(${d.register_key}::text) AS s`);
       const cnt = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
         SELECT count(*) AS n FROM register_records r WHERE r.register_key = ${d.register_key} AND r.state <> 'voided'
           AND NOT EXISTS (SELECT 1 FROM register_records x WHERE x.entity_id = r.entity_id AND x.version_no > r.version_no)
@@ -169,6 +172,7 @@ export class RegistersService {
         approval_levels: d.approval_levels,
         fields,
         record_count: Number(cnt[0]?.n ?? 0),
+        ...(scopes[0]?.s ? { entry_scopes: scopes[0].s } : {}),
       });
     }
     return { items };
@@ -220,7 +224,8 @@ export class RegistersService {
         r.self_approval, r.task_id::text AS task_id, td.code AS task_code, r.created_by::text AS created_by, r.created_at, r.updated_at, r.approved_at,
         r.approved_by::text AS approved_by, r.source, r.version,
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
-        EXISTS (SELECT 1 FROM reg_entry_holders(r.register_key, r.region_id) h WHERE h.user_id = ${actor}::uuid) AS entry_holder,
+        reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
+        reg_warnings(r.id) AS warnings,
         EXISTS (SELECT 1 FROM register_records o WHERE o.entity_id = r.entity_id AND o.state IN ('entry', 'in_review', 'in_approval')) AS has_open,
         ${Prisma.raw(TS_TEXT('r.created_at'))} AS ts
       FROM register_records r
@@ -416,6 +421,7 @@ export class RegistersService {
         updated_at: r.updated_at,
         approved_at: r.approved_at,
         version: r.version,
+        warnings: Array.isArray(r.warnings) ? r.warnings : [],
       };
       if (r.task_id && r.task_code) dto.task = { id: r.task_id, task_code: r.task_code };
       if (party) dto.external_party = party;
