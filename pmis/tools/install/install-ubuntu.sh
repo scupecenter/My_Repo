@@ -462,6 +462,7 @@ if (( RECORDED == 0 && HAS_USERS == 1 )); then
   done
 fi
 APPLIED=0
+APPLIED_NAMES=()
 for d in "$MIGRATIONS_DIR"/0*/; do
   n=$(basename "$d")
   [[ $(psql_su -d "$DB_NAME" -c "SELECT 1 FROM pmis_admin.migrations WHERE name = '$n'") == 1 ]] && continue
@@ -470,10 +471,21 @@ for d in "$MIGRATIONS_DIR"/0*/; do
   { echo "BEGIN;"; cat "$d/migration.sql"; echo; echo "INSERT INTO pmis_admin.migrations (name) VALUES ('$n');"; echo "COMMIT;"; } \
     | psql_su -d "$DB_NAME" >/dev/null
   APPLIED=$((APPLIED + 1))
+  APPLIED_NAMES+=("$n")
 done
 (( APPLIED )) || echo "   Nothing new."
 psql_su -d "$DB_NAME" < "$PMIS_DIR/db/sql/app_grants.sql" >/dev/null
 echo "   Application role rights refreshed (db/sql/app_grants.sql)."
+# Deployment log (migration 0045, GET /admin/deployments): version, git commit, the migrations of this run, who and where. update.sh runs this script too.
+if [[ $(psql_su -d "$DB_NAME" -c "SELECT 1 FROM pg_proc WHERE proname = 'log_deployment'") == 1 ]]; then
+  DEPLOY_VERSION=$(sed -n 's/^  version: *//p' "$PMIS_DIR/contracts/openapi.yaml" | head -1)
+  DEPLOY_SHA=$(git -C "$PMIS_DIR" rev-parse HEAD 2>/dev/null || true)
+  [[ $DEPLOY_SHA =~ ^[0-9a-f]{7,40}$ ]] || DEPLOY_SHA=""
+  DEPLOY_MIGRATIONS="{$(IFS=,; echo "${APPLIED_NAMES[*]}")}"
+  printf 'SELECT log_deployment(%s, nullif(%s, %s), %s::text[], %s, %s);\n' "$(sql_lit "${DEPLOY_VERSION:-unknown}")" "$(sql_lit "$DEPLOY_SHA")" "''" \
+    "$(sql_lit "$DEPLOY_MIGRATIONS")" "$(sql_lit "${SUDO_USER:-$(id -un)}")" "$(sql_lit "$(hostname)")" | psql_su -d "$DB_NAME" >/dev/null \
+    && echo "   Deployment recorded (version ${DEPLOY_VERSION:-unknown})."
+fi
 
 # ---------------------------------------------------------------- API
 say "Building the API"

@@ -13,7 +13,7 @@ import { DbService } from '../db/db.service';
 const KINDS = new Set([
   'task_assigned', 'task_returned', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'holiday_tentative',
   'delegation', 'mfa_exemption', 'template_updated', 'import_batch', 'system', 'mention', 'task_rejected', 'no_eligible_holder', 'register_assigned',
-  'register_rejected', 'gate_closed_again', 'sla_negative_duration', 'followed_change', 'email_change_requested', 'email_change_decided',
+  'register_rejected', 'gate_closed_again', 'sla_negative_duration', 'followed_change', 'email_change_requested', 'email_change_decided', 'security_alert',
 ]);
 
 const snoozeSchema = z
@@ -117,8 +117,8 @@ export class NotificationsService {
   }
 
   private async audit(auth: AuthContext, action: string, id: string | null, before: unknown, after: unknown): Promise<void> {
-    await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO audit_log (action, entity_type, entity_id, before, after, actor_id, ip)
-      VALUES (${action}, 'notification', ${id}, ${JSON.stringify(before)}::jsonb, ${JSON.stringify(after)}::jsonb, ${auth.user.id}::uuid, ${auth.ip}::text)`);
+    void auth;
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write(${action}::text, 'notification', ${id}::text, ${JSON.stringify(before)}::jsonb, ${JSON.stringify(after)}::jsonb, NULL)`);
   }
 
   private async change(auth: AuthContext, id: string, action: string, set: Prisma.Sql): Promise<NotificationDto> {

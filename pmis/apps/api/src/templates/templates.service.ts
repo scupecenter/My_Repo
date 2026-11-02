@@ -159,10 +159,10 @@ export class TemplatesService {
     const issuedAt = new Date();
     const buffer = await this.build(t, cols, rows, { prefill, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
 
-    await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO audit_log (action, entity_type, entity_id, after, actor_id, ip)
-      VALUES ('template_download', 'template', ${t.template_id},
-        ${JSON.stringify({ version: t.current_version, prefill, rows: rows.length, task_id: taskId ?? null, site_ids: site, region_id: region, register_key: t.register_key })}::jsonb,
-        ${auth.user.id}::uuid, ${ip})`);
+    // migration 0045: pmis_app writes no log row itself; the ip and the device come from the request context
+    void ip;
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill, rows: rows.length, task_id: taskId ?? null, site_ids: site, region_id: region, register_key: t.register_key })}::jsonb, NULL)`);
     const name = `${t.template_id}_v${t.current_version}${prefill ? '_prefilled' : ''}_${issuedAt.toISOString().slice(0, 10)}.xlsx`;
     return { buffer, fileName: name };
   }

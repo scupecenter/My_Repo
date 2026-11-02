@@ -22,6 +22,7 @@ interface LoadedRow {
   two_factor: boolean;
   db_now: Date;
   valid: boolean;
+  revoked: boolean;
   user_id: string;
   user_status: UserStatus;
   email: string;
@@ -73,16 +74,18 @@ export class SessionService {
   }
 
   /** Finds the live session behind a cookie token, with its user. Null when unknown, revoked or past a limit. */
-  async load(token: string): Promise<{ session: SessionRow; user: UserRow } | null> {
+  async load(token: string, onExpired?: (sessionId: string) => void): Promise<{ session: SessionRow; user: UserRow } | null> {
     if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     const rows = await this.db.client.$queryRaw<LoadedRow[]>(Prisma.sql`
       SELECT s.id::text AS id, s.auth_method::text AS auth_method, s.csrf_token, s.created_at, s.last_activity_at, s.expires_at,
              s.stepup_at, s.two_factor, now() AS db_now,
              (s.revoked_at IS NULL AND s.expires_at > now() AND s.last_activity_at > now() - make_interval(hours => ${IDLE_HOURS}::int)) AS valid,
+             (s.revoked_at IS NOT NULL) AS revoked,
              u.id::text AS user_id, u.status::text AS user_status, u.email, u.display_name, u.employee_id, u.phone, u.locale, u.theme
       FROM user_sessions s JOIN users u ON u.id = s.user_id
       WHERE s.token_hash = ${sha256Hex(token)}`);
     const r = rows[0];
+    if (r && !r.valid && !r.revoked && onExpired) onExpired(r.id); // migration 0045: security log session_expired (once per session)
     if (!r || !r.valid) return null;
     return {
       session: {
@@ -97,7 +100,11 @@ export class SessionService {
   }
 
   /** Real user activity slides the idle window. Timer polling (X-PMIS-Live: 1) never calls this. */
-  async touch(id: string): Promise<void> {
+  async touch(id: string, screen?: string | null): Promise<void> {
+    if (screen) {
+      await this.db.client.$executeRaw`UPDATE user_sessions SET last_activity_at = now(), current_screen = ${screen} WHERE id = ${id}::uuid AND revoked_at IS NULL`;
+      return;
+    }
     await this.db.client.$executeRaw`UPDATE user_sessions SET last_activity_at = now() WHERE id = ${id}::uuid AND revoked_at IS NULL`;
   }
 

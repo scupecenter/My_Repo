@@ -12,6 +12,7 @@ import { registerErrorMessage, serverFieldIssues } from '@/lib/registerErrors';
 import { cellLevel } from '@/lib/matrixLevels';
 import { defaultsFor, forEntry, OWNER_NOTE, patchData, sectionsFor, validateRecord, visibleData, type FieldIssue } from '@/lib/registerForms';
 import { tripoliToday } from '@/lib/today';
+import { FieldHistory } from './logs/FieldHistory';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
@@ -215,7 +216,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
                     <div key={f.code} className={f.type === 'text' && f.code === 'remark' ? 'col-span-2' : ''}>
-                      <label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
+                      <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
+                        {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} />}</div>
                       {editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} />
                         : <div className="font-semibold" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t)}</div>}
                       {f.code === 'has_expiry' && data.has_expiry === false && <span className="chip mt-1 bg-doneBg text-doneInk" data-testid="reg-permanent">{t('registers.permanent')}</span>}

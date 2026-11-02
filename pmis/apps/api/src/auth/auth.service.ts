@@ -15,6 +15,13 @@ import { SyslogService } from './syslog.service';
 import { UserStateService } from './user-state.service';
 import { IDLE_HOURS } from './session.service';
 import { CodeInput, TwoFactorService, TWO_FACTOR_PARAMS } from './two-factor.service';
+import { SecurityLogService } from '../logs/security-log.service';
+import { applyContext, RequestContext, UA_MAX } from '../logs/context';
+
+/** The context of a sign-in request that has no session yet. */
+const signInCtx = (ip: string | null, userAgent: string | undefined, requestId: string, sessionId?: string): RequestContext => ({
+  ip, userAgent: userAgent ? userAgent.slice(0, UA_MAX) : null, requestId: requestId || null, sessionId: sessionId ?? null, authMethod: 'local', via: 'manual',
+});
 
 export const loginSchema = z.object({ identifier: z.string().min(1).max(254), password: z.string().min(1).max(128) }).strict();
 const codeFields = {
@@ -100,6 +107,7 @@ export class AuthService {
     private readonly hmac: LogHmacService,
     private readonly syslog: SyslogService,
     private readonly twoFactor: TwoFactorService,
+    private readonly securityLog: SecurityLogService,
   ) {}
 
   async sessionBody(auth: AuthContext, csrf = auth.session.csrfToken): Promise<SessionBody> {
@@ -131,11 +139,13 @@ export class AuthService {
     const { password } = parsed.data;
     const identifier = normaliseIdentifier(parsed.data.identifier);
     const masked = this.hmac.mask(identifier);
+    const ctx = signInCtx(ip, userAgent, requestId);
 
     const ipWait = this.limiter.hit(`login:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
     const idWait = this.limiter.hit(`login:id:${masked}`, LOGIN_LIMIT_PER_IDENTIFIER);
     if (ipWait || idWait) {
       await this.syslog.write('warn', 'local_sign_in_rate_limited', { identifier_hmac: masked, ip }, undefined, requestId);
+      await this.securityLog.write({ event: 'sign_in_rate_limited', outcome: 'failure', identifier, ctx, detail: { by: ipWait ? 'ip' : 'identifier' } });
       throw problems.rateLimited(Math.max(ipWait, idWait));
     }
 
@@ -152,16 +162,19 @@ export class AuthService {
 
     if (!row) {
       await this.syslog.write('warn', 'local_sign_in_failed', { identifier_hmac: masked, reason: 'no_match', ip }, undefined, requestId);
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', identifier, ctx, detail: { reason: 'no_match' } });
       throw problems.invalidCredentials();
     }
     if (!eligible) {
       await this.syslog.write('warn', 'local_sign_in_failed', { identifier_hmac: masked, reason: locked ? 'locked' : 'status', ip }, row.user_id, requestId);
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: locked ? 'locked' : 'status' } });
       throw problems.invalidCredentials();
     }
 
     // One transaction: the lockout bookkeeping and, on success, the session. app.user_id is set so the audit rows know the user.
     const created = await this.db.client.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT set_config('app.user_id', ${row.user_id}, true)`;
+      await applyContext(tx, ctx);
       await tx.$executeRaw`SELECT auth_local_result(${row.user_id}::uuid, ${ok}::boolean)`;
       return this.db.runIn(tx, async () => {
         const tf = ok ? await this.twoFactor.state(row.user_id) : null;
@@ -176,7 +189,12 @@ export class AuthService {
       });
     });
     this.states.invalidate(row.user_id);
-    if (!created) throw problems.invalidCredentials();
+    if (!created) {
+      await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'bad_password' } });
+      throw problems.invalidCredentials();
+    }
+    if (created.pending) await this.securityLog.write({ event: 'sign_in_started', outcome: 'info', userId: row.user_id, identifier, ctx, detail: { next: created.next } });
+    else await this.securityLog.write({ event: 'sign_in_succeeded', outcome: 'success', userId: row.user_id, identifier, ctx: { ...ctx, sessionId: created.id }, detail: { method: 'password' } });
     if (created.pending) return { kind: 'pending', token: created.token, body: { authenticated: false, next: created.next, expires_at: created.expiresAt } };
 
     const found = await this.sessions.load(created.token);
@@ -207,6 +225,8 @@ export class AuthService {
       }
     }
     const at = await this.sessions.markStepUp(auth.session.id);
+    await this.securityLog.write({ event: 'step_up_passed', outcome: 'success', userId: auth.user.id, detail: { two_factor: needCode },
+      ctx: { ip: auth.ip, userAgent: null, requestId: null, sessionId: auth.session.id, authMethod: 'local' } }, { inTx: true });
     const next: AuthContext = { ...auth, session: { ...auth.session, stepupAt: at, dbNow: new Date(Math.max(at.getTime(), auth.session.dbNow.getTime())) } };
     return this.sessionBody(next);
   }
@@ -234,9 +254,10 @@ export class AuthService {
   }
 
   /** Runs `fn` in one transaction for a user who is not signed in yet (pending sign-in): app.user_id set, ambient transaction on. */
-  private async asUser<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  private async asUser<T>(userId: string, fn: () => Promise<T>, ctx?: RequestContext): Promise<T> {
     return this.db.client.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true)`;
+      if (ctx) await applyContext(tx, ctx);
       return this.db.runIn(tx, fn);
     });
   }
@@ -275,8 +296,13 @@ export class AuthService {
       }
       if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
       await this.syslog.write('info', 'local_sign_in_ok', { via: r.via, two_factor: true, ip }, userId, requestId);
-      return { created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
-    });
+      return { created: await this.sessions.create(userId, 'local', ip, userAgent), via: r.via } as const;
+    }, signInCtx(ip, userAgent, requestId));
+    if (!('fail' in out)) {
+      const c = signInCtx(ip, userAgent, requestId, out.created.id);
+      await this.securityLog.write({ event: 'two_factor_passed', outcome: 'success', userId, ctx: c, detail: { via: out.via, purpose: 'sign_in' } });
+      await this.securityLog.write({ event: 'sign_in_succeeded', outcome: 'success', userId, ctx: c, detail: { method: 'password_totp' } });
+    }
     this.states.invalidate(userId);
     if ('fail' in out) {
       if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
@@ -305,7 +331,7 @@ export class AuthService {
         return { fail: e.reason } as const;
       }
       return { ok: { secret: e.secret, otpauth_uri: e.otpauth_uri, issuer: TWO_FACTOR_PARAMS.issuer, account: email, algorithm: TWO_FACTOR_PARAMS.algorithm, digits: TWO_FACTOR_PARAMS.digits, period: TWO_FACTOR_PARAMS.period } } as const;
-    });
+    }, signInCtx(ip, undefined, requestId));
     this.states.invalidate(userId);
     if (out.fail !== undefined) throw this.twoFactor.enrolProblem(out.fail, false);
     return out.ok;
@@ -335,7 +361,8 @@ export class AuthService {
       if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
       await this.syslog.write('info', 'local_two_factor_enrolled', { ip }, userId, requestId);
       return { codes, created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
-    });
+    }, signInCtx(ip, userAgent, requestId));
+    if ('created' in out && out.created) await this.securityLog.write({ event: 'sign_in_succeeded', outcome: 'success', userId, ctx: signInCtx(ip, userAgent, requestId, out.created.id), detail: { method: 'enrolment' } });
     this.states.invalidate(userId);
     if (out.enrolFail !== undefined) throw this.twoFactor.enrolProblem(out.enrolFail, false);
     if ('fail' in out) {
@@ -388,6 +415,8 @@ export class AuthService {
     await this.db.tx.$executeRaw`SELECT auth_local_result(${auth.user.id}::uuid, ${ok}::boolean)`;
     if (!ok) {
       await this.syslog.write('warn', `local_${purpose}_failed`, {}, auth.user.id, undefined);
+      await this.securityLog.write({ event: purpose === 'step_up' ? 'step_up_failed' : 'password_changed', outcome: 'failure', userId: auth.user.id,
+        detail: { reason: 'bad_password', purpose }, ctx: { ip: auth.ip, userAgent: null, requestId: null, sessionId: auth.session.id, authMethod: 'local' } });
       throw problems.invalidCredentials(true);
     }
     return row.password_hash;

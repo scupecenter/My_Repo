@@ -197,8 +197,8 @@ export class AnnouncementsService {
         dto.responded_at ? dto.responded_at.toISOString() : '']);
     }
     const csv = '﻿' + lines.map((l) => l.map(csvCell).join(',')).join('\r\n') + '\r\n';
-    await this.db.tx.$executeRaw`INSERT INTO audit_log (action, entity_type, entity_id, after, actor_id, ip, request_id)
-      VALUES ('announcement_exported', 'announcement', ${id}, ${JSON.stringify({ rows: rows.length })}::jsonb, ${auth.user.id}::uuid, ${auth.ip}::text, ${requestId ?? null}::text)`;
+    void requestId;
+    await this.db.tx.$queryRaw`SELECT log_audit_write('announcement_exported', 'announcement', ${id}::text, NULL, ${JSON.stringify({ rows: rows.length })}::jsonb, NULL)`;
     return { file: new StreamableFile(Buffer.from(csv, 'utf8')), name: `announcement-${id}-responses.csv` };
   }
 

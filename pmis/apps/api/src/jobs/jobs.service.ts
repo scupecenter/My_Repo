@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { SyslogService } from '../auth/syslog.service';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
+import { JobRunsService } from '../logs/job-runs.service';
 
 export const JOB_HOUR = 2;
 export const JOB_TIME_ZONE = 'Africa/Tripoli';
@@ -60,6 +61,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly db: DbService,
     private readonly syslog: SyslogService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly runs: JobRunsService,
   ) {}
 
   get enabled(): boolean {
@@ -90,10 +92,13 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
   }
 
   private async execute(): Promise<DailyJobResult | null> {
+    // migration 0045: every run is a job_runs row, and its audit rows say via = job, job_name = daily
+    const run = await this.runs.start('daily');
     try {
       const result: DailyJobResult | null = await this.db.client.$transaction(async (tx): Promise<DailyJobResult | null> => {
         const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.daily_job')) AS ok`;
         if (!lock[0]?.ok) return null;
+        await this.runs.context(tx, 'daily');
         const applied = await tx.$queryRaw<{ n: number }[]>`SELECT sla_apply_due_sets() AS n`;
         const reminded = await tx.$queryRaw<{ n: number }[]>`SELECT cal_tentative_reminders(${REMINDER_DAYS}::integer) AS n`;
         return { slaApplied: Number(applied[0]?.n ?? 0), reminders: Number(reminded[0]?.n ?? 0) };
@@ -103,6 +108,8 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (snapshots > 0) result.snapshots = snapshots;
       }
       this.lastRun = { at: new Date(), result };
+      await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) : null, null,
+        result ? { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 } : { reason: 'locked' });
       if (result && (result.slaApplied > 0 || result.reminders > 0 || (result.snapshots ?? 0) > 0)) {
         await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 });
       }
@@ -110,6 +117,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
     } catch (e) {
       const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
       this.lastRun = { at: new Date(), result: null, error: message };
+      await this.runs.finish(run, 'failed', null, message);
       this.log.warn(`daily job failed: ${message}`);
       await this.syslog.write('error', 'daily job failed', { error: message });
       return null;
@@ -122,6 +130,7 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       return await this.db.client.$transaction(async (tx) => {
         const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.dashboard_snapshot')) AS ok`;
         if (!lock[0]?.ok) return 0;
+        await this.runs.context(tx, 'dashboard_snapshot');
         const r = await tx.$queryRaw<{ n: number }[]>`SELECT dash_snapshot_weekly() AS n`;
         return Number(r[0]?.n ?? 0);
       }, { maxWait: 10_000, timeout: 120_000 });

@@ -284,6 +284,8 @@ describe('hybrid mode list', () => {
       'GET /me/profile', 'PATCH /me/profile', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
+      // contract 0.10.0: the logs core
+      'GET /audit-log', 'POST /audit-log/exports', 'GET /audit-log/exports/:id/download', 'GET /audit-log/field-changes', 'GET /audit-log/field-history', 'GET /audit-log/integrity', 'GET /security-log', 'POST /security-log/exports', 'GET /security-log/exports/:id/download', 'GET /security-log/integrity', 'GET /system-log', 'GET /sessions/active', 'POST /sessions/:id/revoke', 'POST /users/:id/sessions/revoke', 'GET /admin/sessions', 'POST /admin/sessions/:id/end', 'GET /admin/job-runs', 'GET /admin/deployments', 'GET /admin/security-alerts', 'POST /admin/security-alerts/:id/ack', 'GET /settings/log-retention', 'PUT /settings/log-retention', 'GET /settings/security-alerts', 'PUT /settings/security-alerts', 'GET /reports/activity',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

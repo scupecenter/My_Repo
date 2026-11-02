@@ -15,4 +15,16 @@ export class LogHmacService {
   mask(value: string): string {
     return createHmac('sha256', this.key).update(value.trim().toLowerCase()).digest('hex').slice(0, 16);
   }
+
+  /**
+   * The security-log form of an identifier typed in the sign-in box (contract `SecurityLogEntry.identifier_masked`): `?`, the first character only
+   * when the input looks like an email, a 4-digit employee ID or a phone, `***#`, then 12 hex digits of the keyed HMAC of the normalised input.
+   * The same input always gives the same value, so repeated attempts group; the text itself (it may be a password) is never kept.
+   */
+  masked(value: string): string {
+    const v = value.trim().toLowerCase();
+    const looks = /^[^@\s]+@[^@\s]+$/.test(v) || /^[0-9]{4}$/.test(v) || /^\+?[0-9]{7,15}$/.test(v);
+    const first = looks && /^[a-z0-9+]$/i.test(v.charAt(0)) ? v.charAt(0) : '';
+    return `?${first}***#${createHmac('sha256', this.key).update(v).digest('hex').slice(0, 12)}`;
+  }
 }

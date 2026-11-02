@@ -7,7 +7,8 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api/client';
 import { useLogout, useMe, useNotifications, useSession } from '@/api/hooks';
 import { useUnreadTotal } from '@/api/msg';
-import { hasGrant } from '@/lib/perm';
+import { useOpenAlertCount } from '@/api/logs';
+import { hasGrant, isAdmin } from '@/lib/perm';
 import { notificationTarget } from '@/lib/x';
 import { applyLocale, applyTheme, currentLocale, currentTheme } from '@/i18n';
 import { HYBRID } from '@/lib/hybrid';
@@ -15,7 +16,7 @@ import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
-import { BY_GRANT, NAV } from './navItems';
+import { ADMIN_ONLY, BY_GRANT, NAV } from './navItems';
 import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
 
 export { NAV };
@@ -53,7 +54,8 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
-  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : allowed.has(n.key)));
+  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
+  const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const peopleTo = firstPeopleTab(me.data);
   const inPeople = PEOPLE_TABS.some((p) => loc.pathname === p.to || loc.pathname.startsWith(`${p.to}/`));
@@ -92,7 +94,7 @@ export function Shell() {
       <aside ref={asideRef} data-testid="sidebar" aria-label={t('nav.sidebar_label')} style={{ width: compact ? 56 : width }}
         className="sticky top-0 hidden h-screen shrink-0 flex-col border-e border-line bg-side md:flex">
         {brand}
-        <SidebarBody items={sideItems} compact={compact} unread={unread} activeKey={activeKey} />
+        <SidebarBody items={sideItems} compact={compact} unread={unread} alerts={alerts} activeKey={activeKey} />
         {!compact && <div className="border-t border-line px-4 py-3 text-xs text-faint">Synthetic data</div>}
         {!compact && <SidebarSplitter width={width} onChange={resize} asideRef={asideRef} />}
       </aside>
@@ -104,7 +106,7 @@ export function Shell() {
               <div className="flex items-center gap-2 px-4 py-4 font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk">G</span>{t('app.name')}</div>
               <button ref={closeRef} className="btn min-h-11 min-w-11" data-testid="drawer-close" aria-label={t('nav.close_menu')} onClick={() => setDrawer(false)}><X size={16} aria-hidden /></button>
             </div>
-            <SidebarBody items={sideItems} compact={false} unread={unread} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
+            <SidebarBody items={sideItems} compact={false} unread={unread} alerts={alerts} activeKey={activeKey} onNavigate={() => setDrawer(false)} />
           </div>
         </div>
       )}

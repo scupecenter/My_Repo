@@ -258,6 +258,8 @@ enum PermissionAction {
   download_documents
   view_audit
   administer
+  manage_users // migration 0045
+  view_security_log // migration 0045
 }
 
 enum LogLevel {
@@ -2390,12 +2392,121 @@ model AuditLog {
   ip                String?
   user_agent        String?
   request_id        String?
+  // Migration 0045: filled by the BEFORE INSERT trigger audit_log_fill from the app.* settings of the request when the row leaves them null.
+  module_key        String?
+  session_id        String?  @db.Uuid
+  auth_method       String? // local, oidc, break_glass
+  mfa               Boolean?
+  stepup_verified   Boolean?
+  via               String? // manual, template, bulk, api, job
+  batch_id          String?  @db.Uuid
+  batch_row         String?  @db.Uuid
+  device            Json? // { browser, os, type }
+  job_name          String?
 
   @@index([entity_type, entity_id])
   @@index([actor_id, at])
   @@index([site_id, at])
   @@index([at])
   @@map("audit_log")
+}
+
+// Migration 0045: one row per changed field of an audit row (AFTER INSERT trigger on audit_log). Append-only; pmis_app reads it only
+// through log_field_changes_read (decision B4 scope).
+model AuditFieldChange {
+  id             BigInt   @id @default(autoincrement())
+  audit_id       BigInt
+  at             DateTime @db.Timestamptz(6)
+  actor_id       String?  @db.Uuid
+  on_behalf_of   String?  @db.Uuid
+  action         String
+  entity_type    String
+  entity_id      String? // the logical record (register records: entity_id of the record)
+  record_id      String? // the entity_id of the audit row (register records: the version)
+  site_id        String?  @db.Uuid
+  region_id      Int?
+  module_key     String?
+  field          String
+  field_label_en String?
+  field_label_ar String?
+  old_value      Json?
+  new_value      Json?
+  ip             String?
+  user_agent     String?
+  device         Json?
+  session_id     String?  @db.Uuid
+  via            String?
+  batch_id       String?  @db.Uuid
+  request_id     String?
+
+  @@map("audit_field_changes")
+}
+
+// Migration 0045: sign-in and security log, append-only hash chain (security_log_chain). Written only by sec_log_write and the identity triggers.
+model SecurityLog {
+  id              BigInt   @id @default(autoincrement())
+  at              DateTime @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  event           String
+  outcome         String
+  user_id         String?  @db.Uuid
+  actor_id        String?  @db.Uuid
+  identifier_hash String? // masked keyed HMAC ?x***#<12 hex>, never the typed text
+  client_type     String   @default("web")
+  ip              String?
+  user_agent      String?
+  device          Json?
+  session_id      String?  @db.Uuid
+  request_id      String?
+  detail          Json?
+
+  @@map("security_log")
+}
+
+// Migration 0045: job run log and deployment log.
+model JobRun {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  started_at  DateTime  @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  finished_at DateTime? @db.Timestamptz(6)
+  outcome     String    @default("running")
+  rows        BigInt?
+  error       String?
+  detail      Json?
+  host        String?
+
+  @@map("job_runs")
+}
+
+model Deployment {
+  id          BigInt   @id @default(autoincrement())
+  deployed_at DateTime @default(now()) @db.Timestamptz(6)
+  version     String
+  git_sha     String?
+  migrations  String[] @default([])
+  deployed_by String?
+  host        String?
+  detail      Json?
+
+  @@map("deployments")
+}
+
+// Migration 0045: security alerts (rules evaluated by sec_alerts_evaluate); status changes only through sec_alert_ack.
+model SecurityAlert {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at      DateTime  @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  rule            String
+  severity        String
+  status          String    @default("open")
+  title           String
+  detail          Json?
+  dedup_key       String    @unique
+  user_id         String?   @db.Uuid
+  ip              String?
+  acknowledged_at DateTime? @db.Timestamptz(6)
+  acknowledged_by String?   @db.Uuid
+  ack_note        String?
+
+  @@map("security_alerts")
 }
 
 // Separate from the audit log; purged after 12 months by a scheduled job.

@@ -507,11 +507,10 @@ export class AssignmentsService {
     if (action === 'bulk_assign' || action === 'copy_assignments') await this.activatePending(userIds, why);
     await this.db.tx.$executeRaw`RELEASE SAVEPOINT bulk_all`;
     const after = JSON.stringify({ ...extra, done: result.done.length, skipped: result.skipped.length, failed: result.failed.length, ids: result.done.map((d) => d.created_id ?? d.id) });
-    await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO audit_log (action, entity_type, entity_id, after, reason, actor_id, on_behalf_of, ip, request_id)
-      VALUES (${action}, 'bulk_action', ${result.bulk_action_id}, ${after}::jsonb, ${why}, ${auth.user.id}::uuid,
+    void requestId;
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write(${action}::text, 'bulk_action', ${result.bulk_action_id}::text, NULL, ${after}::jsonb, ${why}::text, NULL, NULL,
         CASE WHEN app_actor_is_system_admin() THEN NULL
-             ELSE (SELECT d.from_user_id FROM app_user_delegations(app_actor()) x(id) JOIN delegations d ON d.id = x.id LIMIT 1) END,
-        ${auth.ip}::text, ${requestId ?? null}::text)`);
+             ELSE (SELECT d.from_user_id FROM app_user_delegations(app_actor()) x(id) JOIN delegations d ON d.id = x.id LIMIT 1) END)`);
     this.states.invalidate(...userIds);
   }
 

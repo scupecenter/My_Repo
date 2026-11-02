@@ -14,6 +14,7 @@ import { CommentsPanel } from './Comments';
 import { Holders } from './HolderChip';
 import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
 import { TaskRegisterFields } from './TaskRegisterFields';
+import { FieldHistory } from './logs/FieldHistory';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -94,9 +95,12 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
 
         <section className="grid grid-cols-2 gap-3 text-sm" aria-label={t('drawer.dates')}>
           {([['planned_date', 'plan', 'grid.plan'], ['actual_start', 'start', 'drawer.actual_start'], ['actual_date', 'actual', 'grid.actual']] as const).map(([f, id, label]) => (
-            <label key={f} className="block"><span className="text-mute">{t(label)}</span>
-              <input type="date" className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
-            </label>
+            <div key={f}>
+              <label className="block"><span className="text-mute">{t(label)}</span>
+                <input type="date" className="input mono" data-testid={`drawer-${id}-date`} disabled={!edit} value={draft[f]} onChange={(e) => setDraft((d) => ({ ...d, [f]: e.target.value }))} />
+              </label>
+              <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
+            </div>
           ))}
           <div><span className="text-mute">{t('grid.sla')}</span><div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span></div></div>
           {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={!dirty.length || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}

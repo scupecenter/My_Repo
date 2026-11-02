@@ -18,8 +18,8 @@ export class SyslogService {
   async write(level: LogLevel, message: string, context: Record<string, unknown> = {}, userId?: string, requestId?: string, source = 'api'): Promise<void> {
     try {
       const json = JSON.stringify(context);
-      await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO system_log (level, source, message, context, user_id, request_id)
-        VALUES (${level}::"LogLevel", ${source}, ${message}, ${json}::jsonb, ${userId ?? null}::uuid, ${requestId ?? null})`);
+      // migration 0045: pmis_app cannot insert into system_log; log_system_write (owner pmis_definer) does
+      await this.db.tx.$executeRaw(Prisma.sql`SELECT log_system_write(${level}::text, ${source}::text, ${message}::text, ${json}::jsonb, ${userId ?? null}::uuid, ${requestId ?? null}::text)`);
     } catch (e) {
       this.log.warn(`system log write failed: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);
     }

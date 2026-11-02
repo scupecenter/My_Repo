@@ -5,14 +5,19 @@ import { useMe } from '@/api/hooks';
 import { exportSecurityLog, useSecurityLog, useVerifyIntegrity, type SecFilter } from '@/api/settings';
 import type { LogIntegrity, SecurityEvent } from '@/api/types';
 import { errText } from '@/components/FormDialog';
+import { DeviceIcon } from '@/components/logs/bits';
+import type { DeviceInfo } from '@/api/logs';
 import { PersonTag } from '@/components/PersonTag';
 import { useToast } from '@/components/Toast';
 import { hasGrant, isAdmin } from '@/lib/perm';
 
 export const EVENTS: SecurityEvent[] = ['sign_in_started', 'sign_in_succeeded', 'callback_account_mismatch', 'sign_in_failed', 'signed_out', 'session_expired', 'session_revoked_by_admin', 'mfa_exemption_granted', 'mfa_exemption_revoked', 'step_up_passed', 'step_up_failed', 'break_glass_used'];
+/** The server may send a parsed `device`; otherwise the raw user agent is shown as the tooltip text. */
+const deviceOf = (e: SecurityLogEntryX): DeviceInfo | null => e.device ?? (e.user_agent ? { browser: e.user_agent, os: '', type: /mobile|android|iphone/i.test(e.user_agent) ? 'mobile' : 'desktop' } : null);
+type SecurityLogEntryX = import('@/api/types').SecurityLogEntry & { device?: DeviceInfo | null };
 const TONE = { success: 'bg-doneBg text-doneInk', failure: 'bg-lateBg text-lateInk', info: 'bg-openBg text-openInk' } as const;
 
-function IntegrityCard({ r }: { r: LogIntegrity }) {
+export function IntegrityCard({ r }: { r: LogIntegrity }) {
   const { t } = useTranslation();
   return (
     <div className="card space-y-1 p-3 text-sm" data-testid={`integrity-result-${r.log}`}>
@@ -60,7 +65,7 @@ export function SecurityLog() {
         <table className="w-full text-sm">
           <thead className="border-b border-line bg-card2 text-mute"><tr>
             <th className="p-2 text-start">#</th><th className="p-2 text-start">{t('seclog.at')}</th><th className="p-2 text-start">{t('seclog.event')}</th><th className="p-2 text-start">{t('seclog.outcome')}</th><th className="p-2 text-start">{t('seclog.who')}</th><th className="p-2 text-start">{t('seclog.actor')}</th>
-            {admin && <th className="p-2 text-start" data-testid="seclog-ip-col">IP</th>}<th className="p-2 text-start">{t('seclog.request')}</th>
+            {admin && <th className="p-2 text-start" data-testid="seclog-ip-col">IP</th>}<th className="p-2 text-start">{t('logs.c_device')}</th><th className="p-2 text-start">{t('logs.c_session')}</th><th className="p-2 text-start">{t('seclog.request')}</th>
           </tr></thead>
           <tbody data-testid="seclog-list">
             {items.map((e) => (
@@ -70,9 +75,11 @@ export function SecurityLog() {
                 <td className="p-2">{e.user ? <PersonTag name={e.user.display_name} employeeId={e.user.employee_id} /> : <span className="mono" dir="ltr" data-testid={`seclog-masked-${e.id}`}>{e.identifier_masked}</span>}</td>
                 <td className="p-2">{e.actor && <PersonTag name={e.actor.display_name} employeeId={e.actor.employee_id} />}</td>
                 {admin && <td className="mono p-2 text-xs" dir="ltr" data-testid={`seclog-ip-${e.id}`}>{e.ip ?? '—'}</td>}
+                <td className="p-2" data-testid={`seclog-device-${e.id}`}><DeviceIcon device={deviceOf(e as SecurityLogEntryX)} /></td>
+                <td className="mono p-2 text-xs" dir="ltr">{e.session_id ? e.session_id.slice(0, 8) : '—'}</td>
                 <td className="mono p-2 text-xs" dir="ltr">{e.request_id}</td>
               </tr>))}
-            {q.isSuccess && !items.length && <tr><td colSpan={8} className="p-6 text-center text-mute" data-testid="seclog-empty">{t('seclog.empty')}</td></tr>}
+            {q.isSuccess && !items.length && <tr><td colSpan={10} className="p-6 text-center text-mute" data-testid="seclog-empty">{t('seclog.empty')}</td></tr>}
           </tbody>
         </table>
       </div>

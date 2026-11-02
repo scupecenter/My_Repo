@@ -40,6 +40,12 @@ import { Users } from '@/pages/Users';
 import { Pending } from '@/pages/Pending';
 import { Profile } from '@/pages/Profile';
 import { SecurityLog } from '@/pages/SecurityLog';
+import { ActivityReport } from '@/pages/logs/ActivityReport';
+import { AuditLog } from '@/pages/logs/AuditLog';
+import { FieldChanges } from '@/pages/logs/FieldChanges';
+import { Deployments, JobRuns } from '@/pages/logs/JobRuns';
+import { OnlineSessions } from '@/pages/logs/OnlineSessions';
+import { SecurityAlerts } from '@/pages/logs/SecurityAlerts';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 
 function Soon() {
@@ -98,6 +104,13 @@ function gated(session: Session) {
         </Route>
         <Route path="admin/settings/*" element={<SettingsRoutes />} />
         <Route path="admin/security-log" element={<SecurityLog />} />
+        <Route path="audit" element={<AuditLog />} />
+        <Route path="admin/logs/field-changes" element={<FieldChanges />} />
+        <Route path="admin/logs/online" element={<OnlineSessions />} />
+        <Route path="admin/logs/alerts" element={<SecurityAlerts />} />
+        <Route path="admin/logs/job-runs" element={<JobRuns />} />
+        <Route path="admin/logs/deployments" element={<Deployments />} />
+        <Route path="admin/logs/activity-report" element={<ActivityReport />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

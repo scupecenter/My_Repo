@@ -321,9 +321,9 @@ describe('permission catalogue and profiles', () => {
     const unknown = await api.call('post', '/permission-profiles', { ...base, grants: [{ module_key: 'moon', action: 'view' }] });
     expect(unknown.status).toBe(422);
     expect(unknown.body.errors[0]).toMatchObject({ path: '/grants/0/module_key', code: 'unknown_module' });
-    const notStored = await api.call('post', '/permission-profiles', { ...base, grants: [{ module_key: 'admin.users', action: 'manage_users' }] });
-    expect(notStored.status).toBe(422);
-    expect(notStored.body.errors[0]).toMatchObject({ path: '/grants/0/action', code: 'not_supported' });
+    // migration 0045 added manage_users and view_security_log to the database enum: they are stored now
+    const stored = await api.call('post', '/permission-profiles', { ...base, code: `${base.code}_M`, grants: [{ module_key: 'admin.users', action: 'manage_users' }] });
+    expect(stored.status).toBe(201);
     const ghost = await api.call('post', '/permission-profiles', { ...base, grants: [], field_rules: [{ field_id: randomUUID(), access: 'read' }] });
     expect(ghost.body.errors[0]).toMatchObject({ path: '/field_rules/0/field_id', code: 'not_found' });
     expect((await api.call('post', '/permission-profiles', { ...base, grants: [{ module_key: 'sites', action: 'fly' }] })).status).toBe(422);

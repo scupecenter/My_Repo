@@ -11,7 +11,7 @@ import type { NavItem } from './navItems';
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 400;
 export const SIDEBAR_DEFAULT = 240;
-const GROUPS = ['work', 'registers', 'data', 'admin'] as const;
+const GROUPS = ['work', 'registers', 'data', 'admin', 'logs'] as const;
 const K = { collapsed: 'pmis.nav.collapsed', sites: 'pmis.nav.sites_open', favs: 'pmis.nav.favs', recent: 'pmis.nav.recent' };
 const RECENT_MAX = 5;
 
@@ -37,7 +37,7 @@ function SiteViews({ activeView, onNavigate }: { activeView: string | null; onNa
 }
 
 /** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
-export function SidebarBody({ items, compact, unread, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; activeKey: string | undefined; onNavigate?: () => void }) {
+export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; activeKey: string | undefined; onNavigate?: () => void }) {
   const { t } = useTranslation();
   const loc = useLocation();
   const [collapsed, setCollapsed] = useState<string[]>(() => loadList(K.collapsed));
@@ -74,6 +74,9 @@ export function SidebarBody({ items, compact, unread, activeKey, onNavigate }: {
         {badge && n.key === 'messages' && unread > 0 && (compact
           ? <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="h-2 w-2 rounded-full bg-accent" />
           : <span data-testid="messages-badge" aria-label={t('messages.unread_count', { count: unread })} className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1 text-xs text-accentInk">{unread}</span>)}
+        {n.key === 'logs.alerts' && alerts > 0 && (compact
+          ? <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="h-2 w-2 rounded-full bg-late" />
+          : <span data-testid="alerts-badge" aria-label={t('logs.open_alerts', { count: alerts })} className="grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-white">{alerts}</span>)}
       </>
     );
   };
