@@ -1,6 +1,6 @@
-import { Check, Copy, Download, ShieldCheck, ShieldOff, TriangleAlert } from 'lucide-react';
+import { Check, Copy, Download, KeyRound, ShieldCheck, ShieldOff, TriangleAlert } from 'lucide-react';
 import QRCode from 'qrcode';
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEnrolConfirm, useEnrolStart, useRegenerateRecoveryCodes, useTwoFactorSignIn } from '@/api/auth';
 import { ApiError } from '@/api/client';
@@ -11,6 +11,10 @@ import { useToast } from './Toast';
 /** Text of a failed code check. The detail of the server says when the code was already used. */
 export function codeErrorText(e: unknown, t: (k: string) => string): string {
   if (e instanceof ApiError && e.status === 401 && e.code === 'invalid_code') return /already used/i.test(e.problem.detail ?? '') ? t('twoFactor.reused') : t('twoFactor.wrong');
+  // Contract 0.6.0: the one-time enrolment code from the administrator
+  if (e instanceof ApiError && e.status === 401 && e.code === 'invalid_enrol_code') return t('twoFactor.enrol_code_wrong');
+  if (e instanceof ApiError && e.status === 401 && e.code === 'enrol_code_expired') return t('twoFactor.enrol_code_expired');
+  if (e instanceof ApiError && e.status === 422) return t('twoFactor.enrol_code_required');
   if (e instanceof ApiError && e.status === 429) return t('twoFactor.locked');
   if (e instanceof ApiError && e.status === 401) return t('twoFactor.expired');
   return t('errors.generic');
@@ -138,30 +142,45 @@ export function RecoveryCodesView({ codes, onDone, doneLabel }: { codes: string[
   );
 }
 
-/** Forced enrolment (a user whose two-factor is on and not set up yet): QR code, manual key, the first code, then the recovery codes. */
+/** The enrolment code as people type it: upper case, letters and digits only, the dash after the fourth character (XXXX-XXXX). */
+export const formatEnrolCode = (v: string) => {
+  const c = v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+  return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
+};
+export const enrolCodeComplete = (v: string) => /^[A-Z0-9]{8}$/.test(v.replace('-', ''));
+
+/**
+ * Forced enrolment (a user whose two-factor is on and not set up yet). Contract 0.6.0: the one-time code from the administrator comes first;
+ * the QR code is shown only after the server accepted it (a password alone cannot enrol a phone). Then the QR code, the manual key,
+ * the first code, and the recovery codes. The enrolment code is sent again with the first code and is used up there.
+ */
 export function EnrolFlow({ onDone, onExpired }: { onDone: () => void; onExpired: () => void }) {
   const { t } = useTranslation();
   const start = useEnrolStart();
   const confirm = useEnrolConfirm();
   const { state, copy } = useCopy();
+  const [enrolCode, setEnrolCode] = useState('');
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [codes, setCodes] = useState<string[] | null>(null);
-  const { mutate: begin } = start;
 
-  // One secret per visit. The mutation is idempotent for the user: a reload simply shows a new QR code.
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return; // StrictMode runs effects twice in development: one secret only
-    started.current = true;
-    begin(undefined, { onError: (x) => { if (x instanceof ApiError && x.status === 401) onExpired(); } });
-  }, [begin, onExpired]);
+  const askQr = (e: FormEvent) => {
+    e.preventDefault();
+    if (start.isPending || !enrolCodeComplete(enrolCode)) return;
+    setErr('');
+    start.mutate({ enrol_code: enrolCode }, {
+      onError: (x) => {
+        if (x instanceof ApiError && x.status === 401 && x.code === 'unauthenticated') return onExpired();
+        setErr(codeErrorText(x, t));
+      },
+    });
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (confirm.isPending || !codeComplete(code)) return;
     setErr('');
-    confirm.mutate({ code: digitsOnly(code) }, {
+    confirm.mutate({ code: digitsOnly(code), enrol_code: enrolCode }, {
       onSuccess: (r) => setCodes(r.recovery_codes),
       onError: (x) => {
         setCode('');
@@ -173,23 +192,37 @@ export function EnrolFlow({ onDone, onExpired }: { onDone: () => void; onExpired
 
   if (codes) return <div className="card w-[min(520px,100%)] p-6"><RecoveryCodesView codes={codes} onDone={onDone} /></div>;
   const e = start.data;
+  if (!e) {
+    return (
+      <form onSubmit={askQr} className="card w-[min(520px,100%)] space-y-4 p-6" data-testid="enrol-code-form">
+        <div className="flex items-center gap-2 text-lg font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk"><KeyRound size={18} /></span>{t('twoFactor.enrol_code_title')}</div>
+        <p className="rounded-md bg-waitBg p-2 text-sm text-waitInk" data-testid="enrol-forced">{t('twoFactor.enrol_body')}</p>
+        <p className="text-sm">{t('twoFactor.enrol_code_body')}</p>
+        <div>
+          <label className="block text-sm font-semibold" htmlFor="enrol-admin-code">{t('twoFactor.enrol_code_label')}</label>
+          <input id="enrol-admin-code" data-testid="enrol-admin-code" className="input mono mt-1 text-center text-xl tracking-widest" dir="ltr" autoComplete="off" spellCheck={false} autoCapitalize="characters" autoFocus
+            placeholder="XXXX-XXXX" maxLength={9} value={enrolCode} onChange={(x) => setEnrolCode(formatEnrolCode(x.target.value))} aria-invalid={!!err} />
+          <p className="mt-1 text-xs text-mute">{t('twoFactor.enrol_code_hint')}</p>
+          {err && <p role="alert" data-testid="enrol-admin-code-error" className="mt-1 text-sm text-lateInk">{err}</p>}
+        </div>
+        <button className="btn btn-accent w-full" type="submit" data-testid="enrol-admin-code-submit" disabled={start.isPending || !enrolCodeComplete(enrolCode)}>{t('twoFactor.enrol_code_submit')}</button>
+      </form>
+    );
+  }
   return (
     <form onSubmit={submit} className="card w-[min(520px,100%)] space-y-4 p-6" data-testid="enrol-form">
       <div className="flex items-center gap-2 text-lg font-bold"><span className="grid h-8 w-8 place-items-center rounded-md bg-accent text-accentInk"><ShieldCheck size={18} /></span>{t('twoFactor.enrol_title')}</div>
-      <p className="rounded-md bg-waitBg p-2 text-sm text-waitInk" data-testid="enrol-forced">{t('twoFactor.enrol_body')}</p>
       <p className="text-sm">{t('twoFactor.enrol_step1')}</p>
-      {e ? <div className="flex justify-center"><QrCode value={e.otpauth_uri} label={t('twoFactor.qr_alt')} /></div> : <p className="text-mute">{t('common.loading')}</p>}
+      <div className="flex justify-center"><QrCode value={e.otpauth_uri} label={t('twoFactor.qr_alt')} /></div>
       <p className="text-sm">{t('twoFactor.enrol_step2')}</p>
-      {e && (
-        <div className="flex items-center gap-2">
-          <code className="mono flex-1 select-all break-all rounded-md border border-line bg-card2 p-2 text-sm" dir="ltr" aria-label={t('twoFactor.manual_key')} data-testid="enrol-key">{e.secret.replace(/(.{4})/g, '$1 ').trim()}</code>
-          <button type="button" className="btn" data-testid="enrol-copy" onClick={() => void copy(e.secret)}>{state === 'copied' ? <Check size={16} /> : <Copy size={16} />}{state === 'copied' ? t('twoFactor.copied') : t('twoFactor.copy')}</button>
-        </div>
-      )}
+      <div className="flex items-center gap-2">
+        <code className="mono flex-1 select-all break-all rounded-md border border-line bg-card2 p-2 text-sm" dir="ltr" aria-label={t('twoFactor.manual_key')} data-testid="enrol-key">{e.secret.replace(/(.{4})/g, '$1 ').trim()}</code>
+        <button type="button" className="btn" data-testid="enrol-copy" onClick={() => void copy(e.secret)}>{state === 'copied' ? <Check size={16} /> : <Copy size={16} />}{state === 'copied' ? t('twoFactor.copied') : t('twoFactor.copy')}</button>
+      </div>
       {state === 'failed' && <p role="alert" className="text-sm text-lateInk">{t('twoFactor.copy_failed')}</p>}
       <p className="text-sm">{t('twoFactor.enrol_step3')}</p>
       <CodeField id="enrol-code" value={code} onChange={setCode} error={err} />
-      <button className="btn btn-accent w-full" type="submit" data-testid="enrol-submit" disabled={confirm.isPending || !e || !codeComplete(code)}>{t('twoFactor.confirm')}</button>
+      <button className="btn btn-accent w-full" type="submit" data-testid="enrol-submit" disabled={confirm.isPending || !codeComplete(code)}>{t('twoFactor.confirm')}</button>
     </form>
   );
 }

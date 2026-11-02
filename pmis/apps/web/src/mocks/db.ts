@@ -29,7 +29,11 @@ export const DEMO_PASSWORDS: Record<string, string> = {
 const MUST_CHANGE_DEMO = new Set(['newbie']);
 
 /** Two-factor of one account (mock): `on` = an admin turned it on; `secret` null = not enrolled yet. Codes are kept in clear here only. */
-export type TwoFactorMock = { on: boolean; secret: string | null; pending: string | null; codes: string[]; lastStep: number | null; failures: number };
+export type TwoFactorMock = {
+  on: boolean; secret: string | null; pending: string | null; codes: string[]; lastStep: number | null; failures: number;
+  /** The one-time enrolment code an admin hands over (contract 0.6.0), in clear here only; null once used. */
+  enrolCode?: string | null; enrolExpires?: number | null;
+};
 export type Cred = { password: string; must_change: boolean; failures: number; locked_until: number | null; enabled: boolean; tf?: TwoFactorMock };
 export const tfLabel = (c: Cred | null | undefined): 'off' | 'pending_enrolment' | 'on' => (!c?.tf?.on ? 'off' : c.tf.secret ? 'on' : 'pending_enrolment');
 /** Credentials of an account key ('pm', ..., 'u:<uuid>' for created users, 'e:<id>' for registry staff after a reset). Demo accounts are seeded on first use. */

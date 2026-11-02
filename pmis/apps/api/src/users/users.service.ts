@@ -8,6 +8,7 @@ import { SessionService } from '../auth/session.service';
 import { SyslogService } from '../auth/syslog.service';
 import { UserStateService } from '../auth/user-state.service';
 import { StepUpService } from '../auth/step-up.service';
+import { TwoFactorService } from '../auth/two-factor.service';
 import { decodeCursor, encodeCursor, likePattern, parseLimit } from '../common/cursor';
 import { checkIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
@@ -47,6 +48,15 @@ const twoFactorResetSchema = z.object({ reason }).strict();
 
 const resetSchema = z.object({ reason, temporary_password: z.string().max(1024).optional() }).strict();
 
+/** Answer of the two-factor admin calls. `enrol_code` is present only when a new code was made; it is shown once and never stored in clear. */
+export interface TwoFactorChange {
+  two_factor: string;
+  enrol_code?: string;
+  enrol_code_expires_at?: Date;
+}
+const changeOf = (r: { s: string; e: Date | null }, code: string): TwoFactorChange =>
+  r.e ? { two_factor: r.s, enrol_code: code, enrol_code_expires_at: r.e } : { two_factor: r.s };
+
 export interface UserDetailDto extends UserDto {
   assignments: AssignmentDto[];
   groups: GroupRef[];
@@ -73,6 +83,7 @@ export class UsersService {
     private readonly states: UserStateService,
     private readonly stepUp: StepUpService,
     private readonly syslog: SyslogService,
+    private readonly twoFactor: TwoFactorService,
   ) {}
 
   async list(auth: AuthContext, q: Query): Promise<{ items: UserDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
@@ -258,31 +269,56 @@ export class UsersService {
 
   /**
    * PUT /users/{id}/two-factor: turns two-factor on or off. System Admin, or a delegate with users.two_factor; needs a reason and the
-   * actor's step-up; nobody changes their own (idm_set_two_factor). Turning it on ends the user's local sessions (they enrol at next sign-in).
+   * actor's step-up; nobody changes their own (idm_set_two_factor). Turning it on ends the user's local sessions and returns a one-time
+   * enrolment code (shown once): the user enrols at next sign-in with it, and a password alone can never enrol a phone.
    */
-  async setTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<{ two_factor: string }> {
+  async setTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<TwoFactorChange> {
     const body = parse(twoFactorSchema, raw);
     await this.access.requireAdmin('users', 'administer');
     await this.stepUp.require(auth);
-    if (!uuidSchema.safeParse(id).success || !(await this.repo.find(id))) throw problems.notFound();
-    const rows = await this.db.tx.$queryRaw<{ s: string }[]>`SELECT idm_set_two_factor(${id}::uuid, ${body.enabled}::boolean, ${body.reason}::text) AS s`;
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user) throw problems.notFound();
+    const fresh = this.twoFactor.newEnrolCode(user.id);
+    const rows = await this.db.tx.$queryRaw<{ s: string; e: Date | null }[]>`
+      SELECT r_state AS s, r_expires AS e FROM idm_set_two_factor(${user.id}::uuid, ${body.enabled}::boolean, ${body.reason}::text, ${fresh.hash}::text)`;
     await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-    this.states.invalidate(id);
-    await this.syslog.write('info', body.enabled ? 'two_factor_enabled_by_admin' : 'two_factor_disabled_by_admin', { target_user: id }, auth.user.id);
-    return { two_factor: rows[0]!.s };
+    this.states.invalidate(user.id);
+    await this.syslog.write('info', body.enabled ? 'two_factor_enabled_by_admin' : 'two_factor_disabled_by_admin', { target_user: user.id }, auth.user.id);
+    return changeOf(rows[0]!, fresh.code);
   }
 
-  /** POST /users/{id}/two-factor/reset: lost phone. Clears the secret and the recovery codes, forces a new enrolment, ends the sessions. */
-  async resetTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<{ two_factor: string }> {
+  /** POST /users/{id}/two-factor/reset: lost phone. Clears the secret and the recovery codes, forces a new enrolment (new code), ends the sessions. */
+  async resetTwoFactor(auth: AuthContext, id: string, raw: unknown): Promise<TwoFactorChange> {
     const body = parse(twoFactorResetSchema, raw);
     await this.access.requireAdmin('users', 'administer');
     await this.stepUp.require(auth);
-    if (!uuidSchema.safeParse(id).success || !(await this.repo.find(id))) throw problems.notFound();
-    const rows = await this.db.tx.$queryRaw<{ s: string }[]>`SELECT idm_reset_two_factor(${id}::uuid, ${body.reason}::text) AS s`;
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user) throw problems.notFound();
+    const fresh = this.twoFactor.newEnrolCode(user.id);
+    const rows = await this.db.tx.$queryRaw<{ s: string; e: Date | null }[]>`
+      SELECT r_state AS s, r_expires AS e FROM idm_reset_two_factor(${user.id}::uuid, ${body.reason}::text, ${fresh.hash}::text)`;
     await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
-    this.states.invalidate(id);
-    await this.syslog.write('info', 'two_factor_reset_by_admin', { target_user: id }, auth.user.id);
-    return { two_factor: rows[0]!.s };
+    this.states.invalidate(user.id);
+    await this.syslog.write('info', 'two_factor_reset_by_admin', { target_user: user.id }, auth.user.id);
+    return changeOf(rows[0]!, fresh.code);
+  }
+
+  /**
+   * POST /users/{id}/two-factor/enrol-code: a new enrolment code for a user who is waiting for enrolment (lost or expired code). The old code
+   * stops working. Same rights, reason, step-up and self rule as the toggle. 409 when the user is not waiting for enrolment.
+   */
+  async issueEnrolCode(auth: AuthContext, id: string, raw: unknown): Promise<TwoFactorChange> {
+    const body = parse(twoFactorResetSchema, raw);
+    await this.access.requireAdmin('users', 'administer');
+    await this.stepUp.require(auth);
+    const user = uuidSchema.safeParse(id).success ? await this.repo.find(id) : null;
+    if (!user) throw problems.notFound();
+    const fresh = this.twoFactor.newEnrolCode(user.id);
+    const rows = await this.db.tx.$queryRaw<{ e: Date }[]>`SELECT idm_issue_two_factor_enrol_code(${user.id}::uuid, ${body.reason}::text, ${fresh.hash}::text) AS e`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    this.states.invalidate(user.id);
+    await this.syslog.write('info', 'two_factor_enrol_code_issued_by_admin', { target_user: user.id }, auth.user.id);
+    return changeOf({ s: 'pending_enrolment', e: rows[0]!.e }, fresh.code);
   }
 
   private requireStrong(password: string, ctx: { email: string; employeeId: string | null; phone: string | null }, path: string): void {

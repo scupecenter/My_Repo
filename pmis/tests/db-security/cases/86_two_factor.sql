@@ -1,4 +1,4 @@
--- Two-factor (TOTP) for local accounts (migration 0033, ADR 0014). The application role never reads the encrypted secrets, the
+-- Two-factor (TOTP) for local accounts (migrations 0033 and 0034, ADR 0014). The application role never reads the encrypted secrets, the
 -- recovery-code hashes or the pending sign-ins; it reaches them only through the auth_totp_* / auth_pending_* functions, each of
 -- which works for the signed-in user's own row. Only a System Admin, or a delegate holding users.administer, turns two-factor on,
 -- off or resets it, never for themselves. A session for a user whose two-factor is on needs a code success in the database.
@@ -88,7 +88,7 @@ SELECT auth_totp_result('{{BOB}}', true, 1);
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 only your own enrolment
-SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('a', 64));
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('a', 64), repeat('c', 64));
 -- @end
 
 -- @case TF-11
@@ -196,7 +196,7 @@ SELECT recovery_remaining FROM auth_totp_state('{{BOB}}');
 -- @actor ADMIN
 -- @region *
 -- @expect output pending_enrolment
-SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test');
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
 -- @end
 
 -- @case TF-23
@@ -205,7 +205,7 @@ SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test');
 -- @actor ADMIN
 -- @region *
 -- @expect error 42501 no recent successful sign-in with a code
-SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test');
+SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
 SET app.user_id = '{{BOB}}';
 SELECT auth_local_result('{{BOB}}', true);
 SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", repeat('c', 43), NULL, 'guard test');
@@ -219,4 +219,186 @@ SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", re
 -- @expect output 1
 SELECT auth_local_result('{{BOB}}', true);
 SELECT count(*) FROM (SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", repeat('c', 43), NULL, 'guard test')) s;
+-- @end
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Migration 0034: the one-time enrolment code. A password alone must never enrol a phone: the hash of the code is unreadable
+-- for the application role, the code is matched and used up inside the database, and a miss counts toward the lock.
+-- ---------------------------------------------------------------------------------------------------------------------
+
+-- @case TF-25
+-- @title Alice reads the enrolment-code hashes directly
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 permission denied
+SELECT enrol_code_hash FROM user_totp;
+-- @end
+
+-- @case TF-26
+-- @title Alice reads when the enrolment codes end (the whole table is closed to her)
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 permission denied
+SELECT enrol_code_expires_at FROM user_totp;
+-- @end
+
+-- @case TF-27
+-- @title Alice plants her own enrolment-code hash on Bob's account
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 permission denied
+UPDATE user_totp SET enrol_code_hash = repeat('a', 64), enrol_code_expires_at = now() + interval '1 day' WHERE user_id = '{{BOB}}';
+-- @end
+
+-- @case TF-28
+-- @title Alice calls the internal code matcher (a miss counts toward Bob's lock, a hit would confirm a guess)
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 permission denied for function
+SELECT auth_totp_check_enrol_code('{{BOB}}', repeat('a', 64));
+-- @end
+
+-- @case TF-29
+-- @title Alice, who is not an admin, issues a new enrolment code for Bob
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 System Admin or a delegation covering users.administer required
+SELECT idm_issue_two_factor_enrol_code('{{BOB}}', 'Let me in', repeat('a', 64));
+-- @end
+
+-- @case TF-30
+-- @title A delegate with users.edit and users.delete, but not users.administer, issues a new enrolment code
+-- @category two-factor
+-- @actor DEL_ALL
+-- @region *
+-- @expect error 42501 System Admin or a delegation covering users.administer required
+SELECT idm_issue_two_factor_enrol_code('{{BOB}}', 'Not my right', repeat('a', 64));
+-- @end
+
+-- @case TF-31
+-- @title The System Admin issues an enrolment code for himself
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 you cannot change your own account
+SELECT idm_issue_two_factor_enrol_code('{{ADMIN}}', 'Myself', repeat('a', 64));
+-- @end
+
+-- @case TF-32
+-- @title The System Admin issues a code for a user whose two-factor is off (nothing to enrol)
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect error P0001 no enrolment code can be issued
+SELECT idm_issue_two_factor_enrol_code('{{BOB}}', 'Not waiting', repeat('a', 64));
+-- @end
+
+-- @case TF-33
+-- @title The System Admin turns on Bob's two-factor without a code hash (the old behaviour: enrolment with a password alone)
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect error 22023 an enrolment code hash is required
+SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test');
+-- @end
+
+-- @case TF-34
+-- @title The old three-argument enrolment start (no code) no longer exists
+-- @category two-factor
+-- @actor BOB
+-- @region 1
+-- @expect error 42883 does not exist
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('a', 64));
+-- @end
+
+-- @case TF-35
+-- @title Alice starts an enrolment for Bob with a code hash (planting her own secret on his account)
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 only your own enrolment
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('a', 64), repeat('c', 64));
+-- @end
+
+-- @case TF-36
+-- @title Alice confirms an enrolment for Bob
+-- @category two-factor
+-- @actor ALICE
+-- @region 1
+-- @expect error 42501 only your own enrolment
+SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('a', 64), repeat('c', 64));
+-- @end
+
+-- @case TF-37
+-- @title Bob, waiting for enrolment, starts it with a wrong code: refused ('bad'), and no secret is stored
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect output bad
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SET app.user_id = '{{BOB}}';
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('c', 64));
+-- @end
+
+-- @case TF-38
+-- @title Positive control for TF-37: with the right code hash the enrolment starts ('ok')
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect output ok
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SET app.user_id = '{{BOB}}';
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
+-- @end
+
+-- @case TF-39
+-- @title Bob confirms with a wrong enrolment code even after a right start: refused ('bad'), nothing is activated
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect output bad
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SET app.user_id = '{{BOB}}';
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
+SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('c', 64));
+-- @end
+
+-- @case TF-40
+-- @title Positive control for TF-39: with the right enrolment code the enrolment is confirmed ('ok')
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect output ok
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SET app.user_id = '{{BOB}}';
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
+SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('a', 64));
+-- @end
+
+-- @case TF-42
+-- @title Once confirmed, the same code (and the same sign-in) opens nothing: Bob cannot start a second enrolment
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 not waiting for enrolment
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SET app.user_id = '{{BOB}}';
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
+SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('a', 64));
+SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
+-- @end
+
+-- @case TF-41
+-- @title Positive control: the System Admin issues a new enrolment code for Bob who is waiting (rolled back by the runner)
+-- @category two-factor
+-- @actor ADMIN
+-- @region *
+-- @expect output t
+SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
+SELECT idm_issue_two_factor_enrol_code('{{BOB}}', 'Code lost', repeat('b', 64)) > now();
 -- @end

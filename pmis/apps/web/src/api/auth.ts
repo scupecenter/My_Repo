@@ -35,13 +35,14 @@ export function useTwoFactorSignIn() {
 
 /** Secrets must not stay in the mutation cache (`gcTime: 0`). */
 export function useEnrolStart() {
-  return useMutation<TwoFactorEnrolment, ApiError, void>({ gcTime: 0, mutationFn: () => api.post<TwoFactorEnrolment>('/auth/local/2fa/enrol/start') });
+  // Contract 0.6.0: the one-time enrolment code is needed before the QR code is shown.
+  return useMutation<TwoFactorEnrolment, ApiError, { enrol_code: string }>({ gcTime: 0, mutationFn: (body) => api.post<TwoFactorEnrolment>('/auth/local/2fa/enrol/start', { body }) });
 }
 
 /** Confirms the first code. The answer carries the session (adopted here) and the recovery codes (shown once by the caller). */
 export function useEnrolConfirm() {
   const adopt = useAdoptSession();
-  return useMutation<TwoFactorEnrolled, ApiError, { code: string }>({
+  return useMutation<TwoFactorEnrolled, ApiError, { code: string; enrol_code: string }>({
     gcTime: 0,
     mutationFn: (body) => api.post<TwoFactorEnrolled>('/auth/local/2fa/enrol/confirm', { body }),
     onSuccess: (r) => adopt(r.session),
@@ -57,10 +58,12 @@ export function useRegenerateRecoveryCodes() {
   });
 }
 
-/** Admin: turn two-factor on or off for a user. The server asks for the step-up (password and code) through the client handler. */
+/** Admin: turn two-factor on or off for a user. The server asks for the step-up (password and code) through the client handler.
+ *  Turning it on returns the one-time enrolment code: shown once, so it must not stay in the mutation cache (`gcTime: 0`; the dialog calls `reset()`). */
 export function useSetTwoFactor(userId: string) {
   const qc = useQueryClient();
   return useMutation<TwoFactorState, ApiError, { enabled: boolean; reason: string }>({
+    gcTime: 0,
     mutationFn: (body) => api.put<TwoFactorState>(`/users/${userId}/two-factor`, { body }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['user', userId] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
   });
@@ -69,7 +72,18 @@ export function useSetTwoFactor(userId: string) {
 export function useResetTwoFactor(userId: string) {
   const qc = useQueryClient();
   return useMutation<TwoFactorState, ApiError, { reason: string }>({
+    gcTime: 0,
     mutationFn: (body) => api.post<TwoFactorState>(`/users/${userId}/two-factor/reset`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['user', userId] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+/** Admin: a new one-time enrolment code for a user who is waiting for enrolment (the old code stops working). Shown once. */
+export function useIssueEnrolCode(userId: string) {
+  const qc = useQueryClient();
+  return useMutation<TwoFactorState, ApiError, { reason: string }>({
+    gcTime: 0,
+    mutationFn: (body) => api.post<TwoFactorState>(`/users/${userId}/two-factor/enrol-code`, { body }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['user', userId] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
   });
 }

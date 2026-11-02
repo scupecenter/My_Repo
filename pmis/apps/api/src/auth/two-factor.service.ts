@@ -10,8 +10,8 @@ import { Clock, systemClock } from './rate-limiter';
 import { SyslogService } from './syslog.service';
 import { parseCookie } from './session.service';
 import {
-  base32Encode, decryptSecret, encryptSecret, generateRecoveryCodes, generateSecret, hashRecoveryCode, matchStep,
-  normaliseRecoveryCode, otpauthUri, parseEncKey, TOTP_DIGITS, TOTP_ISSUER, TOTP_PERIOD_S,
+  base32Encode, decryptSecret, encryptSecret, generateEnrolCode, generateRecoveryCodes, generateSecret, hashEnrolCode, hashRecoveryCode, matchStep,
+  normaliseEnrolCode, normaliseRecoveryCode, otpauthUri, parseEncKey, TOTP_DIGITS, TOTP_ISSUER, TOTP_PERIOD_S,
 } from './totp';
 
 export type TwoFactorLabel = 'off' | 'pending_enrolment' | 'on';
@@ -30,6 +30,9 @@ export const PENDING_COOKIE_PATH = '/api/v1/auth/local/2fa';
 
 export type CodeInput = { code: string } | { recovery_code: string };
 export type CodeFailure = 'bad' | 'replay' | 'locked';
+/** Why an enrolment code was refused: wrong (or none issued), past its end, or the account is locked. */
+export type EnrolFailure = 'bad' | 'expired' | 'locked';
+const enrolFailure = (r: string | undefined): EnrolFailure => (r === 'expired' ? 'expired' : r === 'locked' ? 'locked' : 'bad');
 export type CodeOutcome = { ok: true; via: 'totp' | 'recovery'; step: number | null } | { ok: false; reason: CodeFailure; via: 'totp' | 'recovery' };
 
 const sha256Hex = (s: string): string => createHash('sha256').update(s).digest('hex');
@@ -152,21 +155,40 @@ export class TwoFactorService {
   }
 
   // ------------------------------------------------------------------ enrolment
-  /** A new secret for the QR code, stored encrypted as the pending secret. The clear secret leaves only in this answer. */
-  async beginEnrol(userId: string, account: string, pendingToken: string): Promise<{ secret: string; otpauth_uri: string }> {
-    const raw = generateSecret();
-    // bound to the pending sign-in that started it: another sign-in cannot replace this QR code for 10 minutes
-    await this.db.tx.$executeRaw`SELECT auth_totp_begin_enrol(${userId}::uuid, ${encryptSecret(this.key, userId, raw)}, ${sha256Hex(pendingToken)})`;
-    const secret = base32Encode(raw);
-    return { secret, otpauth_uri: otpauthUri(secret, account) };
+  /** A new one-time enrolment code for a user (shown once to the admin). Only the keyed hash goes to the database. */
+  newEnrolCode(userId: string): { code: string; hash: string } {
+    const code = generateEnrolCode();
+    return { code, hash: hashEnrolCode(this.key, userId, normaliseEnrolCode(code)) };
   }
 
-  /** Moves the pending secret to the active one and stores new recovery codes. Returns the codes (shown once). */
-  async confirmEnrol(userId: string, step: number, pendingToken: string): Promise<string[]> {
+  /** Hash of what the user typed. A text that is not a well-formed code is hashed too, so the database counts it as a wrong code. */
+  private enrolHash(userId: string, typed: string): string {
+    return hashEnrolCode(this.key, userId, normaliseEnrolCode(typed));
+  }
+
+  /**
+   * A new secret for the QR code, stored encrypted as the pending secret, but only after the enrolment code matched in the database.
+   * The clear secret leaves only in this answer. A wrong or expired code is an outcome (counted toward the lock), not an exception.
+   */
+  async beginEnrol(userId: string, account: string, pendingToken: string, enrolCode: string): Promise<{ ok: true; secret: string; otpauth_uri: string } | { ok: false; reason: EnrolFailure }> {
+    const raw = generateSecret();
+    // bound to the pending sign-in that started it: another sign-in cannot replace this QR code for 10 minutes
+    const r = await this.db.tx.$queryRaw<{ r: string }[]>`SELECT auth_totp_begin_enrol(${userId}::uuid, ${encryptSecret(this.key, userId, raw)}, ${sha256Hex(pendingToken)}, ${this.enrolHash(userId, enrolCode)}) AS r`;
+    if (r[0]?.r !== 'ok') return { ok: false, reason: enrolFailure(r[0]?.r) };
+    const secret = base32Encode(raw);
+    return { ok: true, secret, otpauth_uri: otpauthUri(secret, account) };
+  }
+
+  /**
+   * Moves the pending secret to the active one, uses up the enrolment code (checked again here) and stores new recovery codes.
+   * Returns the recovery codes (shown once), or why the enrolment code was refused.
+   */
+  async confirmEnrol(userId: string, step: number, pendingToken: string, enrolCode: string): Promise<{ ok: true; codes: string[] } | { ok: false; reason: EnrolFailure }> {
     const codes = generateRecoveryCodes();
     const hashes = codes.map((c) => hashRecoveryCode(this.key, c.replace('-', '')));
-    await this.db.tx.$executeRaw`SELECT auth_totp_confirm_enrol(${userId}::uuid, ${step}::bigint, ${hashes}::text[], ${sha256Hex(pendingToken)})`;
-    return codes;
+    const r = await this.db.tx.$queryRaw<{ r: string }[]>`SELECT auth_totp_confirm_enrol(${userId}::uuid, ${step}::bigint, ${hashes}::text[], ${sha256Hex(pendingToken)}, ${this.enrolHash(userId, enrolCode)}) AS r`;
+    if (r[0]?.r !== 'ok') return { ok: false, reason: enrolFailure(r[0]?.r) };
+    return { ok: true, codes };
   }
 
   async regenerateRecovery(userId: string): Promise<string[]> {
@@ -177,8 +199,17 @@ export class TwoFactorService {
   }
 
   // ------------------------------------------------------------------ outcomes
-  async logFailure(userId: string, reason: CodeFailure, via: string, ip: string | null, purpose: string, requestId?: string): Promise<void> {
-    await this.syslog.write('warn', 'local_two_factor_failed', { reason, via, purpose, ip }, userId, requestId);
+  async logFailure(userId: string, reason: CodeFailure, via: string, ip: string | null, purpose: string, requestId?: string, detail?: string): Promise<void> {
+    await this.syslog.write('warn', 'local_two_factor_failed', { reason, via, purpose, ip, ...(detail ? { detail } : {}) }, userId, requestId);
+  }
+
+  /** The answer for a refused enrolment code. `commit` keeps the failure counter when the request runs in a transaction that would roll back. */
+  enrolProblem(reason: EnrolFailure, commit: boolean): ProblemException {
+    if (reason === 'locked') return this.problem('locked', commit);
+    if (reason === 'expired') {
+      return new ProblemException(401, 'enrol_code_expired', { detail: 'This enrolment code has expired. Ask your administrator for a new one.', commit });
+    }
+    return new ProblemException(401, 'invalid_enrol_code', { detail: 'The enrolment code is not correct. Check it with your administrator, who can issue a new one.', commit });
   }
 
   problem(reason: CodeFailure, commit: boolean): ProblemException {

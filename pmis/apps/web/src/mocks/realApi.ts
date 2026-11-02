@@ -11,7 +11,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/auth/local/login'],
   ['post', '/auth/local/password'],
   ['post', '/auth/local/step-up'],
-  // Contract 0.5.0: two-factor (TOTP) for local accounts (apps/api: auth, users; migration 0033).
+  // Contract 0.5.0 and 0.6.0: two-factor (TOTP) for local accounts and its one-time enrolment code (apps/api: auth, users; migrations 0033, 0034).
   ['post', '/auth/local/2fa'],
   ['post', '/auth/local/2fa/enrol/start'],
   ['post', '/auth/local/2fa/enrol/confirm'],
@@ -28,6 +28,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/users/:id/password-reset'],
   ['put', '/users/:id/two-factor'],
   ['post', '/users/:id/two-factor/reset'],
+  ['post', '/users/:id/two-factor/enrol-code'],
   ['post', '/users/:id/delete'],
   ['post', '/users/:id/restore'],
   ['get', '/groups'],

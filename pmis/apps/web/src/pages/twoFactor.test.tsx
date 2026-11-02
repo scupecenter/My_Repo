@@ -14,12 +14,21 @@ import { Users } from './Users';
 
 const fail = (p: Promise<unknown>) => p.then(() => { throw new Error('expected the call to fail'); }, (e: ApiError) => e);
 /** Two-factor on for a demo account, as an admin would have left it. `secret` null = not set up yet. */
-function setTwoFactor(key: string, secret: string | null) {
+const ENROL = 'K7M2-9QXA';
+function setTwoFactor(key: string, secret: string | null, opt: { code?: string | null; expires?: number } = {}) {
   const c = cred(key)!;
-  c.tf = { on: true, secret, pending: null, codes: secret ? newRecoveryCodes() : [], lastStep: null, failures: 0 };
+  c.tf = {
+    on: true, secret, pending: null, codes: secret ? newRecoveryCodes() : [], lastStep: null, failures: 0,
+    // a user who is waiting for enrolment holds the one-time code an admin handed over (contract 0.6.0)
+    enrolCode: secret ? null : opt.code === undefined ? ENROL : opt.code, enrolExpires: secret ? null : opt.expires ?? Date.now() + 72 * 3600_000,
+  };
   save();
   return c.tf;
 }
+const enterCode = async (u: ReturnType<typeof userEvent.setup>, code: string) => {
+  await u.type(screen.getByTestId('enrol-admin-code'), code);
+  await u.click(screen.getByTestId('enrol-admin-code-submit'));
+};
 const codeAt = (secret: string, offset = 0) => hotp(secret, stepOf(Date.now()) + offset);  // async: WebCrypto
 const fillLogin = async (u: ReturnType<typeof userEvent.setup>, id: string, pw: string) => {
   await u.type(screen.getByTestId('login-identifier'), id);
@@ -108,12 +117,57 @@ describe('sign-in with a code', () => {
 });
 
 describe('forced enrolment', () => {
-  it('shows the QR code and the manual key, confirms with a code, and shows the recovery codes once', async () => {
+  it('asks for the enrolment code first: no QR code, no secret until the right code is entered', async () => {
+    setTwoFactor('engineer', null);
+    const u = userEvent.setup();
+    renderApp(<App />, { route: '/login' });
+    await fillLogin(u, '1204', DEMO_PASSWORDS.engineer);
+    expect(await screen.findByTestId('enrol-code-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('enrol-qr')).toBeNull();
+    expect(screen.queryByTestId('enrol-key')).toBeNull();
+    expect(screen.getByTestId('enrol-admin-code-submit')).toBeDisabled(); // incomplete
+    await u.type(screen.getByTestId('enrol-admin-code'), 'aaaabbbb');
+    expect(screen.getByTestId('enrol-admin-code')).toHaveValue('AAAA-BBBB'); // upper case, dash added
+    await u.click(screen.getByTestId('enrol-admin-code-submit'));
+    expect(await screen.findByTestId('enrol-admin-code-error')).toHaveTextContent(/not correct/i);
+    expect(screen.queryByTestId('enrol-qr')).toBeNull();
+    expect(cred('engineer')!.tf!.pending).toBeNull(); // nothing was made
+    expect(cred('engineer')!.tf!.failures).toBe(1); // a wrong code counts like a wrong authenticator code
+  });
+
+  it('an expired code is explained in plain words, and an administrator is named as the way out', async () => {
+    setTwoFactor('engineer', null, { expires: Date.now() - 60_000 });
+    const u = userEvent.setup();
+    renderApp(<App />, { route: '/login' });
+    await fillLogin(u, '1204', DEMO_PASSWORDS.engineer);
+    await screen.findByTestId('enrol-code-form');
+    expect(screen.getByTestId('enrol-code-form')).toHaveTextContent(/ask your administrator/i);
+    await enterCode(u, ENROL);
+    expect(await screen.findByTestId('enrol-admin-code-error')).toHaveTextContent(/expired.*new one/i);
+    expect(screen.queryByTestId('enrol-qr')).toBeNull();
+  });
+
+  it('five wrong codes lock the account like wrong authenticator codes', async () => {
+    setTwoFactor('engineer', null);
+    const u = userEvent.setup();
+    renderApp(<App />, { route: '/login' });
+    await fillLogin(u, '1204', DEMO_PASSWORDS.engineer);
+    await screen.findByTestId('enrol-code-form');
+    for (let i = 0; i < 5; i++) {
+      await u.clear(screen.getByTestId('enrol-admin-code'));
+      await enterCode(u, `ZZZZ999${i + 1}`);
+      await waitFor(() => expect(cred('engineer')!.tf!.failures).toBe(i + 1 === 5 ? 0 : i + 1));
+    }
+    expect(cred('engineer')!.locked_until).toBeGreaterThan(Date.now() + 14 * 60_000);
+  });
+
+  it('shows the QR code and the manual key after the code, confirms with a code, and shows the recovery codes once', async () => {
     setTwoFactor('engineer', null);
     const u = userEvent.setup();
     renderApp(<App />, { route: '/login' });
     await fillLogin(u, '1204', DEMO_PASSWORDS.engineer);
     expect(await screen.findByTestId('enrol-forced')).toBeInTheDocument();
+    await enterCode(u, 'k7m2 9qxa'); // typing variants are fine
     const qr = await screen.findByTestId('enrol-qr');
     expect(qr.tagName.toLowerCase()).toBe('svg');
     expect(qr.querySelector('path')?.getAttribute('d')?.length).toBeGreaterThan(200);
@@ -139,6 +193,7 @@ describe('forced enrolment', () => {
     await u.click(screen.getByTestId('recovery-continue'));
     expect(await screen.findByTestId('page-my-work')).toBeInTheDocument();
     expect(cred('engineer')!.tf!.secret).toBe(key);
+    expect(cred('engineer')!.tf!.enrolCode).toBeNull(); // single use
   });
 
   it('only the enrolment endpoints answer with the pending sign-in', async () => {
@@ -147,9 +202,22 @@ describe('forced enrolment', () => {
     expect(first.next).toBe('enrol');
     expect((await fail(api.get('/me'))).status).toBe(401);
     expect((await fail(api.post('/auth/local/2fa', { body: { code: '123456' } }))).status).toBe(401);
-    const started = await api.post<{ secret: string; otpauth_uri: string; issuer: string }>('/auth/local/2fa/enrol/start');
+    // contract 0.6.0: no code, no secret and no QR code
+    const none = await fail(api.post('/auth/local/2fa/enrol/start'));
+    expect(none.status).toBe(422);
+    const wrong = await fail(api.post('/auth/local/2fa/enrol/start', { body: { enrol_code: 'AAAA-BBBB' } }));
+    expect(wrong.status).toBe(401);
+    expect(wrong.code).toBe('invalid_enrol_code');
+    expect(cred('engineer')!.tf!.pending).toBeNull();
+    const started = await api.post<{ secret: string; otpauth_uri: string; issuer: string }>('/auth/local/2fa/enrol/start', { body: { enrol_code: ENROL } });
     expect(started.issuer).toBe('GSDN PMIS');
     expect(started.otpauth_uri).toMatch(/^otpauth:\/\/totp\/GSDN%20PMIS:/);
+    // the code is checked again at the confirm step, and used up there
+    const noCode = await fail(api.post('/auth/local/2fa/enrol/confirm', { body: { code: await codeAt(started.secret) } }));
+    expect(noCode.status).toBe(422);
+    const badCode = await fail(api.post('/auth/local/2fa/enrol/confirm', { body: { code: await codeAt(started.secret), enrol_code: 'AAAA-BBBB' } }));
+    expect(badCode.code).toBe('invalid_enrol_code');
+    expect(cred('engineer')!.tf!.secret).toBeNull();
   });
 
   it('renders the QR code and the recovery codes in dark mode and Arabic', async () => {
@@ -158,6 +226,10 @@ describe('forced enrolment', () => {
     const u = userEvent.setup();
     renderApp(<App />, { route: '/login', locale: 'ar' });
     await fillLogin(u, '1204', DEMO_PASSWORDS.engineer);
+    expect(await screen.findByTestId('enrol-code-form')).toHaveTextContent('أدخل رمز التسجيل');
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(screen.getByTestId('enrol-admin-code')).toHaveAttribute('dir', 'ltr');
+    await enterCode(u, ENROL);
     expect(await screen.findByTestId('enrol-form')).toHaveTextContent('إعداد التحقق الثنائي');
     const qr = await screen.findByTestId('enrol-qr');
     expect(qr).toHaveClass('bg-white'); // scannable on a dark page
@@ -224,22 +296,87 @@ describe('Users & Roles: the 2FA badge and the admin actions', () => {
     await u.type(screen.getByTestId('two-factor-dialog-reason'), 'Finance approver');
     await u.click(screen.getByTestId('two-factor-dialog-submit'));
     await stepUp(u);
+    // the one-time enrolment code is shown once, with copy, the expiry and a button that closes it
+    const dlg = await screen.findByTestId('enrol-code-dialog');
+    const shown = within(dlg).getByTestId('enrol-code-value').textContent!;
+    expect(shown).toMatch(/^[A-HJ-NP-Z2-9]{4}-[A-HJ-NP-Z2-9]{4}$/);
+    expect(shown).toBe(cred('engineer')!.tf!.enrolCode);
+    expect(within(dlg).getByTestId('enrol-code-expiry')).toHaveTextContent(/expires on/i);
+    expect(within(dlg).getByTestId('enrol-code-warning')).toBeInTheDocument();
+    expect(within(dlg).getByTestId('enrol-code-copy')).toBeInTheDocument();
+    await u.keyboard('{Escape}');
+    expect(screen.getByTestId('enrol-code-dialog')).toBeInTheDocument(); // not lost by a stray key
+    await u.click(within(dlg).getByTestId('enrol-code-done'));
+    await waitFor(() => expect(screen.queryByTestId('enrol-code-dialog')).toBeNull());
     await waitFor(() => expect(screen.getByTestId('tf-badge-1204')).toHaveAttribute('data-state', 'pending_enrolment'));
     expect(cred('engineer')!.tf).toMatchObject({ on: true, secret: null });
+    expect(await screen.findByTestId('enrol-code-status')).toHaveAttribute('data-state', 'active');
 
-    // enrolled by the user, then reset by the admin
+    // enrolled by the user, then reset by the admin: a new code is shown
     cred('engineer')!.tf = { on: true, secret: newSecret(), pending: null, codes: newRecoveryCodes(), lastStep: null, failures: 0 };
     save();
     await u.click(await screen.findByTestId('two-factor-reset'));
     await u.type(screen.getByTestId('two-factor-dialog-reason'), 'Lost phone');
     await u.click(screen.getByTestId('two-factor-dialog-submit'));
+    const again = await screen.findByTestId('enrol-code-dialog');
+    expect(within(again).getByTestId('enrol-code-value').textContent).toBe(cred('engineer')!.tf!.enrolCode);
+    await u.click(within(again).getByTestId('enrol-code-done'));
     await waitFor(() => expect(cred('engineer')!.tf).toMatchObject({ on: true, secret: null, codes: [] }));
+
+    // a new code for a user who is waiting: the old one stops working
+    const before = cred('engineer')!.tf!.enrolCode;
+    await u.click(await screen.findByTestId('two-factor-new-code'));
+    await u.type(screen.getByTestId('two-factor-dialog-reason'), 'The user lost the note');
+    await u.click(screen.getByTestId('two-factor-dialog-submit'));
+    const fresh = await screen.findByTestId('enrol-code-dialog');
+    const freshCode = within(fresh).getByTestId('enrol-code-value').textContent!;
+    expect(freshCode).not.toBe(before);
+    expect(cred('engineer')!.tf!.enrolCode).toBe(freshCode);
+    await u.click(within(fresh).getByTestId('enrol-code-done'));
+    await waitFor(() => expect(screen.queryByTestId('enrol-code-dialog')).toBeNull());
 
     await u.click(await screen.findByTestId('two-factor-off'));
     await u.type(screen.getByTestId('two-factor-dialog-reason'), 'Phone replaced, user re-enrols later');
     await u.click(screen.getByTestId('two-factor-dialog-submit'));
     await waitFor(() => expect(screen.getByTestId('tf-badge-1204')).toHaveAttribute('data-state', 'off'));
+    expect(screen.queryByTestId('enrol-code-dialog')).toBeNull(); // turning it off makes no code
     expect(cred('engineer')!.tf).toBeUndefined();
+  });
+
+  it('shows when the code ended, offers a new one, and the dialog reads right in Arabic and dark mode', async () => {
+    setTwoFactor('engineer', null, { expires: Date.now() - 3600_000 });
+    document.documentElement.dataset.theme = 'dark';
+    await asAdmin();
+    const u = userEvent.setup();
+    renderApp(<Routes><Route path="/admin/users/:userId" element={<UserDetailPage />} /></Routes>, { route: `/admin/users/${uid('1204')}`, locale: 'ar' });
+    expect(await screen.findByTestId('enrol-code-status')).toHaveAttribute('data-state', 'expired');
+    await u.click(await screen.findByTestId('two-factor-new-code'));
+    await u.type(screen.getByTestId('two-factor-dialog-reason'), 'انتهت صلاحية الرمز');
+    await u.click(screen.getByTestId('two-factor-dialog-submit'));
+    await stepUp(u);
+    const dlg = await screen.findByTestId('enrol-code-dialog');
+    expect(dlg).toHaveTextContent('رمز التسجيل');
+    expect(document.documentElement.dir).toBe('rtl');
+    expect(within(dlg).getByTestId('enrol-code-value')).toHaveAttribute('dir', 'ltr');
+    expect(within(dlg).getByTestId('enrol-code-expiry')).toHaveTextContent('تنتهي صلاحيته');
+    await u.click(within(dlg).getByTestId('enrol-code-done'));
+    delete document.documentElement.dataset.theme;
+  });
+
+  it('issuing a code is refused for a user who is not waiting, for yourself, and for a user without admin rights', async () => {
+    await asAdmin();
+    await api.post('/auth/local/step-up', { body: { password: DEMO_PASSWORDS.pm } });
+    const off = await fail(api.post(`/users/${uid('1204')}/two-factor/enrol-code`, { body: { reason: 'nothing to enrol' } }));
+    expect(off.status).toBe(409);
+    const self = await fail(api.post(`/users/${uid('1001')}/two-factor/enrol-code`, { body: { reason: 'for myself' } }));
+    expect(self.status).toBe(403);
+    expect(self.code).toBe('self_beneficiary');
+    await api.post('/auth/logout');
+    const s = await api.post<{ csrf_token: string }>('/auth/local/login', { body: { identifier: '1204', password: DEMO_PASSWORDS.engineer } });
+    setCsrfToken(s.csrf_token);
+    setTwoFactor('reviewer', null);
+    const denied = await fail(api.post(`/users/${uid('1102')}/two-factor/enrol-code`, { body: { reason: 'let me in' } }));
+    expect(denied.status).toBe(403);
   });
 
   it('nobody changes their own: the buttons are disabled on your own page and the server refuses', async () => {

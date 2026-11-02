@@ -45,9 +45,10 @@ export class AuthController {
   @Public()
   @Post('local/2fa/enrol/start')
   @HttpCode(200)
-  enrolStart(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<Record<string, unknown>> {
+  enrolStart(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<Record<string, unknown>> {
+    this.needJson(req);
     res.setHeader('Cache-Control', 'no-store');
-    return this.auth.enrolStart(this.twoFactor.pendingTokenFrom(req), req.ip ?? null);
+    return this.auth.enrolStart(this.twoFactor.pendingTokenFrom(req), body, req.ip ?? null, req.id ?? '');
   }
 
   @Public()

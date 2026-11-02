@@ -27,6 +27,10 @@ const eitherMsg = { message: 'Send code or recovery_code, not both.', path: ['co
 export const twoFactorSchema = z.object(codeFields).strict().refine(eitherCode, eitherMsg);
 const stepUpSchema = z.object({ password: z.string().max(128), ...codeFields }).strict();
 const confirmSchema = z.object({ code: z.string().trim().min(1).max(16) }).strict();
+/** The one-time enrolment code an admin handed over (XXXX-XXXX; spaces and a missing dash are fine). A missing one is a 422 and counts for nothing. */
+const enrolCodeField = z.string().trim().min(1, 'Enter the enrolment code from your administrator.').max(32);
+const enrolStartSchema = z.object({ enrol_code: enrolCodeField }).strict();
+const enrolConfirmSchema = z.object({ code: z.string().trim().min(1).max(16), enrol_code: enrolCodeField }).strict();
 
 function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | null {
   if (b.recovery_code !== undefined) return { recovery_code: b.recovery_code };
@@ -281,22 +285,35 @@ export class AuthService {
     return this.sessionFor(out.created.token, ip);
   }
 
-  /** POST /auth/local/2fa/enrol/start: a fresh secret and the otpauth URI for the QR code. Only for a pending enrolment. */
-  async enrolStart(pendingToken: string | undefined, ip: string | null): Promise<Record<string, unknown>> {
+  /**
+   * POST /auth/local/2fa/enrol/start: a fresh secret and the otpauth URI for the QR code. Only for a pending enrolment, and only with the
+   * one-time enrolment code an admin issued: without it nothing is shown and no secret is stored. A wrong code counts toward the lock.
+   */
+  async enrolStart(pendingToken: string | undefined, rawBody: unknown, ip: string | null, requestId: string): Promise<Record<string, unknown>> {
+    const { enrol_code } = parse(enrolStartSchema, rawBody);
     const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'enrol');
-    return this.asUser(userId, async () => {
+    const userWait = this.limiter.hit(`2fa:user:${userId}`, LOGIN_LIMIT_PER_IP);
+    if (userWait) throw problems.rateLimited(userWait);
+    const out = await this.asUser(userId, async () => {
       const rows = await this.db.tx.$queryRaw<{ email: string }[]>`SELECT email FROM users WHERE id = ${userId}::uuid`;
       const email = rows[0]?.email ?? userId;
-      const e = await this.twoFactor.beginEnrol(userId, email, pendingToken as string);
-      return { ...e, issuer: TWO_FACTOR_PARAMS.issuer, account: email, algorithm: TWO_FACTOR_PARAMS.algorithm, digits: TWO_FACTOR_PARAMS.digits, period: TWO_FACTOR_PARAMS.period };
+      const e = await this.twoFactor.beginEnrol(userId, email, pendingToken as string, enrol_code);
+      if (!e.ok) {
+        await this.twoFactor.logFailure(userId, e.reason === 'locked' ? 'locked' : 'bad', 'enrol_code', ip, 'enrol_start', requestId, e.reason === 'expired' ? 'expired' : undefined);
+        return { fail: e.reason } as const;
+      }
+      return { ok: { secret: e.secret, otpauth_uri: e.otpauth_uri, issuer: TWO_FACTOR_PARAMS.issuer, account: email, algorithm: TWO_FACTOR_PARAMS.algorithm, digits: TWO_FACTOR_PARAMS.digits, period: TWO_FACTOR_PARAMS.period } } as const;
     });
+    this.states.invalidate(userId);
+    if (out.fail !== undefined) throw this.twoFactor.enrolProblem(out.fail, false);
+    return out.ok;
   }
 
   /** POST /auth/local/2fa/enrol/confirm: the first code. Turns two-factor on for the user, returns the recovery codes once, and signs in. */
   async enrolConfirm(pendingToken: string | undefined, rawBody: unknown, ip: string | null, userAgent: string | undefined, requestId: string): Promise<{ token: string; body: SessionBody; recovery_codes: string[] }> {
-    const { code } = parse(confirmSchema, rawBody);
+    const { code, enrol_code } = parse(enrolConfirmSchema, rawBody);
     const ipWait = this.limiter.hit(`2fa:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
     if (ipWait) throw problems.rateLimited(ipWait);
     const { userId } = await this.pendingOf(pendingToken, 'enrol');
@@ -309,12 +326,18 @@ export class AuthService {
         await this.twoFactor.logFailure(userId, r.reason, 'totp', ip, 'enrol', requestId);
         return { fail: r.reason } as const;
       }
-      const codes = await this.twoFactor.confirmEnrol(userId, r.step, pendingToken as string);
+      const done = await this.twoFactor.confirmEnrol(userId, r.step, pendingToken as string, enrol_code);
+      if (!done.ok) {
+        await this.twoFactor.logFailure(userId, done.reason === 'locked' ? 'locked' : 'bad', 'enrol_code', ip, 'enrol_confirm', requestId, done.reason === 'expired' ? 'expired' : undefined);
+        return { enrolFail: done.reason } as const;
+      }
+      const codes = done.codes;
       if (!(await this.twoFactor.consumePending(pendingToken as string, userId))) return { fail: 'expired' } as const;
       await this.syslog.write('info', 'local_two_factor_enrolled', { ip }, userId, requestId);
       return { codes, created: await this.sessions.create(userId, 'local', ip, userAgent) } as const;
     });
     this.states.invalidate(userId);
+    if (out.enrolFail !== undefined) throw this.twoFactor.enrolProblem(out.enrolFail, false);
     if ('fail' in out) {
       if (out.fail === 'expired') throw problems.unauthenticated('This sign-in has expired. Enter your password again.');
       throw this.twoFactor.problem(out.fail as 'bad' | 'replay' | 'locked', false);

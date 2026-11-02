@@ -62,3 +62,13 @@ export function newRecoveryCodes(): string[] {
 
 export const otpauth = (secret: string, account: string) =>
   `otpauth://totp/GSDN%20PMIS:${encodeURIComponent(account)}?secret=${secret}&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30`;
+
+/** One-time enrolment code (contract 0.6.0): 8 characters, shown as XXXX-XXXX. Mock only: the real server keeps a keyed hash. */
+export function newEnrolCode(): string {
+  const b = new Uint8Array(8);
+  crypto.getRandomValues(b);
+  const c = Array.from(b, (x) => RC[x % RC.length]).join('');
+  return `${c.slice(0, 4)}-${c.slice(4)}`;
+}
+export const normaliseEnrolCode = (raw: string) => raw.toUpperCase().replace(/[\s-]/g, '');
+export const ENROL_CODE_MS = 72 * 3600_000;

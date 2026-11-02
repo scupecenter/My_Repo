@@ -409,7 +409,7 @@ if (( NEED_ADMIN )); then
   unset ADMIN_PASSWORD ADMIN_HASH
   echo "Created. Sign in with $ADMIN_EMAIL${ADMIN_EMP:+ or $ADMIN_EMP} and the password you typed."
   echo "Two-factor (TOTP) is off for this account. Nobody turns it on or off for themselves: create a second System Admin, who can turn it on for you in Users & Roles."
-  echo "If an admin loses the authenticator and no other admin exists, reset it on the server: SELECT idm_installer_reset_two_factor('email'); (add , true to turn it off) as the database superuser."
+  echo "If an admin loses the authenticator and no other admin exists, reset it on the server: sudo bash $PMIS_DIR/tools/install/reset-two-factor.sh <email> (add --disable to turn it off). A reset prints a one-time enrolment code for the user."
 fi
 
 # ---------------------------------------------------------------- web app
