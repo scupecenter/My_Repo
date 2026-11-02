@@ -273,6 +273,11 @@ describe('hybrid mode list', () => {
       // contract 0.7.2: the main dashboard, Project Status, weight sets
       'GET /dashboard', 'GET /dashboard/export', 'GET /project-status', 'GET /project-status/snapshots',
       'GET /settings/weight-sets', 'POST /settings/weight-sets', 'GET /settings/weight-sets/:id', 'PUT /settings/weight-sets/:id', 'POST /settings/weight-sets/:id/preview', 'POST /settings/weight-sets/:id/publish',
+      // contract 0.8.0: documents (slots, files, the Documents list, the bulk zip, the Document Library)
+      'GET /tasks/:id/slots', 'POST /tasks/:id/slots', 'POST /tasks/:id/slots/suggest', 'POST /tasks/:id/slots/:slotId/files', 'DELETE /tasks/:id/slots/:slotId/files/:fileId',
+      'GET /files/:id/download', 'GET /documents', 'POST /exports/zip', 'GET /exports/zip/:id/download', 'GET /jobs/:id',
+      'GET /document-library', 'POST /document-library', 'GET /document-library/:id', 'PATCH /document-library/:id', 'POST /document-library/:id/publish',
+      'GET /document-library/:id/versions', 'GET /document-library/:id/blank-form', 'POST /document-library/:id/blank-form',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

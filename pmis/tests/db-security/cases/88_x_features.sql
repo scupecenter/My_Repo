@@ -1,4 +1,4 @@
--- Phase 4b, X1 to X7 (migrations 0031 and 0036). The application role never writes notifications, follows or status updates itself: rows are created only by the
+-- Phase 4b, X1 to X7 (migrations 0031 and 0040). The application role never writes notifications, follows or status updates itself: rows are created only by the
 -- definer functions (wf_notify, reg_notify, x_notify_watchers, x_follow, x_status_post, x_status_edit), a person reads and changes only their own notification
 -- (read_at and snoozed_until, nothing else), and the helper functions that decide who is notified are not callable from the application role.
 -- Alice has no assignment here, so she holds no right on any module or region; Bob owns one follow and one notification; the status update is for Benghazi.

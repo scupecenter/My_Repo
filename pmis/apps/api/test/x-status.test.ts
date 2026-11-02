@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
- * X7, weekly status updates (migration 0031, the lead check on edit in 0036). Regions 6 and 7. The lists are filtered by author, because other suites write
+ * X7, weekly status updates (migration 0031, the lead check on edit in 0040). Regions 6 and 7. The lists are filtered by author, because other suites write
  * updates too. Weeks are fixed Sundays of January 2026, so no figure depends on today's date or the weekday.
  */
 const A = 6;

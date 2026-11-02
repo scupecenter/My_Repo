@@ -85,7 +85,7 @@ function genTask(i: number, k: number): MockTask {
   const colour = !sla ? 'none' : state === 'locked' || state === 'na' ? 'none' : elapsed > (max ?? 99) ? 'red' : elapsed > sla[0] ? 'amber' : 'green';
   const levels = s === 9 ? 1 : 3;
   const slots: DocumentSlot[] = doc ? [{
-    id: slotIdOf(i, k, 0), doc_code: code, name_en: doc, kind: 'scanned_document', mandatory: true, formats: ['pdf', 'jpg', 'png'], max_size_mb: 20, min_files: 1, max_files: 3,
+    id: slotIdOf(i, k, 0), doc_code: code, name_en: doc, kind: 'scanned_document', mandatory: true, formats: ['pdf', 'jpg', 'png'], max_size_mb: 20, min_files: 1, max_files: null,
     status: state === 'approved' ? 'approved' : 'missing',
     files: state === 'approved' ? [{ id: slotIdOf(i, k, 9), file_group_id: slotIdOf(i, k, 8), version: 1, is_current: true, original_name: `${doc}.pdf`, download_name: `${m.code}_${code}_${doc.replace(/\W+/g, '')}.pdf`, size_bytes: 120000, uploaded_at: `${actual}T09:00:00Z` }] : [],
   }] : [];

@@ -1559,7 +1559,12 @@ export interface paths {
          */
         get: operations["listTaskSlots"];
         put?: never;
-        post?: never;
+        /**
+         * Add a slot to the task (one more candidate, or a conditional document that applies)
+         * @description For a document type placed on the task: a document that is `conditional` and whose rule the PMIS cannot evaluate yet (declare that it applies), or one more slot of the same type for another candidate
+         *     (`candidate_label`, for example each SAR candidate of A1). Allowed to Data Entry (L1) while the task is pending or ongoing. 409 `duplicate` when a slot of that type and label exists already.
+         */
+        post: operations["addTaskSlot"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1577,9 +1582,53 @@ export interface paths {
         put?: never;
         /**
          * Upload a file into a document slot (new version if the slot has files)
-         * @description Streams through the API; format by magic bytes, size and file count from the slot's document-type version (ADR 0008).
+         * @description Streams through the API (ADR 0008). Checks, in order: the caller holds Data Entry (L1) of the task (or is a System Admin when nobody holds it) and the task is pending or ongoing;
+         *     size against the slot's document-type version (413 `file_too_large`); the content type by magic bytes, never by the name or the client's content type, against the allowed formats
+         *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`).
+         *     Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
+         *     The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
          */
         post: operations["uploadSlotFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/slots/{slot_id}/files/{file_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Withdraw a file from a slot before the task is submitted
+         * @description The file is not deleted, it leaves the current set (`is_current` false, `superseded_by` null) and stays on record and in the audit log. Allowed to Data Entry (L1) while the task is pending or ongoing. The slot goes back to `missing` when it falls below `min_files`.
+         */
+        delete: operations["withdrawSlotFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/slots/suggest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest the document slot of each file from its name (multi-file upload)
+         * @description The suggestion is confirmed by the user in a dropdown; nothing is stored. Matches the document code and the words of the document name against the file name, best first.
+         */
+        post: operations["suggestSlotTypes"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1630,8 +1679,74 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download a file (audited before streaming) */
+        /**
+         * Download a file (audited before streaming)
+         * @description Needs `download_documents` on the Documents screen in the file's region (404 outside the caller's regions). The audit row is written first, then the object is streamed through the API (no public bucket, no presigned URL).
+         *     `Content-Disposition: attachment` with the computed name `SITE_TASK_DOC_APPROVEDDATE.ext` (before approval `DRAFT` and the upload date replace the approved date; a superseded version adds `_v<n>`).
+         *     `Content-Type` is the type sniffed from the content when it was stored, with `X-Content-Type-Options: nosniff`. The id may also be the blank form of a document type.
+         */
         get: operations["downloadFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Files of the document slots (the site Documents tab, and the cross-site list)
+         * @description Region and module scope apply as everywhere (a file outside the caller's regions is not listed). Needs `view` on the Documents screen. Newest first. Current files only unless `include_superseded` is true
+         *     (version history). `file_group_id` lists every version of one file.
+         */
+        get: operations["listDocuments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk zip of documents, as a background job
+         * @description Scope: one `site_id`, one `stage_code` (across the sites in scope, or one site), one `doc_code` across sites, or an explicit `file_ids` list; combined with `slot_status`.
+         *     The caller needs `download_documents` and only files in the caller's regions are packed (the job runs with the requester's verified context). Layout `SITE/STAGE/NAME`, with the computed names and a `manifest.csv`
+         *     (name, original name, SHA-256, version, slot status). Superseded versions are packed only with `include_superseded`. Starting is audited with the scope and the number of files; each download of the zip is audited again.
+         *     422 `validation_failed` when the scope is empty, or no file matches. The file is kept 7 days, then 410 `export_expired`.
+         */
+        post: operations["startZipExport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exports/zip/{export_id}/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download a finished zip (audited before streaming) */
+        get: operations["downloadZipExport"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3400,6 +3515,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/document-library/{doc_type_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        /** Published versions of a definition (newest first), with the reason and the publish scope */
+        get: operations["listDocumentTypeVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/document-library/{doc_type_id}/blank-form": {
         parameters: {
             query?: never;
@@ -3410,7 +3545,11 @@ export interface paths {
             };
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Download the blank form of a document (audited)
+         * @description Same rules as `GET /files/{file_id}/download`. 404 when the document has no blank form.
+         */
+        get: operations["downloadBlankForm"];
         put?: never;
         /** Upload the optional blank form to download */
         post: operations["uploadBlankForm"];
@@ -5750,6 +5889,18 @@ export interface components {
             };
         };
         DocumentFile: {
+            /**
+             * Format: date-time
+             * @description Photos: the EXIF capture date; null when the file has none.
+             */
+            capture_date?: string | null;
+            /** @description A photo without an EXIF date: accepted and flagged for the reviewer. */
+            unknown_capture_date?: boolean;
+            /**
+             * Format: uuid
+             * @description The file that replaced this version; null for the current version (and for a withdrawn file).
+             */
+            superseded_by?: string | null;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -5775,12 +5926,20 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             /** @enum {string} */
-            kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template";
+            kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
             mandatory: boolean;
             /** @enum {string} */
             status: "missing" | "uploaded" | "in_review" | "approved" | "rejected" | "not_required";
             reject_reason?: string | null;
             candidate_label?: string | null;
+            /** Format: uuid */
+            doc_type_id?: string;
+            form_kind?: components["schemas"]["FormKind"] | null;
+            /** @description The document has a rule: it is on the task because the rule holds, or because Data Entry declared that it applies. */
+            conditional?: boolean;
+            /** @description The caller may upload to this slot now (Data Entry of a pending or ongoing task, slot not approved or in review). */
+            can_upload?: boolean;
+            expiry_tracked?: boolean;
             formats?: string[];
             max_size_mb?: number;
             min_files?: number;
@@ -7406,9 +7565,13 @@ export interface components {
             code: string;
             /** @description Row version (ETag). */
             version: number;
-            /** @description Library version tasks snapshot on open (ADR 0007 §4). */
+            /** @description Library version tasks snapshot on open (ADR 0007 §4). 0 = never published (not on any task yet). */
             published_version?: number;
             has_unpublished_changes?: boolean;
+            /** @description Seeded from the blueprint and the Master (stages 4 to 10) and not yet reviewed by the product owner; cleared by the first publish. */
+            needs_review?: boolean;
+            /** @description Only on `GET /document-library/{doc_type_id}`: pending or ongoing tasks an "also open tasks" publish would reach. */
+            open_task_count?: number;
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"];
@@ -7417,6 +7580,55 @@ export interface components {
             code: string;
         };
         DocumentTypePatch: components["schemas"]["DocumentTypeFields"] & components["schemas"]["WithReason"] & Record<string, never>;
+        DocumentTypeVersion: {
+            version_no: number;
+            /** Format: date-time */
+            published_at: string;
+            published_by?: components["schemas"]["UserRef"];
+            /** Format: date */
+            effective_from?: string;
+            /** @enum {string} */
+            apply_to: "new_only" | "open_too";
+            reason?: string;
+            affected_open_tasks?: number;
+            spec: components["schemas"]["DocumentTypeFields"];
+        };
+        DocumentListItem: {
+            file: components["schemas"]["DocumentFile"];
+            /** Format: uuid */
+            slot_id: string;
+            /** @enum {string} */
+            slot_status: "missing" | "uploaded" | "in_review" | "approved" | "rejected" | "not_required";
+            candidate_label?: string | null;
+            doc_code: string;
+            doc_name_en: string;
+            doc_name_ar?: string | null;
+            /** @enum {string} */
+            kind: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
+            /** Format: uuid */
+            task_id?: string | null;
+            task_code?: string | null;
+            task_name?: string | null;
+            stage_code?: string | null;
+            stage_name?: string | null;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            site_name?: string | null;
+            region_id: components["schemas"]["RegionId"];
+        };
+        /** @description At least one of `site_id`, `stage_code`, `doc_code` or `file_ids`. */
+        ZipExportRequest: {
+            /** Format: uuid */
+            site_id?: string;
+            stage_code?: string;
+            doc_code?: string;
+            file_ids?: string[];
+            /** @enum {string} */
+            slot_status?: "uploaded" | "in_review" | "approved" | "rejected";
+            /** @default false */
+            include_superseded: boolean;
+        };
         /** @description Common publish body (ADR 0007 §1). */
         PublishRequest: components["schemas"]["WithReason"] & {
             /** Format: date */
@@ -11665,6 +11877,40 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    addTaskSlot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code: string;
+                    candidate_label?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The new slot. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     uploadSlotFile: {
         parameters: {
             query?: never;
@@ -11700,7 +11946,79 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    withdrawSlotFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+                slot_id: string;
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The slot after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentSlot"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    suggestSlotTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    file_names: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description One entry per file name, in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: {
+                            file_name: string;
+                            /** @description Best first; empty when nothing matches. */
+                            suggestions: {
+                                /** Format: uuid */
+                                slot_id: string;
+                                doc_code: string;
+                                score: number;
+                            }[];
+                        }[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -11797,6 +12115,108 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    listDocuments: {
+        parameters: {
+            query?: {
+                site_id?: string;
+                region_id?: components["schemas"]["RegionId"][];
+                /** @description Milestone code of the stage, for example MS2. */
+                stage_code?: string;
+                task_code?: string;
+                doc_code?: string[];
+                kind?: "scanned_document" | "photo" | "email" | "report" | "excel_template" | "generated_form";
+                slot_status?: "uploaded" | "in_review" | "approved" | "rejected" | "missing";
+                uploaded_by?: string;
+                uploaded_from?: string;
+                uploaded_to?: string;
+                /** @description Site code, document name or the name the file was uploaded with. */
+                q?: string;
+                include_superseded?: boolean;
+                file_group_id?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Files. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["DocumentListItem"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    startZipExport: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZipExportRequest"];
+            };
+        };
+        responses: {
+            /** @description Job started (`kind` = `zip_export`; the job id is the export id). On `done`, `result` carries `export_id`, `file_count` and `size_bytes`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Job"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    downloadZipExport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zip, `GSDN_Documents_<date>.zip`. Only the person who started it (or a System Admin) can download it. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            410: components["responses"]["Gone"];
         };
     };
     listApprovals: {
@@ -15236,6 +15656,61 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listDocumentTypeVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DocumentTypeVersion"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadBlankForm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The blank form. */
+            200: {
+                headers: {
+                    "Content-Disposition"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     uploadBlankForm: {

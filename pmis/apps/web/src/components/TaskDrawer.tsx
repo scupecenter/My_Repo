@@ -1,13 +1,14 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Clock, ExternalLink, FileUp, HandMetal, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
-import { useState, type DragEvent } from 'react';
+import { Check, Clock, ExternalLink, HandMetal, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTask } from '@/api/hooks';
 import { taskErrorMessage } from '@/lib/taskErrors';
 import { errText } from './FormDialog';
-import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, useUpload, type TaskOp } from '@/api/sites';
-import type { DocumentSlot, TaskDetail, TaskRegisterField } from '@/api/types';
+import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, type TaskOp } from '@/api/sites';
+import type { TaskDetail, TaskRegisterField } from '@/api/types';
+import { DocSlots } from './DocSlots';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { CommentsPanel } from './Comments';
 import { Holders } from './HolderChip';
@@ -15,32 +16,6 @@ import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
 import { TaskRegisterFields } from './TaskRegisterFields';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
-
-const SLOT_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', uploaded: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', rejected: 'bg-lateBg text-lateInk', missing: 'bg-lockBg text-lockInk', not_required: 'bg-lockBg text-lockInk' };
-
-function Slot({ slot, canUpload, onFile }: { slot: DocumentSlot; canUpload: boolean; onFile: (f: File) => void }) {
-  const { t, i18n } = useTranslation();
-  const [over, setOver] = useState(false);
-  const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f && canUpload) onFile(f); };
-  const name = (i18n.language === 'ar' && slot.name_ar) || slot.name_en;
-  return (
-    <li data-testid={`slot-${slot.id}`} data-status={slot.status} className="rounded-md border border-line p-3">
-      <div className="flex items-center gap-2">
-        <b>{name}</b>{slot.mandatory && <span className="text-lateInk" title={t('drawer.mandatory')}>*</span>}
-        <span className={`chip ms-auto ${SLOT_TONE[slot.status]}`} data-testid={`slot-status-${slot.id}`}>{t(`slotStatus.${slot.status}`)}</span>
-      </div>
-      {slot.status === 'rejected' && slot.reject_reason && <p className="mt-1 text-sm text-lateInk">{slot.reject_reason}</p>}
-      <ul className="mt-1 text-sm text-mute">{slot.files.map((f) => <li key={f.id} className="mono truncate">{f.original_name} <span>v{f.version}</span></li>)}</ul>
-      {canUpload && (
-        <label data-testid={`slot-drop-${slot.id}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop}
-          className={`mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed p-2 text-sm ${over ? 'border-accent bg-accentSoft' : 'border-line text-mute hover:bg-hover'}`}>
-          <FileUp size={14} />{t('drawer.drop')}
-          <input type="file" className="sr-only" data-testid={`slot-input-${slot.id}`} onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }} />
-        </label>
-      )}
-    </li>
-  );
-}
 
 function Comments({ task }: { task: TaskDetail }) {
   const { t } = useTranslation();
@@ -68,7 +43,7 @@ function History({ task }: { task: TaskDetail }) {
 function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterField[] }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const op = useTaskOp(task.site_id), date = useDatePatch(task.site_id), up = useUpload(task);
+  const op = useTaskOp(task.site_id), date = useDatePatch(task.site_id);
   const [rejecting, setRejecting] = useState(false);
   const [tab, setTab] = useState('data');
   const act = (a: string) => task.allowed_actions.find((x) => x.action === a);
@@ -132,10 +107,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
 
         <section aria-label={t('grid.docs')} {...panelProps('documents', tab)}>
           <h3 className="mb-1 font-semibold">{t('approvals.documents', { count: task.slots.length })}</h3>
-          <ul className="space-y-2" data-testid="slot-list">
-            {task.slots.map((s) => <Slot key={s.id} slot={s} canUpload={edit && s.status !== 'approved'} onFile={(file) => up.mutate({ slotId: s.id, file }, { onError: () => toast(t('drawer.upload_failed'), 'err') })} />)}
-            {!task.slots.length && <li className="text-mute">{t('drawer.no_slots')}</li>}
-          </ul>
+          <DocSlots task={task} edit={edit} />
         </section>
         <div {...panelProps('comments', tab)}><Comments task={task} /></div>
         <div {...panelProps('history', tab)}><History task={task} /></div>

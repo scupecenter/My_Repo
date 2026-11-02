@@ -67,7 +67,7 @@ export class ProblemFilter implements ExceptionFilter {
     if (status === 400) return new ProblemException(400, 'validation_failed', { detail: 'The request is not valid.' });
     if (status === 401) return new ProblemException(401, 'unauthenticated', {});
     if (status === 403) return new ProblemException(403, 'action_forbidden', {});
-    if (status === 413) return new ProblemException(413, 'validation_failed', { detail: 'The request body is too large.' });
+    if (status === 413) return /file too large/i.test(e.message) ? new ProblemException(413, 'file_too_large', { detail: 'The file is too large.' }) : new ProblemException(413, 'validation_failed', { detail: 'The request body is too large.' });
     if (status === 415) return new ProblemException(415, 'validation_failed', { detail: 'Use Content-Type: application/json.' });
     return new ProblemException(status, (status >= 500 ? 'internal_error' : 'validation_failed') as ErrorCode, {});
   }

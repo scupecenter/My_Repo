@@ -8,7 +8,7 @@ import { G, createRec, team } from './reg-helpers';
 import { Actor, actor, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
- * X1, the notification inbox (migration 0031 and the review fixes of migration 0036). Region 6 (GM) for sites and tasks, the GECOL register in region 6.
+ * X1, the notification inbox (migration 0031 and the review fixes of migration 0040). Region 6 (GM) for sites and tasks, the GECOL register in region 6.
  * Every test builds its own users. Nothing here depends on the weekday, the clock of the day or the database collation (ids and counts only).
  */
 const REGION = 6;

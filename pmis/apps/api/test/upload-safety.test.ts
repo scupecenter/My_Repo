@@ -48,3 +48,16 @@ describe('xlsx guard (zip bomb)', () => {
     expect(guardXlsx('a.xlsx', zip([...base, liar]))).toMatchObject({ ok: false, reason: 'not_xlsx' });
   });
 });
+
+describe('dashboard CSV cells (formula injection)', () => {
+  it('neutralises text that a spreadsheet would run, and keeps numbers', async () => {
+    const { csvCell } = await import('../src/dashboard/dashboard.service');
+    expect(csvCell('=HYPERLINK("x")')).toBe(`"'=HYPERLINK(""x"")"`);
+    expect(csvCell('+1')).toBe("'+1");
+    expect(csvCell('@SUM(A1)')).toBe("'@SUM(A1)");
+    expect(csvCell('-2+3')).toBe("'-2+3");
+    expect(csvCell(-5)).toBe('-5');
+    expect(csvCell('Tripoli')).toBe('Tripoli');
+    expect(csvCell(null)).toBe('');
+  });
+});

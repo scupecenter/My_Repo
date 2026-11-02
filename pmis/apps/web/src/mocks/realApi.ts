@@ -1,6 +1,6 @@
 import { http, passthrough } from 'msw';
 import { API_BASE } from '@/api/client';
-import { HYBRID, isHybrid } from '@/lib/hybrid';
+import { HYBRID, isHybrid, isRealJob } from '@/lib/hybrid';
 
 /**
  * Hybrid mode: `VITE_USE_MOCKS=true` and `VITE_REAL_API=auth-users`. MSW lets exactly these method + path patterns
@@ -74,7 +74,7 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/delegations'],
   ['post', '/delegations/:id/revoke'],
   // Contract 0.4.1: Site Register with streams, tasks and approvals (apps/api: sites, workflow; migration 0015).
-  // Document slots, file upload and templates are not in the API yet and stay mocked.
+  // Templates are not in the API yet and stay mocked.
   ['get', '/sites'],
   ['get', '/sites/:id'],
   ['get', '/sites/:id/tasks'],
@@ -120,7 +120,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/import-batches/:id/rows'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
-  // Contract 0.4.10 and 0.7.1, phase 4b (apps/api: notifications, follow, insights, status-updates; migrations 0031 and 0036).
+  // Contract 0.4.10 and 0.7.1, phase 4b (apps/api: notifications, follow, insights, status-updates; migrations 0031 and 0040).
   ['get', '/notifications'],
   ['post', '/notifications/read-all'],
   ['post', '/notifications/:id/read'],
@@ -151,6 +151,25 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/weight-sets/:id'],
   ['post', '/settings/weight-sets/:id/preview'],
   ['post', '/settings/weight-sets/:id/publish'],
+  // Contract 0.8.0: the document upload module (apps/api: documents; migration 0038). Slots, files, the Documents list, the bulk zip and the Document Library.
+  ['get', '/tasks/:id/slots'],
+  ['post', '/tasks/:id/slots'],
+  ['post', '/tasks/:id/slots/suggest'],
+  ['post', '/tasks/:id/slots/:slotId/files'],
+  ['delete', '/tasks/:id/slots/:slotId/files/:fileId'],
+  ['get', '/files/:id/download'],
+  ['get', '/documents'],
+  ['post', '/exports/zip'],
+  ['get', '/exports/zip/:id/download'],
+  ['get', '/jobs/:id'],
+  ['get', '/document-library'],
+  ['post', '/document-library'],
+  ['get', '/document-library/:id'],
+  ['patch', '/document-library/:id'],
+  ['post', '/document-library/:id/publish'],
+  ['get', '/document-library/:id/versions'],
+  ['get', '/document-library/:id/blank-form'],
+  ['post', '/document-library/:id/blank-form'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
@@ -162,6 +181,13 @@ export { HYBRID, isHybrid };
 export function realApiHandlers(on = HYBRID) {
   if (!on) return [];
   return REAL_API_AUTH_USERS.map(([method, path]) =>
-    http[method](`${API_BASE}${path}`, ({ params }) => (path === '/users/:id' && NOT_AN_ID.has(String(params.id)) ? undefined : passthrough())),
+    http[method](`${API_BASE}${path}`, ({ params }) => {
+      if (path === '/users/:id' && NOT_AN_ID.has(String(params.id))) return undefined;
+      // only the zip jobs started on the real server are polled there; the other jobs are mocked
+      if (path === '/jobs/:id' && !isRealJob(String(params.id))) return undefined;
+      // the security log export file has a mock id
+      if (path === '/files/:id/download' && String(params.id).startsWith('9a000000-')) return undefined;
+      return passthrough();
+    }),
   );
 }

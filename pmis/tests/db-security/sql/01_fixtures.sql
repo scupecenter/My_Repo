@@ -133,7 +133,7 @@ INSERT INTO import_batch_rows (id, batch_id, row_no, region_id, target_entity, a
 INSERT INTO secsuite_ids VALUES ('BATCH_BEN', '00000000-0000-4000-8000-0000000b0001'), ('BATCH_TRI', '00000000-0000-4000-8000-0000000b0002'),
   ('BATCH_ROW_BEN', '00000000-0000-4000-8000-0000000b1001');
 
--- Phase 4b (migrations 0031 and 0036): a site in Tripoli and one in Benghazi, a follow and two notifications for Bob, and a weekly status update for Benghazi
+-- Phase 4b (migrations 0031 and 0040): a site in Tripoli and one in Benghazi, a follow and two notifications for Bob, and a weekly status update for Benghazi
 -- written by the System Admin through x_status_post.
 INSERT INTO sites (site_code, name, region_id, workflow_version_id, updated_at)
 SELECT c.code, 'Sec site ' || c.code, c.region, w.id, now()

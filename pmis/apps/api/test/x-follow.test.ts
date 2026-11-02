@@ -8,7 +8,7 @@ import { G, PROC, approveAll, createRec, post, recPath, team } from './reg-helpe
 import { Actor, actor, makeSite } from './wf-helpers';
 
 /**
- * X2, follow a site or a register record (migration 0031, review fixes in 0036). Region 4 (Zawia) for sites; the Procurement register in region 4.
+ * X2, follow a site or a register record (migration 0031, review fixes in 0040). Region 4 (Zawia) for sites; the Procurement register in region 4.
  * Nothing depends on the weekday or the database collation.
  */
 const REGION = 4;

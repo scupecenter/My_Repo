@@ -5,6 +5,8 @@
 #   - PostgreSQL 16 with the PMIS database, the pmis_app role and every migration not applied yet
 #   - the API (apps/api, NestJS) as the systemd service gsdn-pmis-api: local sign-in, users and groups
 #   - the first System Admin (asked here, only while none exists)
+#   - document storage: a directory on local disk (default) or, optionally, a MinIO server on this machine (installed here, with its bucket
+#     and a bucket-only user), see "Document storage" below
 #   - the web app (apps/web) served by nginx over HTTPS. Sign-in and users talk to the API; the other screens still
 #     use sample data (MSW) until their API is built.
 #
@@ -95,6 +97,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 # Saved answers first; for an installation made before install.conf existed, read nginx and pmis.env.
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
 PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY=''
+PREV_STORAGE_MODE='' PREV_STORAGE_DIR='' PREV_MINIO_PORT='' PREV_MINIO_DIR='' PREV_S3_ACCESS_KEY='' PREV_S3_SECRET_KEY='' PREV_MINIO_ROOT_PASSWORD=''
 if [[ -r $CONF_DIR/install.conf ]]; then
   # shellcheck disable=SC1091
   . "$CONF_DIR/install.conf"
@@ -118,6 +121,14 @@ p = u.urlsplit(sys.stdin.read().strip()); print(p.port or 5432, p.path.lstrip("/
   PREV_LOG_HMAC_KEY=$(sed -n 's/^LOG_HMAC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_TOTP_ENC_KEY=$(sed -n 's/^TOTP_ENC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_API_PORT=${PREV_API_PORT:-$(sed -n 's/^PORT=//p' "$CONF_DIR/pmis.env")}
+  PREV_S3_ACCESS_KEY=$(sed -n 's/^S3_ACCESS_KEY=//p' "$CONF_DIR/pmis.env")
+  PREV_S3_SECRET_KEY=$(sed -n 's/^S3_SECRET_KEY=//p' "$CONF_DIR/pmis.env")
+  # an installation made before document storage existed has neither STORAGE_DIR nor S3_*: it gets local disk
+  if [[ -z $PREV_STORAGE_MODE && -n $PREV_S3_ACCESS_KEY ]]; then PREV_STORAGE_MODE=minio; fi
+  [[ -n $PREV_STORAGE_DIR ]] || PREV_STORAGE_DIR=$(sed -n 's/^STORAGE_DIR=//p' "$CONF_DIR/pmis.env")
+fi
+if [[ -r $CONF_DIR/minio.env ]]; then
+  PREV_MINIO_ROOT_PASSWORD=$(sed -n 's/^MINIO_ROOT_PASSWORD=//p' "$CONF_DIR/minio.env")
 fi
 UPGRADE=0; [[ -n $PREV_DB_NAME ]] && UPGRADE=1
 
@@ -201,6 +212,29 @@ ask API_PORT "API port" "$DEFAULT_API_PORT"
 is_port "$API_PORT" || die "Invalid port."
 if [[ $API_PORT != "${PREV_API_PORT:-}" ]] && port_busy "$API_PORT"; then die "Port $API_PORT is already used. Choose a free port."; fi
 
+say "Document storage (uploaded documents and photos)"
+echo "Files are kept outside the database, under random names, never in a public place; every download goes through the API and is audited."
+echo "  1) A directory on this server's disk (simple; fine for small installations)"
+echo "  2) MinIO, an S3-compatible object store installed on this server (listens on 127.0.0.1 only; needs to download the MinIO program"
+echo "     from dl.min.io, or a copy you place at /usr/local/bin/minio and /usr/local/bin/mc first)"
+case ${PREV_STORAGE_MODE:-} in minio) DEF_STORAGE=2 ;; *) DEF_STORAGE=1 ;; esac
+ask STORAGE_CHOICE "Choose" "$DEF_STORAGE"
+case $STORAGE_CHOICE in
+  1) STORAGE_MODE=local
+     ask STORAGE_DIR "Directory for the documents" "${PREV_STORAGE_DIR:-/var/lib/gsdn-pmis/files}"
+     [[ $STORAGE_DIR == /* ]] || die "Use an absolute path."
+     [[ $STORAGE_DIR =~ ^[A-Za-z0-9_./-]+$ ]] || die "Use letters, digits and _ . / - only in the path." ;;
+  2) STORAGE_MODE=minio
+     STORAGE_DIR=${PREV_STORAGE_DIR:-/var/lib/gsdn-pmis/files}   # kept, so documents saved earlier on disk can be copied into the bucket
+     ask MINIO_PORT "MinIO port (127.0.0.1)" "${PREV_MINIO_PORT:-9000}"
+     is_port "$MINIO_PORT" || die "Invalid port."
+     if [[ $MINIO_PORT != "${PREV_MINIO_PORT:-}" ]] && port_busy "$MINIO_PORT"; then die "Port $MINIO_PORT is already used. Choose a free port."; fi
+     [[ $((MINIO_PORT + 1)) != "$API_PORT" ]] || die "MinIO also uses port $((MINIO_PORT + 1)) for its console: choose another port."
+     ask MINIO_DIR "Directory for the MinIO data" "${PREV_MINIO_DIR:-/var/lib/gsdn-pmis/minio}"
+     [[ $MINIO_DIR == /* && $MINIO_DIR =~ ^[A-Za-z0-9_./-]+$ ]] || die "Use an absolute path with letters, digits and _ . / - only." ;;
+  *) die "Unknown choice: $STORAGE_CHOICE" ;;
+esac
+
 say "5/6 First System Admin"
 psql_su() { sudo -u postgres env PGOPTIONS="-c client_min_messages=warning" psql -p "$DB_PORT" -v ON_ERROR_STOP=1 -qAt "$@"; }
 # SQL string literal for a value sent on stdin (standard_conforming_strings is on: only ' needs doubling).
@@ -246,6 +280,7 @@ Summary
   Certificate:    $( case $TLS_MODE in 0) echo "keep $PREV_CERT_PATH";; 1) echo "Let's Encrypt ($LE_EMAIL)";; 2) echo "$CERT_FILE";; 3) echo "self-signed";; esac )
   Database:       $DB_NAME on 127.0.0.1:$DB_PORT, role pmis_app
   API:            127.0.0.1:$API_PORT (service gsdn-pmis-api)
+  Documents:      $( [[ $STORAGE_MODE == minio ]] && echo "MinIO on 127.0.0.1:$MINIO_PORT, data in $MINIO_DIR, bucket pmis" || echo "local disk, $STORAGE_DIR" )
   First admin:    $( (( NEED_ADMIN )) && echo "$ADMIN_NAME <$ADMIN_EMAIL>" || echo "already exists" )
   Firewall:       $( (( USE_UFW )) && echo "ufw on, SSH port $SSH_PORT" || echo "not changed" )
 EOF
@@ -341,6 +376,94 @@ chown -R root:root "$API_ROOT"
 cd - >/dev/null
 
 install -d -m 750 -o root -g "$SERVICE_USER" "$CONF_DIR"
+
+# ---------------------------------------------------------------- document storage
+S3_LINES=''
+if [[ $STORAGE_MODE == minio ]]; then
+  say "Setting up MinIO"
+  MINIO_ARCH=$(uname -m)
+  case $MINIO_ARCH in x86_64) MINIO_ARCH=amd64 ;; aarch64) MINIO_ARCH=arm64 ;; *) die "MinIO is not set up for $MINIO_ARCH: use local disk storage." ;; esac
+  for tool in minio mc; do
+    if ! command -v "$tool" >/dev/null && [[ ! -x /usr/local/bin/$tool ]]; then
+      if [[ $tool == minio ]]; then url="https://dl.min.io/server/minio/release/linux-$MINIO_ARCH/minio"; else url="https://dl.min.io/client/mc/release/linux-$MINIO_ARCH/mc"; fi
+      echo "   Downloading $tool from dl.min.io"
+      curl -fsSL -o "/usr/local/bin/$tool.part" "$url" || { rm -f "/usr/local/bin/$tool.part"; die "Could not download $tool. Place the program at /usr/local/bin/$tool yourself (chmod 755) and run the installer again, or choose local disk storage."; }
+      chmod 755 "/usr/local/bin/$tool.part"; mv "/usr/local/bin/$tool.part" "/usr/local/bin/$tool"
+    fi
+  done
+  MINIO_BIN=$(command -v minio); MC_BIN=$(command -v mc)
+  id -u gsdn-minio >/dev/null 2>&1 || useradd --system --home-dir "$MINIO_DIR" --shell /usr/sbin/nologin gsdn-minio
+  install -d -m 700 -o gsdn-minio -g gsdn-minio "$MINIO_DIR"
+  MINIO_ROOT_PASSWORD=${PREV_MINIO_ROOT_PASSWORD:-$(openssl rand -hex 24)}
+  umask 077
+  cat > "$CONF_DIR/minio.env" <<EOF
+# MinIO settings written by install-ubuntu.sh on $(date -Is). Keep this file private (root and gsdn-minio only).
+MINIO_ROOT_USER=pmis-root
+MINIO_ROOT_PASSWORD=$MINIO_ROOT_PASSWORD
+MINIO_VOLUMES=$MINIO_DIR
+MINIO_OPTS=--address 127.0.0.1:$MINIO_PORT --console-address 127.0.0.1:$((MINIO_PORT + 1))
+EOF
+  umask 022
+  chown root:gsdn-minio "$CONF_DIR/minio.env"; chmod 640 "$CONF_DIR/minio.env"
+  cat > /etc/systemd/system/gsdn-pmis-minio.service <<EOF
+[Unit]
+Description=GSDN PMIS MinIO object storage
+After=network.target
+
+[Service]
+User=gsdn-minio
+Group=gsdn-minio
+EnvironmentFile=$CONF_DIR/minio.env
+ExecStart=$MINIO_BIN server \$MINIO_OPTS \$MINIO_VOLUMES
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=$MINIO_DIR
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable -q gsdn-pmis-minio
+  systemctl restart gsdn-pmis-minio
+  for i in $(seq 1 30); do curl -fs "http://127.0.0.1:$MINIO_PORT/minio/health/live" >/dev/null && break; sleep 1; done
+  curl -fs "http://127.0.0.1:$MINIO_PORT/minio/health/live" >/dev/null || { journalctl -u gsdn-pmis-minio -n 20 --no-pager; die "MinIO did not start (see the log above)."; }
+  # the bucket is private; the API's user can use this one bucket only (it cannot administer MinIO or read other buckets)
+  MC_DIR=$(mktemp -d); export MC_CONFIG_DIR=$MC_DIR
+  "$MC_BIN" alias set pmislocal "http://127.0.0.1:$MINIO_PORT" pmis-root "$MINIO_ROOT_PASSWORD" >/dev/null
+  "$MC_BIN" mb --ignore-existing pmislocal/pmis >/dev/null
+  S3_ACCESS_KEY=${PREV_S3_ACCESS_KEY:-pmis-app}
+  S3_SECRET_KEY=${PREV_S3_SECRET_KEY:-$(openssl rand -hex 24)}
+  cat > "$MC_DIR/policy.json" <<EOF
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:ListBucket"],"Resource":["arn:aws:s3:::pmis","arn:aws:s3:::pmis/*"]}]}
+EOF
+  "$MC_BIN" admin policy create pmislocal pmis-bucket-rw "$MC_DIR/policy.json" >/dev/null 2>&1 || true
+  if ! "$MC_BIN" admin user info pmislocal "$S3_ACCESS_KEY" >/dev/null 2>&1; then
+    "$MC_BIN" admin user add pmislocal "$S3_ACCESS_KEY" "$S3_SECRET_KEY" >/dev/null
+  fi
+  "$MC_BIN" admin policy attach pmislocal pmis-bucket-rw --user "$S3_ACCESS_KEY" >/dev/null 2>&1 || true
+  # documents saved on local disk before MinIO was chosen keep their keys: copy them into the bucket (a re-run copies only what is new)
+  if [[ -d $STORAGE_DIR && -n $(ls -A "$STORAGE_DIR" 2>/dev/null) ]]; then
+    echo "   Copying the documents saved on local disk ($STORAGE_DIR) into the bucket"
+    "$MC_BIN" mirror --quiet "$STORAGE_DIR" pmislocal/pmis >/dev/null
+  fi
+  unset MC_CONFIG_DIR; rm -rf "$MC_DIR"
+  S3_LINES="S3_ENDPOINT=http://127.0.0.1:$MINIO_PORT
+S3_BUCKET=pmis
+S3_ACCESS_KEY=$S3_ACCESS_KEY
+S3_SECRET_KEY=$S3_SECRET_KEY
+S3_REGION=us-east-1"
+  API_AFTER=" gsdn-pmis-minio.service"
+  echo "MinIO is up on 127.0.0.1:$MINIO_PORT; bucket pmis (private)."
+else
+  API_AFTER=''
+  install -d -m 700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$STORAGE_DIR"
+  S3_LINES="STORAGE_DIR=$STORAGE_DIR"
+fi
+
 DB_URL_PW=$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.stdin.read().rstrip("\n"), safe=""))' <<<"$DB_APP_PASSWORD")
 LOG_HMAC_KEY=${PREV_LOG_HMAC_KEY:-$(openssl rand -hex 32)}
 # Two-factor secrets are encrypted with this key (32 bytes). An update keeps the existing one and creates it for an installation that lacks it. Never regenerate a key that is in use: every enrolled user would have to enrol again.
@@ -356,6 +479,7 @@ COOKIE_SECURE=true
 DATABASE_URL=postgresql://pmis_app:$DB_URL_PW@127.0.0.1:$DB_PORT/$DB_NAME
 LOG_HMAC_KEY=$LOG_HMAC_KEY
 TOTP_ENC_KEY=$TOTP_ENC_KEY
+$S3_LINES
 EOF
 cat > "$CONF_DIR/install.conf" <<EOF
 # Answers of the last run of install-ubuntu.sh (no secrets). They are the defaults of the next run.
@@ -363,6 +487,10 @@ PREV_SERVER_NAME='$SERVER_NAME'
 PREV_HTTPS_PORT='$HTTPS_PORT'
 PREV_HTTP_PORT='$HTTP_PORT'
 PREV_API_PORT='$API_PORT'
+PREV_STORAGE_MODE='$STORAGE_MODE'
+PREV_STORAGE_DIR='$STORAGE_DIR'
+PREV_MINIO_PORT='${MINIO_PORT:-}'
+PREV_MINIO_DIR='${MINIO_DIR:-}'
 EOF
 umask 022
 chown root:"$SERVICE_USER" "$CONF_DIR/pmis.env"; chmod 640 "$CONF_DIR/pmis.env"; chmod 600 "$CONF_DIR/install.conf"
@@ -370,7 +498,7 @@ chown root:"$SERVICE_USER" "$CONF_DIR/pmis.env"; chmod 640 "$CONF_DIR/pmis.env";
 cat > /etc/systemd/system/gsdn-pmis-api.service <<EOF
 [Unit]
 Description=GSDN PMIS API
-After=network.target postgresql@16-main.service
+After=network.target postgresql@16-main.service$API_AFTER
 Requires=postgresql@16-main.service
 
 [Service]
@@ -385,6 +513,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+ReadWritePaths=-$STORAGE_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -527,6 +656,7 @@ Open:            $APP_URL
 Sign in:         your local account (employee ID, email or phone, and password)
 API service:     systemctl status gsdn-pmis-api   |   journalctl -u gsdn-pmis-api -f
 Database:        sudo -u postgres psql -p $DB_PORT $DB_NAME
+Documents:       $( [[ $STORAGE_MODE == minio ]] && echo "MinIO on 127.0.0.1:$MINIO_PORT (systemctl status gsdn-pmis-minio), bucket pmis" || echo "local disk, $STORAGE_DIR" )
 Settings:        $CONF_DIR/pmis.env (secrets; readable by root and the API service only)
 Upgrade later:   git pull, then run this script again and press Enter at each question
 EOF

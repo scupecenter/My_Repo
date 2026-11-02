@@ -1,5 +1,5 @@
--- 0036_x_features_fix: review fixes for the UI plan features X1 to X7 (phase 4b, migration 0031).
--- Mirror: db/sql/035_x_features_fix.sql (kept identical to prisma/migrations/0036_x_features_fix/migration.sql).
+-- 0040_x_features_fix: review fixes for the UI plan features X1 to X7 (phase 4b, migration 0031).
+-- Mirror: db/sql/039_x_features_fix.sql (kept identical to prisma/migrations/0040_x_features_fix/migration.sql).
 --
 --   X3 / X2  One rule for "who can see the item": x_user_can_read(user, module, region) answers from the permission grid of that user (the profile grants of
 --            the active assignments, each limited to its own regions and modules, plus delegations), exactly like wf_actor_regions does for the caller.

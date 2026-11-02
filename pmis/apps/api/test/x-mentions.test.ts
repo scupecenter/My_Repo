@@ -8,7 +8,7 @@ import { G, PROC, approveAll, createRec, post, recPath, team } from './reg-helpe
 import { Actor, actor, makeSite, makeTask } from './wf-helpers';
 
 /**
- * X3, @mentions in comments on tasks and on register records (migration 0031, rule unified in 0036): a mention reaches only a person who can read the item
+ * X3, @mentions in comments on tasks and on register records (migration 0031, rule unified in 0040): a mention reaches only a person who can read the item
  * now (active account, the module, the region, the `view` right in the grid, through an assignment or a delegation). Everyone else is dropped silently.
  * Region 5 (Benghazi) for tasks and for the Procurement register. Nothing depends on the weekday or the database collation.
  */

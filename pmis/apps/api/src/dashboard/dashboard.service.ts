@@ -215,9 +215,18 @@ export class DashboardService {
       add('regions', String(r.region_name), 'sites', r.sites_total);
       add('regions', String(r.region_name), 'progress %', r.progress_pct);
     }
-    const csv = rows.map((r) => r.map((c) => (c === null ? '' : /[",\n\r;]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : String(c))).join(',')).join('\r\n');
+    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
     await this.db.tx.$executeRaw(Prisma.sql`INSERT INTO audit_log (action, entity_type, entity_id, after, actor_id, ip)
       VALUES ('export', 'dashboard', ${String(basis.ref_date)}, ${JSON.stringify({ filters: q, rows: rows.length - 1 })}::jsonb, ${auth.user.id}::uuid, ${auth.ip}::text)`);
     return { filename: `GSDN_Dashboard_${String(basis.ref_date)}.csv`, body: `${String.fromCharCode(0xfeff)}${csv}\r\n` };
   }
+}
+
+/** One CSV cell. A text that a spreadsheet would read as a formula (=, +, -, @, tab, CR) gets a leading quote; numbers stay numbers. */
+export function csvCell(c: unknown): string {
+  if (c === null || c === undefined) return '';
+  if (typeof c === 'number' || typeof c === 'bigint') return String(c);
+  let t = String(c);
+  if (/^[=+\-@\t\r]/.test(t)) t = `'${t}`;
+  return /[",\n\r;]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
 }
