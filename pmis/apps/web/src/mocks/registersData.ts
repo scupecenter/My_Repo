@@ -12,7 +12,7 @@ const F = (code: string, label_en: string, label_ar: string, type: FT, section: 
 export const PERMIT_TYPES = ['City Council Permit', 'Civil Aviation Authority Permit', 'Security Clearance', 'Other Permit', 'Access - Survey', 'Access - CW', 'Access - TE', 'Access - Dismantle', 'Access - QC / Maintenance', 'PTW - CW', 'PTW - TE', 'PTW - Dismantle'];
 
 const procurement: RegisterDefinition = {
-  register_key: 'procurement', name_en: 'Procurement (PR / PO / WO)', name_ar: 'المشتريات (PR / PO / WO)', module_key: 'procurement', site_scoped: true, multiple_per_site: true, record_types: ['pr', 'po', 'wo'], approval_levels: 3,
+  register_key: 'procurement', name_en: 'Procurement (PR / PO / WO)', name_ar: 'المشتريات (PR / PO / WO)', module_key: 'procurement', site_scoped: true, multiple_per_site: true, record_types: ['pr', 'po', 'wo'], approval_levels: 2,
   fields: [
     F('scope', 'Scope', 'النطاق', 'list', 'Site and scope', { required: true, in_list: true, options: ['CW', 'Tower Erection', 'Site Adaption', 'TE Installation', 'CW Dismantle', 'TE Dismantle', 'STA', 'ST'] }),
     F('delivery', 'Delivery', 'طريقة التنفيذ', 'list', 'Site and scope', { in_list: true, options: ['Outsourced', 'In-House', 'TE Vendor'] }),
@@ -24,7 +24,7 @@ const procurement: RegisterDefinition = {
   ],
 };
 const gecol: RegisterDefinition = {
-  register_key: 'gecol', name_en: 'GECOL power', name_ar: 'كهرباء GECOL', module_key: 'gecol', site_scoped: true, multiple_per_site: false, approval_levels: 3,
+  register_key: 'gecol', name_en: 'GECOL power', name_ar: 'كهرباء GECOL', module_key: 'gecol', site_scoped: true, multiple_per_site: false, approval_levels: 2,
   fields: [
     F('pr_no', 'GECOL PR No.', 'رقم طلب الشراء (GECOL)', 'text', 'Request', { required: true, in_list: true }), F('request_date', 'GECOL Request Date', 'تاريخ طلب GECOL', 'date', 'Request', { required: true, in_list: true }),
     F('contractor', 'GECOL Contractor', 'مقاول GECOL', 'text', 'Request'),
@@ -38,7 +38,7 @@ const gecol: RegisterDefinition = {
   ],
 };
 const hlc: RegisterDefinition = {
-  register_key: 'hlc', name_en: 'HLC fiber', name_ar: 'ألياف HLC', module_key: 'hlc', site_scoped: true, multiple_per_site: false, approval_levels: 3,
+  register_key: 'hlc', name_en: 'HLC fiber', name_ar: 'ألياف HLC', module_key: 'hlc', site_scoped: true, multiple_per_site: false, approval_levels: 2,
   fields: [
     F('request_no', 'HLC Request No.', 'رقم طلب HLC', 'text', 'Request', { required: true, in_list: true }), F('request_date', 'Request Date', 'تاريخ الطلب', 'date', 'Request', { required: true, in_list: true }),
     F('fiber_uplink', 'Fiber Uplink (Exchange / Post)', 'وصلة الألياف (مقسم / عمود)', 'text', 'Request'),
@@ -48,7 +48,7 @@ const hlc: RegisterDefinition = {
   ],
 };
 const permits: RegisterDefinition = {
-  register_key: 'permits_hse', name_en: 'Permits & HSE', name_ar: 'التصاريح والسلامة', module_key: 'permits_hse', site_scoped: true, multiple_per_site: true, approval_levels: 3,
+  register_key: 'permits_hse', name_en: 'Permits & HSE', name_ar: 'التصاريح والسلامة', module_key: 'permits_hse', site_scoped: true, multiple_per_site: true, approval_levels: 2,
   fields: [
     F('permit_type', 'Type', 'النوع', 'list', 'Permit', { required: true, in_list: true, options: PERMIT_TYPES }),
     F('applied_date', 'Applied / Requested', 'تاريخ التقديم', 'date', 'Permit'),
@@ -63,7 +63,7 @@ const permits: RegisterDefinition = {
 };
 // Dismantle (migration 0021): two parts per site, record types cw and te; fields and sections as seeded in register_fields.
 const dismantle: RegisterDefinition = {
-  register_key: 'dismantle', name_en: 'Dismantle', name_ar: 'الفك', module_key: 'dismantle', site_scoped: true, multiple_per_site: true, record_types: ['cw', 'te'], approval_levels: 3,
+  register_key: 'dismantle', name_en: 'Dismantle', name_ar: 'الفك', module_key: 'dismantle', site_scoped: true, multiple_per_site: true, record_types: ['cw', 'te'], approval_levels: 2,
   fields: [
     F('rfd_date', 'RFD Date', 'تاريخ طلب الفك (RFD)', 'date', 'RFD', { required: true, in_list: true }),
     F('rfd_document_ref', 'RFD Document Reference', 'مرجع مستند طلب الفك', 'text', 'RFD'),
@@ -78,7 +78,7 @@ const dismantle: RegisterDefinition = {
 // The registers enabled by migration 0025 (contract 0.4.8): a few synthetic fields each; the form is built from them like any other register.
 // rf_design and acquisition are served by the API but missing from the contract's RegisterKey enum (reported to tech-lead), hence the cast.
 const more = (register_key: string, name_en: string, name_ar: string, module_key: string, site_scoped: boolean, record_types?: string[]): RegisterDefinition => ({
-  register_key: register_key as RegisterDefinition['register_key'], name_en, name_ar, module_key, site_scoped, multiple_per_site: true, approval_levels: 3, ...(record_types ? { record_types } : {}),
+  register_key: register_key as RegisterDefinition['register_key'], name_en, name_ar, module_key, site_scoped, multiple_per_site: true, approval_levels: 2, ...(record_types ? { record_types } : {}),
   fields: [F('title', 'Title', 'العنوان', 'text', 'Details', { required: true, in_list: true }), F('remark', 'Remark', 'ملاحظات', 'text', 'Details')],
 });
 export const REGISTER_DEFS: RegisterDefinition[] = [

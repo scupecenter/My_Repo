@@ -191,9 +191,12 @@ export const siteHandlers = [
     return HttpResponse.json({ id: crypto.randomUUID(), template_id: 'TPL-SITE', template_version: 1, status: 'parsing', counts: {}, version: 1, file_name: f.name }, { status: 202 });
   }),
 
-  http.get(`${B}/matrix`, () => {
+  http.get(`${B}/matrix`, ({ request }) => {
     const g = guard(); if (g) return g;
-    const m = db().matrix;
+    const region = Number(new URL(request.url).searchParams.get('region_id') ?? 0);
+    // as the API answers: the cells of every region, and those of the region asked for
+    const full = db().matrix;
+    const m: Matrix = { ...full, stages: full.stages.map((r) => ({ ...r, cells: r.cells.filter((c) => !c.region_id || c.region_id === region) })) };
     // B14: a deactivated or deleted holder keeps the seat and shows the badge.
     const tag = (x: unknown): unknown => Array.isArray(x) ? x.map(tag) : x && typeof x === 'object'
       ? Object.fromEntries(Object.entries(x).map(([k, v]) => [k, tag(v)]).concat((x as { kind?: string }).kind === 'user' && (x as { employee_id?: string }).employee_id ? [['account_status', accountStatus((x as { employee_id: string }).employee_id)]] : [])) : x;
@@ -207,12 +210,13 @@ export const siteHandlers = [
     if (!stepUpValid()) return stepUp();
     const body = (await request.json()) as MatrixPatch;
     if (!body.reason?.trim()) return invalid('/reason', 'required');
-    for (const l of body.stage_levels ?? []) { const r = rowOf(m, l.stage_code); if (r) r.approval_levels = l.approval_levels; }
+    // the level count is fixed at 2 (owner decision 2026-11-01): the API refuses anything else with 422 and accepts 2 as a no-op
+    for (const [i, l] of (body.stage_levels ?? []).entries()) if ((l.approval_levels as number) !== 2) return invalid(`/stage_levels/${i}/approval_levels`, 'invalid');
     for (const c of body.cells ?? []) {
       const r = rowOf(m, c.stage_code);
       if (!r) continue;
-      // 422 empty_cell as the API answers it: the level in use (cell 1, and 3 / 2 and 3 for 2 / 3 levels) has no holder; `cells` lists them
-      if (usedLevels(r.approval_levels).includes(c.level as 1 | 2 | 3) && c.assignees.length === 0) {
+      // 422 empty_cell as the API answers it: a level in use (L1 = cell 1, L2 = cell 3) has no holder; `cells` lists them
+      if (usedLevels().includes(c.level as 1 | 2 | 3) && c.assignees.length === 0) {
         return problem(422, 'empty_cell', 'A used level needs at least one holder', { cells: [{ stage_code: c.stage_code, task_code: null, level: c.level, level_kind: levelKind(c.level), region_id: null }] } as never);
       }
       const label = (a: { kind: string; ref_id: string }) => (a.kind === 'user' ? STAFF.find((s) => uid(s.employee_id) === a.ref_id) : a.kind === 'role' ? ROLES.find((x) => x.id === a.ref_id) : GROUPS.find((x) => x.id === a.ref_id));
@@ -225,6 +229,28 @@ export const siteHandlers = [
     recomputeSkip(m);
     save();
     return HttpResponse.json(m, { headers: { ETag: `"${m.version}"` } });
+  }),
+  // Q86: delete a region or task override cell; the row default applies again
+  http.delete(`${B}/matrix/cells/:id`, ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const m: Matrix = db().matrix;
+    if (!viewer()?.nav.includes('admin.matrix')) return problem(403, 'forbidden', 'Not allowed');
+    const sp = new URL(request.url).searchParams;
+    const tagHeader = request.headers.get('If-Match');
+    if (!tagHeader) return problem(428, 'precondition_required', 'If-Match is required');
+    if (Number(tagHeader.replace(/"/g, '')) !== m.version) return problem(412, 'precondition_failed', 'The matrix changed; reload');
+    if (!stepUpValid()) return stepUp();
+    if ((sp.get('reason') ?? '').trim().length < 3) return invalid('/reason', 'required');
+    for (const r of m.stages) {
+      const i = r.cells.findIndex((c) => c.id === params.id);
+      if (i < 0) continue;
+      const c = r.cells[i]!;
+      if (!c.region_id && !c.task_code) return invalid('/cell_id', 'row_default');
+      r.cells.splice(i, 1);
+      m.version += 1; recomputeSkip(m); save();
+      return HttpResponse.json(m, { headers: { ETag: `"${m.version}"` } });
+    }
+    return problem(404, 'not_found', 'No such matrix cell.');
   }),
   http.get(`${B}/users/picker`, ({ request }) => {
     if (!viewer()) return problem(401, 'unauthenticated', 'Sign in required');

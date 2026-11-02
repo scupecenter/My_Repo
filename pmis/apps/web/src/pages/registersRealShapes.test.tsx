@@ -5,7 +5,7 @@ import { Route, Routes } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { api, API_BASE } from '@/api/client';
 import type { Matrix, RegisterDefinition, RegisterRecord } from '@/api/types';
-import { cellLevel, levelKind, positionKind, usedLevels } from '@/lib/matrixLevels';
+import { cellLevel, levelCode, levelKind, positionKind, usedLevels } from '@/lib/matrixLevels';
 import { hasExpiry, patchData, sectionsFor, validateRecord, visibleData } from '@/lib/registerForms';
 import { recId, REGISTER_DEFS } from '@/mocks/registersData';
 import { server } from '@/mocks/server';
@@ -17,9 +17,11 @@ const Routed = () => <Routes><Route path="/registers/:key" element={<RegisterPag
 const at = (key: string, q = '') => ({ route: `/registers/${key}${q}` });
 const def = (key: string): RegisterDefinition => REGISTER_DEFS.find((d) => d.register_key === key)!;
 
-describe('matrix levels (owner answer E1): cell 1 entry, 2 review, 3 approve, whatever the row\'s level count', () => {
+describe('matrix levels (owner decision 2026-11-01): two fixed levels, L1 = cell 1 and L2 = cell 3', () => {
   it('maps the positions of a path to the cells', () => {
-    expect([1, 2, 3].map((n) => usedLevels(n))).toEqual([[1], [1, 3], [1, 2, 3]]);
+    expect(usedLevels()).toEqual([1, 3]);
+    expect([1, 2, 3].map(levelCode)).toEqual(['L1', 'L2', 'L2']);
+    // a task or record submitted before the change finishes on its frozen 3-level snapshot (B7): its middle position is cell 2
     expect([cellLevel(1, 3), cellLevel(2, 3), cellLevel(3, 3)]).toEqual([1, 2, 3]);
     expect([cellLevel(1, 2), cellLevel(2, 2)]).toEqual([1, 3]);   // the last position of a 2-level path is Approve (cell 3), not cell 2
     expect(cellLevel(1, 1)).toBe(1);
@@ -28,23 +30,25 @@ describe('matrix levels (owner answer E1): cell 1 entry, 2 review, 3 approve, wh
   });
 });
 
-describe('Matrix page with a 2-level row', () => {
-  it('shows Entry and Approve columns (cells 1 and 3), saves the Approve holder as cell level 3, and previews the skip from entry to approve', async () => {
+describe('Matrix page with two fixed levels', () => {
+  it('shows the L1 and L2 columns (cells 1 and 3) and no level-count choice, and saves the L2 holder as cell level 3', async () => {
     await signIn('pm');
     await api.post('/__mock/step-up');
     renderApp(<MatrixPage />, { route: '/admin/matrix' });
     const u = userEvent.setup();
-    const levels = await screen.findByTestId('matrix-levels-cw');
-    await u.selectOptions(levels, '2');
-    expect(screen.getByTestId('matrix-cell-cw-1')).toBeInTheDocument();
-    expect(screen.getByTestId('matrix-unused-cw-2')).toBeInTheDocument();      // the Review column is not in use
-    const approve = screen.getByTestId('matrix-cell-cw-3');                       // Approve is cell 3, not cell 2
+    await screen.findByTestId('matrix-row-cw');
+    expect(screen.queryByTestId('matrix-levels-cw')).not.toBeInTheDocument();    // the number of levels is not configurable
+    expect(screen.getByTestId('matrix-col-l1')).toHaveTextContent('L1');
+    expect(screen.getByTestId('matrix-col-l2')).toHaveTextContent('L2');
+    expect(screen.getByTestId('matrix-cell-cw-1')).toHaveAttribute('data-level-code', 'L1');
+    expect(screen.getByTestId('matrix-cell-cw-3')).toHaveAttribute('data-level-code', 'L2');
+    const approve = screen.getByTestId('matrix-cell-cw-3');                       // L2 is cell 3, not cell 2
     expect(screen.queryByTestId('matrix-cell-cw-2')).not.toBeInTheDocument();
     await u.click(within(approve).getByTestId('matrix-add'));
     await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
     await u.click(await screen.findByTestId('matrix-opt-user-1210'));
     await u.click(screen.getByTestId('matrix-publish'));
-    await u.type(screen.getByTestId('matrix-reason'), 'CW has two levels');
+    await u.type(screen.getByTestId('matrix-reason'), 'CW L2 holder');
     await u.click(screen.getByTestId('matrix-publish-confirm'));
     await waitFor(() => expect(screen.getByTestId('matrix-dirty')).toHaveTextContent('0'));
     const m = await api.get<Matrix>('/matrix');
@@ -53,22 +57,52 @@ describe('Matrix page with a 2-level row', () => {
     expect(cw.used_levels).toEqual([1, 3]);
     expect(cw.cells.find((c) => c.level === 3)!.assignees.map((a) => a.employee_id)).toContain('1210');
     expect(cw.cells.find((c) => c.level === 2)!.used).toBe(false);               // kept for tasks in flight
+    expect(screen.queryByTestId('matrix-cell-cw-2')).not.toBeInTheDocument();
     expect(await screen.findByTestId('matrix-cell-cw-3')).toBeInTheDocument();
-  }, 15_000); // ~3.5 s of user steps when idle; over the 5 s default under CI's parallel workers
+  }, 30_000); // ~3.5 s of user steps when idle; over the 5 s default under CI's parallel workers
 
-  it('shows the skip between entry and approve of a 2-level row (the same person holds cells 1 and 3)', async () => {
+  it('shows the self-approval when the same person holds L1 and L2, from the server and live while editing', async () => {
     await signIn('pm');
     await api.post('/__mock/step-up');
     renderApp(<MatrixPage />, { route: '/admin/matrix' });
     const u = userEvent.setup();
-    await u.selectOptions(await screen.findByTestId('matrix-levels-site_release'), '2');
-    // Mona Fathi (1102) holds the review cell; Hana's entry is 1103 and 1102: put 1102 on the Approve cell as well
-    await u.click(within(screen.getByTestId('matrix-cell-site_release-3')).getByTestId('matrix-add'));
+    // the server copy: one person holds L1 and L2 of Final Closure
+    expect(await screen.findByTestId('matrix-skip-final_closure')).toHaveTextContent(/hold L1 and L2/);
+    expect(screen.getByTestId('matrix-skip-final_closure')).toHaveTextContent(/final approval/);
+    expect(screen.getByTestId('matrix-skip-site_release')).toHaveTextContent('—');
+    // live: put 1102 on L2 of CW, which has her on neither level yet
+    expect(screen.getByTestId('matrix-skip-cw')).toHaveTextContent('—');
+    await u.click(within(screen.getByTestId('matrix-cell-cw-1')).getByTestId('matrix-add'));
     await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
     await u.click(await screen.findByTestId('matrix-opt-user-1102'));
-    await waitFor(() => expect(screen.getByTestId('matrix-skip-site_release')).toHaveTextContent(/Entry to Approve skipped for .*Mona Fathi/));
-    expect(screen.getByTestId('matrix-warn-self-site_release')).toBeInTheDocument();
-  });
+    await u.click(within(screen.getByTestId('matrix-cell-cw-3')).getByTestId('matrix-add'));
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
+    await u.click(await screen.findByTestId('matrix-opt-user-1102'));
+    await waitFor(() => expect(screen.getByTestId('matrix-skip-cw')).toHaveTextContent(/Mona Fathi hold L1 and L2/));
+    expect(screen.getByTestId('matrix-warn-self-cw')).toBeInTheDocument();
+  }, 30_000);
+
+  it('grants one person both levels with one click, and saves both cells', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    renderApp(<MatrixPage />, { route: '/admin/matrix' });
+    const u = userEvent.setup();
+    await screen.findByTestId('matrix-row-te_installation');
+    await u.click(within(screen.getByTestId('matrix-cell-te_installation-1')).getByTestId('matrix-add'));
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.click(await screen.findByTestId('matrix-both-user-1210'));
+    await waitFor(() => expect(within(screen.getByTestId('matrix-cell-te_installation-1')).getByTestId('person-id-1210')).toBeInTheDocument());
+    expect(within(screen.getByTestId('matrix-cell-te_installation-3')).getByTestId('person-id-1210')).toBeInTheDocument();
+    expect(screen.getByTestId('matrix-dirty')).toHaveTextContent('2');
+    expect(screen.getByTestId('matrix-warn-self-te_installation')).toBeInTheDocument();
+    await u.click(screen.getByTestId('matrix-publish'));
+    await u.type(screen.getByTestId('matrix-reason'), 'Grant both levels');
+    await u.click(screen.getByTestId('matrix-publish-confirm'));
+    await waitFor(() => expect(screen.getByTestId('matrix-dirty')).toHaveTextContent('0'));
+    const row = (await api.get<Matrix>('/matrix')).stages.find((x) => x.code === 'te_installation')!;
+    for (const level of [1, 3]) expect(row.cells.find((c) => c.level === level)!.assignees.map((a) => a.employee_id)).toContain('1210');
+    expect(row.cells.find((c) => c.level === 1)!.skip_preview?.map((x) => x.display_name)).toContain('Hana Zidan');
+  }, 30_000);
 
   it('names the level that has no holder from Problem.cells of the 422 empty_cell answer, not from errors[]', async () => {
     await signIn('pm');
@@ -79,13 +113,15 @@ describe('Matrix page with a 2-level row', () => {
     }, { status: 422, headers: { 'Content-Type': 'application/problem+json' } })));
     renderApp(<MatrixPage />, { route: '/admin/matrix' });
     const u = userEvent.setup();
-    await u.selectOptions(await screen.findByTestId('matrix-levels-cw'), '2');
+    await u.click(within(await screen.findByTestId('matrix-cell-cw-1')).getByTestId('matrix-add'));
+    await u.type(await screen.findByTestId('matrix-picker-q'), 'Hana');
+    await u.click(await screen.findByTestId('matrix-opt-user-1210'));
     await u.click(screen.getByTestId('matrix-publish'));
-    await u.type(screen.getByTestId('matrix-reason'), 'Two levels');
+    await u.type(screen.getByTestId('matrix-reason'), 'Edit L1');
     await u.click(screen.getByTestId('matrix-publish-confirm'));
-    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('CW: the Approve level has no holder');
+    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('CW: L2 (Reviewer & Approver) has no holder');
     expect(screen.getByTestId('matrix-cell-cw-3')).toHaveAttribute('data-refused', 'true');
-  });
+  }, 30_000);
 });
 
 describe('register forms follow the real field definitions', () => {

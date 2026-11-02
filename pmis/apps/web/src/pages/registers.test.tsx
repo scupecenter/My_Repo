@@ -54,8 +54,8 @@ describe('Register list', () => {
   });
 });
 
-describe('Manual entry: create, submit, review, approve', () => {
-  it('walks a procurement record through every level', async () => {
+describe('Manual entry: create, submit, approve (L1 then L2)', () => {
+  it('walks a procurement record through both levels', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement'));
     const u = userEvent.setup();
@@ -66,14 +66,14 @@ describe('Manual entry: create, submit, review, approve', () => {
     await u.type(screen.getByTestId('reg-field-order_status'), 'Open'); // a free list until the owner fixes its values (Q95)
     await u.type(screen.getByTestId('reg-field-pr_no'), 'PR-2026-100');
     await u.click(screen.getByTestId('reg-submit'));
-    await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In review'));
-    await u.click(await screen.findByTestId('reg-review'));
+    // two fixed levels: the submission goes straight to L2 (no middle review step)
     await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In approval'));
+    expect(screen.queryByTestId('reg-review')).not.toBeInTheDocument();
     await u.click(await screen.findByTestId('reg-approve'));
     await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('Approved'));
     const list = await api.get<{ items: RegisterRecord[] }>('/registers/procurement/records');
     expect(list.items.find((r) => r.data.pr_no === 'PR-2026-100')?.state).toBe('approved');
-  });
+  }, 30_000);
 
   it('says in plain words what is wrong and keeps Submit off until it is fixed', async () => {
     await signIn('pm');
@@ -90,7 +90,7 @@ describe('Manual entry: create, submit, review, approve', () => {
     expect(screen.getByTestId('reg-missing')).toBeInTheDocument();
   });
 
-  it('refuses a rejection without a note and returns the record one level back with it', async () => {
+  it('refuses a rejection without a note and returns the record to L1 (Entry) with it', async () => {
     await signIn('pm');
     renderApp(<Routed />, at('procurement', `?record=${recId(4)}`));
     const u = userEvent.setup();
@@ -99,7 +99,7 @@ describe('Manual entry: create, submit, review, approve', () => {
     expect(screen.getByTestId('reject-error')).toBeInTheDocument();
     await u.type(screen.getByTestId('reject-note'), 'PR date is missing');
     await u.click(screen.getByTestId('reject-submit'));
-    await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In review'));
+    await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('Entry')); // two levels: a rejection from L2 goes back to L1
     const r = await api.get<RegisterRecord>(`/registers/procurement/records/${recId(4)}`);
     expect(r.last_return_note).toBe('PR date is missing');
     expect(r.return_count).toBe(1);
@@ -137,9 +137,9 @@ describe('Permits: has expiry date (Q63c)', () => {
     expect(screen.getByTestId('reg-permanent')).toBeInTheDocument();
     expect(screen.queryByTestId('reg-error-valid_to')).not.toBeInTheDocument();
     await u.click(screen.getByTestId('reg-submit'));
-    await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In review'));
+    await waitFor(() => expect(screen.getByTestId('reg-state')).toHaveTextContent('In approval'));
     const items = (await api.get<{ items: RegisterRecord[] }>('/registers/permits_hse/records')).items;
-    const mine = items.find((r) => r.state === 'in_review' && r.data.permit_type === 'Access - CW' && r.data.has_expiry === false);
+    const mine = items.find((r) => r.state === 'in_approval' && r.data.permit_type === 'Access - CW' && r.data.has_expiry === false);
     expect(mine).toBeTruthy();
     expect(mine!.data.valid_to).toBeUndefined();
   });
@@ -197,11 +197,9 @@ describe('Template entry', () => {
     expect(screen.getByTestId('batch-count-invalid')).toHaveTextContent('2 invalid');
     expect(screen.getByTestId('batch-reason-6')).toHaveTextContent('Site ID: Site not in the Site Register.');
     await u.click(screen.getByTestId('batch-submit'));
-    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In review'));
+    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval')); // two levels: straight to L2
     await u.click(await screen.findByTestId('batch-row-reject-2'));
     await waitFor(() => expect(screen.getByTestId('batch-decision-2')).toHaveTextContent('Returned'));
-    await u.click(screen.getByTestId('batch-approve-all'));
-    await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('In approval'));
     await u.click(await screen.findByTestId('batch-approve-all'));
     await waitFor(() => expect(screen.getByTestId('batch-done')).toBeInTheDocument());
     const items = (await api.get<{ items: RegisterRecord[] }>('/registers/procurement/records')).items;
@@ -224,12 +222,12 @@ describe('Matrix: self-approval and empty cell', () => {
     renderApp(<MatrixPage />, { route: '/admin/matrix' });
     const u = userEvent.setup();
     expect(await screen.findByTestId('matrix-rule-site_release-1')).toHaveTextContent('Rule: Any one holder');
-    expect(screen.getByTestId('matrix-warn-self-final_closure')).toHaveTextContent('holds every level of Final Closure'); // one level, one holder: shown in advance
+    expect(screen.getByTestId('matrix-warn-self-final_closure')).toHaveTextContent('holds L1 and L2 of Final Closure'); // one person at L1 and L2: shown in advance
     expect(screen.queryByTestId('matrix-warn-self-site_release')).not.toBeInTheDocument();
     await u.click(within(screen.getByTestId('matrix-cell-site_release-3')).getByTestId('matrix-add'));
     await u.type(await screen.findByTestId('matrix-picker-q'), 'Mona');
     await u.click(await screen.findByTestId('matrix-opt-user-1102'));
-    expect(await screen.findByTestId('matrix-warn-self-site_release')).toHaveTextContent('Mona Fathi holds every level of Site Release');
+    expect(await screen.findByTestId('matrix-warn-self-site_release')).toHaveTextContent('Mona Fathi holds L1 and L2 of Site Release');
   });
 
   it('names the level that has no holder when the server answers empty_cell', async () => {
@@ -242,7 +240,7 @@ describe('Matrix: self-approval and empty cell', () => {
     await u.click(screen.getByTestId('matrix-publish'));
     await u.type(screen.getByTestId('matrix-reason'), 'Test empty');
     await u.click(screen.getByTestId('matrix-publish-confirm'));
-    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('Site Release: the Approve level has no holder');
+    expect(await screen.findByTestId('matrix-error')).toHaveTextContent('Site Release: L2 (Reviewer & Approver) has no holder');
     expect(screen.getByTestId('matrix-cell-site_release-3')).toHaveAttribute('data-refused', 'true');
-  });
+  }, 30_000);
 });

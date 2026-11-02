@@ -264,4 +264,18 @@ export class MatrixService {
       SELECT matrix_save(${wf.version}::int, ${version}::int, ${JSON.stringify(levels)}::jsonb, ${JSON.stringify(cells)}::jsonb, ${b.reason}::text)`);
     return this.read(wf, undefined);
   }
+
+  /** DELETE /matrix/cells/{cell_id} (step-up, If-Match, reason as a query parameter): deletes a region or task override cell; the row default applies again (Q86). */
+  async deleteCell(auth: AuthContext, rawId: string, ifMatch: string | undefined, q: Query): Promise<MatrixDto> {
+    await this.access.requireAdmin('matrix', 'edit');
+    await this.stepUp.require(auth);
+    const version = parseIfMatch(ifMatch);
+    const why = parse(reason, oneParam(q, 'reason') ?? '');
+    const id = z.string().uuid().safeParse(rawId);
+    if (!id.success) throw problems.notFound('No such matrix cell.');
+    const wf = await this.workflowOf(undefined);
+    if (!wf) throw problems.notFound('There is no published workflow version.');
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT matrix_delete_cell(${version}::int, ${id.data}::uuid, ${why}::text)`);
+    return this.read(wf, undefined);
+  }
 }

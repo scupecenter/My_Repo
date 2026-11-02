@@ -156,7 +156,8 @@ describe('Responsibility Matrix', () => {
     await screen.findByTestId('matrix-row-site_release');
     expect(screen.getByTestId('matrix-row-dismantle')).toBeInTheDocument();
     expect(screen.getByTestId('matrix-row-procurement')).toBeInTheDocument();
-    expect(screen.getByTestId('matrix-skip-site_release')).toHaveTextContent('Mona Fathi');
+    // two fixed levels: a person holding both L1 and L2 is a self-approval; Site Release has different people at L1 and L2
+    expect(screen.getByTestId('matrix-skip-site_release')).toHaveTextContent('—');
     expect(screen.getByTestId('matrix-skip-final_closure')).toHaveTextContent(/final approval/);
   });
 
@@ -178,6 +179,26 @@ describe('Responsibility Matrix', () => {
     await waitFor(() => expect(screen.getByTestId('matrix-dirty')).toHaveTextContent('0'));
     expect((await api.get<{ stages: { code: string; cells: { level: number; rule: string; assignees: unknown[] }[] }[] }>('/matrix')).stages.find((s) => s.code === 'pre_cw')!.cells[0]).toMatchObject({ rule: 'all_members' });
   });
+
+  it('lists the region overrides of a region and deletes one with a reason after re-authentication (Q86); the row default stays', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    renderApp(<MatrixPage />, { route: '/admin/matrix' });
+    const u = userEvent.setup();
+    expect(await screen.findByTestId('matrix-overrides-empty')).toBeInTheDocument(); // no task overrides; region overrides show once a region is chosen
+    await waitFor(() => expect(within(screen.getByTestId('matrix-overrides-region')).getAllByRole('option').length).toBeGreaterThan(1));
+    await u.selectOptions(screen.getByTestId('matrix-overrides-region'), '4');
+    const item = await screen.findByTestId(/^matrix-override-(?!delete|reason|confirm|dialog)/);
+    expect(item).toHaveTextContent('L1');
+    const cellId = item.getAttribute('data-testid')!.replace('matrix-override-', '');
+    await u.click(within(item).getByTestId(`matrix-override-delete-${cellId}`));
+    await u.type(await screen.findByTestId('matrix-override-reason'), 'Zawia follows the default');
+    await u.click(screen.getByTestId('matrix-override-confirm'));
+    await waitFor(() => expect(screen.getByTestId('matrix-overrides-empty')).toBeInTheDocument());
+    const cw = (await api.get<{ stages: { code: string; cells: { level: number; region_id?: number | null }[] }[] }>('/matrix', { query: { region_id: 4 } })).stages.find((x) => x.code === 'cw')!;
+    expect(cw.cells.some((c) => c.region_id === 4)).toBe(false);
+    expect(cw.cells.some((c) => c.level === 1 && !c.region_id)).toBe(true); // the row default applies again
+  }, 15_000);
 
   it('refuses an empty used level and keeps the server copy', async () => {
     await signIn('pm');
