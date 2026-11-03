@@ -1578,7 +1578,13 @@
     "hlc_scope_only": "The HLC approval date belongs to scope HLC only.",
     "before_installation": "The TX link test cannot be before the installation date.",
     "before_test": "The in-service date cannot be before the TX link test.",
-    "scope_conflict": "The site scope says N/A for this register."
+    "scope_conflict": "The site scope says N/A for this register.",
+    "task_not_on_site": "This task does not exist on this site (its scope or delivery scenario does not use it).",
+    "task_not_open": "This task takes no entry now.",
+    "task_approved": "The task is approved. An approved task is changed only by an admin reopening it.",
+    "gate_locked": "The task is locked by a closed gate: it takes no entry until the gate opens.",
+    "actual_date_required": "The actual date is required: the task is submitted with its row, as on the task screen.",
+    "mandatory_slots_missing": "Mandatory documents are missing. Upload them on the task first."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -1632,7 +1638,22 @@
     "return_row_title": "Return this row to the uploader",
     "col_changes": "Changes",
     "skipped": "Skipped (identical)",
-    "open_record": "Open the record"
+    "open_record": "Open the record",
+    "group": "The batches of this file",
+    "group_hint": "Parts of the same Master file, each with its own flow:",
+    "held_title_task": "{{count}} row(s) wait for their task",
+    "held_body_task": "The task of these rows waits for a predecessor or is already in review. They are held, \"approve all\" leaves them alone, and they are released when you send the batch again once that is decided.",
+    "hold_open_submission": "Held: the task is in review",
+    "hold_predecessor_open": "Held: waits for a predecessor",
+    "open_task": "Open the task",
+    "task_field": {
+      "planned_date": "Planned date",
+      "actual_start": "Actual start",
+      "actual_date": "Actual date",
+      "aat_se_name": "AAT SE name",
+      "snags_found": "Snags found",
+      "snags_cleared": "Snags cleared"
+    }
   },
   "batchStatus": {
     "parsing": "Checking",
@@ -1874,14 +1895,14 @@
   },
   "tpl": {
     "title": "Templates and uploads",
-    "subtitle": "Each register has one approved template. Download it, fill it, and upload the same file. Every row then goes through Entry and Review / Approve like a manual entry.",
+    "subtitle": "Each register has one approved template, and the Site Register has one per stream and the whole Master. Download it, fill it, and upload the same file. Every row then goes through Entry and Review / Approve like a manual entry.",
     "catalogue": "Approved templates",
     "col_name": "Template",
     "col_id": "ID",
     "col_version": "Version",
     "col_issued": "Issued",
     "none": "No template is available to you.",
-    "streams_note": "The Site Register stream templates (Design & Acquisition, Civil Works, Installation, Handover & Closure) and the full Master template are not issued yet.",
+    "streams_note": "Site Register stream templates (Design & Acquisition, Civil Works, Installation, Handover & Closure) have one row per site and the task fields of the stream in Master order. Grey columns (calculated, set by the workflow, or owned by a register such as As-Built) are shown and never read: enter register data in its register. The Master template holds the whole Master layout and the register sheets, and is split into one batch per part.",
     "batches": "Uploads",
     "all_statuses": "All statuses",
     "all_registers": "All registers",
@@ -1900,7 +1921,26 @@
     "rule_flow": "Nothing is saved to the register until the rows go through the approval levels.",
     "file": "Filled template (.xlsx)",
     "upload": "Upload and check",
-    "rejection_logged": "This refusal was written to the System Log."
+    "rejection_logged": "This refusal was written to the System Log.",
+    "kind_master": "Whole Master",
+    "kind_stream": "Site Register stream",
+    "col_stream": "Stream",
+    "all_streams": "All streams",
+    "stream_DESIGN_ACQ": "Design & Acquisition",
+    "stream_CW": "Civil Works",
+    "stream_TE": "Installation (TE)",
+    "stream_CLOSURE": "Handover & Closure",
+    "part": "Sheet {{sheet}}",
+    "back": "Back to the templates",
+    "rule_tasks": "Each task you fill is entered as L1 Data Entry and submitted: it needs its actual date and its mandatory documents (upload them on the task first). A task locked by a closed gate is refused.",
+    "rule_master": "The file is split into one batch per stream and per register sheet. A column or a sheet the PMIS does not own is ignored with a warning.",
+    "parts_title": "The file became {{count}} batch(es). Each follows its own flow.",
+    "warnings_title": "{{count}} warning(s): nothing was refused, but some of the file was not read.",
+    "warn_column_not_owned": "Column \"{{column}}\" ({{sheet}}): {{count}} value(s) ignored. The PMIS calculates it or another register owns it.",
+    "warn_extra_column": "Column \"{{column}}\" ({{sheet}}) is not part of the template: ignored.",
+    "warn_unknown_sheet": "Sheet \"{{sheet}}\" is not part of the template: ignored.",
+    "warn_part_skipped": "Sheet {{sheet}} was not staged.",
+    "open_first": "Open the first batch"
   },
   "follow": {
     "follow": "Follow",
@@ -2694,5 +2734,13 @@
       "external": "Other external party",
       "aljeel": "Aljeel"
     }
+  },
+  "batchWarn": {
+    "sla_negative": "The actual date is before the SLA start: the duration is negative and raises a data-quality alert.",
+    "sla_late": "The actual date is after the SLA limit: the task is late.",
+    "date_order": "The actual start is after the actual date.",
+    "calculated_column": "Calculated or register-owned column: the value was not read.",
+    "held_predecessor": "The row waits until its predecessor is approved.",
+    "held_open_submission": "The task is in review: the row waits until that is decided."
   }
 }
