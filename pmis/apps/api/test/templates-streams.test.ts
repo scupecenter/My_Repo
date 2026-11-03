@@ -8,7 +8,7 @@ import { Api, startApp, superDb } from './helpers';
 import { G } from './reg-helpers';
 import { day, downloadTemplate, fillTemplate, load, uploadFile } from './tpl-helpers';
 import { SOUT, SR, SITE_ENTRY_GRANTS, filled, moreSite, streamTeam, taskRow } from './tpl-stream-helpers';
-import { actor, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
+import { actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
  * Migration 0051: the Site Register stream templates (TPL-SITE-DA, -CW, -TE, -CL). The tasks A2, A5, B4 ... of workflow v1 in region 7, where no other suite sets
@@ -192,6 +192,26 @@ describe('catalogue and download', () => {
     expect(au[0]!.after.prefill).toBe(true);
     expect(au[0]!.after.rows).toBeGreaterThanOrEqual(1);
     expect(au.length).toBe(2);
+  });
+
+  it('shows a register-owned value in a pre-filled file only to a caller who may view that register in the region', async () => {
+    const t = await streamTeam(app, db, { B13: 'open' });
+    await db.query(
+      `INSERT INTO register_records (entity_id, version_no, register_key, site_id, region_id, state, is_current, data, approved_at, current_level)
+       VALUES (gen_random_uuid(), 1, 'as_built', $1, $2, 'approved', true, '{"cw_as_built_submitted": "Yes"}'::jsonb, now(), 3)`, [t.site.id, SR]);
+    const valueFor = async (api: Api): Promise<ExcelJS.CellValue> => {
+      const dl = await downloadTemplate(api, 'TPL-SITE-CW', '?prefill=true');
+      expect(dl.status).toBe(200);
+      const ws = (await load(dl.buffer)).getWorksheet('Data')!;
+      const h = headersOf(ws);
+      const col = h.findIndex((x) => x.includes('As-Built Submitted'));
+      expect(col).toBeGreaterThanOrEqual(0);
+      const row = [...Array(ws.rowCount).keys()].map((i) => i + 1).find((n) => ws.getRow(n).getCell(1).value === t.site.code)!;
+      return ws.getRow(row).getCell(col + 1).value;
+    };
+    expect(await valueFor(t.entry.api)).toBeNull();                 // no As-Built module: the read-only cell stays empty
+    await addAssignment(db, t.entry.user.id, { level: 'view', regions: [SR], modules: null, grants: G('as_built', 'view') });
+    expect(await valueFor(t.entry.api)).toBe('Yes');                 // with the register's view in the region it is shown
   });
 
   it('refuses a caller without the right to download, or without the Site Register, and an unknown template (permission denied)', async () => {

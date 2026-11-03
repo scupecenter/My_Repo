@@ -367,9 +367,17 @@ export class TemplatesService {
     }
     const regData = new Map<string, Record<string, unknown>>();
     for (const key of regFields.keys()) {
+      // a register's values are shown only to callers who may view that register in the record's region (security review of 0051);
+      // otherwise the read-only cell stays empty
+      const def = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = ${key}`);
+      if (!def[0]) continue;
+      const allowed = await this.access.regions(def[0].module_key, 'view');
+      if (allowed !== null && allowed.length === 0) continue;
       const rec = await this.db.tx.$queryRaw<{ site_id: string; data: Record<string, unknown> }[]>(Prisma.sql`
         SELECT DISTINCT ON (r.site_id) r.site_id::text AS site_id, r.data FROM register_records r
-        WHERE r.register_key = ${key} AND r.site_id = ANY(${ids}::uuid[]) AND r.state = 'approved' AND r.is_current ORDER BY r.site_id, r.version_no DESC`);
+        WHERE r.register_key = ${key} AND r.site_id = ANY(${ids}::uuid[]) AND r.state = 'approved' AND r.is_current
+          ${allowed === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${allowed}::int[])`}
+        ORDER BY r.site_id, r.version_no DESC`);
       for (const x of rec) regData.set(`${key}|${x.site_id}`, x.data);
     }
     return sites.map((s, i) => {
