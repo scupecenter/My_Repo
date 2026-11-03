@@ -15,7 +15,8 @@ import { oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TaskViewService, UserRefDto } from '../workflow/task-view.service';
-import { DATA_SHEET, TPL_SHEET, TemplatesService, TplColumn } from './templates.service';
+import { DocumentsService } from '../documents/documents.service';
+import { DATA_SHEET, LISTS_SHEET, MASTER_INFO_PREFILLED, STREAM_INFO_PREFILLED, TPL_SHEET, TemplatesService, TplColumn, TplPart } from './templates.service';
 import { UploadedFile, importMaxRows } from './upload.interceptor';
 import { guardXlsx } from './xlsx-guard';
 
@@ -48,6 +49,9 @@ interface BatchRow {
   task_id: string | null;
   site_id: string | null;
   register_key: string | null;
+  stream_code: string | null;
+  group_id: string | null;
+  part_sheet: string | null;
   note: string | null;
   module_key: string | null;
   c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint;
@@ -74,6 +78,28 @@ interface ParsedRow {
   pre_errors: { column: string; field: string; code: string; message: string }[];
 }
 
+interface ParsedStreamRow {
+  row_no: number;
+  sheet: string;
+  site_code?: string;
+  cells: Record<string, unknown>;
+  pre_errors: { column: string; field: string; code: string; message: string }[];
+}
+
+/** A note about a whole upload (never blocking): a column or sheet the PMIS does not read, a part that was skipped. */
+export interface UploadWarning {
+  code: 'column_not_owned' | 'extra_column' | 'unknown_sheet' | 'part_skipped';
+  sheet?: string;
+  column?: string;
+  count?: number;
+  message: string;
+}
+
+const OWNER_TEXT: Record<string, string> = {
+  calc: 'calculated by the PMIS', identity: 'owned by the RF & Design register', scope: 'owned by the site scope (Change Control)', baseline: 'owned by the Baseline',
+  dismantle: 'owned by the Dismantle register (TPL-DIS)', issues: 'owned by the Issue Log (TPL-ISS)', row: 'a row number',
+};
+
 const sha256 = (b: Buffer | string): string => createHash('sha256').update(b).digest('hex');
 const unitSeparator = String.fromCharCode(0x1f);
 
@@ -89,6 +115,7 @@ export class ImportService {
     private readonly syslog: SyslogService,
     private readonly templates: TemplatesService,
     private readonly view: TaskViewService,
+    private readonly documents: DocumentsService,
   ) {}
 
   // ------------------------------------------------------------------ upload
@@ -135,7 +162,6 @@ export class ImportService {
     // 2. known and active template, current version
     const current = await this.templates.current(templateId);
     if (!current || !current.is_active) return this.reject(auth, requestId, 'template_unknown_or_inactive', `The template ${templateId} does not exist or is no longer in use.`, ctx);
-    if (current.kind !== 'register') return this.reject(auth, requestId, 'template_unknown_or_inactive', `Uploads of the template ${templateId} are not available yet.`, ctx);
     const issued = await this.templates.version(templateId, version);
     if (!issued) return this.reject(auth, requestId, 'tpl_invalid', `This file names version ${version} of ${templateId}, which was never issued.`, ctx);
     if (!issued.is_current) {
@@ -145,6 +171,10 @@ export class ImportService {
     // 3. the template the user selected
     if (body.template_id && body.template_id !== templateId) {
       return this.reject(auth, requestId, 'wrong_template', `This file is the template ${templateId}, but ${body.template_id} was selected.`, { ...ctx, selected: body.template_id });
+    }
+    if (current.kind === 'master') {
+      if (body.task_id) return this.reject(auth, requestId, 'wrong_template', 'TPL-MASTER has no per-task upload: upload the stream template of the task.', ctx);
+      return this.uploadMaster(auth, requestId, ctx, wb, kv, issued as unknown as { columns: unknown; header_checksum: string }, templateId, version, file.originalname);
     }
     // 4. the header row
     const ws = wb.getWorksheet(kv.get('data_sheet') || DATA_SHEET) ?? wb.getWorksheet(DATA_SHEET);
@@ -162,11 +192,11 @@ export class ImportService {
 
     // 5. the rows (values only; a formula is refused)
     const max = importMaxRows();
-    const rows: ParsedRow[] = [];
+    const rows: (ParsedRow | ParsedStreamRow)[] = [];
     let tooMany = false;
     ws.eachRow({ includeEmpty: false }, (row, n) => {
       if (n === 1 || tooMany) return;
-      const parsed = this.parseRow(row, n, cols);
+      const parsed = current.kind === 'stream' ? this.parseStreamRow(row, n, cols, ws.name, (i) => i + 1) : this.parseRow(row, n, cols);
       if (!parsed) return;
       if (rows.length >= max) { tooMany = true; return; }
       rows.push(parsed);
@@ -180,16 +210,13 @@ export class ImportService {
     return this.getBatch(auth, id);
   }
 
-  /** Savepoint around the staging call: a refusal of the database (version, headers, rights) is logged and answered as template_rejected. */
-  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string): Promise<string> {
+  /** Savepoint around a staging call: a refusal of the database (version, headers, rights) is logged and answered as template_rejected. */
+  private async guarded<T>(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, run: () => Promise<T>): Promise<T> {
     await this.db.tx.$executeRaw`SAVEPOINT imp_stage`;
     try {
-      const r = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
-        SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb)::text AS id`);
+      const r = await run();
       await this.db.tx.$executeRaw`RELEASE SAVEPOINT imp_stage`;
-      const id = r[0]?.id;
-      if (!id) throw new ProblemException(500, 'internal_error', {});
-      return id;
+      return r;
     } catch (e) {
       if (e instanceof ProblemException) throw e;
       const p = mapDbError(e);
@@ -201,6 +228,161 @@ export class ImportService {
       }
       throw p;
     }
+  }
+
+  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string): Promise<string> {
+    const id = await this.guarded(auth, requestId, ctx, async () => {
+      const r = await this.db.tx.$queryRaw<{ id: string | null }[]>(Prisma.sql`
+        SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb)::text AS id`);
+      if (!r[0]) throw new ProblemException(500, 'internal_error', {});
+      return r[0].id;
+    });
+    if (!id) throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns the PMIS does not read.' }]);
+    return id;
+  }
+
+  /**
+   * TPL-MASTER: every sheet of the file is a part (the Master sheet, or the sheet of a register). The columns are found by their header, so a column added to the
+   * file does not break the upload: it is ignored with a warning, as is a sheet the PMIS does not know and every value in a column the PMIS does not own. A sheet that
+   * lacks an issued header is refused. The database then splits the Master sheet into one batch per stream, stages each register sheet as the register's own
+   * template, and answers one batch per part (they share `group_id`).
+   */
+  private async uploadMaster(
+    auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, wb: ExcelJS.Workbook, kv: Map<string, string>,
+    issued: { columns: unknown; header_checksum: string }, templateId: string, version: number, fileName: string,
+  ): Promise<Record<string, unknown>> {
+    const parts = issued.columns as TplPart[];
+    const claimed = kv.get('header_checksum');
+    if (claimed !== undefined && claimed !== issued.header_checksum) {
+      return this.reject(auth, requestId, 'checksum_mismatch', 'The header rows of the file were changed. Use the template as it was issued.', ctx);
+    }
+    const max = importMaxRows();
+    const warnings: UploadWarning[] = [];
+    const staged: { sheet: string; header_checksum: string; rows: unknown[] }[] = [];
+    const helper = new Set([TPL_SHEET, LISTS_SHEET, 'Instructions', 'Columns']);
+    for (const ws of wb.worksheets) {
+      if (helper.has(ws.name)) continue;
+      const part = parts.find((p) => p.sheet === ws.name);
+      if (!part) {
+        warnings.push({ code: 'unknown_sheet', sheet: ws.name, message: `The sheet "${ws.name}" is not part of ${templateId}: it is ignored.` });
+        continue;
+      }
+      const head = ws.getRow(1);
+      const byName = new Map<string, number>();
+      for (let i = 1; i <= head.cellCount; i++) {
+        const h = (this.text(head.getCell(i)) ?? '').trim();
+        if (h && !byName.has(h)) byName.set(h, i);
+      }
+      const missing = part.columns.filter((c) => !byName.has(c.header)).map((c) => c.header);
+      if (missing.length > 0) {
+        return this.reject(auth, requestId, 'checksum_mismatch',
+          `The sheet "${ws.name}" lacks the column(s) ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ' ...' : ''}. Use the template as it was issued.`, { ...ctx, sheet: ws.name });
+      }
+      const known = new Set(part.columns.map((c) => c.header));
+      for (const h of byName.keys()) {
+        if (!known.has(h)) warnings.push({ code: 'extra_column', sheet: ws.name, column: h, message: `The column "${h}" is not owned by the PMIS: it is ignored.` });
+      }
+      const colAt = (i: number): number | undefined => byName.get((part.columns[i] as TplColumn).header);
+      const ignored = new Map<string, number>();
+      const rows: unknown[] = [];
+      let tooMany = false;
+      ws.eachRow({ includeEmpty: false }, (row, n) => {
+        if (n === 1 || tooMany) return;
+        const parsed = part.kind === 'master'
+          ? this.parseStreamRow(row, n, part.columns, ws.name, colAt, { ignored, prefilled: MASTER_INFO_PREFILLED, countDerived: kv.get('prefilled') !== 'yes' })
+          : this.parseRow(row, n, part.columns, colAt, ws.name);
+        if (!parsed) return;
+        if (rows.length >= max) { tooMany = true; return; }
+        rows.push(parsed);
+      });
+      if (tooMany) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The sheet "${ws.name}" has more than ${max} rows. Split it.`, { ...ctx, max_rows: max, sheet: ws.name });
+      for (const [h, count] of ignored) {
+        const col = part.columns.find((c) => c.header === h);
+        warnings.push({ code: 'column_not_owned', sheet: ws.name, column: h, count, message: `The column "${h}" is ${OWNER_TEXT[col?.owner ?? 'calc'] ?? 'not owned by the PMIS'}: ${count} value(s) ignored.` });
+      }
+      if (rows.length > 0) staged.push({ sheet: ws.name, header_checksum: sha256(part.columns.map((c) => c.header).join(unitSeparator)), rows });
+    }
+    if (staged.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The file has no data rows.' }]);
+
+    const payload = JSON.stringify(staged);
+    const result = await this.guarded(auth, requestId, ctx, async () => {
+      const r = await this.db.tx.$queryRaw<{ r: { group_id: string; batches: { id: string }[]; skipped: { sheet: string; kind: string; ref: string; reason?: string; detail?: string }[] } }[]>(Prisma.sql`
+        SELECT imp_stage_master(${templateId}::text, ${version}::int, ${fileName}::text, ${String(ctx.sha256)}::text, ${payload}::jsonb) AS r`);
+      const out = r[0]?.r;
+      if (!out) throw new ProblemException(500, 'internal_error', {});
+      return out;
+    });
+    for (const sk of result.skipped) {
+      warnings.push({ code: 'part_skipped', sheet: sk.sheet, message: `${sk.sheet}${sk.kind === 'stream' ? ` (${sk.ref})` : ''} was not staged: ${sk.detail ?? sk.reason ?? 'refused'}` });
+    }
+    if (result.batches.length === 0) {
+      throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns the PMIS does not read.' }]);
+    }
+    const dtos: Record<string, unknown>[] = [];
+    for (const b of result.batches) dtos.push(await this.getBatch(auth, b.id));
+    return { ...(dtos[0] as Record<string, unknown>), group_id: result.group_id, parts: dtos, warnings };
+  }
+
+  private readCell(cell: ExcelJS.Cell): { kind: 'empty' } | { kind: 'formula' } | { kind: 'error' } | { kind: 'value'; val: unknown } {
+    const v = cell.value;
+    if (v === null || v === undefined) return { kind: 'empty' };
+    let val: unknown = v;
+    if (typeof v === 'object' && !(v instanceof Date)) {
+      const o = v as { formula?: unknown; sharedFormula?: unknown; error?: unknown; text?: unknown; richText?: { text: string }[] };
+      if (o.formula !== undefined || o.sharedFormula !== undefined) return { kind: 'formula' };
+      if (o.error !== undefined) return { kind: 'error' };
+      if (Array.isArray(o.richText)) val = o.richText.map((x) => x.text).join('');
+      else if (typeof o.text === 'string') val = o.text;
+      else return { kind: 'empty' };
+    }
+    if (typeof val === 'string') {
+      // control characters (other than tab, line feed and carriage return) are never part of a value
+      // eslint-disable-next-line no-control-regex
+      val = val.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').trim();
+      if (val === '') return { kind: 'empty' };
+      if ((val as string).startsWith('=')) return { kind: 'formula' };
+    }
+    return { kind: 'value', val };
+  }
+
+  /**
+   * One row of a stream template or of the Master sheet: the Site ID and the cells of the task columns, keyed by column code. A grey task column is sent too (the
+   * database compares it with what the PMIS holds and reports a difference, never reads it); a grey info column is only counted for the warning of the upload.
+   */
+  private parseStreamRow(
+    row: ExcelJS.Row, n: number, cols: TplColumn[], sheet: string, colAt: (i: number) => number | undefined,
+    notes?: { ignored: Map<string, number>; prefilled: Set<string>; countDerived?: boolean },
+  ): ParsedStreamRow | null {
+    const out: ParsedStreamRow = { row_no: n, sheet, cells: {}, pre_errors: [] };
+    let any = false;
+    cols.forEach((c, i) => {
+      const at = colAt(i);
+      if (at === undefined) return;
+      const r = this.readCell(row.getCell(at));
+      if (r.kind === 'empty') return;
+      if (c.kind === 'site') {
+        if (r.kind === 'value') { out.site_code = String(r.val instanceof Date ? r.val.toISOString() : r.val).trim(); any = true; }
+        return;
+      }
+      if (c.kind === 'info') {
+        if (r.kind === 'value' && notes && !notes.prefilled.has(c.code) && !STREAM_INFO_PREFILLED.has(c.code)) notes.ignored.set(c.header, (notes.ignored.get(c.header) ?? 0) + 1);
+        return;
+      }
+      if (c.kind !== 'task') return;
+      if (c.derived) {
+        if (r.kind === 'value') {
+          out.cells[c.code] = this.typed(c, r.val);
+          // a file that was not pre-filled has nothing typed in a grey column that the PMIS put there: the value is the user's, and it is ignored
+          if (notes?.countDerived) notes.ignored.set(c.header, (notes.ignored.get(c.header) ?? 0) + 1);
+        }
+        return;
+      }
+      any = true;
+      if (r.kind === 'formula') { out.pre_errors.push({ column: c.header, field: c.code, code: 'formula_not_allowed', message: 'Cells must hold values, not formulas.' }); return; }
+      if (r.kind === 'error') { out.pre_errors.push({ column: c.header, field: c.code, code: 'cell_error', message: 'The cell holds an error value.' }); return; }
+      out.cells[c.code] = this.typed(c, r.val);
+    });
+    return any ? out : null;
   }
 
   private text(cell: ExcelJS.Cell): string | null {
@@ -219,12 +401,14 @@ export class ImportService {
   }
 
   /** One data row. Blank cells are left out; a formula, an error value or text that starts with "=" is a cell error. A row with no values is skipped. */
-  private parseRow(row: ExcelJS.Row, n: number, cols: TplColumn[]): ParsedRow | null {
-    const out: ParsedRow = { row_no: n, sheet: DATA_SHEET, data: {}, custom: {}, pre_errors: [] };
+  private parseRow(row: ExcelJS.Row, n: number, cols: TplColumn[], colAt: (i: number) => number | undefined = (i) => i + 1, sheet = DATA_SHEET): ParsedRow | null {
+    const out: ParsedRow = { row_no: n, sheet, data: {}, custom: {}, pre_errors: [] };
     let any = false;
     const fail = (c: TplColumn, code: string, message: string) => out.pre_errors.push({ column: c.header, field: c.code, code, message });
     cols.forEach((c, i) => {
-      const cell = row.getCell(i + 1);
+      const at = colAt(i);
+      if (at === undefined) return;
+      const cell = row.getCell(at);
       const v = cell.value;
       if (v === null || v === undefined) return;
       if (c.derived) return; // grey columns are never read
@@ -285,7 +469,7 @@ export class ImportService {
   private batchSelect(where: Prisma.Sql, tail: Prisma.Sql = Prisma.empty): Prisma.Sql {
     return Prisma.sql`
       SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
-        b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.note, rd.module_key,
+        b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL THEN 'sites' END) AS module_key,
         c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
@@ -325,6 +509,9 @@ export class ImportService {
         task_id: r.task_id,
         site_id: r.site_id,
         register_key: r.register_key,
+        stream: r.stream_code,
+        group_id: r.group_id,
+        part_sheet: r.part_sheet,
         note: r.note,
         uploaded_at: r.created_at,
         version: r.version,
@@ -337,7 +524,9 @@ export class ImportService {
 
   private async visible(auth: AuthContext): Promise<Prisma.Sql> {
     const keys = await this.viewableRegisters();
-    return Prisma.sql`(b.uploaded_by = ${auth.user.id}::uuid OR b.register_key = ANY(${keys}::text[]))`;
+    const siteRegs = await this.access.regions('sites', 'view');
+    const sites = siteRegs === null || siteRegs.length > 0;
+    return Prisma.sql`(b.uploaded_by = ${auth.user.id}::uuid OR b.register_key = ANY(${keys}::text[]) ${sites ? Prisma.sql`OR b.stream_code IS NOT NULL` : Prisma.empty})`;
   }
 
   async getBatch(auth: AuthContext, id: string): Promise<Record<string, unknown>> {
@@ -363,6 +552,13 @@ export class ImportService {
     if (template !== undefined) conds.push(Prisma.sql`d.template_id = ${template}`);
     const reg = oneParam(q, 'register_key');
     if (reg !== undefined) conds.push(Prisma.sql`b.register_key = ${reg}`);
+    const stream = oneParam(q, 'stream');
+    if (stream !== undefined) conds.push(Prisma.sql`b.stream_code = ${stream}`);
+    const group = oneParam(q, 'group_id');
+    if (group !== undefined) {
+      if (!uuidSchema.safeParse(group).success) throw problems.validation([{ path: '/group_id', code: 'invalid', message: 'group_id is a uuid.' }]);
+      conds.push(Prisma.sql`b.group_id = ${group}::uuid`);
+    }
     if (cursor) conds.push(Prisma.sql`(b.created_at, b.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     const rows = await this.db.tx.$queryRaw<BatchRow[]>(this.batchSelect(Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY b.created_at DESC, b.id DESC LIMIT ${limit + 1}`));
     const page = rows.slice(0, limit);
@@ -373,7 +569,10 @@ export class ImportService {
   async listRows(auth: AuthContext, id: string, q: Record<string, unknown>): Promise<{ items: unknown[]; page: { limit: number; next_cursor: string | null } }> {
     await this.getBatch(auth, id);
     const limit = parseLimit(oneParam(q, 'limit'));
-    const cursor = decodeCursor(oneParam(q, 'cursor'), 1);
+    const cursor = decodeCursor(oneParam(q, 'cursor'), 3);
+    if (cursor && !(/^[0-9]{1,9}$/.test(cursor[0] as string) && /^[0-9]{1,9}$/.test(cursor[1] as string) && uuidSchema.safeParse(cursor[2]).success)) {
+      throw problems.badRequest('The cursor is not valid.');
+    }
     const action = oneParam(q, 'action');
     if (action !== undefined && !['create', 'update', 'unchanged', 'error'].includes(action)) throw problems.validation([{ path: '/action', code: 'invalid', message: 'action is create, update, unchanged or error.' }]);
     const decision = oneParam(q, 'decision');
@@ -383,15 +582,17 @@ export class ImportService {
     const rows = await this.db.tx.$queryRaw<{
       id: string; sheet: string; row_no: number; row_key: string | null; action: string; diff: Record<string, unknown> | null; errors: unknown[] | null; eff_decision: string;
       decided_by: string | null; decision_note: string | null; register_record_id: string | null; site_code: string | null; record_type: string | null; hold_reason: string | null; record_state: string | null;
+      task_code: string | null; task_id: string | null; site_id: string | null; warnings: unknown[] | null; source_ref: string | null; ord: number;
     }[]>(Prisma.sql`
       SELECT r.id::text AS id, r.sheet, r.row_no, r.row_key, r.action, r.diff, r.errors, r.eff_decision, r.decided_by::text AS decided_by, r.decision_note,
-        r.register_record_id::text AS register_record_id, r.site_code, r.record_type, r.hold_reason, r.record_state
+        r.register_record_id::text AS register_record_id, r.site_code, r.record_type, r.hold_reason, r.record_state,
+        r.task_code, r.task_instance_id::text AS task_id, r.site_id::text AS site_id, r.warnings, r.source_ref, r.ord
       FROM v_import_rows r
       WHERE r.batch_id = ${id}::uuid
         ${action !== undefined ? Prisma.sql`AND r.action = ${action}` : Prisma.empty}
         ${decision !== undefined ? Prisma.sql`AND r.eff_decision = ${decision} AND r.action IN ('create', 'update')` : Prisma.empty}
-        ${cursor ? Prisma.sql`AND r.row_no > ${Number(cursor[0])}::int` : Prisma.empty}
-      ORDER BY r.row_no LIMIT ${limit + 1}`);
+        ${cursor ? Prisma.sql`AND (r.ord, r.row_no, r.id) > (${Number(cursor[0])}::int, ${Number(cursor[1])}::int, ${String(cursor[2])}::uuid)` : Prisma.empty}
+      ORDER BY r.ord, r.row_no, r.id LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
     const refs = await this.view.userRefs([...new Set(page.map((r) => r.decided_by).filter((x): x is string => !!x))]);
     const last = page[page.length - 1];
@@ -410,12 +611,17 @@ export class ImportService {
           site_code: r.site_code,
           record_type: r.record_type,
           record_id: r.register_record_id,
+          task_code: r.task_code,
+          task_id: r.task_id,
+          site_id: r.site_id,
+          warnings: r.warnings ?? [],
+          source_ref: r.source_ref,
         };
         if (r.hold_reason) item.hold_reason = r.hold_reason;
         if (r.decided_by && refs.get(r.decided_by)) item.decided_by = refs.get(r.decided_by);
         return item;
       }),
-      page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([String(last.row_no)]) : null },
+      page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([String(last.ord), String(last.row_no), last.id]) : null },
     };
   }
 
@@ -442,7 +648,14 @@ export class ImportService {
 
   async submit(auth: AuthContext, id: string, ifMatch: string | undefined): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
-    await this.getBatch(auth, id);
+    const batch = await this.getBatch(auth, id);
+    if (batch.stream) {
+      // as on the task screen: the conditional documents that apply now are slots before the engine counts the missing ones
+      const tasks = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT DISTINCT r.task_instance_id::text AS id FROM import_batch_rows r
+        WHERE r.batch_id = ${id}::uuid AND r.task_instance_id IS NOT NULL AND r.action = 'update' AND r.task_submitted_at IS NULL AND r.decision IN ('pending', 'pending_previous_approval')`);
+      for (const t of tasks) await this.documents.syncTaskById(t.id);
+    }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const outcome = await this.call<Outcome>(auth, Prisma.sql`SELECT imp_submit_batch(${id}::uuid, ${version}::int, ${stepOk}::boolean) AS r`);
     return { ...(await this.getBatch(auth, id)), outcome };
@@ -459,7 +672,7 @@ export class ImportService {
     // the level action needs the grid right on the register's module: approve for L2 (the database checks the level holders again for every row)
     const key = String(batch.register_key ?? '');
     const mod = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = ${key}`);
-    const module = mod[0]?.module_key;
+    const module = batch.stream ? 'sites' : mod[0]?.module_key;
     if (module && (body.action === 'approve' || body.action === 'review')) {
       const regs = await this.access.regions(module, body.action === 'approve' ? 'approve' : 'view');
       if (regs !== null && regs.length === 0) throw problems.forbidden('action_forbidden', `You need ${body.action === 'approve' ? 'approve' : 'view'} on ${module}.`);

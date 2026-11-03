@@ -2,8 +2,8 @@ import { ArrowRight, Check, Send, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import { useBatch, useBatchRows, useDecideBatch, useRegisterDefs, useSubmitBatch } from '@/api/registers';
-import type { ImportBatch, ImportBatchOutcome, ImportRow, RegisterDefinition } from '@/api/types';
+import { useBatch, useBatches, useBatchRows, useDecideBatch, useRegisterDefs, useSubmitBatch } from '@/api/registers';
+import { batchPath, type ImportBatch, type ImportBatchOutcome, type ImportRow, type RegisterDefinition } from '@/api/types';
 import { RejectDialog } from '@/components/RejectDialog';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { useToast } from '@/components/Toast';
@@ -12,6 +12,9 @@ import { registerErrorMessage } from '@/lib/registerErrors';
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
 const DECISION_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', pending: 'bg-waitBg text-waitInk', pending_previous_approval: 'bg-lockBg text-lockInk' };
 const SENT = ['in_approval', 'partially_approved', 'approved', 'rejected', 'in_review'];
+/** One file row of a stream batch gives one batch row per touched task, so a row is identified by its number and its task. */
+export const rowId = (r: Pick<ImportRow, 'row_no' | 'task_code'>): string => (r.task_code ? `${r.row_no}-${r.task_code}` : String(r.row_no));
+const humanize = (code: string) => { const s = code.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
 /** The per-cell diff of one row: the field (by its label), what it was and what the file makes it. A new row lists the values it brings. */
 export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition }) {
@@ -19,18 +22,20 @@ export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition
   const entries = Object.entries(row.diff ?? {});
   if (!entries.length) return <span className="text-mute">—</span>;
   return (
-    <ul className="space-y-0.5" data-testid={`batch-diff-${row.row_no}`}>
+    <ul className="space-y-0.5" data-testid={`batch-diff-${rowId(row)}`}>
       {entries.map(([code, v]) => {
         const f = def?.fields.find((x) => x.code === code);
         const show = (x: unknown) => (f ? showValue(f, x, i18n.language, t) : x === null || x === undefined || x === '' ? '—' : String(x));
+        // a task row: the three dates of the task, or a key of its values (the label of the field when the app has one)
+        const label = f ? fieldLabel(f, i18n.language) : row.task_code ? t(`batch.task_field.${code}`, { defaultValue: humanize(code) }) : code;
         return (
-          <li key={code} className="flex flex-wrap items-baseline gap-1" data-testid={`batch-diff-${row.row_no}-${code}`}>
-            <span className="font-semibold">{f ? fieldLabel(f, i18n.language) : code}</span>
+          <li key={code} className="flex flex-wrap items-baseline gap-1" data-testid={`batch-diff-${rowId(row)}-${code}`}>
+            <span className="font-semibold">{label}</span>
             {row.action === 'create' ? <span className="mono">{show(v.new)}</span> : (
               <>
-                <span className="mono text-mute line-through" data-testid={`batch-diff-old-${row.row_no}-${code}`}>{show(v.old)}</span>
+                <span className="mono text-mute line-through" data-testid={`batch-diff-old-${rowId(row)}-${code}`}>{show(v.old)}</span>
                 <ArrowRight size={12} className="rtl:rotate-180" aria-hidden />
-                <span className="mono" data-testid={`batch-diff-new-${row.row_no}-${code}`}>{show(v.new)}</span>
+                <span className="mono" data-testid={`batch-diff-new-${rowId(row)}-${code}`}>{show(v.new)}</span>
               </>
             )}
           </li>
@@ -44,10 +49,25 @@ export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition
 export function RowErrors({ row }: { row: ImportRow }) {
   const { t } = useTranslation();
   return (
-    <ul className="space-y-0.5" data-testid={`batch-reason-${row.row_no}`}>
+    <ul className="space-y-0.5" data-testid={`batch-reason-${rowId(row)}`}>
       {(row.errors ?? []).map((e, i) => (
-        <li key={`${e.code}-${i}`} data-testid={`batch-cell-error-${row.row_no}-${e.field ?? e.code}`}>
+        <li key={`${e.code}-${i}`} data-testid={`batch-cell-error-${rowId(row)}-${e.field ?? e.code}`}>
           {e.column && <b>{e.column}: </b>}{t(`regErrors.${e.code}`, { field: e.column ?? '', defaultValue: e.message ?? e.code })}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The warnings of a task row (never blocking): an SLA that is negative or late, a calculated column that was not read, a row that waits for a predecessor. */
+export function RowWarnings({ row }: { row: ImportRow }) {
+  const { t } = useTranslation();
+  if (!row.warnings?.length) return null;
+  return (
+    <ul className="space-y-0.5 text-waitInk" data-testid={`batch-warnings-${rowId(row)}`}>
+      {row.warnings.map((w, i) => (
+        <li key={`${w.code}-${i}`} data-testid={`batch-warning-${rowId(row)}-${w.code}`}>
+          {w.column && <b>{w.column}: </b>}{t(`batchWarn.${w.code}`, { defaultValue: w.message ?? w.code })}
         </li>
       ))}
     </ul>
@@ -60,9 +80,11 @@ const STEP_OF: Record<string, number> = { validated: 1, in_approval: 2, partiall
 export function RegisterBatch() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const { key = '', batchId = '' } = useParams();
+  const { key: keyParam = '', batchId = '' } = useParams();
   const batch = useBatch(batchId);
   const b = batch.data;
+  const key = keyParam || b?.register_key || '';
+  const stream = b?.stream ?? null;
   const rows = useBatchRows(batchId, !!b);
   const submit = useSubmitBatch(), decide = useDecideBatch();
   const [show, setShow] = useState<'all' | 'valid' | 'invalid' | 'held'>('all');
@@ -76,9 +98,11 @@ export function RegisterBatch() {
   const held = decidable.filter((r) => r.decision === 'pending_previous_approval');
   const shown = show === 'valid' ? valid : show === 'invalid' ? invalid : show === 'held' ? held : all;
   const sent = !!b && SENT.includes(b.status);
-  const open = decidable.filter((r) => r.decision === 'pending' && r.record_id);
-  const back = <Link className="btn" data-testid="batch-back" to={`/registers/${key}`}>{t('registers.back')}</Link>;
-  const name = def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
+  // a register row has a record once the batch was sent; a task row is in the flow when its decision is pending (a held row is pending_previous_approval)
+  const open = decidable.filter((r) => r.decision === 'pending' && (r.record_id || stream));
+  const group = useBatches({ status: '', template_id: '', register_key: '', group_id: b?.group_id ?? '' }, !!b?.group_id);
+  const back = <Link className="btn" data-testid="batch-back" to={stream ? '/templates' : `/registers/${key}`}>{stream ? t('tpl.back') : t('registers.back')}</Link>;
+  const name = stream ? t(`tpl.stream_${stream}`, { defaultValue: stream }) : def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
   const ok = (r: ImportBatchOutcome | undefined) => { if (r) setOutcome({ ...r, held: r.held ?? [], failed: r.failed ?? [] }); };
   const send = (x: ImportBatch) => submit.mutate(x, { onSuccess: (r) => { ok(r.outcome); toast(t('batch.sent')); }, onError: fail });
   const act = (x: ImportBatch, req: Parameters<typeof decide.mutate>[0]['req'], done?: string) =>
@@ -94,6 +118,15 @@ export function RegisterBatch() {
       </div>
       {!b ? <p className="card p-6 text-mute" data-testid="batch-parsing">{t('batch.parsing')}</p> : (
         <>
+          {!!b.group_id && !!group.data?.items.length && (
+            <nav className="mb-3 flex flex-wrap items-center gap-2 text-sm" data-testid="batch-group" aria-label={t('batch.group')}>
+              <span className="text-mute">{t('batch.group_hint')}</span>
+              {[...group.data.items].sort((x, y) => (x.part_sheet ?? '').localeCompare(y.part_sheet ?? '', 'en') || x.template_id.localeCompare(y.template_id, 'en')).map((p) => (
+                <Link key={p.id} to={batchPath(p)} aria-current={p.id === b.id ? 'page' : undefined} data-testid={`batch-group-${p.id}`}
+                  className={`chip ${p.id === b.id ? 'bg-accentSoft text-accentText' : 'bg-card2'}`}>{p.stream ? t(`tpl.stream_${p.stream}`, { defaultValue: p.stream }) : p.part_sheet ?? p.register_key ?? p.template_id} · {t(`batchStatus.${p.status}`, { defaultValue: p.status })}</Link>
+              ))}
+            </nav>
+          )}
           <ol className="mb-3 flex flex-wrap gap-2 text-sm" data-testid="batch-steps" aria-label={t('batch.steps')}>
             {[1, 2, 3].map((n) => (
               <li key={n} aria-current={step === n ? 'step' : undefined} data-step={n} className={`chip ${step === n ? 'bg-accentSoft text-accentText' : step > n ? 'bg-doneBg text-doneInk' : 'bg-card2 text-mute'}`}>{n}. {t(`batch.step_${n}`)}</li>
@@ -126,9 +159,9 @@ export function RegisterBatch() {
           )}
           {!!held.length && (
             <div className="mb-3 rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="batch-held">
-              <p className="font-semibold">{t('batch.held_title', { count: held.length })}</p>
-              <p>{t('batch.held_body')}</p>
-              <ul className="mt-1 list-disc ps-5">{held.map((r) => <li key={r.id} data-testid={`batch-held-${r.row_no}`}><span className="mono">{r.key}</span> {t('batch.row_no', { n: r.row_no })}</li>)}</ul>
+              <p className="font-semibold">{stream ? t('batch.held_title_task', { count: held.length }) : t('batch.held_title', { count: held.length })}</p>
+              <p>{stream ? t('batch.held_body_task') : t('batch.held_body')}</p>
+              <ul className="mt-1 list-disc ps-5">{held.map((r) => <li key={r.id} data-testid={`batch-held-${rowId(r)}`}><span className="mono">{r.key}</span> {t('batch.row_no', { n: r.row_no })}{r.hold_reason && r.hold_reason !== 'open_version' ? ` · ${t(`batch.hold_${r.hold_reason}`)}` : ''}</li>)}</ul>
             </div>
           )}
           {outcome && !!outcome.failed.length && (
@@ -150,24 +183,29 @@ export function RegisterBatch() {
                 {shown.map((r) => {
                   const canDecide = sent && (b.status === 'in_approval' || b.status === 'partially_approved') && (r.action === 'create' || r.action === 'update');
                   return (
-                    <tr key={r.id} className="border-t border-line align-top" data-testid={`batch-row-${r.row_no}`} data-action={r.action} data-decision={r.decision}>
-                      <td className="mono p-2">{r.row_no}</td>
+                    <tr key={r.id} className="border-t border-line align-top" data-testid={`batch-row-${rowId(r)}`} data-action={r.action} data-decision={r.decision} data-source={r.source_ref ?? ''}>
+                      <td className="mono p-2">{r.source_ref && b.group_id ? r.source_ref : r.row_no}</td>
                       <td className="mono p-2 font-semibold">{r.key ?? '—'}</td>
                       <td className="p-2"><span className={`chip ${ACTION_TONE[r.action]}`}>{t(`batch.action_${r.action}`)}</span></td>
                       <td className="p-2">{r.action === 'error' ? <span className="text-mute">—</span> : <RowDiff row={r} def={def} />}</td>
-                      <td className="p-2 text-lateInk">{r.action === 'error' ? <RowErrors row={r} /> : r.note ? <span className="text-mute" data-testid={`batch-note-${r.row_no}`}>{r.note}</span> : '—'}</td>
-                      <td className="p-2">{r.action === 'error' ? '—' : r.action === 'unchanged' ? <span className="text-mute">{t('batch.skipped')}</span> : <span className={`chip ${DECISION_TONE[r.decision]}`} data-testid={`batch-decision-${r.row_no}`}>{t(`batch.decision_${r.decision}`)}</span>}</td>
+                      <td className="p-2 text-lateInk">
+                        {r.action === 'error' ? <RowErrors row={r} /> : r.note ? <span className="text-mute" data-testid={`batch-note-${rowId(r)}`}>{r.note}</span> : !r.warnings?.length ? '—' : null}
+                        <RowWarnings row={r} />
+                      </td>
+                      <td className="p-2">{r.action === 'error' ? '—' : r.action === 'unchanged' ? <span className="text-mute">{t('batch.skipped')}</span>
+                        : <span className={`chip ${DECISION_TONE[r.decision]}`} data-testid={`batch-decision-${rowId(r)}`}>{r.decision === 'pending_previous_approval' && r.hold_reason && r.hold_reason !== 'open_version' ? t(`batch.hold_${r.hold_reason}`) : t(`batch.decision_${r.decision}`)}</span>}</td>
                       <td className="p-2">
                         <span className="flex flex-wrap gap-1">
-                          {r.record_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-record-${r.row_no}`} to={`/registers/${key}?record=${r.record_id}`}>{t('batch.open_record')}</Link>}
-                          {canDecide && r.decision === 'pending' && r.record_id && (
+                          {r.record_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-record-${rowId(r)}`} to={`/registers/${key}?record=${r.record_id}`}>{t('batch.open_record')}</Link>}
+                          {r.task_id && r.site_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-task-${rowId(r)}`} to={`/sites/${r.site_id}?task=${r.task_id}`}>{t('batch.open_task')}</Link>}
+                          {canDecide && r.decision === 'pending' && (r.record_id || stream) && (
                             <>
-                              <button className="btn px-2 py-0.5 text-xs" data-testid={`batch-row-approve-${r.row_no}`} disabled={decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'rows', rows: [{ row_id: r.id, decision: 'approved' }] }, t('approvals.done'))}><Check size={12} />{t('approvals.approve')}</button>
-                              <button className="btn btn-danger px-2 py-0.5 text-xs" data-testid={`batch-row-reject-${r.row_no}`} disabled={decide.isPending} onClick={() => setReturning(r.id)}><Undo2 size={12} />{t('batch.return')}</button>
+                              <button className="btn px-2 py-0.5 text-xs" data-testid={`batch-row-approve-${rowId(r)}`} disabled={decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'rows', rows: [{ row_id: r.id, decision: 'approved' }] }, t('approvals.done'))}><Check size={12} />{t('approvals.approve')}</button>
+                              <button className="btn btn-danger px-2 py-0.5 text-xs" data-testid={`batch-row-reject-${rowId(r)}`} disabled={decide.isPending} onClick={() => setReturning(r.id)}><Undo2 size={12} />{t('batch.return')}</button>
                             </>
                           )}
                           {canDecide && r.decision === 'pending_previous_approval' && (
-                            <button className="btn btn-danger px-2 py-0.5 text-xs" data-testid={`batch-row-reject-${r.row_no}`} disabled={decide.isPending} onClick={() => setReturning(r.id)}><Undo2 size={12} />{t('batch.return')}</button>
+                            <button className="btn btn-danger px-2 py-0.5 text-xs" data-testid={`batch-row-reject-${rowId(r)}`} disabled={decide.isPending} onClick={() => setReturning(r.id)}><Undo2 size={12} />{t('batch.return')}</button>
                           )}
                         </span>
                       </td>

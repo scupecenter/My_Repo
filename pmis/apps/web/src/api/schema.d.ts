@@ -4151,6 +4151,7 @@ export interface paths {
          *     The data sheet `Data` has the locked header row (Master order, then the custom fields that appear in templates, then `Record ID`), drop-downs for the list fields, and grey locked columns for calculated values (never read on upload).
          *     The very-hidden `_tpl` sheet holds `template_id`, `version`, `kind`, `register_key`, `stream`, `header_checksum`, `field_set_hash`, `issued_by` and `issued_at`.
          *     For a pre-filled copy pass `prefill=true`, `task_id` (the task's site; the task must use this template, else 422 `template_rejected` with `wrong_template`) or `site_ids`: the records in force inside the caller's regions, with their `Record ID`.
+         *     **Site Register stream templates and TPL-MASTER (0.11.5).** They need `view` on the Site Register (`sites`) and `download_documents` on `templates`. A stream template has the sheet `Data` (Site ID, Site Name, Region and Delivery Scenario in grey, then the task columns of the stream in Master order); TPL-MASTER has the sheet `Master` (the 187 Master columns) and one sheet per register the caller may view, under the Master sheet names. A visible `Columns` sheet lists every header with its Master column, task, field and whether it is typed or never read (grey). A pre-filled copy holds one row per site of the caller's regions that has a task of the stream (cancelled sites only when named in `site_ids`), sorted by Site ID, with the current values of the tasks, and, grey, the dates the workflow sets, the milestone dates and the register-owned fields. The `task_id` of a task of another stream is 422 `wrong_template`.
          */
         get: operations["downloadTemplate"];
         put?: never;
@@ -4176,6 +4177,7 @@ export interface paths {
          * @description Needs `import` on `templates` (403 otherwise, before the file is read). Then, in order: the form (one file, size limit 5 MB, 2000 data rows; larger answers 413 or 422 `size_or_rows_exceeded`), a plain `.xlsx` package without macros, embedded objects or external links (`not_xlsx`, `macros_not_allowed`), the hidden `_tpl` sheet (`tpl_missing`, `tpl_invalid`), a known and active template (`template_unknown_or_inactive`), the current version (`outdated_version`; the message names both versions), the template the user selected (`wrong_template`), the header checksum (`checksum_mismatch`), and the caller's right to create or edit in the register (`import_not_allowed`).
          *     The first failure answers 422 `template_rejected` with `reason` = TemplateRejectReason, writes a System Log row (`source = template-check`, the reason, the file name and hash) and creates no batch.
          *     A file that passes is read as values (a formula or a text starting with `=` is a cell error), staged by the database and answered 202 with the batch in status `validated`: each row is resolved inside the caller's regions, matched to a record by `Record ID` or by the register's natural key, validated with the same rules as manual entry, and classified. Rows with errors stay in the batch as `error` and never go on. Nothing reaches the register until the uploader sends the batch and the rows are approved.
+         *     **Stream templates and TPL-MASTER (0.11.5).** A stream file is staged as one batch of task rows (`stream` set, `register_key` null): see the 0.11.3 line of the versions list for the checks. A TPL-MASTER file answers the first batch of its parts with `group_id`, `parts` (every batch, in the order Master sheet streams then register sheets) and `warnings`; 422 `validation_failed` when no cell can be entered (the values are only in columns the PMIS does not read), 422 `template_rejected` (`checksum_mismatch`) when a sheet lost an issued header, and `import_not_allowed` only when no part may be imported. A task upload (`task_id`) accepts a stream template of the task's stream only.
          */
         post: operations["uploadImportBatch"];
         delete?: never;
@@ -4239,6 +4241,7 @@ export interface paths {
         /**
          * Send the validated batch into the normal flow (L1 Data Entry)
          * @description Only the uploader (403 `not_eligible_holder` for anyone else, an admin too: the records are entered as L1 in the uploader's name only). Each valid row (`create` or `update`) becomes a register record, and is submitted as the uploader through the same functions as manual entry (`reg_save_record`, `reg_new_version`, `reg_transition_record`, with the import row so that the audit and the history show "via batch"), so it follows the Matrix row of its register: L2 Data Reviewer & Approver decides next. An update is a new version of the record in force; the version in force stays until the new one is approved (R9).
+         *     **Stream batches (0.11.5):** each valid task row starts the task when it is pending (the start date is the actual start of the row, else today), saves its entry and submits it as the uploader through the same functions as the task screen (`wf_start`, `wf_save_entry`, `wf_submit`, with the import row so that the task history and the audit show "via batch"); the task then waits for L2 Data Reviewer & Approver of its Matrix cell. The conditional documents that apply are judged first, as on the task screen. A row whose task is in review or approval, or waits for a predecessor, is held `pending_previous_approval` and listed in `outcome.held` (`open_submission`, `predecessor_open`); a row whose task a closed gate locks becomes an `error` row (`gate_locked`, in `outcome.failed`). When the caller also holds L2 of a task, the submission is a self-approval and needs a step-up.
          *     A row whose logical record has an open version is held `pending_previous_approval` and listed in `outcome.held`; send the batch again after that version is decided and the row is released. A row that the register refuses at submit becomes an `error` row (listed in `outcome.failed`) and nothing of it is kept. When the caller also holds L2, the submission is a self-approval and needs a step-up (401 `step_up_required`, nothing is created).
          */
         post: operations["submitImportBatch"];
@@ -4263,6 +4266,7 @@ export interface paths {
         /**
          * Approve, return or discard: row by row, or all at once
          * @description A row is decided by the same transition a person makes on the record it created (`reg_transition_record`), with the same grid right (`approve` on the register's module for L2), the same holders of the Matrix row and the same step-up for a final approval (401 `step_up_required`); nothing here is a shortcut.
+         *     **Stream batches (0.11.5):** a row is decided by the function a person calls on the task (`wf_review`, `wf_approve`, `wf_reject`) with the grid right `approve` on `sites`, the holders of the task's L2 cell, the step-up of a final approval and the gates and successors of the engine; a return sends the task back to L1 with the note (a rejection comment on the task). A held row is returned by the uploader or an L2 holder of its task.
          *     `approve` (or `review`, for a record still at a legacy middle level) with `scope=all` decides every open row; with `scope=rows` the rows listed. `reject` returns the rows to the uploader with a note (mandatory, 422 `note_required`): the record goes back to L1 Data Entry, the row is `rejected`. `discard` (uploader or System Admin) closes a batch that was not sent; nothing was created.
          *     Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
          */
@@ -7764,9 +7768,14 @@ export interface components {
             /** @enum {string} */
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
+            /**
+             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`) or the whole Master (`TPL-MASTER`).
+             * @enum {string}
+             */
+            template_kind?: "register" | "stream" | "master";
             /** @description The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER. */
             register_key?: string | null;
-            /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. Not built yet. */
+            /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. */
             stream?: string | null;
             /** @description Shown as "v3". Exactly one version is current; older versions are rejected on upload. A new version is issued by the database when the register's fields or custom fields change. */
             current_version: number;
@@ -7788,6 +7797,18 @@ export interface components {
          * @enum {string}
          */
         TemplateRejectReason: "size_or_rows_exceeded" | "tpl_missing" | "template_unknown_or_inactive" | "outdated_version" | "wrong_template" | "checksum_mismatch" | "import_not_allowed" | "not_xlsx" | "macros_not_allowed" | "tpl_invalid";
+        /** @description A note about a whole TPL-MASTER upload. Never blocking. */
+        UploadWarning: {
+            /**
+             * @description `column_not_owned`: values were typed in a column the PMIS calculates or another register owns (count given), `extra_column`: a column that is not in the issued template, `unknown_sheet`: a sheet that is not part of the template, `part_skipped`: a sheet or stream the caller may not import (the reason is in `message`).
+             * @enum {string}
+             */
+            code: "column_not_owned" | "extra_column" | "unknown_sheet" | "part_skipped";
+            sheet?: string;
+            column?: string;
+            count?: number;
+            message: string;
+        };
         /** @description What a send or a decision did. `held` lists the rows held `pending_previous_approval`; `failed` the rows that could not be sent or decided. */
         ImportBatchOutcome: {
             /** @description Rows sent into the flow (submit only). */
@@ -7800,11 +7821,14 @@ export interface components {
                 row_id: string;
                 row_no: number;
                 key?: string | null;
-                /** @enum {string} */
-                reason: "open_version";
+                /**
+                 * @description `open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor.
+                 * @enum {string}
+                 */
+                reason: "open_version" | "open_submission" | "predecessor_open";
                 /**
                  * Format: uuid
-                 * @description The open version that blocks the row.
+                 * @description The open version that blocks the row (a register row only).
                  */
                 record_id?: string | null;
             }[];
@@ -7822,8 +7846,11 @@ export interface components {
             id: string;
             template_id: string;
             template_version: number;
-            /** @enum {string} */
-            source?: "template" | "master_import" | "legacy_master";
+            /**
+             * @description `master_template`: a part of a TPL-MASTER file (the parallel-run import path).
+             * @enum {string}
+             */
+            source?: "template" | "master_import" | "legacy_master" | "master_template";
             file_name?: string;
             /**
              * @description `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
@@ -7836,6 +7863,15 @@ export interface components {
             /** @description Always 2. */
             levels_required?: number;
             register_key?: string | null;
+            /** @description A stream batch (0.11.5): the rows are tasks of this stream, DESIGN_ACQ, CW, TE or CLOSURE. Null for a register batch. */
+            stream?: string | null;
+            /**
+             * Format: uuid
+             * @description The batches of one TPL-MASTER file share it.
+             */
+            group_id?: string | null;
+            /** @description The sheet of the file this batch came from. */
+            part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
             counts: {
@@ -7881,9 +7917,30 @@ export interface components {
              * @description The register record created for the row once the batch was sent (read it with GET /registers/{register_key}/records/{id}).
              */
             record_id?: string | null;
+            /** @description A stream batch row: the task code (B4, D5 ...). One file row gives one batch row per touched task, so several rows share a `row_no`. */
+            task_code?: string | null;
+            /**
+             * Format: uuid
+             * @description The task of the site the row enters (read it with GET /tasks/{task_id}).
+             */
+            task_id?: string | null;
+            /**
+             * Format: uuid
+             * @description The site the Site ID of the row resolved to (null for an error row whose site is unknown). With `task_id` it opens the task: /sites/{site_id}?task={task_id}.
+             */
+            site_id?: string | null;
+            /** @description Where the row came from in the file, `Sheet!row` (the comparison report of the parallel run). */
+            source_ref?: string | null;
+            /** @description Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`. */
+            warnings?: {
+                column?: string;
+                field?: string;
+                code: string;
+                message?: string;
+            }[];
             /** @enum {string} */
             action: "create" | "update" | "unchanged" | "error";
-            /** @description Field code to old/new values. A `create` row lists every value with `old` null. */
+            /** @description Field code to old/new values. A `create` row lists every value with `old` null. A task row lists planned_date, actual_start, actual_date and the keys of the task values that changed. */
             diff?: {
                 [key: string]: {
                     old?: unknown;
@@ -7895,7 +7952,7 @@ export interface components {
                 column?: string;
                 /** @description The code of the field. */
                 field?: string;
-                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`, or a register rule (`in_house_with_pr`). */
+                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `gate_locked`, `actual_date_required`, `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`). */
                 code: string;
                 message?: string;
             }[];
@@ -7905,7 +7962,7 @@ export interface components {
              * @description Why a row is held `pending_previous_approval`.
              * @enum {string}
              */
-            hold_reason?: "open_version";
+            hold_reason?: "open_version" | "open_submission" | "predecessor_open";
             decided_by?: components["schemas"]["UserRef"];
             note?: string | null;
         };
@@ -15901,7 +15958,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ImportBatch"];
+                    "application/json": components["schemas"]["ImportBatch"] & {
+                        /** @description TPL-MASTER only: every batch of the file (a stream batch per stream with a task cell, a register batch per register sheet with rows). */
+                        parts?: components["schemas"]["ImportBatch"][];
+                        /** @description TPL-MASTER only: what the PMIS ignored or skipped. */
+                        warnings?: components["schemas"]["UploadWarning"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -18026,6 +18088,10 @@ export interface operations {
                 status?: string;
                 template_id?: string;
                 register_key?: string;
+                /** @description A stream batch of this stream (DESIGN_ACQ, CW, TE or CLOSURE). */
+                stream?: string;
+                /** @description The batches of one TPL-MASTER file. */
+                group_id?: string;
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -18036,7 +18102,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Batches. Those the caller uploaded, and those of registers whose module the caller may view (inside the caller's regions). */
+            /** @description Batches. Those the caller uploaded, those of registers whose module the caller may view, and the stream batches when the caller may view the Site Register (inside the caller's regions). */
             200: {
                 headers: {
                     [name: string]: unknown;

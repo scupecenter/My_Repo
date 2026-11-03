@@ -88,6 +88,7 @@ function gated(session: Session) {
         <Route path="as-built/items" element={<AsBuiltItems />} />
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates" element={<TemplatesPage />} />
+        <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
         <Route path="absence" element={<Absence />} />
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:threadId" element={<Messages />} />

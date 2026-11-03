@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile } from './client';
-import type { ImportBatch, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UserRef } from './types';
+import type { ImportBatch, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
 
 export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
@@ -144,10 +144,10 @@ export const useBatch = (id: string) =>
 export const useBatchRows = (id: string, enabled: boolean) =>
   useQuery({ queryKey: ['import-batch-rows', id], enabled, queryFn: () => api.get<Page<ImportRow>>(`/import-batches/${id}/rows`, { query: { limit: 200 } }) });
 
-export type BatchFilters = { status: string; template_id: string; register_key: string };
+export type BatchFilters = { status: string; template_id: string; register_key: string; stream?: string; group_id?: string };
 /** `GET /import-batches`: the batches the caller uploaded, or may see through the register's module. */
-export const useBatches = (f: BatchFilters) =>
-  useQuery({ queryKey: ['import-batches', f], queryFn: () => api.get<Page<ImportBatch>>('/import-batches', { query: { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), limit: 100 } }) });
+export const useBatches = (f: BatchFilters, enabled = true) =>
+  useQuery({ queryKey: ['import-batches', f], enabled, queryFn: () => api.get<Page<ImportBatch>>('/import-batches', { query: { ...Object.fromEntries(Object.entries(f).filter(([, v]) => v)), limit: 100 } }) });
 
 const settleBatch = (qc: QueryClient, id: string) => {
   void qc.invalidateQueries({ queryKey: ['import-batch-rows', id] });
@@ -157,7 +157,7 @@ const settleBatch = (qc: QueryClient, id: string) => {
 
 export function useUploadBatch() {
   const qc = useQueryClient();
-  return useMutation<ImportBatch, ApiError, { file: File; template_id: string; task_id?: string }>({
+  return useMutation<UploadedBatch, ApiError, { file: File; template_id: string; task_id?: string }>({
     mutationFn: ({ file, template_id, task_id }) => {
       const fd = new FormData();
       fd.append('file', file); fd.append('template_id', template_id);

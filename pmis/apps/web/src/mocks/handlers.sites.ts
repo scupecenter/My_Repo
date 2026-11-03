@@ -198,7 +198,15 @@ export const siteHandlers = [
     const issued = '2026-10-21T08:00:00Z', versions = [{ version: 1, issued_at: issued, reason: 'first version' }];
     const registers = REGISTER_DEFS.filter((d) => v.nav.includes(d.module_key)).map((d) => ({ template_id: TEMPLATE_OF_REGISTER[d.register_key], name_en: d.name_en, name_ar: d.name_ar, kind: 'data_import', module_key: d.module_key, register_key: d.register_key, current_version: 1, issued_at: issued, is_active: true, versions }));
     const legacy = TEMPLATES.map(([id, en, ar]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', register_key: null, current_version: 1, issued_at: issued, is_active: true, versions }));
-    return HttpResponse.json({ items: [...registers, ...legacy] } as never);
+    // contract 0.11.5: the whole Master and one template per stream, for people who may use the Site Register and the Templates page
+    const site = v.nav.includes('sites') && v.nav.includes('templates') ? [
+      ['TPL-MASTER', 'Master (all sheets)', 'الماستر الكامل (كل الأوراق)', 'master', null, 1],
+      ['TPL-SITE-DA', 'Site Register: Design & Acquisition', 'سجل المواقع: التصميم والاستحواذ', 'stream', 'DESIGN_ACQ', 3],
+      ['TPL-SITE-CW', 'Site Register: Civil Works', 'سجل المواقع: الأعمال المدنية', 'stream', 'CW', 4],
+      ['TPL-SITE-TE', 'Site Register: Installation (TE)', 'سجل المواقع: التركيبات', 'stream', 'TE', 5],
+      ['TPL-SITE-CL', 'Site Register: Handover & Closure', 'سجل المواقع: التسليم والإغلاق', 'stream', 'CLOSURE', 6],
+    ].map(([id, en, ar, tk, stream]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', template_kind: tk, module_key: 'sites', register_key: null, stream, current_version: 1, issued_at: issued, is_active: true, versions })) : [];
+    return HttpResponse.json({ items: [...site, ...registers, ...legacy] } as never);
   }),
   http.get(`${B}/templates/:id/download`, ({ params, request }) => {
     const g = guard(); if (g) return g;

@@ -1464,6 +1464,9 @@ model ImportBatch {
   submitted_at        DateTime? @db.Timestamptz(6)
   submitted_by        String?   @db.Uuid
   closed_at           DateTime? @db.Timestamptz(6)
+  stream_code         String? // a stream batch: the rows are tasks of this stream (0051)
+  group_id            String?   @db.Uuid // the batches of one TPL-MASTER file
+  part_sheet          String? // the sheet of the file this batch came from
 
   template_version TemplateVersion  @relation(fields: [template_version_id], references: [id])
   rows             ImportBatchRow[]
@@ -1499,13 +1502,75 @@ model ImportBatchRow {
   register_record_id String?   @db.Uuid // the register record created when the batch was sent
   hold_reason        String?
   decided_role       String?
+  task_instance_id   String?   @db.Uuid // a task row (stream template): the task of the site the row enters
+  task_code          String?
+  warnings           Json? // never blocking: SLA, calculated column, held for a predecessor
+  ord                Int       @default(0) // the order of the rows in the preview (several task rows share one file row)
+  source_ref         String? // Sheet!row of the file (the comparison report of the parallel run)
+  task_submitted_at  DateTime? @db.Timestamptz(6)
 
   batch ImportBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
 
-  @@unique([batch_id, row_no])
   @@index([batch_id, decision])
   @@index([site_code])
   @@map("import_batch_rows")
+}
+
+// The Master sheet in Master order (187 columns) with the owner of each column (0051). Configuration: written only by the admin functions, read by the template builders.
+model MasterColumn {
+  ord       Int     @id
+  letter    String  @unique
+  group_top String?
+  group_mid String?
+  name      String?
+  header    String  @unique
+  owner     String // row, key, identity, baseline, scope, calc, task, dismantle, issues
+  is_active Boolean @default(true)
+
+  fields TemplateTaskField[]
+
+  @@map("master_columns")
+}
+
+// The task fields a stream template (and the Master sheet) carries beyond the generic planned and actual date (0051). field_key: planned_date, planned_start,
+// actual_start, actual_date, submitted_date, approved_date, external_party, v:<key> (a key of the task values) or r:<register>.<field> (register-owned, never written).
+model TemplateTaskField {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  task_code  String
+  field_key  String
+  label      String
+  label_ar   String?
+  field_type String  @default("text")
+  options    Json?
+  master_col String?
+  read_only  Boolean @default(false)
+  is_active  Boolean @default(true)
+
+  master_column MasterColumn? @relation(fields: [master_col], references: [letter], onUpdate: Cascade)
+
+  @@unique([task_code, field_key])
+  @@map("template_task_fields")
+}
+
+// exclude: the task is on no stream template; readonly: shown, never written (0051).
+model TemplateTaskRule {
+  task_code String  @id
+  mode      String
+  reason    String?
+
+  @@map("template_task_rules")
+}
+
+// The sheet names of the register sheets of TPL-MASTER (0051).
+model TemplatePart {
+  template_id  String
+  register_key String
+  sheet_name   String
+  sort_order   Int    @default(0)
+
+  @@id([template_id, register_key])
+  @@unique([template_id, sheet_name])
+  @@map("template_parts")
 }
 
 // ============================================================================

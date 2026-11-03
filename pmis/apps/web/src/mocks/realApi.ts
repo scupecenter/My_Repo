@@ -111,7 +111,7 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/registers/:key/records/:id/history'],
   ['get', '/registers/:key/records/:id/versions'],
   ['post', '/registers/:key/records/:id/versions'],
-  // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The stream templates and TPL-MASTER are not built yet.
+  // Contract 0.7.0: approved-template entry for the registers (apps/api: templates; migration 0037). The Site Register stream templates and TPL-MASTER (migration 0051, contract 0.11.3) use the same paths: no endpoint was added.
   ['get', '/templates'],
   ['get', '/templates/:id/download'],
   ['get', '/import-batches'],
