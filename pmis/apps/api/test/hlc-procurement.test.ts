@@ -268,11 +268,12 @@ describe('the HLC register: execution only, linked to the HLC request; C4 on the
   it('closes C4 on the in-service date (not on the TX link test), after C3; C4 locked refuses the in-service record (Q92)', async () => {
     const { hlc, fiber } = await hlcTeam();
     const stage = await withTasks(hlc, ['C3', 'C4'], ['C3'], ['procurement', 'hlc']);
-    // C4 is locked while C3 is open: an in-service record is refused, the draft is kept
+    // C4 is locked while C3 is open: an in-service record is refused, the draft is kept. Since 0063 (Q148) the execution dates are refused first, because the
+    // HLC request of the site is not approved yet (C3 open).
     const early = await createRec(fiber, { ...HLC, installation_date: '2026-01-14', tx_link_tested_date: '2026-01-15', in_service_date: '2026-01-16' });
     const refused = await post(fiber.entry.api, 'hlc', early.id, 'submit', early.version);
-    expect(refused.status).toBe(409);
-    expect(refused.body.detail).toContain('C4');
+    expect(refused.status).toBe(422);
+    expect(codesOf(refused.body)).toEqual(['no_approved_hlc_pr']);
     // C3 closes with the HLC request; C4 opens
     const pr = await createRec(hlc, HLC_PR);
     let res = (await post(hlc.entry.api, 'procurement', pr.id, 'submit', pr.version)).body;
@@ -310,9 +311,10 @@ describe('the HLC register: execution only, linked to the HLC request; C4 on the
     const v2 = await post(fiber.entry.api, 'hlc', rec.id, 'versions', rec.version);
     expect(v2.body.data).toMatchObject({ request_no: 'HR-OLD', request_date: '2025-12-20' });
     expect(codesOf((await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { request_no: 'HR-NEW' } })).body)).toEqual(['unknown_field']);
-    const v2b = await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { installation_date: '2026-01-20' } });
+    // (0063, Q148: an execution date would need the approved HLC request first, so the new version records the handover from HLC)
+    const v2b = await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { link_received_date: '2026-01-20' } });
     await pass('hlc', fiber.entry, fiber.approve, v2.body.id, v2b.body.version);
-    expect((await q(db, `SELECT request_no, installation_date::text AS i FROM hlc_records WHERE id = $1`, [rec.entity_id]))[0]).toEqual({ request_no: 'HR-OLD', i: '2026-01-20' });
+    expect((await q(db, `SELECT request_no, link_received_date::text AS l FROM hlc_records WHERE id = $1`, [rec.entity_id]))[0]).toEqual({ request_no: 'HR-OLD', l: '2026-01-20' });
     // once the HLC team has entered the request in Procurement, it is counted there only
     await pass('procurement', hlc.entry, hlc.approve, (await createRec(hlc, HLC_PR)).id, 1);
     expect(await prs()).toEqual([{ k: 'procurement', n: 'HPR-1' }]);

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.10
+  version: 0.12.11
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.11 (2026-11-04): additive. Work package P4c of the owner answers 2026-11-04 (migration 0063; CHANGELOG 92). (1) Q150: an HLC record names the HLC purchase requests it covers, `PUT /registers/hlc/records/{record_id}/purchase-requests` (If-Match, L1 of the record while in entry; an empty list = every submitted request of the site), and `RegisterRecord.purchase_requests` (HLC records) shows the required set, the candidates and whether all are approved by HLC. C3 now closes only when every required request has an HLC approval date, on the latest one; a cancelled request (order status `Cancel...`) is ignored. New warnings `hlc_prs_incomplete`, `hlc_prs_not_linked`. (2) Q148: an HLC record with an installation, TX link test or in-service date is refused at submit and at the final approval (`no_approved_hlc_pr`, 422) until the required requests are approved by HLC; the new fields `pr_exception` / `pr_exception_reason` are the emergency exception (only a holder of `administer` on HLC or a System Admin, `pr_exception_forbidden`), warned to the reviewer (`pr_exception_used`) and audited at the approval. (3) Q139: `POST /registers/hlc/legacy-migration` previews (`dry_run`) or runs (reason, step-up) the one-time move of the legacy HLC requests into Procurement drafts of scope HLC. (4) Q114: Dismantle fields `execution_mode`, `procurement_order_id`, `internal_team`; for Outsourced work the contractor (FO / FT, `external_party`) is derived from the chosen approved Procurement order (`contractor_from_order`, `order_choice_required`, `no_active_order`, `order_not_active`), In-House names the internal team; `GET /registers/dismantle/order-options` lists the active orders. (5) Q151: `GET` / `PUT /settings/gecol-order-warnings` (off by default); warnings `gecol_order` and `billing_before_event` carry `related_path`.
     - 0.12.10 (2026-11-04): additive, work package P4a of the owner answers of 2026-11-04 (Q103 except Quality, Q108, Q113, Q225; migration 0062; CHANGELOG 89). (1) Q225: a site field that changes rules (permits, scope; `requires_approval`, seed `near_airport`) is no longer edited directly: `PATCH /sites/{site_id}` answers 422 `validation_failed` with `/custom/<code>` and the field code `approval_required`; the new `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`, a reason is required) opens one Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, old and new value), entered by the caller as L1 (an L1 holder of the Change Control row with its `create` right); the value applies to the site on the L2 approval, audited, and the site is recalculated. `SiteCustomField` gains `requires_approval`. (2) An approved register record feeds the calculation layer (no new path): Change Control writes `change_requests` (suspensions and resumptions with their effective dates `suspension_start` / `resumption_date` and the approval date; withdrawn with a new version where `withdrawn` = Yes; a Cancellation cancels the site; a site field change applies), RF & Design the site identity, Acquisition Master T and A3, Readiness & Handover D17 and Z1, Issues and Risks their tables. Change Control gains the fields `suspension_start`, `resumption_date` and `withdrawn`; field codes at submit `before_suspension`, `no_open_suspension`, `resumed_already`, `old_value_changed`, `unknown_site_field`, `scope_scenario_conflict`. (3) Q113: As-Built has the record types `cw_part` and `te_part` (one each per site, each approved on its own; a record created without a type takes it from its values); `cw_as_built_submitted` (BU) is filled by the CW part's submission (never typed) with `cw_submitted_date`; `as_built_date` (EF) is the TE part's submission date unless L1 typed the vendor's earlier date; `part_not_applicable` with `na_reason` gives BU N/A. Write-through fields that the system fills answer `edit_via` `none`. (4) Q108: the As-Built fields `wl_antenna_type`, `mw_antenna_type` and `router_type` list the active Warehouse items of their group (WL, MW, IP); quantities of unit `qty` are whole numbers.
     - 0.12.9 (2026-11-04): work package P4b of the owner answers of 2026-11-04 (Q110, Q142 to Q147) and decision D145b (migration 0061; CHANGELOG 88). Not purely additive for `PUT /settings/team-scope-match`: its columns are now codes of the specialization catalogue (`TeamScopeMatch.catalogue`, seed Tower RT, Tower GF, Adaption, TE, Dismantle, GECOL, Fiber, Survey) and a row may allow a functional group (`allowed_groups`, CW or TE); the old column CW became the group CW, TE the code TE, and the name CW is refused as a column (`is_a_group`). (1) Q143 / Q147: `GET /settings/team-scope-match` is also readable, read-only, with `procurement` or `contractors` view (`can_edit` says whether the caller may save); a save that changes eligibility (rows, cells, groups, active codes, a code's group or aliases) needs a fresh step-up (401 `step_up_required`); a label-only change does not; new field errors `is_a_group`, `name_clash`, `not_a_column`. (2) Q144: HLC stays `exempt` (no team needed) but a named team is checked (seed: Fiber). (3) Q110: the Contractors register gains the record type `contract` (`contractor`, `contract_ref`, `contract_start`, `contract_end`, `contract_scopes`, `contract_status`); a team or a contract links to its company by `external_party_id` (found from a unique `contractor` name; an ambiguous name is never linked: `ambiguous_contractor`, a name that is not the chosen company's: `contractor_mismatch`); an unknown Company Type becomes `other` with a review alert. A Procurement record that names a team is refused at submit (422 `validation_failed`, `no_active_contract` / `party_inactive`) unless the team's company has an active contract covering the scope on the order date. (4) Q142: a team may be saved without a specialization; submit needs one (`specialization_required`) unless it is inactive; teams gain `more_specializations`, `safety_cert_expiry` and `team_lead_user`. (5) Q147 CW Delivery Model (scopes of `ContractorRules.cw_delivery_scopes`): an Outsourced order with its PO / WO needs its party (`party_required`) and an active contract; an In-House order names a qualified internal team (`internal_team_required`, `not_internal_team`). (6) Q146: a GECOL record is approved only with its party, an active party and an active contract covering GECOL (`gecol_party_required`, `party_inactive`, `no_active_contract`). (7) Q145: `GET /reports/team-scope-mismatch` (running orders that no longer match) and `GET /reports/contractors-completeness` (Q142, Q110). (8) D145b: `GET/PUT /settings/contractor-rules` (`ContractorRules`): the safety certificate lead days, the alert roles and the rule lists; the daily job alerts the team lead and Procurement (in-app, `team_safety_cert`) and never blocks an order; running-order mismatches are alerted once (`order_team_mismatch`).
     - 0.12.8 (2026-11-04): additive. Work package P3 of the owner answers of 2026-11-04 (migration 0060; CHANGELOG 91). (1) Q1 / Q211, the admin-only legacy import of the real Site Master (no `_tpl`): `POST /master-import/runs` (System Admin or a delegate of `templates` `administer`; the same package guard as a template: macros, embedded objects, external links, size, zip bomb) identifies the file by its sheet names and the three Master header rows, checks the structure (422 `template_rejected` with `not_a_master`, `structure_mismatch` or `is_pmis_template`, written to the System Log, source `master-import`), stores the original file and its SHA-256, and writes the per-cell comparison with what the PMIS holds without changing anything (`MasterImportRun`, `MasterImportDiff`: site, field, both values, `Sheet!row`, kind, reason, resolution). `GET /master-import/runs`, `GET .../{run_id}`, `GET .../{run_id}/diffs`, `GET .../{run_id}/export` (the comparison report as XLSX), `GET .../{run_id}/file` (the original, audited), `PATCH /master-import/diffs/{diff_id}` (the resolution and its note, audited), and `POST .../{run_id}/apply` (reason, step-up, `mode` submit or draft; If-Match): the typed task columns enter through the TPL-MASTER staging and the batch flow (`ImportBatch.source` `master_import`, one `group_id`), so L1 holders, gates, dates, documents and L2 decide as for a person; a file is applied once. Every use is audited and logged. (2) Q8 / Q10: `GET /import-aliases?kind=region|role` and `PUT /import-aliases` (templates edit for all regions, a reason, audited): the Master values that mean a region or a PMIS role; unmapped and ambiguous values are import exceptions; an imported title never grants a right. (3) Q207: `GET /template-mapping` and `POST /template-mapping` (`dry_run` true tests the change and answers its impact per template without saving; a save issues the next template versions with the reason): a calculated or register-owned field never becomes typed (`calculated_field`), a Master column the PMIS does not own is never mapped (`column_not_owned`). (4) Q206: `uploadImportBatch` takes `mode` (`submit`, the default, or `draft` = Save Draft / Planning for the stream templates and the Master sheet): a draft row needs no actual date or document, is saved without submission (`ImportRow.decision` `saved`, `ImportBatch.counts.saved`, `ImportBatchOutcome.saved`), and the batch ends `applied`; it has no L2 decision (409). (5) Q208: a task locked by a closed gate is held (`hold_reason` `gate_locked`, warning `held_gate_locked`) instead of refused, and is applied only when the batch is sent again. (6) Q209: a pending task is started with the row's (or the task's) actual start; a task without an Actual Start column uses its actual date; today is never used (`actual_start_required`). (7) Q205: a Master column may carry several task fields (AY/AZ: B8 or B9; BK:BN: B10 or B11 with a documented projection); on upload the task that applies on the site is written, a projected column is not read, and an ambiguous one refuses the row (`ambiguous_mapping`). (8) D112: a file of an older template version is accepted when only non-input columns changed (`ImportBatch.file_template_version`); a changed typed column refuses it with `outdated_version`, the message naming the changed columns.
@@ -6529,6 +6530,152 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/hlc/records/{record_id}/purchase-requests:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    put:
+      tags: [registers]
+      operationId: setHlcPurchaseRequests
+      summary: Name the HLC purchase requests an HLC record covers (Q150)
+      description: |
+        0.12.11. The L1 holder of the HLC record, while it is in entry, names the Procurement records of scope HLC (of the same site) that the execution covers.
+        The list replaces the previous one; an empty list means every submitted HLC request of the site is required. An approved version keeps its list
+        (history); a new version starts with the same list. C3 closes when every required request has an approved version with an HLC approval date.
+        Field errors: `not_hlc_pr`, `too_many`.
+      x-db-path: hlc_set_pr_links
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [procurement_entity_ids]
+              properties:
+                procurement_entity_ids: { type: array, maxItems: 20, items: { type: string, format: uuid }, description: 'The `entity_id` of each Procurement record (scope HLC).' }
+      responses:
+        '200':
+          description: The record, with its `purchase_requests`.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/hlc/legacy-migration:
+    post:
+      tags: [registers]
+      operationId: migrateLegacyHlcRequests
+      summary: Move the legacy HLC requests into Procurement drafts (Q139, one-time)
+      description: |
+        0.12.11. System Admin, or a delegation of `administer` on Procurement (its regions). `dry_run: true` is the preview and writes nothing. A run needs a
+        reason and a recent step-up. Each legacy HLC request (request_no / request_date kept since 0042) becomes a draft Procurement record of scope HLC with
+        only the number and the date that exist (no approver, no HLC approval date); a request already entered in Procurement with the same PR No. is linked
+        instead (`duplicate`); a request migrated before is `already_migrated`. The HLC team completes the drafts and they go through the usual approval.
+      x-db-path: hlc_legacy_to_drafts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [dry_run]
+              properties:
+                dry_run: { type: boolean }
+                reason: { type: string, minLength: 3, maxLength: 2000, description: 'Required for a run.' }
+      responses:
+        '200':
+          description: The preview or the result.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HlcLegacyMigration'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /registers/dismantle/order-options:
+    get:
+      tags: [registers]
+      operationId: listDismantleOrderOptions
+      summary: The approved, active Procurement orders a Dismantle part may take its contractor from (Q114)
+      description: |
+        0.12.11. The approved Procurement versions in force of the site with scope `CW Dismantle` (part `cw`) or `TE Dismantle` (part `te`), not cancelled.
+        Needs the Dismantle module in the site's region.
+      parameters:
+      - {name: site_id, in: query, required: true, schema: {type: string, format: uuid}}
+      - {name: record_type, in: query, required: true, schema: {type: string, enum: [cw, te]}}
+      responses:
+        '200':
+          description: The orders.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/DismantleOrderOption' } }
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/gecol-order-warnings:
+    get:
+      tags: [settings]
+      operationId: getGecolOrderWarnings
+      summary: The order warnings of the GECOL register (Q151)
+      description: |
+        0.12.11. Each chain lists GECOL date fields in their expected order; a step without a date is skipped; a later step dated before an earlier one is a
+        reviewer warning `gecol_order` (never blocking). `billing_after` names the contract event the billing conversion follows (`billing_before_event`).
+        The draft order of the owner answer is seeded and off (`enabled: false`) until the GECOL team confirms it. Reading needs the Settings screen.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setGecolOrderWarnings
+      summary: Save the GECOL order warnings (reason, If-Match, audited)
+      description: |
+        0.12.11. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_field` (not a GECOL date
+        field; `billing_after` cannot be the billing conversion itself), `duplicate`, `invalid`, `too_many`.
+      x-db-path: admin_save_gecol_order_warnings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/GecolOrderWarningsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /registers:
     get:
       tags: [registers]
@@ -14156,7 +14303,9 @@ components:
               path: { type: string, description: 'JSON pointer of the field, as in `Problem.errors`.' }
               code: { type: string }
               message: { type: string }
-          description: '0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none.'
+              related_path: { type: string, description: '0.12.11. The field the value is compared with (GECOL `gecol_order`, `billing_before_event`).' }
+          description: '0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). 0.12.11: HLC `hlc_prs_incomplete`, `hlc_prs_not_linked`, `pr_exception_used`; GECOL `gecol_order`, `billing_before_event` (setting, off by default); Dismantle `execution_mode_missing`, `order_not_chosen`, `order_without_contractor`. Empty when there is none.'
+        purchase_requests: { $ref: '#/components/schemas/HlcPurchaseRequests' }
         last_transition:
           type: object
           description: Present on the answer of a transition (submit, review, approve, reject, claim, release).
@@ -14170,6 +14319,115 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         version: { type: integer, description: 'ETag (If-Match).' }
+    HlcPurchaseRequests:
+      type: object
+      description: '0.12.11 (Q150), HLC records only. `items` = the required requests (the named ones, or every submitted one while none is named; cancelled ones left out); `candidates` = every HLC request of the site the L1 may name.'
+      required: [linked_explicitly, complete, required, approved_by_hlc, items, candidates]
+      properties:
+        linked_explicitly: { type: boolean }
+        complete: { type: boolean, description: 'Every required request has an approved version with an HLC approval date (C3 closes).' }
+        required: { type: integer, minimum: 0 }
+        approved_by_hlc: { type: integer, minimum: 0 }
+        hlc_approval_date: { type: [string, 'null'], format: date, description: 'The latest HLC approval date, once complete.' }
+        items:
+          type: array
+          items:
+            type: object
+            required: [entity_id, record_id, approved]
+            properties:
+              entity_id: { type: string, format: uuid }
+              record_id: { type: string, format: uuid }
+              pr_no: { type: string }
+              pr_date: { type: string, format: date }
+              hlc_approval_date: { type: string, format: date }
+              approved: { type: boolean }
+              state: { $ref: '#/components/schemas/RegisterRecordState' }
+        candidates:
+          type: array
+          items:
+            type: object
+            required: [entity_id, record_id, linked, cancelled]
+            properties:
+              entity_id: { type: string, format: uuid }
+              record_id: { type: string, format: uuid }
+              pr_no: { type: string }
+              pr_date: { type: string, format: date }
+              state: { $ref: '#/components/schemas/RegisterRecordState' }
+              cancelled: { type: boolean }
+              linked: { type: boolean }
+    HlcLegacyMigration:
+      type: object
+      description: '0.12.11 (Q139).'
+      required: [dry_run, items, counts]
+      properties:
+        dry_run: { type: boolean }
+        counts:
+          type: object
+          required: [create, duplicate, already_migrated]
+          properties:
+            create: { type: integer }
+            duplicate: { type: integer }
+            already_migrated: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            required: [hlc_record_id, site_id, outcome]
+            properties:
+              hlc_record_id: { type: string, format: uuid }
+              hlc_entity_id: { type: string, format: uuid }
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              region_id: { $ref: '#/components/schemas/RegionId' }
+              request_no: { type: string }
+              request_date: { type: string }
+              outcome: { type: string, enum: [create, duplicate, already_migrated] }
+              procurement_record_id: { type: string, format: uuid, description: 'The draft created (run), the request matched, or the draft of an earlier run.' }
+              date_dropped: { type: boolean, description: 'The legacy date was not a valid past date and was not copied.' }
+    DismantleOrderOption:
+      type: object
+      description: '0.12.11 (Q114). An approved, active Procurement order of a Dismantle part.'
+      required: [entity_id, record_id, scope]
+      properties:
+        entity_id: { type: string, format: uuid, description: 'The value of the Dismantle field `procurement_order_id`.' }
+        record_id: { type: string, format: uuid }
+        scope: { type: string, enum: [CW Dismantle, TE Dismantle] }
+        delivery: { type: string }
+        pr_no: { type: string }
+        po_wo_no: { type: string }
+        po_wo_date: { type: string, format: date }
+        order_status: { type: string }
+        external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    GecolOrderWarningsInput:
+      type: object
+      required: [enabled, chains, billing_after]
+      properties:
+        enabled: { type: boolean }
+        chains:
+          type: array
+          maxItems: 10
+          items: { type: array, minItems: 2, maxItems: 20, items: { type: string, minLength: 1, maxLength: 60 }, description: 'GECOL date field codes in their expected order.' }
+        billing_after: { type: [string, 'null'], description: 'The GECOL date field the billing conversion follows (the contract event), or null.' }
+    GecolOrderWarnings:
+      description: '0.12.11 (Q151). Seed: enabled false; chains [request_date, survey_date, layout_received, layout_approved] and [installation_finish, aat_acceptance_date, power_on_date]; billing_after null.'
+      allOf:
+      - {$ref: '#/components/schemas/GecolOrderWarningsInput'}
+      - type: object
+        required: [version, fields]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+          fields:
+            type: array
+            description: 'The GECOL date fields a chain may name.'
+            items:
+              type: object
+              required: [code, label_en]
+              properties:
+                code: { type: string }
+                label_en: { type: string }
+                label_ar: { type: [string, 'null'] }
     RegisterRecordStep:
       type: object
       required: [id, level, action, created_at]

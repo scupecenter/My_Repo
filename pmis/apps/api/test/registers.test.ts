@@ -180,7 +180,8 @@ describe('submit validation (the register rules are blocking)', () => {
     const h = await team(app, db, 'hlc', 'hlc', R);
     const rh = await createRec(h, { ...HLC, installation_date: '2026-02-10', tx_link_tested_date: '2026-02-01' });
     const eh = await post(h.entry.api, 'hlc', rh.id, 'submit', rh.version);
-    expect(eh.body.errors.map((e: { code: string }) => e.code)).toEqual(['before_installation']);
+    // 0063 (Q148): an execution date also needs the approved HLC purchase request of the site
+    expect(eh.body.errors.map((e: { code: string }) => e.code)).toEqual(['before_installation', 'no_approved_hlc_pr']);
   });
 
   it('refuses a GECOL or HLC record for a site whose scope says N/A (DQ07)', async () => {
@@ -647,6 +648,10 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 
     const h = await team(app, db, 'hlc', 'hlc', R);
     const hs = await withTasks(h, ['C4'], ['C4']);
+    // 0063 (Q148): execution needs the approved HLC purchase request of the site; it is planted as approved here (its own approval is tested in hlc-procurement)
+    await db.query(`INSERT INTO register_records (entity_id, register_key, site_id, region_id, state, is_current, levels_required, current_level, submitted_at, approved_at, data)
+      VALUES (gen_random_uuid(), 'procurement', $1, $2, 'approved', true, 2, 2, now(), now(),
+              '{"scope": "HLC", "pr_no": "HPR-Q148", "pr_date": "2026-01-05", "hlc_approval_date": "2026-01-12", "order_status": "Open"}')`, [h.site.id, h.region]);
     const hrec = await createRec(h, { ...HLC, installation_date: '2026-02-10', tx_link_tested_date: '2026-02-15', in_service_date: '2026-02-20' });
     let hr = (await post(h.entry.api, 'hlc', hrec.id, 'submit', hrec.version)).body;
     expect(hr.task.task_code).toBe('C4');

@@ -4184,6 +4184,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/hlc/records/{record_id}/purchase-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Name the HLC purchase requests an HLC record covers (Q150)
+         * @description 0.12.11. The L1 holder of the HLC record, while it is in entry, names the Procurement records of scope HLC (of the same site) that the execution covers.
+         *     The list replaces the previous one; an empty list means every submitted HLC request of the site is required. An approved version keeps its list
+         *     (history); a new version starts with the same list. C3 closes when every required request has an approved version with an HLC approval date.
+         *     Field errors: `not_hlc_pr`, `too_many`.
+         */
+        put: operations["setHlcPurchaseRequests"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/hlc/legacy-migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move the legacy HLC requests into Procurement drafts (Q139, one-time)
+         * @description 0.12.11. System Admin, or a delegation of `administer` on Procurement (its regions). `dry_run: true` is the preview and writes nothing. A run needs a
+         *     reason and a recent step-up. Each legacy HLC request (request_no / request_date kept since 0042) becomes a draft Procurement record of scope HLC with
+         *     only the number and the date that exist (no approver, no HLC approval date); a request already entered in Procurement with the same PR No. is linked
+         *     instead (`duplicate`); a request migrated before is `already_migrated`. The HLC team completes the drafts and they go through the usual approval.
+         */
+        post: operations["migrateLegacyHlcRequests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/dismantle/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a Dismantle part may take its contractor from (Q114)
+         * @description 0.12.11. The approved Procurement versions in force of the site with scope `CW Dismantle` (part `cw`) or `TE Dismantle` (part `te`), not cancelled.
+         *     Needs the Dismantle module in the site's region.
+         */
+        get: operations["listDismantleOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/gecol-order-warnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The order warnings of the GECOL register (Q151)
+         * @description 0.12.11. Each chain lists GECOL date fields in their expected order; a step without a date is skipped; a later step dated before an earlier one is a
+         *     reviewer warning `gecol_order` (never blocking). `billing_after` names the contract event the billing conversion follows (`billing_before_event`).
+         *     The draft order of the owner answer is seeded and off (`enabled: false`) until the GECOL team confirms it. Reading needs the Settings screen.
+         */
+        get: operations["getGecolOrderWarnings"];
+        /**
+         * Save the GECOL order warnings (reason, If-Match, audited)
+         * @description 0.12.11. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_field` (not a GECOL date
+         *     field; `billing_after` cannot be the billing conversion itself), `duplicate`, `invalid`, `too_many`.
+         */
+        put: operations["setGecolOrderWarnings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers": {
         parameters: {
             query?: never;
@@ -10218,13 +10315,16 @@ export interface components {
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
-            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none. */
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). 0.12.11: HLC `hlc_prs_incomplete`, `hlc_prs_not_linked`, `pr_exception_used`; GECOL `gecol_order`, `billing_before_event` (setting, off by default); Dismantle `execution_mode_missing`, `order_not_chosen`, `order_without_contractor`. Empty when there is none. */
             warnings?: {
                 /** @description JSON pointer of the field, as in `Problem.errors`. */
                 path: string;
                 code: string;
                 message?: string;
+                /** @description 0.12.11. The field the value is compared with (GECOL `gecol_order`, `billing_before_event`). */
+                related_path?: string;
             }[];
+            purchase_requests?: components["schemas"]["HlcPurchaseRequests"];
             /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
             last_transition?: {
                 step_ids?: string[];
@@ -10240,6 +10340,112 @@ export interface components {
             updated_at?: string;
             /** @description ETag (If-Match). */
             version: number;
+        };
+        /** @description 0.12.11 (Q150), HLC records only. `items` = the required requests (the named ones, or every submitted one while none is named; cancelled ones left out); `candidates` = every HLC request of the site the L1 may name. */
+        HlcPurchaseRequests: {
+            linked_explicitly: boolean;
+            /** @description Every required request has an approved version with an HLC approval date (C3 closes). */
+            complete: boolean;
+            required: number;
+            approved_by_hlc: number;
+            /**
+             * Format: date
+             * @description The latest HLC approval date, once complete.
+             */
+            hlc_approval_date?: string | null;
+            items: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                pr_no?: string;
+                /** Format: date */
+                pr_date?: string;
+                /** Format: date */
+                hlc_approval_date?: string;
+                approved: boolean;
+                state?: components["schemas"]["RegisterRecordState"];
+            }[];
+            candidates: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                pr_no?: string;
+                /** Format: date */
+                pr_date?: string;
+                state?: components["schemas"]["RegisterRecordState"];
+                cancelled: boolean;
+                linked: boolean;
+            }[];
+        };
+        /** @description 0.12.11 (Q139). */
+        HlcLegacyMigration: {
+            dry_run: boolean;
+            counts: {
+                create: number;
+                duplicate: number;
+                already_migrated: number;
+            };
+            items: {
+                /** Format: uuid */
+                hlc_record_id: string;
+                /** Format: uuid */
+                hlc_entity_id?: string;
+                /** Format: uuid */
+                site_id: string;
+                site_code?: string;
+                region_id?: components["schemas"]["RegionId"];
+                request_no?: string;
+                request_date?: string;
+                /** @enum {string} */
+                outcome: "create" | "duplicate" | "already_migrated";
+                /**
+                 * Format: uuid
+                 * @description The draft created (run), the request matched, or the draft of an earlier run.
+                 */
+                procurement_record_id?: string;
+                /** @description The legacy date was not a valid past date and was not copied. */
+                date_dropped?: boolean;
+            }[];
+        };
+        /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
+        DismantleOrderOption: {
+            /**
+             * Format: uuid
+             * @description The value of the Dismantle field `procurement_order_id`.
+             */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** @enum {string} */
+            scope: "CW Dismantle" | "TE Dismantle";
+            delivery?: string;
+            pr_no?: string;
+            po_wo_no?: string;
+            /** Format: date */
+            po_wo_date?: string;
+            order_status?: string;
+            external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        GecolOrderWarningsInput: {
+            enabled: boolean;
+            chains: string[][];
+            /** @description The GECOL date field the billing conversion follows (the contract event), or null. */
+            billing_after: string | null;
+        };
+        /** @description 0.12.11 (Q151). Seed: enabled false; chains [request_date, survey_date, layout_received, layout_approved] and [installation_finish, aat_acceptance_date, power_on_date]; billing_after null. */
+        GecolOrderWarnings: components["schemas"]["GecolOrderWarningsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The GECOL date fields a chain may name. */
+            fields: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+            }[];
         };
         RegisterRecordStep: {
             /** Format: uuid */
@@ -20436,6 +20642,163 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    setHlcPurchaseRequests: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The `entity_id` of each Procurement record (scope HLC). */
+                    procurement_entity_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The record, with its `purchase_requests`. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    migrateLegacyHlcRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dry_run: boolean;
+                    /** @description Required for a run. */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The preview or the result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HlcLegacyMigration"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listDismantleOrderOptions: {
+        parameters: {
+            query: {
+                site_id: string;
+                record_type: "cw" | "te";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DismantleOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getGecolOrderWarnings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setGecolOrderWarnings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["GecolOrderWarningsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listRegisters: {

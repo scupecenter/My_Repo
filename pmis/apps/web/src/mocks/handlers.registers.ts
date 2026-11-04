@@ -12,6 +12,7 @@ import { uid } from './ids';
 import { holdersOf, rowOf } from './matrixData';
 import { REGISTER_DEFS, REGISTER_TEMPLATES, STREAM_TEMPLATES, recId, type MockBatch, type MockBatchRow, type MockRecord } from './registersData';
 import { SITE_COUNT, siteIdOf, siteIndex, siteMeta, TODAY } from './sites';
+import { deriveDismantle, gecolCfg, hlcPrView, p4cWarnings } from './p4cData';
 
 const B = API_BASE;
 const R = () => db().reg;
@@ -123,7 +124,10 @@ export function toRecord(r: MockRecord): RegisterRecord {
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
     entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: r.source ?? 'manual', ...(r.task ? { task: r.task } : {}),
-    warnings: warningsOf(r),
+    warnings: [...warningsOf(r), ...p4cWarnings(r, R().records, gecolCfg())],
+    // 0063 (Q150, Q114): the HLC purchase requests of an HLC record; the contractor of a record (derived from the order for an outsourced Dismantle part)
+    ...(r.register_key === 'hlc' && r.site_index !== null ? { purchase_requests: hlcPrView(r, R().records) } : {}),
+    ...(r.external_party ? { external_party: r.external_party } : {}),
   };
 }
 
@@ -212,6 +216,7 @@ export const registerHandlers = [
     const r: MockRecord = { id, entity_id: id, version_no: 1, register_key: def.register_key, record_type: b.record_type ?? null, site_index: si, state: 'entry', current_level: 1, levels_required: levelsOf(def.register_key), data, version: 1, return_count: 0, last_return_note: null, created_by: viewer()!.employee_id ?? '9999', created_at: now, updated_at: now, steps: [] };
     step(r, 'create', 1);
     linkHlc(r);
+    deriveDismantle(r, R().records);
     R().records.unshift(r); save();
     return HttpResponse.json(toRecord(r), { status: 201, headers: { ETag: `"${r.version}"` } });
   }),
@@ -243,6 +248,7 @@ export const registerHandlers = [
     for (const k of ['request_no', 'request_date']) if (r.data[k] !== undefined && !(k in next)) next[k] = r.data[k];
     r.data = next;
     linkHlc(r);
+    deriveDismantle(r, R().records);
     if (b.data && !hasExpiry(r.data)) delete r.data.valid_to;
     step(r, 'edit', 1);
     touch(r); save();

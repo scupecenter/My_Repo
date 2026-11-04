@@ -888,7 +888,8 @@
     "tab_documents": "Document Library",
     "tab_team-scope": "Team / scope match",
     "tab_lists": "Lists",
-    "tab_contractor-rules": "Contractor rules"
+    "tab_contractor-rules": "Contractor rules",
+    "tab_gecol-order": "GECOL order warnings"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -941,7 +942,8 @@
     "name_clash": "This name already belongs to another specialization.",
     "not_a_column": "Add the specialization to the table first.",
     "unknown_scope": "Not an order scope of the table.",
-    "unknown_role": "Not a role code."
+    "unknown_role": "Not a role code.",
+    "unknown_field": "Not a field that can be used here."
   },
   "cal": {
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",
@@ -1511,7 +1513,8 @@
     "close": "Close",
     "details": "Details",
     "purchase_request": "Purchase request",
-    "in_service": "In service"
+    "in_service": "In service",
+    "execution": "Execution"
   },
   "registers": {
     "new": "New record",
@@ -1652,7 +1655,19 @@
     "party_required": "An outsourced order with its PO / WO needs its contractor.",
     "internal_team_required": "An in-house order names the internal team.",
     "not_internal_team": "An in-house order needs an internal team.",
-    "gecol_party_required": "A GECOL record is approved with its party."
+    "gecol_party_required": "A GECOL record is approved with its party.",
+    "no_approved_hlc_pr": "Execution needs the HLC purchase request(s) of the site approved by HLC (C3) first, or an emergency exception.",
+    "pr_exception_forbidden": "Only a person with the administer right on HLC (or a System Admin) may give an emergency exception.",
+    "not_applicable": "{{field}} does not apply here.",
+    "not_hlc_pr": "Not an HLC purchase request of this site.",
+    "contractor_from_order": "The contractor comes from the Procurement order and cannot be typed.",
+    "order_choice_required": "The site has several active orders for this part: choose one.",
+    "no_active_order": "The site has no approved, active Procurement order for this part.",
+    "order_not_active": "This order is not approved and active for this part and site.",
+    "in_house_no_order": "In-house work has no Procurement order.",
+    "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
+    "outsourced_no_internal_team": "Outsourced work takes its contractor from the Procurement order.",
+    "execution_mode_required": "Choose the execution mode (Outsourced or In-House) first."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -2563,7 +2578,15 @@
     "test_without_installation": "A TX link test without an installation date.",
     "in_service_without_test": "In service without a TX link test date.",
     "approval_before_pr": "The HLC approval date is before the PR date.",
-    "list_other": "{{field}}: the value is not in its list (accepted while the list allows another value)."
+    "list_other": "{{field}}: the value is not in its list (accepted while the list allows another value).",
+    "hlc_prs_incomplete": "Not every HLC purchase request of the scope is approved by HLC yet.",
+    "hlc_prs_not_linked": "The site has several HLC purchase requests: name the ones this record covers.",
+    "pr_exception_used": "Emergency exception: execution without the approved HLC purchase request(s).",
+    "gecol_order": "{{field}} is before {{other}}.",
+    "billing_before_event": "The billing conversion is before {{other}} (the contract event it follows).",
+    "execution_mode_missing": "No execution mode: the contractor is typed, not taken from the Procurement order.",
+    "order_not_chosen": "Choose the Procurement order of this work before you submit.",
+    "order_without_contractor": "The chosen Procurement order names no contractor."
   },
   "profile": {
     "title": "My profile",
@@ -3355,5 +3378,43 @@
       "no_active_contract": "Register the contract for this scope in the Contractors register, or move the order to a contractor with one.",
       "stop_work": "Follow the safety rules: the work waits until the Stop Work is lifted in Permits & HSE."
     }
+  },
+  "gecolOrder": {
+    "title": "GECOL order warnings",
+    "note": "Each chain lists GECOL dates in their expected order. A step without a date is skipped; a later step dated before an earlier one warns the reviewer and never blocks. The order and the billing event are to be confirmed by the GECOL team (Q151), so the warnings are off by default.",
+    "enabled": "Warn the reviewer when the GECOL dates are out of order",
+    "chain": "Chain {{n}}",
+    "add_step": "Add a step…",
+    "remove_chain": "Remove this chain",
+    "add_chain": "Add a chain",
+    "billing_after": "The billing conversion follows (contract event)",
+    "billing_none": "No check (not set in the contract yet)"
+  },
+  "p4c": {
+    "prs_title": "HLC purchase requests of this work (C3)",
+    "prs_complete": "All approved by HLC · {{date}}",
+    "prs_incomplete": "{{n}} of {{total}} approved by HLC",
+    "prs_linked": "The requests named below cover this record.",
+    "prs_all_submitted": "No request is named: every submitted HLC request of the site is required.",
+    "prs_pick": "The requests this record covers (none = all submitted ones)",
+    "prs_save": "Save the requests",
+    "cancelled": "Cancelled",
+    "no_contractor": "no contractor",
+    "order_site_first": "Choose the site and the part first",
+    "no_orders": "No approved, active order for this part",
+    "contractor_from_order": "Contractor (from the order): {{name}}",
+    "order_choose": "{{count}} active orders: choose the one this work belongs to.",
+    "legacy_menu": "Move old HLC requests to Procurement",
+    "legacy_title": "Old HLC requests to Procurement drafts (one time)",
+    "legacy_run": "Create the drafts",
+    "legacy_note": "Each HLC request entered before the move becomes a draft Procurement request of scope HLC, with only the number and the date it has. No approver and no HLC approval date are made up: the HLC team completes each draft and sends it for approval. Preview first.",
+    "legacy_preview": "Preview",
+    "legacy_counts": "{{create}} to create · {{duplicate}} already entered · {{done}} moved before",
+    "legacy_done": "{{count}} drafts created.",
+    "legacy_none": "No old HLC request is left.",
+    "outcome_create": "a draft will be created",
+    "outcome_duplicate": "already entered in Procurement (linked)",
+    "outcome_already_migrated": "moved before",
+    "date_dropped": "date not copied"
   }
 }

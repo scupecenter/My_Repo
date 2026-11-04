@@ -18,6 +18,7 @@ import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
+import { DismantleOrderSelect, HlcPurchaseRequests } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
 import { LegacyConversion } from './LegacyConversion';
@@ -67,7 +68,9 @@ function Warnings({ record, labelOf }: { record: RegisterRecord; labelOf: (code:
       <ul className="list-disc ps-5">
         {list.map((w, i) => {
           const field = w.path.replace(/^\/data\//, '');
-          return <li key={`${w.code}-${i}`} data-testid={`reg-warning-${w.code}`}>{t(`regWarnings.${w.code}`, { field: labelOf(field), defaultValue: w.message ?? w.code })}</li>;
+          // 0.12.11: `related_path` names the field a GECOL date is compared with (Q151)
+          const other = w.related_path ? labelOf(w.related_path.replace(/^\/data\//, '')) : '';
+          return <li key={`${w.code}-${i}`} data-testid={`reg-warning-${w.code}`}>{t(`regWarnings.${w.code}`, { field: labelOf(field), other, defaultValue: w.message ?? w.code })}</li>;
         })}
       </ul>
     </section>
@@ -180,6 +183,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           </p>
         )}
         {record && key === 'hlc' && <HlcPurchaseRequest record={record} />}
+        {record && key === 'hlc' && <HlcPurchaseRequests record={record} />}
         {record && <Warnings record={record} labelOf={labelOf} />}
         {record && act('transfer') && <p className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-transfer-note">{t('registers.transfer_note')}</p>}
         {record && key === 'meetings' && <LegacyConversion record={record} canEdit={act('edit')} />}
@@ -230,7 +234,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                       <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
                         {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} />}</div>
-                      {editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
+                      {key === 'dismantle' && f.code === 'procurement_order_id'
+                        ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
+                        : editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
                         : <div className="font-semibold whitespace-pre-line" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t, ctx)}</div>}
                       {f.code === 'has_expiry' && data.has_expiry === false && <span className="chip mt-1 bg-doneBg text-doneInk" data-testid="reg-permanent">{t('registers.permanent')}</span>}

@@ -16,6 +16,7 @@ const SECTION_ID: Record<string, string> = {
   'Site and scope': 'site_scope', Request: 'request', Order: 'order', Assignment: 'assignment', 'Status and remark': 'status_remark', 'Survey and layout': 'survey',
   'Notice and works': 'notice', Acceptance: 'acceptance', 'Meter and power-on': 'meter', Remark: 'remark', 'Status and team': 'fiber_status', 'Installation and test': 'install',
   Permit: 'permit', Validity: 'validity', 'N/A': 'na', 'PTW checks': 'ptw', 'Stop work': 'stop', 'Purchase request': 'purchase_request', 'In service': 'in_service',
+  Execution: 'execution',
 };
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'details';
 
@@ -57,7 +58,10 @@ export const MEETING_LEGACY = ['attendees', 'linked_sites', 'minutes_ref', 'acti
 export function isHidden(key: string, code: string, d: Data, def?: RegisterDefinition) {
   if (key === 'meetings' && MEETING_LEGACY.includes(code)) return d[code] === undefined || d[code] === null || d[code] === '';
   if (key === 'procurement') return code === 'hlc_approval_date' && !isHlcScope(d);
-  if (key === 'hlc') return code === 'procurement_record_id';
+  // 0063 (Q148): the reason of an emergency exception exists only with the exception
+  if (key === 'hlc') return code === 'procurement_record_id' || (code === 'pr_exception_reason' && d.pr_exception !== true);
+  // 0063 (Q114): an outsourced Dismantle part names its Procurement order (the contractor comes from it), an in-house one its internal team
+  if (key === 'dismantle') return (code === 'procurement_order_id' && !is(d.execution_mode, 'Outsourced')) || (code === 'internal_team' && !is(d.execution_mode, 'In-House'));
   if (key !== 'permits_hse') return false;
   // 0.12.2 (D220b): the stream is chosen only for the purpose-based permit types; a record that has one shows it
   if (code === 'permit_stream') { const m = permitMeta(def, d); return m ? !m.choose_stream : !d.permit_stream; }
@@ -189,6 +193,8 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
     // D220b: a purpose-based permit type needs its stream (the server answers `stream_required` too)
     if (permitMeta(def, data)?.choose_stream && !data.permit_stream) fail('permit_stream', 'stream_required');
   }
+  // 0063 (Q148): an emergency exception needs its reason (the right to give it and the purchase requests are checked by the server)
+  if (key === 'hlc' && data.pr_exception === true && !String(data.pr_exception_reason ?? '').trim()) fail('pr_exception_reason', 'required');
   return out;
 }
 
