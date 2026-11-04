@@ -115,6 +115,11 @@ install -d -m 750 -o postgres -g postgres /var/lib/gsdn-pmis
 install -d -m 750 -o postgres -g postgres /var/lib/postgresql/.ssh 2>/dev/null || true
 umask 077
 [[ -e $SECRET ]] || install -m 640 -o root -g postgres /dev/null "$SECRET"
+# pgBackRest refuses a key outside a section: the file must start with [global]. A file written by an older installer without the
+# header gets it inserted (the keys are kept).
+if ! grep -q '^\[global\]' "$SECRET"; then
+  { echo '[global]'; cat "$SECRET"; } >"$SECRET.new" && cat "$SECRET.new" >"$SECRET" && rm -f "$SECRET.new"
+fi
 ensure_key() { # ensure_key NAME: creates NAME=<random> in the secret file only when it is missing
   grep -q "^$1=" "$SECRET" || printf '%s=%s\n' "$1" "$(openssl rand -hex 32)" >>"$SECRET"
 }
@@ -237,8 +242,11 @@ if [[ $NEED_RESTART == 1 ]]; then
 fi
 
 echo "==> Stanza, check"
-sudo -u postgres pgbackrest --config="$CFG" --config-include-path="$INC" --stanza="$STANZA" --log-level-console=warn stanza-create
-sudo -u postgres pgbackrest --config="$CFG" --config-include-path="$INC" --stanza="$STANZA" --log-level-console=warn check
+# pgBackRest prints the offending config line in some errors: mask every cipher or S3 key before it reaches the terminal or a log.
+redact() { sed -E 's/((cipher-pass|s3-key|s3-key-secret)=)[^[:space:]]+/\1********/g'; }
+pgbr() { sudo -u postgres pgbackrest --config="$CFG" --config-include-path="$INC" --stanza="$STANZA" --log-level-console=warn "$@" 2>&1 | redact; return "${PIPESTATUS[0]}"; }
+pgbr stanza-create || { echo "stanza-create failed (see above)." >&2; exit 1; }
+pgbr check || { echo "check failed (see above)." >&2; exit 1; }
 
 echo "==> Timers"
 unit_timer() { # unit_timer NAME ONCALENDAR DESCRIPTION EXEC_ARG
