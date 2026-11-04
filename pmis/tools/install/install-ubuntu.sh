@@ -687,6 +687,8 @@ if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1; elif (( A
 if (( CLAM_ON )); then say "Setting up the ClamAV virus scan"; bash "$PMIS_DIR/tools/install/install-clamav.sh"; fi
 if [[ -r $CONF_DIR/backup.env ]]; then BACKUP_ON=1; elif (( AUTO )); then BACKUP_ON=0; elif ask_yes "Back up the stored files every night with restic (encrypted, 14 daily, 8 weekly, 12 monthly)?"; then BACKUP_ON=1; else BACKUP_ON=0; fi
 if (( BACKUP_ON )); then say "Setting up the nightly backup of the stored files"; bash "$PMIS_DIR/tools/install/install-file-backup.sh"; fi
+if [[ -r /etc/pgbackrest/db-backup.env ]]; then DBBACKUP_ON=1; elif (( AUTO )); then DBBACKUP_ON=0; elif ask_yes "Back up the database with pgBackRest (point-in-time restore, WAL every 5 minutes, encrypted, a copy in another building)?"; then DBBACKUP_ON=1; else DBBACKUP_ON=0; fi
+if (( DBBACKUP_ON )); then say "Setting up the database backup (pgBackRest)"; bash "$PMIS_DIR/tools/install/install-db-backup.sh"; fi
 
 # ---------------------------------------------------------------- web app
 say "Building the web app"

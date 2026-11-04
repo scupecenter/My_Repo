@@ -48,6 +48,19 @@ Only the certificate question is skipped. Every other question is still asked.
 
 `TLS_MODE` takes `0` to `4` or `le-existing`. `TLS_LE_NAME` is required for option 4. For `update.sh` the saved answers are used.
 
+## Database backup (pgBackRest, optional, Q196)
+
+- `install-db-backup.sh` (asked at the end of `install-ubuntu.sh`, or run on its own): installs pgbackrest, writes `/etc/pgbackrest/`
+  (repositories, encrypted with one key per repository; the keys are created once and never regenerated), turns on WAL archiving
+  (`archive_timeout` 5 minutes) with a PostgreSQL restart, creates the stanza `gsdn-pmis`, and installs the timers: nightly full backup at 02:00,
+  a check every 15 minutes (System Log alert when a backup or the WAL archive is late), and, when configured, a pg_dump copy at 03:00,
+  a weekly copy and a monthly copy.
+- Repository 2 in another building is an answer to the installer (`sftp:` or `s3:`). The owner's names, destinations and key custody are a
+  checklist in `infra/RUNBOOK.md` section 8.8, not decided by the installer.
+- Each run writes job_runs rows (`db_basebackup`, `db_dump`). Restore: `infra/backup/db-restore.sh` (point in time, scratch cluster only).
+
+    sudo bash pmis/tools/install/install-db-backup.sh
+
 ## Tests
 
 `test-le-existing.sh` runs the option 4 helpers against a fake `/etc/letsencrypt` tree made in a temporary directory:
