@@ -329,7 +329,7 @@ describe.each(SPECS)("$key register", (s) => {
       expect.arrayContaining(s.fieldsInclude),
     );
     if (s.key === "contractors")
-      expect(def.record_types).toEqual(["company", "team"]);
+      expect(def.record_types).toEqual(["company", "team", "contract"]); // contract: migration 0061 (Q110)
     if (s.key === "acquisition") expect(def.multiple_per_site).toBe(true);
     if (s.onePerSite) expect(def.multiple_per_site).toBe(false);
 

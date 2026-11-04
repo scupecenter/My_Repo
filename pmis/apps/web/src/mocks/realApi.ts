@@ -192,6 +192,11 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.9.1: the team / scope match of Procurement (apps/api: settings; migration 0043, Q97).
   ['get', '/settings/team-scope-match'],
   ['put', '/settings/team-scope-match'],
+  // Contract 0.12.9: P4b contractors, contracts and the team / scope match (apps/api: contractors; migration 0061, Q110, Q142 to Q147, D145b).
+  ['get', '/settings/contractor-rules'],
+  ['put', '/settings/contractor-rules'],
+  ['get', '/reports/team-scope-mismatch'],
+  ['get', '/reports/contractors-completeness'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['patch', '/me/profile'],

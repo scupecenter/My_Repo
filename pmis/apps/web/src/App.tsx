@@ -11,6 +11,7 @@ import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
 import { Inbox } from '@/pages/Inbox';
 import { StatusUpdates } from '@/pages/StatusUpdates';
+import { ContractorsReports } from '@/pages/ContractorsReports';
 import { Workload } from '@/pages/Workload';
 import { Dashboard } from '@/pages/Dashboard';
 import { ManualItems } from '@/pages/ManualItems';
@@ -82,6 +83,7 @@ function gated(session: Session) {
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="workload" element={<Workload />} />
+        <Route path="reports/contractors" element={<ContractorsReports />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="dashboard/manual-items" element={<ManualItems />} />

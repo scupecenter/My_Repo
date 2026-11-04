@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.8
+  version: 0.12.9
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.9 (2026-11-04): work package P4b of the owner answers of 2026-11-04 (Q110, Q142 to Q147) and decision D145b (migration 0061; CHANGELOG 88). Not purely additive for `PUT /settings/team-scope-match`: its columns are now codes of the specialization catalogue (`TeamScopeMatch.catalogue`, seed Tower RT, Tower GF, Adaption, TE, Dismantle, GECOL, Fiber, Survey) and a row may allow a functional group (`allowed_groups`, CW or TE); the old column CW became the group CW, TE the code TE, and the name CW is refused as a column (`is_a_group`). (1) Q143 / Q147: `GET /settings/team-scope-match` is also readable, read-only, with `procurement` or `contractors` view (`can_edit` says whether the caller may save); a save that changes eligibility (rows, cells, groups, active codes, a code's group or aliases) needs a fresh step-up (401 `step_up_required`); a label-only change does not; new field errors `is_a_group`, `name_clash`, `not_a_column`. (2) Q144: HLC stays `exempt` (no team needed) but a named team is checked (seed: Fiber). (3) Q110: the Contractors register gains the record type `contract` (`contractor`, `contract_ref`, `contract_start`, `contract_end`, `contract_scopes`, `contract_status`); a team or a contract links to its company by `external_party_id` (found from a unique `contractor` name; an ambiguous name is never linked: `ambiguous_contractor`, a name that is not the chosen company's: `contractor_mismatch`); an unknown Company Type becomes `other` with a review alert. A Procurement record that names a team is refused at submit (422 `validation_failed`, `no_active_contract` / `party_inactive`) unless the team's company has an active contract covering the scope on the order date. (4) Q142: a team may be saved without a specialization; submit needs one (`specialization_required`) unless it is inactive; teams gain `more_specializations`, `safety_cert_expiry` and `team_lead_user`. (5) Q147 CW Delivery Model (scopes of `ContractorRules.cw_delivery_scopes`): an Outsourced order with its PO / WO needs its party (`party_required`) and an active contract; an In-House order names a qualified internal team (`internal_team_required`, `not_internal_team`). (6) Q146: a GECOL record is approved only with its party, an active party and an active contract covering GECOL (`gecol_party_required`, `party_inactive`, `no_active_contract`). (7) Q145: `GET /reports/team-scope-mismatch` (running orders that no longer match) and `GET /reports/contractors-completeness` (Q142, Q110). (8) D145b: `GET/PUT /settings/contractor-rules` (`ContractorRules`): the safety certificate lead days, the alert roles and the rule lists; the daily job alerts the team lead and Procurement (in-app, `team_safety_cert`) and never blocks an order; running-order mismatches are alerted once (`order_team_mismatch`).
     - 0.12.8 (2026-11-04): additive. Work package P3 of the owner answers of 2026-11-04 (migration 0060; CHANGELOG 91). (1) Q1 / Q211, the admin-only legacy import of the real Site Master (no `_tpl`): `POST /master-import/runs` (System Admin or a delegate of `templates` `administer`; the same package guard as a template: macros, embedded objects, external links, size, zip bomb) identifies the file by its sheet names and the three Master header rows, checks the structure (422 `template_rejected` with `not_a_master`, `structure_mismatch` or `is_pmis_template`, written to the System Log, source `master-import`), stores the original file and its SHA-256, and writes the per-cell comparison with what the PMIS holds without changing anything (`MasterImportRun`, `MasterImportDiff`: site, field, both values, `Sheet!row`, kind, reason, resolution). `GET /master-import/runs`, `GET .../{run_id}`, `GET .../{run_id}/diffs`, `GET .../{run_id}/export` (the comparison report as XLSX), `GET .../{run_id}/file` (the original, audited), `PATCH /master-import/diffs/{diff_id}` (the resolution and its note, audited), and `POST .../{run_id}/apply` (reason, step-up, `mode` submit or draft; If-Match): the typed task columns enter through the TPL-MASTER staging and the batch flow (`ImportBatch.source` `master_import`, one `group_id`), so L1 holders, gates, dates, documents and L2 decide as for a person; a file is applied once. Every use is audited and logged. (2) Q8 / Q10: `GET /import-aliases?kind=region|role` and `PUT /import-aliases` (templates edit for all regions, a reason, audited): the Master values that mean a region or a PMIS role; unmapped and ambiguous values are import exceptions; an imported title never grants a right. (3) Q207: `GET /template-mapping` and `POST /template-mapping` (`dry_run` true tests the change and answers its impact per template without saving; a save issues the next template versions with the reason): a calculated or register-owned field never becomes typed (`calculated_field`), a Master column the PMIS does not own is never mapped (`column_not_owned`). (4) Q206: `uploadImportBatch` takes `mode` (`submit`, the default, or `draft` = Save Draft / Planning for the stream templates and the Master sheet): a draft row needs no actual date or document, is saved without submission (`ImportRow.decision` `saved`, `ImportBatch.counts.saved`, `ImportBatchOutcome.saved`), and the batch ends `applied`; it has no L2 decision (409). (5) Q208: a task locked by a closed gate is held (`hold_reason` `gate_locked`, warning `held_gate_locked`) instead of refused, and is applied only when the batch is sent again. (6) Q209: a pending task is started with the row's (or the task's) actual start; a task without an Actual Start column uses its actual date; today is never used (`actual_start_required`). (7) Q205: a Master column may carry several task fields (AY/AZ: B8 or B9; BK:BN: B10 or B11 with a documented projection); on upload the task that applies on the site is written, a projected column is not read, and an ambiguous one refuses the row (`ambiguous_mapping`). (8) D112: a file of an older template version is accepted when only non-input columns changed (`ImportBatch.file_template_version`); a changed typed column refuses it with `outdated_version`, the message naming the changed columns.
     - 0.12.7 (2026-11-04): work package P2 of the owner answers of 2026-11-04 (dashboard, Project Status, delay attribution; migration 0059; CHANGELOG 90). Additive except where noted. (1) Q7: delay that no approved period covers is `kind` `unattributed` (party `unattributed`) with the task's R party only as `suggested_party`; the kinds `external`, `default_type` and `unassigned` are no longer sent (not additive for a client that grouped by them). New `attributed_working_days`, `unattributed_working_days`, `attributed_pct`, `data_gap_working_days`, `proposed_working_days`, `proposals_count`, `pending_party_count` and `scorecard` (approved periods only). (2) Q180 (delay side): suspension days use `coalesce(suspension_start, approval_date)` to the first later `coalesce(resumption_date, approval_date)`. (3) Q181: a late task without a due date has its window rebuilt from the SLA start plus the maximum; when no day can be placed its days are a data gap (`data_gap`, no suggestion). (4) Q182, Q184: `POST /tasks/{task_id}/delay-periods` now **proposes** a period (status `proposed`, optional `evidence`; L1 may propose) with no effect; `POST /tasks/{task_id}/delay-periods/{period_id}/decision` approves or rejects it (L2, a System Admin or `dashboard.delay` edit; never the proposer: 403 `self_beneficiary`; a rejection needs `note`); approving a `contractor` or `external` period needs `external_party_id` (422 `external_party_required`). `DelayPeriod` gains `status`, `evidence`, `proposed_by`, `decided_by`, `decided_at`, `decision_note`, `counts`; `DelayPeriodList` gains `can_propose`, `can_decide`, `me`, `external_parties`. (5) Q175: a manual central value counts in the project-wide figure only; regional, site and filtered figures show it in `central_line` (not additive for clients that read the regional figure with manual values). (6) Q176: `source` is required on `POST /project-status/manual-items/{item_code}/values` (not additive). (7) Q177: `POST /project-status/manual-items/{item_code}/plan` (points or a target date), `ManualItem.plan`, `DashboardProjectStatusItem.plan`; `progress_vs_plan_index` (the old `spi`, same value, kept), `partial_index`. (8) Q178: an effective date before the current month needs `dashboard.historical_correction` edit (403 otherwise) and is flagged `historical_correction`; `ManualItemList.open_period_from`, `can_correct_history`, `without_plan`. (9) Q186: blocked gates that cannot be known for the date are null: `DashboardGates.status` (`live`, `snapshot`, `historically_unavailable`), `blocked_total` may be null, `DashboardMilestone.blocked` may be null with `blocked_available`; `DashboardBasis.snapshot_kinds[].rebuilt` and `taken_at`. (10) D186: the weekly snapshot is on Thursday (setting `dashboard.snapshot_weekday` 4). (11) D16: `DashboardHealth.components[].draft`, `draft_factors`, `approved_factors`; `meta.health_draft_factors`. (12) Q116: `meta.pipeline_variant` (A rings, default; B flat segmented track) and `PUT /dashboard/pipeline-variant`. (13) Q187: the xlsx export has the sheets Project Overview, CW, TE, Late tasks, Delay attribution, Project Status items, Regions and About.
     - 0.12.6 (2026-11-04): identity and profile follow-up of the owner answers of 2026-11-04 (work package P8, migration 0058, CHANGELOG 86). **Not additive for the phone:** (1) D156: the phone is a sign-in identifier, so `PATCH /me/profile` no longer takes `phone` (403 `field_read_only`, `errors[]` names `/phone` and points to the request) and `MyProfile.editable_fields` is `display_name`, `locale`, `theme`. A phone change is a request an admin approves, like the email: `POST /me/phone-change` (new E.164 phone or null, the password re-entered; one pending request per user; the number must be free), `DELETE /me/phone-change` (cancel while pending), `GET /phone-change-requests` and `POST /phone-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account); `MyProfile.phone_change`; notification kinds `phone_change_requested` and `phone_change_decided`. (2) Q158: the new email address is verified before an approval. `POST /me/email-change` mails a one-time code (XXXX-XXXX, valid `email_change.verify_hours`, default 24) to the new address and a notice to the old one; `POST /me/email-change/verify` and `POST /me/email-change/resend`; `EmailChangeRequest` carries `verified_at`, `verified_via` (`code`, `admin_check`), `verify_sent_at` and `verify_expires_at`. An approval of an unverified address is 409 `email_not_verified` unless the admin sends `identity_check` (the documented check made while mail is unavailable; stored in `EmailChangeRequestAdmin.identity_check` and audited). Old and new addresses are told of the decision by mail. (3) Q161: turning two-factor off ends the other sessions (self, from the profile) or all the user's sessions (admin, `PUT /users/{user_id}/two-factor`), and writes a `security_notice` to the user's inbox and by mail. (4) Q18: an assignment overlaps only when the same person and role overlap in dates **and** share a region **and** a module; `BulkItemIssue.conflicts` lists the conflicting assignment ids. New error code `email_not_verified`.
@@ -5808,8 +5809,10 @@ paths:
       operationId: getTeamScopeMatch
       summary: Team specialization / scope match of Procurement (Q97)
       description: |
-        0.9.1. The rows are the order scopes, the columns the team specializations, each cell allowed yes / no. A scope marked `exempt` is not checked
-        (seed: HLC, whose request has no contractor team). Reading needs the Settings screen (`admin.settings` view).
+        0.9.1, 0.12.9. The rows are the order scopes, the columns the codes of the specialization catalogue (Q143), each cell allowed yes / no; a row may
+        also allow a functional group (CW, TE), which accepts every code of that group. `exempt` means that the order needs no team; a named team is
+        always checked (Q144, seed: HLC accepts a Fiber team). Reading needs the Settings screen (`admin.settings` view), or, read-only, `procurement`
+        or `contractors` view (Q147); `can_edit` tells whether the caller may save.
       responses:
         '200':
           description: The table.
@@ -5825,9 +5828,14 @@ paths:
       operationId: setTeamScopeMatch
       summary: Replace the team specialization / scope match (reason, If-Match, audited)
       description: |
-        0.9.1. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. Field-level errors: `unknown_key`,
-        `duplicate` (a specialization or a scope listed twice; specializations compare case-insensitively), `unknown_specialization` (an allowed value
-        that is not one of the columns), `invalid`, `too_many`. Records already approved are not re-checked; drafts are checked again at submit.
+        0.9.1, 0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. `specializations` lists the
+        active columns in order: each is a catalogue code, label or alias, or a new name that becomes a new code; a code not listed is deactivated, never
+        deleted. `catalogue` (optional) edits the labels, the group and the aliases of listed codes. A change that affects eligibility needs a fresh
+        step-up (401 `step_up_required`, checked in the database); labels alone do not. Field-level errors: `unknown_key`, `duplicate`,
+        `unknown_specialization` (an allowed value that is not one of the columns), `is_a_group` (CW or TE named as a column), `name_clash` (a name of
+        two codes), `not_a_column`, `invalid`, `too_many`. Records already approved are not re-checked (they are listed by
+        `GET /reports/team-scope-mismatch`); drafts are checked again at submit.
+      x-step-up: when eligibility changes
       x-db-path: admin_save_team_scope_match
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -5852,6 +5860,92 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/contractor-rules:
+    get:
+      tags: [settings]
+      operationId: getContractorRules
+      summary: Contractor rules (certificate alert lead time, alert roles, CW Delivery Model, internal team types, closed order statuses)
+      description: 0.12.9 (Q145, Q147, D145b). Needs the Settings screen (`admin.settings` view).
+      responses:
+        '200':
+          description: The rules.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContractorRules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setContractorRules
+      summary: Save the contractor rules (reason, If-Match, audited)
+      description: |
+        0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. A change of `cw_delivery_scopes` or `internal_team_types` decides
+        eligibility and needs a fresh step-up (401 `step_up_required`, Q147); the lead days, the roles and the closed statuses do not. Field errors:
+        `unknown_key`, `out_of_range`, `invalid`, `unknown_role`, `unknown_scope`. Audited as `contractor_rules_update` with before and after.
+      x-step-up: when cw_delivery_scopes or internal_team_types change
+      x-db-path: admin_save_contractor_rules
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/ContractorRulesInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContractorRules'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /reports/team-scope-mismatch:
+    get:
+      tags: [registers]
+      operationId: getTeamScopeMismatchReport
+      summary: Running Procurement orders that no longer match their team, contract or site (Q145)
+      description: |
+        0.12.9. Approved orders are never changed; this lists the running ones (order status not in `ContractorRules.closed_order_statuses`) that have a
+        problem today: `specialization_mismatch`, `team_inactive`, `party_inactive`, `no_active_contract`, `stop_work` (an active Stop Work on the site,
+        Permits & HSE) with severity `eligibility`, and `safety_cert_expired` with severity `info` (D145b: information only). Needs `procurement` view; the
+        rows are those of the caller's Procurement regions (B3). The daily job alerts Procurement once per order and `eligibility` problem.
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TeamScopeMismatchReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /reports/contractors-completeness:
+    get:
+      tags: [registers]
+      operationId: getContractorsCompletenessReport
+      summary: Contractors data to complete (Q142, Q110)
+      description: |
+        0.12.9. Active teams without a specialization (`no_specialization`), with an old text that is no catalogue specialization
+        (`unknown_specialization`), with a safety certificate expired or due within the lead days (`safety_cert_expired`, `safety_cert_due`; information
+        only); active parties to review (`type_review`: the Company Type was not a known type) or without an active contract today
+        (`no_active_contract`); contracts without a scope list (`scope_not_specified`: the company record's own contract) or past their end date while
+        active (`past_end_date`). Needs `contractors` view (the register is global).
+      responses:
+        '200':
+          description: The report.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ContractorsCompletenessReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /settings/notification-policy:
     get:
       tags: [settings]
@@ -13411,12 +13505,30 @@ components:
       required: [scope, allowed]
       properties:
         scope: { type: string, minLength: 1, maxLength: 60, description: 'An order scope of Procurement (the scope list), for example CW or TE Installation.' }
-        exempt: { type: boolean, default: false, description: 'true = no team check for this scope (seed: HLC).' }
+        exempt: { type: boolean, default: false, description: '0.12.9: true = the order needs no team (seed: HLC); a named team is still checked (Q144).' }
         allowed:
           type: array
           maxItems: 30
-          description: 'The specializations whose teams may take an order of this scope. Empty = no team is accepted.'
+          description: 'The specialization codes whose teams may take an order of this scope (a label or alias is accepted on input). Empty with no group = no team is accepted.'
           items: { type: string, minLength: 1, maxLength: 60 }
+        allowed_groups:
+          type: array
+          maxItems: 2
+          description: '0.12.9 (Q143): the functional groups whose every specialization may take an order of this scope, including codes added later.'
+          items: { $ref: '#/components/schemas/SpecializationGroup' }
+    SpecializationGroup:
+      type: string
+      enum: [CW, TE]
+    TeamSpecialization:
+      type: object
+      required: [code, label_en]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{0,29}$' }
+        label_en: { type: string, minLength: 1, maxLength: 60 }
+        label_ar: { type: [string, 'null'], maxLength: 60 }
+        group: { anyOf: [{ $ref: '#/components/schemas/SpecializationGroup' }, { type: 'null' }] }
+        aliases: { type: array, maxItems: 20, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Other names (an old Master value, a spelling) that resolve to this code.' }
+        is_active: { type: boolean, readOnly: true, description: 'false = not a column any more (kept, never deleted).' }
     TeamScopeMatchInput:
       type: object
       required: [specializations, scopes]
@@ -13424,22 +13536,136 @@ components:
         specializations:
           type: array
           maxItems: 30
-          description: 'The columns, in order: the team specializations of the Contractors register (compared trimmed and case-insensitively).'
+          description: '0.12.9: the active columns, in order: catalogue codes (or a label or alias of one); a new name becomes a new code; a code that is not listed is deactivated. CW and TE are groups, not columns.'
           items: { type: string, minLength: 1, maxLength: 60 }
         scopes:
           type: array
           maxItems: 60
           items: { $ref: '#/components/schemas/TeamScopeMatchRow' }
+        catalogue:
+          type: array
+          maxItems: 60
+          description: '0.12.9, optional: labels, group and aliases of listed codes.'
+          items: { $ref: '#/components/schemas/TeamSpecialization' }
     TeamScopeMatch:
-      description: '0.9.1 (Q97). Seed: CW, Tower Erection, Site Adaption, CW Dismantle and GECOL allow CW; TE Installation allows TE; TE Dismantle allows CW and TE; STA and ST allow none; HLC is exempt.'
+      description: '0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none.'
       allOf:
       - {$ref: '#/components/schemas/TeamScopeMatchInput'}
+      - type: object
+        required: [version, groups, catalogue, can_edit]
+        properties:
+          groups: { type: array, items: { $ref: '#/components/schemas/SpecializationGroup' } }
+          version: { type: integer, minimum: 1 }
+          can_edit: { type: boolean, description: '0.12.9: the caller may save (System Admin or admin.settings edit for all regions); Procurement and Contractors read only.' }
+          updated_at: { type: string, format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    ContractorRulesInput:
+      type: object
+      additionalProperties: false
+      required: [safety_cert_lead_days, recipient_roles, cw_delivery_scopes, internal_team_types, closed_order_statuses]
+      properties:
+        safety_cert_lead_days: { type: integer, minimum: 0, maximum: 365, description: 'D145b: days before the safety certificate expiry at which the team lead and Procurement are alerted (default 30). Information only.' }
+        recipient_roles: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Role codes whose holders get the certificate and mismatch alerts ("Procurement"; default PROC_TEAM). Nobody: the System Admins.' }
+        cw_delivery_scopes: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q147: the order scopes of the CW Delivery Model (default CW, Tower Erection, Site Adaption, CW Dismantle).' }
+        internal_team_types: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q147: the Team Type values of an internal (Aljeel) team for an In-House order (default Internal, In-House).' }
+        closed_order_statuses: { type: array, maxItems: 30, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Q145: the order statuses that end an order (default Closed, Cancelled, Completed).' }
+    ContractorRules:
+      allOf:
+      - {$ref: '#/components/schemas/ContractorRulesInput'}
       - type: object
         required: [version]
         properties:
           version: { type: integer, minimum: 1 }
           updated_at: { type: string, format: date-time }
           updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    ContractorProblem:
+      type: object
+      required: [code, severity, message]
+      properties:
+        code: { type: string, enum: [specialization_mismatch, team_inactive, party_inactive, no_active_contract, stop_work, safety_cert_expired] }
+        severity: { type: string, enum: [eligibility, info], description: '`info` never blocks (D145b).' }
+        message: { type: string }
+    NamedRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+    TeamScopeMismatchRow:
+      type: object
+      required: [record_id, entity_id, site_id, site_code, region_id, scope, problems]
+      properties:
+        record_id: { type: string, format: uuid, description: 'The approved version in force.' }
+        entity_id: { type: string, format: uuid }
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        region_id: { type: integer }
+        scope: { type: [string, 'null'] }
+        delivery: { type: [string, 'null'] }
+        order_status: { type: [string, 'null'] }
+        team:
+          anyOf:
+          - type: object
+            required: [id, name, specializations]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              specializations: { type: array, items: { type: string } }
+          - type: 'null'
+        party: { anyOf: [{ $ref: '#/components/schemas/NamedRef' }, { type: 'null' }] }
+        problems: { type: array, items: { $ref: '#/components/schemas/ContractorProblem' } }
+        checked_match_version: { type: [integer, 'null'], description: 'The match table version the order was checked under at submit (Q145).' }
+    TeamScopeMismatchReport:
+      type: object
+      required: [as_of, match_version, items]
+      properties:
+        as_of: { type: string, format: date }
+        match_version: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/TeamScopeMismatchRow' } }
+    ContractorsCompletenessReport:
+      type: object
+      required: [as_of, teams, parties, contracts]
+      properties:
+        as_of: { type: string, format: date }
+        teams:
+          type: array
+          items:
+            type: object
+            required: [team_id, name, party, issues]
+            properties:
+              team_id: { type: string, format: uuid }
+              name: { type: string }
+              party: { $ref: '#/components/schemas/NamedRef' }
+              record_id: { type: [string, 'null'], format: uuid }
+              specialization_text: { type: [string, 'null'] }
+              safety_cert_expiry: { type: [string, 'null'], format: date }
+              issues: { type: array, items: { type: string, enum: [no_specialization, unknown_specialization, safety_cert_expired, safety_cert_due] } }
+        parties:
+          type: array
+          items:
+            type: object
+            required: [party_id, name, type, issues]
+            properties:
+              party_id: { type: string, format: uuid }
+              name: { type: string }
+              type: { type: string }
+              company_type: { type: [string, 'null'] }
+              record_id: { type: [string, 'null'], format: uuid }
+              issues: { type: array, items: { type: string, enum: [type_review, no_active_contract] } }
+        contracts:
+          type: array
+          items:
+            type: object
+            required: [contract_id, party, origin, status, issues]
+            properties:
+              contract_id: { type: string, format: uuid }
+              party: { $ref: '#/components/schemas/NamedRef' }
+              contract_ref: { type: [string, 'null'] }
+              origin: { type: string, enum: [company, contract] }
+              start_date: { type: [string, 'null'], format: date }
+              end_date: { type: [string, 'null'], format: date }
+              status: { type: string, enum: [active, suspended, terminated, expired] }
+              issues: { type: array, items: { type: string, enum: [scope_not_specified, past_end_date] } }
     IdleTaskAlertSetting:
       type: object
       required: [enabled, working_days, version]

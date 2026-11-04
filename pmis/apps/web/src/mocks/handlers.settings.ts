@@ -2,19 +2,34 @@
 // staff visibility, security log, integrity, online now. Synthetic data; validation mirrors the contract.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatchInput, WeightSet } from '@/api/types';
+import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatch, TeamScopeMatchInput, TeamSpecialization, WeightSet } from '@/api/types';
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
-import { CALENDAR_CODES, CATALOGUE, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
+import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
 const C = () => db().cfg;
-/** A mock store saved before 0.9.1 has no match table: start it from the seed. */
-const SM = () => (C().scopeMatch ??= initCfg().scopeMatch);
+/** A mock store saved before 0.9.1 has no match table, one saved before 0.12.9 no catalogue: start it from the seed. */
+const SM = () => (C().scopeMatch?.catalogue ? C().scopeMatch : (C().scopeMatch = initCfg().scopeMatch));
+const CR = () => (C().contractorRules ??= initCfg().contractorRules);
+/** The field rules of PUT /settings/contractor-rules (admin_save_contractor_rules of migration 0061). Exported for unit tests. */
+export function validateContractorRules(b: Record<string, unknown>) {
+  const errs: { path: string; code: string }[] = [];
+  const LISTS = ['recipient_roles', 'cw_delivery_scopes', 'internal_team_types', 'closed_order_statuses'];
+  for (const k of Object.keys(b)) if (![...LISTS, 'safety_cert_lead_days', 'reason'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+  if (!int(b.safety_cert_lead_days, 0, 365)) errs.push({ path: '/safety_cert_lead_days', code: 'out_of_range' });
+  for (const k of LISTS) {
+    const v = b[k];
+    if (!Array.isArray(v) || v.length > 30 || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > 60)) errs.push({ path: `/${k}`, code: 'invalid' });
+  }
+  const scopes = new Set(SM().scopes.map((s) => s.scope));
+  if (Array.isArray(b.cw_delivery_scopes) && (b.cw_delivery_scopes as string[]).some((s) => !scopes.has(String(s).trim()))) errs.push({ path: '/cw_delivery_scopes', code: 'unknown_scope' });
+  return errs;
+}
 const isAdmin = () => viewer()?.key === 'pm';
 const needAdmin = () => guard() ?? (isAdmin() ? null : problem(403, 'action_forbidden', 'Administrators only'));
 const fields = (...errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
@@ -42,30 +57,72 @@ function dateErrs(d: string | undefined, kind: 'sla' | 'weights', code?: string)
   return last && d! <= last ? [{ path: '/effective_date', code: 'effective_date_not_after_current' }] : [];
 }
 
-/** The field rules of PUT /settings/team-scope-match (as admin_save_team_scope_match of migration 0043). Exported for unit tests. */
-export function validateScopeMatch(b: Partial<TeamScopeMatchInput> & Record<string, unknown>) {
+/** The comparison form of a name (p4b_norm of migration 0061): lower case, spaces and punctuation removed. */
+export const specNorm = (s: string) => s.trim().toLowerCase().replace(/[\s\p{P}]+/gu, '');
+type Cat = TeamSpecialization & { is_active?: boolean };
+/** A name (code, label or alias) as its catalogue code. */
+export function resolveSpec(catalogue: Cat[], name: string): string | null {
+  const n = specNorm(name);
+  if (!n) return null;
+  return catalogue.find((c) => [c.code, c.label_en, c.label_ar ?? '', ...(c.aliases ?? [])].some((x) => x && specNorm(x) === n))?.code ?? null;
+}
+/** A new code from a new name (as admin_save_team_scope_match). */
+export const newSpecCode = (name: string) => name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
+
+/**
+ * The field rules of PUT /settings/team-scope-match (admin_save_team_scope_match of migrations 0043 and 0061). Exported for unit tests.
+ * Returns the errors and, when there are none, the resulting catalogue and rows.
+ */
+export function validateScopeMatch(b: Partial<TeamScopeMatchInput> & Record<string, unknown>, current: Cat[] = SM().catalogue as Cat[]) {
   const errs: { path: string; code: string }[] = [];
-  for (const k of Object.keys(b)) if (!['reason', 'specializations', 'scopes'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
-  const specs: string[] = [];
+  for (const k of Object.keys(b)) if (!['reason', 'specializations', 'scopes', 'catalogue'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_key' });
+  const cat: Cat[] = current.map((c) => ({ ...c, aliases: [...(c.aliases ?? [])] }));
+  const codes: string[] = [];
   if (!Array.isArray(b.specializations)) errs.push({ path: '/specializations', code: 'required' });
   else b.specializations.forEach((x, i) => {
     const v = typeof x === 'string' ? x.trim() : '';
-    if (!v || v.length > 60) errs.push({ path: `/specializations/${i}`, code: 'invalid' });
-    else if (specs.some((s) => s.toLowerCase() === v.toLowerCase())) errs.push({ path: `/specializations/${i}`, code: 'duplicate' });
-    else specs.push(v);
+    if (!v || v.length > 60) { errs.push({ path: `/specializations/${i}`, code: 'invalid' }); return; }
+    let code = resolveSpec(cat, v);
+    if (!code && ['CW', 'TE'].includes(v.toUpperCase())) { errs.push({ path: `/specializations/${i}`, code: 'is_a_group' }); return; }
+    if (!code) { code = newSpecCode(v) || `SPEC_${cat.length + 1}`; cat.push({ code, label_en: v, label_ar: null, group: null, aliases: [], is_active: true }); }
+    if (codes.includes(code)) errs.push({ path: `/specializations/${i}`, code: 'duplicate' });
+    else codes.push(code);
   });
+  (Array.isArray(b.catalogue) ? b.catalogue : []).forEach((e, i) => {
+    const c = cat.find((x) => x.code === e.code);
+    if (!c) { errs.push({ path: `/catalogue/${i}/code`, code: 'not_a_column' }); return; }
+    c.label_en = e.label_en; if (e.label_ar !== undefined) c.label_ar = e.label_ar; if (e.group !== undefined) c.group = e.group; if (e.aliases) c.aliases = e.aliases;
+  });
+  const owner = new Map<string, string>();
+  for (const c of cat) for (const n of [c.code, c.label_en, c.label_ar ?? '', ...(c.aliases ?? [])].map(specNorm).filter(Boolean)) {
+    if (owner.has(n) && owner.get(n) !== c.code) { errs.push({ path: '/catalogue', code: 'name_clash' }); break; }
+    owner.set(n, c.code);
+  }
   const seen = new Set<string>();
+  const scopes: { scope: string; exempt: boolean; allowed: string[]; allowed_groups: ('CW' | 'TE')[] }[] = [];
   if (!Array.isArray(b.scopes)) errs.push({ path: '/scopes', code: 'required' });
   else b.scopes.forEach((row, i) => {
     const v = typeof row?.scope === 'string' ? row.scope.trim() : '';
     if (!v || v.length > 60) errs.push({ path: `/scopes/${i}/scope`, code: 'invalid' });
     else if (seen.has(v)) errs.push({ path: `/scopes/${i}/scope`, code: 'duplicate' });
     seen.add(v);
+    const allowed: string[] = [];
     if (!Array.isArray(row?.allowed)) errs.push({ path: `/scopes/${i}/allowed`, code: 'required' });
-    else row.allowed.forEach((a, j) => { if (typeof a !== 'string' || !specs.some((s) => s.toLowerCase() === a.trim().toLowerCase())) errs.push({ path: `/scopes/${i}/allowed/${j}`, code: 'unknown_specialization' }); });
+    else row.allowed.forEach((a, j) => {
+      const c = typeof a === 'string' ? resolveSpec(cat, a) : null;
+      if (!c || !codes.includes(c)) errs.push({ path: `/scopes/${i}/allowed/${j}`, code: 'unknown_specialization' });
+      else allowed.push(c);
+    });
+    const groups = row?.allowed_groups ?? [];
+    if (!Array.isArray(groups) || groups.some((g) => g !== 'CW' && g !== 'TE')) errs.push({ path: `/scopes/${i}/allowed_groups`, code: 'invalid' });
+    scopes.push({ scope: v, exempt: row?.exempt ?? false, allowed: codes.filter((c) => allowed.includes(c)), allowed_groups: [...new Set(groups)].sort() as ('CW' | 'TE')[] });
   });
-  return errs;
+  cat.forEach((c) => { c.is_active = codes.includes(c.code); });
+  const ordered = [...codes.map((c) => cat.find((x) => x.code === c)!), ...cat.filter((c) => !codes.includes(c.code))];
+  return Object.assign(errs, { result: { codes, catalogue: ordered, scopes } });
 }
+/** What decides eligibility (Q147): a change of it needs a step-up; labels do not. */
+const matchRules = (m: { catalogue: Cat[]; scopes: unknown[] }) => JSON.stringify({ s: m.scopes, c: m.catalogue.filter((c) => c.is_active).map((c) => [c.code, c.group, c.aliases]).sort() });
 
 /** Closed-schema validation of SLA rule items; `min_exceeds_max` sits on the max_working_days path. Exported for unit tests. */
 export function validateSlaRules(rules: (SlaTaskRule & { __i?: number })[]) {
@@ -461,7 +518,8 @@ export const settingsHandlers = [
 
 
   // ------------------------------------------------------------------ team / scope match of Procurement (0.9.1, Q97)
-  http.get(`${B}/settings/team-scope-match`, () => { const g = guard(); if (g) return g; return HttpResponse.json(SM(), tag(SM().version)); }),
+  // 0.12.9 (P4b): codes of the catalogue, groups, read-only for Procurement and Contractors (can_edit), step-up when eligibility changes
+  http.get(`${B}/settings/team-scope-match`, () => { const g = guard(); if (g) return g; return HttpResponse.json({ ...SM(), can_edit: isAdmin() }, tag(SM().version)); }),
   http.put(`${B}/settings/team-scope-match`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
@@ -470,14 +528,33 @@ export const settingsHandlers = [
     const r = reasonErr(b.reason); if (r) return r;
     const errs = validateScopeMatch(b);
     if (errs.length) return fields(...errs);
-    C().scopeMatch = {
-      specializations: b.specializations.map((x) => x.trim()),
-      scopes: b.scopes.map((x) => ({ scope: x.scope.trim(), exempt: x.exempt ?? false, allowed: b.specializations.map((sp) => sp.trim()).filter((sp) => x.allowed.some((a) => a.trim().toLowerCase() === sp.toLowerCase())) })),
-      version: SM().version + 1, updated_at: new Date().toISOString(), updated_by: me(),
-    };
+    const { codes, catalogue, scopes } = errs.result;
+    if (matchRules({ catalogue, scopes }) !== matchRules({ catalogue: SM().catalogue as Cat[], scopes: SM().scopes.map((s) => ({ ...s, allowed_groups: [...(s.allowed_groups ?? [])].sort() })) }) && !stepUpValid()) return stepUp();
+    C().scopeMatch = { specializations: codes, groups: ['CW', 'TE'], catalogue, scopes, version: SM().version + 1, can_edit: true, updated_at: new Date().toISOString(), updated_by: me() } as TeamScopeMatch;
     save();
     return HttpResponse.json(C().scopeMatch, tag(C().scopeMatch.version));
   }),
+
+  // ------------------------------------------------------------------ contractor rules and the two reports (0.12.9, P4b: Q142, Q145, Q147, D145b)
+  http.get(`${B}/settings/contractor-rules`, () => { const g = guard(); if (g) return g; return HttpResponse.json(CR(), tag(CR().version)); }),
+  http.put(`${B}/settings/contractor-rules`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'Send the ETag you last read in If-Match.');
+    const p = ver(request, CR().version); if (p) return p;
+    const b = await body<ContractorRulesInput & { reason?: string } & Record<string, unknown>>(request);
+    const r = reasonErr(b.reason); if (r) return r;
+    const errs = validateContractorRules(b);
+    if (errs.length) return fields(...errs);
+    const same = (x: string[], y: string[]) => [...x].sort().join('|') === [...y].sort().join('|');
+    if ((!same(b.cw_delivery_scopes, CR().cw_delivery_scopes) || !same(b.internal_team_types, CR().internal_team_types)) && !stepUpValid()) return stepUp();
+    const { reason: _r, ...rest } = b;
+    void _r;
+    C().contractorRules = { ...(rest as ContractorRulesInput), version: CR().version + 1, updated_at: new Date().toISOString(), updated_by: me() };
+    save();
+    return HttpResponse.json(C().contractorRules, tag(C().contractorRules.version));
+  }),
+  http.get(`${B}/reports/team-scope-mismatch`, () => { const g = guard(); if (g) return g; return HttpResponse.json(MISMATCH); }),
+  http.get(`${B}/reports/contractors-completeness`, () => { const g = guard(); if (g) return g; return HttpResponse.json(COMPLETENESS); }),
 
   // ------------------------------------------------------------------ notification policy
   http.get(`${B}/settings/notification-policy/catalogue`, () => { const g = needAdmin(); if (g) return g; return HttpResponse.json({ items: CATALOGUE }); }),

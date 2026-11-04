@@ -5,6 +5,7 @@ import { allLocked, open, q, taskId, taskRow } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { G, GECOL, HLC, HLC_PR, PROC, Team, createRec, patch, post, recPath, regCell, team } from './reg-helpers';
 import { Actor, actor, setCell } from './wf-helpers';
+import { partyWithContract } from './p4b-helpers';
 
 /**
  * Migration 0042: the HLC fiber purchasing redesign (owner decision 2026-11-02) and Q91.
@@ -322,7 +323,8 @@ describe('Q91: an approved GECOL request closes C1 with the request date', () =>
   it('closes C1 and, in the same approval, C2 when the record also holds the Power-On date and C2 has the same L2', async () => {
     const g = await team(app, db, 'gecol', 'gecol', R);
     const stage = await withTasks(g, ['C1', 'C2'], ['C1']);
-    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-01-20', power_on_date: '2026-01-25' });
+    // 0061 (Q146): approved with its GECOL party and an active contract for GECOL
+    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-01-20', power_on_date: '2026-01-25' }, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });
     let res = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;
     expect(res.task.task_code).toBe('C1');
     await stage.api.stepUp(stage.user.password);
@@ -339,7 +341,7 @@ describe('Q91: an approved GECOL request closes C1 with the request date', () =>
     const stage = await withTasks(g, ['C1'], ['C1']);
     const other = await actor(app, db, { level: 'approve', grants: G('gecol', 'view', 'approve'), regions: [R], modules: null });
     await setCell(db, 'C2', R, 'approve', { user: [other.user.id] });
-    const rec = await createRec(g, { ...GECOL, power_on_date: '2026-01-25' });
+    const rec = await createRec(g, { ...GECOL, power_on_date: '2026-01-25' }, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });   // 0061 (Q146)
     const sub = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;
     await stage.api.stepUp(stage.user.password);
     expect((await post(stage.api, 'gecol', rec.id, 'approve', sub.version)).body.state).toBe('approved');

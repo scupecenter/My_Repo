@@ -48,3 +48,8 @@ REVOKE ALL ON phone_change_requests FROM pmis_app;  -- 0058: phone change reques
 REVOKE ALL ON email_change_requests FROM pmis_app;  -- 0058: still no right; the address check (Q158) only through idm_email_change_set_verification and idm_email_change_verify
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ps_manual_plans FROM pmis_app;  -- 0059: the plans of the manual Project Status items only through ps_manual_plan_set (append-only, versioned); delay periods are proposed and decided only through delay_period_propose / delay_period_decide
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON region_aliases, role_aliases, master_reconciliation_runs, master_reconciliation_rows, master_reconciliation_diffs FROM pmis_app;  -- 0060: the import aliases (Q8, Q10) only through imp_alias_save, the legacy Master import runs, their rows and the comparison report (Q1, Q211) only through mi_stage_run, mi_apply_run and mi_resolve_diff
+-- 0061 (P4b, Q110 and Q142 to Q147, D145b): the specialization catalogue, the allowed groups, the team specializations, the party contracts, the type map and the contractor rules
+-- only through admin_save_team_scope_match, admin_save_contractor_rules and the approval of a Contractors record (audited); the submit checks and the sent alerts are internal.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON team_specializations, team_scope_match_groups, external_team_specializations, external_party_contracts, external_party_type_map, contractor_rules FROM pmis_app;
+REVOKE ALL ON team_scope_checks, contractor_alerts_sent FROM pmis_app;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON external_parties, external_teams FROM pmis_app;  -- 0061 (Q110): parties and teams are the projection of approved Contractors records only (the API never wrote them)

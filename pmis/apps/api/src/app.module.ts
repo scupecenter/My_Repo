@@ -107,6 +107,8 @@ import { MailService } from './mail/mail.service';
 import { MappingService } from './master-import/mapping.service';
 import { MasterImportController, TemplateMappingController } from './master-import/master-import.controller';
 import { MasterImportService } from './master-import/master-import.service';
+import { ContractorsController } from './contractors/contractors.controller';
+import { ContractorsService } from './contractors/contractors.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -120,6 +122,7 @@ export function appModuleFor(config: AppConfig) {
       MailController, HealthController,
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
+      ContractorsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -134,6 +137,7 @@ export function appModuleFor(config: AppConfig) {
       // P8 mails (MailPort) go through P9's mail outbox
       { provide: MailPort, useClass: OutboxMail },
       MasterImportService, MappingService,
+      ContractorsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

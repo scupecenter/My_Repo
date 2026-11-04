@@ -71,7 +71,8 @@
     "logs.deployments": "Deployments",
     "logs.activity_report": "Monthly activity report",
     "logs.mail": "Mail delivery",
-    "logs.integrity": "Integrity checks"
+    "logs.integrity": "Integrity checks",
+    "contractor_reports": "Contractor reports"
   },
   "top": {
     "search": "Search or jump to…",
@@ -886,11 +887,12 @@
     "tab_staff-visibility": "Staff field visibility",
     "tab_documents": "Document Library",
     "tab_team-scope": "Team / scope match",
-    "tab_lists": "Lists"
+    "tab_lists": "Lists",
+    "tab_contractor-rules": "Contractor rules"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
-    "note": "A Procurement order that names a team is accepted only when the team's specialization is ticked for the order scope. An exempt scope is not checked (HLC has no contractor team). A scope that is not listed, and a team without a specialization, are refused.",
+    "note": "A Procurement order that names a team is accepted only when one of the team's specializations is ticked for the order scope, or belongs to a functional group (CW, TE) ticked for it, and the team's company holds an active contract for the scope. Exempt means the order needs no team; a named team is still checked. A scope that is not listed, and a team without a specialization, are refused.",
     "scope": "Scope",
     "exempt": "Exempt",
     "add_specialization": "Add specialization",
@@ -901,7 +903,12 @@
     "cell": "{{specialization}} teams may take {{scope}} orders",
     "save": "Save the table",
     "unsaved": "Unsaved changes",
-    "version": "Version {{version}}"
+    "version": "Version {{version}}",
+    "read_only": "Read only: only a System Admin or a delegate of Settings for all regions changes this table.",
+    "group": "Group {{group}}",
+    "group_cell": "Every {{group}} specialization may take {{scope}} orders",
+    "via_group": "Allowed through the group {{group}}",
+    "step_up_note": "A change of who may take an order asks you to confirm your password before it is saved."
   },
   "fieldError": {
     "required": "This field is required.",
@@ -929,7 +936,12 @@
     "unknown_specialization": "Not one of the listed specializations.",
     "too_many": "Too many entries.",
     "unknown_end_event": "Unknown end event.",
-    "future_date": "The date cannot be in the future."
+    "future_date": "The date cannot be in the future.",
+    "is_a_group": "CW and TE are functional groups: tick the group on the row instead.",
+    "name_clash": "This name already belongs to another specialization.",
+    "not_a_column": "Add the specialization to the table first.",
+    "unknown_scope": "Not an order scope of the table.",
+    "unknown_role": "Not a role code."
   },
   "cal": {
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",
@@ -1630,7 +1642,17 @@
     "row_incomplete": "{{field}}: fill the required columns of every row.",
     "not_closed": "{{field}}: only a closed action has a closed date.",
     "unknown_warehouse_item": "{{field}}: no Warehouse item has this code.",
-    "unknown_task": "{{field}}: unknown task."
+    "unknown_task": "{{field}}: unknown task.",
+    "specialization_required": "An active team needs at least one specialization.",
+    "ambiguous_contractor": "More than one company has this name: choose the company.",
+    "contractor_mismatch": "The contractor name is not the chosen company.",
+    "unknown_scope": "Not an order scope of the team / scope match.",
+    "no_active_contract": "The contractor has no active contract for this scope on the order date.",
+    "party_inactive": "The contractor is inactive.",
+    "party_required": "An outsourced order with its PO / WO needs its contractor.",
+    "internal_team_required": "An in-house order names the internal team.",
+    "not_internal_team": "An in-house order needs an internal team.",
+    "gecol_party_required": "A GECOL record is approved with its party."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -3280,5 +3302,51 @@
     "status_ambiguous": "Ambiguous",
     "status_unmapped": "Not mapped",
     "no_aliases": "No value yet."
+  },
+  "contractorRules": {
+    "title": "Contractor rules",
+    "note": "Alerts and checks of the Contractors and Procurement registers. The safety certificate date is information only: it never blocks an order or an assignment.",
+    "lead_days": "Safety certificate alert (days before expiry)",
+    "lead_note": "The team owner / lead and Procurement are told in-app this many days ahead, and again once it has expired.",
+    "roles": "Roles alerted (\"Procurement\"), role codes separated by commas",
+    "cw_scopes": "Scopes of the CW Delivery Model",
+    "cw_scopes_note": "Outsourced: once the order has its PO / WO it needs its contractor with an active contract. In-House: it names a qualified internal team. Changing these needs a step-up.",
+    "internal_types": "Team types of an internal team (In-House), separated by commas",
+    "closed": "Order statuses that end an order, separated by commas"
+  },
+  "contractorReports": {
+    "title": "Contractor reports",
+    "mismatch": "Running orders that no longer match",
+    "mismatch_note": "Approved orders are never changed. These running orders have a problem today; correct them with a new version of the order.",
+    "completeness": "Contractors data to complete",
+    "completeness_note": "Teams, companies and contracts that need data before they can take new orders.",
+    "none": "Nothing to show.",
+    "site": "Site",
+    "team": "Team",
+    "party": "Contractor",
+    "problems": "Problems",
+    "action": "What to do",
+    "info_only": "information only",
+    "code": {
+      "specialization_mismatch": "Specialization does not match",
+      "team_inactive": "Team inactive",
+      "party_inactive": "Contractor inactive",
+      "no_active_contract": "No active contract",
+      "stop_work": "Stop Work on the site",
+      "safety_cert_expired": "Safety certificate expired",
+      "safety_cert_due": "Safety certificate expires soon",
+      "no_specialization": "No specialization",
+      "unknown_specialization": "Specialization not in the catalogue",
+      "type_review": "Company type to review",
+      "scope_not_specified": "Contract scope not specified",
+      "past_end_date": "Past its end date"
+    },
+    "fix": {
+      "specialization_mismatch": "Open a new version of the order and name a matching team, or ask the System Admin to review the team / scope match.",
+      "team_inactive": "Open a new version of the order with an active team.",
+      "party_inactive": "Check the company in the Contractors register, or move the order to another contractor.",
+      "no_active_contract": "Register the contract for this scope in the Contractors register, or move the order to a contractor with one.",
+      "stop_work": "Follow the safety rules: the work waits until the Stop Work is lifted in Permits & HSE."
+    }
   }
 }

@@ -286,6 +286,8 @@ describe('hybrid mode list', () => {
       'GET /document-library/:id/versions', 'GET /document-library/:id/blank-form', 'POST /document-library/:id/blank-form',
       // contract 0.9.1: the team / scope match of Procurement (Q97)
       'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
+      // contract 0.12.9: P4b contractor rules and the two reports
+      'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'PATCH /me/profile', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',

@@ -6,6 +6,7 @@ import { makeTask } from './wf-helpers';
 import { startApp, superDb } from './helpers';
 import { GECOL, HLC, PERMIT_CW, PROC, G, Team, approveAll, createRec, otherSite, patch, post, recPath, regCell, team } from './reg-helpers';
 import { actor, groupWith, makeSite, plainAdmin, setCell } from './wf-helpers';
+import { partyWithContract } from './p4b-helpers';
 
 /**
  * Migration 0019: the register framework with Procurement, GECOL, HLC and Permits & HSE. Each describe builds its own site and holders in
@@ -453,7 +454,8 @@ describe('Q43: a record that is the source of a task is approved with the task\'
     // a new version with the PO / WO date is the source of B2
     const v2 = await post(t.entry.api, 'procurement', rec.id, 'versions', res.body.version);
     expect(v2.status).toBe(201);
-    const v2b = await patch(t.entry.api, 'procurement', v2.body.id, v2.body.version, { data: { po_wo_no: 'PO-77', po_wo_date: '2026-01-20' } });
+    // 0061 (Q147): an outsourced CW order with its PO / WO names its contractor, which holds an active contract for the scope
+    const v2b = await patch(t.entry.api, 'procurement', v2.body.id, v2.body.version, { external_party_id: await partyWithContract(db, { scopes: ['CW'] }), data: { po_wo_no: 'PO-77', po_wo_date: '2026-01-20' } });
     res = await post(t.entry.api, 'procurement', v2.body.id, 'submit', v2b.body.version);
     expect(res.body.task.task_code).toBe('B2');
     res = await post(stageApprove.api, 'procurement', v2.body.id, 'approve', res.body.version);
@@ -625,7 +627,8 @@ describe('Q43: a record that is the source of a task is approved with the task\'
   it('closes C1 on the GECOL request date (Q91), C2 on the Power-On date and C4 on the HLC in-service date (0042)', async () => {
     const g = await team(app, db, 'gecol', 'gecol', R);
     const gs = await withTasks(g, ['C1', 'C2'], ['C1']);
-    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-02-01' });
+    // 0061 (Q146): a GECOL record is approved with its party and an active contract for GECOL
+    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-02-01' }, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });
     let res = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;      // the request: the source of C1 (Q91)
     expect(res.task.task_code).toBe('C1');
     await gs.stageApprove.api.stepUp(gs.stageApprove.user.password);
@@ -657,7 +660,7 @@ describe('Q43: a record that is the source of a task is approved with the task\'
 describe('GECOL and HLC: one logical record per site, new requests are versions (Q55, Q56)', () => {
   it('refuses a second record for the site, versions the first, keeps the approved one in force until the new one is approved', async () => {
     const t = await team(app, db, 'gecol', 'gecol', R);
-    const rec = await createRec(t, GECOL);
+    const rec = await createRec(t, GECOL, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });   // 0061 (Q146)
     const dup = await t.entry.api.call('post', recPath('gecol'), { site_id: t.site.id, data: GECOL });
     expect(dup.status).toBe(409);
     expect(dup.body.code).toBe('duplicate');
