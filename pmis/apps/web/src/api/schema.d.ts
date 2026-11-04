@@ -1155,6 +1155,8 @@ export interface paths {
          *     **0.12.6 (Q158):** `approve` needs a verified address (the user entered the mailed code); otherwise 409 `email_not_verified`, unless
          *     `identity_check` records the documented check the admin made while mail is unavailable (stored and audited). The old and the new
          *     address are told of the decision by mail (no reason in the mail).
+         *     **0.13.0 (Q303):** an approval ends every session of the user (the email is a sign-in identifier, as after a password change) and writes a
+         *     `security_notice` to the user's inbox; a rejection keeps them. The audit row is flagged as an admin override (Q307).
          */
         post: operations["decideEmailChangeRequest"];
         delete?: never;
@@ -5584,7 +5586,7 @@ export interface paths {
         put?: never;
         /**
          * Add a value to a list
-         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version.
+         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version. **0.13.0 (Q292):** the list `TeamSpecialization` mirrors the team specializations of Settings and is never edited here (422 `validation_failed`, field error `managed_elsewhere`).
          */
         post: operations["createListValue"];
         delete?: never;
@@ -5613,7 +5615,7 @@ export interface paths {
         head?: never;
         /**
          * Relabel, add aliases or groups, reorder or deactivate a value (never deleted; the code is fixed)
-         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`).
+         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`). **0.13.0 (Q292):** the values of the list `TeamSpecialization` cannot be edited here (422 `validation_failed`, field error `managed_elsewhere`); they follow `PUT /settings/team-scope-match`.
          */
         patch: operations["updateListValue"];
         trace?: never;
@@ -10008,7 +10010,10 @@ export interface components {
             code: string;
             label_en: string;
             label_ar?: string | null;
+            /** @description Kept for older clients: the first of `groups`, or null. On input `groups` wins when both are sent. */
             group?: components["schemas"]["SpecializationGroup"] | null;
+            /** @description 0.13.0 (Q292): the functional groups of the specialization (CW, TE, both, or none). A scope that allows a group accepts every active specialization of it. */
+            groups?: components["schemas"]["SpecializationGroup"][];
             /** @description Other names (an old Master value, a spelling) that resolve to this code. */
             aliases?: string[];
             /** @description false = not a column any more (kept, never deleted). */
@@ -10021,7 +10026,7 @@ export interface components {
             /** @description 0.12.9, optional: labels, group and aliases of listed codes. */
             catalogue?: components["schemas"]["TeamSpecialization"][];
         };
-        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. */
+        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147), 0.13.0 (Q292). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. Since 0.13.0 the group of a specialization is `groups` (Dismantle is CW and TE). */
         TeamScopeMatch: components["schemas"]["TeamScopeMatchInput"] & {
             groups: components["schemas"]["SpecializationGroup"][];
             version: number;

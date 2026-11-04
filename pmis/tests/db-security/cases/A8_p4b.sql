@@ -11,7 +11,7 @@
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied
-INSERT INTO team_specializations (code, label_en, func_group) VALUES ('ANYTHING', 'Anything', 'CW');
+INSERT INTO team_specializations (code, label_en, func_groups) VALUES ('ANYTHING', 'Anything', ARRAY['CW']);
 -- @end
 
 -- @case P4B-02

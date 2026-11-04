@@ -7,11 +7,11 @@ import { HOLIDAYS } from './holidaysSeed';
 import { byId, uid } from './ids';
 
 /** Q143 (migration 0061): the 8 agreed team specializations and their functional groups. */
-export const SPEC_SEED: { code: string; label_en: string; label_ar: string; group: 'CW' | 'TE' | null }[] = [
-  { code: 'TOWER_RT', label_en: 'Tower RT', label_ar: 'برج سطح', group: 'CW' }, { code: 'TOWER_GF', label_en: 'Tower GF', label_ar: 'برج أرضي', group: 'CW' },
-  { code: 'ADAPTION', label_en: 'Adaption', label_ar: 'تهيئة الموقع', group: 'CW' }, { code: 'TE', label_en: 'TE', label_ar: 'تركيب المعدات', group: 'TE' },
-  { code: 'DISMANTLE', label_en: 'Dismantle', label_ar: 'تفكيك', group: null }, { code: 'GECOL', label_en: 'GECOL', label_ar: 'كهرباء GECOL', group: null },
-  { code: 'FIBER', label_en: 'Fiber', label_ar: 'ألياف', group: null }, { code: 'SURVEY', label_en: 'Survey', label_ar: 'مسح', group: null },
+export const SPEC_SEED: { code: string; label_en: string; label_ar: string; group: 'CW' | 'TE' | null; groups: ('CW' | 'TE')[] }[] = [
+  { code: 'TOWER_RT', label_en: 'Tower RT', label_ar: 'برج سطح', group: 'CW', groups: ['CW'] }, { code: 'TOWER_GF', label_en: 'Tower GF', label_ar: 'برج أرضي', group: 'CW', groups: ['CW'] },
+  { code: 'ADAPTION', label_en: 'Adaption', label_ar: 'تهيئة الموقع', group: 'CW', groups: ['CW'] }, { code: 'TE', label_en: 'TE', label_ar: 'تركيب المعدات', group: 'TE', groups: ['TE'] },
+  { code: 'DISMANTLE', label_en: 'Dismantle', label_ar: 'تفكيك', group: 'CW', groups: ['CW', 'TE'] }, { code: 'GECOL', label_en: 'GECOL', label_ar: 'كهرباء GECOL', group: null, groups: [] },
+  { code: 'FIBER', label_en: 'Fiber', label_ar: 'ألياف', group: null, groups: [] }, { code: 'SURVEY', label_en: 'Survey', label_ar: 'مسح', group: null, groups: [] },
 ];
 
 /** Q145 (synthetic): two running orders that no longer match. */

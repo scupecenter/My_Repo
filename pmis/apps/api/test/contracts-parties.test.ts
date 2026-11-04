@@ -37,7 +37,7 @@ afterAll(async () => {
 
 const getMatch = (who: Actor = admin) => who.api.call('get', '/settings/team-scope-match');
 const putMatch = (who: Actor, version: number, body: unknown) => who.api.call('put', '/settings/team-scope-match', body, { 'If-Match': `"${version}"` });
-type Match = { specializations: string[]; scopes: { scope: string; exempt: boolean; allowed: string[]; allowed_groups: string[] }[]; catalogue: { code: string; label_en: string; label_ar: string | null; aliases: string[]; group: string | null }[]; version: number };
+type Match = { specializations: string[]; scopes: { scope: string; exempt: boolean; allowed: string[]; allowed_groups: string[] }[]; catalogue: { code: string; label_en: string; label_ar: string | null; aliases: string[]; group: string | null; groups: string[] }[]; version: number };
 const bodyOf = (m: Match) => ({ specializations: m.specializations, scopes: m.scopes.map((s) => ({ scope: s.scope, exempt: s.exempt, allowed: s.allowed, allowed_groups: s.allowed_groups })) });
 
 /** Runs fn and puts the match table back as it was (with a step-up, since the restore may change eligibility). */
@@ -49,7 +49,7 @@ async function withMatch(fn: (m: Match) => Promise<void>): Promise<void> {
     await admin.api.stepUp(admin.user.password);
     const cur = (await getMatch()).body as Match;
     const r = await putMatch(admin, cur.version, { reason: 'test: back as it was', ...bodyOf(before),
-      catalogue: before.catalogue.filter((c) => before.specializations.includes(c.code)).map((c) => ({ code: c.code, label_en: c.label_en, label_ar: c.label_ar, group: c.group, aliases: c.aliases })) });
+      catalogue: before.catalogue.filter((c) => before.specializations.includes(c.code)).map((c) => ({ code: c.code, label_en: c.label_en, label_ar: c.label_ar, groups: c.groups, aliases: c.aliases })) });
     expect(r.status).toBe(200);
   }
 }
@@ -162,6 +162,111 @@ describe('Q143 and Q147: the specialization catalogue and the match table', () =
   });
 });
 
+describe('Q292: team_specializations is the single source; the list TeamSpecialization mirrors it', () => {
+  const listValues = async () => (await admin.api.call('get', '/list-catalogues/TeamSpecialization')).body.values as { id: string; code: string; label_en: string; label_ar: string | null; groups: string[]; is_active: boolean; sort_order: number; version: number }[];
+
+  it('the groups are as decided: Tower RT, Tower GF and Adaption CW; TE TE; Dismantle CW and TE; GECOL, Fiber and Survey none; group is the first group', async () => {
+    const m = (await getMatch()).body as Match;
+    const g = (code: string) => m.catalogue.find((c) => c.code === code)!;
+    for (const [code, groups] of [['TOWER_RT', ['CW']], ['TOWER_GF', ['CW']], ['ADAPTION', ['CW']], ['TE', ['TE']], ['DISMANTLE', ['CW', 'TE']], ['GECOL', []], ['FIBER', []], ['SURVEY', []]] as const) {
+      expect(g(code).groups, code).toEqual(groups);
+      expect(g(code).group, code).toBe(groups[0] ?? null);
+    }
+    // the list catalogue says the same, by label
+    const vals = await listValues();
+    const v = (label: string) => vals.find((x) => x.code === label)!;
+    expect(v('Dismantle')).toMatchObject({ groups: ['CW', 'TE'], is_active: true });
+    expect(v('Tower RT').groups).toEqual(['CW']);
+    expect(v('Survey').groups).toEqual([]);
+    expect(v('CW')).toMatchObject({ is_active: false });   // the old text CW stays an inactive value (Q320)
+    expect(await q(db, `SELECT 1 FROM team_specializations t JOIN list_values l ON l.catalogue_code = 'TeamSpecialization' AND l.code = t.list_code
+      WHERE (l.label_en, l.groups, l.is_active, l.sort_order) IS DISTINCT FROM (t.label_en, t.func_groups, t.is_active, t.sort_order)`)).toEqual([]);
+  });
+
+  it('a scope that allows a group accepts a team of either group: Dismantle on the scope CW, then on TE Installation once it allows the group TE', async () => {
+    await withMatch(async (m) => {
+      const party = await partyWithContract(db);
+      const dis = await teamOf(db, party, { codes: ['DISMANTLE'] });
+      const gec = await teamOf(db, party, { codes: ['GECOL'] });
+      const problem = async (scope: string, team: string) => (await q<{ p: unknown }>(db, `SELECT team_scope_problem($1, $2) AS p`, [scope, team]))[0]!.p;
+      expect(await problem('CW', dis)).toBeNull();                 // the group CW
+      expect(await problem('CW', gec)).not.toBeNull();
+      expect(await problem('TE Installation', dis)).not.toBeNull();   // this scope allows the code TE only
+      await admin.api.stepUp(admin.user.password);
+      const body = { ...bodyOf(m), scopes: bodyOf(m).scopes.map((s) => (s.scope === 'TE Installation' ? { ...s, allowed_groups: ['TE'] } : s)) };
+      expect((await putMatch(admin, m.version, { reason: 'TE group on TE Installation', ...body })).status).toBe(200);
+      expect(await problem('TE Installation', dis)).toBeNull();     // Dismantle is also in the group TE
+      expect(await problem('TE Installation', gec)).not.toBeNull();
+    });
+  });
+
+  it('a group change through the catalogue (groups, or the older single group) is mirrored to the list, with the code of the value unchanged', async () => {
+    await withMatch(async (m) => {
+      await admin.api.stepUp(admin.user.password);
+      const before = (await listValues()).find((x) => x.code === 'Dismantle')!;
+      const res = await putMatch(admin, m.version, { reason: 'Dismantle is CW only for now', ...bodyOf(m),
+        catalogue: [{ code: 'DISMANTLE', label_en: 'Dismantle works', groups: ['CW'] }, { code: 'GECOL', label_en: 'GECOL', group: 'TE' }] });
+      expect(res.status).toBe(200);
+      const cat = (code: string) => res.body.catalogue.find((c: { code: string }) => c.code === code);
+      expect(cat('DISMANTLE')).toMatchObject({ group: 'CW', groups: ['CW'], label_en: 'Dismantle works' });
+      expect(cat('GECOL')).toMatchObject({ group: 'TE', groups: ['TE'] });
+      const after = (await listValues()).find((x) => x.code === 'Dismantle')!;   // the code it was first given
+      expect(after).toMatchObject({ id: before.id, label_en: 'Dismantle works', groups: ['CW'], is_active: true });
+      expect(after.version).toBeGreaterThan(before.version);
+      expect((await listValues()).find((x) => x.code === 'GECOL')!.groups).toEqual(['TE']);
+      const bad = await putMatch(admin, res.body.version, { reason: 'bad group', ...bodyOf(m), catalogue: [{ code: 'DISMANTLE', label_en: 'Dismantle', groups: ['CW', 'XX'] }] });
+      expect(bad.status).toBe(422);
+      expect(bad.body.errors[0]).toMatchObject({ path: expect.stringContaining('groups') });
+    });
+    // withMatch has put the groups and labels back: the list follows again
+    const back = (await listValues()).find((x) => x.code === 'Dismantle')!;
+    expect(back).toMatchObject({ label_en: 'Dismantle', groups: ['CW', 'TE'] });
+    expect((await listValues()).find((x) => x.code === 'GECOL')!.groups).toEqual([]);
+  });
+
+  it('a new specialization appears in the list; one that is left out becomes inactive there, never deleted', async () => {
+    await withMatch(async (m) => {
+      await admin.api.stepUp(admin.user.password);
+      const res = await putMatch(admin, m.version, { reason: 'Civil and no Survey', ...bodyOf(m), specializations: [...m.specializations.filter((c) => c !== 'SURVEY'), 'Civil Works'] });
+      expect(res.status).toBe(200);
+      const vals = await listValues();
+      expect(vals.find((x) => x.code === 'Civil Works')).toMatchObject({ is_active: true, label_en: 'Civil Works', groups: [] });
+      expect(vals.find((x) => x.code === 'Survey')).toMatchObject({ is_active: false });
+      const opts = await q<{ options: string[] }>(db, `SELECT options FROM register_fields WHERE register_key = 'contractors' AND code = 'specialization'`);
+      expect(opts[0]!.options).toContain('Civil Works');
+    });
+    const vals = await listValues();
+    expect(vals.find((x) => x.code === 'Survey')).toMatchObject({ is_active: true });
+    expect(vals.find((x) => x.code === 'Civil Works')).toMatchObject({ is_active: false });
+  });
+
+  it('the list is never edited on its own: add and change answer 422 managed_elsewhere; a plain user is 403; another list is edited as before; no writer bypasses it', async () => {
+    const dis = (await listValues()).find((x) => x.code === 'Dismantle')!;
+    const add = await admin.api.call('post', '/list-catalogues/TeamSpecialization/values', { code: 'Painting', reason: 'A new specialization' });
+    expect(add.status).toBe(422);
+    expect(add.body.code).toBe('validation_failed');
+    expect(add.body.errors[0]).toMatchObject({ code: 'managed_elsewhere' });
+    expect(add.body.errors[0].message).toMatch(/Settings, Team specialization \/ scope match/);
+    for (const patchBody of [{ label_en: 'Dismantling' }, { is_active: false }, { groups: [] }, { sort_order: 5 }]) {
+      const r = await admin.api.call('patch', `/list-catalogues/TeamSpecialization/values/${dis.id}`, { ...patchBody, reason: 'Edit on its own' }, { 'If-Match': `"${dis.version}"` });
+      expect(r.status, JSON.stringify(patchBody)).toBe(422);
+      expect(r.body.errors[0].code).toBe('managed_elsewhere');
+    }
+    expect((await listValues()).find((x) => x.code === 'Dismantle')).toMatchObject({ label_en: 'Dismantle', is_active: true, groups: ['CW', 'TE'], version: dis.version });
+    const plain = await actor(app, db, { grants: G('contractors', 'view'), regions: [R], modules: null });
+    expect((await plain.api.call('post', '/list-catalogues/TeamSpecialization/values', { code: 'Painting', reason: 'No right' })).status).toBe(403);
+    // another list is still edited here
+    const other = await admin.api.call('post', '/list-catalogues/ActionStatus/values', { code: `Parked ${Date.now()}`, reason: 'Probe of the follow-up' });
+    expect(other.status).toBe(201);
+    // the database itself refuses any other writer (the superuser included) except the sync
+    await expect(db.query(`UPDATE list_values SET label_en = 'Hijack' WHERE catalogue_code = 'TeamSpecialization' AND code = 'Fiber'`)).rejects.toMatchObject({ code: '23514' });
+    await expect(db.query(`INSERT INTO list_values (catalogue_code, code, label_en) VALUES ('TeamSpecialization', 'Hijack', 'Hijack')`)).rejects.toMatchObject({ code: '23514' });
+    await db.query('SET ROLE pmis_app');
+    await expect(db.query('UPDATE team_specializations SET is_active = false')).rejects.toMatchObject({ code: '42501' });
+    await db.query('RESET ROLE');
+  });
+});
+
 // ------------------------------------------------------------------------------------------------------------------- Q142 / Q110
 describe('Q142 and Q110: teams, companies and contracts in the Contractors register', () => {
   let t: Team;
@@ -226,6 +331,50 @@ describe('Q142 and Q110: teams, companies and contracts in the Contractors regis
     expect(p[0]).toEqual({ type: 'other', type_review: true, company_type: 'Civil Works House' });   // the original value is kept
     const n = await q(db, `SELECT 1 FROM notifications WHERE kind = 'party_type_review' AND body LIKE $1`, [`%Civil Works House%`]);
     expect(n.length).toBeGreaterThan(0);
+  });
+
+  it('Q294: a company with the status Suspended or Blacklisted deactivates its party like Terminated or Inactive; a later version can activate it again; the existing checks refuse its orders', async () => {
+    const mk = async (status: string) => {
+      const name = `Status Co ${status} ${Date.now()}`;
+      const co = await create({ record_type: 'company', data: { contractor_name: name, company_type: 'CW Contractor', contract_ref: 'S-1', contract_start: '2026-01-01', company_status: status } });
+      expect(co.status).toBe(201);
+      const done = await approveFlex(t, co.body.id, co.body.version);
+      expect(done.status).toBe(200);
+      return { name, party: done.body.entity_id as string, rec: done.body };
+    };
+    const active = async (party: string) => (await q<{ is_active: boolean }>(db, 'SELECT is_active FROM external_parties WHERE id = $1', [party]))[0]!.is_active;
+    const results: Record<string, boolean> = {};
+    for (const st of ['Active', 'Suspended', 'Blacklisted', 'Inactive']) results[st] = await active((await mk(st)).party);
+    expect(results).toEqual({ Active: true, Suspended: false, Blacklisted: false, Inactive: false });
+
+    // a new version puts the status back and the party is active again; the other way round it is deactivated
+    const sus = await mk('Suspended');
+    expect(await active(sus.party)).toBe(false);
+    const v2 = await post(t.entry.api, 'contractors', sus.rec.id, 'versions', sus.rec.version);
+    expect(v2.status).toBe(201);
+    const p2 = await patch(t.entry.api, 'contractors', v2.body.id, v2.body.version, { data: { company_status: 'Active' } });
+    expect(p2.status).toBe(200);
+    const a2 = await approveFlex(t, v2.body.id, p2.body.version);
+    expect(a2.status).toBe(200);
+    expect(await active(sus.party)).toBe(true);
+    const v3 = await post(t.entry.api, 'contractors', a2.body.id, 'versions', a2.body.version);
+    expect(v3.status).toBe(201);
+    const p3 = await patch(t.entry.api, 'contractors', v3.body.id, v3.body.version, { data: { company_status: 'Blacklisted' } });
+    expect(p3.status).toBe(200);
+    expect((await approveFlex(t, v3.body.id, p3.body.version)).status).toBe(200);
+    expect(await active(sus.party)).toBe(false);
+
+    // the existing checks: a draft that names the deactivated party is refused (unknown_party); an order whose team belongs to it is refused at submit (party_inactive)
+    const proc = await team(app, db, 'procurement', 'procurement', R);
+    await addContract(db, sus.party, { scopes: null });
+    const tm = await teamOf(db, sus.party, { codes: ['TOWER_RT'] });
+    const named = await proc.entry.api.call('post', recPath('procurement'), { site_id: proc.site.id, data: { ...PROC, team_id: tm }, external_party_id: sus.party });
+    expect(named.status).toBe(422);                                                         // a draft that names the party is refused at once
+    expect(named.body.errors[0]).toMatchObject({ path: '/external_party_id', code: 'unknown_party' });
+    const rec = await createRec(proc, { ...PROC, team_id: tm });
+    const sub = await post(proc.entry.api, 'procurement', rec.id, 'submit', rec.version);
+    expect(sub.status).toBe(422);
+    expect(sub.body.errors.map((e: { code: string }) => e.code)).toContain('party_inactive');
   });
 
   it('Q110: a team links by party id; an ambiguous name is never linked', async () => {

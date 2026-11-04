@@ -18,11 +18,12 @@ const putSchema = z.object({
   }).strict()).max(60),
   catalogue: z.array(z.object({
     code: z.string().trim().min(1).max(30), label_en: label, label_ar: z.string().trim().max(60).nullable().optional(), group: group.nullable().optional(),
+    groups: z.array(group).max(2).optional(),
     aliases: z.array(label).max(20).optional(),
   }).strict()).max(60).optional(),
 }).strict();
 
-interface CatalogueEntry { code: string; label_en: string; label_ar: string | null; group: 'CW' | 'TE' | null; aliases: string[]; is_active: boolean }
+interface CatalogueEntry { code: string; label_en: string; label_ar: string | null; group: 'CW' | 'TE' | null; groups: ('CW' | 'TE')[]; aliases: string[]; is_active: boolean }
 interface MatchJson {
   specializations: string[];
   groups: string[];

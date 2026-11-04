@@ -84,14 +84,14 @@ export function validateScopeMatch(b: Partial<TeamScopeMatchInput> & Record<stri
     if (!v || v.length > 60) { errs.push({ path: `/specializations/${i}`, code: 'invalid' }); return; }
     let code = resolveSpec(cat, v);
     if (!code && ['CW', 'TE'].includes(v.toUpperCase())) { errs.push({ path: `/specializations/${i}`, code: 'is_a_group' }); return; }
-    if (!code) { code = newSpecCode(v) || `SPEC_${cat.length + 1}`; cat.push({ code, label_en: v, label_ar: null, group: null, aliases: [], is_active: true }); }
+    if (!code) { code = newSpecCode(v) || `SPEC_${cat.length + 1}`; cat.push({ code, label_en: v, label_ar: null, group: null, groups: [], aliases: [], is_active: true }); }
     if (codes.includes(code)) errs.push({ path: `/specializations/${i}`, code: 'duplicate' });
     else codes.push(code);
   });
   (Array.isArray(b.catalogue) ? b.catalogue : []).forEach((e, i) => {
     const c = cat.find((x) => x.code === e.code);
     if (!c) { errs.push({ path: `/catalogue/${i}/code`, code: 'not_a_column' }); return; }
-    c.label_en = e.label_en; if (e.label_ar !== undefined) c.label_ar = e.label_ar; if (e.group !== undefined) c.group = e.group; if (e.aliases) c.aliases = e.aliases;
+    c.label_en = e.label_en; if (e.label_ar !== undefined) c.label_ar = e.label_ar; if (e.groups !== undefined) { c.groups = [...new Set(e.groups)]; c.group = c.groups[0] ?? null; } else if (e.group !== undefined) { c.group = e.group; c.groups = e.group ? [e.group] : []; } if (e.aliases) c.aliases = e.aliases;
   });
   const owner = new Map<string, string>();
   for (const c of cat) for (const n of [c.code, c.label_en, c.label_ar ?? '', ...(c.aliases ?? [])].map(specNorm).filter(Boolean)) {

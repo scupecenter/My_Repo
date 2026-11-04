@@ -37,6 +37,21 @@ describe('team / scope match (Q97, Q143, Q144)', () => {
     expect(screen.getByTestId('tsm-save')).toBeDisabled();       // nothing changed yet
   });
 
+  it('Q292 (0.13.0): Dismantle belongs to both groups, so ticking either group of a scope takes the Dismantle column with it', async () => {
+    const u = userEvent.setup();
+    await signIn('pm');
+    settings();
+    expect(await screen.findByTestId('tsm-grid')).toBeInTheDocument();
+    expect(screen.getByTestId('tsm-col-DISMANTLE')).toHaveTextContent('CW + TE');
+    expect(screen.getByTestId('tsm-col-GECOL')).not.toHaveTextContent('CW');
+    expect(cell('CW', 'DISMANTLE')).toBeChecked();                 // the group CW of the scope CW
+    expect(cell('TE Installation', 'DISMANTLE').checked).toBe(false);
+    await u.click(group('TE Installation', 'TE'));
+    expect(cell('TE Installation', 'DISMANTLE')).toBeChecked();    // through the group TE
+    expect(cell('TE Installation', 'DISMANTLE')).toBeDisabled();
+    expect(cell('TE Installation', 'GECOL').checked).toBe(false);
+  });
+
   it('saves a ticked cell, a group and a new specialization with a reason; the change of eligibility asks for the step-up first', async () => {
     await signIn('pm');
     const u = userEvent.setup();
