@@ -98,6 +98,15 @@ export function initialMatrix(): Matrix {
     kind: 'register', register_key: 'permits_hse_om', code: 'permits_hse_om', name_en: 'Permits & HSE - O&M stream', name_ar: 'التصاريح والسلامة - مسار التشغيل والصيانة', approval_levels: 2,
     cells: [],
   });
+  // migration 0056 (Q230): the Matrix row of the TE stream of QC snags, right after Quality (seeded as a copy of the Quality row: the same holders).
+  const qte = stages.findIndex((r) => r.code === 'quality');
+  if (qte >= 0) {
+    const q = stages[qte]!;
+    stages.splice(qte + 1, 0, {
+      ...q, register_key: 'quality_te', code: 'quality_te', name_en: 'Quality - TE stream (QC snags)', name_ar: 'الجودة - مسار TE (ملاحظات الجودة)',
+      cells: (q.cells ?? []).map((c) => cell('quality_te', c.level, c.assignees)),
+    } as typeof q);
+  }
   // Zawia (region 4) has its own L1 for CW: a region override that the screen lists and an admin may delete (Q86)
   const cw = stages.find((r) => r.code === 'cw')!;
   cw.cells.push({ ...cell('cw', 1, ['1205']), region_id: 4 });

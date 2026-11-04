@@ -10,7 +10,8 @@ export type ErrorCode =
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
   | 'file_too_large' | 'file_rejected' | 'malware_scan_unavailable' | 'export_expired' | 'team_scope_mismatch' | 'two_factor_enforced'
   | 'scope_scenario_conflict'
-  | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured';
+  | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
+  | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan';
 
 export interface FieldError {
   path: string;
@@ -38,6 +39,9 @@ const TITLES: Record<string, string> = {
   mandatory_fields_missing: 'Mandatory fields are missing',
   open_snags: 'Open snags block this approval',
   scope_scenario_conflict: 'The scenario and the scope flags disagree',
+  self_approval_forbidden: 'You may not approve this yourself',
+  document_rule_pending: 'A document rule cannot be decided yet',
+  file_pending_scan: 'The file waits for the virus scan',
   empty_cell: 'A level in use has no holder',
   role_in_use: 'The role is in use',
   precondition_failed: 'The resource changed',

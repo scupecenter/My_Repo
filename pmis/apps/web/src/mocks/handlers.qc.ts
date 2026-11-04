@@ -1,9 +1,10 @@
-// MSW handlers of contract 0.11.1 (migration 0047): the site field near_airport (Q130), document slots on register records (Q131) and QC snag photos (Q132).
+// MSW handlers of contract 0.11.1 (migration 0047): the site field near_airport (Q130), document slots on register records (Q131) and QC snag photos (Q132);
+// contract 0.12.4 (migration 0056, P6): severities, pending evidence, no self-approval of a snag (D230b) and the documents and QC settings.
 // Synthetic data; the checks mirror the contract (the real API reads the bytes and the EXIF date, the mock reads the name).
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { DocumentSlot, SiteDetail } from '@/api/types';
-import type { Snag, SnagType } from '@/api/qc';
+import type { DocumentsQcSettings, Snag, SnagSeverity, SnagType } from '@/api/qc';
 import { db, stepUpValid, viewer } from './db';
 import { guard, problem, stepUp } from './handlers';
 import { rejectReason } from './handlers.documents';
@@ -64,13 +65,25 @@ function slotsOfRecord(key: string, id: string): DocumentSlot[] | null {
 
 // ---------------------------------------------------------------- Q132: snags
 const TYPES: SnagType[] = [
-  { id: uid('snagtype-QC_GENERAL'), code: 'QC_GENERAL', name_en: 'General QC snag', name_ar: 'ملاحظة جودة عامة', photo_rules: { min_count: 1, shot_types: [], formats: ['JPG', 'PNG', 'HEIC'], max_size_mb: 20 }, blocks_preliminary_acceptance: true, is_active: true, version: 1 },
-  { id: uid('snagtype-CRACK'), code: 'CRACK', name_en: 'Concrete crack', name_ar: 'شرخ خرساني', photo_rules: { min_count: 2, shot_types: ['wide', 'close'], formats: ['JPG'], max_size_mb: 20 }, blocks_preliminary_acceptance: true, is_active: true, version: 1 },
+  { id: uid('snagtype-QC_GENERAL'), code: 'QC_GENERAL', name_en: 'General QC snag', name_ar: 'ملاحظة جودة عامة', photo_rules: { min_count: 1, shot_types: [], formats: ['JPG', 'PNG', 'HEIC'], max_size_mb: 20 }, stream: null, blocking_rule: 'always', blocks_preliminary_acceptance: true, is_active: true, version: 1 },
+  { id: uid('snagtype-CRACK'), code: 'CRACK', name_en: 'Concrete crack', name_ar: 'شرخ خرساني', photo_rules: { min_count: 2, shot_types: ['wide', 'close'], formats: ['JPG'], max_size_mb: 20 }, stream: 'CW', blocking_rule: 'by_severity', blocks_preliminary_acceptance: true, is_active: true, version: 1 },
 ];
+// ---------------------------------------------------------------- P6 (contract 0.12.4): severities (Q233) and the documents / QC settings (Q229, Q232)
+const SEVERITIES_SEED: SnagSeverity[] = [
+  { code: 'CRITICAL', name_en: 'Critical', name_ar: 'حرجة', blocks: true, is_active: true },
+  { code: 'MAJOR', name_en: 'Major', name_ar: 'رئيسية', blocks: true, is_active: true },
+  { code: 'MINOR', name_en: 'Minor', name_ar: 'ثانوية', blocks: false, is_active: true },
+];
+let severities = { items: SEVERITIES_SEED.map((x) => ({ ...x })), version: 1 };
+const SETTINGS_SEED: DocumentsQcSettings = {
+  new_version_inherit: false, exif_tolerance_hours: 24, exif_time_zone: 'Africa/Tripoli',
+  scan: { mode: 'clamd', on_failure: 'fail_closed', uploads: true, generated_exports: false, zip_leaves_out_unscanned: true }, version: 1, updated_at: null,
+};
+let qcSettings: DocumentsQcSettings = { ...SETTINGS_SEED };
 const SNAGS = new Map<string, Snag[]>();
 const me = () => { const v = viewer()!; return { id: uid(v.employee_id ?? '9999'), display_name: v.name, employee_id: v.employee_id ?? null }; };
 const missingOf = (s: Snag) => {
-  const live = s.photos!.filter((p) => p.status !== 'rejected');
+  const live = s.photos!.filter((p) => p.status === 'accepted');
   const r = s.snag_type.photo_rules;
   const out: { path: string; code: string; message: string }[] = [];
   if (live.length < Math.max(r.min_count ?? 1, 1)) out.push({ path: '/photos', code: 'min_count', message: `At least ${Math.max(r.min_count ?? 1, 1)} photo(s) of the fix are needed.` });
@@ -83,8 +96,14 @@ function view(s: Snag): Snag {
   const l1 = !isPm(), state = s.state === 'open' || s.state === 'fix_submitted' ? (missing.length ? 'open' : 'fix_submitted') : s.state;
   const actions: NonNullable<Snag['allowed_actions']> = [];
   if ((state === 'open' || state === 'fix_submitted') && l1) { actions.push('upload', 'edit'); if (!missing.length) actions.push('submit'); }
-  if (state === 'in_review' && isPm()) actions.push('approve', 'reject');
-  return { ...s, state, photos_missing: state === 'open' || state === 'fix_submitted' ? missing : [], allowed_actions: actions };
+  // D230b: whoever raised, found or fixed the snag never approves its closure
+  const mine = [s.raised_by?.id, s.found_by?.id, s.fixed_by?.id].includes(me().id);
+  if (state === 'in_review' && isPm() && !mine) actions.push('approve', 'reject');
+  if (isPm() && !mine && state !== 'closed' && state !== 'cancelled' && s.photos!.some((p) => p.status === 'pending_evidence')) actions.push('decide_evidence');
+  const sev = severities.items.find((x) => x.code === s.severity);
+  return { ...s, state, photos_missing: state === 'open' || state === 'fix_submitted' ? missing : [], allowed_actions: actions,
+    approval_blocked: state === 'in_review' && isPm() && mine ? 'self_approval_forbidden' : null, severity_missing: !s.severity,
+    severity_label: sev ? { name_en: sev.name_en, name_ar: sev.name_ar ?? null } : null };
 }
 function snagById(id: string): { site: string; s: Snag } | null {
   for (const [site, list] of SNAGS) { const s = list.find((x) => x.id === id); if (s) return { site, s }; }
@@ -183,17 +202,22 @@ export const qcHandlers = [
     const g = guard(); if (g) return g;
     const i = siteIndex(params.id as string);
     if (i < 0) return problem(404, 'not_found', 'Site not found');
-    const b = (await request.json().catch(() => ({}))) as { snag_type_id?: string; scope?: 'CW' | 'TE'; title?: string; description?: string; task_id?: string };
+    const b = (await request.json().catch(() => ({}))) as { snag_type_id?: string; scope?: 'CW' | 'TE'; title?: string; description?: string; task_id?: string; severity?: string };
     const type = TYPES.find((x) => x.id === b.snag_type_id);
     const errs: { path: string; code: string }[] = [];
     if (!type) errs.push({ path: '/snag_type_id', code: 'unknown_snag_type' });
     if (!b.title || b.title.trim().length < 3) errs.push({ path: '/title', code: 'invalid' });
     if (!b.scope && !b.task_id) errs.push({ path: '/scope', code: 'required' });
+    const sev = severities.items.find((x) => x.is_active && (x.code === (b.severity ?? '').toUpperCase() || x.name_en.toLowerCase() === (b.severity ?? '').toLowerCase()));
+    if (!b.severity) errs.push({ path: '/severity', code: 'required' });
+    else if (!sev) errs.push({ path: '/severity', code: 'unknown_severity' });
+    if (type?.stream && b.scope && type.stream !== b.scope) errs.push({ path: '/snag_type_id', code: 'wrong_stream' });
     if (errs.length) return fields(...errs);
     const s: Snag = {
       id: crypto.randomUUID(), site_id: params.id as string, site_code: siteMeta(i).code, task_id: b.task_id ?? null, scope: b.scope ?? 'CW', snag_type: type!, title: b.title!.trim(),
       description: b.description ?? null, state: 'open', photos: [], photos_required: Math.max(type!.photo_rules.min_count ?? 1, 1), return_count: 0, last_return_note: null,
-      raised_by: me(), raised_at: new Date().toISOString(), closed_at: null, version: 1, self_approval: false,
+      raised_by: me(), found_by: me(), raised_at: new Date().toISOString(), closed_at: null, version: 1, self_approval: false, severity: sev?.code ?? null,
+      blocks_acceptance: type!.blocking_rule === 'always' || (type!.blocking_rule === 'by_severity' && (sev?.blocks ?? true)), register_record: null,
     };
     SNAGS.set(s.site_id, [s, ...(SNAGS.get(s.site_id) ?? [])]);
     return tagged(s, 201);
@@ -211,11 +235,15 @@ export const qcHandlers = [
     const formats = (h.s.snag_type.photo_rules.formats ?? []).map((x) => x.toLowerCase());
     if (rejectReason(file.name, { formats })) return problem(422, 'file_rejected', 'The photo is not accepted', { reason: 'format_not_allowed', allowed: h.s.snag_type.photo_rules.formats } as never);
     // the mock has no EXIF reader: a photo whose bytes start with "exif:before" stands for one taken before the snag was raised
-    if ((await file.text()).startsWith('exif:before')) return problem(422, 'file_rejected', 'The photo was taken before the snag was raised', { reason: 'before_snag_raised' } as never);
+    const head = await file.text();
+    if (head.startsWith('exif:before')) return problem(422, 'file_rejected', 'The photo was taken before the snag was raised', { reason: 'before_snag_raised' } as never);
+    // "exif:future" stands for a photo dated in the future beyond the tolerance (Q232): kept as pending evidence
+    const future = head.startsWith('exif:future');
     const shot = (form.get('shot_type') as string | null) || null;
     const shots = h.s.snag_type.photo_rules.shot_types ?? [];
     if (shots.length && (!shot || !shots.includes(shot))) return fields({ path: '/shot_type', code: 'unknown_shot_type' });
-    const p = { id: crypto.randomUUID(), file_id: '', shot_type: shot, status: 'accepted' as const, reject_reason: null, captured_at: null, unknown_capture_date: true, in_app_camera: false, distance_m: null, geofence_ok: null, uploaded_by: me(), uploaded_at: new Date().toISOString() };
+    const p = { id: crypto.randomUUID(), file_id: '', shot_type: shot, status: (future ? 'pending_evidence' : 'accepted') as 'accepted' | 'pending_evidence', reject_reason: null,
+      evidence_note: future ? 'EXIF date in the future beyond the tolerance' : null, captured_at: null, unknown_capture_date: true, in_app_camera: false, distance_m: null, geofence_ok: null, uploaded_by: me(), uploaded_at: new Date().toISOString() };
     p.file_id = p.id;
     const next = update(h.s.id, (s) => ({ ...s, photos: [...s.photos!, p], version: s.version + 1 }))!;
     void next;
@@ -225,6 +253,48 @@ export const qcHandlers = [
     const g = guard(); if (g) return g;
     const next = update(params.id as string, (s) => ({ ...s, photos: s.photos!.filter((p) => p.id !== params.photo), version: s.version + 1 }));
     return next ? tagged(next) : problem(404, 'not_found', 'Snag not found');
+  }),
+  http.post(`${B}/snags/:id/photos/:photo/evidence`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const h = snagById(params.id as string);
+    if (!h) return problem(404, 'not_found', 'Snag not found');
+    const b = (await request.json().catch(() => ({}))) as { decision?: string; note?: string };
+    if (!['accept', 'reject'].includes(b.decision ?? '') || (b.note ?? '').trim().length < 3) return fields({ path: '/note', code: 'required' });
+    const v = view(h.s);
+    if (!v.allowed_actions!.includes('decide_evidence')) return problem(403, v.approval_blocked || [h.s.raised_by?.id, h.s.fixed_by?.id].includes(me().id) ? 'self_approval_forbidden' : 'not_eligible_holder', 'Only L2 decides');
+    const next = update(h.s.id, (s) => ({ ...s, version: s.version + 1, photos: s.photos!.map((p) => p.id !== params.photo ? p
+      : { ...p, status: b.decision === 'accept' ? 'accepted' : 'rejected', evidence_note: b.note!.trim(), reject_reason: b.decision === 'accept' ? null : b.note!.trim() }) }))!;
+    return tagged(next);
+  }),
+  http.get(`${B}/snag-severities`, () => { const g = guard(); if (g) return g; return HttpResponse.json(severities, { headers: { ETag: `"${severities.version}"` } }); }),
+  http.put(`${B}/snag-severities`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!isPm()) return problem(403, 'action_forbidden', 'Only the admin edits the catalogue');
+    const m = ifMatchOf(request);
+    if (m === 'missing') return problem(428, 'precondition_required', 'If-Match is required');
+    if (m !== severities.version) return problem(412, 'precondition_failed', 'The severities changed');
+    const b = (await request.json().catch(() => ({}))) as { reason?: string; items?: SnagSeverity[] };
+    if (!b.reason || b.reason.trim().length < 3 || !Array.isArray(b.items) || !b.items.length) return fields({ path: '/items', code: 'required' });
+    const gone = severities.items.filter((x) => !b.items!.some((y) => y.code === x.code));
+    if (gone.length) return fields(...gone.map((x) => ({ path: '/items', code: 'cannot_remove', message: `The severity ${x.code} cannot be removed: deactivate it.` })));
+    severities = { items: b.items.map((x) => ({ ...x, is_active: x.is_active ?? true })), version: severities.version + 1 };
+    return HttpResponse.json(severities, { headers: { ETag: `"${severities.version}"` } });
+  }),
+  http.get(`${B}/settings/documents-qc`, () => { const g = guard(); if (g) return g; return HttpResponse.json(qcSettings, { headers: { ETag: `"${qcSettings.version}"` } }); }),
+  http.put(`${B}/settings/documents-qc`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!isPm()) return problem(403, 'action_forbidden', 'Only the admin changes the settings');
+    const m = ifMatchOf(request);
+    if (m === 'missing') return problem(428, 'precondition_required', 'If-Match is required');
+    if (m !== qcSettings.version) return problem(412, 'precondition_failed', 'The settings changed');
+    const b = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const unknown = Object.keys(b).filter((k) => !['reason', 'new_version_inherit', 'exif_tolerance_hours'].includes(k));
+    if (unknown.length) return fields(...unknown.map((k) => ({ path: `/${k}`, code: 'unknown_key' })));
+    const h = b.exif_tolerance_hours;
+    if (h !== undefined && (typeof h !== 'number' || !Number.isInteger(h) || h < 0 || h > 168)) return fields({ path: '/exif_tolerance_hours', code: 'out_of_range' });
+    qcSettings = { ...qcSettings, ...(typeof b.new_version_inherit === 'boolean' ? { new_version_inherit: b.new_version_inherit } : {}), ...(typeof h === 'number' ? { exif_tolerance_hours: h } : {}),
+      version: qcSettings.version + 1, updated_at: new Date().toISOString() };
+    return HttpResponse.json(qcSettings, { headers: { ETag: `"${qcSettings.version}"` } });
   }),
   ...(['submit', 'review', 'approve', 'reject'] as const).map((op) => http.post(`${B}/snags/:id/${op}`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
@@ -238,13 +308,18 @@ export const qcHandlers = [
     if (!v.allowed_actions!.includes(op)) return problem(v.state === 'closed' ? 409 : 403, v.state === 'closed' ? 'invalid_transition' : 'not_eligible_holder', 'Not possible now');
     const b = (await request.json().catch(() => ({}))) as { note?: string };
     if (op === 'reject' && !(b.note ?? '').trim()) return problem(422, 'note_required', 'A rejection needs a note');
+    if (op === 'approve' && v.approval_blocked) return problem(403, 'self_approval_forbidden', 'You raised, found or fixed this snag');
     if (op === 'approve' && !stepUpValid()) return stepUp();
-    const next = update(h.s.id, (s) => op === 'submit' ? { ...s, state: 'in_review', version: s.version + 1 }
-      : op === 'approve' ? { ...s, state: 'closed', closed_at: new Date().toISOString(), version: s.version + 1 }
+    const next = update(h.s.id, (s) => op === 'submit' ? { ...s, state: 'in_review', fixed_by: me(), version: s.version + 1 }
+      : op === 'approve' ? { ...s, state: 'closed', closed_at: new Date().toISOString(), approved_by: me(), version: s.version + 1 }
         : { ...s, state: 'open', return_count: (s.return_count ?? 0) + 1, last_return_note: b.note!, version: s.version + 1 })!;
     return tagged(next);
   })),
 ];
 
 /** Test helper: an empty snag store and no edited site field. */
-export function resetQcMocks() { SNAGS.clear(); siteCustom.clear(); recSlots.clear(); }
+export function resetQcMocks() {
+  SNAGS.clear(); siteCustom.clear(); recSlots.clear();
+  severities = { items: SEVERITIES_SEED.map((x) => ({ ...x })), version: 1 };
+  qcSettings = { ...SETTINGS_SEED };
+}

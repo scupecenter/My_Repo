@@ -306,6 +306,11 @@ describe('hybrid mode list', () => {
       'GET /number-sequences',
       'POST /number-sequences',
       'PATCH /number-sequences/:id',
+      'POST /snags/:id/photos/:photoId/evidence',
+      'GET /snag-severities',
+      'PUT /snag-severities',
+      'GET /settings/documents-qc',
+      'PUT /settings/documents-qc',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

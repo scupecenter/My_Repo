@@ -265,6 +265,13 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/number-sequences'],
   ['post', '/number-sequences'],
   ['patch', '/number-sequences/:id'],
+  // Contract 0.12.4: work package P6 (apps/api: qc; migration 0056). Pending evidence of a snag photo (Q232), the severity catalogue (Q233),
+  // the documents and QC settings (Q229, Q232, Q195).
+  ['post', '/snags/:id/photos/:photoId/evidence'],
+  ['get', '/snag-severities'],
+  ['put', '/snag-severities'],
+  ['get', '/settings/documents-qc'],
+  ['put', '/settings/documents-qc'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

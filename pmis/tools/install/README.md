@@ -75,7 +75,7 @@ CI checks the scripts with `bash -n` and `shellcheck --severity=error` ("Install
 
 - `FILE_ENC_KEY` (the master key of the encrypted stored files) is generated on the first run and kept on every update, like `TOTP_ENC_KEY`.
   Keep a copy offline: without it the stored files cannot be read.
-- **ClamAV virus scan** (optional, asked at the end of the installer; `install-clamav.sh` can also be run alone): installs `clamav-daemon` and
+- **ClamAV virus scan** (on by default since owner answer Q195: installed without a question; `PMIS_VIRUS_SCAN=off` on the command line, or `MALWARE_SCAN=off` in `pmis.env`, skips it; `install-clamav.sh` can also be run alone): installs `clamav-daemon` and
   `clamav-freshclam`, sets `MALWARE_SCAN=clamd` and `SCAN_FAILURE=fail_closed` in `pmis.env`, and makes the API start after clamd.
 - **Backup of the stored files** (optional; `install-file-backup.sh`): installs restic, asks for the repository (another building: an absolute
   path on another disk, or `sftp:`), creates the repository password file once, and installs the nightly timer `gsdn-pmis-files-backup` at 02:30

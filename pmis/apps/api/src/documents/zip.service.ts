@@ -176,10 +176,14 @@ export class ZipService implements OnApplicationBootstrap {
           site_code: string; task_code: string | null; doc_code: string; candidate_label: string | null; stage_code: string | null; slot_status: string;
         }[]>(Prisma.sql`
           SELECT f.id::text AS id, f.original_name, f.storage_key, f.ext, f.version, f.is_current, f.sha256, f.size_bytes, f.uploaded_at, f.approved_date::text AS approved_date,
-            si.site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
+            coalesce(si.site_code, 'GLOBAL') AS site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, st.code AS stage_code, s.status::text AS slot_status
           ${DocumentsService.LIST_FROM}
           WHERE ${Prisma.join(this.matchFilter(job.scope, regions, await this.docs.registerScopeSql(admin)), ' AND ')} ORDER BY si.site_code, st.code, td.code, dt.code, f.uploaded_at, f.id`);
         if (rows.length === 0) throw new Error('no files');
+        // Q195: a zip carries only uploaded files that passed the virus scan; a file in quarantine (pending_rescan or infected) is left out and listed
+        const states = this.storage.meta.scanStates ? await this.storage.meta.scanStates(rows.map((r) => r.storage_key)) : new Map<string, string>();
+        const skipped = rows.filter((r) => { const st = states.get(r.storage_key); return st !== undefined && st !== 'clean' && st !== 'legacy'; });
+        const included = rows.filter((r) => !skipped.includes(r));
         const out = createWriteStream(tmp as string, { mode: 0o600 });
         const done = new Promise<void>((res, rej) => {
           out.on('finish', res);
@@ -197,7 +201,7 @@ export class ZipService implements OnApplicationBootstrap {
         const used = new Set<string>();
         const manifest = [['path', 'original_name', 'sha256', 'version', 'is_current', 'slot_status', 'approved_date', 'uploaded_at'].map(csvCell).join(',')];
         let i = 0;
-        for (const r of rows) {
+        for (const r of included) {
           const name = displayName({ site_code: r.site_code, task_code: r.task_code, doc_code: r.doc_code, candidate_label: r.candidate_label, approved_date: r.approved_date, uploaded_at: r.uploaded_at, ext: r.ext ?? 'bin', version: r.version, is_current: r.is_current });
           let path = `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}/${name}`;
           for (let n = 2; used.has(path.toLowerCase()); n++) path = `${safePart(r.site_code)}/${safePart(r.stage_code ?? 'NA')}/${name.replace(/(\.[a-z0-9]+)$/, `_${n}$1`)}`;
@@ -209,7 +213,10 @@ export class ZipService implements OnApplicationBootstrap {
           entry.push(new Uint8Array(0), true);
           manifest.push([path, r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(','));
           i++;
-          if (i % 20 === 0) await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${jobId}::uuid, 'running', ${i / rows.length}::numeric, NULL, NULL, NULL, NULL)`);
+          if (i % 20 === 0) await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${jobId}::uuid, 'running', ${i / included.length}::numeric, NULL, NULL, NULL, NULL)`);
+        }
+        for (const r of skipped) {
+          manifest.push(['', r.original_name, r.sha256, r.version, r.is_current, r.slot_status, r.approved_date, r.uploaded_at.toISOString()].map(csvCell).join(',') + ',' + csvCell('left out: waits for the virus scan'));
         }
         const m = new ZipPassThrough('manifest.csv');
         zip.add(m);
@@ -220,8 +227,12 @@ export class ZipService implements OnApplicationBootstrap {
         const size = (await fs.stat(tmp as string)).size;
         key = newObjectKey('exports');
         await this.storage.store.putFile(key, tmp as string, size);
-        await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${jobId}::uuid, 'done', 1, ${rows.length}::int, ${size}::bigint, ${key}::text, NULL)`);
-        return rows.length;
+        await this.db.tx.$executeRaw(Prisma.sql`SELECT doc_job_update(${jobId}::uuid, 'done', 1, ${included.length}::int, ${size}::bigint, ${key}::text, NULL)`);
+        if (skipped.length > 0) {
+          await this.db.tx.$executeRaw(Prisma.sql`SELECT log_audit_write('document_zip_skipped_unscanned', 'document_zip_export', ${jobId}::text, NULL,
+            ${JSON.stringify({ skipped_file_ids: skipped.map((r) => r.id) })}::jsonb, 'Q195: files that wait for the virus scan are left out of a zip')`);
+        }
+        return included.length;
       });
       void result;
     } catch (e) {

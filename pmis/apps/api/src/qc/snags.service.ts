@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { AccessService } from '../access/access.service';
 import type { AuthContext } from '../auth/auth.types';
 import { StepUpService } from '../auth/step-up.service';
+import { APP_CONFIG, type AppConfig } from '../config/config';
 import { decodeCursor, encodeCursor, parseLimit } from '../common/cursor';
 import { mapDbError } from '../common/db-errors';
 import { parseIfMatch } from '../common/etag';
@@ -12,22 +13,23 @@ import { ProblemException, problems } from '../common/problem';
 import { TS_TEXT, boolParam, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
-import { readExifDate } from '../documents/exif';
+import { exifWallToInstant, readExifDate } from '../documents/exif';
 import { sniff } from '../documents/sniff';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { MatrixAssigneeDto, TaskViewService, accountStatus } from '../workflow/task-view.service';
 
 /**
- * QC snags and the photos of their fix (owner answers Q131 / Q132, CLAUDE.md "Documents and QC"). The site engineer (L1 of the Quality register row of the
- * Responsibility Matrix) uploads fresh photos that follow the snag type's photo rules and submits; L2 approves, which closes the snag, or rejects with a note.
+ * QC snags and the photos of their fix (owner answers Q131 / Q132, CLAUDE.md "Documents and QC"), with the P6 follow-up of the owner answers of
+ * 2026-11-04 (migration 0056): severity and the blocking rule (Q233), finder / fixer / approver and the Quality - TE row (Q230), no self-approval of a
+ * snag (D230b), all-members L2 (Q231), the EXIF tolerance setting and pending evidence (Q232), and the link with the Quality register record (Q234).
  * Every write is a SECURITY DEFINER function (qc_*); this service only checks the bytes and reads.
  */
 export const QC_MODULE = 'quality';
-/** EXIF has no time zone: a photo dated up to one day before the snag was raised is still accepted (owner answer Q132). Repeated by the database. */
-export const EXIF_TOLERANCE_MS = 24 * 60 * 60 * 1000;
+/** Default of the setting qc.exif_tolerance_hours (Q232); the database reads the setting itself. */
+export const EXIF_TOLERANCE_HOURS_DEFAULT = 24;
 
 const STATE_OUT: Record<string, string> = { open: 'open', fix_uploaded: 'fix_submitted', in_review: 'in_review', closed: 'closed', cancelled: 'cancelled' };
-const STATE_IN: Record<string, string> = { open: 'open', fix_submitted: 'fix_uploaded', in_review: 'in_review', closed: 'closed' };
+const STATE_IN: Record<string, string> = { open: 'open', fix_submitted: 'fix_uploaded', in_review: 'in_review', closed: 'closed', cancelled: 'cancelled' };
 
 const photoRules = z
   .object({
@@ -41,6 +43,8 @@ const typeFields = {
   name_en: z.string().trim().min(2).max(200).optional(),
   name_ar: z.string().trim().max(200).optional(),
   photo_rules: photoRules.optional(),
+  stream: z.enum(['CW', 'TE']).nullable().optional(),
+  blocking_rule: z.enum(['always', 'by_severity', 'never']).optional(),
   blocks_preliminary_acceptance: z.boolean().optional(),
   is_active: z.boolean().optional(),
   reason: z.string().trim().min(3).max(2000),
@@ -54,9 +58,14 @@ const snagInput = z
     scope: z.enum(['CW', 'TE']).optional(),
     title: z.string().trim().min(3).max(200),
     description: z.string().max(2000).optional(),
+    severity: z.string().trim().min(1).max(40),
+    found_by: z.string().uuid().optional(),
   })
   .strict();
-const snagPatch = z.object({ title: z.string().trim().min(3).max(200).optional(), description: z.string().max(2000).optional() }).strict().refine((v) => Object.keys(v).length > 0, 'send at least one field');
+const snagPatch = z
+  .object({ title: z.string().trim().min(3).max(200).optional(), description: z.string().max(2000).optional(), severity: z.string().trim().min(1).max(40).optional() })
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, 'send at least one field');
 const noteBody = z.object({ note: z.string().max(2000).optional() }).strict();
 const rejectBody = z
   .object({
@@ -64,6 +73,20 @@ const rejectBody = z
     rejected_photos: z.array(z.object({ photo_id: z.string().uuid(), reason: z.string().trim().min(1).max(500) }).strict()).max(100).optional(),
   })
   .strict();
+const evidenceBody = z.object({ decision: z.enum(['accept', 'reject']), note: z.string().trim().min(3).max(500) }).strict();
+const severitiesBody = z
+  .object({
+    reason: z.string().trim().min(3).max(2000),
+    items: z
+      .array(z.object({ code: z.string().regex(/^[A-Z][A-Z0-9_]{1,30}$/), name_en: z.string().trim().min(2).max(100), name_ar: z.string().trim().max(100).nullable().optional(), blocks: z.boolean(), is_active: z.boolean().optional() }).strict())
+      .min(1)
+      .max(30),
+  })
+  .strict();
+const settingsBody = z
+  .object({ reason: z.string().trim().min(3).max(2000), new_version_inherit: z.boolean().optional(), exif_tolerance_hours: z.number().int().min(0).max(168).optional() })
+  .strict()
+  .refine((v) => Object.keys(v).length >= 2, 'send at least one setting besides the reason');
 
 interface TypeRow {
   id: string;
@@ -75,6 +98,8 @@ interface TypeRow {
   formats: string[] | null;
   max_size_mb: number;
   blocks_preliminary_acceptance: boolean;
+  stream: string | null;
+  blocking_rule: string;
   is_active: boolean;
   version: number;
 }
@@ -89,14 +114,23 @@ interface SnagRow {
   scope: string;
   title: string | null;
   description: string;
+  severity: string | null;
   status: string;
   raised_by: string;
+  found_by: string | null;
+  fixed_by: string | null;
+  approved_by: string | null;
   raised_at: Date;
   closed_at: Date | null;
   return_count: number;
   last_return_note: string | null;
   pinned: string | null;
   self_approval: boolean;
+  register_entity_id: string | null;
+  record_id: string | null;
+  record_code: string | null;
+  cancel_reason: string | null;
+  blocks: boolean | null;
   version: number;
   ts: string;
 }
@@ -114,12 +148,18 @@ interface PhotoRow {
   uploaded_at: Date;
   rejected_at: Date | null;
   review_note: string | null;
+  evidence_status: string;
+  evidence_note: string | null;
 }
 
 const SNAG_SELECT = Prisma.sql`
   SELECT s.id::text AS id, s.site_id::text AS site_id, si.site_code, s.region_id, s.task_id::text AS task_id, s.snag_type_id::text AS snag_type_id, s.scope, s.title,
-    s.description, s.status::text AS status, s.raised_by::text AS raised_by, s.raised_at, s.closed_at, s.return_count, s.last_return_note,
-    s.ball_in_court_user_id::text AS pinned, s.self_approval, s.version, ${Prisma.raw(TS_TEXT('s.raised_at'))} AS ts
+    s.description, s.severity, s.status::text AS status, s.raised_by::text AS raised_by, s.found_by::text AS found_by, s.fixed_by::text AS fixed_by,
+    s.approved_by::text AS approved_by, s.raised_at, s.closed_at, s.return_count, s.last_return_note,
+    s.ball_in_court_user_id::text AS pinned, s.self_approval, s.register_entity_id::text AS register_entity_id,
+    (SELECT r.id::text FROM register_records r WHERE r.entity_id = s.register_entity_id ORDER BY r.is_current DESC, r.version_no DESC LIMIT 1) AS record_id,
+    (SELECT r.data ->> 'record_code' FROM register_records r WHERE r.entity_id = s.register_entity_id ORDER BY r.is_current DESC, r.version_no DESC LIMIT 1) AS record_code,
+    s.cancel_reason, qc_blocks(s.snag_type_id, s.severity) AS blocks, s.version, ${Prisma.raw(TS_TEXT('s.raised_at'))} AS ts
   FROM snags s JOIN sites si ON si.id = s.site_id`;
 
 @Injectable()
@@ -130,6 +170,7 @@ export class SnagsService {
     private readonly stepUp: StepUpService,
     private readonly view: TaskViewService,
     private readonly storage: StorageService,
+    @Inject(APP_CONFIG) private readonly config: AppConfig,
   ) {}
 
   private async call<T>(auth: AuthContext, sql: Prisma.Sql): Promise<T> {
@@ -164,6 +205,8 @@ export class SnagsService {
         formats: (t.formats ?? ['jpg', 'png', 'heic']).map((f) => f.toUpperCase().replace('JPEG', 'JPG')),
         max_size_mb: t.max_size_mb,
       },
+      stream: t.stream,
+      blocking_rule: t.blocking_rule,
       blocks_preliminary_acceptance: t.blocks_preliminary_acceptance,
       is_active: t.is_active,
       version: t.version,
@@ -172,7 +215,7 @@ export class SnagsService {
 
   private async typeRows(where: Prisma.Sql): Promise<TypeRow[]> {
     return this.db.tx.$queryRaw<TypeRow[]>(Prisma.sql`
-      SELECT id::text AS id, code, name_en, name_ar, min_photos, required_shots, formats, max_size_mb, blocks_preliminary_acceptance, is_active, version
+      SELECT id::text AS id, code, name_en, name_ar, min_photos, required_shots, formats, max_size_mb, blocks_preliminary_acceptance, stream, blocking_rule, is_active, version
       FROM snag_types WHERE ${where} ORDER BY code COLLATE "C"`);
   }
 
@@ -188,9 +231,9 @@ export class SnagsService {
     return this.typeDto(t);
   }
 
-  private typePatchJson(b: { name_en?: string; name_ar?: string; photo_rules?: z.infer<typeof photoRules>; blocks_preliminary_acceptance?: boolean; is_active?: boolean; code?: string }): string {
+  private typePatchJson(b: Record<string, unknown>): string {
     const out: Record<string, unknown> = {};
-    for (const k of ['code', 'name_en', 'name_ar', 'photo_rules', 'blocks_preliminary_acceptance', 'is_active'] as const) if (b[k] !== undefined) out[k] = b[k];
+    for (const k of ['code', 'name_en', 'name_ar', 'photo_rules', 'stream', 'blocking_rule', 'blocks_preliminary_acceptance', 'is_active']) if (b[k] !== undefined) out[k] = b[k];
     return JSON.stringify(out);
   }
 
@@ -206,6 +249,50 @@ export class SnagsService {
     await this.getType(id);
     await this.call(auth, Prisma.sql`SELECT admin_save_snag_type(${id}::uuid, ${this.typePatchJson(b)}::jsonb, ${b.reason}::text, ${version}::int) AS r`);
     return this.getType(id);
+  }
+
+  // ------------------------------------------------------------------ severities (Q233) and the documents / QC settings (Q229, Q232, Q195)
+  async severities(): Promise<Record<string, unknown>> {
+    return (await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>`SELECT snag_severities_json() AS j`)[0]!.j;
+  }
+
+  async saveSeverities(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const b = parse(severitiesBody, raw);
+    return this.call(auth, Prisma.sql`SELECT admin_save_snag_severities(${JSON.stringify(b.items)}::jsonb, ${b.reason}::text, ${version}::int) AS r`);
+  }
+
+  private settingsDto(j: Record<string, unknown>): Record<string, unknown> {
+    const scan = this.config.scan;
+    return {
+      new_version_inherit: j.new_version_inherit,
+      exif_tolerance_hours: j.exif_tolerance_hours,
+      exif_time_zone: 'Africa/Tripoli',
+      // Q195: what the virus scan covers (read only: MALWARE_SCAN and SCAN_FAILURE are set on the server by the installer)
+      scan: {
+        mode: scan.mode === 'clamd' ? 'clamd' : 'off',
+        on_failure: scan.onFailure,
+        uploads: scan.mode === 'clamd',
+        generated_exports: false,
+        zip_leaves_out_unscanned: true,
+      },
+      version: j.version,
+      updated_at: j.updated_at,
+    };
+  }
+
+  async settings(auth: AuthContext): Promise<Record<string, unknown>> {
+    if (!auth.state.isAdmin && !(await this.access.hasGrant(auth, 'admin.settings', 'view')) && !(await this.access.hasGrant(auth, 'document_types', 'view'))) {
+      throw new ProblemException(403, 'module_forbidden', { detail: 'You cannot use the Settings screen.' });
+    }
+    return this.settingsDto((await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>`SELECT documents_qc_settings_json() AS j`)[0]!.j);
+  }
+
+  async saveSettings(auth: AuthContext, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const { reason, ...patch } = parse(settingsBody, raw);
+    const j = await this.call<Record<string, unknown>>(auth, Prisma.sql`SELECT admin_save_documents_qc(${JSON.stringify(patch)}::jsonb, ${reason}::text, ${version}::int) AS r`);
+    return this.settingsDto(j);
   }
 
   // ------------------------------------------------------------------ snags: reads
@@ -236,7 +323,7 @@ export class SnagsService {
     const state = oneParam(q, 'state');
     if (state !== undefined) {
       const st = STATE_IN[state];
-      if (!st) throw problems.validation([{ path: '/state', code: 'invalid', message: 'state is open, fix_submitted, in_review or closed.' }]);
+      if (!st) throw problems.validation([{ path: '/state', code: 'invalid', message: 'state is open, fix_submitted, in_review, closed or cancelled.' }]);
       conds.push(Prisma.sql`s.status::text = ${st}`);
     }
     if (cursor) conds.push(Prisma.sql`(s.raised_at, s.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
@@ -253,9 +340,11 @@ export class SnagsService {
     const types = new Map((await this.typeRows(Prisma.sql`id = ANY(${[...new Set(rows.map((r) => r.snag_type_id))]}::uuid[])`)).map((t) => [t.id, t]));
     const photos = await this.db.tx.$queryRaw<PhotoRow[]>(Prisma.sql`
       SELECT p.id::text AS id, p.snag_id::text AS snag_id, p.shot_type, p.exif_date, p.unknown_capture_date, p.captured_in_app, p.distance_m::text AS distance_m,
-        p.geofence_result::text AS geofence_result, p.uploaded_by::text AS uploaded_by, p.uploaded_at, p.rejected_at, p.review_note
+        p.geofence_result::text AS geofence_result, p.uploaded_by::text AS uploaded_by, p.uploaded_at, p.rejected_at, p.review_note, p.evidence_status, p.evidence_note
       FROM snag_photos p WHERE p.snag_id = ANY(${ids}::uuid[]) AND p.withdrawn_at IS NULL ORDER BY p.uploaded_at, p.id`);
-    const refs = await this.view.userRefs([...new Set([...rows.map((r) => r.raised_by), ...rows.map((r) => r.pinned).filter((x): x is string => !!x), ...photos.map((p) => p.uploaded_by)])]);
+    const people = rows.flatMap((r) => [r.raised_by, r.pinned, r.found_by, r.fixed_by, r.approved_by]).filter((x): x is string => !!x);
+    const refs = await this.view.userRefs([...new Set([...people, ...photos.map((p) => p.uploaded_by)])]);
+    const sev = new Map(((await this.severities()).items as { code: string; name_en: string; name_ar: string | null; blocks: boolean }[]).map((v) => [v.code, v]));
     const grants = {
       edit: await this.access.regions(QC_MODULE, 'edit'),
       approve: await this.access.regions(QC_MODULE, 'approve'),
@@ -270,13 +359,27 @@ export class SnagsService {
         ? (await this.db.tx.$queryRaw<{ ok: boolean }[]>(Prisma.sql`SELECT qc_snag_can(${r.id}::uuid, ${kind}::text) AS ok`))[0]?.ok === true
         : false;
       const missing = kind === 'entry' ? (await this.db.tx.$queryRaw<{ m: unknown[] }[]>(Prisma.sql`SELECT qc_photos_missing(${r.id}::uuid) AS m`))[0]?.m ?? [] : [];
+      const snagPhotos = photos.filter((p) => p.snag_id === r.id);
+      const pendingEvidence = snagPhotos.some((p) => p.evidence_status === 'pending_evidence' && !p.rejected_at);
+      // D230b: who raised, found or fixed the snag never approves it; the screen says so in advance
+      const excluded = [r.raised_by, r.found_by, r.fixed_by, ...snagPhotos.map((p) => p.uploaded_by)].includes(auth.user.id);
+      const canDecide = kind !== null && !excluded && has(grants.approve, r.region_id)
+        && (await this.db.tx.$queryRaw<{ ok: boolean }[]>(Prisma.sql`SELECT (EXISTS (SELECT 1 FROM qc_snag_holders(${r.id}::uuid, 'approve') h WHERE h.user_id = ${auth.user.id}::uuid)
+             OR (app_actor_is_system_admin() AND NOT EXISTS (SELECT 1 FROM qc_snag_holders(${r.id}::uuid, 'approve')))) AS ok`))[0]?.ok === true;
       const pinnedOther = r.pinned !== null && r.pinned !== auth.user.id;
       const actions: string[] = [];
       if (kind === 'entry' && can && !pinnedOther && has(grants.edit, r.region_id)) {
-        actions.push('upload', 'edit');
+        actions.push('upload');
+        if (!r.register_entity_id) actions.push('edit');
         if (missing.length === 0) actions.push('submit');
       }
       if (kind === 'approve' && can && has(grants.approve, r.region_id)) actions.push('approve', 'reject');
+      if (pendingEvidence && canDecide) actions.push('decide_evidence');
+      const votes = kind === 'approve'
+        ? await this.db.tx.$queryRaw<{ user_id: string; voted_at: Date | null }[]>(Prisma.sql`SELECT user_id::text AS user_id, voted_at FROM qc_snag_votes(${r.id}::uuid) ORDER BY user_id`)
+        : [];
+      const sv = r.severity ? sev.get(r.severity.toUpperCase()) : undefined;
+      const ref = (id: string | null) => (id ? refs.get(id) : undefined);
       const dto: Record<string, unknown> = {
         id: r.id,
         site_id: r.site_id,
@@ -286,15 +389,21 @@ export class SnagsService {
         snag_type: this.typeDto(t),
         title: r.title ?? r.description,
         description: r.title ? r.description || null : null,
+        severity: r.severity,
+        severity_label: sv ? { name_en: sv.name_en, name_ar: sv.name_ar } : null,
+        // Q109: a legacy snag without a severity blocks conservatively and asks for one
+        severity_missing: r.severity === null,
+        blocks_acceptance: r.blocks !== false,
         state: STATE_OUT[r.status] ?? r.status,
-        photos: photos.filter((p) => p.snag_id === r.id).map((p) => {
+        photos: snagPhotos.map((p) => {
           const u = refs.get(p.uploaded_by);
           return {
             id: p.id,
             file_id: p.id,
             shot_type: p.shot_type,
-            status: p.rejected_at ? 'rejected' : 'accepted',
+            status: p.rejected_at ? 'rejected' : p.evidence_status === 'pending_evidence' ? 'pending_evidence' : 'accepted',
             reject_reason: p.rejected_at ? p.review_note : null,
+            evidence_note: p.evidence_note,
             captured_at: p.exif_date,
             unknown_capture_date: p.unknown_capture_date,
             in_app_camera: p.captured_in_app,
@@ -309,29 +418,39 @@ export class SnagsService {
         return_count: r.return_count,
         last_return_note: r.last_return_note,
         self_approval: r.self_approval,
+        approval_blocked: kind === 'approve' && excluded ? 'self_approval_forbidden' : null,
         raised_at: r.raised_at,
         closed_at: r.closed_at,
+        cancel_reason: r.cancel_reason,
+        register_record: r.register_entity_id ? { register_key: 'quality', entity_id: r.register_entity_id, record_id: r.record_id, record_code: r.record_code } : null,
         version: r.version,
         allowed_actions: actions,
       };
-      const raiser = refs.get(r.raised_by);
-      if (raiser) dto.raised_by = raiser;
+      for (const [k, v] of [['raised_by', r.raised_by], ['found_by', r.found_by], ['fixed_by', r.fixed_by], ['approved_by', r.approved_by]] as const) {
+        const u = ref(v);
+        if (u) dto[k] = u;
+      }
       if (kind && holders) {
         const pinned = r.pinned ? refs.get(r.pinned) : undefined;
-        dto.ball_in_court = { level: kind === 'entry' ? 1 : 2, level_kind: kind, holders: holders.list, rule: holders.rule, no_eligible_holder: !holders.any, ...(pinned ? { claimed_by: pinned } : {}) };
+        dto.ball_in_court = {
+          level: kind === 'entry' ? 1 : 2, level_kind: kind, holders: holders.list, rule: holders.rule, no_eligible_holder: !holders.any,
+          matrix_row: holders.row,
+          ...(pinned ? { claimed_by: pinned } : {}),
+          ...(votes.length > 0 ? { votes_needed: votes.length, votes_done: votes.filter((v) => v.voted_at !== null).length } : {}),
+        };
       }
       out.push(dto);
     }
     return out;
   }
 
-  /** The holders of the Quality register row's cell for the level (L1 = entry, L2 = the approve cell), as the matrix names them. */
-  private async holders(snagId: string, kind: string): Promise<{ list: MatrixAssigneeDto[]; rule: string; any: boolean }> {
-    const cell = await this.db.tx.$queryRaw<{ id: string | null; rule: string | null; any: boolean }[]>(Prisma.sql`
-      SELECT c.id::text AS id, c.rule::text AS rule, EXISTS (SELECT 1 FROM qc_snag_holders(${snagId}::uuid, ${kind}::text)) AS any
+  /** The holders of the cell for the level (L1 = entry, L2 = the approve cell): the Quality row, or Quality - TE for a TE snag (Q230). */
+  private async holders(snagId: string, kind: string): Promise<{ list: MatrixAssigneeDto[]; rule: string; any: boolean; row: string }> {
+    const cell = await this.db.tx.$queryRaw<{ id: string | null; rule: string | null; any: boolean; row: string | null }[]>(Prisma.sql`
+      SELECT c.id::text AS id, c.rule::text AS rule, c.register_key AS row, EXISTS (SELECT 1 FROM qc_snag_holders(${snagId}::uuid, ${kind}::text)) AS any
       FROM (SELECT qc_snag_cell(${snagId}::uuid, ${kind}::text) AS cid) x LEFT JOIN matrix_cells c ON c.id = x.cid`);
     const c = cell[0];
-    if (!c?.id) return { list: [], rule: 'any_one', any: c?.any ?? false };
+    if (!c?.id) return { list: [], rule: 'any_one', any: c?.any ?? false, row: 'quality' };
     const rows = await this.db.tx.$queryRaw<{ kind: string; ref_id: string; label: string; employee_id: string | null; status: string | null; deleted: boolean | null }[]>(Prisma.sql`
       SELECT a.kind::text AS kind, a.ref_id::text AS ref_id, coalesce(u.display_name, ro.name_en, g.name, '') AS label, u.employee_id, u.status::text AS status, (u.deleted_at IS NOT NULL) AS deleted
       FROM matrix_cell_assignees a LEFT JOIN users u ON a.kind = 'user' AND u.id = a.ref_id LEFT JOIN roles ro ON a.kind = 'role' AND ro.id = a.ref_id
@@ -344,7 +463,7 @@ export class SnagsService {
       }
       return dto;
     });
-    return { list, rule: c.rule ?? 'any_one', any: c.any };
+    return { list, rule: c.rule ?? 'any_one', any: c.any, row: c.row ?? 'quality' };
   }
 
   // ------------------------------------------------------------------ snags: writes
@@ -353,7 +472,7 @@ export class SnagsService {
     if (!uuidSchema.safeParse(siteId).success) throw problems.notFound();
     const b = parse(snagInput, raw);
     const id = await this.call<string>(auth, Prisma.sql`SELECT qc_raise_snag(${siteId}::uuid, ${b.snag_type_id}::uuid, ${b.task_id ?? null}::uuid, ${b.scope ?? null}::text,
-      ${b.title}::text, ${b.description ?? null}::text)::text AS r`);
+      ${b.title}::text, ${b.description ?? null}::text, ${b.severity}::text, ${b.found_by ?? null}::uuid)::text AS r`);
     return this.get(auth, id);
   }
 
@@ -384,10 +503,13 @@ export class SnagsService {
     if (!sn.ok) return reject(sn.reason, sn.detail);
     const ext = sn.ext === 'jpeg' ? 'jpg' : sn.ext;
     if (!sn.image || !rules.formats.map((f) => f.toLowerCase()).includes(ext)) reject('format_not_allowed', `Photos of this snag type are ${rules.formats.join(', ')}.`, { allowed: rules.formats });
-    const capture = ['jpg', 'tiff', 'heic'].includes(ext) ? readExifDate(file.buffer) : null;
+    const wall = ['jpg', 'tiff', 'heic'].includes(ext) ? readExifDate(file.buffer) : null;
+    // Q232: the EXIF wall clock is read in Africa/Tripoli; the tolerance is the setting qc.exif_tolerance_hours (the database checks again)
+    const capture = wall ? exifWallToInstant(wall) : null;
+    const tolMs = Number((await this.db.tx.$queryRaw<{ h: number }[]>`SELECT extract(epoch FROM qc_exif_tolerance())::float8 / 3600 AS h`)[0]?.h ?? EXIF_TOLERANCE_HOURS_DEFAULT) * 3600 * 1000;
     const raised = new Date(snag.raised_at as Date);
-    if (capture && capture.getTime() < raised.getTime() - EXIF_TOLERANCE_MS) {
-      reject('before_snag_raised', 'The photo was taken before the snag was raised (EXIF date, one day of tolerance). Take a fresh photo of the fix.', {
+    if (capture && capture.getTime() < raised.getTime() - tolMs) {
+      reject('before_snag_raised', `The photo was taken before the snag was raised (EXIF date, ${Math.round(tolMs / 3600000)} hour(s) of tolerance). Take a fresh photo of the fix.`, {
         captured_at: capture.toISOString(), raised_at: raised.toISOString(),
       });
     }
@@ -419,6 +541,15 @@ export class SnagsService {
     return this.get(auth, id);
   }
 
+  /** Q232: L2 accepts or rejects a photo kept as pending evidence (EXIF date in the future beyond the tolerance). */
+  async decideEvidence(auth: AuthContext, id: string, photoId: string, raw: unknown): Promise<Record<string, unknown>> {
+    await this.snagRow(auth, id);
+    if (!uuidSchema.safeParse(photoId).success) throw problems.notFound();
+    const b = parse(evidenceBody, raw);
+    await this.call(auth, Prisma.sql`SELECT true AS r FROM (SELECT qc_decide_evidence(${id}::uuid, ${photoId}::uuid, ${b.decision === 'accept'}::boolean, ${b.note}::text)) x`);
+    return this.get(auth, id);
+  }
+
   async transition(auth: AuthContext, id: string, action: 'submit' | 'review' | 'approve' | 'reject', ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
     await this.snagRow(auth, id);
@@ -435,7 +566,17 @@ export class SnagsService {
     } else {
       note = parse(noteBody, raw ?? {}).note ?? null;
     }
-    if (action === 'approve') await this.stepUp.require(auth);
+    if (action === 'approve') {
+      // D230b before the step-up: a raiser, finder or fixer is refused whatever their password says
+      const ex = await this.db.tx.$queryRaw<{ ex: boolean }[]>(Prisma.sql`SELECT ${auth.user.id}::uuid = ANY (ARRAY(
+        SELECT u FROM (SELECT s.raised_by AS u FROM snags s WHERE s.id = ${id}::uuid UNION ALL SELECT s.found_by FROM snags s WHERE s.id = ${id}::uuid
+          UNION ALL SELECT s.fixed_by FROM snags s WHERE s.id = ${id}::uuid UNION ALL SELECT p.uploaded_by FROM snag_photos p WHERE p.snag_id = ${id}::uuid AND p.withdrawn_at IS NULL) x
+        WHERE u IS NOT NULL)) AS ex`);
+      if (ex[0]?.ex) {
+        throw new ProblemException(403, 'self_approval_forbidden', { detail: 'You raised, found or fixed this snag: somebody else must approve its closure (owner decision D230b).' });
+      }
+      await this.stepUp.require(auth);
+    }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     await this.call(auth, Prisma.sql`SELECT qc_transition_snag(${id}::uuid, ${version}::int, ${action}::text, ${note}::text, ${stepOk}::boolean, ${photos}::jsonb) AS r`);
     return this.get(auth, id);

@@ -76,6 +76,14 @@ function SlotCard({ slot, canUpload, onFile, onWithdraw, onDeclare, onAddCandida
         <span className={`chip ms-auto ${SLOT_TONE[slot.status]}`} data-testid={`slot-status-${slot.id}`}>{t(`slotStatus.${slot.status}`)}</span>
       </div>
       <p className="text-xs text-mute" data-testid={`slot-limits-${slot.id}`}>{t('docs.limits', { formats: (slot.formats ?? []).join(', '), mb: slot.max_size_mb ?? 20 })}{slot.max_files ? ` · ${t('docs.max_files', { n: slot.max_files })}` : ''}</p>
+      {slot.determination_pending && <p className="mt-1 rounded-md bg-waitBg p-2 text-xs text-waitInk" data-testid={`slot-pending-${slot.id}`}>{t('docs.determination_pending')}</p>}
+      {slot.inherited_approval && <p className="mt-1 text-xs text-mute" data-testid={`slot-inherited-${slot.id}`}>{t('docs.inherited_approval')}</p>}
+      {slot.shared_with && (
+        <p className="mt-1 text-xs text-mute" data-testid={`slot-shared-${slot.id}`}>
+          {slot.shared_with.owner === 'task' ? t('docs.shared_task', { code: slot.shared_with.task_code ?? '' }) : t('docs.shared_record', { key: slot.shared_with.register_key ?? '' })}
+          {slot.shared_with.has_file && ['uploaded', 'in_review', 'approved'].includes(slot.shared_with.status ?? '') ? ` · ${t('docs.shared_filled')}` : ''}
+        </p>
+      )}
       {slot.status === 'rejected' && slot.reject_reason && <p className="mt-1 text-sm text-lateInk" data-testid={`slot-reject-${slot.id}`}>{slot.reject_reason}</p>}
       {slot.blank_form_file_id && <button type="button" className="mt-1 text-xs text-link hover:underline" data-testid={`slot-blank-${slot.id}`} onClick={() => void downloadDocument(slot.blank_form_file_id as string)}>{t('docs.blank_form')}</button>}
       <ul className="mt-1 space-y-1 text-sm text-mute">{current.map((f) => fileLine(f, false))}</ul>
@@ -180,8 +188,9 @@ export function SlotList({ slots, target, edit, suggestFor }: { slots: DocumentS
   const up = useSlotUpload(target), del = useWithdrawFile(target), add = useAddSlot(target);
   const [multi, setMulti] = useState<File[] | null>(null);
   const [over, setOver] = useState(false);
-  const active = slots.filter((s) => s.status !== 'not_required');
-  const optional = slots.filter((s) => s.status === 'not_required');
+  // Q226: a slot whose rule waits for a determination is shown with the active slots ("pending determination"), not as a confirmed "not required"
+  const active = slots.filter((s) => s.status !== 'not_required' || s.determination_pending);
+  const optional = slots.filter((s) => s.status === 'not_required' && !s.determination_pending);
   const uploadable = active.filter((s) => slotUploadable(s, edit));
   const send = (slot: DocumentSlot, file: File): Promise<boolean> => {
     const pre = precheck(t, slot, file);

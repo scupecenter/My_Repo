@@ -43,7 +43,12 @@ afterAll(async () => {
 });
 
 const q = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> => (await db.query(sql, params)).rows as T[];
-const taskSlots = async (a: Actor, taskId: string) => (await a.api.call('get', `/tasks/${taskId}/slots`)).body.items as { id: string; doc_code: string; status: string; mandatory: boolean; conditional: boolean }[];
+/** An approved Procurement order of a site (version 1, in force), written as a fixture by the superuser. */
+const approvedProc = async (siteId: string, data: Record<string, unknown>): Promise<void> => {
+  await db.query(`INSERT INTO register_records (entity_id, version_no, is_current, register_key, site_id, region_id, state, current_level, levels_required, data, approved_at)
+    SELECT gen_random_uuid(), 1, true, 'procurement', s.id, s.region_id, 'approved', 2, 2, $2::jsonb, now() FROM sites s WHERE s.id = $1`, [siteId, JSON.stringify(data)]);
+};
+const taskSlots = async (a: Actor, taskId: string) => (await a.api.call('get', `/tasks/${taskId}/slots`)).body.items as { id: string; doc_code: string; status: string; mandatory: boolean; conditional: boolean; determination_pending: boolean }[];
 const slotOfTask = async (a: Actor, taskId: string, code: string) => (await taskSlots(a, taskId)).find((s) => s.doc_code === code);
 /** EXIF wall-clock text ("YYYY:MM:DD HH:MM:SS") of a moment, as a camera without a time zone would write it. */
 const exifText = (d: Date): string => d.toISOString().slice(0, 19).replace('T', ' ').replace(/-/g, ':');
@@ -95,7 +100,7 @@ describe('Q130: conditional documents judge themselves', () => {
     expect((await q(`SELECT 1 FROM audit_log WHERE action = 'site_custom_update' AND entity_id = $1`, [site.id]))).toHaveLength(0);
   });
 
-  it('B1 reads the delivery of the site\'s Procurement record: outsourced adds the PR e-mail slot, in-house leaves it not required', async () => {
+  it('B1 reads the delivery of the site\'s approved Procurement orders (Q226): outsourced adds the PR e-mail slot, in-house leaves it not required, no approved order is pending', async () => {
     const e = await actor(app, db, { level: 'entry', regions: [R], grants: [['sites', 'view'], ['sites', 'edit'], ...G('procurement', 'view', 'create', 'edit')] });
     await regCell(db, 'procurement', R, 'entry', { user: [e.user.id] });
     const out = await makeSite(db, R, { prefix: 'Q130B' });
@@ -103,24 +108,35 @@ describe('Q130: conditional documents judge themselves', () => {
     const tOut = await makeTask(db, out, 'B1', 'entry');
     const tIn = await makeTask(db, inh, 'B1', 'entry');
     await setCell(db, 'B1', R, 'entry', { user: [e.user.id] });
-    // no Procurement record yet: the rule cannot judge, the slot waits as not required (Data Entry may still declare it)
-    expect(await slotOfTask(e, tOut, 'B1')).toMatchObject({ status: 'not_required', conditional: true });
-
-    const r1 = await e.api.call('post', recPath('procurement'), { site_id: out.id, data: { ...PROC, delivery: 'Outsourced' } });
-    expect(r1.status).toBe(201);
-    const r2 = await e.api.call('post', recPath('procurement'), { site_id: inh.id, data: { scope: 'CW', delivery: 'In-House', po_wo_no: 'WO-1', po_wo_date: '2026-01-05', order_status: 'Open' } });
-    expect(r2.status).toBe(201);
-    expect(await slotOfTask(e, tOut, 'B1')).toMatchObject({ status: 'missing', mandatory: true });
-    expect(await slotOfTask(e, tIn, 'B1')).toMatchObject({ status: 'not_required' });
+    // no Procurement order yet: the rule cannot judge; the slot waits as "pending determination" (Q226), not as a confirmed "not required"
+    expect(await slotOfTask(e, tOut, 'B1')).toMatchObject({ status: 'not_required', conditional: true, determination_pending: true });
+    // a draft order never decides (only the approved version in force)
+    expect((await e.api.call('post', recPath('procurement'), { site_id: out.id, data: { ...PROC, delivery: 'Outsourced' } })).status).toBe(201);
+    expect(await slotOfTask(e, tOut, 'B1')).toMatchObject({ status: 'not_required', determination_pending: true });
+    await approvedProc(out.id, { ...PROC, delivery: 'Outsourced' });
+    await approvedProc(inh.id, { scope: 'CW', delivery: 'In-House', po_wo_no: 'WO-1', po_wo_date: '2026-01-05', order_status: 'Open' });
+    expect(await slotOfTask(e, tOut, 'B1')).toMatchObject({ status: 'missing', mandatory: true, determination_pending: false });
+    expect(await slotOfTask(e, tIn, 'B1')).toMatchObject({ status: 'not_required', determination_pending: false });
     // the manual "this document applies" stays possible on the in-house site
     const declared = await e.api.call('post', `/tasks/${tIn}/slots`, { doc_code: 'B1' });
     expect(declared.status).toBe(201);
     expect(declared.body.status).toBe('missing');
-    // a Procurement record of a scope that is not a B1 source (TE Installation) does not decide B1
+    // an approved order of a scope that is not a B1 source (TE Installation) does not decide B1: still pending
     const te = await makeSite(db, R, { prefix: 'Q130B' });
     const tTe = await makeTask(db, te, 'B1', 'entry');
-    expect((await e.api.call('post', recPath('procurement'), { site_id: te.id, data: { ...PROC, scope: 'TE Installation', delivery: 'Outsourced' } })).status).toBe(201);
-    expect(await slotOfTask(e, tTe, 'B1')).toMatchObject({ status: 'not_required' });
+    await approvedProc(te.id, { ...PROC, scope: 'TE Installation', delivery: 'Outsourced' });
+    expect(await slotOfTask(e, tTe, 'B1')).toMatchObject({ status: 'not_required', determination_pending: true });
+    // a mixed answer (one order in-house, one without a delivery) is pending too, never "the latest order"
+    const mixed = await makeSite(db, R, { prefix: 'Q130B' });
+    const tMix = await makeTask(db, mixed, 'B1', 'entry');
+    await approvedProc(mixed.id, { scope: 'CW', delivery: 'In-House', po_wo_no: 'WO-2', po_wo_date: '2026-01-05', order_status: 'Open' });
+    await approvedProc(mixed.id, { scope: 'Tower Erection', pr_no: 'PR-9', pr_date: '2026-01-05', order_status: 'Open' });
+    expect(await slotOfTask(e, tMix, 'B1')).toMatchObject({ determination_pending: true });
+    // a pending determination blocks the approval of the task (database gate), unless Data Entry declared that the document applies
+    const blocked = await db.query(`UPDATE task_instances SET state = 'approved' WHERE id = $1`, [tTe]).then(() => 'ok', (err: Error) => err.message);
+    expect(blocked).toContain('document_rule_pending');
+    expect((await e.api.call('post', `/tasks/${tTe}/slots`, { doc_code: 'B1' })).status).toBe(201);
+    expect(await slotOfTask(e, tTe, 'B1')).toMatchObject({ status: 'missing', determination_pending: false });
   });
 });
 
@@ -303,7 +319,7 @@ async function snagTeam(): Promise<{ e: Actor; a: Actor; site: { id: string; cod
 describe('Q132: QC snag photos', () => {
   it('EXIF date before the raise is refused, within one day of tolerance accepted, after accepted, none accepted with the unknown-capture-date flag; format, shot type and count follow the type', async () => {
     const { e, a, site } = await snagTeam();
-    const r = await a.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'CW', title: 'Crack at plinth' });
+    const r = await a.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'CW', title: 'Crack at plinth', severity: 'MAJOR' });
     expect(r.status).toBe(201);
     expect(r.body).toMatchObject({ state: 'open', scope: 'CW', photos: [], photos_required: 2 });
     expect(r.body.allowed_actions).toEqual([]);
@@ -357,7 +373,9 @@ describe('Q132: QC snag photos', () => {
     const { e, a, site } = await snagTeam();
     const pac = await makeTask(db, site, 'B13', 'entry', { actualDate: '2026-01-05' });
     await setCell(db, 'B13', R, 'entry', { user: [e.user.id] });
-    const id = (await a.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, task_id: pac, title: 'Paint missing on tower leg' })).body.id as string;
+    // the inspector raises the snag; the L2 who approves the closure is somebody else (D230b)
+    const inspector = await actor(app, db, { level: 'entry', regions: [R], grants: G('quality', 'view', 'create') });
+    const id = (await inspector.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, task_id: pac, title: 'Paint missing on tower leg', severity: 'MAJOR' })).body.id as string;
     let s = await snag(a, id);
     expect(s).toMatchObject({ state: 'open' });
     expect((await a.api.call('get', `/snags/${id}`)).body.scope).toBe('CW'); // from the task (CW PAC)
@@ -414,22 +432,34 @@ describe('Q132: QC snag photos', () => {
     expect((await e.api.call('get', `/sites/${site.id}`)).body.counts.open_snags).toBe(0);
   });
 
-  it('B5: a person who holds L1 and L2 closes the snag with the submission (self-approval, step-up); a caller without the Quality module cannot raise one', async () => {
+  it('D230b: a person who holds L1 and L2 cannot close a snag they fixed or raised (no self-approval for snags); a caller without the Quality module cannot raise one', async () => {
     const { site } = await snagTeam();
     const both = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'create', 'edit', 'approve') });
+    const other = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'approve') });
     const outsider = await actor(app, db, { level: 'entry', regions: [R], grants: [['sites', 'view']] });
-    await regCell(db, 'quality', R, 'entry', { user: [both.user.id] });
-    await regCell(db, 'quality', R, 'approve', { user: [both.user.id] });
-    expect((await outsider.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'TE', title: 'Loose cable tray' })).status).toBe(403);
-    const r = await both.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'TE', title: 'Loose cable tray' });
+    await regCell(db, 'quality_te', R, 'entry', { user: [both.user.id] });
+    await regCell(db, 'quality_te', R, 'approve', { user: [both.user.id, other.user.id] });
+    expect((await outsider.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'TE', title: 'Loose cable tray', severity: 'MAJOR' })).status).toBe(403);
+    const r = await both.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, scope: 'TE', title: 'Loose cable tray', severity: 'MAJOR' });
     expect(r.status).toBe(201);
-    expect((await both.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, title: 'No stream' })).status).toBe(422);
+    expect(r.body.ball_in_court.matrix_row).toBe('quality_te');
+    expect((await both.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: snagType, title: 'No stream', severity: 'MAJOR' })).status).toBe(422);
     await photo(both, r.body.id, jpegWithExif(null), 'wide');
     await photo(both, r.body.id, jpegWithExif(null), 'close');
     const s = await snag(both, r.body.id);
-    const done = await act(both, r.body.id, 'submit', s.version);
-    expect(done.status).toBe(200);
-    expect(done.body).toMatchObject({ state: 'closed', self_approval: true });
+    const sub = await act(both, r.body.id, 'submit', s.version);
+    expect(sub.status).toBe(200);
+    expect(sub.body).toMatchObject({ state: 'in_review', self_approval: false, approval_blocked: 'self_approval_forbidden' });
+    expect(sub.body.allowed_actions).not.toContain('approve');
+    const self = await act(both, r.body.id, 'approve', sub.body.version);
+    expect(self.status).toBe(403);
+    expect(self.body.code).toBe('self_approval_forbidden');
+    const ok = await act(other, r.body.id, 'approve', sub.body.version);
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ state: 'closed', self_approval: false });
+    expect(ok.body.approved_by.id).toBe(other.user.id);
+    expect(ok.body.fixed_by.id).toBe(both.user.id);
+    expect(ok.body.found_by.id).toBe(both.user.id);
     const list = await both.api.call('get', `/sites/${site.id}/snags?state=closed`);
     expect(list.body.items.map((x: { id: string }) => x.id)).toContain(r.body.id);
   });

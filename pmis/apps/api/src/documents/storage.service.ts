@@ -156,6 +156,8 @@ export interface MetaStore {
   expiredExports(limit: number): Promise<{ export_id: string; storage_key: string; expires_at: Date }[]>;
   exportPurged(exportId: string): Promise<void>;
   malwareAlert(title: string, detail: Record<string, unknown>, dedup: string): Promise<void>;
+  /** The scan state of each key (Q195, migration 0056): `legacy` for an object without an envelope. */
+  scanStates?(keys: string[]): Promise<Map<string, Envelope['scan_status'] | 'legacy'>>;
 }
 
 /** What the storage layer tells the System Log and the security alerts. */
@@ -218,6 +220,14 @@ export class DbMetaStore implements MetaStore {
   }
   async malwareAlert(title: string, detail: Record<string, unknown>, dedup: string): Promise<void> {
     await this.db.client.$executeRaw(Prisma.sql`SELECT storage_malware_alert(${title}::text, ${JSON.stringify(detail)}::jsonb, ${dedup}::text, NULL::uuid)`);
+  }
+  async scanStates(keys: string[]): Promise<Map<string, Envelope['scan_status'] | 'legacy'>> {
+    const out = new Map<string, Envelope['scan_status'] | 'legacy'>();
+    for (let i = 0; i < keys.length; i += 5000) {
+      const rows = await this.db.tx.$queryRaw<{ storage_key: string; scan_status: string }[]>(Prisma.sql`SELECT * FROM storage_scan_states(${keys.slice(i, i + 5000)}::text[])`);
+      for (const r of rows) out.set(r.storage_key, r.scan_status as Envelope['scan_status'] | 'legacy');
+    }
+    return out;
   }
 }
 
@@ -296,6 +306,16 @@ export class ProtectedStorage implements ObjectStorage {
     await this.encryptAndStore(key, createReadStream(path), size, 'clean');   // generated content (zip exports): not scanned
   }
 
+  /**
+   * Content the PMIS generated itself, with no user file inside (CSV log exports, owner answer Q195): encrypted like every object but not sent to the
+   * virus scanner, so a clamd outage does not stop the export. The caller sanitizes the content (CSV cells that could run as a formula are quoted).
+   * A zip of uploaded files never comes here: it is built only from files that passed the scan.
+   */
+  async putGenerated(key: string, body: Buffer): Promise<void> {
+    checkKey(key);
+    await this.encryptAndStore(key, Readable.from(chunked(body)), body.length, 'clean');
+  }
+
   async putStream(key: string, body: Readable, size: number, replace = false): Promise<void> {
     checkKey(key);
     await this.encryptAndStore(key, body, size, 'clean', replace);
@@ -306,6 +326,10 @@ export class ProtectedStorage implements ObjectStorage {
     const row = await this.meta.get(key);
     if (!row) return this.raw.get(key);                     // legacy plaintext object
     if (row.scan_status === 'infected') throw new ProblemException(404, 'not_found', { detail: 'The file does not exist.' });
+    // Q195: a file stored while the scanner was down (fail_open) stays in quarantine until the rescan passes it
+    if (row.scan_status === 'pending_rescan') {
+      throw new ProblemException(409, 'file_pending_scan', { detail: 'The file waits for the virus scan and cannot be downloaded yet: try again later.' });
+    }
     const master = this.keys.keys.get(row.key_id);
     if (!master) throw new Error(`no master key for ${row.key_id}`);
     const dataKey = unwrapDataKey(master, row.wrapped_key);
@@ -326,14 +350,22 @@ export class ProtectedStorage implements ObjectStorage {
         if (n > expected) { dec.destroy(); throw new Error('storage: object longer than its envelope (integrity)'); }
         parts.push(c as Buffer);
       }
-      return Readable.from([Buffer.concat(parts)]);
+      const plain = Buffer.concat(parts);
+      // Q199: besides the GCM tag, the plaintext must match the recorded size and SHA-256 before a byte is released
+      if (plain.length !== expected || sha256Hex(plain) !== row.plain_sha256) throw new Error('storage: object does not match its envelope (integrity)');
+      return Readable.from([plain]);
     }
     const dir = await fs.mkdtemp(join(tmpdir(), 'pmis-dec-'));   // mode 0700, owned by the API user
     const tmp = join(dir, 'spool');
     const ek = randomBytes(32);
     const iv = randomBytes(16);
+    const tap = new Sha256Tap();
+    let spooled = 0;
+    const count = new Transform({ transform(c: Buffer, _e, cb) { spooled += c.length; cb(null, c); } });
     try {
-      await pipeline(dec, createCipheriv('aes-256-ctr', ek, iv), createWriteStream(tmp, { mode: 0o600, flags: 'wx' }));   // tag checked at the end
+      await pipeline(dec, tap.stream, count, createCipheriv('aes-256-ctr', ek, iv), createWriteStream(tmp, { mode: 0o600, flags: 'wx' }));   // tag checked at the end
+      // Q199: the size and the SHA-256 of the plaintext are checked too, before the response starts
+      if (spooled !== expected || tap.digest() !== row.plain_sha256) throw new Error('storage: object does not match its envelope (integrity)');
     } catch (e) {
       await fs.rm(dir, { recursive: true, force: true });
       throw e;

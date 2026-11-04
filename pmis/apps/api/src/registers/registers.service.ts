@@ -424,6 +424,14 @@ export class RegistersService {
       const g = await grant(module, action);
       return g === null || (g.length > 0 && (region === null || g.includes(region)));
     };
+    // Q234 (migration 0056): a Quality snag record and its QC snag are one work item; the record shows the snag's state (the snag is closed only by
+    // the QC photo flow). An approved snag record without a snag could not be linked (no Stage / stream): it shows as needs_review.
+    const snagRecs = rows.filter((r) => r.register_key === 'quality' && r.record_type === 'snag').map((r) => r.entity_id);
+    const qcSnags = new Map(snagRecs.length
+      ? (await this.db.tx.$queryRaw<{ entity_id: string; id: string; status: string; scope: string }[]>(Prisma.sql`
+          SELECT register_entity_id::text AS entity_id, id::text AS id, status::text AS status, scope FROM snags WHERE register_entity_id = ANY(${snagRecs}::uuid[])`)).map((x) => [x.entity_id, x])
+      : []);
+    const QC_STATE: Record<string, string> = { open: 'open', fix_uploaded: 'fix_submitted', in_review: 'in_review', closed: 'closed', cancelled: 'cancelled' };
     const out: Record<string, unknown>[] = [];
     for (const r of rows) {
       if (!defs.has(r.register_key)) defs.set(r.register_key, await this.definition(r.register_key));
@@ -457,6 +465,11 @@ export class RegistersService {
         warnings: Array.isArray(r.warnings) ? r.warnings : [],
       };
       if (r.task_id && r.task_code) dto.task = { id: r.task_id, task_code: r.task_code };
+      if (r.register_key === 'quality' && r.record_type === 'snag') {
+        const qs = qcSnags.get(r.entity_id);
+        dto.qc_snag = qs ? { id: qs.id, state: QC_STATE[qs.status] ?? qs.status, scope: qs.scope, link: 'linked' }
+          : { id: null, state: null, scope: null, link: r.state === 'approved' ? 'needs_review' : 'on_approval' };
+      }
       if (party) dto.external_party = party;
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);

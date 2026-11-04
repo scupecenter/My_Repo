@@ -97,7 +97,7 @@ SELECT doc_record_submit_gate();
 -- @title Nobody signed in raises a snag
 -- @category documents
 -- @expect error 42501 no signed-in actor
-SELECT qc_raise_snag('{{SITE_TRI}}', gen_random_uuid(), NULL, 'CW', 'Synthetic snag', NULL);
+SELECT qc_raise_snag('{{SITE_TRI}}', gen_random_uuid(), NULL, 'CW', 'Synthetic snag', NULL, 'MAJOR', NULL);
 -- @end
 
 -- @case RSN-12

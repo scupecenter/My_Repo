@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.3
+  version: 0.12.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.4 (2026-11-04): additive, plus two rule changes the owner decided. Work package P6 of the owner answers of 2026-11-04 (documents, QC snags and storage; migration 0056; CHANGELOG 82). (1) Storage (Q195, Q199): a file stored while the virus scanner was down (`pending_rescan`) stays in quarantine: `GET /files/{file_id}/download` answers 409 `file_pending_scan` until the rescan passes it, and a zip export leaves it out and lists it in its `manifest.csv`; CSV log exports are generated content and no longer pass the scanner; every download is released only after the GCM tag, the size and the SHA-256 of the plaintext are verified. (2) Documents: `DocumentSlot.determination_pending` (Q226: B1 reads only the approved Procurement orders in force; with no approved order, an order without a delivery or mixed values the PR e-mail rule is pending, shown as not required with this flag, and the task cannot be approved: 422 `document_rule_pending`, unless Data Entry declared that the document applies); `DocumentSlot.shared_with` (Q227: a document type placed on a task and on the register of its source record is one requirement; a current file on either slot fills both); slots on global register records (Q228: Contractors, Risks, Meetings; `site_code` `GLOBAL`; visibility from the register module); `DocumentSlot.inherited_approval` and the setting `new_version_inherit` (Q229). (3) `GET` and `PUT /settings/documents-qc` (`DocumentsQcSettings`: `new_version_inherit`, `exif_tolerance_hours`, the read-only scan scope; System Admin or a delegate of `document_types` edit, reason, If-Match). (4) QC snags: `SnagInput.severity` is required and `found_by` optional (Q233, Q230); `GET` and `PUT /snag-severities` (the editable severity catalogue); `SnagType.stream` and `blocking_rule` (`always`, `by_severity`, `never`; QC_GENERAL stays `always`); `Snag.severity`, `severity_missing`, `blocks_acceptance`, `found_by`, `fixed_by`, `approved_by`, `register_record`, `approval_blocked`; **rule change D230b**: a snag is never self-approved: whoever raised, found or fixed it answers 403 `self_approval_forbidden` on approve, and the submission never closes it (B5 stays for every other task and record); an L2 cell set to `all_members` is honoured (Q231, `BallInCourt.votes_needed` / `votes_done`); `MatrixRowKey` gains `quality_te` (the Quality - TE row of QC snags, Q230); **rule change Q232**: a fix photo whose EXIF date (read in Africa/Tripoli) is in the future beyond the tolerance is kept as `pending_evidence` and decided by L2 through `POST /snags/{snag_id}/photos/{photo_id}/evidence`. (5) `RegisterRecord.qc_snag` (Q234, Q103): the approval of a Quality record of type snag creates or updates its QC snag; the snag is closed only by the QC photo flow.
     - 0.12.3 (2026-11-04): additive except where noted. Logs, monitoring and the mail service (work package P9, owner answers Q165 and Q167 to Q171 of 2026-11-04; migration 0055; CHANGELOG 81). (1) Q165: `Role.capabilities` (`audit_full_reader`, `team_lead`) decide who reads the whole Audit Log and who reads it as a Team Lead; `RolePatch.capabilities` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up, audited as `role_capabilities_set`). The settings `logs.audit.full_reader_roles` and `logs.audit.team_lead_roles` are used only while no role carries the capability. (2) Q167: the outbound mail service (SMTP from the environment). Security alerts are mailed to every active System Admin from `email_min_severity` up; other notification kinds only when listed in the setting `mail.notification_kinds` (empty during development). New `GET /admin/mail/status`, `POST /admin/mail/test` (System Admin; 422 `mail_not_configured` without SMTP), `GET /admin/mail/outbox` (no bodies) and `POST /admin/mail/outbox/{mail_id}/retry`. The channel reads `verified` only after a test mail went out with the current settings. New `GET /health` (no session; words only) for an external monitor. (3) Q168: `SecurityAlertSettings` gains `severity` (per rule), `mandatory_severity`, `email_min_severity` and `trusted_networks`; the input takes `severity`, `email_min_severity` and `trusted_networks` optionally (left out = kept); lowering a severity, raising the mail floor or adding a network is a weakening (step-up, alert). `SecurityAlert.severity` gains `info` (a new address inside a trusted network is softened one level, never dropped); `SecurityAlertRule` gains `malware_upload` (0.11.2) and `break_glass_used` (critical). Sign-in limiting per address is progressive: failures only, free up to 10 in 15 minutes, then a wait from 2 s doubling up to 60 s (429 `rate_limited` with `Retry-After`). (4) Q169: `GET /reports/activity?format=xlsx` answers the workbook (Summary, User Activity, Module Activity, Exports, Exceptions, About; no security log; audited as `report.activity_export`). (5) Q170: an Audit Log or security log export that matches more than 100 000 rows answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `*.export_refused`); nothing is cut. (6) Q171: `POST /admin/log-integrity/runs` starts the check as a job (202, `LogIntegrityRun` with `progress`), `GET /admin/log-integrity/runs` and `GET /admin/log-integrity/runs/{run_id}`; the same check runs every night (job `audit_integrity_check`) with the stored result and an external anchor; a break or `anchor_mismatch` raises `audit_integrity_failure`. `GET /audit-log/integrity` and `GET /security-log/integrity` answer 422 `integrity_too_large` above the setting `logs.integrity.sync_max_rows` (default 200 000). `ErrorCode` gains `too_many_rows`, `integrity_too_large` and `mail_not_configured`.
     - 0.12.2 (2026-11-04): additive. Work package P11 of the owner answers of 2026-11-04 (Q215, Q216, Q217, Q220, Q221, Q222, decision D220b; migration 0054; CHANGELOG 87). (1) Q215: every task or register record converted to the two fixed levels (by 0050 or now) sends one in-app notice, `NotificationKind` `levels_converted`, to the old reviewer and to the entry person, saying what changed and who is asked now. (2) Q216: `WorkflowStep.previous_path` and `RegisterRecordStep.previous_path` are true for the review and approve acts of the old 3-level path recorded before the conversion; the screens label them "previous path before conversion". (3) Q217: open items frozen on a one-level snapshot are converted to L1 / L2 after an impact report; an item whose L2 has no holder is held: its submission answers 422 `empty_cell` until the Responsibility Matrix names an L2 holder (System Admins alerted with `no_eligible_holder`). (4) Q220 / D220b: a permit's stream follows the activity. New Matrix rows `permits_hse_acq` (Acquisition / RF & Design; default L1 Acquisition Team and RF Engineer, L2 RF & Design / Acquisition Team Lead) and `permits_hse_om` (O&M; no default holder) beside `permits_hse` (CW) and `permits_hse_te`. City Council and Civil Aviation are on Acquisition / RF & Design; the purpose-based types (Access / PTW - Dismantle, Access - Survey, Access - QC / Maintenance, Security Clearance, Other Permit) carry the new Permits & HSE field `permit_stream` (`CW`, `TE`, `ACQ`, `OM`), chosen by the person entering the permit and required for those types; it decides the Matrix row. Refusals (422 `validation_failed`, path `/data/permit_stream`): `stream_required`, `stream_not_allowed`, `stream_fixed`. (5) Q221: the entry check of a permit runs at every save and at submit (403 `not_eligible_holder`). New `POST /registers/{register_key}/records/{record_id}/transfer` (Permits & HSE drafts only; `If-Match`, optional `note`): the holder of a draft who no longer holds L1 of its row hands it over, or a qualified holder takes over a draft held by such a person; the draft is pinned to the only qualified holder (or left to all of them), and both sides get `NotificationKind` `permit_transferred`; `RegisterRecord.allowed_actions` gains `transfer` and `RegisterRecordStep.action` gains `transfer`. (6) Q222: `RegisterDefinition.entry_permit_types` (Permits & HSE only) lists the permit types the caller may enter and the streams they may choose (`PermitEntryType`); the form offers only those, the database decides again on every write.
     - 0.12.1 (2026-11-04): work package P7, the Warehouse follow-up of the owner answers Q105, Q106, Q107 and decision D6 (migration 0053; CHANGELOG 83). Additive except where noted. (1) Q105: a Faulty or Damaged return goes to quarantine, never back to the available stock: `StockLevel.quarantine` is new and `on_hand` / `available` count only Good returns; the effective condition of each return line is written on the line when the RN posts; an RN with the reason "Faulty or Damaged" is refused on submit (422 `validation_failed`, `errors[].code` `condition_required` on `/lines/<n>/condition`) until every line or the document names a condition. (2) Q106: the numbering service is built: `GET /number-sequences`, `POST /number-sequences` and `PATCH /number-sequences/{sequence_key}` (System Admin or a delegate of `settings.edit` for all regions, a reason, audited; unknown keys 422; `next_value` only up, `only_up`; a pattern needs `{SEQ:n}` once and, for a yearly reset, the year: `sequence_token`, `year_required`). `NumberSequence` gains `record_type`, `region_id`, `region_code`, `last_issued_at` and `updated_at`; `form_kind` is now optional (a sequence numbers a form kind, a warehouse document type, or both). Seed: the Q32 CW sequences of Tripoli (`DN-CW-TR`, `RN-CW-TR`, `PAC-CW-TR`, `FAC-CW-TR`, `SL-CW-TR`) and, as assumptions, `DN-TE-TR`, `RN-TE-TR`, `PL-WH`, `OPEN-WH`, `ADJ-WH`. `POST /warehouse/movements` without `doc_no` takes the next number of the active sequence of its type and region (none = it stays empty and is typed before the submit); a typed number is still accepted when it is unique and was never issued by a sequence (409 otherwise). `StockMovement` gains `doc_no_locked`, `sequence_key` and `doc_date`: once posted, the Doc No. is locked, and an edit or a new version of its record that changes it answers 422 `validation_failed` with `doc_no_locked` on `/data/doc_no`. (3) Q107: `WarehouseItem.code_source` (`master`, `internal_provisional`); `NeedRule.status` (`confirmed`, `pending_configuration`, the default; a confirmed need has a quantity); `NeedRule.quantity_rule` and `applies_when` are now `NeedQuantityRule` and `NeedAppliesWhen` (documented shapes, unknown keys 422; they replace the generic `ConditionRule`, which no server ever read). (4) D6: `GET /warehouse/dispatch-status` (TE sites of the caller's regions, filters `need_status`, `region_id`, `q`) and `GET /warehouse/dispatch-status/{site_id}` (`SiteDispatch` with its lines): `te_dispatch_complete_date` is the date of the latest posted TE DN (Q65, for the Master comparison); `need_status` is the separate PMIS status `complete`, `short`, `pending_configuration` (a pending need, or a count that cannot be made yet: never complete) or `not_applicable`. (5) `GET /warehouse/region-vendors` and `PUT /warehouse/region-vendors/{region_id}` (Setting tblRegionVendor, D58; System Admin or a delegate of `warehouse.items.edit`; a reason; audited), and `GET /warehouse/config-gaps` (the owner data still missing).
@@ -5580,6 +5581,48 @@ paths:
                   items: { type: array, items: { $ref: '#/components/schemas/SlaMasterColumn' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /settings/documents-qc:
+    get:
+      tags: [settings]
+      operationId: getDocumentsQcSettings
+      summary: Documents and QC settings (Q229, Q232) and the scope of the virus scan (Q195)
+      description: The Settings screen (admin.settings view) or the Document Library (document_types view).
+      responses:
+        '200':
+          description: Settings.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentsQcSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setDocumentsQcSettings
+      summary: Set the documents and QC settings
+      description: System Admin or a delegate of document_types edit for all regions; a reason and If-Match; unknown keys are refused; audited with before and after.
+      x-db-path: admin_save_documents_qc
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DocumentsQcSettingsPut'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DocumentsQcSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/team-scope-match:
     get:
       tags: [settings]
@@ -8251,7 +8294,7 @@ paths:
       operationId: uploadSnagPhoto
       summary: Upload a fresh photo of the fix
       x-db-path: qc_attach_photo
-      description: By L1 (Data Entry of the Quality register row) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date is more than one day before the snag was raised (EXIF has no time zone), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
+      description: By L1 (Data Entry of the Quality register row, or Quality - TE for a TE snag) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date (read in Africa/Tripoli) is before the raise by more than the tolerance (setting `exif_tolerance_hours`, default 24); a date in the future beyond the tolerance is stored as `pending_evidence` (0.12.4, Q232), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
       requestBody:
         required: true
         content:
@@ -8307,8 +8350,7 @@ paths:
       tags: [qc]
       operationId: submitSnag
       summary: Submit the fix photos for review (site engineer)
-      description: L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules. When the caller also holds L2 (any one member) the submission closes the snag (B5, step-up, `self_approval`).
-      x-step-up: when the caller holds L1 and L2 (self-approval, B5)
+      description: L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules (a pending_evidence photo does not count). The submission always goes to L2 (0.12.4, D230b, never a self-approval); an all-members L2 asks every eligible approver except the raiser, the finder and the fixer.
       x-db-path: qc_transition_snag
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -8361,7 +8403,7 @@ paths:
       tags: [qc]
       operationId: approveSnag
       summary: 'Approve: closes the snag'
-      description: L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream.
+      description: L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream. 0.12.4 (D230b) 403 `self_approval_forbidden` for whoever raised, found or fixed the snag (submitted it or uploaded a photo of it). With an all-members L2 (Q231) each voter approves once; the last vote closes the snag.
       x-step-up: true
       x-db-path: qc_transition_snag
       parameters:
@@ -8409,6 +8451,77 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /snags/{snag_id}/photos/{photo_id}/evidence:
+    parameters:
+    - {$ref: '#/components/parameters/SnagId'}
+    - name: photo_id
+      in: path
+      required: true
+      schema: {type: string, format: uuid}
+    post:
+      tags: [qc]
+      operationId: decideSnagEvidence
+      summary: Accept or reject a photo kept as pending evidence (L2)
+      description: '0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix. Reject: it leaves the set (kept on record).'
+      x-db-path: qc_decide_evidence
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SnagEvidenceDecision'}
+      responses:
+        '200':
+          description: The snag after the decision.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Snag'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /snag-severities:
+    get:
+      tags: [qc]
+      operationId: listSnagSeverities
+      summary: The severity catalogue of QC snags (Q233)
+      responses:
+        '200':
+          description: Severities in display order.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnagSeverityList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [qc]
+      operationId: setSnagSeverities
+      summary: Replace the severity catalogue (System Admin or a delegate of document_types edit)
+      description: The whole list in display order, a reason and If-Match. Unknown keys and duplicate codes are refused with field errors; a code cannot be removed (422 `cannot_remove`), only deactivated. Audited with before and after.
+      x-db-path: admin_save_snag_severities
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SnagSeveritiesPut'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SnagSeverityList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
@@ -9802,6 +9915,9 @@ components:
         - too_many_rows
         - integrity_too_large
         - mail_not_configured
+        - self_approval_forbidden
+        - document_rule_pending
+        - file_pending_scan
     PageEnvelope:
       type: object
       required: [items, page]
@@ -10747,6 +10863,7 @@ components:
         claimed_by: { $ref: '#/components/schemas/UserRef' }
         votes_done: { type: integer }
         votes_needed: { type: integer }
+        matrix_row: { type: string, description: '0.12.4: the Matrix row a QC snag takes this level from (quality or quality_te).' }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         no_eligible_holder: { type: boolean }
     ExternalPartyRef:
@@ -10886,6 +11003,20 @@ components:
         camera_only: { type: boolean }
         blank_form_file_id: { type: [string, 'null'], format: uuid }
         valid_to: { type: [string, 'null'], format: date }
+        determination_pending: { type: boolean, description: '0.12.4 (Q226): the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order with a delivery). Shown as not required; the task cannot be approved until it is decided or Data Entry declares that the document applies.' }
+        inherited_approval: { type: boolean, description: '0.12.4 (Q229): the slot kept the approval of the previous version of its record; a replacement sends it back to L2.' }
+        shared_with:
+          type: [object, 'null']
+          description: '0.12.4 (Q227): the same requirement on the task or on its source register record; a current file there (uploaded, in review or approved) fills this slot too.'
+          properties:
+            slot_id: { type: string, format: uuid }
+            owner: { type: string, enum: [task, register_record] }
+            task_id: { type: string, format: uuid }
+            task_code: { type: string }
+            register_key: { type: string }
+            register_entity_id: { type: string, format: uuid }
+            status: { type: string }
+            has_file: { type: boolean }
         files: { type: array, items: { $ref: '#/components/schemas/DocumentFile' } }
     AllowedAction:
       type: object
@@ -11084,8 +11215,8 @@ components:
         in_flight: { type: integer, minimum: 0, description: 'Submitted at least once and not finished: they keep the level path frozen at their first submission.' }
     MatrixRowKey:
       type: string
-      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220).'
-      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, permits_hse_acq, permits_hse_om, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
+      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220). 0.12.4: `quality_te`, the row of the TE stream of QC snags (Q230; a TE snag uses its region cell, else the Quality region cell, else its global cell, else the Quality global cell).'
+      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, permits_hse_acq, permits_hse_om, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle, quality_te]
     Matrix:
       type: object
       required: [workflow_version, stages, version]
@@ -12542,6 +12673,14 @@ components:
           properties:
             id: { type: string, format: uuid }
             task_code: { type: string }
+        qc_snag:
+          type: object
+          description: '0.12.4 (Q234, Q103): a Quality record of type snag and its QC snag are one work item. `on_approval`: the snag is created by the final approval; `linked`: the snag and its state; `needs_review`: approved but not linked (no stream from the Stage).'
+          properties:
+            id: { type: [string, 'null'], format: uuid }
+            state: { type: [string, 'null'], enum: [open, fix_submitted, in_review, closed, cancelled, null] }
+            scope: { type: [string, 'null'], enum: [CW, TE, null] }
+            link: { type: string, enum: [linked, on_approval, needs_review] }
         self_approval: { type: boolean }
         approved_by: { $ref: '#/components/schemas/UserRef' }
         approved_at: { type: [string, 'null'], format: date-time }
@@ -13123,7 +13262,9 @@ components:
         name_en: { type: string }
         name_ar: { type: [string, 'null'] }
         photo_rules: { $ref: '#/components/schemas/PhotoRules' }
-        blocks_preliminary_acceptance: { type: boolean }
+        stream: { type: [string, 'null'], enum: [CW, TE, null], description: '0.12.4 (Q233): the stream the type is for; null = both.' }
+        blocking_rule: { type: string, enum: [always, by_severity, never], description: '0.12.4 (Q233): an open snag of this type blocks the PAC / FAC of its stream always, by the severity (a snag without a severity blocks), or never.' }
+        blocks_preliminary_acceptance: { type: boolean, description: 'blocking_rule is not never.' }
         is_active: { type: boolean }
         version: { type: integer }
     SnagTypeFields:
@@ -13132,8 +13273,81 @@ components:
         name_en: { type: string }
         name_ar: { type: string }
         photo_rules: { $ref: '#/components/schemas/PhotoRules' }
-        blocks_preliminary_acceptance: { type: boolean }
+        stream: { type: [string, 'null'], enum: [CW, TE, null] }
+        blocking_rule: { type: string, enum: [always, by_severity, never] }
+        blocks_preliminary_acceptance: { type: boolean, description: 'The old flag: false = never, true = always (ignored when blocking_rule is sent).' }
         is_active: { type: boolean }
+    SnagSeverity:
+      type: object
+      required: [code, name_en, blocks, is_active]
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        blocks: { type: boolean, description: 'An open snag of this severity blocks when its type blocks by severity.' }
+        is_active: { type: boolean }
+        in_use: { type: boolean, readOnly: true }
+    SnagSeverityList:
+      type: object
+      required: [items, version]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/SnagSeverity' } }
+        version: { type: integer }
+    SnagSeveritiesPut:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              minItems: 1
+              maxItems: 30
+              description: The whole list in display order. A code in the catalogue cannot be left out (deactivate it).
+              items:
+                type: object
+                required: [code, name_en, blocks]
+                additionalProperties: false
+                properties:
+                  code: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$' }
+                  name_en: { type: string, minLength: 2, maxLength: 100 }
+                  name_ar: { type: [string, 'null'], maxLength: 100 }
+                  blocks: { type: boolean }
+                  is_active: { type: boolean }
+    SnagEvidenceDecision:
+      type: object
+      required: [decision, note]
+      additionalProperties: false
+      properties:
+        decision: { type: string, enum: [accept, reject] }
+        note: { type: string, minLength: 3, maxLength: 500 }
+    DocumentsQcSettings:
+      type: object
+      required: [new_version_inherit, exif_tolerance_hours, version]
+      properties:
+        new_version_inherit: { type: boolean, description: 'Q229: a new version of an approved register record keeps the approval of its unchanged document slots (default false: every approved slot goes back to L2).' }
+        exif_tolerance_hours: { type: integer, minimum: 0, maximum: 168, description: 'Q232: tolerance of the EXIF date of a fix photo (default 24).' }
+        exif_time_zone: { type: string, readOnly: true, description: 'The time zone the EXIF wall clock is read in.' }
+        scan:
+          type: object
+          readOnly: true
+          description: 'Q195: what the virus scan covers (set on the server: MALWARE_SCAN, SCAN_FAILURE).'
+          properties:
+            mode: { type: string, enum: [clamd, 'off'] }
+            on_failure: { type: string, enum: [fail_closed, fail_open] }
+            uploads: { type: boolean }
+            generated_exports: { type: boolean }
+            zip_leaves_out_unscanned: { type: boolean }
+        version: { type: integer }
+        updated_at: { type: [string, 'null'], format: date-time }
+    DocumentsQcSettingsPut:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          minProperties: 2
+          properties:
+            new_version_inherit: { type: boolean }
+            exif_tolerance_hours: { type: integer, minimum: 0, maximum: 168 }
     SnagPhoto:
       type: object
       required: [id, file_id, status]
@@ -13141,8 +13355,9 @@ components:
         id: { type: string, format: uuid }
         file_id: { type: string, format: uuid }
         shot_type: { type: [string, 'null'] }
-        status: { type: string, enum: [accepted, rejected], description: 'rejected when the EXIF date is before the snag was raised, or the format or size is wrong.' }
+        status: { type: string, enum: [accepted, rejected, pending_evidence], description: 'rejected by L2 with a note; pending_evidence (0.12.4, Q232): the EXIF date is in the future beyond the tolerance, kept but not proof of the fix until L2 accepts it.' }
         reject_reason: { type: [string, 'null'] }
+        evidence_note: { type: [string, 'null'], description: 'Why the photo was kept as pending evidence, then the note of the L2 decision.' }
         captured_at: { type: [string, 'null'], format: date-time }
         unknown_capture_date: { type: boolean, description: 'No EXIF date: accepted with a flag for the reviewer.' }
         in_app_camera: { type: boolean }
@@ -13167,8 +13382,25 @@ components:
         photos: { type: array, items: { $ref: '#/components/schemas/SnagPhoto' } }
         photos_required: { type: integer }
         photos_missing: { type: array, description: 'What the photos still lack against the snag type rules (same shape as Problem.errors).', items: { type: object, properties: { path: { type: string }, code: { type: string }, message: { type: string }, shot_type: { type: string } } } }
-        self_approval: { type: boolean }
-        allowed_actions: { type: array, items: { type: string, enum: [upload, edit, submit, approve, reject] } }
+        self_approval: { type: boolean, description: 'Always false since 0.12.4 (D230b: a snag is never self-approved); true only on snags closed before.' }
+        severity: { type: [string, 'null'], description: '0.12.4 (Q233): a code of the severity catalogue. Null only on legacy snags (then severity_missing).' }
+        severity_label: { type: [object, 'null'], properties: { name_en: { type: string }, name_ar: { type: [string, 'null'] } } }
+        severity_missing: { type: boolean, description: 'Q109: a legacy snag without a severity; it blocks conservatively until one is set.' }
+        blocks_acceptance: { type: boolean, description: 'While open, the snag blocks the PAC / FAC of its stream (type rule and severity).' }
+        found_by: { $ref: '#/components/schemas/UserRef' }
+        fixed_by: { $ref: '#/components/schemas/UserRef' }
+        approved_by: { $ref: '#/components/schemas/UserRef' }
+        approval_blocked: { type: [string, 'null'], enum: [self_approval_forbidden, null], description: 'D230b: the caller raised, found or fixed the snag and may not approve it.' }
+        cancel_reason: { type: [string, 'null'] }
+        register_record:
+          type: [object, 'null']
+          description: '0.12.4 (Q234): the Quality register record of type snag this snag is the work item of; the snag is then changed through the record.'
+          properties:
+            register_key: { type: string, enum: [quality] }
+            entity_id: { type: string, format: uuid }
+            record_id: { type: [string, 'null'], format: uuid }
+            record_code: { type: [string, 'null'] }
+        allowed_actions: { type: array, items: { type: string, enum: [upload, edit, submit, approve, reject, decide_evidence] } }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
         raised_by: { $ref: '#/components/schemas/UserRef' }
@@ -13177,13 +13409,15 @@ components:
         version: { type: integer }
     SnagInput:
       type: object
-      required: [snag_type_id, title]
+      required: [snag_type_id, title, severity]
       properties:
         snag_type_id: { type: string, format: uuid }
         task_id: { type: string, format: uuid }
         scope: { type: string, enum: [CW, TE], description: 'Required unless task_id names a CW or TE task.' }
         title: { type: string, minLength: 3, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
+        severity: { type: string, minLength: 1, maxLength: 40, description: '0.12.4 (Q109, Q233): required; an active code of GET /snag-severities (or its English name).' }
+        found_by: { type: string, format: uuid, description: '0.12.4 (Q230): who found the defect, when not the caller (an active user).' }
     SnagRejectRequest:
       type: object
       required: [note]
@@ -13229,6 +13463,7 @@ components:
       properties:
         title: { type: string, minLength: 3, maxLength: 200 }
         description: { type: string, maxLength: 2000 }
+        severity: { type: string, minLength: 1, maxLength: 40 }
     # ---------------------------------------------------------- custom fields
     CustomFieldEntity:
       type: string

@@ -2490,7 +2490,12 @@
         "duplicate": "This code is in use.",
         "immutable": "The code never changes."
       }
-    }
+    },
+    "determination_pending": "Pending determination: this document depends on an approved Procurement order that does not exist yet. You may upload it now; the task cannot be approved until it is decided.",
+    "inherited_approval": "Approval kept from the previous version. Replacing the file sends it back for approval.",
+    "shared_task": "Same document as task {{code}}: one file is enough",
+    "shared_record": "Same document as the {{key}} record: one file is enough",
+    "shared_filled": "filled there"
   },
   "regWarnings": {
     "no_approved_hlc_pr": "The site has no approved HLC purchase request in Procurement yet.",
@@ -2728,7 +2733,8 @@
       "min_count": "More photos of the fix are needed.",
       "shot_type_missing": "A required shot is still missing.",
       "unknown_shot_type": "Choose one of the shot types of the snag type.",
-      "failed": "The action failed."
+      "failed": "The action failed.",
+      "self_approval_forbidden": "You raised, found or fixed this snag: somebody else must approve it."
     },
     "photo_added": "Photo added.",
     "done_submit": "Fix submitted for approval.",
@@ -2752,7 +2758,23 @@
     "open_count_one": "{{count}} open snag (it blocks the PAC and FAC of its stream)",
     "open_count_other": "{{count}} open snags (they block the PAC and FAC of their stream)",
     "load_failed": "The snags could not be loaded.",
-    "none": "No snag on this site."
+    "none": "No snag on this site.",
+    "severity": "Severity",
+    "severity_choose": "Choose…",
+    "severity_missing": "No severity: counts as blocking",
+    "from_record": "Quality record {{code}}",
+    "found_by": "Found by {{name}}",
+    "fixed_by": "Fixed by {{name}}",
+    "approved_by": "Approved by {{name}}",
+    "self_blocked": "You raised, found or fixed this snag: another approver must close it.",
+    "votes": "Approvals {{done}} of {{needed}} (all members)",
+    "pending_evidence": "Pending evidence (future date)",
+    "evidence_accept": "Accept as proof",
+    "evidence_reject": "Reject",
+    "evidence_accept_prompt": "Why is this photo accepted as proof of the fix? (3 characters or more)",
+    "evidence_reject_prompt": "Why is this photo rejected? (3 characters or more)",
+    "evidence_accepted": "The photo was accepted as proof.",
+    "evidence_rejected": "The photo was rejected."
   },
   "snagState": {
     "open": "Open",

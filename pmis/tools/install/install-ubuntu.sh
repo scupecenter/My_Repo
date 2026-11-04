@@ -699,7 +699,14 @@ fi
 
 # ---------------------------------------------------------------- optional: virus scan and backup of the stored files (owner answer Q134)
 # Each step asks once; an update keeps the answer (the settings it wrote stay in pmis.env and backup.env).
-if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1; elif (( AUTO )); then CLAM_ON=0; elif ask_yes "Install the ClamAV virus scan for uploads (needs about 1 GB of disk and an internet connection for the signatures)?"; then CLAM_ON=1; else CLAM_ON=0; fi
+# Owner answer Q195 (2026-11-04): the virus scan is ON by default on a production install, without a question. It is skipped only when the owner
+# says so: PMIS_VIRUS_SCAN=off on the command line, or MALWARE_SCAN=off already in pmis.env (an earlier explicit choice, kept on every update).
+if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1
+elif [[ ${PMIS_VIRUS_SCAN-} == off ]] || grep -q '^MALWARE_SCAN=off' "$CONF_DIR/pmis.env"; then
+  CLAM_ON=0
+  grep -q '^MALWARE_SCAN=' "$CONF_DIR/pmis.env" || echo 'MALWARE_SCAN=off' >> "$CONF_DIR/pmis.env"
+  echo "Virus scan of uploads: OFF by the owner's choice (PMIS_VIRUS_SCAN=off). Not recommended for production."
+else CLAM_ON=1; fi
 if (( CLAM_ON )); then say "Setting up the ClamAV virus scan"; bash "$PMIS_DIR/tools/install/install-clamav.sh"; fi
 if [[ -r $CONF_DIR/backup.env ]]; then BACKUP_ON=1; elif (( AUTO )); then BACKUP_ON=0; elif ask_yes "Back up the stored files every night with restic (encrypted, 14 daily, 8 weekly, 12 monthly)?"; then BACKUP_ON=1; else BACKUP_ON=0; fi
 if (( BACKUP_ON )); then say "Setting up the nightly backup of the stored files"; bash "$PMIS_DIR/tools/install/install-file-backup.sh"; fi

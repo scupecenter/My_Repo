@@ -136,7 +136,9 @@ export class WorkflowService {
   /** The database call alone (also used one by one by the bulk endpoint). */
   async transitionRaw(auth: AuthContext, taskId: string, action: TransitionAction, version: number | null, note: string | null): Promise<WfResult> {
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
-    if (action === 'submit') await this.documents.syncTaskById(taskId); // conditional documents that apply now are slots before the engine counts the missing ones
+    // conditional documents that apply now are slots before the engine counts the missing ones; Q226: before a review or an approval the
+    // "pending determination" flag of a rule is refreshed too (an approved Procurement order may have decided it since)
+    await this.documents.syncTaskById(taskId);
     const fn = action === 'submit' ? Prisma.sql`wf_submit` : action === 'review' ? Prisma.sql`wf_review` : Prisma.sql`wf_approve`;
     return this.call(auth, Prisma.sql`SELECT ${fn}(${taskId}::uuid, ${version}::int, ${note}::text, ${stepOk}::boolean) AS r`);
   }

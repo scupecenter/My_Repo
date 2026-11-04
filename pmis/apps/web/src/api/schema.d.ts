@@ -3563,6 +3563,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/documents-qc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Documents and QC settings (Q229, Q232) and the scope of the virus scan (Q195)
+         * @description The Settings screen (admin.settings view) or the Document Library (document_types view).
+         */
+        get: operations["getDocumentsQcSettings"];
+        /**
+         * Set the documents and QC settings
+         * @description System Admin or a delegate of document_types edit for all regions; a reason and If-Match; unknown keys are refused; audited with before and after.
+         */
+        put: operations["setDocumentsQcSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/team-scope-match": {
         parameters: {
             query?: never;
@@ -5157,7 +5181,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a fresh photo of the fix
-         * @description By L1 (Data Entry of the Quality register row) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date is more than one day before the snag was raised (EXIF has no time zone), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
+         * @description By L1 (Data Entry of the Quality register row, or Quality - TE for a TE snag) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date (read in Africa/Tripoli) is before the raise by more than the tolerance (setting `exif_tolerance_hours`, default 24); a date in the future beyond the tolerance is stored as `pending_evidence` (0.12.4, Q232), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
          */
         post: operations["uploadSnagPhoto"];
         delete?: never;
@@ -5201,7 +5225,7 @@ export interface paths {
         put?: never;
         /**
          * Submit the fix photos for review (site engineer)
-         * @description L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules. When the caller also holds L2 (any one member) the submission closes the snag (B5, step-up, `self_approval`).
+         * @description L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules (a pending_evidence photo does not count). The submission always goes to L2 (0.12.4, D230b, never a self-approval); an all-members L2 asks every eligible approver except the raiser, the finder and the fixer.
          */
         post: operations["submitSnag"];
         delete?: never;
@@ -5248,7 +5272,7 @@ export interface paths {
         put?: never;
         /**
          * Approve: closes the snag
-         * @description L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream.
+         * @description L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream. 0.12.4 (D230b) 403 `self_approval_forbidden` for whoever raised, found or fixed the snag (submitted it or uploaded a photo of it). With an all-members L2 (Q231) each voter approves once; the last vote closes the snag.
          */
         post: operations["approveSnag"];
         delete?: never;
@@ -5274,6 +5298,51 @@ export interface paths {
          * @description L2. The snag returns to the person who submitted it (B6) with the note; the photos named in `rejected_photos` become `rejected` and leave the set.
          */
         post: operations["rejectSnag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snags/{snag_id}/photos/{photo_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept or reject a photo kept as pending evidence (L2)
+         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix. Reject: it leaves the set (kept on record).
+         */
+        post: operations["decideSnagEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snag-severities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The severity catalogue of QC snags (Q233) */
+        get: operations["listSnagSeverities"];
+        /**
+         * Replace the severity catalogue (System Admin or a delegate of document_types edit)
+         * @description The whole list in display order, a reason and If-Match. Unknown keys and duplicate codes are refused with field errors; a code cannot be removed (422 `cannot_remove`), only deactivated. Audited with before and after.
+         */
+        put: operations["setSnagSeverities"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6065,7 +6134,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -6974,6 +7043,8 @@ export interface components {
             claimed_by?: components["schemas"]["UserRef"];
             votes_done?: number;
             votes_needed?: number;
+            /** @description 0.12.4: the Matrix row a QC snag takes this level from (quality or quality_te). */
+            matrix_row?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
             no_eligible_holder?: boolean;
         };
@@ -7162,6 +7233,25 @@ export interface components {
             blank_form_file_id?: string | null;
             /** Format: date */
             valid_to?: string | null;
+            /** @description 0.12.4 (Q226): the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order with a delivery). Shown as not required; the task cannot be approved until it is decided or Data Entry declares that the document applies. */
+            determination_pending?: boolean;
+            /** @description 0.12.4 (Q229): the slot kept the approval of the previous version of its record; a replacement sends it back to L2. */
+            inherited_approval?: boolean;
+            /** @description 0.12.4 (Q227): the same requirement on the task or on its source register record; a current file there (uploaded, in review or approved) fills this slot too. */
+            shared_with?: {
+                /** Format: uuid */
+                slot_id?: string;
+                /** @enum {string} */
+                owner?: "task" | "register_record";
+                /** Format: uuid */
+                task_id?: string;
+                task_code?: string;
+                register_key?: string;
+                /** Format: uuid */
+                register_entity_id?: string;
+                status?: string;
+                has_file?: boolean;
+            } | null;
             files: components["schemas"]["DocumentFile"][];
         };
         AllowedAction: {
@@ -7407,10 +7497,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220). 0.12.4: `quality_te`, the row of the TE stream of QC snags (Q230; a TE snag uses its region cell, else the Quality region cell, else its global cell, else the Quality global cell).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle" | "quality_te";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -8934,6 +9024,17 @@ export interface components {
                 id: string;
                 task_code: string;
             };
+            /** @description 0.12.4 (Q234, Q103): a Quality record of type snag and its QC snag are one work item. `on_approval`: the snag is created by the final approval; `linked`: the snag and its state; `needs_review`: approved but not linked (no stream from the Stage). */
+            qc_snag?: {
+                /** Format: uuid */
+                id?: string | null;
+                /** @enum {string|null} */
+                state?: "open" | "fix_submitted" | "in_review" | "closed" | "cancelled" | null;
+                /** @enum {string|null} */
+                scope?: "CW" | "TE" | null;
+                /** @enum {string} */
+                link?: "linked" | "on_approval" | "needs_review";
+            };
             self_approval?: boolean;
             approved_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
@@ -9588,6 +9689,17 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             photo_rules: components["schemas"]["PhotoRules"];
+            /**
+             * @description 0.12.4 (Q233): the stream the type is for; null = both.
+             * @enum {string|null}
+             */
+            stream?: "CW" | "TE" | null;
+            /**
+             * @description 0.12.4 (Q233): an open snag of this type blocks the PAC / FAC of its stream always, by the severity (a snag without a severity blocks), or never.
+             * @enum {string}
+             */
+            blocking_rule?: "always" | "by_severity" | "never";
+            /** @description blocking_rule is not never. */
             blocks_preliminary_acceptance: boolean;
             is_active: boolean;
             version: number;
@@ -9596,8 +9708,66 @@ export interface components {
             name_en?: string;
             name_ar?: string;
             photo_rules?: components["schemas"]["PhotoRules"];
+            /** @enum {string|null} */
+            stream?: "CW" | "TE" | null;
+            /** @enum {string} */
+            blocking_rule?: "always" | "by_severity" | "never";
+            /** @description The old flag: false = never, true = always (ignored when blocking_rule is sent). */
             blocks_preliminary_acceptance?: boolean;
             is_active?: boolean;
+        };
+        SnagSeverity: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description An open snag of this severity blocks when its type blocks by severity. */
+            blocks: boolean;
+            is_active: boolean;
+            readonly in_use?: boolean;
+        };
+        SnagSeverityList: {
+            items: components["schemas"]["SnagSeverity"][];
+            version: number;
+        };
+        SnagSeveritiesPut: components["schemas"]["WithReason"] & {
+            /** @description The whole list in display order. A code in the catalogue cannot be left out (deactivate it). */
+            items: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                blocks: boolean;
+                is_active?: boolean;
+            }[];
+        };
+        SnagEvidenceDecision: {
+            /** @enum {string} */
+            decision: "accept" | "reject";
+            note: string;
+        };
+        DocumentsQcSettings: {
+            /** @description Q229: a new version of an approved register record keeps the approval of its unchanged document slots (default false: every approved slot goes back to L2). */
+            new_version_inherit: boolean;
+            /** @description Q232: tolerance of the EXIF date of a fix photo (default 24). */
+            exif_tolerance_hours: number;
+            /** @description The time zone the EXIF wall clock is read in. */
+            readonly exif_time_zone?: string;
+            /** @description Q195: what the virus scan covers (set on the server: MALWARE_SCAN, SCAN_FAILURE). */
+            readonly scan?: {
+                /** @enum {string} */
+                mode?: "clamd" | "off";
+                /** @enum {string} */
+                on_failure?: "fail_closed" | "fail_open";
+                uploads?: boolean;
+                generated_exports?: boolean;
+                zip_leaves_out_unscanned?: boolean;
+            };
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        DocumentsQcSettingsPut: components["schemas"]["WithReason"] & {
+            new_version_inherit?: boolean;
+            exif_tolerance_hours?: number;
         };
         SnagPhoto: {
             /** Format: uuid */
@@ -9606,11 +9776,13 @@ export interface components {
             file_id: string;
             shot_type?: string | null;
             /**
-             * @description rejected when the EXIF date is before the snag was raised, or the format or size is wrong.
+             * @description rejected by L2 with a note; pending_evidence (0.12.4, Q232): the EXIF date is in the future beyond the tolerance, kept but not proof of the fix until L2 accepts it.
              * @enum {string}
              */
-            status: "accepted" | "rejected";
+            status: "accepted" | "rejected" | "pending_evidence";
             reject_reason?: string | null;
+            /** @description Why the photo was kept as pending evidence, then the note of the L2 decision. */
+            evidence_note?: string | null;
             /** Format: date-time */
             captured_at?: string | null;
             /** @description No EXIF date: accepted with a flag for the reviewer. */
@@ -9653,8 +9825,38 @@ export interface components {
                 message?: string;
                 shot_type?: string;
             }[];
+            /** @description Always false since 0.12.4 (D230b: a snag is never self-approved); true only on snags closed before. */
             self_approval?: boolean;
-            allowed_actions?: ("upload" | "edit" | "submit" | "approve" | "reject")[];
+            /** @description 0.12.4 (Q233): a code of the severity catalogue. Null only on legacy snags (then severity_missing). */
+            severity?: string | null;
+            severity_label?: {
+                name_en?: string;
+                name_ar?: string | null;
+            } | null;
+            /** @description Q109: a legacy snag without a severity; it blocks conservatively until one is set. */
+            severity_missing?: boolean;
+            /** @description While open, the snag blocks the PAC / FAC of its stream (type rule and severity). */
+            blocks_acceptance?: boolean;
+            found_by?: components["schemas"]["UserRef"];
+            fixed_by?: components["schemas"]["UserRef"];
+            approved_by?: components["schemas"]["UserRef"];
+            /**
+             * @description D230b: the caller raised, found or fixed the snag and may not approve it.
+             * @enum {string|null}
+             */
+            approval_blocked?: "self_approval_forbidden" | null;
+            cancel_reason?: string | null;
+            /** @description 0.12.4 (Q234): the Quality register record of type snag this snag is the work item of; the snag is then changed through the record. */
+            register_record?: {
+                /** @enum {string} */
+                register_key?: "quality";
+                /** Format: uuid */
+                entity_id?: string;
+                /** Format: uuid */
+                record_id?: string | null;
+                record_code?: string | null;
+            } | null;
+            allowed_actions?: ("upload" | "edit" | "submit" | "approve" | "reject" | "decide_evidence")[];
             return_count?: number;
             last_return_note?: string | null;
             raised_by?: components["schemas"]["UserRef"];
@@ -9676,6 +9878,13 @@ export interface components {
             scope?: "CW" | "TE";
             title: string;
             description?: string;
+            /** @description 0.12.4 (Q109, Q233): required; an active code of GET /snag-severities (or its English name). */
+            severity: string;
+            /**
+             * Format: uuid
+             * @description 0.12.4 (Q230): who found the defect, when not the caller (an active user).
+             */
+            found_by?: string;
         };
         SnagRejectRequest: {
             note: string;
@@ -9713,6 +9922,7 @@ export interface components {
         SnagPatch: {
             title?: string;
             description?: string;
+            severity?: string;
         };
         /** @enum {string} */
         CustomFieldEntity: "site" | "milestone" | "gate" | "task" | "rf_design" | "acquisition" | "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle";
@@ -17753,6 +17963,62 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    getDocumentsQcSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsQcSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDocumentsQcSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentsQcSettingsPut"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsQcSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getTeamScopeMatch: {
         parameters: {
             query?: never;
@@ -21128,6 +21394,95 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    decideSnagEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnagEvidenceDecision"];
+            };
+        };
+        responses: {
+            /** @description The snag after the decision. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snag"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSnagSeverities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Severities in display order. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnagSeverityList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setSnagSeverities: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnagSeveritiesPut"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnagSeverityList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

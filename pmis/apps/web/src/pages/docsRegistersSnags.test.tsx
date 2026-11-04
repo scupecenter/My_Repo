@@ -84,6 +84,9 @@ describe('Q132: QC snag photos', () => {
     await u.click(await screen.findByTestId('snag-raise'));
     await u.selectOptions(await screen.findByTestId('snag-raise-type'), await screen.findByRole('option', { name: 'Concrete crack' }));
     await u.type(screen.getByTestId('snag-raise-title'), 'Crack at plinth');
+    // a snag needs a severity (Q233, contract 0.12.4)
+    expect(screen.getByTestId('snag-raise-send')).toBeDisabled();
+    await u.selectOptions(screen.getByTestId('snag-raise-severity'), await screen.findByRole('option', { name: 'Major' }));
     await u.click(screen.getByTestId('snag-raise-send'));
     const card = (await screen.findAllByTestId(/^snag-[0-9a-f-]{36}$/))[0]!;
     const sid = card.dataset.testid!.replace('snag-', '');

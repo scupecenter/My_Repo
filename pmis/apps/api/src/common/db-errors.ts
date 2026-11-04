@@ -77,6 +77,15 @@ export function mapWfError(message: string): ProblemException | null {
         detail: m[1] === 'mandatory_slots_missing' ? 'Mandatory document slots are missing.' : 'Mandatory fields are missing.',
         extra: { missing: Array.isArray(extra.missing) ? extra.missing : [] },
       });
+    case 'self_approval_forbidden':
+      // D230b (migration 0056): the raiser, finder or fixer of a QC snag may not approve its closure
+      return new ProblemException(403, 'self_approval_forbidden', { detail: detail ?? 'You may not approve this yourself.' });
+    case 'document_rule_pending':
+      // Q226 (migration 0056): a conditional document whose rule cannot be decided yet blocks the approval
+      return new ProblemException(422, 'document_rule_pending', {
+        detail: detail ?? 'A document rule cannot be decided yet.',
+        extra: { missing: Array.isArray(extra.missing) ? extra.missing : [] },
+      });
     case 'open_snags':
       return new ProblemException(422, 'open_snags', {
         detail: `This acceptance cannot be submitted or approved while ${String(extra.count ?? 'some')} open ${typeof extra.scope === 'string' ? `${extra.scope} ` : ''}snag(s) remain on the site.`,
