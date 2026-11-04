@@ -31,7 +31,7 @@ export type AdminSession = {
 };
 export type JobRun = { id: string; name: string; started_at: string; finished_at: string | null; outcome: 'ok' | 'failed' | 'running'; rows: number | null; error: string | null };
 export type Deployment = { id: string; at: string; version: string; git_sha: string; migrations: string[]; by: string };
-export type SecurityAlert = { id: string; at: string; rule: string; severity: 'low' | 'medium' | 'high' | 'critical'; summary: string; detail: string | null; status: 'open' | 'acknowledged'; ack_by: string | null; ack_at: string | null };
+export type SecurityAlert = { id: string; at: string; rule: string; severity: 'info' | 'low' | 'medium' | 'high' | 'critical'; summary: string; detail: string | null; status: 'open' | 'acknowledged'; ack_by: string | null; ack_at: string | null };
 export type ActivityReport = {
   month: string;
   users: { user: { id: string; display_name: string; employee_id: string | null }; actions: number; field_changes: number; approvals: number; sign_ins: number; failed_sign_ins: number }[];
@@ -137,3 +137,60 @@ export function useAckAlert() {
   });
 }
 export const useActivityReport = (month: string) => useQuery({ queryKey: ['activity-report', month], queryFn: () => api.get<ActivityReport>('/reports/activity', { query: { month } }) });
+
+// ---------------------------------------------------------------- P9 (contract 0.12.3): mail delivery, integrity runs, alert rules, activity workbook
+export type MailStatus = components['schemas']['MailStatus'];
+export type MailOutboxItem = components['schemas']['MailOutboxItem'];
+export type MailTestResult = components['schemas']['MailTestResult'];
+export type LogIntegrityRun = components['schemas']['LogIntegrityRun'];
+export type AlertSettings = components['schemas']['SecurityAlertSettings'];
+export type AlertSettingsInput = components['schemas']['SecurityAlertSettingsInput'];
+export type Severity = components['schemas']['AlertSeverity'];
+export const SEVERITIES: Severity[] = ['info', 'low', 'medium', 'high', 'critical'];
+export const RULES_WITH_SEVERITY = ['failed_sign_ins', 'failed_sign_ins_ip', 'new_ip', 'large_export', 'admin_set_changed', 'alert_settings_weakened', 'malware_upload', 'break_glass_used'] as const;
+
+export const useMailStatus = () => useQuery({ queryKey: ['mail-status'], queryFn: () => api.get<MailStatus>('/admin/mail/status') });
+export const useMailOutbox = (status: string) => usePaged<MailOutboxItem>('mail-outbox', '/admin/mail/outbox', { status: status || undefined });
+export function useSendTestMail() {
+  const qc = useQueryClient();
+  return useMutation<MailTestResult, ApiError, void>({
+    mutationFn: () => api.post<MailTestResult>('/admin/mail/test'),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['mail-status'] }); void qc.invalidateQueries({ queryKey: ['mail-outbox'] }); },
+  });
+}
+export function useRetryMail() {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, reason }) => api.post(`/admin/mail/outbox/${id}/retry`, { body: { reason } }),
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['mail-outbox'] }); void qc.invalidateQueries({ queryKey: ['mail-status'] }); },
+  });
+}
+
+/** Polls every 2 s while a run of the list is still running. */
+export const INTEGRITY_POLL_MS = 2_000;
+export const useIntegrityRuns = () =>
+  useQuery({
+    queryKey: ['integrity-runs'],
+    queryFn: () => api.get<PagedList<LogIntegrityRun>>('/admin/log-integrity/runs', { query: { limit: 20 }, headers: { 'X-PMIS-Live': '1' } }).then((r) => r.items),
+    refetchInterval: (q) => ((q.state.data ?? []).some((r) => r.status === 'running') ? INTEGRITY_POLL_MS : false),
+  });
+export function useStartIntegrityRun() {
+  const qc = useQueryClient();
+  return useMutation<LogIntegrityRun, ApiError, 'audit' | 'security'>({
+    mutationFn: (log) => api.post<LogIntegrityRun>('/admin/log-integrity/runs', { body: { log } }),
+    onSuccess: (run) => qc.setQueryData<LogIntegrityRun[]>(['integrity-runs'], (d) => [run, ...(d ?? []).filter((r) => r.id !== run.id)]),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['integrity-runs'] }),
+  });
+}
+
+export const useAlertSettings = () => useQuery({ queryKey: ['alert-settings'], queryFn: () => api.get<AlertSettings>('/settings/security-alerts') });
+export function useSetAlertSettings() {
+  const qc = useQueryClient();
+  return useMutation<AlertSettings, ApiError, { version: number; body: AlertSettingsInput }>({
+    mutationFn: ({ version, body }) => api.put<AlertSettings>('/settings/security-alerts', { version, body }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['alert-settings'] }),
+  });
+}
+
+/** The monthly workbook (Q169): six sheets, no security log. Resolves with the file name. */
+export const downloadActivityXlsx = (month: string) => downloadFile('/reports/activity', { month, format: 'xlsx' });

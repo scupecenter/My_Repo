@@ -62,6 +62,12 @@ export interface DocumentSlotDto {
   can_upload: boolean;
   blank_form_file_id: string | null;
   valid_to: string | null;
+  /** Q226: the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order): the task cannot be approved. */
+  determination_pending: boolean;
+  /** Q229: the slot kept the approval of the previous version of its record (setting documents.new_version_inherit). */
+  inherited_approval: boolean;
+  /** Q227: the same requirement on the task or on the source record; a current file there fills this slot too. */
+  shared_with: Record<string, unknown> | null;
   files: DocumentFileDto[];
 }
 
@@ -100,6 +106,8 @@ interface SlotRow {
   dt_has_expiry: boolean;
   blank_form_file_id: string | null;
   valid_to: string | null;
+  determination_pending: boolean;
+  inherited: boolean;
 }
 
 interface FileRow {
@@ -203,7 +211,7 @@ export class DocumentsService {
    * judges the conditional ones with the rule language (a rule it cannot judge changes nothing).
    */
   async syncSlots(task: TaskCtx): Promise<void> {
-    if (task.state !== 'open' && task.state !== 'entry') return;
+    if (['approved', 'na', 'skipped'].includes(task.state)) return;
     const defs = await this.db.tx.$queryRaw<{ id: string; condition_rule: unknown }[]>(Prisma.sql`
       SELECT dt.id::text AS id, dt.condition_rule FROM document_types dt
       WHERE dt.lib_managed AND dt.is_active AND dt.published_version > 0 AND dt.condition_rule IS NOT NULL
@@ -211,7 +219,12 @@ export class DocumentsService {
     if (defs.length === 0) return;
     const ctx = await this.ruleCtx(task.site_id, task.task_code, task.site, { values: task.values ?? {}, custom: task.custom ?? {} });
     const { yes, no } = judge(defs, ctx);
-    await this.db.tx.$queryRaw(Prisma.sql`SELECT doc_sync_task_slots(${task.id}::uuid, ${yes}::uuid[], ${no}::uuid[])`);
+    // Q226: a rule that reads the Procurement delivery while it is still undecided waits as "pending determination" (blocks the approval)
+    const pending = ctx.procurement_pending === true
+      ? defs.filter((d) => !yes.includes(d.id) && !no.includes(d.id) && JSON.stringify(d.condition_rule).includes('procurement.')).map((d) => d.id)
+      : [];
+    if (task.state === 'open' || task.state === 'entry') await this.db.tx.$queryRaw(Prisma.sql`SELECT doc_sync_task_slots(${task.id}::uuid, ${yes}::uuid[], ${no}::uuid[])`);
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT doc_mark_pending(${task.id}::uuid, ${pending}::uuid[])`);
   }
 
   /**
@@ -222,11 +235,14 @@ export class DocumentsService {
   private async ruleCtx(siteId: string, taskCode: string | null, site: Record<string, unknown>, task: Record<string, unknown>): Promise<Record<string, unknown>> {
     const p = await this.db.tx.$queryRaw<{ d: string | null }[]>(Prisma.sql`SELECT doc_procurement_delivery(${siteId}::uuid, ${taskCode ?? ''}::text) AS d`);
     const delivery = p[0]?.d ?? null;
+    // Q226: `pending` = no approved order decides yet (none, one without a delivery, or mixed): the rule cannot be judged
+    const pending = delivery === 'pending';
     return {
       site: { ...site, scenario: site.delivery_scenario },
       task,
       scenario: site.delivery_scenario,
-      procurement: delivery === null ? {} : { delivery },
+      procurement: delivery === null || pending ? {} : { delivery },
+      procurement_pending: pending,
     };
   }
 
@@ -277,13 +293,15 @@ export class DocumentsService {
       SELECT ds.id::text AS id, ds.doc_type_id::text AS doc_type_id, dt.code AS doc_code, dt.name_en, dt.name_ar, dt.kind::text AS kind, dt.form_kind, ds.status::text AS status, ds.reject_reason,
         ds.candidate_label, ds.conditional_declared, dt.condition_rule, v.spec, dt.is_mandatory AS dt_mandatory, dt.formats AS dt_formats, dt.max_size_mb AS dt_max_size_mb,
         dt.min_files AS dt_min_files, dt.max_files AS dt_max_files, dt.photo_rules AS dt_photo_rules, dt.has_expiry AS dt_has_expiry,
-        dt.blank_form_file_id::text AS blank_form_file_id, ds.valid_to::text AS valid_to
+        dt.blank_form_file_id::text AS blank_form_file_id, ds.valid_to::text AS valid_to, ds.determination_pending, (ds.inherited_at IS NOT NULL) AS inherited
       FROM document_slots ds JOIN document_types dt ON dt.id = ds.doc_type_id LEFT JOIN document_type_versions v ON v.id = ds.doc_type_version_id
       WHERE ${where} ORDER BY dt.code, ds.candidate_label NULLS FIRST, ds.id`);
     if (slots.length === 0) return [];
     const files = await this.fileRows(slots.map((s) => s.id));
     const refs = await this.view.userRefs([...new Set(files.map((f) => f.uploaded_by))]);
     const can = owner.can_upload;
+    const twins = new Map((await this.db.tx.$queryRaw<{ slot_id: string; twin: Record<string, unknown> | null }[]>(Prisma.sql`
+      SELECT slot_id::text AS slot_id, twin FROM doc_slot_twins(${slots.map((x) => x.id)}::uuid[])`)).map((t) => [t.slot_id, t.twin]));
     return slots.map((s) => {
       const spec = s.spec ?? {};
       const photo = (spec.photo_rules ?? s.dt_photo_rules) as { camera_only?: unknown } | null;
@@ -307,9 +325,12 @@ export class DocumentsService {
         max_files: spec.max_files === undefined ? s.dt_max_files : (spec.max_files as number | null),
         camera_only: typeof photo === 'object' && photo !== null && photo.camera_only === true,
         expiry_tracked: typeof spec.expiry_tracked === 'boolean' ? spec.expiry_tracked : s.dt_has_expiry,
-        can_upload: can && ['missing', 'uploaded', 'rejected'].includes(s.status),
+        can_upload: can && (['missing', 'uploaded', 'rejected'].includes(s.status) || (s.status === 'approved' && s.inherited)),
         blank_form_file_id: s.blank_form_file_id,
         valid_to: s.valid_to,
+        determination_pending: s.determination_pending,
+        inherited_approval: s.inherited,
+        shared_with: twins.get(s.id) ?? null,
         files: slotFiles.map((f) => this.fileDto(f, refs, { site_code: owner.site_code, task_code: owner.name_code, doc_code: s.doc_code, candidate_label: s.candidate_label, ordinal: f.ord })),
       };
     });
@@ -422,7 +443,7 @@ export class DocumentsService {
 
   /** Judges the conditional documents placed on the record's register (rule roots site, record, procurement) and refreshes its slot set. */
   async syncRecord(r: RecordCtx): Promise<void> {
-    if (r.state !== 'entry' || !r.site_id || !r.site) return;
+    if (r.state !== 'entry') return;
     const defs = await this.db.tx.$queryRaw<{ id: string; condition_rule: unknown }[]>(Prisma.sql`
       SELECT dt.id::text AS id, dt.condition_rule FROM document_types dt
       WHERE dt.lib_managed AND dt.is_active AND dt.published_version > 0 AND dt.condition_rule IS NOT NULL
@@ -431,7 +452,7 @@ export class DocumentsService {
     let yes: string[] = [];
     let no: string[] = [];
     if (defs.length > 0) {
-      const ctx = await this.ruleCtx(r.site_id, null, r.site, {});
+      const ctx: Record<string, unknown> = r.site_id && r.site ? await this.ruleCtx(r.site_id, null, r.site, {}) : { site: {}, task: {}, procurement: {} };
       ctx.record = { data: r.data ?? {}, custom: r.custom ?? {}, record_type: r.record_type };
       ({ yes, no } = judge(defs, ctx));
     }
@@ -449,9 +470,10 @@ export class DocumentsService {
 
   private async recordOwner(auth: AuthContext, r: RecordCtx): Promise<SlotOwner> {
     let can = false;
-    if (r.state === 'entry' && r.site_id && r.region_id !== null && (await this.access.hasGrant(auth, r.module_key, 'edit'))) {
+    if (r.state === 'entry' && (await this.access.hasGrant(auth, r.module_key, 'edit'))) {
       const regions = await this.access.regions(r.module_key, 'edit');
-      if (regions === null || regions.includes(r.region_id)) {
+      // Q228: a global record (no site, no region) is edited by a holder of the module's edit right in any region
+      if (regions === null || (r.region_id === null ? regions.length > 0 : regions.includes(r.region_id))) {
         const q = await this.db.tx.$queryRaw<{ ok: boolean }[]>(Prisma.sql`
           SELECT ((reg_is_eligible(x.id, 'entry', ${auth.user.id}::uuid) OR (app_actor_is_system_admin() AND NOT reg_has_holder(x.id, 'entry')))
                   AND (x.ball_in_court_user_id IS NULL OR x.ball_in_court_user_id = ${auth.user.id}::uuid OR NOT reg_is_eligible(x.id, 'entry', x.ball_in_court_user_id))) AS ok
@@ -464,7 +486,6 @@ export class DocumentsService {
   }
 
   private async recordSlotsFor(auth: AuthContext, r: RecordCtx): Promise<DocumentSlotDto[]> {
-    if (!r.site_id) return [];
     await this.syncRecord(r);
     return this.slotDtos(await this.recordOwner(auth, r));
   }
@@ -612,7 +633,7 @@ export class DocumentsService {
     for (const [module, keys] of byModule) {
       const r = await this.access.regions(module, 'view');
       if (r === null) allKeys.push(...keys);
-      else if (r.length > 0) parts.push(Prisma.sql`(s.register_key = ANY(${keys}::text[]) AND s.region_id = ANY(${r}::int[]))`);
+      else if (r.length > 0) parts.push(Prisma.sql`(s.register_key = ANY(${keys}::text[]) AND (s.region_id = ANY(${r}::int[]) OR s.is_global))`);
     }
     if (allKeys.length > 0) parts.push(Prisma.sql`s.register_key = ANY(${allKeys}::text[])`);
     return Prisma.sql`(${Prisma.join(parts, ' OR ')})`;
@@ -633,11 +654,12 @@ export class DocumentsService {
         f.uploaded_by::text AS uploaded_by, f.uploaded_at, f.approved_date::text AS approved_date, f.capture_date, f.unknown_capture_date, f.superseded_by::text AS superseded_by, f.withdrawn_at, f.storage_key,
         s.site_id::text AS site_id, s.region_id, si.site_code, coalesce(td.code, upper(s.register_key)) AS task_code, dt.code AS doc_code, s.candidate_label, s.status::text AS slot_status,
         ${ORD} AS ord
-      FROM document_files f JOIN document_slots s ON s.id = f.slot_id JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
+      FROM document_files f JOIN document_slots s ON s.id = f.slot_id LEFT JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
       LEFT JOIN task_instances ti ON ti.id = s.task_id LEFT JOIN task_definitions td ON td.id = ti.task_def_id
       WHERE f.id = ${fileId}::uuid AND ${await this.registerScopeSql()}`);
     const f = rows[0] as (typeof rows)[number] & { storage_key?: string } | undefined;
-    if (!f || (regions !== null && !regions.includes(f.region_id))) {
+    if (f && f.site_code === null) f.site_code = 'GLOBAL';
+    if (!f || (regions !== null && f.region_id !== null && !regions.includes(f.region_id))) {
       const photo = await this.downloadSnagPhoto(fileId, regions);
       return photo ?? this.downloadBlank(fileId, regions);
     }
@@ -702,7 +724,8 @@ export class DocumentsService {
   /** Filter conditions shared by the list and the zip export. */
   filterSql(q: Query, regions: number[] | null): Prisma.Sql[] {
     const conds: Prisma.Sql[] = [Prisma.sql`true`];
-    if (regions !== null) conds.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
+    // Q228: a global record's slot has no region; its visibility comes from the register's module (registerScopeSql)
+    if (regions !== null) conds.push(Prisma.sql`(s.region_id = ANY(${regions}::int[]) OR s.is_global)`);
     const site = oneParam(q, 'site_id');
     if (site !== undefined) {
       if (!uuidSchema.safeParse(site).success) throw problems.validation([{ path: '/site_id', code: 'invalid', message: 'Not a uuid.' }]);
@@ -757,7 +780,7 @@ export class DocumentsService {
   }
 
   static readonly LIST_FROM = Prisma.sql`
-    FROM document_files f JOIN document_slots s ON s.id = f.slot_id JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
+    FROM document_files f JOIN document_slots s ON s.id = f.slot_id LEFT JOIN sites si ON si.id = s.site_id JOIN document_types dt ON dt.id = s.doc_type_id
     LEFT JOIN task_instances ti ON ti.id = s.task_id LEFT JOIN task_definitions td ON td.id = ti.task_def_id LEFT JOIN stage_definitions st ON st.id = td.stage_id`;
 
   async list(auth: AuthContext, q: Query) {
@@ -775,7 +798,7 @@ export class DocumentsService {
       SELECT f.id::text AS id, f.slot_id::text AS slot_id, f.file_group_id::text AS file_group_id, f.version, f.is_current, f.original_name, f.stored_name, f.ext, f.mime_type, f.size_bytes, f.sha256,
         f.uploaded_by::text AS uploaded_by, f.uploaded_at, to_char(f.uploaded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cur_text, f.approved_date::text AS approved_date, f.capture_date,
         f.unknown_capture_date, f.superseded_by::text AS superseded_by, f.withdrawn_at,
-        s.site_id::text AS site_id, s.region_id, si.site_code, si.name AS site_name, ti.id::text AS task_id, td.code AS task_code, td.name_en AS task_name, st.code AS stage_code, st.name_en AS stage_name,
+        s.site_id::text AS site_id, s.region_id, coalesce(si.site_code, 'GLOBAL') AS site_code, si.name AS site_name, ti.id::text AS task_id, td.code AS task_code, td.name_en AS task_name, st.code AS stage_code, st.name_en AS stage_name,
         dt.code AS doc_code, dt.name_en AS doc_name_en, dt.name_ar AS doc_name_ar, dt.kind::text AS kind, dt.form_kind, s.candidate_label, s.status::text AS slot_status,
         s.register_key, s.register_entity_id::text AS register_entity_id,
         ${ORD} AS ord

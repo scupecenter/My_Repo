@@ -41,34 +41,30 @@ describe('profile: self-editable and admin-owned fields', () => {
     expect(r.headers.etag).toBe(`"${r.body.version}"`);
     expect(r.body).toMatchObject({
       id: u.id, display_name: u.name, email: u.email, employee_id: u.employeeId, phone: u.phone, local_sign_in: true, auth_method: 'local',
-      editable_fields: ['display_name', 'phone', 'locale', 'theme'],
-      two_factor: { state: 'off', enforced: false, can_enable: true, can_disable: false }, email_change: null,
+      editable_fields: ['display_name', 'locale', 'theme'],
+      two_factor: { state: 'off', enforced: false, can_enable: true, can_disable: false }, email_change: null, phone_change: null,
     });
     expect(r.body.admin_owned.roles.length).toBe(1);
     expect(r.body.admin_owned.region_ids).toBe('all');
   });
 
-  it('changes display name, phone, language and theme with If-Match; audited once with before and after of what changed', async () => {
+  it('changes display name, language and theme with If-Match; audited once with before and after of what changed', async () => {
     const u = await makeUser(db, { assigned: true });
     const api = await loggedIn(app, u);
     const etag = await etagOf(api);
-    const phone = `+2189${String(Date.now() % 100_000_000).padStart(8, '0')}`;
-    const r = await api.call('patch', '/me/profile', { display_name: '  Renamed Person ', phone, locale: 'ar', theme: 'dark' }, { 'If-Match': etag });
+    const r = await api.call('patch', '/me/profile', { display_name: '  Renamed Person ', locale: 'ar', theme: 'dark' }, { 'If-Match': etag });
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ display_name: 'Renamed Person', phone, locale: 'ar', theme: 'dark' });
+    expect(r.body).toMatchObject({ display_name: 'Renamed Person', phone: u.phone, locale: 'ar', theme: 'dark' });
     expect(r.headers.etag).not.toBe(etag);
     const a = await audits('profile_updated', u.id);
     expect(a).toHaveLength(1);
-    expect(a[0].before).toEqual({ display_name: u.name, phone: u.phone, locale: 'en', theme: 'light' });
-    expect(a[0].after).toMatchObject({ display_name: 'Renamed Person', phone, locale: 'ar', theme: 'dark' });
+    expect(a[0].before).toEqual({ display_name: u.name, locale: 'en', theme: 'light' });
+    expect(a[0].after).toMatchObject({ display_name: 'Renamed Person', locale: 'ar', theme: 'dark' });
     expect(a[0].actor_id).toBe(u.id);
     // the same values again change nothing and write no audit row
     const again = await api.call('patch', '/me/profile', { theme: 'dark' }, { 'If-Match': r.headers.etag as string });
     expect(again.status).toBe(200);
     expect(await audits('profile_updated', u.id)).toHaveLength(1);
-    // the phone can be cleared
-    const cleared = await api.call('patch', '/me/profile', { phone: null }, { 'If-Match': again.headers.etag as string });
-    expect(cleared.body.phone).toBeNull();
   });
 
   it('needs If-Match (428) and a current one (412)', async () => {
@@ -82,7 +78,7 @@ describe('profile: self-editable and admin-owned fields', () => {
     const u = await makeUser(db, { assigned: true });
     const api = await loggedIn(app, u);
     const etag = await etagOf(api);
-    for (const body of [{ email: 'me@example.test' }, { employee_id: '1234' }, { status: 'active' }, { team: 'cw' }, { region_ids: [1] }, { roles: [] }, { display_name: 'Ok', department_id: null }]) {
+    for (const body of [{ email: 'me@example.test' }, { phone: '+218912345678' }, { phone: null }, { employee_id: '1234' }, { status: 'active' }, { team: 'cw' }, { region_ids: [1] }, { roles: [] }, { display_name: 'Ok', department_id: null }]) {
       const r = await api.call('patch', '/me/profile', body, { 'If-Match': etag });
       expect(r.status, JSON.stringify(body)).toBe(403);
       expect(r.body.code).toBe('field_read_only');
@@ -91,21 +87,15 @@ describe('profile: self-editable and admin-owned fields', () => {
     expect(email.body.errors[0]).toMatchObject({ path: '/email', code: 'read_only' });
     expect((await api.call('patch', '/me/profile', { nickname: 'x' }, { 'If-Match': etag })).status).toBe(422);
     expect((await api.call('patch', '/me/profile', {}, { 'If-Match': etag })).status).toBe(422);
-    expect((await api.call('patch', '/me/profile', { phone: '0912345678' }, { 'If-Match': etag })).status).toBe(422);
+    // 0058 (D156): the phone changes only through a request
+    const phone = await api.call('patch', '/me/profile', { phone: '0912345678' }, { 'If-Match': etag });
+    expect(phone.status).toBe(403);
+    expect(phone.body.errors[0]).toMatchObject({ path: '/phone', code: 'read_only' });
+    expect(phone.body.errors[0].message).toMatch(/phone-change/);
     expect((await api.call('patch', '/me/profile', { display_name: '   ' }, { 'If-Match': etag })).status).toBe(422);
     expect((await api.call('patch', '/me/profile', { locale: 'fr' }, { 'If-Match': etag })).status).toBe(422);
-    const row = await db.query('SELECT email, employee_id, status FROM users WHERE id = $1', [u.id]);
-    expect(row.rows[0]).toMatchObject({ email: u.email, employee_id: u.employeeId, status: 'active' });
-  });
-
-  it('keeps phones unique (409 duplicate)', async () => {
-    const a = await makeUser(db, { assigned: true });
-    const b = await makeUser(db, { assigned: true });
-    const api = await loggedIn(app, a);
-    const r = await api.call('patch', '/me/profile', { phone: b.phone }, { 'If-Match': await etagOf(api) });
-    expect(r.status).toBe(409);
-    expect(r.body.code).toBe('duplicate');
-    expect(r.body.errors[0]).toMatchObject({ path: '/phone', code: 'duplicate' });
+    const row = await db.query('SELECT email, employee_id, status, phone FROM users WHERE id = $1', [u.id]);
+    expect(row.rows[0]).toMatchObject({ email: u.email, employee_id: u.employeeId, status: 'active', phone: u.phone });
   });
 
   it('is not for a pending account or without a session', async () => {
@@ -170,7 +160,8 @@ describe('email change: a request that an admin approves', () => {
     // a third request, approved: the login email changes and the user signs in with it
     const third = freshEmail();
     const r3 = await api.call('post', '/me/email-change', { new_email: third, password: u.password });
-    const ok = await adminCall.call('post', `/email-change-requests/${r3.body.id}/decide`, { decision: 'approve', reason: 'Verified by phone' });
+    // 0058 (Q158): unverified, so the admin records the documented identity check
+    const ok = await adminCall.call('post', `/email-change-requests/${r3.body.id}/decide`, { decision: 'approve', reason: 'Verified by phone', identity_check: 'Called the user on the registered phone' });
     expect(ok.status).toBe(200);
     expect(ok.body.status).toBe('approved');
     expect((await db.query('SELECT email FROM users WHERE id = $1', [u.id])).rows[0].email).toBe(third);

@@ -33,6 +33,23 @@ const schema = z.object({
   CLAMD_PORT: z.coerce.number().int().min(1).max(65535).optional(),
   CLAMD_TIMEOUT_MS: z.coerce.number().int().min(1000).max(900000).optional(),
   SCAN_FAILURE: z.enum(['fail_closed', 'fail_open']).optional(),
+  // Outbound mail (owner answer Q167, migration 0055). Off when SMTP_HOST is empty: the queue then records what it would have sent.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SMTP_TLS: z.enum(['starttls', 'tls', 'none']).optional(),
+  SMTP_TLS_REJECT_UNAUTHORIZED: z.enum(['true', 'false']).optional(),
+  SMTP_CA_FILE: z.string().optional(),
+  SMTP_ALLOW_PLAIN_AUTH: z.enum(['true', 'false']).optional(),
+  SMTP_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120000).optional(),
+  SMTP_HELO_NAME: z.string().optional(),
+  // Base of the links in mails, for example https://pmis.aljeel.local (no trailing slash). Empty: the links stay relative.
+  APP_BASE_URL: z.string().optional(),
+  APP_URL: z.string().optional(),
+  // The chain heads of the nightly integrity check are appended here (Q171): keep it outside the database and copy it off the server.
+  LOG_ANCHOR_DIR: z.string().optional(),
 });
 
 export interface ScanConfig {
@@ -49,6 +66,23 @@ export interface StorageConfig {
   /** Directory of the local driver (also created when it is missing). */
   localDir: string;
   s3?: { endpoint: string; bucket: string; accessKey: string; secretKey: string; region: string };
+}
+
+export interface MailConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  /** starttls (upgrade on the plain port, refused when the server does not offer it), tls (implicit TLS, port 465) or none. */
+  tls: 'starttls' | 'tls' | 'none';
+  user?: string;
+  pass?: string;
+  /** The address in MAIL FROM, and the From header (with the display name when one was given). */
+  fromAddress: string;
+  fromHeader: string;
+  rejectUnauthorized: boolean;
+  caFile?: string;
+  timeoutMs: number;
+  heloName: string;
 }
 
 export interface AppConfig {
@@ -68,6 +102,50 @@ export interface AppConfig {
   fileEnc: MasterKeys;
   /** The virus scan of uploads. */
   scan: ScanConfig;
+  /** Outbound mail (migration 0055). Absent or enabled=false: mails are recorded in the outbox as `logged`, never sent. */
+  mail?: MailConfig;
+  /** Base of the links in mails. */
+  appBaseUrl?: string;
+  /** Directory of the external anchor files of the integrity check. */
+  anchorDir?: string;
+}
+
+const ADDR_RE = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
+
+/** "GSDN PMIS <pmis@example.ly>" or "pmis@example.ly". Returns null when it is not one of the two forms (no line breaks, no quotes). */
+export function parseFrom(v: string): { address: string; header: string } | null {
+  const t = v.trim();
+  const m = /^([^<>"\r\n]{1,80}?)\s*<([^<>\s]+)>$/.exec(t);
+  if (m) {
+    const name = (m[1] as string).trim();
+    const address = m[2] as string;
+    if (!ADDR_RE.test(address) || !/^[\p{L}\p{N} .,_()&'-]+$/u.test(name)) return null;
+    return { address, header: `${name} <${address}>` };
+  }
+  return ADDR_RE.test(t) ? { address: t, header: t } : null;
+}
+
+function mailFrom(v: z.infer<typeof schema>): MailConfig {
+  const e = (x: string | undefined): string | undefined => (x && x.trim() !== '' ? x.trim() : undefined);
+  const host = e(v.SMTP_HOST);
+  const tls = v.SMTP_TLS ?? (v.SMTP_PORT === 465 ? 'tls' : 'starttls');
+  const base = {
+    host: host ?? '', port: v.SMTP_PORT ?? (tls === 'tls' ? 465 : 587), tls, rejectUnauthorized: v.SMTP_TLS_REJECT_UNAUTHORIZED !== 'false',
+    caFile: e(v.SMTP_CA_FILE), timeoutMs: v.SMTP_TIMEOUT_MS ?? 15_000, heloName: e(v.SMTP_HELO_NAME) ?? 'pmis.localdomain',
+  } as const;
+  if (!host) return { ...base, enabled: false, fromAddress: '', fromHeader: '' };
+  const problems: string[] = [];
+  const from = e(v.SMTP_FROM) ? parseFrom(v.SMTP_FROM as string) : null;
+  if (!from) problems.push('SMTP_FROM must be an address or "Name <address>" when SMTP_HOST is set');
+  const user = e(v.SMTP_USER);
+  const pass = v.SMTP_PASS && v.SMTP_PASS !== '' ? v.SMTP_PASS : undefined;
+  if ((user === undefined) !== (pass === undefined)) problems.push('SMTP_USER and SMTP_PASS go together (both or neither)');
+  if (user && tls === 'none' && v.SMTP_ALLOW_PLAIN_AUTH !== 'true') {
+    problems.push('SMTP_TLS=none would send the SMTP password in clear: use starttls or tls, or set SMTP_ALLOW_PLAIN_AUTH=true for a relay on the same host');
+  }
+  if (!/^[A-Za-z0-9.-]{1,253}$/.test(base.heloName)) problems.push('SMTP_HELO_NAME must be a host name');
+  if (problems.length) throw new Error(`Invalid configuration:\n${problems.map((p) => `  ${p}`).join('\n')}`);
+  return { ...base, enabled: true, user, pass, fromAddress: (from as { address: string }).address, fromHeader: (from as { header: string }).header };
 }
 
 function storageFrom(v: z.infer<typeof schema>): StorageConfig {
@@ -122,6 +200,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     storage: storageFrom(v),
     fileEnc: fileEncFrom(v),
     scan: scanFrom(v),
+    mail: mailFrom(v),
+    appBaseUrl: (() => { const u = (v.APP_BASE_URL ?? '').trim() || (v.APP_URL ?? '').trim(); return u ? u.replace(/\/+$/, '') : undefined; })(),
+    anchorDir: v.LOG_ANCHOR_DIR && v.LOG_ANCHOR_DIR.trim() !== '' ? v.LOG_ANCHOR_DIR.trim() : undefined,
   };
 }
 

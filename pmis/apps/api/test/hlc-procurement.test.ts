@@ -80,7 +80,8 @@ async function withTasks(t: Team, codes: string[], opened: string[], modules: st
 }
 
 const codesOf = (body: { errors?: { code: string }[] }): string[] => (body.errors ?? []).map((e) => e.code).sort();
-const warnOf = (body: { warnings?: { code: string }[] }): string[] => (body.warnings ?? []).map((e) => e.code).sort();
+// 0057 (Q104): `list_other` marks a value outside a pending list that still accepts another value (the fixtures use Open and Exchange); the ordering warnings are what this suite checks
+const warnOf = (body: { warnings?: { code: string }[] }): string[] => (body.warnings ?? []).map((e) => e.code).filter((c) => c !== 'list_other').sort();
 
 describe('entry rights per scope (the database decides)', () => {
   it('lets only the HLC Fiber Team enter scope HLC, and keeps every other scope with the Procurement team', async () => {

@@ -288,6 +288,7 @@ describe('hybrid mode list', () => {
       'GET /email-change-requests', 'POST /email-change-requests/:id/decide', 'PUT /users/:id/two-factor/enforced',
       // contract 0.10.0: the logs core
       'GET /audit-log', 'POST /audit-log/exports', 'GET /audit-log/exports/:id/download', 'GET /audit-log/field-changes', 'GET /audit-log/field-history', 'GET /audit-log/integrity', 'GET /security-log', 'POST /security-log/exports', 'GET /security-log/exports/:id/download', 'GET /security-log/integrity', 'GET /system-log', 'GET /sessions/active', 'POST /sessions/:id/revoke', 'POST /users/:id/sessions/revoke', 'GET /admin/sessions', 'POST /admin/sessions/:id/end', 'GET /admin/job-runs', 'GET /admin/deployments', 'GET /admin/security-alerts', 'POST /admin/security-alerts/:id/ack', 'GET /settings/log-retention', 'PUT /settings/log-retention', 'GET /settings/security-alerts', 'PUT /settings/security-alerts', 'GET /reports/activity',
+      'GET /admin/mail/status', 'POST /admin/mail/test', 'GET /admin/mail/outbox', 'POST /admin/mail/outbox/:id/retry', 'GET /admin/log-integrity/runs', 'POST /admin/log-integrity/runs', 'GET /admin/log-integrity/runs/:id', 'GET /health',
       // contract 0.11.1: the documents follow-up (Q130 to Q132)
       'PATCH /sites/:id', 'GET /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots', 'POST /registers/:key/records/:id/slots/:slotId/files',
       'DELETE /registers/:key/records/:id/slots/:slotId/files/:fileId', 'GET /snag-types', 'POST /snag-types', 'PATCH /snag-types/:id', 'GET /sites/:id/snags', 'POST /sites/:id/snags',
@@ -305,6 +306,17 @@ describe('hybrid mode list', () => {
       'GET /number-sequences',
       'POST /number-sequences',
       'PATCH /number-sequences/:id',
+      'POST /snags/:id/photos/:photoId/evidence',
+      'GET /snag-severities',
+      'PUT /snag-severities',
+      'GET /settings/documents-qc',
+      'PUT /settings/documents-qc',
+      // contract 0.12.5 (P5): the list catalogue and the conversion of the old text of a meeting
+      'GET /list-catalogues', 'POST /list-catalogues', 'GET /list-catalogues/:code', 'PATCH /list-catalogues/:code', 'POST /list-catalogues/:code/values',
+      'PATCH /list-catalogues/:code/values/:valueId', 'GET /registers/:key/records/:id/legacy-conversion', 'POST /registers/:key/records/:id/legacy-conversion',
+      // contract 0.12.6 (P8): email code, phone change and its decision
+      'POST /me/email-change/verify', 'POST /me/email-change/resend', 'POST /me/phone-change', 'DELETE /me/phone-change',
+      'GET /phone-change-requests', 'POST /phone-change-requests/:id/decide',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

@@ -1,8 +1,12 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { problems } from '../common/problem';
+import { oneParam } from '../common/query';
+import { attachmentHeader } from '../documents/naming';
+import { IntegrityService } from './integrity.service';
 import { LogsService } from './logs.service';
 
 type Q = Record<string, unknown>;
@@ -78,7 +82,7 @@ export class SecurityLogController {
 /** System Log, sessions, admin log screens, log settings and the activity report. */
 @Controller()
 export class LogsAdminController {
-  constructor(private readonly logs: LogsService) {}
+  constructor(private readonly logs: LogsService, private readonly integrityJobs: IntegrityService) {}
 
   @Get('system-log')
   systemLog(@Query() q: Q) {
@@ -162,8 +166,32 @@ export class LogsAdminController {
     return r;
   }
 
+  /** JSON by default; `format=xlsx` (0.12.3, Q169) answers the workbook. */
   @Get('reports/activity')
-  activity(@Query() q: Q) {
-    return this.logs.activity(q);
+  async activity(@Auth() auth: AuthContext, @Query() q: Q, @Res({ passthrough: true }) res: Response) {
+    const format = oneParam(q, 'format') ?? 'json';
+    if (format !== 'json' && format !== 'xlsx') throw problems.validation([{ path: '/format', code: 'invalid', message: 'format is json or xlsx.' }]);
+    if (format === 'json') return this.logs.activity(q);
+    const f = await this.logs.activityXlsx(auth, q);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return new StreamableFile(f.body, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', disposition: attachmentHeader(f.filename), length: f.body.length });
+  }
+
+  // Q171 (0.12.3): the integrity check as a job with progress
+  @Post('admin/log-integrity/runs')
+  @HttpCode(202)
+  startIntegrity(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.integrityJobs.startManual(auth, body ?? {}, (go) => res.once('finish', go));
+  }
+
+  @Get('admin/log-integrity/runs')
+  integrityRuns(@Query() q: Q) {
+    return this.integrityJobs.list(q);
+  }
+
+  @Get('admin/log-integrity/runs/:id')
+  integrityRun(@Param('id') id: string) {
+    return this.integrityJobs.get(id);
   }
 }

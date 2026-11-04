@@ -291,7 +291,7 @@ describe('departments and manager', () => {
     const u = userEvent.setup();
     renderApp(<Users />);
     expect(await screen.findByTestId('user-dept-1103')).toHaveTextContent('RF & Design'); // department column
-    expect(screen.getAllByRole('tab').map((x) => x.getAttribute('data-testid'))).toEqual(['users-tab-active', 'users-tab-deleted', 'users-tab-departments', 'users-tab-email_changes', 'users-tab-online']);
+    expect(screen.getAllByRole('tab').map((x) => x.getAttribute('data-testid'))).toEqual(['users-tab-active', 'users-tab-deleted', 'users-tab-departments', 'users-tab-email_changes', 'users-tab-phone_changes', 'users-tab-online']);
     await u.click(screen.getByTestId('users-tab-departments'));
     expect(await screen.findByTestId('dept-row-CIVIL')).toHaveTextContent('Civil Works');
     expect(screen.getByTestId('dept-status-LEGACY')).toHaveTextContent('Inactive');

@@ -64,6 +64,41 @@ export function useWithdrawSnagPhoto(siteId: string) {
   return useMutation<Snag, ApiError, { snag: Snag; photoId: string }>({ mutationFn: ({ snag, photoId }) => api.del(`/snags/${snag.id}/photos/${photoId}`), onSettled: refresh });
 }
 
+// ------------------------------------------------------------------------------------------------- P6 (contract 0.12.4): severities, evidence, settings
+export type SnagSeverity = S['SnagSeverity'];
+export type SnagSeverityList = S['SnagSeverityList'];
+export type DocumentsQcSettings = S['DocumentsQcSettings'];
+
+export const useSnagSeverities = () =>
+  useQuery({ queryKey: ['snag-severities'], staleTime: 300_000, queryFn: () => api.get<SnagSeverityList>('/snag-severities') });
+
+export function useSaveSnagSeverities() {
+  const qc = useQueryClient();
+  return useMutation<SnagSeverityList, ApiError, { version: number; reason: string; items: { code: string; name_en: string; name_ar?: string | null; blocks: boolean; is_active?: boolean }[] }>({
+    mutationFn: ({ version, ...body }) => api.put('/snag-severities', { version, body }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['snag-severities'] }),
+  });
+}
+
+export const useDocumentsQcSettings = () => useQuery({ queryKey: ['documents-qc-settings'], queryFn: () => api.get<DocumentsQcSettings>('/settings/documents-qc') });
+
+export function useSaveDocumentsQcSettings() {
+  const qc = useQueryClient();
+  return useMutation<DocumentsQcSettings, ApiError, { version: number; reason: string; new_version_inherit?: boolean; exif_tolerance_hours?: number }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/documents-qc', { version, body }),
+    onSettled: () => void qc.invalidateQueries({ queryKey: ['documents-qc-settings'] }),
+  });
+}
+
+/** Q232: L2 accepts or rejects a fix photo kept as pending evidence. */
+export function useDecideEvidence(siteId: string) {
+  const refresh = useSnagRefresh(siteId);
+  return useMutation<Snag, ApiError, { snag: Snag; photoId: string; decision: 'accept' | 'reject'; note: string }>({
+    mutationFn: ({ snag, photoId, decision, note }) => api.post(`/snags/${snag.id}/photos/${photoId}/evidence`, { body: { decision, note } }),
+    onSettled: refresh,
+  });
+}
+
 export type SnagOp = 'submit' | 'approve' | 'reject';
 export function useSnagOp(siteId: string) {
   const refresh = useSnagRefresh(siteId);

@@ -2,6 +2,8 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCreateRole, useProfiles, useRolePatch, useRoles } from '@/api/admin';
+import { useMe } from '@/api/hooks';
+import { isAdmin } from '@/lib/perm';
 import { useRegions } from '@/api/sites';
 import type { Role, RoleInput, RolePatch } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -19,6 +21,9 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
   const [code, setCode] = useState(''), [en, setEn] = useState(role?.name_en ?? ''), [arName, setAr] = useState(role?.name_ar ?? '');
   const [desc, setDesc] = useState(role?.description_en ?? ''), [hold, setHold] = useState(role?.can_hold_matrix_levels ?? false), [active, setActive] = useState(role?.is_active ?? true);
   const [profile, setProfile] = useState(role?.default_profile_id ?? '');
+  // Q165 (contract 0.12.3): who reads the whole Audit Log, and who reads it as a Team Lead. System Admin only.
+  const admin = isAdmin(useMe(true).data);
+  const [caps, setCaps] = useState<string[]>([...(role?.capabilities ?? [])].sort());
   const [reg, setReg] = useState<'all' | number[]>(role?.default_region_ids ?? 'all'), [mods, setMods] = useState<'all' | string[]>(role?.default_module_keys ?? 'all');
   const m = role ? patch : create;
   const bad = en.trim().length < 2 || (!role && !/^[A-Z][A-Z0-9_]{1,40}$/.test(code));
@@ -32,6 +37,7 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
           if ((profile || null) !== (role.default_profile_id ?? null)) p.default_profile_id = profile || null;
           if (!same(reg, role.default_region_ids ?? 'all')) p.default_region_ids = reg;
           if (!same(mods, role.default_module_keys ?? 'all')) p.default_module_keys = mods;
+          if (admin && !same(caps, [...(role.capabilities ?? [])].sort())) (p as Record<string, unknown>).capabilities = caps;
           patch.mutate({ role, reason, patch: p as Partial<Role> }, { onSuccess: done });
         } else {
           const body: RoleInput = { code, name_en: en, name_ar: arName || undefined, description_en: desc || undefined, can_hold_matrix_levels: hold, default_profile_id: profile || null, default_region_ids: reg, default_module_keys: mods, reason };
@@ -53,6 +59,15 @@ function RoleForm({ role, onClose }: { role?: Role; onClose: () => void }) {
       <ScopePicker id="role-regions" label={t('roles.default_regions')} options={(regions.data ?? []).map((r): [number, string] => [r.id, (ar && r.name_ar) || r.name_en])} value={reg} onChange={setReg} />
       <ScopePicker id="role-modules" label={t('roles.default_modules')} options={modules} value={mods} onChange={setMods} />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="role-can-hold" checked={hold} onChange={(e) => setHold(e.target.checked)} />{t('roles.can_hold')}</label>
+      {role && admin && (
+        <fieldset className="space-y-1 rounded-md border border-line p-2" data-testid="role-capabilities">
+          <legend className="px-1 text-sm font-semibold">{t('roles.capabilities')}</legend>
+          {(['audit_full_reader', 'team_lead'] as const).map((c) => (
+            <label key={c} className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid={`role-cap-${c}`} checked={caps.includes(c)}
+              onChange={(e) => setCaps((x) => (e.target.checked ? [...x, c].sort() : x.filter((y) => y !== c)))} />{t(`roles.cap_${c}`)}</label>))}
+          <p className="text-xs text-mute">{t('roles.cap_hint')}</p>
+        </fieldset>
+      )}
       {role && <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="role-active" checked={active} onChange={(e) => setActive(e.target.checked)} />{t('roles.active')}</label>}
       {role && !active && role.is_active && (role.active_assignment_count ?? 0) > 0 && <p className="text-sm text-lateInk" data-testid="role-in-use-hint">{t('roles.in_use_hint')}</p>}
     </FormDialog>

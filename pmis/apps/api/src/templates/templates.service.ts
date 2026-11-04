@@ -18,6 +18,9 @@ export interface TplColumn {
   required?: boolean;
   derived?: boolean;
   options?: string[];
+  /** 0057: the list accepts another value (the drop-down only warns), or the cell holds several values separated by ";" (no drop-down check). */
+  allow_other?: boolean;
+  multiple?: boolean;
   /** task columns: the task code, the field (planned_date, actual_date, v:<key>, r:<register>.<field> ...), the Master column and the stream. */
   task?: string;
   field?: string;
@@ -241,6 +244,20 @@ export class TemplatesService {
         if (c.type === 'user') userIds.add(v);
       }
     }
+    // 0057: the multi values, the Warehouse items and the child lists are written with the codes a person types (employee IDs, site codes, item codes)
+    const siteIds = new Set<string>(), itemIds = new Set<string>();
+    for (const c of cols) {
+      if (c.kind !== 'field') continue;
+      for (const r of page) {
+        const v = r.data[c.code];
+        if (c.type === 'multi_user' && Array.isArray(v)) v.forEach((x) => typeof x === 'string' && userIds.add(x));
+        if (c.type === 'multi_site' && Array.isArray(v)) v.forEach((x) => typeof x === 'string' && siteIds.add(x));
+        if (c.type === 'warehouse_item' && typeof v === 'string') itemIds.add(v);
+        if (c.type === 'child_list' && Array.isArray(v)) for (const row of v as Record<string, unknown>[]) if (typeof row.owner === 'string') userIds.add(row.owner);
+      }
+    }
+    const sitesById = siteIds.size ? await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`SELECT id::text AS id, site_code FROM sites WHERE id = ANY(${[...siteIds]}::uuid[])`) : [];
+    const itemsById = itemIds.size ? await this.db.tx.$queryRaw<{ id: string; item_code: string }[]>(Prisma.sql`SELECT id::text AS id, item_code FROM warehouse_items WHERE id = ANY(${[...itemIds]}::uuid[])`) : [];
     const teams = teamIds.size ? await this.db.tx.$queryRaw<{ id: string; name: string }[]>(Prisma.sql`SELECT id::text AS id, name FROM external_teams WHERE id = ANY(${[...teamIds]}::uuid[])`) : [];
     const users = userIds.size ? await this.db.tx.$queryRaw<{ id: string; employee_id: string | null; email: string }[]>(Prisma.sql`SELECT id::text AS id, employee_id, email FROM users WHERE id = ANY(${[...userIds]}::uuid[])`) : [];
     return page.map((r) => {
@@ -250,6 +267,15 @@ export class TemplatesService {
           let v = r.data[c.code];
           if (c.type === 'external_team' && typeof v === 'string') v = teams.find((t) => t.id === v)?.name ?? v;
           if (c.type === 'user' && typeof v === 'string') { const u = users.find((x) => x.id === v); v = u?.employee_id?.trim() || u?.email || v; }
+          const person = (id: unknown) => { const u = users.find((x) => x.id === id); return u?.employee_id?.trim() || u?.email || String(id ?? ''); };
+          if (c.type === 'multi_user' && Array.isArray(v)) v = v.map(person).join('; ');
+          if (c.type === 'multi_site' && Array.isArray(v)) v = v.map((id) => sitesById.find((x) => x.id === id)?.site_code ?? String(id)).join('; ');
+          if (c.type === 'multi_list' && Array.isArray(v)) v = v.join('; ');
+          if (c.type === 'warehouse_item' && typeof v === 'string') v = itemsById.find((x) => x.id === v)?.item_code ?? v;
+          // a child list is shown, one row per line, and never read back (the rows are entered in the PMIS, so an action is never entered twice)
+          if (c.type === 'child_list' && Array.isArray(v)) {
+            v = (v as Record<string, unknown>[]).map((row) => Object.entries(row).filter(([k]) => k !== 'id').map(([k, x]) => `${k}: ${k === 'owner' ? person(x) : String(x)}`).join(' | ')).join('\n');
+          }
           out[c.code] = v;
         } else if (c.kind === 'custom') out[c.code] = r.custom[c.code];
       }
@@ -466,8 +492,11 @@ export class TemplatesService {
       }
       if (!c.derived && c.kind !== 'record_id') {
         const range = `${ws.getColumn(i + 1).letter}2:${ws.getColumn(i + 1).letter}${lastRow}`;
-        if (formula) {
-          validations.add(range, { type: 'list', allowBlank: true, formulae: [formula], showErrorMessage: true, errorStyle: 'stop', errorTitle: head.text, error: 'Choose a value from the list.' });
+        if (formula && c.multiple) {
+          // several values separated by ";": the hidden list shows the choices, the database checks every value on upload
+        } else if (formula) {
+          validations.add(range, { type: 'list', allowBlank: true, formulae: [formula], showErrorMessage: true, errorStyle: c.allow_other ? 'warning' : 'stop', errorTitle: head.text,
+            error: c.allow_other ? 'This value is not in the list. It is accepted while the list allows another value.' : 'Choose a value from the list.' });
         } else if (c.type === 'date') {
           validations.add(range, { type: 'date', operator: 'between', allowBlank: true, formulae: [new Date(Date.UTC(2020, 0, 1)), new Date(Date.UTC(2035, 11, 31))], showErrorMessage: true, errorStyle: 'stop', errorTitle: head.text, error: 'A date between 2020-01-01 and 2035-12-31.' });
         } else if (c.type === 'number') {

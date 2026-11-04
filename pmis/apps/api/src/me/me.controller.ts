@@ -4,7 +4,7 @@ import { AllowIncomplete, Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { contentVersion, etagHeader } from '../common/etag';
 import { MeDto, MeService } from './me.service';
-import { EmailChangesService, ProfileDto, ProfileService } from './profile.service';
+import { EmailChangesService, PhoneChangesService, ProfileDto, ProfileService } from './profile.service';
 
 @Controller('me')
 export class MeController {
@@ -56,6 +56,32 @@ export class MeController {
     await this.profile.cancelEmailChange();
   }
 
+  // 0058 (Q158): the code mailed to the new address, and a new code
+  @Post('email-change/verify')
+  @HttpCode(200)
+  verifyEmailChange(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.profile.verifyEmailChange(auth, body);
+  }
+
+  @Post('email-change/resend')
+  @HttpCode(200)
+  resendEmailVerification(@Auth() auth: AuthContext) {
+    return this.profile.resendEmailVerification(auth);
+  }
+
+  // 0058 (D156): the phone is a sign-in identifier; it changes through a request an admin approves
+  @Post('phone-change')
+  @HttpCode(201)
+  requestPhoneChange(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.profile.requestPhoneChange(auth, body);
+  }
+
+  @Delete('phone-change')
+  @HttpCode(204)
+  async cancelPhoneChange(): Promise<void> {
+    await this.profile.cancelPhoneChange();
+  }
+
   @Post('two-factor/enrol/start')
   @HttpCode(200)
   enrolStart(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response) {
@@ -80,6 +106,22 @@ export class MeController {
 @Controller('email-change-requests')
 export class EmailChangeRequestsController {
   constructor(private readonly changes: EmailChangesService) {}
+
+  @Get()
+  list(@Query() query: Record<string, unknown>) {
+    return this.changes.list(query);
+  }
+
+  @Post(':id/decide')
+  @HttpCode(200)
+  decide(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
+    return this.changes.decide(auth, id, body);
+  }
+}
+
+@Controller('phone-change-requests')
+export class PhoneChangeRequestsController {
+  constructor(private readonly changes: PhoneChangesService) {}
 
   @Get()
   list(@Query() query: Record<string, unknown>) {

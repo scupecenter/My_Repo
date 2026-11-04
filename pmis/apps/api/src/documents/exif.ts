@@ -83,3 +83,22 @@ export function readExifDate(data: Buffer): Date | null {
   }
   return null;
 }
+
+/**
+ * EXIF DateTimeOriginal has no time zone: readExifDate gives the camera's wall clock as if it were UTC. Q232 (migration 0056): that wall clock is
+ * read in the project's time zone (Africa/Tripoli), so it compares correctly with the raise time of a snag.
+ */
+export function exifWallToInstant(wall: Date, timeZone = 'Africa/Tripoli'): Date {
+  const offsetAt = (at: Date): number => {
+    const parts: Record<string, number> = {};
+    for (const p of new Intl.DateTimeFormat('en-US', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(at)) {
+      if (p.type !== 'literal') parts[p.type] = Number(p.value);
+    }
+    const asUtc = Date.UTC(parts.year as number, (parts.month as number) - 1, parts.day as number, parts.hour as number, parts.minute as number, parts.second as number);
+    return asUtc - Math.floor(at.getTime() / 1000) * 1000;
+  };
+  // two passes: the offset at the guessed instant, so a change of offset near the wall time is taken into account
+  let t = wall.getTime() - offsetAt(wall);
+  t = wall.getTime() - offsetAt(new Date(t));
+  return new Date(t);
+}

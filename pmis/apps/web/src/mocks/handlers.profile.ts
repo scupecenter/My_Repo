@@ -1,5 +1,6 @@
-// MSW handlers for the self-service "My profile" page (contract 0.9.2): details, email change request and its admin decision, password,
-// two-factor self enrolment and self disable, and the admin "enforced" mark. Synthetic only.
+// MSW handlers for the self-service "My profile" page (contract 0.9.2, 0.12.6): details, email change request (with the code mailed to the new
+// address) and its admin decision, phone change request and its decision, password, two-factor self enrolment and self disable, and the admin
+// "enforced" mark. Synthetic only. The mock sends no mail: the code of an email change is always MOCK_EMAIL_CODE.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { MyProfile } from '@/api/profile';
@@ -10,8 +11,10 @@ import { passwordRules } from './handlers.auth';
 import { newRecoveryCodes, newSecret, otpauth } from './totp';
 
 const B = API_BASE;
-const SELF_EDITABLE = ['display_name', 'phone', 'locale', 'theme'];
-const ADMIN_OWNED = ['email', 'employee_id', 'status', 'team', 'teams', 'region', 'region_id', 'region_ids', 'regions', 'role', 'roles', 'role_ids', 'assignments', 'department', 'department_id', 'manager', 'manager_id', 'position', 'title', 'groups'];
+const SELF_EDITABLE = ['display_name', 'locale', 'theme'];
+/** The code the mock "mails" to a requested new address (there is no mail in the mock). */
+export const MOCK_EMAIL_CODE = 'ABCD-2345';
+const ADMIN_OWNED = ['email', 'phone', 'employee_id', 'status', 'team', 'teams', 'region', 'region_id', 'region_ids', 'regions', 'role', 'roles', 'role_ids', 'assignments', 'department', 'department_id', 'manager', 'manager_id', 'position', 'title', 'groups'];
 const E164 = /^\+[1-9][0-9]{7,14}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const iso = () => new Date().toISOString();
@@ -20,11 +23,30 @@ const acct = () => db().session!.account;
 const isLocal = () => db().session?.method === 'local' && !!cred(acct())?.enabled;
 const over = (key = acct()) => (db().profiles ??= {})[key] ??= { version: 1 };
 const changes = () => (db().emailChanges ??= []);
+const phoneChanges = () => (db().phoneChanges ??= []);
 const emailOf = (key: string) => over(key).email ?? whoOf(key).email ?? ACCOUNTS[key]?.email ?? '';
 const nameOf = (key: string) => over(key).display_name ?? ACCOUNTS[key]?.name ?? db().admin.users.find((x) => accountKeyOf(x) === key)?.local?.display_name ?? '';
 const notLocal = (detail: string) => problem(403, 'action_forbidden', 'Not a local account', { detail });
 
 /** The emails and phones already used by any account (demo accounts, created users, registry staff), lower case. */
+function usedPhones(except: string): Set<string> {
+  const out = new Set<string>();
+  for (const s of STAFF) if (s.employee_id !== ACCOUNTS[except]?.employee_id && s.phone) out.add(s.phone.replace(/[\s().-]/g, ''));
+  for (const [k, o] of Object.entries(db().profiles ?? {})) if (k !== except && o.phone) out.add(o.phone);
+  return out;
+}
+const phoneOf = (key: string): string | null => { const o = over(key); return o.phone !== undefined ? o.phone : (whoOf(key).phone ?? '').replace(/[\s().-]/g, '') || null; };
+const emailBody = (x: (ReturnType<typeof changes>)[number]) => ({
+  id: x.id, old_email: x.old_email, new_email: x.new_email, status: x.status, requested_at: x.requested_at, decided_at: x.decided_at, decision_reason: x.decision_reason,
+  verified_at: x.verified_at ?? null, verified_via: x.verified_via ?? null, verify_sent_at: x.verify_sent_at ?? null, verify_expires_at: x.verify_expires_at ?? null,
+});
+const phoneBody = (x: (ReturnType<typeof phoneChanges>)[number]) => ({
+  id: x.id, old_phone: x.old_phone, new_phone: x.new_phone, status: x.status, requested_at: x.requested_at, decided_at: x.decided_at, decision_reason: x.decision_reason,
+});
+const sendCode = (x: (ReturnType<typeof changes>)[number]) => {
+  Object.assign(x, { code: MOCK_EMAIL_CODE, attempts: 0, verify_sent_at: iso(), verify_expires_at: new Date(Date.now() + 24 * 3600_000).toISOString() });
+};
+
 function usedEmails(except: string): Set<string> {
   const out = new Set<string>();
   for (const k of Object.keys(ACCOUNTS)) if (k !== except) out.add(emailOf(k).toLowerCase());
@@ -38,13 +60,15 @@ export function profileBody(): MyProfile {
   const v = viewer()!, key = acct(), c = cred(key), o = over(key);
   const state = tfLabel(c), enforced = !!c?.tf?.on && !!c.tf.enforced, local = isLocal();
   const mine = changes().filter((x) => x.account === key).sort((a, b) => (a.requested_at < b.requested_at ? 1 : -1))[0];
+  const minePhone = phoneChanges().filter((x) => x.account === key).sort((a, b) => (a.requested_at < b.requested_at ? 1 : -1))[0];
   return {
     id: sessionBody().user!.id, display_name: nameOf(key) || v.name, email: emailOf(key) || v.email, employee_id: v.employee_id,
-    phone: o.phone !== undefined ? o.phone : (whoOf(key).phone ?? '').replace(/[\s().-]/g, '') || null, locale: o.locale ?? 'en', theme: o.theme ?? 'light', status: v.status,
+    phone: phoneOf(key), locale: o.locale ?? 'en', theme: o.theme ?? 'light', status: v.status,
     auth_method: db().session!.method ?? 'm365', local_sign_in: !!c?.enabled, editable_fields: SELF_EDITABLE as MyProfile['editable_fields'],
     admin_owned: { roles: v.key === 'pm' ? [{ id: '0f000000-0000-4000-8000-000000000001', code: 'PM', name_en: 'Project Manager', name_ar: 'مدير المشروع' }] : [], teams: [], region_ids: 'all', department: null, manager: null },
     two_factor: { state, enforced, recovery_codes_remaining: state === 'on' ? c!.tf!.codes.length : 0, can_enable: local && state === 'off', can_disable: local && state === 'on' && !enforced },
-    email_change: mine ? { id: mine.id, old_email: mine.old_email, new_email: mine.new_email, status: mine.status, requested_at: mine.requested_at, decided_at: mine.decided_at, decision_reason: mine.decision_reason } : null,
+    email_change: mine ? emailBody(mine) : null,
+    phone_change: minePhone ? phoneBody(minePhone) : null,
     version: o.version,
   };
 }
@@ -54,7 +78,15 @@ const json = async (r: Request) => (await r.json().catch(() => ({}))) as Record<
 function adminRow(x: (ReturnType<typeof changes>)[number]) {
   const u = db().admin.users.find((y) => accountKeyOf(y) === x.account);
   return {
-    id: x.id, old_email: x.old_email, new_email: x.new_email, status: x.status, requested_at: x.requested_at, decided_at: x.decided_at, decision_reason: x.decision_reason,
+    ...emailBody(x), identity_check: x.identity_check ?? null,
+    user: { id: sessionBodyIdOf(x.account), display_name: nameOf(x.account), employee_id: u?.employee_id || ACCOUNTS[x.account]?.employee_id || null },
+    decided_by: x.decided_by ? { id: sessionBodyIdOf(x.decided_by), display_name: nameOf(x.decided_by), employee_id: ACCOUNTS[x.decided_by]?.employee_id ?? null } : null,
+  };
+}
+function phoneAdminRow(x: (ReturnType<typeof phoneChanges>)[number]) {
+  const u = db().admin.users.find((y) => accountKeyOf(y) === x.account);
+  return {
+    ...phoneBody(x),
     user: { id: sessionBodyIdOf(x.account), display_name: nameOf(x.account), employee_id: u?.employee_id || ACCOUNTS[x.account]?.employee_id || null },
     decided_by: x.decided_by ? { id: sessionBodyIdOf(x.decided_by), display_name: nameOf(x.decided_by), employee_id: ACCOUNTS[x.decided_by]?.employee_id ?? null } : null,
   };
@@ -71,7 +103,7 @@ export const profileHandlers = [
     const g = guard(); if (g) return g;
     const b = await json(request);
     const ro = Object.keys(b).filter((k) => ADMIN_OWNED.includes(k));
-    if (ro.length) return problem(403, 'field_read_only', 'These fields are managed by an administrator', { errors: ro.map((k) => ({ path: `/${k}`, code: 'read_only' })) });
+    if (ro.length) return problem(403, 'field_read_only', 'These fields are managed by an administrator', { errors: ro.map((k) => ({ path: `/${k}`, code: 'read_only', ...(k === 'phone' ? { message: 'Ask for a phone change instead (POST /me/phone-change).' } : {}) })) });
     const unknown = Object.keys(b).filter((k) => !SELF_EDITABLE.includes(k));
     if (unknown.length || !Object.keys(b).length) return problem(422, 'validation_failed', 'Validation failed', { errors: (unknown.length ? unknown : ['']).map((k) => ({ path: `/${k}`, code: 'invalid' })) });
     const h = request.headers.get('If-Match');
@@ -80,15 +112,10 @@ export const profileHandlers = [
     if (h.replace(/"/g, '') !== String(o.version)) return problem(412, 'precondition_failed', 'The profile changed since you read it');
     const errors: { path: string; code: string }[] = [];
     if ('display_name' in b && (typeof b.display_name !== 'string' || !b.display_name.trim() || b.display_name.trim().length > 200)) errors.push({ path: '/display_name', code: 'invalid' });
-    if ('phone' in b && b.phone !== null && (typeof b.phone !== 'string' || !E164.test(b.phone))) errors.push({ path: '/phone', code: 'invalid' });
     if ('locale' in b && !['en', 'ar'].includes(b.locale as string)) errors.push({ path: '/locale', code: 'invalid' });
     if ('theme' in b && !['light', 'dark'].includes(b.theme as string)) errors.push({ path: '/theme', code: 'invalid' });
     if (errors.length) return problem(422, 'validation_failed', 'Validation failed', { errors });
-    if (typeof b.phone === 'string' && STAFF.some((s) => s.phone === b.phone && s.employee_id !== viewer()!.employee_id)) {
-      return problem(409, 'duplicate', 'This phone is already used by another account', { errors: [{ path: '/phone', code: 'duplicate' }] });
-    }
     if (typeof b.display_name === 'string') o.display_name = b.display_name.trim();
-    if ('phone' in b) o.phone = b.phone as string | null;
     if (b.locale) o.locale = b.locale as 'en' | 'ar';
     if (b.theme) o.theme = b.theme as 'light' | 'dark';
     o.version += 1;
@@ -124,10 +151,92 @@ export const profileHandlers = [
     if (usedEmails(key).has(email) || changes().some((x) => x.status === 'pending' && x.new_email === email)) {
       return problem(409, 'duplicate', 'This email is already used or requested by another account', { errors: [{ path: '/new_email', code: 'duplicate' }] });
     }
-    const r = { id: crypto.randomUUID(), account: key, old_email: emailOf(key), new_email: email, status: 'pending' as const, requested_at: iso(), decided_at: null, decision_reason: null, decided_by: null };
+    const r: (ReturnType<typeof changes>)[number] = { id: crypto.randomUUID(), account: key, old_email: emailOf(key), new_email: email, status: 'pending', requested_at: iso(), decided_at: null, decision_reason: null, decided_by: null };
+    sendCode(r);
     changes().push(r);
     save();
-    return HttpResponse.json({ id: r.id, old_email: r.old_email, new_email: r.new_email, status: r.status, requested_at: r.requested_at, decided_at: null, decision_reason: null }, { status: 201 });
+    return HttpResponse.json(emailBody(r), { status: 201 });
+  }),
+
+  http.post(`${B}/me/email-change/verify`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    const r = changes().find((x) => x.account === acct() && x.status === 'pending');
+    if (!r) return problem(404, 'not_found', 'No email change is waiting for a decision');
+    if (r.verified_at) return HttpResponse.json(emailBody(r));
+    if (!r.code) return problem(409, 'invalid_transition', 'No code was sent for this request: send a new one.');
+    const b = await json(request);
+    const typed = String(b.code ?? '').toUpperCase().replace(/[\s-]/g, '');
+    const bad = (code: string, msg: string) => problem(422, 'invalid_code', msg, { errors: [{ path: '/code', code }] });
+    if ((r.attempts ?? 0) >= 5) return bad('locked', 'Too many wrong codes: send a new code.');
+    if (r.verify_expires_at && r.verify_expires_at < iso()) return bad('expired', 'The code has expired: send a new code.');
+    if (typed !== r.code.replace('-', '')) { r.attempts = (r.attempts ?? 0) + 1; save(); return bad(r.attempts >= 5 ? 'locked' : 'invalid', 'The code is not correct.'); }
+    Object.assign(r, { verified_at: iso(), verified_via: 'code', code: null });
+    save();
+    return HttpResponse.json(emailBody(r));
+  }),
+
+  http.post(`${B}/me/email-change/resend`, () => {
+    const g = guard(); if (g) return g;
+    const r = changes().find((x) => x.account === acct() && x.status === 'pending');
+    if (!r) return problem(404, 'not_found', 'No email change is waiting for a decision');
+    if (r.verified_at) return problem(409, 'invalid_transition', 'The new address is already confirmed.');
+    sendCode(r);
+    save();
+    return HttpResponse.json(emailBody(r));
+  }),
+
+  http.post(`${B}/me/phone-change`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!isLocal()) return notLocal('Your account signs in with Microsoft 365. Ask an administrator to change your phone.');
+    const key = acct(), c = cred(key)!;
+    const b = await json(request);
+    const phone = b.new_phone === null ? null : String(b.new_phone ?? '').trim();
+    if ((phone !== null && !E164.test(phone)) || typeof b.password !== 'string' || !b.password) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/new_phone', code: 'invalid' }] });
+    if (c.locked_until && c.locked_until > Date.now()) return problem(429, 'account_locked', 'Account locked', {});
+    if (b.password !== c.password) { recordFailure(key); save(); return GENERIC(); }
+    if (phone === phoneOf(key)) return problem(422, 'validation_failed', 'This is already your phone', { errors: [{ path: '/new_phone', code: 'same_as_current' }] });
+    if (phoneChanges().some((x) => x.account === key && x.status === 'pending')) return problem(409, 'invalid_transition', 'A phone change is already waiting for approval');
+    if (phone && (usedPhones(key).has(phone) || phoneChanges().some((x) => x.status === 'pending' && x.new_phone === phone))) {
+      return problem(409, 'duplicate', 'This phone is already used or requested by another account', { errors: [{ path: '/new_phone', code: 'duplicate' }] });
+    }
+    const r = { id: crypto.randomUUID(), account: key, old_phone: phoneOf(key), new_phone: phone, status: 'pending' as const, requested_at: iso(), decided_at: null, decision_reason: null, decided_by: null };
+    phoneChanges().push(r);
+    save();
+    return HttpResponse.json(phoneBody(r), { status: 201 });
+  }),
+
+  http.delete(`${B}/me/phone-change`, () => {
+    const g = guard(); if (g) return g;
+    const r = phoneChanges().find((x) => x.account === acct() && x.status === 'pending');
+    if (!r) return problem(404, 'not_found', 'No phone change is waiting for a decision');
+    Object.assign(r, { status: 'cancelled', decided_at: iso(), decided_by: acct() });
+    save();
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(`${B}/phone-change-requests`, ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const status = new URL(request.url).searchParams.get('status') ?? 'pending';
+    const items = phoneChanges().filter((x) => status === 'all' || x.status === status).sort((a, b) => (a.requested_at < b.requested_at ? 1 : -1)).map(phoneAdminRow);
+    return HttpResponse.json({ items, page: { limit: 200, next_cursor: null, total: items.length } });
+  }),
+
+  http.post(`${B}/phone-change-requests/:id/decide`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    const r = phoneChanges().find((x) => x.id === params.id);
+    if (!r) return problem(404, 'not_found', 'Request not found');
+    const b = await json(request);
+    if (!['approve', 'reject'].includes(b.decision as string) || String(b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'A decision and a reason are required', { errors: [{ path: '/reason', code: 'required' }] });
+    if (r.account === acct()) return problem(403, 'self_beneficiary', 'You cannot decide a phone change on your own account');
+    if (r.status !== 'pending') return problem(409, 'invalid_transition', 'This phone change is no longer waiting for a decision');
+    if (b.decision === 'approve') {
+      if (r.new_phone && usedPhones(r.account).has(r.new_phone)) return problem(409, 'duplicate', 'This phone is already used by another account', { errors: [{ path: '/new_phone', code: 'duplicate' }] });
+      over(r.account).phone = r.new_phone;
+    }
+    Object.assign(r, { status: b.decision === 'approve' ? 'approved' : 'rejected', decided_at: iso(), decided_by: acct(), decision_reason: String(b.reason).trim() });
+    save();
+    return HttpResponse.json(phoneAdminRow(r));
   }),
 
   http.delete(`${B}/me/email-change`, () => {
@@ -197,6 +306,11 @@ export const profileHandlers = [
     if (!['approve', 'reject'].includes(b.decision as string) || String(b.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'A decision and a reason are required', { errors: [{ path: '/reason', code: 'required' }] });
     if (r.account === acct()) return problem(403, 'self_beneficiary', 'You cannot decide an email change on your own account');
     if (r.status !== 'pending') return problem(409, 'invalid_transition', 'This email change is no longer waiting for a decision');
+    const check = typeof b.identity_check === 'string' ? b.identity_check.trim() : '';
+    if (b.decision === 'approve' && !r.verified_at && check.length < 3) {
+      return problem(409, 'email_not_verified', 'The new email address is not confirmed', { errors: [{ path: '/identity_check', code: 'required' }] });
+    }
+    if (b.decision === 'approve' && !r.verified_at) Object.assign(r, { verified_at: iso(), verified_via: 'admin_check', identity_check: check, code: null });
     if (b.decision === 'approve') {
       if (usedEmails(r.account).has(r.new_email)) return problem(409, 'duplicate', 'This email is already used by another account', { errors: [{ path: '/new_email', code: 'duplicate' }] });
       over(r.account).email = r.new_email;

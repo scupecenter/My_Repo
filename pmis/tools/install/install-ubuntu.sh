@@ -604,6 +604,19 @@ FILE_ENC_KEY=${PREV_FILE_ENC_KEY:-$(openssl rand -hex 32)}
 KEEP_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(FILE_ENC_KEY_ID|FILE_ENC_OLD_KEYS|MALWARE_SCAN|CLAMD_SOCKET|CLAMD_HOST|CLAMD_PORT|CLAMD_TIMEOUT_MS|SCAN_FAILURE)=' "$CONF_DIR/pmis.env" || true )
 grep -q '^FILE_ENC_KEY_ID=' <<<"$KEEP_LINES" || KEEP_LINES="${KEEP_LINES:+$KEEP_LINES
 }FILE_ENC_KEY_ID=k1"
+# Outbound mail (owner answer Q167, migration 0055) and the integrity anchors (Q171). The SMTP lines are filled by IT on the server and are kept as
+# they are on every update; a first install writes them empty (mail off: the PMIS records what it would have sent). See tools/install/README.md.
+MAIL_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|SMTP_FROM|SMTP_TLS|SMTP_TLS_REJECT_UNAUTHORIZED|SMTP_CA_FILE|SMTP_ALLOW_PLAIN_AUTH|SMTP_TIMEOUT_MS|SMTP_HELO_NAME|APP_BASE_URL)=' "$CONF_DIR/pmis.env" || true )
+grep -q '^SMTP_HOST=' <<<"$MAIL_LINES" || MAIL_LINES="${MAIL_LINES:+$MAIL_LINES
+}SMTP_HOST=
+SMTP_PORT=587
+SMTP_TLS=starttls
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM="
+ANCHOR_DIR=$( [[ -r $CONF_DIR/pmis.env ]] && sed -n 's/^LOG_ANCHOR_DIR=//p' "$CONF_DIR/pmis.env" || true )
+ANCHOR_DIR=${ANCHOR_DIR:-/var/lib/gsdn-pmis/log-anchors}
+install -d -m 750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$ANCHOR_DIR"
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
 # GSDN PMIS settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
@@ -618,6 +631,9 @@ TOTP_ENC_KEY=$TOTP_ENC_KEY
 FILE_ENC_KEY=$FILE_ENC_KEY
 $KEEP_LINES
 $S3_LINES
+# Mail: fill SMTP_HOST, SMTP_FROM (and SMTP_USER / SMTP_PASS when the relay needs them), then: sudo systemctl restart gsdn-pmis-api
+$MAIL_LINES
+LOG_ANCHOR_DIR=$ANCHOR_DIR
 EOF
 cat > "$CONF_DIR/install.conf" <<EOF
 # Answers of the last run of install-ubuntu.sh (no secrets). They are the defaults of the next run.
@@ -653,7 +669,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=-$STORAGE_DIR
+ReadWritePaths=-$STORAGE_DIR -$ANCHOR_DIR
 
 [Install]
 WantedBy=multi-user.target
@@ -683,7 +699,14 @@ fi
 
 # ---------------------------------------------------------------- optional: virus scan and backup of the stored files (owner answer Q134)
 # Each step asks once; an update keeps the answer (the settings it wrote stay in pmis.env and backup.env).
-if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1; elif (( AUTO )); then CLAM_ON=0; elif ask_yes "Install the ClamAV virus scan for uploads (needs about 1 GB of disk and an internet connection for the signatures)?"; then CLAM_ON=1; else CLAM_ON=0; fi
+# Owner answer Q195 (2026-11-04): the virus scan is ON by default on a production install, without a question. It is skipped only when the owner
+# says so: PMIS_VIRUS_SCAN=off on the command line, or MALWARE_SCAN=off already in pmis.env (an earlier explicit choice, kept on every update).
+if grep -q '^MALWARE_SCAN=clamd' "$CONF_DIR/pmis.env"; then CLAM_ON=1
+elif [[ ${PMIS_VIRUS_SCAN-} == off ]] || grep -q '^MALWARE_SCAN=off' "$CONF_DIR/pmis.env"; then
+  CLAM_ON=0
+  grep -q '^MALWARE_SCAN=' "$CONF_DIR/pmis.env" || echo 'MALWARE_SCAN=off' >> "$CONF_DIR/pmis.env"
+  echo "Virus scan of uploads: OFF by the owner's choice (PMIS_VIRUS_SCAN=off). Not recommended for production."
+else CLAM_ON=1; fi
 if (( CLAM_ON )); then say "Setting up the ClamAV virus scan"; bash "$PMIS_DIR/tools/install/install-clamav.sh"; fi
 if [[ -r $CONF_DIR/backup.env ]]; then BACKUP_ON=1; elif (( AUTO )); then BACKUP_ON=0; elif ask_yes "Back up the stored files every night with restic (encrypted, 14 daily, 8 weekly, 12 monthly)?"; then BACKUP_ON=1; else BACKUP_ON=0; fi
 if (( BACKUP_ON )); then say "Setting up the nightly backup of the stored files"; bash "$PMIS_DIR/tools/install/install-file-backup.sh"; fi

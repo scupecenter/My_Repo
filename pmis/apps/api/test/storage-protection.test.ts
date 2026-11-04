@@ -196,6 +196,28 @@ describe('storage protection', () => {
     await expect(s.get(KEY)).rejects.toThrow();
   });
 
+  it('Q199: the plaintext must also match the recorded size and SHA-256 before release (small and spooled objects)', async () => {
+    const s = store({ scanner: false });
+    await s.put(KEY, Buffer.from('a signed PAC, small'));
+    (meta.rows.get(KEY) as Envelope).plain_sha256 = 'ab'.repeat(32);
+    await expect(s.get(KEY)).rejects.toThrow(/integrity/);
+    const KEY2 = 'docs/2026/11/0c8f1d3e-1111-4222-8333-aaaabbbbcccc';
+    const big = randomBytes(4 * 1024 * 1024 + 99);
+    await s.put(KEY2, big);
+    const before = readdirSync(tmpdir()).filter((n) => n.startsWith('pmis-dec-')).length;
+    (meta.rows.get(KEY2) as Envelope).plain_sha256 = 'cd'.repeat(32);
+    await expect(s.get(KEY2)).rejects.toThrow(/integrity/);
+    expect(readdirSync(tmpdir()).filter((n) => n.startsWith('pmis-dec-')).length).toBe(before);
+  });
+
+  it('Q195: generated content (CSV log exports) is stored without the scanner, even when clamd is down under fail_closed', async () => {
+    const s = store({ failure: 'fail_closed', socket: join(sockDir, 'missing.sock') });
+    await expect(s.put(KEY, Buffer.from('an upload'))).rejects.toBeInstanceOf(ProblemException);
+    await s.putGenerated(KEY, Buffer.from('id,at\r\n1,2026-11-04\r\n'));
+    expect(meta.rows.get(KEY)?.scan_status).toBe('clean');
+    expect((await readAll(await s.get(KEY))).toString()).toBe('id,at\r\n1,2026-11-04\r\n');
+  });
+
   it('a legacy plaintext object (no envelope row) stays readable', async () => {
     await fs.mkdir(join(dir, 'docs/2026/11'), { recursive: true });
     writeFileSync(rawPath(), 'legacy bytes');
@@ -274,6 +296,9 @@ describe('storage protection', () => {
     await s.put(KEY, Buffer.from('accepted unscanned'));
     expect(meta.rows.get(KEY)?.scan_status).toBe('pending_rescan');
     expect(ev.lines.some((l) => l.includes('flagged for rescan'))).toBe(true);
+    // Q195 (0056): the file stays in quarantine until the rescan passes it
+    await expect(s.get(KEY)).rejects.toMatchObject({ code: 'file_pending_scan' });
+    await meta.setScan(KEY, 'clean');
     expect((await readAll(await s.get(KEY))).toString()).toBe('accepted unscanned');
   });
 

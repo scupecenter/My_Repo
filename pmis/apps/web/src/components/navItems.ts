@@ -43,6 +43,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'reg
   { key: 'logs.job_runs', to: '/admin/logs/job-runs', icon: 'jobRuns', group: 'logs' },
   { key: 'logs.deployments', to: '/admin/logs/deployments', icon: 'deployments', group: 'logs' },
   { key: 'logs.activity_report', to: '/admin/logs/activity-report', icon: 'report', group: 'logs' },
+  { key: 'logs.integrity', to: '/admin/logs/integrity', icon: 'integrity', group: 'logs' },
+  { key: 'logs.mail', to: '/admin/logs/mail', icon: 'mail', group: 'logs' },
 ];
 
 /** Entries opened by a grant rather than by the server's module list (security log, online now). */
@@ -50,5 +52,5 @@ export const BY_GRANT: Record<string, string> = {
   'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
 };
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
-export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments']);
+export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];

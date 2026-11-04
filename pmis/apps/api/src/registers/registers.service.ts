@@ -57,6 +57,19 @@ const noteSchema = z
   .strict();
 const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() }).strict();
 const transferSchema = z.object({ note: z.string().trim().max(2000).optional() }).strict();
+const convertSchema = z
+  .object({
+    values: z
+      .object({
+        organiser: z.string().uuid().optional(),
+        attendee_users: z.array(z.string().uuid()).max(200).optional(),
+        linked_site_ids: z.array(z.string().uuid()).max(500).optional(),
+        action_items_list: z.array(z.record(z.unknown())).max(200).optional(),
+      })
+      .strict(),
+    reason: z.string().trim().min(3).max(1000),
+  })
+  .strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
 
 interface RecordRow {
@@ -127,7 +140,20 @@ interface FieldRow {
   options: unknown;
   in_list: boolean;
   section: string | null;
+  list_catalogue: string | null;
 }
+
+interface ChildColumn { code: string; label_en?: string; label_ar?: string | null; type: string; required?: boolean; list_catalogue?: string }
+interface CatalogueInfo {
+  ref: { code: string; status: string; critical: boolean; allow_other: boolean };
+  options: { value: string; label_en: string; label_ar: string | null; groups?: string[] }[];
+  all: Set<string>;
+}
+const childColumns = (f: { field_type: string; options: unknown }): ChildColumn[] =>
+  f.field_type === 'child_list' && f.options && typeof f.options === 'object' && Array.isArray((f.options as { columns?: unknown }).columns)
+    ? ((f.options as { columns: ChildColumn[] }).columns)
+    : [];
+const isUuid = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
 const FIELD_ENTITY: Record<string, string> = {
   procurement: 'procurement', gecol: 'gecol', hlc: 'hlc', permits_hse: 'permit',
@@ -204,33 +230,79 @@ export class RegistersService {
     return rows[0]?.r ?? [];
   }
 
-  private async fieldsOf(key: string): Promise<unknown[]> {
+  /** 0057 (Q104): the lists of the catalogue, active values first (code, labels, groups) and every code ever used (for the `list_other` warning). */
+  private async catalogues(codes: string[]): Promise<Map<string, CatalogueInfo>> {
+    const out = new Map<string, CatalogueInfo>();
+    if (codes.length === 0) return out;
+    const cats = await this.db.tx.$queryRaw<{ code: string; status: string; critical: boolean; allow_other: boolean }[]>(Prisma.sql`
+      SELECT code, status, critical, allow_other FROM list_catalogues WHERE code = ANY(${codes}::text[])`);
+    const vals = await this.db.tx.$queryRaw<{ catalogue_code: string; code: string; label_en: string; label_ar: string | null; groups: string[]; is_active: boolean }[]>(Prisma.sql`
+      SELECT catalogue_code, code, label_en, label_ar, groups, is_active FROM list_values WHERE catalogue_code = ANY(${codes}::text[]) ORDER BY sort_order, code COLLATE "C"`);
+    for (const c of cats) {
+      const mine = vals.filter((v) => v.catalogue_code === c.code);
+      out.set(c.code, {
+        ref: { code: c.code, status: c.status, critical: c.critical, allow_other: c.allow_other },
+        options: mine.filter((v) => v.is_active).map((v) => ({ value: v.code, label_en: v.label_en, label_ar: v.label_ar, ...(v.groups.length ? { groups: v.groups } : {}) })),
+        all: new Set(mine.map((v) => v.code)),
+      });
+    }
+    return out;
+  }
+
+  /** The raw field rows of a register with the catalogues they read (cached for one request). */
+  private async fieldRows(key: string): Promise<{ rows: FieldRow[]; cats: Map<string, CatalogueInfo> }> {
     const rows = await this.db.tx.$queryRaw<FieldRow[]>(Prisma.sql`
-      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section
+      SELECT register_key, code, label_en, label_ar, field_type, required, derived, options, in_list, section, list_catalogue
       FROM register_fields WHERE register_key = ${key} AND is_active ORDER BY sort_order, code COLLATE "C"`);
+    const codes = new Set<string>();
+    for (const f of rows) {
+      if (f.list_catalogue) codes.add(f.list_catalogue);
+      for (const c of childColumns(f)) if (c.list_catalogue) codes.add(c.list_catalogue);
+    }
+    return { rows, cats: await this.catalogues([...codes]) };
+  }
+
+  private async fieldsOf(key: string): Promise<unknown[]> {
+    const { rows, cats } = await this.fieldRows(key);
     let permitTypes: string[] | null = null;
     const out: unknown[] = [];
     for (const f of rows) {
-      let options: { value: string; label_en: string }[] | undefined;
-      if (Array.isArray(f.options)) {
-        const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;
+      let options: { value: string; label_en: string; label_ar?: string | null }[] | undefined;
+      const cat = f.list_catalogue ? cats.get(f.list_catalogue) : undefined;
+      // the permit streams (0054, Q220) keep their names even when the list catalogue (0057) holds only the codes
+      const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;
+      if (cat) options = cat.options.map((o) => (labels?.[o.value] ? { ...o, ...labels[o.value] } : o));
+      else if (Array.isArray(f.options)) {
         options = (f.options as string[]).map((v) => (labels?.[v] ? { value: v, ...labels[v] } : { value: v, label_en: v }));
       }
       else if (f.options && typeof f.options === 'object' && (f.options as { source?: string }).source === 'permit_types') {
         permitTypes ??= (await this.db.tx.$queryRaw<{ code: string }[]>(Prisma.sql`SELECT code FROM permit_types WHERE is_active ORDER BY sort_order`)).map((r) => r.code);
         options = permitTypes.map((v) => ({ value: v, label_en: v }));
       }
+      const multiple = f.field_type === 'list_code' && (f.options as { multiple?: boolean } | null)?.multiple === true;
       out.push({
         code: f.code,
         label_en: f.label_en,
         label_ar: f.label_ar,
-        type: f.field_type === 'external_team' ? 'text' : f.field_type,
+        type: f.field_type === 'external_team' ? 'text' : f.field_type === 'list_code' ? (multiple ? 'multi_list' : 'list') : f.field_type,
         required: f.required,
         read_only: f.derived,
         in_list: f.in_list,
         is_custom: false,
         ...(f.section ? { section: f.section } : {}),
         ...(options ? { options } : {}),
+        ...(cat ? { list: cat.ref } : {}),
+        ...(f.field_type === 'child_list'
+          ? {
+              columns: childColumns(f).map((c) => {
+                const cc = c.list_catalogue ? cats.get(c.list_catalogue) : undefined;
+                return {
+                  code: c.code, label_en: c.label_en ?? c.code, label_ar: c.label_ar ?? null, type: c.type === 'list_code' ? 'list' : c.type, required: c.required === true,
+                  ...(cc ? { list: cc.ref, options: cc.options } : {}),
+                };
+              }),
+            }
+          : {}),
       });
     }
     const entity = FIELD_ENTITY[key];
@@ -424,6 +496,14 @@ export class RegistersService {
       const g = await grant(module, action);
       return g === null || (g.length > 0 && (region === null || g.includes(region)));
     };
+    // Q234 (migration 0056): a Quality snag record and its QC snag are one work item; the record shows the snag's state (the snag is closed only by
+    // the QC photo flow). An approved snag record without a snag could not be linked (no Stage / stream): it shows as needs_review.
+    const snagRecs = rows.filter((r) => r.register_key === 'quality' && r.record_type === 'snag').map((r) => r.entity_id);
+    const qcSnags = new Map(snagRecs.length
+      ? (await this.db.tx.$queryRaw<{ entity_id: string; id: string; status: string; scope: string }[]>(Prisma.sql`
+          SELECT register_entity_id::text AS entity_id, id::text AS id, status::text AS status, scope FROM snags WHERE register_entity_id = ANY(${snagRecs}::uuid[])`)).map((x) => [x.entity_id, x])
+      : []);
+    const QC_STATE: Record<string, string> = { open: 'open', fix_uploaded: 'fix_submitted', in_review: 'in_review', closed: 'closed', cancelled: 'cancelled' };
     const out: Record<string, unknown>[] = [];
     for (const r of rows) {
       if (!defs.has(r.register_key)) defs.set(r.register_key, await this.definition(r.register_key));
@@ -457,6 +537,11 @@ export class RegistersService {
         warnings: Array.isArray(r.warnings) ? r.warnings : [],
       };
       if (r.task_id && r.task_code) dto.task = { id: r.task_id, task_code: r.task_code };
+      if (r.register_key === 'quality' && r.record_type === 'snag') {
+        const qs = qcSnags.get(r.entity_id);
+        dto.qc_snag = qs ? { id: qs.id, state: QC_STATE[qs.status] ?? qs.status, scope: qs.scope, link: 'linked' }
+          : { id: null, state: null, scope: null, link: r.state === 'approved' ? 'needs_review' : 'on_approval' };
+      }
       if (party) dto.external_party = party;
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);
@@ -494,7 +579,75 @@ export class RegistersService {
       dto.allowed_actions = actions;
       out.push(dto);
     }
+    await this.attachRefs(out);
     return out;
+  }
+
+  /**
+   * 0057: the display data of the ids a record holds (people, sites, Warehouse items, files, tasks) and the `list_other` warning of a value that is not in its
+   * list (accepted while the list allows another value, Q104).
+   */
+  private async attachRefs(out: Record<string, unknown>[]): Promise<void> {
+    const meta = new Map<string, { rows: FieldRow[]; cats: Map<string, CatalogueInfo> }>();
+    for (const d of out) if (!meta.has(d.register_key as string)) meta.set(d.register_key as string, await this.fieldRows(d.register_key as string));
+    const ids = { users: new Set<string>(), sites: new Set<string>(), items: new Set<string>(), files: new Set<string>(), tasks: new Set<string>() };
+    const add = (set: Set<string>, v: unknown) => { if (isUuid(v)) set.add(v.toLowerCase()); };
+    for (const d of out) {
+      const data = (d.data ?? {}) as Record<string, unknown>;
+      const m = meta.get(d.register_key as string) as { rows: FieldRow[]; cats: Map<string, CatalogueInfo> };
+      const warnings = (d.warnings as unknown[]) ?? [];
+      for (const f of m.rows) {
+        const v = data[f.code];
+        if (v === undefined || v === null) continue;
+        if (f.field_type === 'user') add(ids.users, v);
+        else if (f.field_type === 'multi_user' && Array.isArray(v)) v.forEach((x) => add(ids.users, x));
+        else if (f.field_type === 'multi_site' && Array.isArray(v)) v.forEach((x) => add(ids.sites, x));
+        else if (f.field_type === 'warehouse_item') add(ids.items, v);
+        else if (f.field_type === 'file') add(ids.files, v);
+        else if (f.field_type === 'child_list' && Array.isArray(v)) {
+          for (const row of v as Record<string, unknown>[]) for (const c of childColumns(f)) {
+            if (c.type === 'user') add(ids.users, row[c.code]);
+            if (c.type === 'task') add(ids.tasks, row[c.code]);
+          }
+        }
+        const cat = f.list_catalogue ? m.cats.get(f.list_catalogue) : undefined;
+        if (cat && cat.ref.allow_other) {
+          for (const x of Array.isArray(v) ? v : [v]) {
+            if (typeof x === 'string' && !cat.all.has(x)) {
+              warnings.push({ path: `/data/${f.code}`, code: 'list_other', message: `"${x}" is not a value of the list ${cat.ref.code} (accepted while the list allows another value).` });
+            }
+          }
+        }
+      }
+      d.warnings = warnings;
+    }
+    const refs = {
+      users: ids.users.size ? await this.view.userRefs([...ids.users]) : new Map<string, UserRefDto>(),
+      sites: ids.sites.size ? await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`SELECT id::text AS id, site_code FROM sites WHERE id = ANY(${[...ids.sites]}::uuid[])`) : [],
+      items: ids.items.size ? await this.db.tx.$queryRaw<{ id: string; item_code: string; name: string; is_active: boolean }[]>(Prisma.sql`SELECT id::text AS id, item_code, name, is_active FROM warehouse_items WHERE id = ANY(${[...ids.items]}::uuid[])`) : [],
+      // a file name is shown only for a file of a slot of the same logical record
+      files: ids.files.size ? await this.db.tx.$queryRaw<{ id: string; entity: string; name: string }[]>(Prisma.sql`
+        SELECT f.id::text AS id, s.register_entity_id::text AS entity, f.original_name AS name FROM document_files f JOIN document_slots s ON s.id = f.slot_id
+        WHERE f.id = ANY(${[...ids.files]}::uuid[]) AND s.register_entity_id IS NOT NULL`) : [],
+      tasks: ids.tasks.size ? await this.db.tx.$queryRaw<{ id: string; code: string }[]>(Prisma.sql`
+        SELECT t.id::text AS id, td.code FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id WHERE t.id = ANY(${[...ids.tasks]}::uuid[])`) : [],
+    };
+    for (const d of out) {
+      const data = JSON.stringify(d.data ?? {}).toLowerCase();
+      const has = (id: string) => data.includes(id.toLowerCase());
+      const r: Record<string, Record<string, unknown>> = {};
+      const users = [...refs.users.entries()].filter(([id]) => has(id));
+      if (users.length) r.users = Object.fromEntries(users.map(([id, u]) => [id, { display_name: u.display_name, employee_id: u.employee_id }]));
+      const sites = refs.sites.filter((x) => has(x.id));
+      if (sites.length) r.sites = Object.fromEntries(sites.map((x) => [x.id, x.site_code]));
+      const items = refs.items.filter((x) => has(x.id));
+      if (items.length) r.warehouse_items = Object.fromEntries(items.map((x) => [x.id, { item_code: x.item_code, name: x.name, is_active: x.is_active }]));
+      const files = refs.files.filter((x) => has(x.id) && x.entity === d.entity_id);
+      if (files.length) r.files = Object.fromEntries(files.map((x) => [x.id, x.name]));
+      const tasks = refs.tasks.filter((x) => has(x.id));
+      if (tasks.length) r.tasks = Object.fromEntries(tasks.map((x) => [x.id, x.code]));
+      if (Object.keys(r).length) d.refs = r;
+    }
   }
 
   // ------------------------------------------------------------------ writes
@@ -606,6 +759,54 @@ export class RegistersService {
     await this.rowFor(auth, key, id);
     await this.stepUp.require(auth);
     await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_void_record(${id}::uuid, ${version}::int, ${body.reason}::text)) v`);
+    return this.get(auth, key, id);
+  }
+
+  // ------------------------------------------------------------------ Q111: the explicit conversion of the old free text of a meeting
+  async legacyProposal(auth: AuthContext, key: string, id: string): Promise<Record<string, unknown>> {
+    if (key !== 'meetings') throw problems.notFound('Only a meeting has old text to convert.');
+    const { row } = await this.rowFor(auth, key, id);
+    const d = row.data as Record<string, unknown>;
+    const str = (k: string) => (typeof d[k] === 'string' ? (d[k] as string) : null);
+    const done = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+      SELECT count(*) AS n FROM register_records WHERE entity_id = ${row.entity_id}::uuid AND data ? 'legacy_converted_at'`);
+    const tokens = (t: string | null, re: RegExp) => [...new Set((t ?? '').split(re).map((x) => x.trim()).filter(Boolean))];
+    const attendees: Record<string, unknown>[] = [], sites: Record<string, unknown>[] = [];
+    const unmatched = { attendees: [] as string[], sites: [] as string[] };
+    for (const t of tokens(str('attendees'), /[,;\n]+/)) {
+      const u = await this.db.tx.$queryRaw<{ id: string; display_name: string; employee_id: string | null }[]>(Prisma.sql`
+        SELECT id::text AS id, display_name, employee_id FROM users WHERE deleted_at IS NULL
+          AND (lower(display_name) = lower(${t}) OR lower(email) = lower(${t}) OR btrim(employee_id) = ${t}) LIMIT 2`);
+      if (u.length === 1 && u[0]) attendees.push({ text: t, user_id: u[0].id, display_name: u[0].display_name, employee_id: u[0].employee_id?.trim() ?? null });
+      else unmatched.attendees.push(t);
+    }
+    // the sites the caller may link: those of the regions of the register's module (the same rule as the multi-site field)
+    const regs = await this.access.regions('meetings', 'view');
+    for (const t of tokens(str('linked_sites'), /[,;\s]+/)) {
+      const s2 = await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`
+        SELECT id::text AS id, site_code FROM sites WHERE upper(site_code) = upper(${t})
+          ${regs === null ? Prisma.empty : Prisma.sql`AND region_id = ANY(${regs}::int[])`} LIMIT 1`);
+      if (s2[0]) sites.push({ text: t, site_id: s2[0].id, site_code: s2[0].site_code });
+      else unmatched.sites.push(t);
+    }
+    // each line of the old action text is one proposed action; the owner and the due date are for the person to fill (nothing becomes a task by itself)
+    const actions = (str('action_items') ?? '').split(/\n+/).map((x) => x.replace(/^\s*(?:[-*\u2022]|\d+[.)])\s*/, '').trim()).filter(Boolean)
+      .map((description) => ({ description, status: 'Open' }));
+    return {
+      record_id: row.id,
+      converted: Number(done[0]?.n ?? 0) > 0,
+      legacy: { attendees: str('attendees'), linked_sites: str('linked_sites'), minutes_ref: str('minutes_ref'), action_items: str('action_items') },
+      attendees, sites, action_items: actions, unmatched,
+      minutes_note: str('minutes_ref'),
+    };
+  }
+
+  async legacyApply(auth: AuthContext, key: string, id: string, ifMatch: string | undefined, rawBody: unknown): Promise<Record<string, unknown>> {
+    if (key !== 'meetings') throw problems.notFound('Only a meeting has old text to convert.');
+    const version = parseIfMatch(ifMatch);
+    const body = parse(convertSchema, rawBody);
+    await this.rowFor(auth, key, id);
+    await this.call<string>(auth, Prisma.sql`SELECT reg_meeting_convert(${id}::uuid, ${version}::int, ${JSON.stringify(body.values)}::jsonb, ${body.reason}::text)::text AS r`);
     return this.get(auth, key, id);
   }
 

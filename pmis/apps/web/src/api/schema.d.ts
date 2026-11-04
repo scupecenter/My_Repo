@@ -704,9 +704,10 @@ export interface paths {
         head?: never;
         /**
          * Change my own name, phone, language or theme (0.9.2)
-         * @description Only `display_name`, `phone` (E.164 or null, unique: 409 `duplicate`), `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+         * @description Only `display_name`, `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
          *     `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
-         *     naming them; the email changes only through `POST /me/email-change`. Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
+         *     naming them; the email changes only through `POST /me/email-change`, and **0.12.6 (D156):** the phone only through
+         *     `POST /me/phone-change` (`phone` here is 403 `field_read_only`). Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
          *     with the before and after values of what really changed (`profile_updated`); sending the current values changes nothing.
          */
         patch: operations["updateMyProfile"];
@@ -751,6 +752,8 @@ export interface paths {
          *     One pending request per user (409 `invalid_transition`: cancel it first). The address must be free: not the email of any account and
          *     not asked for in another pending request (409 `duplicate`); the current email is 422. The deciders are told in the inbox
          *     (`email_change_requested`). Audited. Local accounts only (an M365 session gets 403).
+         *     **0.12.6 (Q158):** a one-time code (XXXX-XXXX) is mailed to the new address, valid `email_change.verify_hours` (default 24); only its
+         *     keyed hash is stored. The old address gets a notice. The user enters the code with `POST /me/email-change/verify`.
          */
         post: operations["requestMyEmailChange"];
         /**
@@ -758,6 +761,78 @@ export interface paths {
          * @description 404 when no request is pending. Audited (`email_change_cancelled`).
          */
         delete: operations["cancelMyEmailChange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/email-change/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the new address with the code mailed to it (0.12.6)
+         * @description Q158. The code that reached the new address of the pending request (case and dash do not matter). A wrong code is 422 `invalid_code`
+         *     (`errors[0].code` `invalid`) and is counted; after five wrong codes, or once it expired, it no longer works (`errors[0].code` `locked`
+         *     or `expired`): send a new one. 404 when nothing is pending, 409 when no code was sent. Entering it again after success returns the
+         *     request. Audited (`email_change_verified`).
+         */
+        post: operations["verifyMyEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/email-change/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mail a new code to the new address (0.12.6)
+         * @description Q158. A new code for the pending, unverified request; the previous code stops working and the attempts start again. Rate-limited.
+         *     404 when nothing is pending, 409 when the address is already confirmed. Audited (`email_change_verification_sent`).
+         */
+        post: operations["resendMyEmailChangeCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/phone-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask for a new sign-in phone (an admin approves it) (0.12.6)
+         * @description D156: the phone is a sign-in identifier. The new phone in E.164 form, or null to remove it, and the password re-entered (a wrong
+         *     password is 401 `invalid_credentials` and counts toward the lock). Stored as `pending`; the phone does not change until an admin
+         *     approves it. One pending request per user (409 `invalid_transition`: cancel it first). The number must be free: not the phone of any
+         *     account and not asked for in another pending request (409 `duplicate`, `errors[0].path` `/new_phone`); the current phone is 422. The
+         *     deciders are told in the inbox (`phone_change_requested`) and the user by mail. Audited. Local accounts only (an M365 session gets 403).
+         */
+        post: operations["requestMyPhoneChange"];
+        /**
+         * Cancel my pending phone change (0.12.6)
+         * @description 404 when no request is pending. Audited (`phone_change_cancelled`).
+         */
+        delete: operations["cancelMyPhoneChange"];
         options?: never;
         head?: never;
         patch?: never;
@@ -824,7 +899,8 @@ export interface paths {
          * @description Needs the password and a TOTP `code` or one `recovery_code` (missing: 422, nothing counted). **403 `two_factor_enforced` when an admin
          *     enforces it** (`User.two_factor_enforced`), answered before anything is counted. A wrong password (401 `invalid_credentials`) or code
          *     (401 `invalid_code`) counts toward the lock. On success the secret, the recovery codes and pending sign-ins are deleted. 409 when
-         *     two-factor is not on. Audited (`two_factor_self_disabled`).
+         *     two-factor is not on. Audited (`two_factor_self_disabled`). **0.12.6 (Q161):** the user's other sessions end (this one stays), and a
+         *     `security_notice` goes to the inbox and by mail; the audit row records `sessions_ended`.
          */
         post: operations["disableMyTwoFactor"];
         delete?: never;
@@ -999,7 +1075,8 @@ export interface paths {
          *     code. **0.6.0:** the answer carries a one-time `enrol_code` (and `enrol_code_expires_at`), shown only in this answer and never cached: the
          *     admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
          *     recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
-         *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
+         *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one). **0.12.6 (Q161):** off also ends every session of the user
+         *     and writes a `security_notice` (inbox and mail).
          *     The change is audited with before and after (never the secret).
          *     **0.9.2:** turning it on also marks it **enforced by admin** (`User.two_factor_enforced`), so the user cannot turn it off; "on" for a user who
          *     already turned it on themselves marks it enforced and returns no code. Turning it off clears the mark. A user whose two-factor is not
@@ -1075,8 +1152,55 @@ export interface paths {
          *     first M365 sign-in matches); uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409
          *     `invalid_transition`. The user is told in the inbox (`email_change_decided`). Audited (`email_changed` or `email_change_rejected`) with
          *     before and after.
+         *     **0.12.6 (Q158):** `approve` needs a verified address (the user entered the mailed code); otherwise 409 `email_not_verified`, unless
+         *     `identity_check` records the documented check the admin made while mail is unavailable (stored and audited). The old and the new
+         *     address are told of the decision by mail (no reason in the mail).
          */
         post: operations["decideEmailChangeRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone-change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone change requests to decide (0.12.6)
+         * @description D156. System Admin, or a delegate holding `users.edit` for all regions (403 otherwise). `status` defaults to `pending`; `all` lists every
+         *     request. Newest first, at most 200.
+         */
+        get: operations["listPhoneChangeRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone-change-requests/{request_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject a phone change (0.12.6)
+         * @description D156. System Admin, or a delegate holding `users.edit` for all regions; a delegate never for an admin or a delegate. **Never on one's own
+         *     account** (403 `self_beneficiary`). Needs a reason and step-up. Only `approve` changes the user's phone (a sign-in identifier);
+         *     uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409 `invalid_transition`. The user is told in the
+         *     inbox (`phone_change_decided`) and by mail. Audited (`phone_changed` or `phone_change_rejected`) with before and after.
+         */
+        post: operations["decidePhoneChangeRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1202,7 +1326,10 @@ export interface paths {
         put?: never;
         /**
          * Assign one role to many people, or many roles to one person
-         * @description Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11).
+         * @description Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11). **0.12.6 (Q18):** a row
+         *     overlaps only when the same person holds the same role in an overlapping period **and** the two rows share a region **and** a module
+         *     (`all` shares everything); rows for other regions or modules are created. The skipped item lists the conflicting assignment ids in
+         *     `conflicts`. `bulk-update` refuses (failed, `already_assigned`) a change that makes a row overlap another row, and `copy` skips the same way.
          *     Rows whose beneficiary is the caller are refused with `self_beneficiary` unless the caller is a System Admin without delegation.
          *     All rows share one `bulk_action_id` in the audit log. `dry_run=true` returns the same result without writing.
          */
@@ -2395,7 +2522,7 @@ export interface paths {
         put?: never;
         /**
          * Export the filtered Audit Log as CSV (job; the export is itself audited)
-         * @description Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows (at most 100 000). The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
+         * @description Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows. **At most 100 000 rows per file (Q170, 0.12.3).** A filter that matches more answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `audit_log.export_refused`); narrow the filters or export the period in parts. Nothing is ever cut; when the rows grew above the cap between the start and the run, the job fails with `too_many_rows`. The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
          */
         post: operations["exportAuditLog"];
         delete?: never;
@@ -2470,7 +2597,7 @@ export interface paths {
         };
         /**
          * Verify the hash chain of the Audit Log (System Admins only)
-         * @description The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+         * @description The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`. A range above the setting `logs.integrity.sync_max_rows` (default 200 000) answers 422 `integrity_too_large` with `row_count` and `max_rows` (0.12.3, Q171): start it as a job with `POST /admin/log-integrity/runs`, or give `from_seq` and `to_seq`.
          */
         get: operations["getAuditLogIntegrity"];
         put?: never;
@@ -2513,7 +2640,7 @@ export interface paths {
         put?: never;
         /**
          * Export the filtered security log as CSV (job; the export is itself audited)
-         * @description Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`.
+         * @description Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`. At most 100 000 rows per file; more answers 422 `too_many_rows` with `row_count` and `max_rows` (0.12.3, Q170).
          */
         post: operations["exportSecurityLog"];
         delete?: never;
@@ -2608,7 +2735,7 @@ export interface paths {
         };
         /**
          * Job run log (every scheduled job run, newest first)
-         * @description System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes) and `log_purge` (daily).
+         * @description System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes), `log_purge` (daily, also the mail outbox), `mail_send` (one row per run that had mail to send; 0.12.3) and `audit_integrity_check` (nightly and on demand, `detail.progress` 0 to 100; 0.12.3).
          */
         get: operations["listJobRuns"];
         put?: never;
@@ -2648,9 +2775,147 @@ export interface paths {
         };
         /**
          * Security alerts (newest first; `page.total` counts the matching alerts)
-         * @description System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`). Thresholds: `GET /settings/security-alerts`.
+         * @description System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`), an infected upload (`malware_upload`) and every use of the break-glass account (`break_glass_used`, 0.12.3). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`) and, from `email_min_severity` up, by mail (0.12.3). The severity is the rule's setting (`severity`); a new address inside a `trusted_networks` range is one level softer (`info` from `low`). Thresholds: `GET /settings/security-alerts`.
          */
         get: operations["listSecurityAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mail delivery status (0.12.3, Q167)
+         * @description System Admin or `view` on `admin.system_log`. The SMTP settings come from the server environment (`SMTP_*` in the env file) and are never edited here; the password is never shown.
+         */
+        get: operations["getMailStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test mail to the caller now (System Admin; audited as `mail_test_sent`)
+         * @description The mail is sent inside the request and the outcome is answered. Without SMTP configured, 422 `mail_not_configured`. A failed test is not retried.
+         */
+        post: operations["sendTestMail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/outbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail outbox, newest first (no bodies)
+         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+         */
+        get: operations["listMailOutbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/outbox/{mail_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue a given-up mail again (System Admin; reason; audited as `mail_retry`) */
+        post: operations["retryMail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/log-integrity/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Integrity check runs, newest first (0.12.3, Q171)
+         * @description System Admin or `view` on `admin.system_log`.
+         */
+        get: operations["listLogIntegrityRuns"];
+        put?: never;
+        /**
+         * Check a whole chain as a job with progress (System Admin; audited)
+         * @description Checks the live chain (after the purged prefix, up to the head when it starts) in steps; the result is stored with its range and head, and the head is appended to the external anchor file (`LOG_ANCHOR_DIR`). The previous anchor must still match the chain (else `anchor_mismatch`). A break raises the mandatory alert `audit_integrity_failure`. One run per log at a time (409 `invalid_transition` while one runs). The same check runs every night at 03:00 Africa/Tripoli.
+         */
+        post: operations["startLogIntegrityRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/log-integrity/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One integrity check run (progress and result) */
+        get: operations["getLogIntegrityRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health for an external monitor (no session; words only)
+         * @description For a monitor outside the PMIS (owner answer Q167). No counts, names or addresses. 200 with `ok` or `degraded` (mail failing, an integrity break, a failed job in the last 24 hours); 503 `down` when the database does not answer. The API itself does not limit it; a reverse proxy in front may answer 429.
+         */
+        get: operations["getHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3425,6 +3690,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/documents-qc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Documents and QC settings (Q229, Q232) and the scope of the virus scan (Q195)
+         * @description The Settings screen (admin.settings view) or the Document Library (document_types view).
+         */
+        get: operations["getDocumentsQcSettings"];
+        /**
+         * Set the documents and QC settings
+         * @description System Admin or a delegate of document_types edit for all regions; a reason and If-Match; unknown keys are refused; audited with before and after.
+         */
+        put: operations["setDocumentsQcSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/team-scope-match": {
         parameters: {
             query?: never;
@@ -3546,7 +3835,7 @@ export interface paths {
         get: operations["getSecurityAlertSettings"];
         /**
          * Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after)
-         * @description Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up.
+         * @description Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up. 0.12.3 (Q167, Q168): lowering a rule `severity`, raising `email_min_severity` or adding a network to `trusted_networks` is a weakening too. A rule that is not configurable is 422 (`unknown_field`, or `mandatory_locked` for `retention_reduced` and `audit_integrity_failure`); a network that is not CIDR (host bits set, for example) is 422 `invalid`.
          */
         put: operations["setSecurityAlertSettings"];
         post?: never;
@@ -4806,6 +5095,128 @@ export interface paths {
         patch: operations["updateAsBuiltItem"];
         trace?: never;
     };
+    "/list-catalogues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The list catalogue (every list with its values)
+         * @description Any signed-in user may read the lists (their values appear in the forms). `include_inactive` also returns the deactivated lists and values.
+         */
+        get: operations["listListCatalogues"];
+        put?: never;
+        /** Add a list (System Admin or a delegate of fields edit for all regions) */
+        post: operations["createListCatalogue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        /** One list with its values and the fields that use it */
+        get: operations["getListCatalogue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, mark critical, confirm or deactivate a list (never deleted)
+         * @description A critical list accepts only its own values (`allow_other` false). A list is confirmed only with at least one active value. A list that an active field uses cannot be deactivated (422 `item_in_use`).
+         */
+        patch: operations["updateListCatalogue"];
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a value to a list
+         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version.
+         */
+        post: operations["createListValue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}/values/{value_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Relabel, add aliases or groups, reorder or deactivate a value (never deleted; the code is fixed)
+         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`).
+         */
+        patch: operations["updateListValue"];
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/legacy-conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Q111. A proposal of the structured values from the old free text of a meeting
+         * @description Only `meetings`. Names, e-mails and employee IDs are matched to users, site codes to the sites of the caller's regions, and each line of the old action text becomes a proposed action (status Open, owner and due date to fill). Nothing is saved. A typed minutes reference is never an upload.
+         */
+        get: operations["getLegacyConversion"];
+        put?: never;
+        /**
+         * Q111. Apply the reviewed values (once per meeting)
+         * @description The record must be in entry and the caller its L1 holder with edit. Attendees and sites are added to the structured ones; an action whose text is already in the list is not added again. The old text stays read-only. 409 `duplicate` when the meeting was converted already. Audited (`meeting_legacy_convert`).
+         */
+        post: operations["applyLegacyConversion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouse/items": {
         parameters: {
             query?: never;
@@ -5019,7 +5430,7 @@ export interface paths {
         put?: never;
         /**
          * Upload a fresh photo of the fix
-         * @description By L1 (Data Entry of the Quality register row) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date is more than one day before the snag was raised (EXIF has no time zone), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
+         * @description By L1 (Data Entry of the Quality register row, or Quality - TE for a TE snag) while the snag is open or fix submitted. Rejected with 422 `file_rejected` (`reason` `before_snag_raised`) when the EXIF date (read in Africa/Tripoli) is before the raise by more than the tolerance (setting `exif_tolerance_hours`, default 24); a date in the future beyond the tolerance is stored as `pending_evidence` (0.12.4, Q232), with 422 `file_rejected` (`format_not_allowed`) or 413 when the format or size breaks the snag type rules, and 422 `validation_failed` (`unknown_shot_type`) when the shot type is not one of the type's. A missing EXIF date is accepted with `unknown_capture_date` for L2.
          */
         post: operations["uploadSnagPhoto"];
         delete?: never;
@@ -5063,7 +5474,7 @@ export interface paths {
         put?: never;
         /**
          * Submit the fix photos for review (site engineer)
-         * @description L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules. When the caller also holds L2 (any one member) the submission closes the snag (B5, step-up, `self_approval`).
+         * @description L1 of the Quality register row. 422 `validation_failed` (`min_count`, `shot_type_missing`) while the photos do not meet the snag type's rules (a pending_evidence photo does not count). The submission always goes to L2 (0.12.4, D230b, never a self-approval); an all-members L2 asks every eligible approver except the raiser, the finder and the fixer.
          */
         post: operations["submitSnag"];
         delete?: never;
@@ -5110,7 +5521,7 @@ export interface paths {
         put?: never;
         /**
          * Approve: closes the snag
-         * @description L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream.
+         * @description L2 of the Quality register row (or a System Admin when nobody holds it, B10). The snag closes; it no longer blocks the PAC / FAC of its stream. 0.12.4 (D230b) 403 `self_approval_forbidden` for whoever raised, found or fixed the snag (submitted it or uploaded a photo of it). With an all-members L2 (Q231) each voter approves once; the last vote closes the snag.
          */
         post: operations["approveSnag"];
         delete?: never;
@@ -5136,6 +5547,51 @@ export interface paths {
          * @description L2. The snag returns to the person who submitted it (B6) with the note; the photos named in `rejected_photos` become `rejected` and leave the set.
          */
         post: operations["rejectSnag"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snags/{snag_id}/photos/{photo_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept or reject a photo kept as pending evidence (L2)
+         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix. Reject: it leaves the set (kept on record).
+         */
+        post: operations["decideSnagEvidence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/snag-severities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The severity catalogue of QC snags (Q233) */
+        get: operations["listSnagSeverities"];
+        /**
+         * Replace the severity catalogue (System Admin or a delegate of document_types edit)
+         * @description The whole list in display order, a reason and If-Match. Unknown keys and duplicate codes are refused with field errors; a code cannot be removed (422 `cannot_remove`), only deactivated. Audited with before and after.
+         */
+        put: operations["setSnagSeverities"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5423,8 +5879,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Monthly activity report (per-user counts and the sensitive changes of the month; JSON only)
-         * @description Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`). No xlsx variant yet.
+         * Monthly activity report (per-user counts and the sensitive changes of the month; JSON, or the xlsx workbook)
+         * @description Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`).
+         *     **xlsx (0.12.3, Q169):** `format=xlsx` answers a workbook with the sheets Summary, User Activity (employee ID, name, actions, field changes, approvals), Module Activity, Exports (the export and download rows of the month), Exceptions (admin overrides, self-approvals and the sensitive changes) and About (period, time zone, regions, scope, filters, generation time and person). Same reader rules; the security log is never part of it (export it separately from `/security-log/exports`). Exports and Exceptions list at most 5000 rows each. Text is never a formula. Audited as `report.activity_export` with the row count (the large-export rule applies).
          */
         get: operations["getActivityReport"];
         put?: never;
@@ -5926,7 +6383,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -5960,6 +6417,8 @@ export interface components {
             ref: string;
             code: components["schemas"]["ErrorCode"];
             message?: string;
+            /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
+            conflicts?: string[];
         };
         Reason: string;
         /** @description Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check. */
@@ -6262,16 +6721,47 @@ export interface components {
             /** Format: date-time */
             decided_at: string | null;
             decision_reason: string | null;
+            /**
+             * Format: date-time
+             * @description 0.12.6 (Q158): when the new address was confirmed.
+             */
+            verified_at: string | null;
+            /**
+             * @description `code`: the user entered the mailed code; `admin_check`: the admin recorded an identity check.
+             * @enum {string|null}
+             */
+            verified_via: "code" | "admin_check" | null;
+            /** Format: date-time */
+            verify_sent_at: string | null;
+            /** Format: date-time */
+            verify_expires_at: string | null;
         };
         EmailChangeRequestAdmin: components["schemas"]["EmailChangeRequest"] & {
             user: components["schemas"]["UserRef"];
             decided_by: components["schemas"]["UserRef"] | null;
+            /** @description 0.12.6: the documented identity check of an approval without a code. */
+            identity_check: string | null;
         };
-        /** @description 0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. */
+        /** @description 0.12.6 (D156). A request to change the sign-in phone; `new_phone` null removes it. */
+        PhoneChangeRequest: {
+            /** Format: uuid */
+            id: string;
+            old_phone: string | null;
+            new_phone: string | null;
+            status: components["schemas"]["EmailChangeStatus"];
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            decided_at: string | null;
+            decision_reason: string | null;
+        };
+        PhoneChangeRequestAdmin: components["schemas"]["PhoneChangeRequest"] & {
+            user: components["schemas"]["UserRef"];
+            decided_by: components["schemas"]["UserRef"] | null;
+        };
+        /** @description 0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. 0.12.6 (D156): `phone` is no longer here (403 `field_read_only`); use `POST /me/phone-change`. */
         MyProfilePatch: {
             display_name?: string;
-            /** @description E.164; a local sign-in identifier, unique. */
-            phone?: string | null;
             /** @enum {string} */
             locale?: "en" | "ar";
             /** @enum {string} */
@@ -6289,6 +6779,7 @@ export interface components {
             email: string;
             /** @description Admin-owned. */
             employee_id: string | null;
+            /** @description The sign-in phone. 0.12.6: changes only through an approved phone change request. */
             phone: string | null;
             /** @enum {string} */
             locale: "en" | "ar";
@@ -6298,7 +6789,7 @@ export interface components {
             /** @enum {string} */
             auth_method: "local" | "m365" | "break_glass";
             local_sign_in: boolean;
-            editable_fields: ("display_name" | "phone" | "locale" | "theme")[];
+            editable_fields: ("display_name" | "locale" | "theme")[];
             admin_owned: {
                 roles: components["schemas"]["RoleRef"][];
                 teams: components["schemas"]["TeamKind"][];
@@ -6309,6 +6800,8 @@ export interface components {
             two_factor: components["schemas"]["MyTwoFactor"];
             /** @description The newest request, any status. */
             email_change: components["schemas"]["EmailChangeRequest"] | null;
+            /** @description 0.12.6: the newest phone change request, any status. */
+            phone_change: components["schemas"]["PhoneChangeRequest"] | null;
             version: number;
         };
         Me: {
@@ -6418,6 +6911,8 @@ export interface components {
             default_region_ids?: "all" | components["schemas"]["RegionId"][];
             default_module_keys?: "all" | components["schemas"]["ModuleKey"][];
             can_hold_matrix_levels: boolean;
+            /** @description 0.12.3 (Q165). */
+            capabilities?: components["schemas"]["RoleCapability"][];
             is_active: boolean;
             active_assignment_count?: number;
             version?: number;
@@ -6451,7 +6946,14 @@ export interface components {
             default_module_keys?: "all" | components["schemas"]["ModuleKey"][];
             can_hold_matrix_levels?: boolean;
             is_active?: boolean;
+            /** @description 0.12.3 (Q165). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_capabilities_set`. */
+            capabilities?: components["schemas"]["RoleCapability"][];
         };
+        /**
+         * @description `audit_full_reader` reads the whole Audit Log (seed: PM); `team_lead` reads the Audit Log of the modules and regions of its assignments while they are valid (seed: RFD_ACQ_TL, CW_TL, TE_TL). Neither gives the security log.
+         * @enum {string}
+         */
+        RoleCapability: "audit_full_reader" | "team_lead";
         Assignment: {
             /** Format: uuid */
             id: string;
@@ -6826,6 +7328,8 @@ export interface components {
             claimed_by?: components["schemas"]["UserRef"];
             votes_done?: number;
             votes_needed?: number;
+            /** @description 0.12.4: the Matrix row a QC snag takes this level from (quality or quality_te). */
+            matrix_row?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
             no_eligible_holder?: boolean;
         };
@@ -7014,6 +7518,25 @@ export interface components {
             blank_form_file_id?: string | null;
             /** Format: date */
             valid_to?: string | null;
+            /** @description 0.12.4 (Q226): the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order with a delivery). Shown as not required; the task cannot be approved until it is decided or Data Entry declares that the document applies. */
+            determination_pending?: boolean;
+            /** @description 0.12.4 (Q229): the slot kept the approval of the previous version of its record; a replacement sends it back to L2. */
+            inherited_approval?: boolean;
+            /** @description 0.12.4 (Q227): the same requirement on the task or on its source register record; a current file there (uploaded, in review or approved) fills this slot too. */
+            shared_with?: {
+                /** Format: uuid */
+                slot_id?: string;
+                /** @enum {string} */
+                owner?: "task" | "register_record";
+                /** Format: uuid */
+                task_id?: string;
+                task_code?: string;
+                register_key?: string;
+                /** Format: uuid */
+                register_entity_id?: string;
+                status?: string;
+                has_file?: boolean;
+            } | null;
             files: components["schemas"]["DocumentFile"][];
         };
         AllowedAction: {
@@ -7259,10 +7782,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220). 0.12.4: `quality_te`, the row of the TE stream of QC snags (Q230; a TE snag uses its region cell, else the Quality region cell, else its global cell, else the Quality global cell).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle" | "quality_te";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -8695,10 +9218,13 @@ export interface components {
             label_en: string;
             label_ar?: string | null;
             /** @enum {string} */
-            type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file";
+            type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file" | "multi_user" | "multi_site" | "child_list" | "warehouse_item";
             required?: boolean;
             /** @description Field-level rule for the caller. */
             read_only?: boolean;
+            list?: components["schemas"]["ListRef"];
+            /** @description 0.12.5. Only for `child_list`: the columns of a row, in order. */
+            columns?: components["schemas"]["RegisterFieldColumn"][];
             in_list?: boolean;
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
@@ -8707,7 +9233,184 @@ export interface components {
                 value: string;
                 label_en: string;
                 label_ar?: string | null;
+                /** @description 0.12.5. Functional groups of the value (for example CW, TE; closed for an action status). */
+                groups?: string[];
             }[];
+        };
+        /** @description 0.12.5 (Q104). The list catalogue a list field reads. */
+        ListRef: {
+            code: string;
+            /** @enum {string} */
+            status: "pending" | "confirmed";
+            critical: boolean;
+            /** @description Another value is accepted as typed (shown as the warning `list_other`). */
+            allow_other: boolean;
+        };
+        RegisterFieldColumn: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            type: "text" | "number" | "date" | "yes_no" | "user" | "list" | "task";
+            required?: boolean;
+            list?: components["schemas"]["ListRef"];
+            options?: {
+                value: string;
+                label_en: string;
+                label_ar?: string | null;
+                groups?: string[];
+            }[];
+        };
+        /** @description 0.12.5. Display data of the ids a record holds (people, sites, Warehouse items, files, tasks), keyed by id. */
+        RecordRefs: {
+            users?: {
+                [key: string]: {
+                    display_name: string;
+                    employee_id?: string | null;
+                };
+            };
+            /** @description id -> site code. */
+            sites?: {
+                [key: string]: string;
+            };
+            warehouse_items?: {
+                [key: string]: {
+                    item_code: string;
+                    name: string;
+                    is_active?: boolean;
+                };
+            };
+            /** @description id -> original file name. */
+            files?: {
+                [key: string]: string;
+            };
+            /** @description id -> task code. */
+            tasks?: {
+                [key: string]: string;
+            };
+        };
+        ListValue: {
+            /** Format: uuid */
+            id: string;
+            /** @description Stable: the text stored in the records. */
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            aliases: string[];
+            groups: string[];
+            sort_order: number;
+            is_active: boolean;
+            version: number;
+        };
+        ListCatalogue: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            description?: string | null;
+            /** @description Drives a calculation, a rule or a permission: only its own values, and approval waits until it has one. */
+            critical: boolean;
+            /**
+             * @description pending = a draft for the owner's review (Q104).
+             * @enum {string}
+             */
+            status: "pending" | "confirmed";
+            allow_other: boolean;
+            is_active: boolean;
+            /** @description ETag (If-Match). */
+            version: number;
+            values: components["schemas"]["ListValue"][];
+            used_by: {
+                register_key: string;
+                field_code: string;
+                /** @description The column of a child list. */
+                column?: string;
+            }[];
+        };
+        ListCatalogueInput: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            description?: string | null;
+            critical?: boolean;
+            allow_other?: boolean;
+            reason: string;
+        };
+        ListCataloguePatch: {
+            name_en?: string;
+            name_ar?: string | null;
+            description?: string | null;
+            critical?: boolean;
+            /** @enum {string} */
+            status?: "pending" | "confirmed";
+            allow_other?: boolean;
+            is_active?: boolean;
+            reason: string;
+        };
+        ListValueInput: {
+            code: string;
+            label_en?: string;
+            label_ar?: string | null;
+            aliases?: string[];
+            groups?: string[];
+            sort_order?: number;
+            is_active?: boolean;
+            reason: string;
+        };
+        ListValuePatch: {
+            label_en?: string;
+            label_ar?: string | null;
+            aliases?: string[];
+            groups?: string[];
+            sort_order?: number;
+            is_active?: boolean;
+            reason: string;
+        };
+        LegacyConversionProposal: {
+            /** Format: uuid */
+            record_id: string;
+            /** @description The old text of this meeting was converted already. */
+            converted: boolean;
+            legacy?: {
+                attendees?: string | null;
+                linked_sites?: string | null;
+                minutes_ref?: string | null;
+                action_items?: string | null;
+            };
+            attendees: {
+                text: string;
+                /** Format: uuid */
+                user_id: string;
+                display_name: string;
+                employee_id?: string | null;
+            }[];
+            sites: {
+                text: string;
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+            }[];
+            action_items: {
+                description: string;
+                status: string;
+            }[];
+            unmatched: {
+                attendees: string[];
+                sites: string[];
+            };
+            /** @description The old minutes reference, shown with the advice to upload the file. */
+            minutes_note?: string | null;
+        };
+        LegacyConversionInput: {
+            values: {
+                /** Format: uuid */
+                organiser?: string;
+                attendee_users?: string[];
+                linked_site_ids?: string[];
+                action_items_list?: {
+                    [key: string]: unknown;
+                }[];
+            };
+            reason: string;
         };
         RegisterDefinition: {
             register_key: components["schemas"]["RegisterKey"];
@@ -8764,6 +9467,7 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+            refs?: components["schemas"]["RecordRefs"];
             custom?: components["schemas"]["CustomValues"];
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
@@ -8786,13 +9490,24 @@ export interface components {
                 id: string;
                 task_code: string;
             };
+            /** @description 0.12.4 (Q234, Q103): a Quality record of type snag and its QC snag are one work item. `on_approval`: the snag is created by the final approval; `linked`: the snag and its state; `needs_review`: approved but not linked (no stream from the Stage). */
+            qc_snag?: {
+                /** Format: uuid */
+                id?: string | null;
+                /** @enum {string|null} */
+                state?: "open" | "fix_submitted" | "in_review" | "closed" | "cancelled" | null;
+                /** @enum {string|null} */
+                scope?: "CW" | "TE" | null;
+                /** @enum {string} */
+                link?: "linked" | "on_approval" | "needs_review";
+            };
             self_approval?: boolean;
             approved_by?: components["schemas"]["UserRef"];
             /** Format: date-time */
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
-            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. Empty when there is none. */
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none. */
             warnings?: {
                 /** @description JSON pointer of the field, as in `Problem.errors`. */
                 path: string;
@@ -9440,6 +10155,17 @@ export interface components {
             name_en: string;
             name_ar?: string | null;
             photo_rules: components["schemas"]["PhotoRules"];
+            /**
+             * @description 0.12.4 (Q233): the stream the type is for; null = both.
+             * @enum {string|null}
+             */
+            stream?: "CW" | "TE" | null;
+            /**
+             * @description 0.12.4 (Q233): an open snag of this type blocks the PAC / FAC of its stream always, by the severity (a snag without a severity blocks), or never.
+             * @enum {string}
+             */
+            blocking_rule?: "always" | "by_severity" | "never";
+            /** @description blocking_rule is not never. */
             blocks_preliminary_acceptance: boolean;
             is_active: boolean;
             version: number;
@@ -9448,8 +10174,66 @@ export interface components {
             name_en?: string;
             name_ar?: string;
             photo_rules?: components["schemas"]["PhotoRules"];
+            /** @enum {string|null} */
+            stream?: "CW" | "TE" | null;
+            /** @enum {string} */
+            blocking_rule?: "always" | "by_severity" | "never";
+            /** @description The old flag: false = never, true = always (ignored when blocking_rule is sent). */
             blocks_preliminary_acceptance?: boolean;
             is_active?: boolean;
+        };
+        SnagSeverity: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            /** @description An open snag of this severity blocks when its type blocks by severity. */
+            blocks: boolean;
+            is_active: boolean;
+            readonly in_use?: boolean;
+        };
+        SnagSeverityList: {
+            items: components["schemas"]["SnagSeverity"][];
+            version: number;
+        };
+        SnagSeveritiesPut: components["schemas"]["WithReason"] & {
+            /** @description The whole list in display order. A code in the catalogue cannot be left out (deactivate it). */
+            items: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                blocks: boolean;
+                is_active?: boolean;
+            }[];
+        };
+        SnagEvidenceDecision: {
+            /** @enum {string} */
+            decision: "accept" | "reject";
+            note: string;
+        };
+        DocumentsQcSettings: {
+            /** @description Q229: a new version of an approved register record keeps the approval of its unchanged document slots (default false: every approved slot goes back to L2). */
+            new_version_inherit: boolean;
+            /** @description Q232: tolerance of the EXIF date of a fix photo (default 24). */
+            exif_tolerance_hours: number;
+            /** @description The time zone the EXIF wall clock is read in. */
+            readonly exif_time_zone?: string;
+            /** @description Q195: what the virus scan covers (set on the server: MALWARE_SCAN, SCAN_FAILURE). */
+            readonly scan?: {
+                /** @enum {string} */
+                mode?: "clamd" | "off";
+                /** @enum {string} */
+                on_failure?: "fail_closed" | "fail_open";
+                uploads?: boolean;
+                generated_exports?: boolean;
+                zip_leaves_out_unscanned?: boolean;
+            };
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+        };
+        DocumentsQcSettingsPut: components["schemas"]["WithReason"] & {
+            new_version_inherit?: boolean;
+            exif_tolerance_hours?: number;
         };
         SnagPhoto: {
             /** Format: uuid */
@@ -9458,11 +10242,13 @@ export interface components {
             file_id: string;
             shot_type?: string | null;
             /**
-             * @description rejected when the EXIF date is before the snag was raised, or the format or size is wrong.
+             * @description rejected by L2 with a note; pending_evidence (0.12.4, Q232): the EXIF date is in the future beyond the tolerance, kept but not proof of the fix until L2 accepts it.
              * @enum {string}
              */
-            status: "accepted" | "rejected";
+            status: "accepted" | "rejected" | "pending_evidence";
             reject_reason?: string | null;
+            /** @description Why the photo was kept as pending evidence, then the note of the L2 decision. */
+            evidence_note?: string | null;
             /** Format: date-time */
             captured_at?: string | null;
             /** @description No EXIF date: accepted with a flag for the reviewer. */
@@ -9505,8 +10291,38 @@ export interface components {
                 message?: string;
                 shot_type?: string;
             }[];
+            /** @description Always false since 0.12.4 (D230b: a snag is never self-approved); true only on snags closed before. */
             self_approval?: boolean;
-            allowed_actions?: ("upload" | "edit" | "submit" | "approve" | "reject")[];
+            /** @description 0.12.4 (Q233): a code of the severity catalogue. Null only on legacy snags (then severity_missing). */
+            severity?: string | null;
+            severity_label?: {
+                name_en?: string;
+                name_ar?: string | null;
+            } | null;
+            /** @description Q109: a legacy snag without a severity; it blocks conservatively until one is set. */
+            severity_missing?: boolean;
+            /** @description While open, the snag blocks the PAC / FAC of its stream (type rule and severity). */
+            blocks_acceptance?: boolean;
+            found_by?: components["schemas"]["UserRef"];
+            fixed_by?: components["schemas"]["UserRef"];
+            approved_by?: components["schemas"]["UserRef"];
+            /**
+             * @description D230b: the caller raised, found or fixed the snag and may not approve it.
+             * @enum {string|null}
+             */
+            approval_blocked?: "self_approval_forbidden" | null;
+            cancel_reason?: string | null;
+            /** @description 0.12.4 (Q234): the Quality register record of type snag this snag is the work item of; the snag is then changed through the record. */
+            register_record?: {
+                /** @enum {string} */
+                register_key?: "quality";
+                /** Format: uuid */
+                entity_id?: string;
+                /** Format: uuid */
+                record_id?: string | null;
+                record_code?: string | null;
+            } | null;
+            allowed_actions?: ("upload" | "edit" | "submit" | "approve" | "reject" | "decide_evidence")[];
             return_count?: number;
             last_return_note?: string | null;
             raised_by?: components["schemas"]["UserRef"];
@@ -9528,6 +10344,13 @@ export interface components {
             scope?: "CW" | "TE";
             title: string;
             description?: string;
+            /** @description 0.12.4 (Q109, Q233): required; an active code of GET /snag-severities (or its English name). */
+            severity: string;
+            /**
+             * Format: uuid
+             * @description 0.12.4 (Q230): who found the defect, when not the caller (an active user).
+             */
+            found_by?: string;
         };
         SnagRejectRequest: {
             note: string;
@@ -9565,6 +10388,7 @@ export interface components {
         SnagPatch: {
             title?: string;
             description?: string;
+            severity?: string;
         };
         /** @enum {string} */
         CustomFieldEntity: "site" | "milestone" | "gate" | "task" | "rf_design" | "acquisition" | "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle";
@@ -9841,8 +10665,11 @@ export interface components {
                  * @description First row at which the chain no longer holds; null for `unsealed`.
                  */
                 seq: number | null;
-                /** @enum {string} */
-                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch" | "row_missing" | "unsealed";
+                /**
+                 * @description `anchor_mismatch` (0.12.3): only in a job run; the chain no longer holds the hash of the last external anchor at its position.
+                 * @enum {string}
+                 */
+                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch" | "row_missing" | "unsealed" | "anchor_mismatch";
                 /**
                  * Format: int64
                  * @description The log row (audit or security id).
@@ -9851,6 +10678,141 @@ export interface components {
                 expected_hash?: string | null;
                 found_hash?: string | null;
             }[];
+        };
+        /** @description One integrity check run as a job (0.12.3, Q171). Its job_runs row is `audit_integrity_check` with the same progress. */
+        LogIntegrityRun: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            log: "audit" | "security";
+            /** @enum {string} */
+            trigger: "nightly" | "manual";
+            /** @enum {string} */
+            status: "running" | "ok" | "broken" | "failed";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            requested_by?: string | null;
+            /**
+             * Format: int64
+             * @description First position (after the purged prefix).
+             */
+            from_seq: number;
+            /**
+             * Format: int64
+             * @description The chain head when the run started.
+             */
+            to_seq: number;
+            /** Format: int64 */
+            checked_through: number;
+            /** Format: int64 */
+            row_count: number;
+            progress: number;
+            break_count: number;
+            /** @description At most 100, same shape as `LogIntegrity.breaks`. */
+            breaks: {
+                [key: string]: unknown;
+            }[];
+            head_hash?: string | null;
+            /** @description The previous external anchor: `seq`, `ref`, `ok`. */
+            anchor_check?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Line of the anchor file this run appended (`anchor-<log>.jsonl#<line>:<sha256 prefix>`). */
+            anchor_ref?: string | null;
+            error?: string | null;
+            /** Format: uuid */
+            job_run_id?: string | null;
+        };
+        MailStatus: {
+            /** @description SMTP_HOST is set. */
+            enabled: boolean;
+            /**
+             * @description `verified` only after a test mail went out with the current settings; `failing` when a mail was given up in the last 24 hours.
+             * @enum {string}
+             */
+            state: "disabled" | "unverified" | "verified" | "failing";
+            settings: null | {
+                host: string;
+                port: number;
+                /** @enum {string} */
+                tls: "starttls" | "tls" | "none";
+                from: string;
+                /** @description The server is given a user name and password (never shown). */
+                auth: boolean;
+                verify_certificate: boolean;
+            };
+            /** Format: date-time */
+            verified_at: string | null;
+            counts: {
+                queued?: number;
+                retrying?: number;
+                sending?: number;
+                dead?: number;
+                dead_24h?: number;
+                sent_24h?: number;
+                logged_24h?: number;
+                suppressed_24h?: number;
+            };
+            /** Format: date-time */
+            last_sent_at: string | null;
+            last_error: string | null;
+        };
+        MailOutboxItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * @example security_alert
+             * @example mail.test
+             * @example identity.email_verify
+             */
+            kind: string;
+            /** Format: email */
+            to: string;
+            /** Format: uuid */
+            to_user_id?: string | null;
+            /** @description `(hidden)` for a mail that holds a secret. */
+            subject: string;
+            sensitive?: boolean;
+            /**
+             * @description `logged`: no SMTP configured, recorded only; `suppressed`: above the hourly cap of the address.
+             * @enum {string}
+             */
+            status: "queued" | "retrying" | "sending" | "sent" | "dead" | "logged" | "suppressed";
+            attempts: number;
+            /** Format: date-time */
+            next_attempt_at?: string | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            sent_at?: string | null;
+        };
+        MailTestResult: {
+            /** Format: uuid */
+            mail_id: string;
+            /** @enum {string} */
+            outcome: "sent" | "failed";
+            /** @description The server reply of the failing step (never a credential). */
+            error: string | null;
+            /** @description The masked address of the caller. */
+            to: string;
+        };
+        Health: {
+            /** @enum {string} */
+            status: "ok" | "degraded" | "down";
+            checks: {
+                /** @enum {string} */
+                database: "ok" | "down";
+                /** @enum {string} */
+                mail: "ok" | "disabled" | "unverified" | "failing" | "unknown";
+                /** @enum {string} */
+                integrity: "ok" | "broken" | "unknown";
+                /** @enum {string} */
+                jobs: "ok" | "failing" | "unknown";
+            };
         };
         ActiveSession: {
             /** Format: uuid */
@@ -10002,15 +10964,30 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used";
+        /**
+         * @description `info` (0.12.3): a new address inside a trusted network.
+         * @enum {string}
+         */
+        AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical. */
+        AlertSeverityMap: {
+            failed_sign_ins?: components["schemas"]["AlertSeverity"];
+            failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
+            new_ip?: components["schemas"]["AlertSeverity"];
+            large_export?: components["schemas"]["AlertSeverity"];
+            admin_set_changed?: components["schemas"]["AlertSeverity"];
+            alert_settings_weakened?: components["schemas"]["AlertSeverity"];
+            malware_upload?: components["schemas"]["AlertSeverity"];
+            break_glass_used?: components["schemas"]["AlertSeverity"];
+        };
         SecurityAlert: {
             /** Format: uuid */
             id: string;
             /** Format: date-time */
             at: string;
             rule: components["schemas"]["SecurityAlertRule"];
-            /** @enum {string} */
-            severity: "low" | "medium" | "high" | "critical";
+            severity: components["schemas"]["AlertSeverity"];
             summary: string;
             /** @description One line for the list. */
             detail?: string | null;
@@ -10042,6 +11019,15 @@ export interface components {
             large_export_rows: number;
             /** @default true */
             new_ip: boolean;
+            severity?: components["schemas"]["AlertSeverityMap"];
+            /** @description The rules whose severity is fixed (always critical). */
+            readonly mandatory_severity?: {
+                [key: string]: components["schemas"]["AlertSeverity"];
+            };
+            /** @description Alerts from this severity up are mailed to every active System Admin (default low; 0.12.3, Q167). */
+            email_min_severity?: components["schemas"]["AlertSeverity"];
+            /** @description Internal ranges (CIDR) that soften a new-address alert by one level; the other rules are unchanged (0.12.3, Q168). */
+            trusted_networks?: string[];
             version: number;
             /** Format: date-time */
             updated_at?: string | null;
@@ -10053,6 +11039,9 @@ export interface components {
             failed_by_ip: components["schemas"]["SecurityAlertThreshold"];
             large_export_rows: number;
             new_ip: boolean;
+            severity?: components["schemas"]["AlertSeverityMap"];
+            email_min_severity?: components["schemas"]["AlertSeverity"];
+            trusted_networks?: string[];
         };
         ActivityReport: {
             /** @example 2026-11 */
@@ -10097,7 +11086,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -11139,6 +12128,10 @@ export interface components {
         WarehouseItemId: string;
         /** @description Stock movement. */
         MovementId: string;
+        /** @description List catalogue code (for example `TeamSpecialization`). */
+        CatalogueCode: string;
+        /** @description List value. */
+        ListValueId: string;
         /** @description As-Built item. */
         AsBuiltItemId: string;
         /** @description Snag type. */
@@ -12268,6 +13261,114 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    verifyMyEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Verified. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resendMyEmailChangeCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    requestMyPhoneChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    new_phone: string | null;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Pending. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    cancelMyPhoneChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     startMyTwoFactorEnrolment: {
         parameters: {
             query?: never;
@@ -12765,6 +13866,8 @@ export interface operations {
                     /** @enum {string} */
                     decision: "approve" | "reject";
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.6: how the admin confirmed the address when it is not verified by code. */
+                    identity_check?: string;
                 };
             };
         };
@@ -12776,6 +13879,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailChangeRequestAdmin"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listPhoneChangeRequests: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "cancelled" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PhoneChangeRequestAdmin"][];
+                        page: components["schemas"]["PageInfo"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    decidePhoneChangeRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "reject";
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Decided. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneChangeRequestAdmin"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -15306,6 +16472,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     downloadAuditLogExport: {
@@ -15503,6 +16670,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getSecurityLogIntegrity: {
@@ -15709,6 +16877,234 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMailStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    sendTestMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Outcome. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTestResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMailOutbox: {
+        parameters: {
+            query?: {
+                status?: "queued" | "retrying" | "sending" | "sent" | "dead" | "logged" | "suppressed";
+                kind?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mails. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MailOutboxItem"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    retryMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mail_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @constant */
+                        status: "queued";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listLogIntegrityRuns: {
+        parameters: {
+            query?: {
+                log?: "audit" | "security";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["LogIntegrityRun"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    startLogIntegrityRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    log: "audit" | "security";
+                };
+            };
+        };
+        responses: {
+            /** @description Started; poll `GET /admin/log-integrity/runs/{run_id}`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrityRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getLogIntegrityRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrityRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            /** @description The database does not answer. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
         };
     };
     ackSecurityAlert: {
@@ -17208,6 +18604,62 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDocumentsQcSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsQcSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDocumentsQcSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentsQcSettingsPut"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentsQcSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     getTeamScopeMatch: {
@@ -19868,6 +21320,262 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listListCatalogues: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lists. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ListCatalogue"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createListCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListCatalogueInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getListCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateListCatalogue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListCataloguePatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    createListValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListValueInput"];
+            };
+        };
+        responses: {
+            /** @description Created; the list with its values. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateListValue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListValuePatch"];
+            };
+        };
+        responses: {
+            /** @description Updated; the list with its values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLegacyConversion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Proposal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyConversionProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyLegacyConversion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LegacyConversionInput"];
+            };
+        };
+        responses: {
+            /** @description The record. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listWarehouseItems: {
         parameters: {
             query?: {
@@ -20590,6 +22298,95 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    decideSnagEvidence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Snag. */
+                snag_id: components["parameters"]["SnagId"];
+                photo_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnagEvidenceDecision"];
+            };
+        };
+        responses: {
+            /** @description The snag after the decision. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Snag"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSnagSeverities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Severities in display order. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnagSeverityList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setSnagSeverities: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SnagSeveritiesPut"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SnagSeverityList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     listCustomFields: {
         parameters: {
             query?: {
@@ -21083,6 +22880,8 @@ export interface operations {
         parameters: {
             query: {
                 month: string;
+                /** @description 0.12.3. Another value is 422. */
+                format?: "json" | "xlsx";
             };
             header?: never;
             path?: never;
@@ -21090,13 +22889,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Report. */
+            /** @description Report (JSON), or the workbook when `format=xlsx`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityReport"];
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

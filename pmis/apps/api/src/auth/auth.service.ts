@@ -47,6 +47,10 @@ function codeInput(b: { code?: string; recovery_code?: string }): CodeInput | nu
 const changePasswordSchema = z.object({ current_password: z.string().max(128), new_password: z.string().max(1024) }).strict();
 
 export const LOGIN_LIMIT_PER_IP = 10;
+/** Progressive limiting per address (Q168): failures counted over 15 minutes; after LOGIN_LIMIT_PER_IP of them the wait doubles from 2 s up to 60 s. */
+export const LOGIN_IP_WINDOW_MS = 15 * 60_000;
+export const LOGIN_IP_BASE_SECONDS = 2;
+export const LOGIN_IP_MAX_SECONDS = 60;
 export const LOGIN_LIMIT_PER_IDENTIFIER = 5;
 export const PASSWORD_CHANGE_LIMIT = 10;
 
@@ -141,13 +145,29 @@ export class AuthService {
     const masked = this.hmac.mask(identifier);
     const ctx = signInCtx(ip, userAgent, requestId);
 
-    const ipWait = this.limiter.hit(`login:ip:${ip ?? 'unknown'}`, LOGIN_LIMIT_PER_IP);
-    const idWait = this.limiter.hit(`login:id:${masked}`, LOGIN_LIMIT_PER_IDENTIFIER);
+    const ipKey = `login:ip:${ip ?? 'unknown'}`;
+    const ipWait = this.limiter.progressiveWait(ipKey, LOGIN_LIMIT_PER_IP, LOGIN_IP_WINDOW_MS, LOGIN_IP_BASE_SECONDS, LOGIN_IP_MAX_SECONDS);
+    const idWait = ipWait ? 0 : this.limiter.hit(`login:id:${masked}`, LOGIN_LIMIT_PER_IDENTIFIER);
     if (ipWait || idWait) {
       await this.syslog.write('warn', 'local_sign_in_rate_limited', { identifier_hmac: masked, ip }, undefined, requestId);
       await this.securityLog.write({ event: 'sign_in_rate_limited', outcome: 'failure', identifier, ctx, detail: { by: ipWait ? 'ip' : 'identifier' } });
       throw problems.rateLimited(Math.max(ipWait, idWait));
     }
+    // Reserved before the first await: parallel attempts from one address count as failures until they end, so they cannot all pass the check above.
+    const release = this.limiter.progressiveBegin(ipKey);
+    const failed = (): void => {
+      this.limiter.progressiveFail(ipKey, LOGIN_IP_WINDOW_MS);
+      release();
+    };
+    try {
+      return await this.loginChecked(identifier, password, masked, ctx, ip, userAgent, requestId, failed);
+    } finally {
+      release();
+    }
+  }
+
+  private async loginChecked(identifier: string, password: string, masked: string, ctx: ReturnType<typeof signInCtx>, ip: string | null,
+    userAgent: string | undefined, requestId: string, failed: () => void): Promise<LoginResult> {
 
     const rows = await this.db.client.$queryRaw<LookupRow[]>(Prisma.sql`SELECT user_id::text AS user_id, password_hash, must_change, locked_until, status::text AS status
       FROM auth_local_lookup(${identifier})`);
@@ -161,11 +181,13 @@ export class AuthService {
     else await this.passwords.dummyVerify(password);
 
     if (!row) {
+      failed();
       await this.syslog.write('warn', 'local_sign_in_failed', { identifier_hmac: masked, reason: 'no_match', ip }, undefined, requestId);
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', identifier, ctx, detail: { reason: 'no_match' } });
       throw problems.invalidCredentials();
     }
     if (!eligible) {
+      failed();
       await this.syslog.write('warn', 'local_sign_in_failed', { identifier_hmac: masked, reason: locked ? 'locked' : 'status', ip }, row.user_id, requestId);
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: locked ? 'locked' : 'status' } });
       throw problems.invalidCredentials();
@@ -190,6 +212,7 @@ export class AuthService {
     });
     this.states.invalidate(row.user_id);
     if (!created) {
+      failed();
       await this.securityLog.write({ event: 'sign_in_failed', outcome: 'failure', userId: row.user_id, identifier, ctx, detail: { reason: 'bad_password' } });
       throw problems.invalidCredentials();
     }

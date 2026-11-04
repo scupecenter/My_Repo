@@ -59,7 +59,11 @@ let alerts: MockAlert[] = [
     detail: 'Retention reduced (audit row 880).', data: { audit_id: 880 }, status: 'acknowledged', user: ACTOR, ip: '10.20.1.15', ack_by: LEAD.display_name, ack_by_user: LEAD,
     ack_at: '2026-11-01T18:00:00.000000Z', ack_note: 'Agreed with the owner' },
 ];
-let thresholds = { failed_sign_ins: { count: 5, minutes: 15 }, failed_by_ip: { count: 20, minutes: 15 }, large_export_rows: 5000, new_ip: true, version: 1, updated_at: null as string | null, updated_by: null as unknown };
+const SEVS = ['info', 'low', 'medium', 'high', 'critical'];
+const DEFAULT_SEV: Record<string, string> = { failed_sign_ins: 'medium', failed_sign_ins_ip: 'medium', new_ip: 'low', large_export: 'medium', admin_set_changed: 'high',
+  alert_settings_weakened: 'high', malware_upload: 'high', break_glass_used: 'critical' };
+let thresholds = { failed_sign_ins: { count: 5, minutes: 15 }, failed_by_ip: { count: 20, minutes: 15 }, large_export_rows: 5000, new_ip: true,
+  severity: { ...DEFAULT_SEV }, mandatory_severity: { retention_reduced: 'critical', audit_integrity_failure: 'critical' }, email_min_severity: 'low', trusted_networks: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as unknown };
 let sessions = [
   { session_id: '6a000000-0000-4000-8000-000000000001', user: ACTOR, status: 'online', started_at: '2026-11-02T07:30:00Z', last_activity_at: '2026-11-02T09:41:12Z', ip: '10.20.1.15',
     device: CHROME, current_screen: '/registers/gecol', auth_method: 'local', mfa: false, is_current: false },
@@ -166,7 +170,8 @@ export const logsHandlers = [
     const h = request.headers.get('If-Match');
     if (!h) return problem(428, 'precondition_required', 'If-Match is required');
     if (Number(h.replace(/"/g, '')) !== thresholds.version) return problem(412, 'precondition_failed', 'Changed by someone else; reload');
-    const b = (await request.json().catch(() => ({}))) as { reason?: string; failed_sign_ins?: { count: number; minutes: number }; failed_by_ip?: { count: number; minutes: number }; large_export_rows?: number; new_ip?: boolean };
+    const b = (await request.json().catch(() => ({}))) as { reason?: string; failed_sign_ins?: { count: number; minutes: number }; failed_by_ip?: { count: number; minutes: number }; large_export_rows?: number; new_ip?: boolean;
+      severity?: Record<string, string>; email_min_severity?: string; trusted_networks?: string[] };
     const errors: { path: string; code: string }[] = [];
     const inr = (v: unknown, a: number, z: number) => typeof v === 'number' && Number.isInteger(v) && v >= a && v <= z;
     if ((b.reason ?? '').trim().length < 3) errors.push({ path: '/reason', code: 'required' });
@@ -176,8 +181,16 @@ export const logsHandlers = [
     if (!inr(b.failed_by_ip?.minutes, 1, 1440)) errors.push({ path: '/failed_by_ip/minutes', code: 'out_of_range' });
     if (!inr(b.large_export_rows, 100, 1_000_000)) errors.push({ path: '/large_export_rows', code: 'out_of_range' });
     if (typeof b.new_ip !== 'boolean') errors.push({ path: '/new_ip', code: 'invalid' });
+    for (const [k, v] of Object.entries(b.severity ?? {})) {
+      if (!(k in DEFAULT_SEV)) errors.push({ path: `/severity/${k}`, code: k in thresholds.mandatory_severity ? 'mandatory_locked' : 'unknown_field' });
+      else if (!SEVS.includes(v)) errors.push({ path: `/severity/${k}`, code: 'invalid' });
+    }
+    if (b.email_min_severity !== undefined && !SEVS.includes(b.email_min_severity)) errors.push({ path: '/email_min_severity', code: 'invalid' });
+    for (const n of b.trusted_networks ?? []) if (!/^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/.test(n)) errors.push({ path: '/trusted_networks', code: 'invalid' });
     if (errors.length) return problem(422, 'validation_failed', 'Validation failed', { errors });
-    thresholds = { failed_sign_ins: b.failed_sign_ins!, failed_by_ip: b.failed_by_ip!, large_export_rows: b.large_export_rows!, new_ip: b.new_ip!, version: thresholds.version + 1,
+    thresholds = { ...thresholds, failed_sign_ins: b.failed_sign_ins!, failed_by_ip: b.failed_by_ip!, large_export_rows: b.large_export_rows!, new_ip: b.new_ip!,
+      severity: { ...thresholds.severity, ...(b.severity ?? {}) }, email_min_severity: b.email_min_severity ?? thresholds.email_min_severity,
+      trusted_networks: b.trusted_networks ?? thresholds.trusted_networks, version: thresholds.version + 1,
       updated_at: new Date().toISOString(), updated_by: ACTOR };
     return HttpResponse.json(thresholds, { headers: { ETag: `"${thresholds.version}"` } });
   }),
@@ -185,6 +198,11 @@ export const logsHandlers = [
     const g = guard(); if (g) return g;
     const month = new URL(request.url).searchParams.get('month') ?? '';
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/month', code: 'invalid' }] });
+    // 0.12.3 (Q169): the workbook; the mock answers a tiny placeholder file with the real headers
+    if (new URL(request.url).searchParams.get('format') === 'xlsx') {
+      return new HttpResponse(new Uint8Array([0x50, 0x4b, 0x03, 0x04]), { headers: { 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="GSDN_ActivityReport_${month}.xlsx"` } });
+    }
     return HttpResponse.json({
       month, from: `${month}-01T00:00:00+02:00`, to: `${month}-28T00:00:00+02:00`, scope: 'all', includes_security_log: true,
       users: [

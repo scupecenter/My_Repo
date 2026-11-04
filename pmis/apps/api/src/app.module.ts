@@ -17,6 +17,9 @@ import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
 import { RegistersService } from './registers/registers.service';
+// P5 (migration 0057): the list catalogue
+import { ListCataloguesController } from './registers/list-catalogues.controller';
+import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
 import { InsightsController } from './insights/insights.controller';
@@ -69,8 +72,10 @@ import { GroupsController } from './groups/groups.controller';
 import { GroupsService } from './groups/groups.service';
 import { MatrixController } from './matrix/matrix.controller';
 import { MatrixService } from './matrix/matrix.service';
-import { EmailChangeRequestsController, MeController } from './me/me.controller';
-import { EmailChangesService, ProfileService } from './me/profile.service';
+import { EmailChangeRequestsController, MeController, PhoneChangeRequestsController } from './me/me.controller';
+import { EmailChangesService, PhoneChangesService, ProfileService } from './me/profile.service';
+import { MailPort } from './mail/mail.port';
+import { OutboxMail } from './mail/outbox-mail';
 import { MeService } from './me/me.service';
 import { PermissionsController } from './permissions/permissions.controller';
 import { PermissionsService } from './permissions/permissions.service';
@@ -96,26 +101,34 @@ import { SecurityLogService } from './logs/security-log.service';
 import { JobRunsService } from './logs/job-runs.service';
 import { ScenarioSettingsController, SiteApplicabilityController } from './scenario/scenario.controller';
 import { ScenarioService } from './scenario/scenario.service';
+import { IntegrityService } from './logs/integrity.service';
+import { HealthController, MailController } from './mail/mail.controller';
+import { MailService } from './mail/mail.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
-      AuthController, MeController, EmailChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
+      AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
+      MailController, HealthController,
+      ListCataloguesController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
-      AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, UsersService, GroupsService,
+      AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
+      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
+      ListCataloguesService,
+      // P8 mails (MailPort) go through P9's mail outbox
+      { provide: MailPort, useClass: OutboxMail },
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

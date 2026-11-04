@@ -66,7 +66,22 @@ const copySchema = z.object({
   dry_run: z.boolean().default(true),
 }).strict();
 
-interface Issue { ref: string; code: ErrorCode; message?: string }
+interface Issue { ref: string; code: ErrorCode; message?: string; conflicts?: string[] }
+
+/** The scope of one assignment row: regions and modules (Q18: an overlap is the same user and role, dates, regions and modules). */
+interface Scope { allRegions: boolean; regions: number[]; allModules: boolean; modules: string[] }
+/** An existing row that may clash with a new or changed one. */
+interface Held extends Scope { id: string; userId: string; roleId: string; from: Date; to: Date | null }
+
+/** Two scopes overlap when they share at least one region and at least one module ("all" shares everything). */
+export function scopesOverlap(a: Scope, b: Scope): boolean {
+  const regions = a.allRegions || b.allRegions || a.regions.some((r) => b.regions.includes(r));
+  const modules = a.allModules || b.allModules || a.modules.some((m) => b.modules.includes(m));
+  return regions && modules;
+}
+const periodsOverlap = (aFrom: Date, aTo: Date | null, bFrom: Date, bTo: Date | null): boolean =>
+  (bTo === null || aFrom < bTo) && (aTo === null || bFrom < aTo);
+const OVERLAP_MESSAGE = 'The person already holds this role for an overlapping region and module in that period.';
 export interface BulkResultDto {
   bulk_action_id: string;
   dry_run: boolean;
@@ -210,7 +225,7 @@ export class AssignmentsService {
     const [users, roles, taken, primaries] = await Promise.all([
       this.db.tx.user.findMany({ where: { id: { in: userIds } }, select: { id: true, status: true, deleted_at: true } }),
       this.db.tx.role.findMany({ where: { id: { in: roleIds } }, include: { default_regions: true, default_modules: true } }),
-      this.overlapping(userIds, roleIds, validFrom, validTo),
+      this.held(userIds, roleIds),
       this.db.tx.userRoleAssignment.findMany({ where: { user_id: { in: userIds }, is_primary: true }, select: { user_id: true } }),
     ]);
     const userById = new Map(users.map((u) => [u.id, u]));
@@ -229,7 +244,6 @@ export class AssignmentsService {
         if (!role) { result.failed.push({ ref, code: 'not_found', message: 'No such role.' }); continue; }
         if (!role.is_active) { result.failed.push({ ref, code: 'validation_failed', message: 'The role is inactive.' }); continue; }
         if (userId === auth.user.id) { result.failed.push({ ref, code: 'self_beneficiary', message: 'You cannot assign roles to yourself.' }); continue; }
-        if (taken.has(ref)) { result.skipped.push({ ref, code: 'already_assigned', message: 'The person already holds this role in that period.' }); continue; }
 
         // Missing defaults come from the role definition (ADR 0003 item 2).
         const allRegions = d.region_ids !== undefined ? d.region_ids === 'all' : role.default_all_regions;
@@ -245,6 +259,9 @@ export class AssignmentsService {
           result.failed.push({ ref, code: 'validation_failed', message: `Give ${missing.join(', ')}: the role ${role.code} has no default for it.` });
           continue;
         }
+        // Q18: skipped only when an existing row of this role overlaps in dates, regions and modules; other regions or modules are independent
+        const clash = this.clashes(taken, userId, roleId, validFrom ?? new Date(), validTo, { allRegions, regions, allModules, modules });
+        if (clash.length > 0) { result.skipped.push({ ref, code: 'already_assigned', message: OVERLAP_MESSAGE, conflicts: clash }); continue; }
         const row: NewRow = {
           userId, roleId, level: d.permission_level, team: d.team ?? role.team, validFrom, validTo,
           primary: !hasPrimary.has(userId),
@@ -252,6 +269,8 @@ export class AssignmentsService {
         };
         const created = await this.tryAssign(row, b.reason);
         if ('code' in created) { result.failed.push({ ref, ...created }); continue; }
+        // a later pair of the same request is checked against this new row too
+        taken.push({ id: created.id, userId, roleId, from: validFrom ?? new Date(), to: validTo, allRegions, regions, allModules, modules });
         if (row.primary) hasPrimary.add(userId);
         touched.add(userId);
         result.done.push({ id: created.id, created_id: created.id });
@@ -296,7 +315,17 @@ export class AssignmentsService {
         result.failed.push({ ref: item.id, code: 'validation_failed', message: 'valid_from cannot change: end the row and assign again.' });
         continue;
       }
-      const problem = await this.tryUpdate(a, p, p.valid_to !== undefined ? (p.valid_to ? new Date(p.valid_to) : null) : a.valid_to, b.reason);
+      const newTo = p.valid_to !== undefined ? (p.valid_to ? new Date(p.valid_to) : null) : a.valid_to;
+      // Q18: the changed row must not overlap another row of the same person and role (dates, regions and modules)
+      const others = (await this.held([a.user_id], [a.role_id])).filter((h) => h.id !== a.id);
+      const clash = this.clashes(others, a.user_id, a.role_id, a.valid_from, newTo, {
+        allRegions: p.region_ids === undefined ? a.all_regions : p.region_ids === 'all',
+        regions: Array.isArray(p.region_ids) ? p.region_ids : p.region_ids === undefined ? a.regions.map((r) => r.region_id) : [],
+        allModules: p.module_keys === undefined ? a.all_modules : p.module_keys === 'all',
+        modules: Array.isArray(p.module_keys) ? p.module_keys : p.module_keys === undefined ? a.modules.map((m) => m.module_key) : [],
+      });
+      if (clash.length > 0) { result.failed.push({ ref: item.id, code: 'already_assigned', message: OVERLAP_MESSAGE, conflicts: clash }); continue; }
+      const problem = await this.tryUpdate(a, p, newTo, b.reason);
       if (problem) { result.failed.push({ ref: item.id, ...problem }); continue; }
       touched.add(a.user_id);
       result.done.push({ id: item.id });
@@ -416,8 +445,10 @@ export class AssignmentsService {
       let primaryTaken = hasPrimary;
       for (const s of source) {
         const ref = `${target}:${s.role_id}`;
-        if ((await this.overlapping([target], [s.role_id], null, s.valid_to)).has(ref)) {
-          result.skipped.push({ ref, code: 'already_assigned', message: 'The person already holds this role in that period.' });
+        const scope: Scope = { allRegions: s.all_regions, regions: s.regions.map((r) => r.region_id), allModules: s.all_modules, modules: s.modules.map((m) => m.module_key) };
+        const clash = this.clashes(await this.held([target], [s.role_id]), target, s.role_id, new Date(), s.valid_to, scope);
+        if (clash.length > 0) {
+          result.skipped.push({ ref, code: 'already_assigned', message: OVERLAP_MESSAGE, conflicts: clash });
           continue;
         }
         const row: NewRow = {
@@ -472,12 +503,21 @@ export class AssignmentsService {
     return null;
   }
 
-  /** (user:role) pairs that already hold an overlapping period. */
-  private async overlapping(users: string[], roles: string[], from: Date | null, to: Date | null): Promise<Set<string>> {
-    const rows = await this.db.tx.$queryRaw<{ user_id: string; role_id: string }[]>(Prisma.sql`SELECT user_id::text AS user_id, role_id::text AS role_id
-      FROM user_role_assignments WHERE user_id = ANY(${users}::uuid[]) AND role_id = ANY(${roles}::uuid[])
-        AND tstzrange(valid_from, valid_to, '[)') && tstzrange(coalesce(${from}::timestamptz, now()), ${to}::timestamptz, '[)')`);
-    return new Set(rows.map((r) => `${r.user_id}:${r.role_id}`));
+  /** The rows (not yet ended) of these people in these roles, with their regions and modules: the candidates of an overlap (Q18). */
+  private async held(users: string[], roles: string[]): Promise<Held[]> {
+    const rows = await this.db.tx.$queryRaw<{ id: string; user_id: string; role_id: string; valid_from: Date; valid_to: Date | null; all_regions: boolean;
+      all_modules: boolean; regions: number[] | null; modules: string[] | null }[]>(Prisma.sql`SELECT a.id::text AS id, a.user_id::text AS user_id, a.role_id::text AS role_id,
+        a.valid_from, a.valid_to, a.all_regions, a.all_modules,
+        ARRAY(SELECT r.region_id FROM user_role_assignment_regions r WHERE r.assignment_id = a.id ORDER BY 1) AS regions,
+        ARRAY(SELECT m.module_key FROM user_role_assignment_modules m WHERE m.assignment_id = a.id ORDER BY 1) AS modules
+      FROM user_role_assignments a WHERE a.user_id = ANY(${users}::uuid[]) AND a.role_id = ANY(${roles}::uuid[]) AND (a.valid_to IS NULL OR a.valid_to > now())`);
+    return rows.map((r) => ({ id: r.id, userId: r.user_id, roleId: r.role_id, from: r.valid_from, to: r.valid_to, allRegions: r.all_regions,
+      allModules: r.all_modules, regions: r.regions ?? [], modules: r.modules ?? [] }));
+  }
+
+  /** Ids of the held rows that overlap a row of (user, role) over [from, to) with this scope: same dates, a shared region and a shared module. */
+  private clashes(held: Held[], userId: string, roleId: string, from: Date, to: Date | null, scope: Scope): string[] {
+    return held.filter((h) => h.userId === userId && h.roleId === roleId && periodsOverlap(from, to, h.from, h.to) && scopesOverlap(scope, h)).map((h) => h.id);
   }
 
   /** Undo one row after an error and make sure constraint checking is back to deferred. */

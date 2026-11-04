@@ -92,12 +92,38 @@ const more = (register_key: string, name_en: string, name_ar: string, module_key
   register_key: register_key as RegisterDefinition['register_key'], name_en, name_ar, module_key, site_scoped, multiple_per_site: true, approval_levels: 2, ...(record_types ? { record_types } : {}),
   fields: [F('title', 'Title', 'العنوان', 'text', 'Details', { required: true, in_list: true }), F('remark', 'Remark', 'ملاحظات', 'text', 'Details')],
 });
+// Contract 0.12.5 (Q12, Q111, migration 0057): Meetings with the structured fields; the old free-text fields are read-only until converted.
+const ACTION_STATUS = { code: 'ActionStatus', status: 'pending' as const, critical: false, allow_other: false };
+export const meetings: RegisterDefinition = {
+  register_key: 'meetings', name_en: 'Meetings', name_ar: 'الاجتماعات', module_key: 'meetings', site_scoped: false, multiple_per_site: true, approval_levels: 2,
+  fields: [
+    F('meeting_date', 'Date', 'التاريخ', 'date', 'Meeting', { required: true, in_list: true }), F('title', 'Title', 'العنوان', 'text', 'Meeting', { required: true, in_list: true }),
+    { ...F('meeting_type', 'Type', 'النوع', 'list', 'Meeting', { in_list: true }), list: { code: 'MeetingType', status: 'pending', critical: false, allow_other: true }, options: [] },
+    F('organiser', 'Organiser', 'المنظم', 'user', 'Meeting', { in_list: true }),
+    F('attendee_users', 'Attendees', 'الحضور', 'multi_user', 'Attendees and sites'), F('linked_site_ids', 'Linked sites', 'المواقع المرتبطة', 'multi_site', 'Attendees and sites'),
+    F('minutes_file', 'Minutes file', 'ملف المحضر', 'file', 'Minutes'),
+    { ...F('action_items_list', 'Action items', 'إجراءات المتابعة', 'child_list', 'Action items'), columns: [
+      { code: 'description', label_en: 'Action', label_ar: 'الإجراء', type: 'text', required: true },
+      { code: 'owner', label_en: 'Owner', label_ar: 'المسؤول', type: 'user', required: true },
+      { code: 'due_date', label_en: 'Due date', label_ar: 'تاريخ الاستحقاق', type: 'date', required: true },
+      { code: 'status', label_en: 'Status', label_ar: 'الحالة', type: 'list', required: true, list: ACTION_STATUS,
+        options: [{ value: 'Open', label_en: 'Open', label_ar: 'مفتوح' }, { value: 'In Progress', label_en: 'In Progress', label_ar: 'قيد التنفيذ' }, { value: 'Done', label_en: 'Done', label_ar: 'منجز', groups: ['closed'] }, { value: 'Cancelled', label_en: 'Cancelled', label_ar: 'ملغى', groups: ['closed'] }] },
+      { code: 'closed_date', label_en: 'Closed date', label_ar: 'تاريخ الإغلاق', type: 'date', required: false },
+      { code: 'task_id', label_en: 'Task', label_ar: 'المهمة', type: 'task', required: false },
+    ] },
+    F('attendees', 'Attendees (old text)', 'الحضور (نص قديم)', 'text', 'Old text (to convert)', { read_only: true }),
+    F('linked_sites', 'Linked sites (old text)', 'المواقع (نص قديم)', 'text', 'Old text (to convert)', { read_only: true }),
+    F('minutes_ref', 'Minutes (reference) (old text)', 'مرجع المحضر (نص قديم)', 'text', 'Old text (to convert)', { read_only: true }),
+    F('action_items', 'Action items (old text)', 'الإجراءات (نص قديم)', 'text', 'Old text (to convert)', { read_only: true }),
+    F('legacy_converted_at', 'Old text converted on', 'تاريخ تحويل النص القديم', 'date', 'Old text (to convert)', { read_only: true }),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, more('contractors', 'Contractors', 'المقاولون', 'contractors', false, ['company', 'team']), gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
-  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), more('meetings', 'Meetings', 'الاجتماعات', 'meetings', false),
+  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), meetings,
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
@@ -170,6 +196,9 @@ export function initRegisters() {
     rec('dismantle', 'te', 1, 'entry', { rfd_date: '2026-10-05', dismantle_reason: 'Relocation' }),
     // migration 0042: the HLC purchase request of site 1, entered by the HLC Fiber Team in Procurement; it closed C3 on the HLC approval date
     rec('procurement', 'pr', 1, 'approved', { scope: 'HLC', delivery: 'Outsourced', pr_no: 'HPR-2026-044', pr_date: '2026-09-10', hlc_approval_date: '2026-09-14', order_status: 'Open' }, { task: { id: task(1, 14), task_code: 'C3' } }),
+    // contract 0.12.5 (Q111): a meeting entered with the old free text, to convert after a review (recId(15))
+    rec('meetings', null, 0, 'entry', { meeting_date: '2026-10-01', title: 'Weekly progress', attendees: 'Ahmed Salem, Mona Fathi', linked_sites: 'TR101',
+      minutes_ref: 'MoM-07 on the share', action_items: '- Send the LLD\n- Book the crane' }, { site_index: null }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

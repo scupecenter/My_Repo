@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { memoryStorage } from 'multer';
@@ -36,6 +36,28 @@ export class SnagsController {
     return this.tag(res, await this.snags.updateType(auth, id, ifMatch, body));
   }
 
+  // Q233 (contract 0.12.4): the severity catalogue of QC snags
+  @Get('snag-severities')
+  async severities(@Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.snags.severities());
+  }
+
+  @Put('snag-severities')
+  async saveSeverities(@Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.snags.saveSeverities(auth, ifMatch, body));
+  }
+
+  // Q229 / Q232 / Q195 (contract 0.12.4): the documents and QC settings
+  @Get('settings/documents-qc')
+  async settings(@Auth() auth: AuthContext, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.snags.settings(auth));
+  }
+
+  @Put('settings/documents-qc')
+  async saveSettings(@Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.snags.saveSettings(auth, ifMatch, body));
+  }
+
   @Get('sites/:id/snags')
   list(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>) {
     return this.snags.listSite(auth, id, q);
@@ -67,6 +89,13 @@ export class SnagsController {
   @Delete('snags/:id/photos/:photoId')
   async withdrawPhoto(@Auth() auth: AuthContext, @Param('id') id: string, @Param('photoId') photoId: string, @Res({ passthrough: true }) res: Response) {
     return this.tag(res, await this.snags.withdrawPhoto(auth, id, photoId));
+  }
+
+  // Q232: L2 decides a photo kept as pending evidence
+  @Post('snags/:id/photos/:photoId/evidence')
+  @HttpCode(200)
+  async evidence(@Auth() auth: AuthContext, @Param('id') id: string, @Param('photoId') photoId: string, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.snags.decideEvidence(auth, id, photoId, body));
   }
 
   @Post('snags/:id/submit')

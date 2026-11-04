@@ -2859,9 +2859,47 @@ model RegisterField {
   section      String?
   sort_order   Int     @default(0)
   is_active    Boolean @default(true)
+  list_catalogue String? // 0057 (Q104): the list catalogue of a list or list_code field
 
   @@id([register_key, code])
   @@map("register_fields")
+}
+
+// 0057 (P5, Q104): every list of a register is data. Written only through admin_save_list_catalogue / admin_save_list_value.
+model ListCatalogue {
+  code        String   @id
+  name_en     String
+  name_ar     String?
+  description String?
+  critical    Boolean  @default(false)
+  status      String   @default("pending") // pending | confirmed
+  allow_other Boolean  @default(false)
+  is_active   Boolean  @default(true)
+  version     Int      @default(1)
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_at  DateTime @default(now()) @db.Timestamptz(6)
+  updated_by  String?  @db.Uuid
+
+  @@map("list_catalogues")
+}
+
+model ListValue {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  catalogue_code String
+  code           String // stable: the value stored in the records
+  label_en       String
+  label_ar       String?
+  aliases        String[] @default([])
+  groups         String[] @default([])
+  sort_order     Int      @default(0)
+  is_active      Boolean  @default(true)
+  version        Int      @default(1)
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_by     String?  @db.Uuid
+
+  @@unique([catalogue_code, code])
+  @@map("list_values")
 }
 
 model RegisterTaskSource {

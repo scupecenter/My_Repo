@@ -217,6 +217,15 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/security-alerts'],
   ['put', '/settings/security-alerts'],
   ['get', '/reports/activity'],
+  // Contract 0.12.3: logs, monitoring and the mail service (apps/api: logs, mail; migration 0055). Mail delivery, the integrity checks as jobs, the health check.
+  ['get', '/admin/mail/status'],
+  ['post', '/admin/mail/test'],
+  ['get', '/admin/mail/outbox'],
+  ['post', '/admin/mail/outbox/:id/retry'],
+  ['get', '/admin/log-integrity/runs'],
+  ['post', '/admin/log-integrity/runs'],
+  ['get', '/admin/log-integrity/runs/:id'],
+  ['get', '/health'],
   // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
   // document slots on register records, QC snags and the photos of their fix.
   ['patch', '/sites/:id'],
@@ -256,6 +265,29 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/number-sequences'],
   ['post', '/number-sequences'],
   ['patch', '/number-sequences/:id'],
+  // Contract 0.12.4: work package P6 (apps/api: qc; migration 0056). Pending evidence of a snag photo (Q232), the severity catalogue (Q233),
+  // the documents and QC settings (Q229, Q232, Q195).
+  ['post', '/snags/:id/photos/:photoId/evidence'],
+  ['get', '/snag-severities'],
+  ['put', '/snag-severities'],
+  ['get', '/settings/documents-qc'],
+  ['put', '/settings/documents-qc'],
+  // Contract 0.12.5 (P5, migration 0057): the list catalogue (Q104) and the conversion of the old text of a meeting (Q111)
+  ['get', '/list-catalogues'],
+  ['post', '/list-catalogues'],
+  ['get', '/list-catalogues/:code'],
+  ['patch', '/list-catalogues/:code'],
+  ['post', '/list-catalogues/:code/values'],
+  ['patch', '/list-catalogues/:code/values/:valueId'],
+  ['get', '/registers/:key/records/:id/legacy-conversion'],
+  ['post', '/registers/:key/records/:id/legacy-conversion'],
+  // Contract 0.12.6 (P8, migration 0058): the code mailed to a new email address, the phone change request and its decision (apps/api: me).
+  ['post', '/me/email-change/verify'],
+  ['post', '/me/email-change/resend'],
+  ['post', '/me/phone-change'],
+  ['delete', '/me/phone-change'],
+  ['get', '/phone-change-requests'],
+  ['post', '/phone-change-requests/:id/decide'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

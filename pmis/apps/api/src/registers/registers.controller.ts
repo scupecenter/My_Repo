@@ -112,6 +112,17 @@ export class RegistersController {
     return this.tag(res, await this.registers.newVersion(auth, key, id, ifMatch));
   }
 
+  @Get(':key/records/:id/legacy-conversion')
+  legacy(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string) {
+    return this.registers.legacyProposal(auth, key, id);
+  }
+
+  @Post(':key/records/:id/legacy-conversion')
+  @HttpCode(200)
+  async convert(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.registers.legacyApply(auth, key, id, ifMatch, body));
+  }
+
   @Get(':key/records/:id/comments')
   comments(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Query() q: Record<string, unknown>) {
     return this.registers.comments(auth, key, id, q);

@@ -9,7 +9,11 @@ export type ErrorCode =
   | 'account_locked' | 'invalid_credentials' | 'invalid_code' | 'invalid_enrol_code' | 'enrol_code_expired' | 'password_change_required' | 'weak_password' | 'internal_error'
   | 'mandatory_slots_missing' | 'mandatory_fields_missing' | 'open_snags' | 'empty_cell' | 'insufficient_stock' | 'item_in_use' | 'template_rejected'
   | 'file_too_large' | 'file_rejected' | 'malware_scan_unavailable' | 'export_expired' | 'team_scope_mismatch' | 'two_factor_enforced'
-  | 'scope_scenario_conflict';
+  | 'scope_scenario_conflict'
+  | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
+  | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
+  | 'list_not_configured'
+  | 'email_not_verified';
 
 export interface FieldError {
   path: string;
@@ -37,6 +41,10 @@ const TITLES: Record<string, string> = {
   mandatory_fields_missing: 'Mandatory fields are missing',
   open_snags: 'Open snags block this approval',
   scope_scenario_conflict: 'The scenario and the scope flags disagree',
+  self_approval_forbidden: 'You may not approve this yourself',
+  document_rule_pending: 'A document rule cannot be decided yet',
+  file_pending_scan: 'The file waits for the virus scan',
+  list_not_configured: 'A critical list has no value yet',
   empty_cell: 'A level in use has no holder',
   role_in_use: 'The role is in use',
   precondition_failed: 'The resource changed',
@@ -58,6 +66,10 @@ const TITLES: Record<string, string> = {
   team_scope_mismatch: 'The team does not match the order scope',
   two_factor_enforced: 'Two-factor is enforced by an administrator',
   field_read_only: 'This field is managed by an administrator',
+  too_many_rows: 'Too many rows for one file',
+  integrity_too_large: 'The check is too large for one request',
+  mail_not_configured: 'Mail is not configured',
+  email_not_verified: 'The new email address is not confirmed',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

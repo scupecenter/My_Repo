@@ -75,10 +75,38 @@ CI checks the scripts with `bash -n` and `shellcheck --severity=error` ("Install
 
 - `FILE_ENC_KEY` (the master key of the encrypted stored files) is generated on the first run and kept on every update, like `TOTP_ENC_KEY`.
   Keep a copy offline: without it the stored files cannot be read.
-- **ClamAV virus scan** (optional, asked at the end of the installer; `install-clamav.sh` can also be run alone): installs `clamav-daemon` and
+- **ClamAV virus scan** (on by default since owner answer Q195: installed without a question; `PMIS_VIRUS_SCAN=off` on the command line, or `MALWARE_SCAN=off` in `pmis.env`, skips it; `install-clamav.sh` can also be run alone): installs `clamav-daemon` and
   `clamav-freshclam`, sets `MALWARE_SCAN=clamd` and `SCAN_FAILURE=fail_closed` in `pmis.env`, and makes the API start after clamd.
 - **Backup of the stored files** (optional; `install-file-backup.sh`): installs restic, asks for the repository (another building: an absolute
   path on another disk, or `sftp:`), creates the repository password file once, and installs the nightly timer `gsdn-pmis-files-backup` at 02:30
   (retention 14 daily, 8 weekly, 12 monthly).
 
 The steps and the commands of the owner after an update are in `infra/RUNBOOK.md` (sections 2 to 6).
+
+## Outbound mail and the integrity anchors (migration 0055, Q167, Q171)
+
+The PMIS mails the security alerts to every active System Admin (and, later, the notification kinds listed in the setting `mail.notification_kinds`).
+The SMTP settings live only in `/etc/gsdn-pmis/pmis.env`. A first install writes them empty; **every update keeps them as they are**. With
+`SMTP_HOST` empty, mail is off: nothing leaves the server and the System Log records what would have been sent (kind, masked address, subject;
+never the body).
+
+| Setting | Meaning | Example |
+|---|---|---|
+| `SMTP_HOST` | The internal relay (empty = mail off) | `smtp.aljeel.local` |
+| `SMTP_PORT` | 587 for STARTTLS, 465 for implicit TLS, 25 for a relay without TLS | `587` |
+| `SMTP_TLS` | `starttls` (required: a relay that does not offer it is refused, never downgraded), `tls` (port 465) or `none` | `starttls` |
+| `SMTP_USER`, `SMTP_PASS` | The account the relay wants, both or neither. Never logged, never shown on screen | `pmis-relay` |
+| `SMTP_FROM` | The sender, an address or `Name <address>` | `GSDN PMIS <pmis-noreply@aljeel.ly>` |
+| `SMTP_TLS_REJECT_UNAUTHORIZED` | `true` (default) checks the relay certificate; `false` only for a test relay | `true` |
+| `SMTP_CA_FILE` | The internal CA certificate when the relay uses one (readable by the service user) | `/etc/gsdn-pmis/relay-ca.pem` |
+| `SMTP_ALLOW_PLAIN_AUTH` | `true` allows a password over `SMTP_TLS=none` (a relay on the same host only) | (empty) |
+| `SMTP_TIMEOUT_MS`, `SMTP_HELO_NAME` | Optional: time-out per step (15000) and the EHLO name | `pmis.aljeel.local` |
+| `APP_BASE_URL` | Base of the links in mails; empty = `APP_URL` | `https://pmis.aljeel.local` |
+| `LOG_ANCHOR_DIR` | Where the nightly integrity check appends the chain heads (written by the installer: `/var/lib/gsdn-pmis/log-anchors`) | |
+
+After filling them: `sudo systemctl restart gsdn-pmis-api`, then **Logs → Mail delivery → Send a test mail to me**. The channel reads
+"Verified" only after a test mail went out with the current settings. A failed mail is retried after 1, 5, 15, 60 and 240 minutes (setting
+`mail.retry_minutes`), then given up; the System Admins are told in-app and `GET /api/v1/health` reports `mail: failing` for an external monitor.
+
+Copy the files in `LOG_ANCHOR_DIR` off the server (for example with the file backup): they are the reference that shows a rewrite of the whole
+Audit Log or security log chain by someone with database superuser rights.

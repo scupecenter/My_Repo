@@ -490,7 +490,7 @@ describe("rules of the spec", () => {
     });
     const team1 = await t.entry.api.call("post", recPath("contractors"), {
       record_type: "team",
-      data: { team_name: "T-2", contractor: name, specialization: "CW" },
+      data: { team_name: "T-2", contractor: name, specialization: "Tower RT" },  // 0057 (Q104): the agreed TeamSpecialization values; CW is a group, kept as an inactive value
     });
     const tdone = await approveFlex(t, team1.body.id, team1.body.version);
     const et = await db.query(
