@@ -25,6 +25,19 @@ export function useUpdateSite(siteId: string) {
   });
 }
 
+// ------------------------------------------------------------------------------------------------- Q225 (contract 0.12.10): a rule-affecting site field is proposed
+export type SiteChangeProposalResult = S['SiteChangeProposalResult'];
+export function useProposeSiteChange(siteId: string) {
+  const qc = useQueryClient();
+  return useMutation<SiteChangeProposalResult, ApiError, { custom: Record<string, unknown>; reason: string }>({
+    mutationFn: (body) => api.post(`/sites/${siteId}/change-proposals`, { body }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['site', siteId] });
+      void qc.invalidateQueries({ queryKey: ['register-records'] });
+    },
+  });
+}
+
 // ------------------------------------------------------------------------------------------------- Q132: QC snags and the photos of the fix
 export const useSnagTypes = () => useQuery({ queryKey: ['snag-types'], staleTime: 300_000, queryFn: () => api.get<{ items: SnagType[] }>('/snag-types').then((r) => r.items) });
 export const useSiteSnags = (siteId: string) =>

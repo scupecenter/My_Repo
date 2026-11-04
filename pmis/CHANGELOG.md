@@ -98,6 +98,30 @@
 ### مفتوح
 - أسئلة المالك Q340 إلى Q351 في `docs/spec/open-questions.md` (منحنى الخطة بين النقاط، من يعتمد الخطة، مراجعة التصحيح التاريخي، تقويم إعادة بناء النافذة، نقص البيانات، الفترات القديمة بلا طرف، مصدر الطرف المقترح، وزن السطر المركزي، أسباب البوابات في اللقطة، اختيار شكل المسار، أوراق التصدير، وقواعد `pending_confirmation` من P1).
 
+## 2026-11-04 (89): التحكم بالتغيير وتغذية السجلات المعتمدة إلى الحسابات والبوابات، وجزءا As-Built (حزمة P4a، الترحيل 0062، العقد 0.12.10)
+
+### قرارات
+- **إجابات المالك 2026-11-04 (ملزمة، D0):** Q103 (عدا Quality) «لا يُعد السجل مكتملًا إذا كان اعتماده لا يصل إلى الحسابات والبوابات»، وQ108 (ربط أنواع الأصناف بكتالوج Warehouse، وRF Height رقم بالمتر مع ملاحظة اختيارية وفق D108b وتبقى نوعية الحقل لحزمة P5)، وQ113 (فصل As-Built إلى جزأي CW وTE باعتمادين مستقلين؛ BU تقديم جزء CW وEF تاريخ تقديم جزء TE، لا تاريخ الاعتماد)، وQ225 (الصفات المؤثرة في القواعد مثل near_airport تمر بمقترح تغيير واعتماد L2، وتبقى القيمة المعتمدة حتى القرار).
+
+### إضافة
+- **الترحيل `0062_p4a_change_control_feeds`** (ومرآته `db/sql/061_p4a_change_control_feeds.sql` مطابقة حرفيًا). كل تغذية تعمل عند الاعتماد النهائي فقط (المشغّل `zz_p4a_feed`)، ومفتاحها السجل المنطقي (`entity_id`)، فإعادة الاعتماد أو إصدار جديد يحدّث الصف نفسه دون تكرار، والمسودة والمرفوض والملغى لا تغذي شيئًا.
+- **Change Control ← `change_requests`:** كل أنواع التغيير تُكتب (Suspension ← suspension، Resumption ← resumption، Scope Change ← scope_change، Baseline Re-plan ← date_change، والبقية other). الإيقاف والاستئناف يُكتبان **بالتاريخين** تنسيقًا مع P1 (Q180): `approval_date` تاريخ الاعتماد، و`suspension_start` / `resumption_date` التاريخ الفعلي (حقلان جديدان في السجل، وعند خلوّهما يُكتب تاريخ الاعتماد مع `effective_from_approval = true`)، و`paired_change_id` يربط الإيقاف بالاستئناف الذي ينهيه. لم تُغيَّر طريقة قراءة البوابات (من اختصاص P1). أعمدة جديدة: `register_record_id`، `record_version`، `change_type`، `withdrawn`، `effective_from_approval`، `applied`، `previous_overall_status`.
+- **السحب:** إصدار جديد بالحقل `withdrawn = Yes` يجعل الصف `rejected` و`withdrawn = true` فلا يحسبه أي قارئ؛ ولا يُسحب إيقاف أنهاه استئناف قبل سحب الاستئناف. **الإلغاء (Cancellation)** المعتمد يجعل حالة الموقع `cancelled` (rules.md 2.4)، وسحبه يعيد الحالة السابقة.
+- **Q225:** العمود `field_definitions.requires_approval` (مفعّل لـ near_airport، ولا يُغيَّر إلا عبر مسار مدقق). `PATCH /sites/{id}` يرفض هذه الحقول بالرمز `approval_required`، والمسار الجديد `POST /sites/{id}/change-proposals` (الدالة `site_propose_change`) يفتح مسودة Change Control لكل حقل (القيمة القديمة والجديدة والسبب). عند اعتماد L2 تُطبَّق القيمة على الموقع (تدقيق `site_change_applied`)، ويُعاد حساب الموقع، وتُستدعى دالتا P1 `wf_apply_applicability` و`scope_scenario_conflicts` إن وُجدتا (التعارض يمنع الاعتماد). يمكن أيضًا تغيير أعلام النطاق الستة وسيناريو الموقع بالطريقة نفسها. المقترح القديم يُرفض عند الإرسال (`old_value_changed`).
+- **تغذيات أخرى:** RF & Design ← `rf_design_records` وهوية الموقع (Master C:Q، والسيناريو مع `delivery_scenario`)؛ Acquisition ← `acquisition_candidates` و`sites.acquisition_date` (Master T) ومصدر المهمة A3؛ Readiness & Handover ← `readiness_handover` ومصدر المهمتين D17 (فيتبعها MS9) وZ1 (البوابة G6 بلا شرط وفق Q77)؛ Issues ← `issues` (عدد المشاكل المفتوحة في تفاصيل الموقع) وRisks ← `risks` (المخاطرة بلا تقييم لا تُسقط حتى لا تظهر درجتها صفرًا).
+- **Q113 جزءا As-Built:** نوعا السجل `cw_part` و`te_part`، سجل واحد لكل موقع وجزء، ولكل منهما اعتماده. BU (`cw_as_built_submitted`) يُملأ عند تقديم جزء CW (Yes، أو N/A لجزء غير منطبق مع سببه) مع `cw_submitted_date`، وEF (`as_built_date`) تاريخ تقديم جزء TE (أو التاريخ الذي يكتبه L1 لتقديم المورّد السابق). تُرحَّل السجلات الحالية (تدقيق `as_built_part_split`). `as_built_records` صف واحد لكل موقع بالجزأين وتواريخ التقديم والاعتماد والكميات وRF Height رقمًا.
+- **Q108:** حقول أنواع الهوائي والراوتر تعرض أصناف Warehouse النشطة من مجموعتها (`as_built_type_sources`: WL وMW وIP، تتبع الكتالوج تلقائيًا)، والكميات بوحدة qty أعداد صحيحة.
+- **الواجهة:** حقل near_airport في صفحة الموقع يحمل شارة «يحتاج اعتمادًا»، وتغييره يفتح مقترحًا بسبب إلزامي بدل الحفظ المباشر (عربي/إنجليزي، والمحاكاة MSW محدَّثة). الحقول التي يملؤها النظام في شبكة المهام تظهر للقراءة فقط.
+- **الاختبارات:** `apps/api/test/register-feeds.test.ts` (إيقاف واستئناف معتمدان يكتبان الصفوف والبوابة تتبعهما، المرفوض والملغى والمسودة لا تفعل شيئًا، التكرار الآمن عند الإصدار الجديد والسحب، الإلغاء، مقترح الموقع، التغذيات الأخرى، جزءا As-Built)، وتحديث `write-through.test.ts` و`documents-registers-snags.test.ts`، وحالات `tests/db-security/cases/A9_p4a.sql`.
+
+### أمان
+- دور التطبيق `pmis_app` للقراءة فقط على `change_requests` و`rf_design_records` و`acquisition_candidates` و`readiness_handover` و`as_built_records` و`issues` و`risks` و`as_built_type_sources` (`db/sql/app_grants.sql`)؛ لا يكتبها إلا مالك الدوال `pmis_definer`. كل الدوال SECURITY DEFINER مع `SET search_path`، وصفوف التدقيق عبر `log_audit_write`.
+
+### مفتوح
+- أسئلة المالك Q330 إلى Q341 في `docs/spec/open-questions.md` (التواريخ الفعلية، السحب، الإلغاء، الحقول القابلة للتغيير، صاحب المقترح، BU/EF للبيانات التاريخية، ترحيل الأجزاء، مجموعات Warehouse، D17/Z1، A3، هوية الموقع، المخاطر بلا تقييم).
+
+---
+
 ## 2026-11-04 (88): المقاولون والعقود ومطابقة الفريق والنطاق (حزمة P4b، الترحيل 0061، العقد 0.12.9)
 
 ### قرارات

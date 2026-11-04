@@ -25,6 +25,8 @@ const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocatio
 const siteVersion = (v: unknown): number => contentVersion([v instanceof Date ? v.toISOString() : String(v)]);
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const patchSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().max(2000).optional() }).strict();
+/** Q225 (migration 0062): a change to a site field that requires approval, proposed as Change Control drafts. */
+const proposalSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().min(1).max(2000) }).strict();
 
 interface SiteRow {
   id: string;
@@ -433,14 +435,15 @@ export class SitesService {
 
   /** The site's custom fields the caller may see (Q130: near_airport), with whether the caller may edit each one (sites edit in the region and the field rule). */
   private async customFields(auth: AuthContext, region: number): Promise<Record<string, unknown>[]> {
-    const rows = await this.db.tx.$queryRaw<{ code: string; label_en: string; label_ar: string | null; data_type: string; section: string | null; required: boolean; access: string | null }[]>(Prisma.sql`
-      SELECT fd.code, fd.label_en, fd.label_ar, fd.data_type::text AS data_type, fd.section, fd.required, app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text AS access
+    const rows = await this.db.tx.$queryRaw<{ code: string; label_en: string; label_ar: string | null; data_type: string; section: string | null; required: boolean; requires_approval: boolean; access: string | null }[]>(Prisma.sql`
+      SELECT fd.code, fd.label_en, fd.label_ar, fd.data_type::text AS data_type, fd.section, fd.required, fd.requires_approval, app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text AS access
       FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.is_active AND fd.task_code IS NULL ORDER BY fd.sort_order, fd.code COLLATE "C"`);
     const regions = (await this.access.hasGrant(auth, 'sites', 'edit')) ? await this.access.regions('sites', 'edit') : [];
     const mayEdit = regions === null || regions.includes(region);
     return rows
       .filter((r) => r.access !== 'hidden')
-      .map((r) => ({ code: r.code, label_en: r.label_en, label_ar: r.label_ar, type: r.data_type, section: r.section, required: r.required, can_edit: mayEdit && (r.access ?? 'edit') === 'edit' }));
+      .map((r) => ({ code: r.code, label_en: r.label_en, label_ar: r.label_ar, type: r.data_type, section: r.section, required: r.required, can_edit: mayEdit && (r.access ?? 'edit') === 'edit',
+        requires_approval: r.requires_approval }));
   }
 
   // ------------------------------------------------------------------ PATCH /sites/{id} (Q130: custom fields of the site, through site_save_custom)
@@ -462,6 +465,27 @@ export class SitesService {
       throw p;
     }
     return this.get(auth, id);
+  }
+
+  // ------------------------------------------------------------------ POST /sites/{id}/change-proposals (Q225, site_propose_change)
+  /** A rule-affecting site field (near_airport) is changed by a Change Control draft per field, entered by the caller as L1; it applies after L2 approval. */
+  async propose(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const body = parse(proposalSchema, raw);
+    const site = await this.siteRow(regions, id);
+    if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
+    await this.db.tx.$executeRaw`SAVEPOINT site_propose`;
+    try {
+      const rows = await this.db.tx.$queryRaw<{ r: { items: Record<string, unknown>[] } }[]>(Prisma.sql`
+        SELECT site_propose_change(${id}::uuid, ${JSON.stringify(body.custom)}::jsonb, ${body.reason}::text) AS r`);
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT site_propose`;
+      return { items: rows[0]?.r.items ?? [] };
+    } catch (e) {
+      const p = mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT site_propose`;
+      throw p;
+    }
   }
 
   /** Custom field values of the site that the caller may see (field-level rules: a hidden field is left out). */
@@ -607,9 +631,9 @@ export class SitesService {
     const codes = [...new Set(tasks.map((t) => t.task_code))];
     if (codes.length === 0) return;
     const src = await this.db.tx.$queryRaw<{ task_code: string; register_key: string; record_type: string | null; field_code: string; master_col: string | null; label_en: string | null;
-      label_ar: string | null; f_label_en: string | null; f_label_ar: string | null; f_type: string | null; f_options: unknown; module_key: string }[]>(Prisma.sql`
+      label_ar: string | null; f_label_en: string | null; f_label_ar: string | null; f_type: string | null; f_options: unknown; f_derived: boolean; module_key: string }[]>(Prisma.sql`
       SELECT x.task_code, x.register_key, x.record_type, x.field_code, x.master_col, x.label_en, x.label_ar, f.label_en AS f_label_en, f.label_ar AS f_label_ar,
-        f.field_type AS f_type, f.options AS f_options, d.module_key
+        f.field_type AS f_type, f.options AS f_options, coalesce(f.derived, false) AS f_derived, d.module_key
       FROM task_field_sources x JOIN register_definitions d ON d.register_key = x.register_key AND d.is_active AND d.enabled
       LEFT JOIN register_fields f ON f.register_key = x.register_key AND f.code = x.field_code AND f.is_active
       WHERE x.is_active AND x.task_code = ANY(${codes}::text[]) ORDER BY x.task_code, x.sort_order`);
@@ -630,7 +654,8 @@ export class SitesService {
         const actions = (rec?.allowed_actions as string[] | undefined) ?? [];
         const party = r.field_code === 'external_party_id';
         const value = rec ? (party ? ((rec.external_party as { name?: string } | undefined)?.name ?? null) : ((rec.data as Record<string, unknown>)[r.field_code] ?? null)) : null;
-        const editVia = !rec ? (canCreate.get(r.register_key) ? 'create' : 'none') : actions.includes('edit') ? 'patch' : actions.includes('new_version') ? 'new_version' : 'none';
+        // a value the system fills (Q45 approval fields, Q113 BU from the CW part's submission) is shown, never typed
+        const editVia = r.f_derived ? 'none' : !rec ? (canCreate.get(r.register_key) ? 'create' : 'none') : actions.includes('edit') ? 'patch' : actions.includes('new_version') ? 'new_version' : 'none';
         return {
           code: r.field_code,
           label_en: r.label_en ?? r.f_label_en ?? r.field_code,

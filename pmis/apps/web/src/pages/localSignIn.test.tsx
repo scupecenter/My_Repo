@@ -323,6 +323,8 @@ describe('hybrid mode list', () => {
       // contract 0.12.6 (P8): email code, phone change and its decision
       'POST /me/email-change/verify', 'POST /me/email-change/resend', 'POST /me/phone-change', 'DELETE /me/phone-change',
       'GET /phone-change-requests', 'POST /phone-change-requests/:id/decide',
+      // contract 0.12.10: P4a (Q225 site change proposals)
+      'POST /sites/:id/change-proposals',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

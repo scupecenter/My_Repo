@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.9
+  version: 0.12.10
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.10 (2026-11-04): additive, work package P4a of the owner answers of 2026-11-04 (Q103 except Quality, Q108, Q113, Q225; migration 0062; CHANGELOG 89). (1) Q225: a site field that changes rules (permits, scope; `requires_approval`, seed `near_airport`) is no longer edited directly: `PATCH /sites/{site_id}` answers 422 `validation_failed` with `/custom/<code>` and the field code `approval_required`; the new `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`, a reason is required) opens one Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, old and new value), entered by the caller as L1 (an L1 holder of the Change Control row with its `create` right); the value applies to the site on the L2 approval, audited, and the site is recalculated. `SiteCustomField` gains `requires_approval`. (2) An approved register record feeds the calculation layer (no new path): Change Control writes `change_requests` (suspensions and resumptions with their effective dates `suspension_start` / `resumption_date` and the approval date; withdrawn with a new version where `withdrawn` = Yes; a Cancellation cancels the site; a site field change applies), RF & Design the site identity, Acquisition Master T and A3, Readiness & Handover D17 and Z1, Issues and Risks their tables. Change Control gains the fields `suspension_start`, `resumption_date` and `withdrawn`; field codes at submit `before_suspension`, `no_open_suspension`, `resumed_already`, `old_value_changed`, `unknown_site_field`, `scope_scenario_conflict`. (3) Q113: As-Built has the record types `cw_part` and `te_part` (one each per site, each approved on its own; a record created without a type takes it from its values); `cw_as_built_submitted` (BU) is filled by the CW part's submission (never typed) with `cw_submitted_date`; `as_built_date` (EF) is the TE part's submission date unless L1 typed the vendor's earlier date; `part_not_applicable` with `na_reason` gives BU N/A. Write-through fields that the system fills answer `edit_via` `none`. (4) Q108: the As-Built fields `wl_antenna_type`, `mw_antenna_type` and `router_type` list the active Warehouse items of their group (WL, MW, IP); quantities of unit `qty` are whole numbers.
     - 0.12.9 (2026-11-04): work package P4b of the owner answers of 2026-11-04 (Q110, Q142 to Q147) and decision D145b (migration 0061; CHANGELOG 88). Not purely additive for `PUT /settings/team-scope-match`: its columns are now codes of the specialization catalogue (`TeamScopeMatch.catalogue`, seed Tower RT, Tower GF, Adaption, TE, Dismantle, GECOL, Fiber, Survey) and a row may allow a functional group (`allowed_groups`, CW or TE); the old column CW became the group CW, TE the code TE, and the name CW is refused as a column (`is_a_group`). (1) Q143 / Q147: `GET /settings/team-scope-match` is also readable, read-only, with `procurement` or `contractors` view (`can_edit` says whether the caller may save); a save that changes eligibility (rows, cells, groups, active codes, a code's group or aliases) needs a fresh step-up (401 `step_up_required`); a label-only change does not; new field errors `is_a_group`, `name_clash`, `not_a_column`. (2) Q144: HLC stays `exempt` (no team needed) but a named team is checked (seed: Fiber). (3) Q110: the Contractors register gains the record type `contract` (`contractor`, `contract_ref`, `contract_start`, `contract_end`, `contract_scopes`, `contract_status`); a team or a contract links to its company by `external_party_id` (found from a unique `contractor` name; an ambiguous name is never linked: `ambiguous_contractor`, a name that is not the chosen company's: `contractor_mismatch`); an unknown Company Type becomes `other` with a review alert. A Procurement record that names a team is refused at submit (422 `validation_failed`, `no_active_contract` / `party_inactive`) unless the team's company has an active contract covering the scope on the order date. (4) Q142: a team may be saved without a specialization; submit needs one (`specialization_required`) unless it is inactive; teams gain `more_specializations`, `safety_cert_expiry` and `team_lead_user`. (5) Q147 CW Delivery Model (scopes of `ContractorRules.cw_delivery_scopes`): an Outsourced order with its PO / WO needs its party (`party_required`) and an active contract; an In-House order names a qualified internal team (`internal_team_required`, `not_internal_team`). (6) Q146: a GECOL record is approved only with its party, an active party and an active contract covering GECOL (`gecol_party_required`, `party_inactive`, `no_active_contract`). (7) Q145: `GET /reports/team-scope-mismatch` (running orders that no longer match) and `GET /reports/contractors-completeness` (Q142, Q110). (8) D145b: `GET/PUT /settings/contractor-rules` (`ContractorRules`): the safety certificate lead days, the alert roles and the rule lists; the daily job alerts the team lead and Procurement (in-app, `team_safety_cert`) and never blocks an order; running-order mismatches are alerted once (`order_team_mismatch`).
     - 0.12.8 (2026-11-04): additive. Work package P3 of the owner answers of 2026-11-04 (migration 0060; CHANGELOG 91). (1) Q1 / Q211, the admin-only legacy import of the real Site Master (no `_tpl`): `POST /master-import/runs` (System Admin or a delegate of `templates` `administer`; the same package guard as a template: macros, embedded objects, external links, size, zip bomb) identifies the file by its sheet names and the three Master header rows, checks the structure (422 `template_rejected` with `not_a_master`, `structure_mismatch` or `is_pmis_template`, written to the System Log, source `master-import`), stores the original file and its SHA-256, and writes the per-cell comparison with what the PMIS holds without changing anything (`MasterImportRun`, `MasterImportDiff`: site, field, both values, `Sheet!row`, kind, reason, resolution). `GET /master-import/runs`, `GET .../{run_id}`, `GET .../{run_id}/diffs`, `GET .../{run_id}/export` (the comparison report as XLSX), `GET .../{run_id}/file` (the original, audited), `PATCH /master-import/diffs/{diff_id}` (the resolution and its note, audited), and `POST .../{run_id}/apply` (reason, step-up, `mode` submit or draft; If-Match): the typed task columns enter through the TPL-MASTER staging and the batch flow (`ImportBatch.source` `master_import`, one `group_id`), so L1 holders, gates, dates, documents and L2 decide as for a person; a file is applied once. Every use is audited and logged. (2) Q8 / Q10: `GET /import-aliases?kind=region|role` and `PUT /import-aliases` (templates edit for all regions, a reason, audited): the Master values that mean a region or a PMIS role; unmapped and ambiguous values are import exceptions; an imported title never grants a right. (3) Q207: `GET /template-mapping` and `POST /template-mapping` (`dry_run` true tests the change and answers its impact per template without saving; a save issues the next template versions with the reason): a calculated or register-owned field never becomes typed (`calculated_field`), a Master column the PMIS does not own is never mapped (`column_not_owned`). (4) Q206: `uploadImportBatch` takes `mode` (`submit`, the default, or `draft` = Save Draft / Planning for the stream templates and the Master sheet): a draft row needs no actual date or document, is saved without submission (`ImportRow.decision` `saved`, `ImportBatch.counts.saved`, `ImportBatchOutcome.saved`), and the batch ends `applied`; it has no L2 decision (409). (5) Q208: a task locked by a closed gate is held (`hold_reason` `gate_locked`, warning `held_gate_locked`) instead of refused, and is applied only when the batch is sent again. (6) Q209: a pending task is started with the row's (or the task's) actual start; a task without an Actual Start column uses its actual date; today is never used (`actual_start_required`). (7) Q205: a Master column may carry several task fields (AY/AZ: B8 or B9; BK:BN: B10 or B11 with a documented projection); on upload the task that applies on the site is written, a projected column is not read, and an ambiguous one refuses the row (`ambiguous_mapping`). (8) D112: a file of an older template version is accepted when only non-input columns changed (`ImportBatch.file_template_version`); a changed typed column refuses it with `outdated_version`, the message naming the changed columns.
     - 0.12.7 (2026-11-04): work package P2 of the owner answers of 2026-11-04 (dashboard, Project Status, delay attribution; migration 0059; CHANGELOG 90). Additive except where noted. (1) Q7: delay that no approved period covers is `kind` `unattributed` (party `unattributed`) with the task's R party only as `suggested_party`; the kinds `external`, `default_type` and `unassigned` are no longer sent (not additive for a client that grouped by them). New `attributed_working_days`, `unattributed_working_days`, `attributed_pct`, `data_gap_working_days`, `proposed_working_days`, `proposals_count`, `pending_party_count` and `scorecard` (approved periods only). (2) Q180 (delay side): suspension days use `coalesce(suspension_start, approval_date)` to the first later `coalesce(resumption_date, approval_date)`. (3) Q181: a late task without a due date has its window rebuilt from the SLA start plus the maximum; when no day can be placed its days are a data gap (`data_gap`, no suggestion). (4) Q182, Q184: `POST /tasks/{task_id}/delay-periods` now **proposes** a period (status `proposed`, optional `evidence`; L1 may propose) with no effect; `POST /tasks/{task_id}/delay-periods/{period_id}/decision` approves or rejects it (L2, a System Admin or `dashboard.delay` edit; never the proposer: 403 `self_beneficiary`; a rejection needs `note`); approving a `contractor` or `external` period needs `external_party_id` (422 `external_party_required`). `DelayPeriod` gains `status`, `evidence`, `proposed_by`, `decided_by`, `decided_at`, `decision_note`, `counts`; `DelayPeriodList` gains `can_propose`, `can_decide`, `me`, `external_parties`. (5) Q175: a manual central value counts in the project-wide figure only; regional, site and filtered figures show it in `central_line` (not additive for clients that read the regional figure with manual values). (6) Q176: `source` is required on `POST /project-status/manual-items/{item_code}/values` (not additive). (7) Q177: `POST /project-status/manual-items/{item_code}/plan` (points or a target date), `ManualItem.plan`, `DashboardProjectStatusItem.plan`; `progress_vs_plan_index` (the old `spi`, same value, kept), `partial_index`. (8) Q178: an effective date before the current month needs `dashboard.historical_correction` edit (403 otherwise) and is flagged `historical_correction`; `ManualItemList.open_period_from`, `can_correct_history`, `without_plan`. (9) Q186: blocked gates that cannot be known for the date are null: `DashboardGates.status` (`live`, `snapshot`, `historically_unavailable`), `blocked_total` may be null, `DashboardMilestone.blocked` may be null with `blocked_available`; `DashboardBasis.snapshot_kinds[].rebuilt` and `taken_at`. (10) D186: the weekly snapshot is on Thursday (setting `dashboard.snapshot_weekday` 4). (11) D16: `DashboardHealth.components[].draft`, `draft_factors`, `approved_factors`; `meta.health_draft_factors`. (12) Q116: `meta.pipeline_variant` (A rings, default; B flat segmented track) and `PUT /dashboard/pipeline-variant`. (13) Q187: the xlsx export has the sheets Project Overview, CW, TE, Late tasks, Delay attribution, Project Status items, Regions and About.
@@ -2633,6 +2634,8 @@ paths:
         Needs `sites` edit in the site's region; each field follows its field-level rule (hidden, read, edit). A value is checked like every custom field
         (type, list, validation); `null` clears it. Audited with before and after. Conditional documents whose rule reads a site field (A3 civil aviation
         permit: `site.custom.near_airport`) follow on the next read of the task's slots.
+        **Q225 (0.12.10):** a field with `requires_approval` (seed `near_airport`) is refused with the field code `approval_required` (an invalid value is still `invalid`);
+        propose it with `POST /sites/{site_id}/change-proposals`.
       x-db-path: site_save_custom
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -2775,6 +2778,36 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/GateEvent' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/change-proposals:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    post:
+      tags: [sites]
+      operationId: proposeSiteChange
+      summary: Propose a change to site fields that require approval (Q225)
+      description: |
+        One Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, the site's value now as Old Value, the proposed one as New Value, the
+        reason, today as Request Date), entered by the caller as L1: the caller needs `sites` view in the site's region, edit access to the field, the `create` right
+        of Change Control in the region and to be an L1 holder of the Change Control row (403 / 422 `not_eligible_holder` otherwise). The site keeps its approved value
+        until L2 approves the record; the approval applies it (audited `site_change_applied`), recalculates the site and re-judges its conditional documents. A stale
+        Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
+        `required`, `unchanged`; `/reason` `required`.
+      x-db-path: site_propose_change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteChangeProposal' }
+      responses:
+        '201':
+          description: The drafts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteChangeProposalResult' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -14879,6 +14912,29 @@ components:
         section: { type: [string, 'null'] }
         required: { type: boolean }
         can_edit: { type: boolean }
+        requires_approval: { type: boolean, description: 'Q225 (0.12.10): the field changes permits or scope, so it is changed by a proposal (`POST /sites/{site_id}/change-proposals`) and its L2 approval, never by `PATCH /sites/{site_id}`.' }
+    SiteChangeProposal:
+      type: object
+      required: [custom, reason]
+      additionalProperties: false
+      properties:
+        custom: { allOf: [{ $ref: '#/components/schemas/CustomValues' }], description: 'Field code -> proposed value; null clears.' }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    SiteChangeProposalResult:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [field, record_id, change_id, old_value, new_value]
+            properties:
+              field: { type: string }
+              record_id: { type: string, format: uuid, description: 'The Change Control draft (register `change_control`), in entry.' }
+              change_id: { type: string }
+              old_value: { type: string, description: "The site's value now as text ('(none)' when empty)." }
+              new_value: { type: string }
     RegisterRecordSlots:
       type: object
       required: [items, task_id, missing_for_submit]

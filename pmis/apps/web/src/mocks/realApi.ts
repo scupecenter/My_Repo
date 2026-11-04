@@ -306,6 +306,8 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/me/phone-change'],
   ['get', '/phone-change-requests'],
   ['post', '/phone-change-requests/:id/decide'],
+  // Contract 0.12.10: P4a (apps/api: sites; migration 0062). Q225: a change to a site field that requires approval opens Change Control drafts.
+  ['post', '/sites/:id/change-proposals'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

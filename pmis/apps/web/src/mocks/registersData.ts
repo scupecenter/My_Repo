@@ -123,7 +123,7 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
-  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), meetings,
+  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */

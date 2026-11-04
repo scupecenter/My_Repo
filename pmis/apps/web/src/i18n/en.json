@@ -2812,7 +2812,14 @@
   "siteFields": {
     "title": "Site details",
     "saved": "Site saved. The documents that depend on it are updated.",
-    "failed": "The site could not be saved."
+    "failed": "The site could not be saved.",
+    "requires_approval": "Needs approval",
+    "requires_approval_hint": "This field changes permits or scope: a change is proposed and applies after L2 approval in Change Control.",
+    "propose_note": "Propose {{field}} = {{value}}. The site keeps its current value until L2 approves.",
+    "reason": "Reason for the change",
+    "propose": "Propose the change",
+    "proposed": "Proposal {{id}} created in Change Control. Submit it there for L2 approval.",
+    "propose_failed": "The proposal could not be created."
   },
   "recDocs": {
     "global": "A record that is not tied to a site has no document slots.",
