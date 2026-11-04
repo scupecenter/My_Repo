@@ -269,9 +269,10 @@ export class RegistersService {
     for (const f of rows) {
       let options: { value: string; label_en: string; label_ar?: string | null }[] | undefined;
       const cat = f.list_catalogue ? cats.get(f.list_catalogue) : undefined;
-      if (cat) options = cat.options;
+      // the permit streams (0054, Q220) keep their names even when the list catalogue (0057) holds only the codes
+      const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;
+      if (cat) options = cat.options.map((o) => (labels?.[o.value] ? { ...o, ...labels[o.value] } : o));
       else if (Array.isArray(f.options)) {
-        const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;
         options = (f.options as string[]).map((v) => (labels?.[v] ? { value: v, ...labels[v] } : { value: v, label_en: v }));
       }
       else if (f.options && typeof f.options === 'object' && (f.options as { source?: string }).source === 'permit_types') {
