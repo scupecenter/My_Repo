@@ -150,6 +150,14 @@ function dismantleErrors(d: Record<string, unknown>) {
   if (d.closed === true && !String(d.closing_rn_ref ?? '').trim()) out.push({ path: '/data/closing_rn_ref', code: 'rn_required', message: 'A part closes only with the reference of its signed RN.' });
   return out;
 }
+/** 0.12.5: every child-list row keeps a stable id given by the server (so a row is never entered twice). */
+function withRowIds(def: RegisterDefinition, data: Record<string, unknown>): Record<string, unknown> {
+  for (const f of def.fields) {
+    const v = data[f.code];
+    if (f.type === 'child_list' && Array.isArray(v)) data[f.code] = (v as Record<string, unknown>[]).map((row) => (row.id ? row : { ...row, id: crypto.randomUUID() }));
+  }
+  return data;
+}
 const invalid = (errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
 
 export const registerHandlers = [
@@ -196,7 +204,7 @@ export const registerHandlers = [
     }
     if (!def.multiple_per_site && R().records.some((r) => r.register_key === def.register_key && r.site_index === si && r.state !== 'voided' && r.version_no === 1))
       return problem(409, 'duplicate', 'This site already has a row; a new request is a new version of it (Q55)');
-    const data = visibleData(def, b.data ?? {});
+    const data = withRowIds(def, visibleData(def, b.data ?? {}));
     const bad = Object.entries(data).filter(([c, v]) => def.fields.find((f) => f.code === c)?.type === 'date' && typeof v === 'string' && (v < DATE_MIN || v > DATE_MAX));
     if (bad.length) return invalid(bad.map(([c]) => ({ path: `/data/${c}`, code: 'date_range' })));
     const now = new Date().toISOString();
@@ -223,7 +231,9 @@ export const registerHandlers = [
     // a key that is sent applies, an explicit null clears it (as the API does); read-only fields cannot be typed (Q45)
     const merged: Record<string, unknown> = { ...r.data };
     for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
-    const next = visibleData(def, merged);
+    const next = withRowIds(def, visibleData(def, merged));
+    // 0.12.5: read-only values (the old text of a meeting, the values the approval fills) stay as they are
+    for (const f of def.fields) if (f.read_only && r.data[f.code] !== undefined) next[f.code] = r.data[f.code];
     if (def.register_key === 'dismantle') { const errs = dismantleErrors(next); if (errs.length) return invalid(errs); }
     if (def.register_key === 'permits_hse') { const pe = permitIssues(next); if (pe.length) return invalid(pe); }
     if (rowKey(def.register_key, next) !== rk(r) && viewer()?.key !== 'pm' && !userHolds(rowKey(def.register_key, next), 1, viewer()?.employee_id)) {

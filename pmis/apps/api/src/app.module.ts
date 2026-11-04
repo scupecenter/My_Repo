@@ -17,6 +17,9 @@ import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
 import { RegistersService } from './registers/registers.service';
+// P5 (migration 0057): the list catalogue
+import { ListCataloguesController } from './registers/list-catalogues.controller';
+import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
 import { InsightsController } from './insights/insights.controller';
@@ -110,6 +113,7 @@ export function appModuleFor(config: AppConfig) {
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
+      ListCataloguesController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -120,6 +124,7 @@ export function appModuleFor(config: AppConfig) {
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
+      ListCataloguesService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

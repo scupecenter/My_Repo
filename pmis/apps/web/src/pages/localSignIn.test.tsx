@@ -311,6 +311,9 @@ describe('hybrid mode list', () => {
       'PUT /snag-severities',
       'GET /settings/documents-qc',
       'PUT /settings/documents-qc',
+      // contract 0.12.5 (P5): the list catalogue and the conversion of the old text of a meeting
+      'GET /list-catalogues', 'POST /list-catalogues', 'GET /list-catalogues/:code', 'PATCH /list-catalogues/:code', 'POST /list-catalogues/:code/values',
+      'PATCH /list-catalogues/:code/values/:valueId', 'GET /registers/:key/records/:id/legacy-conversion', 'POST /registers/:key/records/:id/legacy-conversion',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

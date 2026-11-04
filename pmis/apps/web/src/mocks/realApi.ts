@@ -272,6 +272,15 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/snag-severities'],
   ['get', '/settings/documents-qc'],
   ['put', '/settings/documents-qc'],
+  // Contract 0.12.5 (P5, migration 0057): the list catalogue (Q104) and the conversion of the old text of a meeting (Q111)
+  ['get', '/list-catalogues'],
+  ['post', '/list-catalogues'],
+  ['get', '/list-catalogues/:code'],
+  ['patch', '/list-catalogues/:code'],
+  ['post', '/list-catalogues/:code/values'],
+  ['patch', '/list-catalogues/:code/values/:valueId'],
+  ['get', '/registers/:key/records/:id/legacy-conversion'],
+  ['post', '/registers/:key/records/:id/legacy-conversion'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

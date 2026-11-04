@@ -5,6 +5,7 @@ import { api } from '@/api/client';
 import { usePicker } from '@/api/sites';
 import type { Page, RegisterField, SiteListItem } from '@/api/types';
 import { DATE_MAX, DATE_MIN, type FieldIssue } from '@/lib/registerForms';
+import { ChildListInput, FileFieldInput, MultiSiteInput, MultiUserInput, showTyped, type FieldCtx } from './RegisterFieldTypes';
 
 export const fieldLabel = (f: RegisterField, lang: string) => (lang === 'ar' && f.label_ar) || f.label_en;
 
@@ -37,7 +38,7 @@ function UserField({ id, value, onChange, disabled }: { id: string; value: Perso
 }
 
 /** One input for one register field, from its contract type. `has_expiry` and other yes/no fields are switches (Q63c). */
-export function FieldInput({ field, value, onChange, disabled, invalid }: { field: RegisterField; value: unknown; onChange: (v: unknown) => void; disabled?: boolean; invalid?: boolean }) {
+export function FieldInput({ field, value, onChange, disabled, invalid, ctx }: { field: RegisterField; value: unknown; onChange: (v: unknown) => void; disabled?: boolean; invalid?: boolean; ctx?: FieldCtx }) {
   const { t, i18n } = useTranslation();
   const id = `reg-field-${field.code}`;
   const ro = disabled || field.read_only;
@@ -56,6 +57,13 @@ export function FieldInput({ field, value, onChange, disabled, invalid }: { fiel
       );
     case 'list':
     case 'external_party':
+      // 0.12.5 (Q104): a list that accepts another value offers its values and lets the person type another one (kept as typed, shown as a warning)
+      if (field.list?.allow_other) return (
+        <>
+          <input className="input" list={`${id}-values`} value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common} />
+          <datalist id={`${id}-values`}>{(field.options ?? []).map((o) => <option key={o.value} value={o.value}>{(i18n.language === 'ar' && o.label_ar) || o.label_en}</option>)}</datalist>
+        </>
+      );
       if (field.options?.length) return (
         <select className="input" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common}>
           <option value="">{t('registers.choose')}</option>
@@ -65,16 +73,40 @@ export function FieldInput({ field, value, onChange, disabled, invalid }: { fiel
       return <input className="input" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common} />;
     case 'user':
       return <UserField id={id} value={(value as Person | null) ?? null} onChange={onChange} disabled={ro} />;
+    case 'multi_user':
+      return <MultiUserInput id={id} value={value} onChange={onChange} ctx={ctx} disabled={ro} />;
+    case 'multi_site':
+      return <MultiSiteInput id={id} value={value} onChange={onChange} ctx={ctx} disabled={ro} />;
+    case 'file':
+      return <FileFieldInput id={id} value={value} onChange={onChange} ctx={ctx} disabled={ro} />;
+    case 'child_list':
+      return <ChildListInput field={field} value={value} onChange={onChange} ctx={ctx} disabled={ro} />;
+    case 'multi_list': {
+      const cur = Array.isArray(value) ? (value as string[]) : [];
+      return (
+        <div className="flex flex-wrap gap-2" data-testid={id}>
+          {(field.options ?? []).map((o) => (
+            <label key={o.value} className="flex items-center gap-1 text-sm"><input type="checkbox" disabled={ro} checked={cur.includes(o.value)}
+              onChange={(e) => onChange(e.target.checked ? [...cur, o.value] : cur.filter((x) => x !== o.value))} />{(i18n.language === 'ar' && o.label_ar) || o.label_en}</label>
+          ))}
+        </div>
+      );
+    }
+    case 'warehouse_item':
+      // the item code; the server keeps the item's id (RegisterRecord.refs gives the name back)
+      return <input className="input mono" placeholder={t('fieldTypes.item_code')} value={typeof value === 'string' ? (ctx?.refs?.warehouse_items?.[value]?.item_code ?? value) : ''} onChange={(e) => onChange(e.target.value)} {...common} />;
     default:
       return <input className="input" value={(value as string) ?? ''} onChange={(e) => onChange(e.target.value)} {...common} />;
   }
 }
 
 /** Read-only text of a value (list label, yes/no, person name). */
-export function showValue(f: RegisterField, v: unknown, lang: string, t: ReturnType<typeof useTranslation>['t']): string {
+export function showValue(f: RegisterField, v: unknown, lang: string, t: ReturnType<typeof useTranslation>['t'], ctx?: FieldCtx): string {
   if (v === undefined || v === null || v === '') return '—';
+  const typed = showTyped(f, v, lang, t, ctx);
+  if (typed !== null) return typed;
   if (f.type === 'yes_no') return v ? t('common.yes') : t('common.no');
-  if (f.type === 'user') return (v as Person).display_name ?? '—';
+  if (f.type === 'user') return typeof v === 'string' ? (ctx?.refs?.users?.[v]?.display_name ?? v) : ((v as Person).display_name ?? '—');
   if (f.type === 'list' || f.type === 'external_party') { const o = f.options?.find((x) => x.value === v); return o ? ((lang === 'ar' && o.label_ar) || o.label_en) : String(v); }
   return String(v);
 }

@@ -123,6 +123,12 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'The scenario and the scope flags disagree.',
         extra: { conflicts: Array.isArray(extra.conflicts) ? extra.conflicts : [] },
       });
+    case 'list_not_configured':
+      // 0057 (Q104): a critical list of the register has no active value yet; approval waits for the System Admin
+      return new ProblemException(422, 'list_not_configured', {
+        detail: detail ?? 'A critical list of this register has no value yet.',
+        extra: { lists: Array.isArray(extra.lists) ? extra.lists : [] },
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

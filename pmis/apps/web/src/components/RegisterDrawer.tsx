@@ -20,6 +20,7 @@ import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
+import { LegacyConversion } from './LegacyConversion';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
 
@@ -84,7 +85,10 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
-  const recSlots = useRecordSlots(key, record?.site_id ? record.id : null);
+  // 0.12.5: a register with a file field reads the record's slots too (the slots of a record without a site come with Q228)
+  const hasFile = rawDef.fields.some((f) => f.type === 'file');
+  const recSlots = useRecordSlots(key, record && (record.site_id || hasFile) ? record.id : null);
+  const ctx = { refs: record?.refs, files: (recSlots.data?.items ?? []).flatMap((sl) => sl.files.filter((f) => !f.superseded_by).map((f) => ({ id: f.id, name: f.original_name }))) };
   const docsMissing = record?.state === 'entry' ? (recSlots.data?.missing_for_submit ?? []) : [];
   const [data, setData] = useState<Data>(record?.data ?? defaultsFor(rawDef.register_key, rawDef));
   const [site, setSite] = useState<SiteSel>(record?.site_id ? { id: record.site_id, code: record.site_code ?? '', region_id: record.region_id as number | undefined } : null);
@@ -178,6 +182,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {record && key === 'hlc' && <HlcPurchaseRequest record={record} />}
         {record && <Warnings record={record} labelOf={labelOf} />}
         {record && act('transfer') && <p className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-transfer-note">{t('registers.transfer_note')}</p>}
+        {record && key === 'meetings' && <LegacyConversion record={record} canEdit={act('edit')} />}
         {record?.last_return_note && record.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="reg-return-note">{t('approvals.returned_note', { note: record.last_return_note })}</div>}
         {record && record.state !== 'entry' && record.state !== 'approved' && record.state !== 'voided' && (
           <section aria-label={t('grid.ball')}>
@@ -221,11 +226,13 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                   const iss = issues[f.code];
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
-                    <div key={f.code} className={f.type === 'text' && f.code === 'remark' ? 'col-span-2' : ''}>
+                    <div key={f.code} className={(f.type === 'text' && f.code === 'remark') || ['child_list', 'multi_user', 'multi_site'].includes(f.type) ? 'col-span-2' : ''}>
                       <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
+                        {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} />}</div>
-                      {editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} />
-                        : <div className="font-semibold" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t)}</div>}
+                      {editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
+                        : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
+                        : <div className="font-semibold whitespace-pre-line" data-testid={`reg-view-${f.code}`}>{showValue(f, data[f.code], lang, t, ctx)}</div>}
                       {f.code === 'has_expiry' && data.has_expiry === false && <span className="chip mt-1 bg-doneBg text-doneInk" data-testid="reg-permanent">{t('registers.permanent')}</span>}
                       {show && <p id={`reg-field-${f.code}-error`} role="alert" data-testid={`reg-error-${f.code}`} className="text-sm text-lateInk">{issueText(t, fieldLabel(f, lang), iss, labelOf)}</p>}
                     </div>

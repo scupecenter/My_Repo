@@ -11,7 +11,8 @@ export type ErrorCode =
   | 'file_too_large' | 'file_rejected' | 'malware_scan_unavailable' | 'export_expired' | 'team_scope_mismatch' | 'two_factor_enforced'
   | 'scope_scenario_conflict'
   | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
-  | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan';
+  | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
+  | 'list_not_configured';
 
 export interface FieldError {
   path: string;
@@ -42,6 +43,7 @@ const TITLES: Record<string, string> = {
   self_approval_forbidden: 'You may not approve this yourself',
   document_rule_pending: 'A document rule cannot be decided yet',
   file_pending_scan: 'The file waits for the virus scan',
+  list_not_configured: 'A critical list has no value yet',
   empty_cell: 'A level in use has no holder',
   role_in_use: 'The role is in use',
   precondition_failed: 'The resource changed',

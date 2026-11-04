@@ -248,7 +248,8 @@
     "not_na_by_scenario": "The scenario of this site does not make this task N/A.",
     "change_not_approved": "Name an approved Change Control record of this site.",
     "integrity_too_large": "The chain is too long to check in one request. Start it as a job on the Integrity checks screen.",
-    "mail_not_configured": "Mail is not configured on the server (SMTP settings in the env file)."
+    "mail_not_configured": "Mail is not configured on the server (SMTP settings in the env file).",
+    "list_not_configured": "A critical list of this register has no value yet: ask the System Admin to configure it before approving."
   },
   "common": {
     "cancel": "Cancel",
@@ -884,7 +885,8 @@
     "tab_retention": "Log retention",
     "tab_staff-visibility": "Staff field visibility",
     "tab_documents": "Document Library",
-    "tab_team-scope": "Team / scope match"
+    "tab_team-scope": "Team / scope match",
+    "tab_lists": "Lists"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -1622,7 +1624,13 @@
     "mandatory_slots_missing": "Mandatory documents are missing. Upload them on the task first.",
     "stream_required": "Choose the stream of this permit by its purpose.",
     "stream_not_allowed": "This permit type cannot be entered on that stream.",
-    "stream_fixed": "This permit type always belongs to its own stream."
+    "stream_fixed": "This permit type always belongs to its own stream.",
+    "file_not_attached": "{{field}}: upload the file to this record and choose it (a typed reference is not an upload).",
+    "inactive_value": "{{field}}: this value is deactivated; choose an active one.",
+    "row_incomplete": "{{field}}: fill the required columns of every row.",
+    "not_closed": "{{field}}: only a closed action has a closed date.",
+    "unknown_warehouse_item": "{{field}}: no Warehouse item has this code.",
+    "unknown_task": "{{field}}: unknown task."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -2504,7 +2512,8 @@
     "before_link_received": "The installation is before the link was received from HLC.",
     "test_without_installation": "A TX link test without an installation date.",
     "in_service_without_test": "In service without a TX link test date.",
-    "approval_before_pr": "The HLC approval date is before the PR date."
+    "approval_before_pr": "The HLC approval date is before the PR date.",
+    "list_other": "{{field}}: the value is not in its list (accepted while the list allows another value)."
   },
   "profile": {
     "title": "My profile",
@@ -2962,5 +2971,83 @@
     "anchor_bad": "The external anchor does not match the chain.",
     "anchor_none": "No external anchor to compare yet.",
     "none": "No check has run yet."
+  },
+  "lists": {
+    "title": "Lists",
+    "note": "Every list of a register is data. A value keeps its code for ever (records store the code); rename its labels, add old names as aliases, deactivate it instead of deleting it. Pending lists are drafts for the owner's review. A critical list accepts only its own values and blocks approvals while it has none.",
+    "filter": "Search lists",
+    "new": "New list",
+    "edit": "Edit list",
+    "add_value": "Add value",
+    "edit_value": "Edit value {{code}}",
+    "code": "Code",
+    "name": "Name",
+    "name_en": "Name (English)",
+    "name_ar": "Name (Arabic)",
+    "status": "Status",
+    "values": "Active values",
+    "used_by": "Used by",
+    "status_pending": "Pending review",
+    "status_confirmed": "Confirmed",
+    "critical": "Critical",
+    "allow_other": "Accepts another value",
+    "inactive": "Inactive",
+    "active": "Active",
+    "label_en": "Label (English)",
+    "label_ar": "Label (Arabic)",
+    "aliases": "Aliases",
+    "groups": "Groups",
+    "sort_order": "Order",
+    "aliases_hint": "Aliases (old names, separated by commas)",
+    "groups_hint": "Groups (separated by commas, for example CW, TE)",
+    "critical_hint": "Critical: drives a calculation, a rule or a permission (only its own values; approval waits until it has one)",
+    "allow_other_hint": "Accept another value as typed (transitional, not for a critical list)",
+    "code_hint_list": "A capital letter, then letters and digits (for example TeamType). It never changes.",
+    "code_hint_value": "The text stored in the records. It never changes: deactivate the value and add a new one instead.",
+    "no_values": "No value yet.",
+    "blocking": "No active value: approvals of the registers that use this list are blocked",
+    "pending": "Draft list",
+    "pending_hint": "The values of this list are a draft waiting for the owner's review."
+  },
+  "listErrors": {
+    "critical_closed": "A critical list accepts only its own values.",
+    "no_values": "Add an active value first.",
+    "duplicate": "Another value already uses this code, label or alias.",
+    "last_active_value": "A critical list keeps at least one active value.",
+    "item_in_use": "An active field uses this list.",
+    "field_read_only": "The code never changes.",
+    "invalid": "Not a valid value.",
+    "required": "Required.",
+    "unknown_field": "Unknown field."
+  },
+  "fieldTypes": {
+    "remove": "Remove {{name}}",
+    "project_wide": "No site: a project-wide record",
+    "file_none": "Upload the file in the Documents tab, then choose it here.",
+    "file_missing": "A file that is not uploaded to this record",
+    "person": "Person",
+    "task_hint": "Task id",
+    "remove_row": "Remove the row",
+    "no_rows": "No row yet.",
+    "add_row": "Add a row",
+    "item_code": "Warehouse item code",
+    "rows_one": "{{count}} row",
+    "rows_other": "{{count}} rows"
+  },
+  "legacy": {
+    "title": "Old text (to convert)",
+    "note": "This meeting was entered with free text, which cannot be followed up. Convert it into people, sites and actions after a review.",
+    "converted": "Converted on {{date}}. The old text stays for reference.",
+    "convert": "Review and convert",
+    "review": "Keep or drop each proposed item. Nothing is saved until you confirm.",
+    "attendees": "Attendees",
+    "sites": "Linked sites",
+    "actions": "Actions",
+    "unmatched": "Not matched (add them by hand): {{list}}",
+    "actions_note": "An action already in the list is not added again. Nothing becomes a task by itself.",
+    "owner": "Owner of the converted actions",
+    "due": "Due date",
+    "minutes": "Old minutes reference: \"{{ref}}\". A reference is not an upload: attach the minutes file in the Documents tab.",
+    "done": "The old text was converted."
   }
 }

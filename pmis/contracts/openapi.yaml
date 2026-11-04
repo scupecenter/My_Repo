@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.4
+  version: 0.12.5
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.5 (2026-11-04): additive. The register framework of work package P5 (owner answers Q12, Q104, Q111 and D108b; migration 0057; CHANGELOG 85). (1) Q104, lists are data: new tag `lists` with `GET`/`POST /list-catalogues`, `GET`/`PATCH /list-catalogues/{catalogue_code}`, `POST /list-catalogues/{catalogue_code}/values` and `PATCH /list-catalogues/{catalogue_code}/values/{value_id}` (System Admin or a delegate of `fields` edit for all regions; a reason; If-Match; audited with before and after). A value has a stable `code` (the text stored in the records), EN/AR labels, `aliases` (old names that map to it), `groups` and `is_active` (deactivated, never deleted). A list has `critical`, `status` (`pending` = a draft for the owner's review, `confirmed`) and `allow_other`. Every list field of a register now reads its catalogue: `RegisterField.list` names it and `options` lists its active values with their Arabic labels; a value may be typed as its code, its label or an alias. A list that accepts another value keeps it as typed and the record shows the warning `list_other`; a critical list accepts only its values, and while it has no active value the final approval of a record of a register that uses it answers 422 `list_not_configured` (new error code; `lists` names them). An inactive value may stay only where the previous version had it (422 `validation_failed`, code `inactive_value`, at submit). (2) Field types: `RegisterField.type` gains `multi_user`, `multi_site`, `child_list` and `warehouse_item`; `file` and `multi_list` are now used by register fields. Values: `multi_user` and `multi_site` are arrays of ids (users may be given by employee ID or e-mail, sites by code); `warehouse_item` is an item id (or its code on input); `file` is the id of a file uploaded to a document slot of the record (checked at submit, code `file_not_attached`: a typed reference is not an upload); `child_list` is an array of row objects with the columns of `RegisterField.columns` and a stable `id` given by the server. `RegisterRecord.refs` resolves the ids of a record to names and codes for display. (3) Q12 / Q111, Meetings: new fields `organiser`, `attendee_users`, `linked_site_ids` (empty = a project-wide meeting), `minutes_file` and `action_items_list` (action, owner, due date, status, closed date, task link; a closed status needs the closed date). The old free-text fields `attendees`, `linked_sites`, `minutes_ref` and `action_items` are read-only; `GET /registers/{register_key}/records/{record_id}/legacy-conversion` proposes the structured values from them and `POST` of the same path applies the reviewed values once (409 `duplicate` when done already; a reason; audited). (4) D108b: As-Built gains `rf_height_note` beside the number `rf_height`. (5) Templates: multi values are separated by ";"; file and child-list columns are grey and never read.
     - 0.12.4 (2026-11-04): additive, plus two rule changes the owner decided. Work package P6 of the owner answers of 2026-11-04 (documents, QC snags and storage; migration 0056; CHANGELOG 82). (1) Storage (Q195, Q199): a file stored while the virus scanner was down (`pending_rescan`) stays in quarantine: `GET /files/{file_id}/download` answers 409 `file_pending_scan` until the rescan passes it, and a zip export leaves it out and lists it in its `manifest.csv`; CSV log exports are generated content and no longer pass the scanner; every download is released only after the GCM tag, the size and the SHA-256 of the plaintext are verified. (2) Documents: `DocumentSlot.determination_pending` (Q226: B1 reads only the approved Procurement orders in force; with no approved order, an order without a delivery or mixed values the PR e-mail rule is pending, shown as not required with this flag, and the task cannot be approved: 422 `document_rule_pending`, unless Data Entry declared that the document applies); `DocumentSlot.shared_with` (Q227: a document type placed on a task and on the register of its source record is one requirement; a current file on either slot fills both); slots on global register records (Q228: Contractors, Risks, Meetings; `site_code` `GLOBAL`; visibility from the register module); `DocumentSlot.inherited_approval` and the setting `new_version_inherit` (Q229). (3) `GET` and `PUT /settings/documents-qc` (`DocumentsQcSettings`: `new_version_inherit`, `exif_tolerance_hours`, the read-only scan scope; System Admin or a delegate of `document_types` edit, reason, If-Match). (4) QC snags: `SnagInput.severity` is required and `found_by` optional (Q233, Q230); `GET` and `PUT /snag-severities` (the editable severity catalogue); `SnagType.stream` and `blocking_rule` (`always`, `by_severity`, `never`; QC_GENERAL stays `always`); `Snag.severity`, `severity_missing`, `blocks_acceptance`, `found_by`, `fixed_by`, `approved_by`, `register_record`, `approval_blocked`; **rule change D230b**: a snag is never self-approved: whoever raised, found or fixed it answers 403 `self_approval_forbidden` on approve, and the submission never closes it (B5 stays for every other task and record); an L2 cell set to `all_members` is honoured (Q231, `BallInCourt.votes_needed` / `votes_done`); `MatrixRowKey` gains `quality_te` (the Quality - TE row of QC snags, Q230); **rule change Q232**: a fix photo whose EXIF date (read in Africa/Tripoli) is in the future beyond the tolerance is kept as `pending_evidence` and decided by L2 through `POST /snags/{snag_id}/photos/{photo_id}/evidence`. (5) `RegisterRecord.qc_snag` (Q234, Q103): the approval of a Quality record of type snag creates or updates its QC snag; the snag is closed only by the QC photo flow.
     - 0.12.3 (2026-11-04): additive except where noted. Logs, monitoring and the mail service (work package P9, owner answers Q165 and Q167 to Q171 of 2026-11-04; migration 0055; CHANGELOG 81). (1) Q165: `Role.capabilities` (`audit_full_reader`, `team_lead`) decide who reads the whole Audit Log and who reads it as a Team Lead; `RolePatch.capabilities` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up, audited as `role_capabilities_set`). The settings `logs.audit.full_reader_roles` and `logs.audit.team_lead_roles` are used only while no role carries the capability. (2) Q167: the outbound mail service (SMTP from the environment). Security alerts are mailed to every active System Admin from `email_min_severity` up; other notification kinds only when listed in the setting `mail.notification_kinds` (empty during development). New `GET /admin/mail/status`, `POST /admin/mail/test` (System Admin; 422 `mail_not_configured` without SMTP), `GET /admin/mail/outbox` (no bodies) and `POST /admin/mail/outbox/{mail_id}/retry`. The channel reads `verified` only after a test mail went out with the current settings. New `GET /health` (no session; words only) for an external monitor. (3) Q168: `SecurityAlertSettings` gains `severity` (per rule), `mandatory_severity`, `email_min_severity` and `trusted_networks`; the input takes `severity`, `email_min_severity` and `trusted_networks` optionally (left out = kept); lowering a severity, raising the mail floor or adding a network is a weakening (step-up, alert). `SecurityAlert.severity` gains `info` (a new address inside a trusted network is softened one level, never dropped); `SecurityAlertRule` gains `malware_upload` (0.11.2) and `break_glass_used` (critical). Sign-in limiting per address is progressive: failures only, free up to 10 in 15 minutes, then a wait from 2 s doubling up to 60 s (429 `rate_limited` with `Retry-After`). (4) Q169: `GET /reports/activity?format=xlsx` answers the workbook (Summary, User Activity, Module Activity, Exports, Exceptions, About; no security log; audited as `report.activity_export`). (5) Q170: an Audit Log or security log export that matches more than 100 000 rows answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `*.export_refused`); nothing is cut. (6) Q171: `POST /admin/log-integrity/runs` starts the check as a job (202, `LogIntegrityRun` with `progress`), `GET /admin/log-integrity/runs` and `GET /admin/log-integrity/runs/{run_id}`; the same check runs every night (job `audit_integrity_check`) with the stored result and an external anchor; a break or `anchor_mismatch` raises `audit_integrity_failure`. `GET /audit-log/integrity` and `GET /security-log/integrity` answer 422 `integrity_too_large` above the setting `logs.integrity.sync_max_rows` (default 200 000). `ErrorCode` gains `too_many_rows`, `integrity_too_large` and `mail_not_configured`.
     - 0.12.2 (2026-11-04): additive. Work package P11 of the owner answers of 2026-11-04 (Q215, Q216, Q217, Q220, Q221, Q222, decision D220b; migration 0054; CHANGELOG 87). (1) Q215: every task or register record converted to the two fixed levels (by 0050 or now) sends one in-app notice, `NotificationKind` `levels_converted`, to the old reviewer and to the entry person, saying what changed and who is asked now. (2) Q216: `WorkflowStep.previous_path` and `RegisterRecordStep.previous_path` are true for the review and approve acts of the old 3-level path recorded before the conversion; the screens label them "previous path before conversion". (3) Q217: open items frozen on a one-level snapshot are converted to L1 / L2 after an impact report; an item whose L2 has no holder is held: its submission answers 422 `empty_cell` until the Responsibility Matrix names an L2 holder (System Admins alerted with `no_eligible_holder`). (4) Q220 / D220b: a permit's stream follows the activity. New Matrix rows `permits_hse_acq` (Acquisition / RF & Design; default L1 Acquisition Team and RF Engineer, L2 RF & Design / Acquisition Team Lead) and `permits_hse_om` (O&M; no default holder) beside `permits_hse` (CW) and `permits_hse_te`. City Council and Civil Aviation are on Acquisition / RF & Design; the purpose-based types (Access / PTW - Dismantle, Access - Survey, Access - QC / Maintenance, Security Clearance, Other Permit) carry the new Permits & HSE field `permit_stream` (`CW`, `TE`, `ACQ`, `OM`), chosen by the person entering the permit and required for those types; it decides the Matrix row. Refusals (422 `validation_failed`, path `/data/permit_stream`): `stream_required`, `stream_not_allowed`, `stream_fixed`. (5) Q221: the entry check of a permit runs at every save and at submit (403 `not_eligible_holder`). New `POST /registers/{register_key}/records/{record_id}/transfer` (Permits & HSE drafts only; `If-Match`, optional `note`): the holder of a draft who no longer holds L1 of its row hands it over, or a qualified holder takes over a draft held by such a person; the draft is pinned to the only qualified holder (or left to all of them), and both sides get `NotificationKind` `permit_transferred`; `RegisterRecord.allowed_actions` gains `transfer` and `RegisterRecordStep.action` gains `transfer`. (6) Q222: `RegisterDefinition.entry_permit_types` (Permits & HSE only) lists the permit types the caller may enter and the streams they may choose (`PermitEntryType`); the form offers only those, the database decides again on every write.
@@ -175,6 +176,8 @@ tags:
     description: "Generated forms DN, RN, PAC, FAC and snag list: template versions, numbering, PDFs."
   - name: warehouse
     description: "Item master, stock levels and movements (DN, RN, PL, OPEN, ADJ documents with lines and serials; reserved while pending, posted on approval)."
+  - name: lists
+    description: "0.12.5 (Q104). The list catalogue: every list of a register is data, with stable codes, EN/AR labels, aliases and deactivation."
   - name: as-built
     description: "The editable As-Built item list (CW quantities and TE items), linked to Warehouse item codes (Q74)."
   - name: qc
@@ -7847,6 +7850,197 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /list-catalogues:
+    get:
+      tags: [lists]
+      operationId: listListCatalogues
+      summary: The list catalogue (every list with its values)
+      description: Any signed-in user may read the lists (their values appear in the forms). `include_inactive` also returns the deactivated lists and values.
+      parameters:
+      - name: include_inactive
+        in: query
+        schema: {type: boolean, default: false}
+      responses:
+        '200':
+          description: Lists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    post:
+      tags: [lists]
+      operationId: createListCatalogue
+      summary: Add a list (System Admin or a delegate of fields edit for all regions)
+      x-db-path: admin_save_list_catalogue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ListCatalogueInput'}
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /list-catalogues/{catalogue_code}:
+    parameters:
+    - {$ref: '#/components/parameters/CatalogueCode'}
+    get:
+      tags: [lists]
+      operationId: getListCatalogue
+      summary: One list with its values and the fields that use it
+      responses:
+        '200':
+          description: List.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [lists]
+      operationId: updateListCatalogue
+      summary: Rename, mark critical, confirm or deactivate a list (never deleted)
+      description: A critical list accepts only its own values (`allow_other` false). A list is confirmed only with at least one active value. A list that an active field uses cannot be deactivated (422 `item_in_use`).
+      x-db-path: admin_save_list_catalogue
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ListCataloguePatch'}
+      responses:
+        '200':
+          description: Updated.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /list-catalogues/{catalogue_code}/values:
+    parameters:
+    - {$ref: '#/components/parameters/CatalogueCode'}
+    post:
+      tags: [lists]
+      operationId: createListValue
+      summary: Add a value to a list
+      description: The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version.
+      x-db-path: admin_save_list_value
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ListValueInput'}
+      responses:
+        '201':
+          description: Created; the list with its values.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /list-catalogues/{catalogue_code}/values/{value_id}:
+    parameters:
+    - {$ref: '#/components/parameters/CatalogueCode'}
+    - {$ref: '#/components/parameters/ListValueId'}
+    patch:
+      tags: [lists]
+      operationId: updateListValue
+      summary: Relabel, add aliases or groups, reorder or deactivate a value (never deleted; the code is fixed)
+      description: The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`).
+      x-db-path: admin_save_list_value
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ListValuePatch'}
+      responses:
+        '200':
+          description: Updated; the list with its values.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/legacy-conversion:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [registers]
+      operationId: getLegacyConversion
+      summary: Q111. A proposal of the structured values from the old free text of a meeting
+      description: Only `meetings`. Names, e-mails and employee IDs are matched to users, site codes to the sites of the caller's regions, and each line of the old action text becomes a proposed action (status Open, owner and due date to fill). Nothing is saved. A typed minutes reference is never an upload.
+      responses:
+        '200':
+          description: Proposal.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/LegacyConversionProposal'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [registers]
+      operationId: applyLegacyConversion
+      summary: Q111. Apply the reviewed values (once per meeting)
+      description: The record must be in entry and the caller its L1 holder with edit. Attendees and sites are added to the structured ones; an action whose text is already in the list is not added again. The old text stays read-only. 409 `duplicate` when the meeting was converted already. Audited (`meeting_legacy_convert`).
+      x-db-path: reg_meeting_convert
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LegacyConversionInput'}
+      responses:
+        '200':
+          description: The record.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /warehouse/items:
     get:
       tags: [warehouse]
@@ -9709,6 +9903,18 @@ components:
       required: true
       description: Stock movement.
       schema: {type: string, format: uuid}
+    CatalogueCode:
+      name: catalogue_code
+      in: path
+      required: true
+      description: List catalogue code (for example `TeamSpecialization`).
+      schema: {type: string, pattern: '^[A-Z][A-Za-z0-9]{1,40}$'}
+    ListValueId:
+      name: value_id
+      in: path
+      required: true
+      description: List value.
+      schema: {type: string, format: uuid}
     AsBuiltItemId:
       name: item_id
       in: path
@@ -9918,6 +10124,7 @@ components:
         - self_approval_forbidden
         - document_rule_pending
         - file_pending_scan
+        - list_not_configured
     PageEnvelope:
       type: object
       required: [items, page]
@@ -12594,9 +12801,14 @@ components:
         code: { type: string }
         label_en: { type: string }
         label_ar: { type: [string, 'null'] }
-        type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file] }
+        type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file, multi_user, multi_site, child_list, warehouse_item] }
         required: { type: boolean }
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
+        list: { $ref: '#/components/schemas/ListRef' }
+        columns:
+          type: array
+          description: '0.12.5. Only for `child_list`: the columns of a row, in order.'
+          items: { $ref: '#/components/schemas/RegisterFieldColumn' }
         in_list: { type: boolean }
         is_custom: { type: boolean }
         section: { type: [string, 'null'], description: '0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields.' }
@@ -12609,6 +12821,207 @@ components:
               value: { type: string }
               label_en: { type: string }
               label_ar: { type: [string, 'null'] }
+              groups: { type: array, items: { type: string }, description: '0.12.5. Functional groups of the value (for example CW, TE; closed for an action status).' }
+    ListRef:
+      type: object
+      description: '0.12.5 (Q104). The list catalogue a list field reads.'
+      required: [code, status, critical, allow_other]
+      properties:
+        code: { type: string }
+        status: { type: string, enum: [pending, confirmed] }
+        critical: { type: boolean }
+        allow_other: { type: boolean, description: 'Another value is accepted as typed (shown as the warning `list_other`).' }
+    RegisterFieldColumn:
+      type: object
+      required: [code, label_en, type]
+      properties:
+        code: { type: string }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        type: { type: string, enum: [text, number, date, yes_no, user, list, task] }
+        required: { type: boolean }
+        list: { $ref: '#/components/schemas/ListRef' }
+        options:
+          type: array
+          items:
+            type: object
+            required: [value, label_en]
+            properties:
+              value: { type: string }
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+              groups: { type: array, items: { type: string } }
+    RecordRefs:
+      type: object
+      description: '0.12.5. Display data of the ids a record holds (people, sites, Warehouse items, files, tasks), keyed by id.'
+      properties:
+        users:
+          type: object
+          additionalProperties:
+            type: object
+            required: [display_name]
+            properties:
+              display_name: { type: string }
+              employee_id: { type: [string, 'null'] }
+        sites: { type: object, additionalProperties: { type: string }, description: 'id -> site code.' }
+        warehouse_items:
+          type: object
+          additionalProperties:
+            type: object
+            required: [item_code, name]
+            properties:
+              item_code: { type: string }
+              name: { type: string }
+              is_active: { type: boolean }
+        files: { type: object, additionalProperties: { type: string }, description: 'id -> original file name.' }
+        tasks: { type: object, additionalProperties: { type: string }, description: 'id -> task code.' }
+    ListValue:
+      type: object
+      required: [id, code, label_en, aliases, groups, sort_order, is_active, version]
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string, description: 'Stable: the text stored in the records.' }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        aliases: { type: array, items: { type: string } }
+        groups: { type: array, items: { type: string } }
+        sort_order: { type: integer }
+        is_active: { type: boolean }
+        version: { type: integer }
+    ListCatalogue:
+      type: object
+      required: [code, name_en, critical, status, allow_other, is_active, version, values, used_by]
+      properties:
+        code: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        critical: { type: boolean, description: 'Drives a calculation, a rule or a permission: only its own values, and approval waits until it has one.' }
+        status: { type: string, enum: [pending, confirmed], description: 'pending = a draft for the owner''s review (Q104).' }
+        allow_other: { type: boolean }
+        is_active: { type: boolean }
+        version: { type: integer, description: 'ETag (If-Match).' }
+        values: { type: array, items: { $ref: '#/components/schemas/ListValue' } }
+        used_by:
+          type: array
+          items:
+            type: object
+            required: [register_key, field_code]
+            properties:
+              register_key: { type: string }
+              field_code: { type: string }
+              column: { type: string, description: 'The column of a child list.' }
+    ListCatalogueInput:
+      type: object
+      required: [code, name_en, reason]
+      additionalProperties: false
+      properties:
+        code: { type: string, pattern: '^[A-Z][A-Za-z0-9]{1,40}$' }
+        name_en: { type: string, minLength: 2, maxLength: 200 }
+        name_ar: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        critical: { type: boolean }
+        allow_other: { type: boolean }
+        reason: { type: string, minLength: 3 }
+    ListCataloguePatch:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        name_en: { type: string, minLength: 2, maxLength: 200 }
+        name_ar: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        critical: { type: boolean }
+        status: { type: string, enum: [pending, confirmed] }
+        allow_other: { type: boolean }
+        is_active: { type: boolean }
+        reason: { type: string, minLength: 3 }
+    ListValueInput:
+      type: object
+      required: [code, reason]
+      additionalProperties: false
+      properties:
+        code: { type: string, minLength: 1, maxLength: 80 }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        aliases: { type: array, maxItems: 20, items: { type: string } }
+        groups: { type: array, maxItems: 10, items: { type: string } }
+        sort_order: { type: integer, minimum: 0 }
+        is_active: { type: boolean }
+        reason: { type: string, minLength: 3 }
+    ListValuePatch:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        aliases: { type: array, maxItems: 20, items: { type: string } }
+        groups: { type: array, maxItems: 10, items: { type: string } }
+        sort_order: { type: integer, minimum: 0 }
+        is_active: { type: boolean }
+        reason: { type: string, minLength: 3 }
+    LegacyConversionProposal:
+      type: object
+      required: [record_id, converted, attendees, sites, action_items, unmatched]
+      properties:
+        record_id: { type: string, format: uuid }
+        converted: { type: boolean, description: 'The old text of this meeting was converted already.' }
+        legacy:
+          type: object
+          properties:
+            attendees: { type: [string, 'null'] }
+            linked_sites: { type: [string, 'null'] }
+            minutes_ref: { type: [string, 'null'] }
+            action_items: { type: [string, 'null'] }
+        attendees:
+          type: array
+          items:
+            type: object
+            required: [text, user_id, display_name]
+            properties:
+              text: { type: string }
+              user_id: { type: string, format: uuid }
+              display_name: { type: string }
+              employee_id: { type: [string, 'null'] }
+        sites:
+          type: array
+          items:
+            type: object
+            required: [text, site_id, site_code]
+            properties:
+              text: { type: string }
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+        action_items:
+          type: array
+          items:
+            type: object
+            required: [description, status]
+            properties:
+              description: { type: string }
+              status: { type: string }
+        unmatched:
+          type: object
+          required: [attendees, sites]
+          properties:
+            attendees: { type: array, items: { type: string } }
+            sites: { type: array, items: { type: string } }
+        minutes_note: { type: [string, 'null'], description: 'The old minutes reference, shown with the advice to upload the file.' }
+    LegacyConversionInput:
+      type: object
+      required: [values, reason]
+      additionalProperties: false
+      properties:
+        values:
+          type: object
+          additionalProperties: false
+          properties:
+            organiser: { type: string, format: uuid }
+            attendee_users: { type: array, items: { type: string, format: uuid } }
+            linked_site_ids: { type: array, items: { type: string, format: uuid } }
+            action_items_list: { type: array, items: { type: object, additionalProperties: true } }
+        reason: { type: string, minLength: 3 }
     RegisterDefinition:
       type: object
       required: [register_key, name_en, module_key, site_scoped, approval_levels, fields]
@@ -12657,6 +13070,7 @@ components:
         levels_required: { type: integer }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
         data: { type: object, additionalProperties: true, description: 'Base fields keyed by `RegisterField.code`.' }
+        refs: { $ref: '#/components/schemas/RecordRefs' }
         custom: { $ref: '#/components/schemas/CustomValues' }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
@@ -12694,7 +13108,7 @@ components:
               path: { type: string, description: 'JSON pointer of the field, as in `Problem.errors`.' }
               code: { type: string }
               message: { type: string }
-          description: '0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. Empty when there is none.'
+          description: '0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none.'
         last_transition:
           type: object
           description: Present on the answer of a transition (submit, review, approve, reject, claim, release).

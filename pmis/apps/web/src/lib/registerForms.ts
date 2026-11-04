@@ -51,7 +51,11 @@ const isHlcScope = (d: Data) => d.scope === HLC_SCOPE;
  * A field that is not shown is not sent: `valid_to` of a permanent permit, N/A fields on other rows, PTW fields on other permit types,
  * the HLC approval date on a Procurement scope other than HLC, and the HLC record's pointer to its purchase request (shown as a link instead).
  */
+/** Q111: the old free text of a meeting, read-only until its conversion; shown only on a record that has it. */
+export const MEETING_LEGACY = ['attendees', 'linked_sites', 'minutes_ref', 'action_items', 'legacy_converted_at', 'legacy_converted_by'];
+
 export function isHidden(key: string, code: string, d: Data, def?: RegisterDefinition) {
+  if (key === 'meetings' && MEETING_LEGACY.includes(code)) return d[code] === undefined || d[code] === null || d[code] === '';
   if (key === 'procurement') return code === 'hlc_approval_date' && !isHlcScope(d);
   if (key === 'hlc') return code === 'procurement_record_id';
   if (key !== 'permits_hse') return false;
@@ -150,7 +154,7 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
   for (const f of def.fields) {
     if (isHidden(key, f.code, data, def) || f.read_only) continue;
     const v = data[f.code];
-    const empty = v === undefined || v === null || v === '';
+    const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
     if (f.required && empty) { fail(f.code, 'required'); continue; }
     if (empty) continue;
     if (f.type === 'date' && typeof v === 'string') {
@@ -158,7 +162,11 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
       const nf = NO_FUTURE[key];
       if (v > today && (nf === 'all-dates' || nf?.includes(f.code))) fail(f.code, 'future_date');
     }
-    if (f.type === 'list' && f.options?.length && !f.options.some((o) => o.value === v)) fail(f.code, 'not_in_list');
+    // 0.12.5 (Q104): a list that accepts another value keeps it as typed (the server shows the warning list_other)
+    if (f.type === 'list' && !f.list?.allow_other && f.options?.length && !f.options.some((o) => o.value === v)) fail(f.code, 'not_in_list');
+    if (f.type === 'child_list' && Array.isArray(v)) {
+      (v as Data[]).forEach((row) => { for (const c of f.columns ?? []) if (c.required && (row[c.code] === undefined || row[c.code] === null || row[c.code] === '')) fail(f.code, 'row_incomplete'); });
+    }
   }
   for (const [a, b] of ORDER[key] ?? []) {
     const x = data[a], y = data[b];
@@ -187,5 +195,6 @@ export function validateRecord(def: RegisterDefinition, data: Data, siteId: stri
 /** Server `errors[].path` -> field code: `/data/<code>`, `field:<code>` or `/site_id`. */
 export function pathToField(path: string): string {
   if (path.startsWith('field:')) return path.slice(6);
-  return path.replace(/^\/(data|custom)\//, '').replace(/^\//, '');
+  // 0.12.5: an error inside a multi value or a child-list row (/data/<code>/<index>/<column>) belongs to its field
+  return path.replace(/^\/(data|custom)\//, '').replace(/^\//, '').split('/')[0] ?? '';
 }
