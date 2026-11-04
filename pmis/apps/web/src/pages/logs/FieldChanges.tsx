@@ -74,7 +74,7 @@ export function FieldChanges() {
   return (
     <div data-testid="page-field-changes">
       <PageHeader title={t('nav.logs.field_changes')} subtitle={t('logs.fc_subtitle')} />
-      <Toolbar filters={<SavedViews screen="field-changes" value={f} onApply={setF} empty={EMPTY_FILTER} />}
+      <Toolbar filters={<SavedViews screen="field-changes" value={f} onApply={setF} empty={EMPTY_FILTER} table={tbl} />}
         count={<span className="text-sm text-mute" data-testid="fc-count">{t('logs.shown', { count: q.items.length })}</span>} tools={<ColumnMenu api={tbl} label={(id) => t(`logs.c_${id}`)} />} />
       <LogFilters kind="field" f={f} set={setF} />
       <LogTable tbl={tbl} label={(id) => t(`logs.c_${id}`)} rows={q.items} rowId={(r) => r.id} cell={cell} onOpen={setSel} activeId={sel?.id} testid="fc-table"

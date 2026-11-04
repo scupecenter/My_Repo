@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.11
+  version: 0.12.12
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.12 (2026-11-04): additive. Shared saved views and server-side drafts (P10, owner answers Q115 and Q117; migration 0065; CHANGELOG 84). (1) Saved views move from the browser to the server: `GET/POST /saved-views`, `GET/PATCH /saved-views/{view_id}`, `POST .../deactivate`, `.../restore`, `.../transfer`, `GET .../versions` and `POST /saved-views/import`. A view holds the filters, columns (order, hidden, width, density) and sort of one list screen (`screen_key`). Every user has private views that nobody else reads; sharing with roles, groups, users or everyone needs `views.share` (grant `views`/`create`, seeded for System Admin, Team Leads and Project Manager, delegable), `everyone` needs it for all regions, a region filter must lie in the sharer's regions, and a view reaches only recipients who may open the screen's module. Hidden columns are stripped server-side for every reader (`stripped_columns`). Views are versioned, audited and deactivated, never deleted. Editing, deactivating and transferring other people's shared views needs `views.manage` (`views`/`administer`); when an owner leaves, their shared views move to their active direct manager, or show `owner_left`. The browser's old local views are imported once per screen (idempotent per `local_id`). (2) Drafts (Q115): `GET /me/drafts`, `GET/PUT/DELETE /me/drafts/{draft_key}` keep unsaved input of a task, a register record or a form on the server for the caller only (setting `drafts.retention_days`, default 30); a draft is never a submission, an approval or an input of any calculation. `DelegableRight` gains `views.share` and `views.manage`; `ModuleKey` examples gain `views`.
     - 0.12.11 (2026-11-04): additive. Work package P4c of the owner answers 2026-11-04 (migration 0063; CHANGELOG 92). (1) Q150: an HLC record names the HLC purchase requests it covers, `PUT /registers/hlc/records/{record_id}/purchase-requests` (If-Match, L1 of the record while in entry; an empty list = every submitted request of the site), and `RegisterRecord.purchase_requests` (HLC records) shows the required set, the candidates and whether all are approved by HLC. C3 now closes only when every required request has an HLC approval date, on the latest one; a cancelled request (order status `Cancel...`) is ignored. New warnings `hlc_prs_incomplete`, `hlc_prs_not_linked`. (2) Q148: an HLC record with an installation, TX link test or in-service date is refused at submit and at the final approval (`no_approved_hlc_pr`, 422) until the required requests are approved by HLC; the new fields `pr_exception` / `pr_exception_reason` are the emergency exception (only a holder of `administer` on HLC or a System Admin, `pr_exception_forbidden`), warned to the reviewer (`pr_exception_used`) and audited at the approval. (3) Q139: `POST /registers/hlc/legacy-migration` previews (`dry_run`) or runs (reason, step-up) the one-time move of the legacy HLC requests into Procurement drafts of scope HLC. (4) Q114: Dismantle fields `execution_mode`, `procurement_order_id`, `internal_team`; for Outsourced work the contractor (FO / FT, `external_party`) is derived from the chosen approved Procurement order (`contractor_from_order`, `order_choice_required`, `no_active_order`, `order_not_active`), In-House names the internal team; `GET /registers/dismantle/order-options` lists the active orders. (5) Q151: `GET` / `PUT /settings/gecol-order-warnings` (off by default); warnings `gecol_order` and `billing_before_event` carry `related_path`.
     - 0.12.10 (2026-11-04): additive, work package P4a of the owner answers of 2026-11-04 (Q103 except Quality, Q108, Q113, Q225; migration 0062; CHANGELOG 89). (1) Q225: a site field that changes rules (permits, scope; `requires_approval`, seed `near_airport`) is no longer edited directly: `PATCH /sites/{site_id}` answers 422 `validation_failed` with `/custom/<code>` and the field code `approval_required`; the new `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`, a reason is required) opens one Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, old and new value), entered by the caller as L1 (an L1 holder of the Change Control row with its `create` right); the value applies to the site on the L2 approval, audited, and the site is recalculated. `SiteCustomField` gains `requires_approval`. (2) An approved register record feeds the calculation layer (no new path): Change Control writes `change_requests` (suspensions and resumptions with their effective dates `suspension_start` / `resumption_date` and the approval date; withdrawn with a new version where `withdrawn` = Yes; a Cancellation cancels the site; a site field change applies), RF & Design the site identity, Acquisition Master T and A3, Readiness & Handover D17 and Z1, Issues and Risks their tables. Change Control gains the fields `suspension_start`, `resumption_date` and `withdrawn`; field codes at submit `before_suspension`, `no_open_suspension`, `resumed_already`, `old_value_changed`, `unknown_site_field`, `scope_scenario_conflict`. (3) Q113: As-Built has the record types `cw_part` and `te_part` (one each per site, each approved on its own; a record created without a type takes it from its values); `cw_as_built_submitted` (BU) is filled by the CW part's submission (never typed) with `cw_submitted_date`; `as_built_date` (EF) is the TE part's submission date unless L1 typed the vendor's earlier date; `part_not_applicable` with `na_reason` gives BU N/A. Write-through fields that the system fills answer `edit_via` `none`. (4) Q108: the As-Built fields `wl_antenna_type`, `mw_antenna_type` and `router_type` list the active Warehouse items of their group (WL, MW, IP); quantities of unit `qty` are whole numbers.
     - 0.12.9 (2026-11-04): work package P4b of the owner answers of 2026-11-04 (Q110, Q142 to Q147) and decision D145b (migration 0061; CHANGELOG 88). Not purely additive for `PUT /settings/team-scope-match`: its columns are now codes of the specialization catalogue (`TeamScopeMatch.catalogue`, seed Tower RT, Tower GF, Adaption, TE, Dismantle, GECOL, Fiber, Survey) and a row may allow a functional group (`allowed_groups`, CW or TE); the old column CW became the group CW, TE the code TE, and the name CW is refused as a column (`is_a_group`). (1) Q143 / Q147: `GET /settings/team-scope-match` is also readable, read-only, with `procurement` or `contractors` view (`can_edit` says whether the caller may save); a save that changes eligibility (rows, cells, groups, active codes, a code's group or aliases) needs a fresh step-up (401 `step_up_required`); a label-only change does not; new field errors `is_a_group`, `name_clash`, `not_a_column`. (2) Q144: HLC stays `exempt` (no team needed) but a named team is checked (seed: Fiber). (3) Q110: the Contractors register gains the record type `contract` (`contractor`, `contract_ref`, `contract_start`, `contract_end`, `contract_scopes`, `contract_status`); a team or a contract links to its company by `external_party_id` (found from a unique `contractor` name; an ambiguous name is never linked: `ambiguous_contractor`, a name that is not the chosen company's: `contractor_mismatch`); an unknown Company Type becomes `other` with a review alert. A Procurement record that names a team is refused at submit (422 `validation_failed`, `no_active_contract` / `party_inactive`) unless the team's company has an active contract covering the scope on the order date. (4) Q142: a team may be saved without a specialization; submit needs one (`specialization_required`) unless it is inactive; teams gain `more_specializations`, `safety_cert_expiry` and `team_lead_user`. (5) Q147 CW Delivery Model (scopes of `ContractorRules.cw_delivery_scopes`): an Outsourced order with its PO / WO needs its party (`party_required`) and an active contract; an In-House order names a qualified internal team (`internal_team_required`, `not_internal_team`). (6) Q146: a GECOL record is approved only with its party, an active party and an active contract covering GECOL (`gecol_party_required`, `party_inactive`, `no_active_contract`). (7) Q145: `GET /reports/team-scope-mismatch` (running orders that no longer match) and `GET /reports/contractors-completeness` (Q142, Q110). (8) D145b: `GET/PUT /settings/contractor-rules` (`ContractorRules`): the safety certificate lead days, the alert roles and the rule lists; the daily job alerts the team lead and Procurement (in-app, `team_safety_cert`) and never blocks an order; running-order mismatches are alerted once (`order_team_mismatch`).
@@ -202,6 +203,8 @@ tags:
     description: "Dashboard KPIs (P3 shapes, refined against the legacy dashboard)."
   - name: project-status
     description: "Project Status with the weight-set version, and weekly snapshots."
+  - name: saved-views
+    description: "Saved views of the list screens, shared with roles, groups, users or everyone (Q117), and the caller's server-side drafts (Q115)."
 
 paths:
   # ------------------------------------------------------------------ auth
@@ -10562,6 +10565,335 @@ paths:
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
 
+  /saved-views:
+    get:
+      tags: [saved-views]
+      operationId: listSavedViews
+      summary: Saved views of a list screen that the caller may see (0.12.12, P10, Q117)
+      description: |
+        The caller's own views (private or shared) and the active views others shared with them (everyone, the caller, a role the caller holds, a group
+        the caller is in), only when the caller may open the screen's module. Hidden columns are stripped for the caller (`stripped_columns`). Another
+        user's private view is never listed, not even to a System Admin. `scope=orphaned` (views.manage only) lists the active shared views whose owner left.
+      parameters:
+      - {name: screen_key, in: query, required: false, schema: {$ref: '#/components/schemas/SavedViewScreenKey'}}
+      - {name: scope, in: query, required: false, schema: {type: string, enum: [all, mine, shared, orphaned], default: all}}
+      - {name: include_inactive, in: query, required: false, schema: {type: boolean, default: false}, description: 'Also the caller''s own deactivated views.'}
+      responses:
+        '200':
+          description: Own views first, then shared ones.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, can_share, can_manage]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/SavedView'}}
+                  can_share: {type: string, enum: [none, limited, all], description: 'The caller''s views.share scope: limited = roles, groups and users only; all = also everyone.'}
+                  can_manage: {type: boolean, description: 'The caller holds views.manage (edit, deactivate and transfer other people''s shared views).'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    post:
+      tags: [saved-views]
+      operationId: createSavedView
+      summary: Save the current filters, columns and sort as a view (0.12.12)
+      description: |
+        A view is private unless `audience` names someone. Sharing needs views.share (seeded for System Admin, Team Leads and Project Manager, delegable);
+        `audience.everyone` needs it for all regions. A region filter of a shared view must lie in the caller's regions. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedViewInput'}
+      responses:
+        '201':
+          description: The new view.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/import:
+    post:
+      tags: [saved-views]
+      operationId: importSavedViews
+      summary: First use of a screen, hand over the views the browser kept locally (0.12.12)
+      description: Each item becomes a private view of the caller. Idempotent per `local_id`; a name already used gets a " (2)" suffix. At most 50 items. Audited.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [screen_key, items]
+              properties:
+                screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+                items:
+                  type: array
+                  maxItems: 50
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [local_id, name]
+                    properties:
+                      local_id: {type: string, minLength: 1, maxLength: 100}
+                      name: {type: string, minLength: 1, maxLength: 120}
+                      filters: {type: object, additionalProperties: true}
+                      columns: {$ref: '#/components/schemas/SavedViewColumns'}
+                      sort: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/SavedViewSort'}}
+      responses:
+        '200':
+          description: What was imported.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [imported, skipped, items]
+                properties:
+                  imported: {type: integer}
+                  skipped: {type: integer}
+                  items: {type: array, items: {$ref: '#/components/schemas/SavedView'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/{view_id}:
+    parameters:
+    - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [saved-views]
+      operationId: getSavedView
+      summary: One saved view (0.12.12)
+      description: 404 for a view the caller may not read (another user's private view, or a shared view of a screen the caller cannot open).
+      responses:
+        '200':
+          description: The view, hidden columns stripped.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [saved-views]
+      operationId: updateSavedView
+      summary: Change a view (name, filters, columns, sort, audience) (0.12.12)
+      description: The owner, or views.manage on a shared view (with a reason). A new version is kept and audited. A deactivated view is restored first (409).
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedViewPatch'}
+      responses:
+        '200':
+          description: The changed view.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /saved-views/{view_id}/deactivate:
+    parameters:
+    - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [saved-views]
+      operationId: deactivateSavedView
+      summary: Deactivate a view; it is never deleted (0.12.12)
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedViewReason'}
+      responses:
+        '200':
+          description: The deactivated view.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /saved-views/{view_id}/restore:
+    parameters:
+    - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [saved-views]
+      operationId: restoreSavedView
+      summary: Restore a deactivated view (0.12.12)
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SavedViewReason'}
+      responses:
+        '200':
+          description: The restored view.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /saved-views/{view_id}/transfer:
+    parameters:
+    - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [saved-views]
+      operationId: transferSavedView
+      summary: Hand a shared view to another owner (0.12.12, Q117)
+      description: The owner, or views.manage (for example when the creator left). The new owner must be active and hold views.share. A private view is never handed over (409).
+      parameters:
+      - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [owner_id, reason]
+              properties:
+                owner_id: {type: string, format: uuid}
+                reason: {type: string, minLength: 3, maxLength: 1000}
+      responses:
+        '200':
+          description: The view with its new owner.
+          headers:
+            ETag: {schema: {type: string}}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SavedView'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /saved-views/{view_id}/versions:
+    parameters:
+    - {name: view_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [saved-views]
+      operationId: listSavedViewVersions
+      summary: Every version of a view, newest first (0.12.12)
+      description: The owner, or views.manage on a shared view.
+      responses:
+        '200':
+          description: Versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/SavedViewVersion'}}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /me/drafts:
+    get:
+      tags: [saved-views]
+      operationId: listMyDrafts
+      summary: My server-side drafts, newest first, without their content (0.12.12, Q115)
+      responses:
+        '200':
+          description: Drafts that are not expired.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, retention_days]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Draft'}}
+                  retention_days: {type: integer, description: 'Setting drafts.retention_days (default 30).'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /me/drafts/{draft_key}:
+    parameters:
+    - name: draft_key
+      in: path
+      required: true
+      description: '`task.<task id>`, `record.<register key>.<record id or new>` or `form.<name>` (dots, so the key is one safe path segment).'
+      schema: {type: string, pattern: '^(task|record|form)\.[A-Za-z0-9_.-]{1,200}$'}
+    get:
+      tags: [saved-views]
+      operationId: getMyDraft
+      summary: One of my drafts with its content (0.12.12, Q115)
+      description: 404 when there is none, it expired, or the caller can no longer read its task or record.
+      responses:
+        '200':
+          description: The draft.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Draft'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    put:
+      tags: [saved-views]
+      operationId: saveMyDraft
+      summary: Save a draft of unsaved input (autosave) (0.12.12, Q115)
+      description: |
+        Only the caller reads it. A draft is never a submission, an approval or an input of any calculation. The caller must be able to read the task or
+        record (and, for `record.<key>.new`, may create in the register's module). `base_version` is the version last seen: a newer save from another window
+        answers 412. At most 64 KB; at most 200 drafts per user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [payload]
+              properties:
+                payload: {type: object, additionalProperties: true}
+                base_version: {type: [integer, 'null'], minimum: 1}
+      responses:
+        '200':
+          description: Saved (the content is not echoed).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Draft'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [saved-views]
+      operationId: discardMyDraft
+      summary: Discard a draft (after a save, or when the user chooses not to restore it) (0.12.12)
+      responses:
+        '204': {description: Discarded (also when there was none).}
+        '401': {$ref: '#/components/responses/Unauthorized'}
 components:
   securitySchemes:
     cookieAuth:
@@ -11128,7 +11460,7 @@ components:
     ModuleKey:
       type: string
       description: Module or `module.screen` key. The list is served by `GET /permissions/catalogue`; values below are the seed.
-      examples: [sites, sites.documents, approvals, my_work, dashboard, procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports, admin.users, admin.matrix, admin.workflow, admin.settings, audit]
+      examples: [sites, sites.documents, approvals, my_work, dashboard, procurement, contractors, rf_design, acquisition, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness, as_built, meetings, templates, reports, admin.users, admin.matrix, admin.workflow, admin.settings, audit, views]
     PermissionAction:
       type: string
       enum: [view, create, edit, delete, approve, export, import, download_documents, view_audit, administer, manage_users, view_security_log]
@@ -11143,7 +11475,7 @@ components:
     DelegableRight:
       type: string
       description: Closed list for partial delegation (ADR 0003 §5).
-      enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign, users.edit, assignments.edit, groups.edit, matrix.edit, roles.edit, profiles.edit, settings.edit, documents.edit, templates.edit, fields.edit, workflow.edit, workflow.publish, workflow.migrate, warehouse.items.edit, users.two_factor]
+      enum: [unlock, skip, mark_na, accept_without_document, accept_without_workflow, reopen, edit_date, reassign, users.edit, assignments.edit, groups.edit, matrix.edit, roles.edit, profiles.edit, settings.edit, documents.edit, templates.edit, fields.edit, workflow.edit, workflow.publish, workflow.migrate, warehouse.items.edit, users.two_factor, views.share, views.manage]
     RegionId:
       type: integer
       minimum: 1
@@ -15800,6 +16132,114 @@ components:
       properties:
         note: {type: string, maxLength: 2000, description: 'Mandatory on reject.'}
         via: {$ref: '#/components/schemas/WorkflowVia'}
+    SavedViewScreenKey:
+      type: string
+      pattern: '^[a-z][a-z0-9_-]{1,80}$'
+      description: 'A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`.'
+    SavedViewColumns:
+      type: object
+      additionalProperties: false
+      description: 'Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission.'
+      properties:
+        order: {type: array, maxItems: 200, items: {type: string, maxLength: 100}}
+        hidden: {type: array, maxItems: 200, items: {type: string, maxLength: 100}}
+        width: {type: object, additionalProperties: {type: integer, minimum: 40, maximum: 1000}}
+        density: {type: string, enum: [comfortable, compact]}
+    SavedViewSort:
+      type: object
+      additionalProperties: false
+      required: [id, dir]
+      properties:
+        id: {type: string, maxLength: 100}
+        dir: {type: string, enum: [asc, desc]}
+    SavedViewAudience:
+      type: object
+      additionalProperties: false
+      description: 'Who else sees the view. Empty = private. Ids must be active roles, groups and users.'
+      properties:
+        everyone: {type: boolean}
+        role_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
+        group_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
+        user_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
+    SavedViewInput:
+      type: object
+      additionalProperties: false
+      required: [screen_key, name]
+      properties:
+        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+        name: {type: string, minLength: 1, maxLength: 120}
+        filters: {type: object, additionalProperties: true, description: 'The screen''s filter values (at most 50 keys, 16 KB).'}
+        columns: {$ref: '#/components/schemas/SavedViewColumns'}
+        sort: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/SavedViewSort'}}
+        audience: {$ref: '#/components/schemas/SavedViewAudience'}
+        reason: {type: string, maxLength: 1000}
+    SavedViewPatch:
+      type: object
+      additionalProperties: false
+      properties:
+        name: {type: string, minLength: 1, maxLength: 120}
+        filters: {type: object, additionalProperties: true}
+        columns: {$ref: '#/components/schemas/SavedViewColumns'}
+        sort: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/SavedViewSort'}}
+        audience: {$ref: '#/components/schemas/SavedViewAudience'}
+        reason: {type: string, maxLength: 1000, description: 'Required (3 characters or more) when views.manage changes somebody else''s view.'}
+    SavedViewReason:
+      type: object
+      additionalProperties: false
+      properties:
+        reason: {type: string, maxLength: 1000, description: 'Required (3 characters or more) when views.manage acts on somebody else''s view.'}
+    SavedViewAudienceOut:
+      type: object
+      required: [everyone, roles, groups, users]
+      properties:
+        everyone: {type: boolean}
+        roles: {type: array, items: {type: object, required: [id, name_en], properties: {id: {type: string, format: uuid}, name_en: {type: string}, name_ar: {type: [string, 'null']}}}}
+        groups: {type: array, items: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}}
+        users: {type: array, items: {$ref: '#/components/schemas/UserRef'}}
+    SavedView:
+      type: object
+      required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
+        name: {type: string}
+        filters: {type: object, additionalProperties: true}
+        columns: {$ref: '#/components/schemas/SavedViewColumns'}
+        sort: {type: array, items: {$ref: '#/components/schemas/SavedViewSort'}}
+        stripped_columns: {type: integer, description: 'How many columns, filters or sort keys were removed because they are hidden for the caller.'}
+        owner: {$ref: '#/components/schemas/UserRef'}
+        owner_left: {type: boolean, description: 'The owner is no longer active (views.manage may transfer the view).'}
+        is_owner: {type: boolean}
+        shared: {type: boolean}
+        audience: {description: 'Only for the owner and views.manage.', oneOf: [{$ref: '#/components/schemas/SavedViewAudienceOut'}, {type: 'null'}]}
+        can_edit: {type: boolean}
+        can_share: {type: boolean}
+        is_active: {type: boolean}
+        version: {type: integer}
+        imported: {type: boolean, description: 'Imported from the browser''s old local views.'}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    SavedViewVersion:
+      type: object
+      required: [version, change, snapshot, changed_at]
+      properties:
+        version: {type: integer}
+        change: {type: string, enum: [create, edit, deactivate, restore, transfer, import, owner_left]}
+        snapshot: {type: object, additionalProperties: true}
+        reason: {type: [string, 'null']}
+        changed_by: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        changed_at: {type: string, format: date-time}
+    Draft:
+      type: object
+      required: [key, version, saved_at, created_at, expires_at]
+      description: 'A server-side draft of unsaved input (Q115): the caller''s own, never a submission or an approval.'
+      properties:
+        key: {type: string}
+        version: {type: integer}
+        saved_at: {type: string, format: date-time}
+        created_at: {type: string, format: date-time}
+        expires_at: {type: string, format: date-time}
+        payload: {type: object, additionalProperties: true, description: 'Only in GET /me/drafts/{draft_key}.'}
     Follow:
       type: object
       required: [id, entity_type, entity_id, created_at]

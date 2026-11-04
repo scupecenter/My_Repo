@@ -6779,6 +6779,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/saved-views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Saved views of a list screen that the caller may see (0.12.12, P10, Q117)
+         * @description The caller's own views (private or shared) and the active views others shared with them (everyone, the caller, a role the caller holds, a group
+         *     the caller is in), only when the caller may open the screen's module. Hidden columns are stripped for the caller (`stripped_columns`). Another
+         *     user's private view is never listed, not even to a System Admin. `scope=orphaned` (views.manage only) lists the active shared views whose owner left.
+         */
+        get: operations["listSavedViews"];
+        put?: never;
+        /**
+         * Save the current filters, columns and sort as a view (0.12.12)
+         * @description A view is private unless `audience` names someone. Sharing needs views.share (seeded for System Admin, Team Leads and Project Manager, delegable);
+         *     `audience.everyone` needs it for all regions. A region filter of a shared view must lie in the caller's regions. Audited.
+         */
+        post: operations["createSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * First use of a screen, hand over the views the browser kept locally (0.12.12)
+         * @description Each item becomes a private view of the caller. Idempotent per `local_id`; a name already used gets a " (2)" suffix. At most 50 items. Audited.
+         */
+        post: operations["importSavedViews"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One saved view (0.12.12)
+         * @description 404 for a view the caller may not read (another user's private view, or a shared view of a screen the caller cannot open).
+         */
+        get: operations["getSavedView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a view (name, filters, columns, sort, audience) (0.12.12)
+         * @description The owner, or views.manage on a shared view (with a reason). A new version is kept and audited. A deactivated view is restored first (409).
+         */
+        patch: operations["updateSavedView"];
+        trace?: never;
+    };
+    "/saved-views/{view_id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate a view; it is never deleted (0.12.12) */
+        post: operations["deactivateSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore a deactivated view (0.12.12) */
+        post: operations["restoreSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Hand a shared view to another owner (0.12.12, Q117)
+         * @description The owner, or views.manage (for example when the creator left). The new owner must be active and hold views.share. A private view is never handed over (409).
+         */
+        post: operations["transferSavedView"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/saved-views/{view_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Every version of a view, newest first (0.12.12)
+         * @description The owner, or views.manage on a shared view.
+         */
+        get: operations["listSavedViewVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My server-side drafts, newest first, without their content (0.12.12, Q115) */
+        get: operations["listMyDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/drafts/{draft_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `task.<task id>`, `record.<register key>.<record id or new>` or `form.<name>` (dots, so the key is one safe path segment). */
+                draft_key: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One of my drafts with its content (0.12.12, Q115)
+         * @description 404 when there is none, it expired, or the caller can no longer read its task or record.
+         */
+        get: operations["getMyDraft"];
+        /**
+         * Save a draft of unsaved input (autosave) (0.12.12, Q115)
+         * @description Only the caller reads it. A draft is never a submission, an approval or an input of any calculation. The caller must be able to read the task or
+         *     record (and, for `record.<key>.new`, may create in the register's module). `base_version` is the version last seen: a newer save from another window
+         *     answers 412. At most 64 KB; at most 200 drafts per user.
+         */
+        put: operations["saveMyDraft"];
+        post?: never;
+        /** Discard a draft (after a save, or when the user chooses not to restore it) (0.12.12) */
+        delete: operations["discardMyDraft"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7037,6 +7239,7 @@ export interface components {
          * @example admin.workflow
          * @example admin.settings
          * @example audit
+         * @example views
          */
         ModuleKey: string;
         /**
@@ -7055,7 +7258,7 @@ export interface components {
          * @description Closed list for partial delegation (ADR 0003 §5).
          * @enum {string}
          */
-        DelegableRight: "unlock" | "skip" | "mark_na" | "accept_without_document" | "accept_without_workflow" | "reopen" | "edit_date" | "reassign" | "users.edit" | "assignments.edit" | "groups.edit" | "matrix.edit" | "roles.edit" | "profiles.edit" | "settings.edit" | "documents.edit" | "templates.edit" | "fields.edit" | "workflow.edit" | "workflow.publish" | "workflow.migrate" | "warehouse.items.edit" | "users.two_factor";
+        DelegableRight: "unlock" | "skip" | "mark_na" | "accept_without_document" | "accept_without_workflow" | "reopen" | "edit_date" | "reassign" | "users.edit" | "assignments.edit" | "groups.edit" | "matrix.edit" | "roles.edit" | "profiles.edit" | "settings.edit" | "documents.edit" | "templates.edit" | "fields.edit" | "workflow.edit" | "workflow.publish" | "workflow.migrate" | "warehouse.items.edit" | "users.two_factor" | "views.share" | "views.manage";
         /** @description 1 Tripoli, 2 Middle, 3 WM, 4 Zawia, 5 Benghazi, 6 GM, 7 Sebha. */
         RegionId: number;
         EmployeeId: string;
@@ -12056,6 +12259,129 @@ export interface components {
             /** @description Mandatory on reject. */
             note?: string;
             via?: components["schemas"]["WorkflowVia"];
+        };
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`. */
+        SavedViewScreenKey: string;
+        /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
+        SavedViewColumns: {
+            order?: string[];
+            hidden?: string[];
+            width?: {
+                [key: string]: number;
+            };
+            /** @enum {string} */
+            density?: "comfortable" | "compact";
+        };
+        SavedViewSort: {
+            id: string;
+            /** @enum {string} */
+            dir: "asc" | "desc";
+        };
+        /** @description Who else sees the view. Empty = private. Ids must be active roles, groups and users. */
+        SavedViewAudience: {
+            everyone?: boolean;
+            role_ids?: string[];
+            group_ids?: string[];
+            user_ids?: string[];
+        };
+        SavedViewInput: {
+            screen_key: components["schemas"]["SavedViewScreenKey"];
+            name: string;
+            /** @description The screen's filter values (at most 50 keys, 16 KB). */
+            filters?: {
+                [key: string]: unknown;
+            };
+            columns?: components["schemas"]["SavedViewColumns"];
+            sort?: components["schemas"]["SavedViewSort"][];
+            audience?: components["schemas"]["SavedViewAudience"];
+            reason?: string;
+        };
+        SavedViewPatch: {
+            name?: string;
+            filters?: {
+                [key: string]: unknown;
+            };
+            columns?: components["schemas"]["SavedViewColumns"];
+            sort?: components["schemas"]["SavedViewSort"][];
+            audience?: components["schemas"]["SavedViewAudience"];
+            /** @description Required (3 characters or more) when views.manage changes somebody else's view. */
+            reason?: string;
+        };
+        SavedViewReason: {
+            /** @description Required (3 characters or more) when views.manage acts on somebody else's view. */
+            reason?: string;
+        };
+        SavedViewAudienceOut: {
+            everyone: boolean;
+            roles: {
+                /** Format: uuid */
+                id: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            groups: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            users: components["schemas"]["UserRef"][];
+        };
+        SavedView: {
+            /** Format: uuid */
+            id: string;
+            screen_key: components["schemas"]["SavedViewScreenKey"];
+            name: string;
+            filters: {
+                [key: string]: unknown;
+            };
+            columns: components["schemas"]["SavedViewColumns"];
+            sort: components["schemas"]["SavedViewSort"][];
+            /** @description How many columns, filters or sort keys were removed because they are hidden for the caller. */
+            stripped_columns: number;
+            owner: components["schemas"]["UserRef"];
+            /** @description The owner is no longer active (views.manage may transfer the view). */
+            owner_left: boolean;
+            is_owner: boolean;
+            shared: boolean;
+            /** @description Only for the owner and views.manage. */
+            audience?: components["schemas"]["SavedViewAudienceOut"] | null;
+            can_edit: boolean;
+            can_share: boolean;
+            is_active: boolean;
+            version: number;
+            /** @description Imported from the browser's old local views. */
+            imported: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        SavedViewVersion: {
+            version: number;
+            /** @enum {string} */
+            change: "create" | "edit" | "deactivate" | "restore" | "transfer" | "import" | "owner_left";
+            snapshot: {
+                [key: string]: unknown;
+            };
+            reason?: string | null;
+            changed_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            changed_at: string;
+        };
+        /** @description A server-side draft of unsaved input (Q115): the caller's own, never a submission or an approval. */
+        Draft: {
+            key: string;
+            version: number;
+            /** Format: date-time */
+            saved_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            /** @description Only in GET /me/drafts/{draft_key}. */
+            payload?: {
+                [key: string]: unknown;
+            };
         };
         Follow: {
             /** Format: uuid */
@@ -25482,6 +25808,426 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSavedViews: {
+        parameters: {
+            query?: {
+                screen_key?: components["schemas"]["SavedViewScreenKey"];
+                scope?: "all" | "mine" | "shared" | "orphaned";
+                /** @description Also the caller's own deactivated views. */
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Own views first, then shared ones. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SavedView"][];
+                        /**
+                         * @description The caller's views.share scope: limited = roles, groups and users only; all = also everyone.
+                         * @enum {string}
+                         */
+                        can_share: "none" | "limited" | "all";
+                        /** @description The caller holds views.manage (edit, deactivate and transfer other people's shared views). */
+                        can_manage: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewInput"];
+            };
+        };
+        responses: {
+            /** @description The new view. */
+            201: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    importSavedViews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    screen_key: components["schemas"]["SavedViewScreenKey"];
+                    items: {
+                        local_id: string;
+                        name: string;
+                        filters?: {
+                            [key: string]: unknown;
+                        };
+                        columns?: components["schemas"]["SavedViewColumns"];
+                        sort?: components["schemas"]["SavedViewSort"][];
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description What was imported. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        imported: number;
+                        skipped: number;
+                        items: components["schemas"]["SavedView"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSavedView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The view, hidden columns stripped. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSavedView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavedViewPatch"];
+            };
+        };
+        responses: {
+            /** @description The changed view. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    deactivateSavedView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SavedViewReason"];
+            };
+        };
+        responses: {
+            /** @description The deactivated view. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    restoreSavedView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SavedViewReason"];
+            };
+        };
+        responses: {
+            /** @description The restored view. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    transferSavedView: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    owner_id: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The view with its new owner. */
+            200: {
+                headers: {
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SavedView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSavedViewVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                view_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SavedViewVersion"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMyDrafts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Drafts that are not expired. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["Draft"][];
+                        /** @description Setting drafts.retention_days (default 30). */
+                        retention_days: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getMyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `task.<task id>`, `record.<register key>.<record id or new>` or `form.<name>` (dots, so the key is one safe path segment). */
+                draft_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveMyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `task.<task id>`, `record.<register key>.<record id or new>` or `form.<name>` (dots, so the key is one safe path segment). */
+                draft_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    payload: {
+                        [key: string]: unknown;
+                    };
+                    base_version?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved (the content is not echoed). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Draft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    discardMyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `task.<task id>`, `record.<register key>.<record id or new>` or `form.<name>` (dots, so the key is one safe path segment). */
+                draft_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded (also when there was none). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

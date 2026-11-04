@@ -325,6 +325,9 @@ describe('hybrid mode list', () => {
       'GET /phone-change-requests', 'POST /phone-change-requests/:id/decide',
       // contract 0.12.10: P4a (Q225 site change proposals)
       'POST /sites/:id/change-proposals',
+      'GET /saved-views', 'POST /saved-views', 'POST /saved-views/import', 'GET /saved-views/:id', 'PATCH /saved-views/:id', 'POST /saved-views/:id/deactivate',
+      'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions', 'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
+      'DELETE /me/drafts/:key',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

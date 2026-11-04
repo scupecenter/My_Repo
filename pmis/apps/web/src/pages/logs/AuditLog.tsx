@@ -131,7 +131,7 @@ export function AuditLog() {
     <div data-testid="page-audit-log">
       <PageHeader title={t('nav.audit')} subtitle={t('logs.audit_subtitle')} />
       <Toolbar
-        filters={<SavedViews screen="audit-log" value={f} onApply={setF} empty={EMPTY_FILTER} />}
+        filters={<SavedViews screen="audit-log" value={f} onApply={setF} empty={EMPTY_FILTER} table={tbl} />}
         count={<span className="text-sm text-mute" data-testid="audit-count">{t('logs.shown', { count: q.items.length })}</span>}
         tools={<>
           <ColumnMenu api={tbl} label={(id) => t(`logs.c_${id}`)} />

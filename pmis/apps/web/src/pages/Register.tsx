@@ -1,5 +1,5 @@
 import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, type RecordFilters } from '@/api/registers';
@@ -21,6 +21,10 @@ import { isLive, OWNER_NOTE } from '@/lib/registerForms';
 
 const RF_KEYS = ['q', 'region_id', 'state', 'record_type'] as const;
 const STATES = ['entry', 'in_review', 'in_approval', 'approved', 'voided'];
+const VIEW_EMPTY: RecordFilters = { q: '', region_id: '', state: '', record_type: '' };
+// P10: the saved-views control (and its share dialog, people picker and role/group queries) loads on its own, after the records, so it never
+// delays the first paint of the list.
+const SavedViews = lazy(() => import('@/components/SavedViews').then((m) => ({ default: m.SavedViews<RecordFilters> })));
 
 export function RegisterSoon({ name }: { name: string }) {
   const { t } = useTranslation();
@@ -46,6 +50,8 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const templates = useTemplates();
   const [uploading, setUploading] = useState(false);
   const [legacy, setLegacy] = useState(false);   // 0063 (Q139): the one-time migration of the legacy HLC requests
+  // The saved-views control mounts once the first page has settled; the list keeps its previous data, so a filter change does not unmount it.
+  const viewsReady = !list.isPending;
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const total = list.data?.pages[0]?.page.total ?? items.length;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
@@ -88,6 +94,8 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {OWNER_NOTE[key] && <p className="mb-3 text-mute" data-testid="register-owner-note">{t(OWNER_NOTE[key])}</p>}
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
+        {viewsReady && <Suspense fallback={null}><SavedViews screen={`register-${key}`} value={f} empty={VIEW_EMPTY} table={tbl}
+          onApply={(v) => setParams(Object.fromEntries(RF_KEYS.map((k) => [k, String((v as Record<string, unknown>)[k] ?? '')])))} /></Suspense>}
         <input className="input max-w-64" data-testid="register-search" placeholder={t('registers.search')} aria-label={t('registers.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <select className="input w-auto" aria-label={t('sites.all_regions')} data-testid="register-filter-region" value={f.region_id} onChange={(e) => set('region_id')(e.target.value)}>
           <option value="">{t('sites.all_regions')}</option>{(regions.data ?? []).map((r) => <option key={r.id} value={r.id}>{(i18n.language === 'ar' && r.name_ar) || r.name_en}</option>)}

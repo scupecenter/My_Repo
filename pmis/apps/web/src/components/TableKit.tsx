@@ -18,6 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { useSession } from "@/api/hooks";
 import {
+  defaultHidden,
   dropCol,
   loadPrefs,
   moveCol,
@@ -62,6 +63,14 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
     setDensity: (d: Density) => set((p) => ({ ...p, density: d })),
     reset: () =>
       set(() => ({ order: [], hidden: [], width: {}, density: "comfortable" })),
+    /** Applies the columns of a saved view (P10): unknown or forbidden columns are dropped by reconcile. */
+    apply: (c: Partial<Prefs>) =>
+      set(() => ({
+        order: c.order ?? [],
+        hidden: c.hidden ?? defaultHidden(defs),
+        width: c.width ?? {},
+        density: c.density === "compact" ? "compact" : "comfortable",
+      })),
   };
 }
 export type TableApi = ReturnType<typeof useTablePrefs>;

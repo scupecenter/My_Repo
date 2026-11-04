@@ -45,6 +45,8 @@ export const MODULES: ModuleDef[] = [
   { key: 'messages', name_en: 'Messages', actions: ['view', 'create'] },
   { key: 'announcements', name_en: 'Announcements', actions: ['view', 'create'] },
   { key: 'audit', name_en: 'Audit Log', actions: ['view', 'view_audit', 'export'] },
+  // P10 (Q117): views.share = (views, create) shares saved views; views.manage = (views, administer) manages other people's shared views.
+  { key: 'views', name_en: 'Saved views', actions: ['create', 'administer'] },
   {
     key: 'admin',
     name_en: 'Administration',
@@ -124,6 +126,9 @@ export const RIGHT_GRANTS: Record<string, Grant[]> = {
   'workflow.publish': [['workflow_versions', 'administer']],
   'workflow.migrate': [['workflow_versions', 'administer']],
   'warehouse.items.edit': edit('warehouse_items'),
+  // P10 (Q117): share saved views with others (sv_share_scope), and manage everyone's shared views (sv_is_manager).
+  'views.share': [['views', 'create']],
+  'views.manage': [['views', 'administer']],
 };
 
 export const DELEGABLE_RIGHTS = Object.keys(RIGHT_GRANTS);
@@ -136,7 +141,8 @@ export const DELEGABLE_RIGHTS = Object.keys(RIGHT_GRANTS);
 export function rightsFromGrants(grants: { module_key: string; action: string }[]): string[] {
   const have = new Set(grants.map((g) => `${g.module_key}\u0000${g.action}`));
   return DELEGABLE_RIGHTS.filter((r) => {
-    const main = RIGHT_GRANTS[r]!.find(([, a]) => a === 'edit' || a === 'administer');
+    const g = RIGHT_GRANTS[r]!;
+    const main = g.find(([, a]) => a === 'edit' || a === 'administer') ?? (g.length === 1 ? g[0] : undefined); // views.share is one create grant
     return main !== undefined && have.has(`${main[0]}\u0000${main[1]}`);
   });
 }
