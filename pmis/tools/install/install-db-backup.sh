@@ -134,6 +134,9 @@ repo_block() {
   local n=$1 spec=$2 keep=$3
   ensure_key "repo$n-cipher-pass"
   if [[ $spec == /* ]]; then
+    # pgBackRest runs as postgres and cannot create a folder under a root-owned parent (/var/backups): create the repository
+    # folder here, owned by postgres and closed to others (parents stay root-owned).
+    install -d -m 750 -o postgres -g postgres "$spec"
     printf 'repo%s-type=posix\nrepo%s-path=%s\n' "$n" "$n" "$spec"
   elif [[ $spec =~ $SFTP_RE ]]; then
     printf 'repo%s-type=sftp\nrepo%s-sftp-host=%s\nrepo%s-sftp-host-user=%s\nrepo%s-path=%s\n' \
