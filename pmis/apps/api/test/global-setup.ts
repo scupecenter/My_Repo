@@ -24,6 +24,9 @@ export const BOOTSTRAP_ADMIN = {
   password: 'Bootstrap-Admin-Pass-2026',
 };
 
+/** 32 bytes as hex, test only. Loaded into pmis_context_keys of every test database; the API signs its contexts with the same key (testConfig in helpers.ts). */
+export const TEST_CONTEXT_KEY = '5a1ec0de5e55105c0de7e57a11c0de5e55105c0de7e57a11c0de5e55105c0de7';
+
 const API_ROOT = resolve(__dirname, '..');
 const REPO_PMIS = resolve(API_ROOT, '..', '..');
 
@@ -68,6 +71,7 @@ async function buildDatabase(adminUrl: string, dbName: string, appPassword: stri
   // documents, so the seeded library is switched off there (is_active false: no slot is built and nothing blocks Submit). The documents suites run on
   // their own database (TEST_DATABASE_URL_DOCS) with the library as the migration seeded it.
   if (!withLibrary) await db.query('UPDATE document_types SET is_active = false WHERE lib_managed');
+  await db.query('SELECT app_ctx_key_install($1)', [TEST_CONTEXT_KEY]);
   await db.query('SELECT idm_bootstrap_admin($1, $2, $3, $4, $5)', [BOOTSTRAP_ADMIN.email, BOOTSTRAP_ADMIN.name, BOOTSTRAP_ADMIN.employeeId, BOOTSTRAP_ADMIN.phone, hash]);
   await db.end();
 

@@ -15,7 +15,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { attachmentHeader } from '../documents/naming';
-import { parseDevice } from './context';
+import { applyContext, jobContext, parseDevice } from './context';
 import { WorkbookInput, activityWorkbook } from './activity-workbook';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -636,9 +636,9 @@ export class LogsService {
 
   private inContext<T>(userId: string, admin: boolean, sessionId: string, fn: () => Promise<T>): Promise<T> {
     return this.db.client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true)`;
-      await tx.$queryRaw`SELECT set_config('app.region_ids', CASE WHEN ${admin}::boolean THEN '*' ELSE app_resolve_region_ids(${userId}::uuid) END, true)`;
-      await tx.$queryRaw`SELECT set_config('app.session_id', ${sessionId}, true), set_config('app.via', 'job', true), set_config('app.job_name', 'log_export', true)`;
+      // The requester's rights are derived by the database (app_begin); `admin` is no longer sent.
+      void admin;
+      await applyContext(tx, { ...jobContext('log_export'), userId, sessionId });
       return this.db.runIn(tx, fn);
     }, { maxWait: 10_000, timeout: 600_000 });
   }

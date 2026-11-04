@@ -3,7 +3,7 @@ import { Client as PgClient } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { allLocked, open, q, taskId, taskRow } from './calc-helpers';
 import { makeTask } from './wf-helpers';
-import { startApp, superDb } from './helpers';
+import { beginAs, ensureRole, makeUser, startApp, superDb } from './helpers';
 import { GECOL, HLC, PERMIT_CW, PROC, G, Team, approveAll, createRec, otherSite, patch, post, recPath, regCell, team } from './reg-helpers';
 import { actor, groupWith, makeSite, plainAdmin, setCell } from './wf-helpers';
 import { partyWithContract } from './p4b-helpers';
@@ -887,13 +887,30 @@ describe('the database refuses every write that does not come from a reg_* funct
       // without a signed-in actor the writers refuse
       expect(await refused(`SELECT reg_save_record('procurement', NULL, NULL, '${t.site.id}', NULL, '{}', NULL, NULL, false)`)).not.toBe('allowed');
       // row level security: a session limited to region 6 sees nothing of region 7
-      await appDb.query('BEGIN');
-      await appDb.query(`SELECT set_config('app.region_ids', '6', true)`);
-      const seen = await appDb.query(`SELECT count(*)::int AS n FROM register_records WHERE site_id = '${t.site.id}'`);
-      const seenTyped = await appDb.query(`SELECT count(*)::int AS n FROM procurement_records WHERE site_id = '${t.site.id}'`);
-      await appDb.query('ROLLBACK');
-      expect(seen.rows[0].n).toBe(0);
-      expect(seenTyped.rows[0].n).toBe(0);
+      // (migration 0069: the regions come from the user's assignments, through a signed context; the settings are not read)
+      const inRegion = async (region: number): Promise<string> => {
+        const u = await makeUser(db, { status: 'active' });
+        const role = await ensureRole(db, 'RLS_REGION_ROLE');
+        await db.query('BEGIN');
+        const as = await db.query(`INSERT INTO user_role_assignments (user_id, role_id, permission_level, team, all_regions, all_modules, valid_from)
+          VALUES ($1, $2, 'view', 'none', false, true, now() - interval '1 hour') RETURNING id`, [u.id, role]);
+        await db.query('INSERT INTO user_role_assignment_regions (assignment_id, region_id) VALUES ($1, $2)', [as.rows[0].id, region]);
+        await db.query('COMMIT');
+        return u.id;
+      };
+      const countAs = async (userId: string): Promise<{ plain: number; typed: number }> => {
+        await appDb.query('BEGIN');
+        await beginAs(appDb, userId);
+        await appDb.query(`SELECT set_config('app.region_ids', '*', true)`); // a forged widening changes nothing
+        const plain = await appDb.query(`SELECT count(*)::int AS n FROM register_records WHERE site_id = '${t.site.id}'`);
+        const typed = await appDb.query(`SELECT count(*)::int AS n FROM procurement_records WHERE site_id = '${t.site.id}'`);
+        await appDb.query('ROLLBACK');
+        return { plain: plain.rows[0].n, typed: typed.rows[0].n };
+      };
+      const other = await countAs(await inRegion(6));
+      expect(other).toEqual({ plain: 0, typed: 0 });
+      const own = await countAs(await inRegion(R));
+      expect(own.plain).toBeGreaterThan(0);
     } finally {
       await appDb.end();
     }

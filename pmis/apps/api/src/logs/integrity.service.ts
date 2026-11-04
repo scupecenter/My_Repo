@@ -110,8 +110,8 @@ export class IntegrityService implements OnApplicationBootstrap, OnModuleDestroy
 
   private inAdmin<T>(userId: string, sessionId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
     return this.db.client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true), set_config('app.region_ids', '*', true)`;
-      await tx.$queryRaw`SELECT set_config('app.session_id', ${sessionId}, true), set_config('app.via', 'job', true), set_config('app.job_name', 'audit_integrity_check', true)`;
+      // The admin who asked: the database derives their rights (all regions for a System Admin) from its own data.
+      await applyContext(tx, { ...jobContext('audit_integrity_check'), userId, sessionId });
       return fn(tx);
     }, { maxWait: 10_000, timeout: 300_000 });
   }

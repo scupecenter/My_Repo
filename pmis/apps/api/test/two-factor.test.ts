@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RateLimiter } from '../src/auth/rate-limiter';
 import { TwoFactorService } from '../src/auth/two-factor.service';
 import { base32Decode, hotp, stepOf, totpCode } from '../src/auth/totp';
-import { Api, adminApi, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
+import { Api, adminApi, beginAs, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
 
 let app: NestExpressApplication;
 let db: Pg;
@@ -704,7 +704,7 @@ describe('the database guard and the grants', () => {
     const e = await enrolledUser(admin);
     await asApp(async (c) => {
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [e.user.id]);
+      await beginAs(c, e.user.id);
       await c.query('SELECT auth_local_result($1::uuid, true)', [e.user.id]); // a fresh password success
       await expect(mint(c, e.user.id)).rejects.toMatchObject({ code: '42501', message: expect.stringMatching(/with a code/) });
       await c.query('ROLLBACK');
@@ -713,7 +713,7 @@ describe('the database guard and the grants', () => {
     await db.query(`UPDATE auth_pending SET used_at = now() - interval '5 minutes' WHERE user_id = $1`, [e.user.id]);
     await asApp(async (c) => {
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [e.user.id]);
+      await beginAs(c, e.user.id);
       await c.query('SELECT auth_local_result($1::uuid, true)', [e.user.id]);
       tick();
       const ok = await c.query('SELECT auth_totp_result($1::uuid, true, $2::bigint) AS r', [e.user.id, stepOf(clock.t)]);
@@ -729,11 +729,11 @@ describe('the database guard and the grants', () => {
     const other = await makeUser(db, { assigned: true });
     await asApp(async (c) => {
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [u.id]);
+      await beginAs(c, u.id);
       await expect(mint(c, u.id)).rejects.toMatchObject({ code: '42501' }); // no recent password check
       await c.query('ROLLBACK');
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [u.id]);
+      await beginAs(c, u.id);
       await c.query('SELECT auth_local_result($1::uuid, true)', [u.id]);
       await expect(mint(c, other.id)).rejects.toMatchObject({ code: '42501' });
       await c.query('ROLLBACK');
@@ -756,7 +756,7 @@ describe('the database guard and the grants', () => {
       await expect(c.query(`INSERT INTO user_totp (user_id, required) VALUES ('${other.id}', true)`)).rejects.toMatchObject({ code: '42501' });
       // another user's secret through the function
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [other.id]);
+      await beginAs(c, other.id);
       await expect(c.query('SELECT * FROM auth_totp_secret($1::uuid)', [e.user.id])).rejects.toMatchObject({ code: '42501' });
       await c.query('ROLLBACK');
       // without an actor
@@ -768,7 +768,7 @@ describe('the database guard and the grants', () => {
       // the identity writes need an admin actor
       for (const sql of [`SELECT idm_set_two_factor($1::uuid, false, 'let me in')`, `SELECT idm_reset_two_factor($1::uuid, 'let me in')`]) {
         await c.query('BEGIN');
-        await c.query(`SELECT set_config('app.user_id', $1, true)`, [other.id]);
+        await beginAs(c, other.id);
         await expect(c.query(sql, [e.user.id])).rejects.toMatchObject({ code: '42501' });
         await c.query('ROLLBACK');
       }
@@ -795,7 +795,7 @@ describe('the database guard and the grants', () => {
     await delegate(db, d.id, [['users', 'edit']]);
     await asApp(async (c) => {
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [d.id]);
+      await beginAs(c, d.id);
       await expect(c.query(`SELECT idm_set_two_factor($1::uuid, true, 'policy')`, [target.id])).rejects.toMatchObject({ code: '42501' });
       await c.query('ROLLBACK');
     });
@@ -1260,18 +1260,18 @@ describe('the enrolment code: the database', () => {
       // enrolment functions act only for the signed-in user
       await expect(c.query(`SELECT auth_totp_begin_enrol($1::uuid, 'v1:aaaaaaaaaaaaaaaaaaaaaaaa', '${'b'.repeat(64)}', '${'c'.repeat(64)}')`, [u.id])).rejects.toMatchObject({ code: '42501' });
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [other.id]);
+      await beginAs(c, other.id);
       await expect(c.query(`SELECT auth_totp_begin_enrol($1::uuid, 'v1:aaaaaaaaaaaaaaaaaaaaaaaa', '${'b'.repeat(64)}', '${'c'.repeat(64)}')`, [u.id])).rejects.toMatchObject({ code: '42501' });
       await c.query('ROLLBACK');
       // the user's own call with a made-up hash is a miss: counted, no secret stored
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [u.id]);
+      await beginAs(c, u.id);
       const miss = await c.query(`SELECT auth_totp_begin_enrol($1::uuid, 'v1:aaaaaaaaaaaaaaaaaaaaaaaa', '${'b'.repeat(64)}', '${'c'.repeat(64)}') AS r`, [u.id]);
       expect(miss.rows[0].r).toBe('bad');
       await c.query('COMMIT');
       // a malformed hash is refused outright
       await c.query('BEGIN');
-      await c.query(`SELECT set_config('app.user_id', $1, true)`, [u.id]);
+      await beginAs(c, u.id);
       await expect(c.query(`SELECT auth_totp_begin_enrol($1::uuid, 'v1:aaaaaaaaaaaaaaaaaaaaaaaa', '${'b'.repeat(64)}', 'nothex')`, [u.id])).rejects.toMatchObject({ code: '22023' });
       await c.query('ROLLBACK');
     });
@@ -1292,7 +1292,7 @@ describe('the enrolment code: the database', () => {
         `SELECT * FROM idm_reset_two_factor($1::uuid, 'let me in', '${h}')`,
       ]) {
         await c.query('BEGIN');
-        await c.query(`SELECT set_config('app.user_id', $1, true)`, [nobody.id]);
+        await beginAs(c, nobody.id);
         await expect(c.query(sql, [target.id])).rejects.toMatchObject({ code: '42501' });
         await c.query('ROLLBACK');
         await expect(c.query(sql, [target.id])).rejects.toMatchObject({ code: '42501' }); // no actor at all

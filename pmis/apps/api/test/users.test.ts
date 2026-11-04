@@ -1,7 +1,7 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as Pg } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Api, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
+import { Api, beginAs, delegate, grantProfile, loggedIn, makeAdmin, makeUser, startApp, superDb, TestUser } from './helpers';
 
 let app: NestExpressApplication;
 let db: Pg;
@@ -446,7 +446,7 @@ describe('what pmis_app may do in the database', () => {
         VALUES ($1, $2, 'local', $3, now() + interval '1 hour')`, [hash, u.id, csrf])).rejects.toThrow(/permission denied/);
       await expect(c.query('UPDATE user_sessions SET user_id = $1', [u.id])).rejects.toThrow(/permission denied/);
       await c.query('BEGIN');
-      await c.query("SELECT set_config('app.user_id', $1, true)", [u.id]);
+      await beginAs(c, u.id);
       await expect(c.query(`SELECT auth_session_create($1, $2, 'local', $3, NULL, NULL)`, [u.id, hash, csrf])).rejects.toThrow(/no recent successful sign-in/);
       await c.query('ROLLBACK');
     } finally {

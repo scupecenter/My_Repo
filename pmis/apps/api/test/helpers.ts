@@ -7,7 +7,8 @@ import { Client as PgClient } from 'pg';
 import request from 'supertest';
 import { createApp } from '../src/app.factory';
 import type { AppConfig } from '../src/config/config';
-import { BOOTSTRAP_ADMIN } from './global-setup';
+import { BOOTSTRAP_ADMIN, TEST_CONTEXT_KEY } from './global-setup';
+import { beginContext, parseContextKey, type ContextInput } from '../src/db/session-context';
 import { parseMasterKeys } from '../src/documents/file-crypto';
 
 
@@ -30,6 +31,7 @@ export function testConfig(over: Partial<AppConfig> = {}): AppConfig {
     cookieSecure: false,
     logHmacKey: 'test-only-hmac-key-0123456789abcdef',
     totpEncKey: TEST_TOTP_ENC_KEY,
+    contextKey: TEST_CONTEXT_KEY,
     jobsEnabled: false,
     storage: { driver: 'local', localDir: TEST_STORAGE_DIR },
     fileEnc: parseMasterKeys({ FILE_ENC_KEY: TEST_FILE_ENC_KEY, FILE_ENC_KEY_ID: 'k1' }),
@@ -329,3 +331,22 @@ export async function loggedIn(app: NestExpressApplication, u: TestUser, by: 'em
 }
 
 export const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Starts the verified session context (app_begin, migration 0069) on a raw pmis_app connection that is inside a transaction (BEGIN ... COMMIT). The tests that
+ * used to set_config('app.user_id', ...) and set_config('app.region_ids', ...) use this: the user is signed with the test key and the database derives the
+ * regions and the admin status from its data.
+ */
+export async function beginAs(c: Pick<PgClient, 'query'>, userId: string | null, over: ContextInput = {}): Promise<{ user_id: string | null; admin: boolean; regions: string }> {
+  const key = parseContextKey(TEST_CONTEXT_KEY);
+  const tx = {
+    $queryRaw: async (strings: TemplateStringsArray, ...vals: unknown[]): Promise<unknown[]> => {
+      let text = strings[0] as string;
+      vals.forEach((_, i) => {
+        text += `$${i + 1}${strings[i + 1] as string}`;
+      });
+      return (await c.query(text, vals)).rows;
+    },
+  };
+  return beginContext(tx as never, { userId, via: 'manual', ...over }, key);
+}

@@ -181,7 +181,7 @@ describe('storage drivers', () => {
 });
 
 describe('storage configuration', () => {
-  const env = { NODE_ENV: 'test', DATABASE_URL: 'postgresql://x', LOG_HMAC_KEY: '0123456789abcdef0123', TOTP_ENC_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff', FILE_ENC_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff' };
+  const env = { NODE_ENV: 'test', DATABASE_URL: 'postgresql://x', LOG_HMAC_KEY: '0123456789abcdef0123', TOTP_ENC_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff', FILE_ENC_KEY: '00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff', PMIS_CONTEXT_KEY: 'd'.repeat(64) };
   it('uses local disk unless S3 is fully configured', () => {
     expect(loadConfig(env).storage).toMatchObject({ driver: 'local', localDir: './storage' });
     expect(loadConfig({ ...env, STORAGE_DIR: '/var/lib/pmis/files' }).storage).toMatchObject({ driver: 'local', localDir: '/var/lib/pmis/files' });

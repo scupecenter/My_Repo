@@ -112,7 +112,7 @@ SELECT * FROM reg_hlc_pr('{{SITE_BEN}}');
 -- @expect error P0001 not_eligible_holder
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'HLC_TEAM'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case HLC-12');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('procurement', NULL, NULL, '{{SITE_TRI}}', NULL, '{"scope": "CW", "order_status": "Open"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -124,7 +124,7 @@ SELECT reg_save_record('procurement', NULL, NULL, '{{SITE_TRI}}', NULL, '{"scope
 -- @expect error P0001 not_eligible_holder
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'HLC_TEAM'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case HLC-13');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT set_config('secsuite.rec', reg_save_record('procurement', NULL, NULL, '{{SITE_TRI}}', NULL, '{"scope": "HLC", "order_status": "Open"}'::jsonb, NULL, NULL, false)::text, true);
 SELECT reg_save_record('procurement', current_setting('secsuite.rec')::uuid, 1, NULL, NULL, '{"scope": "CW"}'::jsonb, NULL, NULL, false);
 -- @end
@@ -137,7 +137,7 @@ SELECT reg_save_record('procurement', current_setting('secsuite.rec')::uuid, 1, 
 -- @expect output true
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'HLC_TEAM'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case HLC-14');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT (reg_save_record('procurement', NULL, NULL, '{{SITE_TRI}}', NULL, '{"scope": "HLC", "order_status": "Open"}'::jsonb, NULL, NULL, false) IS NOT NULL)::text;
 -- @end
 
@@ -160,7 +160,6 @@ SELECT reg_save_record('procurement', NULL, NULL, '{{SITE_TRI}}', NULL, '{"scope
 -- @expect output []
 SELECT set_config('secsuite.rec', reg_save_record('procurement', NULL, NULL, '{{SITE_BEN}}', NULL,
   '{"scope": "HLC", "order_status": "Open", "pr_no": "B-1", "pr_date": "2026-01-10", "hlc_approval_date": "2026-01-05"}'::jsonb, NULL, NULL, false)::text, true);
-SET app.user_id = '{{ALICE}}';
-SET app.region_ids = '1';
+\ctx ALICE
 SELECT reg_warnings(current_setting('secsuite.rec')::uuid)::text;
 -- @end

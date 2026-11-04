@@ -197,8 +197,7 @@ SELECT is_admin_override FROM audit_log WHERE id = :nid;
 -- @expect output t
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE fa25 AS SELECT idm_request_phone_change('+218910000071') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_phone_change((SELECT id FROM fa25), true, 'Confirmed in person');
 SELECT is_admin_override FROM audit_log WHERE action = 'phone_changed' AND entity_id = '{{BOB}}' ORDER BY id DESC LIMIT 1;
 -- @end
@@ -211,8 +210,7 @@ SELECT is_admin_override FROM audit_log WHERE action = 'phone_changed' AND entit
 -- @expect output t
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE fa26 AS SELECT idm_request_email_change('bob.override@example.test') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM fa26), false, 'Not this address');
 SELECT is_admin_override FROM audit_log WHERE action = 'email_change_rejected' AND entity_id = '{{BOB}}' ORDER BY id DESC LIMIT 1;
 -- @end
@@ -252,10 +250,9 @@ SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", re
 CREATE TEMP TABLE fa30 AS SELECT idm_request_email_change('bob.sessions@example.test') AS id;
 SELECT idm_email_change_set_verification((SELECT id FROM fa30), repeat('d', 64));
 SELECT idm_email_change_verify(repeat('d', 64));
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM fa30), true, 'Verified address', NULL);
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT count(*) FROM user_sessions WHERE user_id = '{{BOB}}' AND revoked_at IS NULL;
 -- @end
 
@@ -269,10 +266,9 @@ SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE fa31 AS SELECT idm_request_email_change('bob.notice@example.test') AS id;
 SELECT idm_email_change_set_verification((SELECT id FROM fa31), repeat('e', 64));
 SELECT idm_email_change_verify(repeat('e', 64));
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM fa31), true, 'Verified address', NULL);
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT count(*) FROM notifications WHERE user_id = '{{BOB}}' AND kind = 'security_notice';
 -- @end
 
@@ -285,8 +281,7 @@ SELECT count(*) FROM notifications WHERE user_id = '{{BOB}}' AND kind = 'securit
 SELECT auth_local_result('{{BOB}}', true);
 SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", repeat('c', 43), NULL, 'fa test');
 CREATE TEMP TABLE fa32 AS SELECT idm_request_email_change('bob.rejected@example.test') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM fa32), false, 'Not this address');
 SELECT count(*) FROM user_sessions WHERE user_id = '{{BOB}}' AND revoked_at IS NULL;
 -- @end
@@ -300,8 +295,7 @@ SELECT count(*) FROM user_sessions WHERE user_id = '{{BOB}}' AND revoked_at IS N
 SELECT auth_local_result('{{BOB}}', true);
 SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", repeat('c', 43), NULL, 'fa test');
 CREATE TEMP TABLE fa33 AS SELECT idm_request_phone_change('+218910000072') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_phone_change((SELECT id FROM fa33), true, 'Confirmed in person');
 SELECT count(*) FROM user_sessions WHERE user_id = '{{BOB}}' AND revoked_at IS NULL;
 -- @end
@@ -314,7 +308,7 @@ SELECT count(*) FROM user_sessions WHERE user_id = '{{BOB}}' AND revoked_at IS N
 -- @expect error 42501 System Admin or a delegation covering users.edit required
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE fa34 AS SELECT idm_request_email_change('bob.alice@example.test') AS id;
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT idm_decide_email_change((SELECT id FROM fa34), true, 'Looks fine', 'I know Bob');
 -- @end
 

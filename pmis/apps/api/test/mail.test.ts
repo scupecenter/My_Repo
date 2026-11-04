@@ -6,6 +6,7 @@ import { loadConfig, type MailConfig } from '../src/config/config';
 import { MailService } from '../src/mail/mail.service';
 import { SmtpError, buildMessage, encodeHeader, smtpSend } from '../src/mail/smtp';
 import { FakeSmtp } from './fake-smtp';
+import { TEST_CONTEXT_KEY } from './global-setup';
 import { API, TEST_FILE_ENC_KEY, TEST_TOTP_ENC_KEY, adminApi, loggedIn, makeUser, startApp } from './helpers';
 
 /**
@@ -52,7 +53,7 @@ async function deliveredTo(address: string) {
 }
 
 const BASE_ENV = {
-  NODE_ENV: 'test', DATABASE_URL: 'postgresql://x@127.0.0.1/x', LOG_HMAC_KEY: 'test-only-hmac-key-0123456789abcdef', TOTP_ENC_KEY: TEST_TOTP_ENC_KEY, FILE_ENC_KEY: TEST_FILE_ENC_KEY,
+  NODE_ENV: 'test', DATABASE_URL: 'postgresql://x@127.0.0.1/x', LOG_HMAC_KEY: 'test-only-hmac-key-0123456789abcdef', TOTP_ENC_KEY: TEST_TOTP_ENC_KEY, FILE_ENC_KEY: TEST_FILE_ENC_KEY, PMIS_CONTEXT_KEY: TEST_CONTEXT_KEY,
 };
 
 describe('SMTP settings from the environment', () => {

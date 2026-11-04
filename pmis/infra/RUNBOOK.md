@@ -5,7 +5,7 @@ PMIS server as root unless it says otherwise. Secrets are read from `/etc/gsdn-p
 them into a ticket or a chat.
 
 Sections: 1 what is protected and how, 2 enable ClamAV, 3 backup target, 4 re-encrypt existing files, 5 key rotation, 6 restore drill,
-7 scheduled jobs and logs, 8 open items.
+7 scheduled jobs and logs, 8 database backup, 9 session context key rotation.
 
 ## 1. What is protected, and how
 
@@ -306,3 +306,29 @@ manual, not scheduled.
 - The objects are not written to a second building by the API; only the restic copy is. Q197 asks whether the MinIO bucket replication
   (ADR 0008 item 9) is set up by the network team.
 - Object lock (governance mode) on the MinIO buckets is set on the server, not by the installer (Q133).
+
+## 9. Session context key rotation (migration 0069, P1-DB-03)
+
+The API signs the context of every database transaction with `PMIS_CONTEXT_KEY` (in `/etc/gsdn-pmis/pmis.env`); the database holds the same key in
+`pmis_context_keys` and verifies each signature. Several keys can exist at the same time: the API signs with one, the database verifies with every key
+that has not expired. That lets you rotate without downtime. Rotate once a year, after anybody who could read `pmis.env` leaves, and at once if the file
+may have leaked. **Never print the key, paste it into a ticket or put it in a log.** All commands read it from a variable.
+
+1. Make the new key and load it (`pmis` is the default database name; use the one you gave the installer). The old key keeps verifying for one hour, enough to restart the API:
+
+       NEW=$(openssl rand -hex 32)
+       printf "SELECT app_ctx_key_install('%s', interval '1 hour');\n" "$NEW" | sudo -u postgres psql -d pmis -qAt >/dev/null
+
+2. Put the new key in `pmis.env` and restart the API (the sed replaces the line without showing it):
+
+       sudo sed -i "s/^PMIS_CONTEXT_KEY=.*/PMIS_CONTEXT_KEY=$NEW/" /etc/gsdn-pmis/pmis.env
+       sudo systemctl restart gsdn-pmis-api
+       unset NEW
+
+3. Check: sign in and open any list. A request fails with 500 and the System Log says "session context refused" if the two keys differ.
+4. After a week, delete the expired key: `SELECT app_ctx_key_purge(interval '7 days');`.
+5. If the key leaked: install a new one with `interval '0 seconds'` (the old one stops verifying at once; every request fails until the API restarts with the new
+   one), then review the Audit Log and the security log for the period (the chains in Logs → Integrity).
+
+A restore of the database from a backup made before the key existed has an empty `pmis_context_keys`: run `install-ubuntu.sh` again (it loads the key from
+`pmis.env`), or `app_ctx_key_install` by hand as in step 1 with the key from `pmis.env`.

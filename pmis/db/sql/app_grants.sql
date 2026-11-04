@@ -58,3 +58,6 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON hlc_pr_links, hlc_legacy_migrations F
 -- 0065 (P10): saved views and drafts only through sv_save, sv_set_active, sv_transfer, sv_import, dr_save and dr_discard (audited); pmis_app reads
 -- its own rows only (row security), the shared views of others only through sv_list / sv_get, with hidden columns stripped
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON saved_views, saved_view_targets, saved_view_versions, user_drafts FROM pmis_app;
+
+-- 0069 (P1-DB-03): the session context keys are readable by pmis_definer only; pmis_app only calls app_begin (the signed session context)
+REVOKE ALL ON pmis_context_keys FROM pmis_app;

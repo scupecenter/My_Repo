@@ -10,8 +10,8 @@ import type { Request } from 'express';
 type Outcome = { ok: true; value: unknown } | { ok: false; error: ProblemException };
 
 /**
- * One transaction per authenticated request. The first statements are set_config('app.user_id') and
- * set_config('app.region_ids') (transaction-local), so the database functions and row-level security know who acts.
+ * One transaction per authenticated request. The first statement is app_begin (migration 0069): a signed context naming the user, from which the database
+ * derives the regions, admin status and delegation itself, so the database functions and row-level security know who acts.
  * A ProblemException with commit=true (a wrong password that must count toward the lockout) commits first, then is thrown.
  */
 @Injectable()
@@ -27,14 +27,11 @@ export class TxInterceptor implements NestInterceptor {
 
   private async run(req: Request, auth: AuthContext, next: CallHandler): Promise<unknown> {
     // Migration 0045: the request context (ip, user agent, request id, session, sign-in method, MFA, step-up, device, via) reaches every audit row.
-    const ctx = contextFromRequest(req, auth, (await this.stepUp.validUntil(auth)) !== null);
+    const until = await this.stepUp.validUntil(auth);
+    const ctx = { ...contextFromRequest(req, auth, until !== null), userId: auth.user.id, stepupUntil: until };
     const outcome: Outcome = await this.db.client.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT set_config('app.user_id', ${auth.user.id}, true)`;
         await applyContext(tx, ctx);
-        // System Admins see every region. Others get the union of their active assignments (empty = nothing, ADR 0003).
-        await tx.$queryRaw`SELECT set_config('app.region_ids',
-          CASE WHEN ${auth.state.isAdmin}::boolean THEN '*' ELSE app_resolve_region_ids(${auth.user.id}::uuid) END, true)`;
         return this.db.runIn(tx, async (): Promise<Outcome> => {
           try {
             return { ok: true, value: await lastValueFrom(next.handle(), { defaultValue: undefined }) };
@@ -42,7 +39,7 @@ export class TxInterceptor implements NestInterceptor {
             if (e instanceof ProblemException && e.commit) return { ok: false, error: e };
             throw e;
           }
-        });
+        }, ctx);
       },
       { maxWait: 10_000, timeout: 30_000 },
     );

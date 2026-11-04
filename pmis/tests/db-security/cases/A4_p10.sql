@@ -45,13 +45,9 @@ DELETE FROM saved_view_versions;
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 wf:not_found
-DO $$
-DECLARE v uuid;
-BEGIN
-  v := (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Admin private", "filters": {"q": "secret"}}'::jsonb, NULL) ->> 'id')::uuid;
-  PERFORM set_config('app.user_id', '{{ALICE}}', true);
-  PERFORM sv_get(v);
-END $$;
+SELECT (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Admin private", "filters": {"q": "secret"}}'::jsonb, NULL) ->> 'id') AS v \gset
+\ctx ALICE
+SELECT sv_get(:'v'::uuid);
 -- @end
 
 -- @case SV-06
@@ -61,7 +57,7 @@ END $$;
 -- @region *
 -- @expect output 0
 SELECT sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Admin only"}'::jsonb, NULL) IS NOT NULL;
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT count(*) FROM saved_views;
 -- @end
 
@@ -72,7 +68,7 @@ SELECT count(*) FROM saved_views;
 -- @region *
 -- @expect output 0
 SELECT sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Admin listed"}'::jsonb, NULL) IS NOT NULL;
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT count(*) FROM jsonb_array_elements(sv_list('sites', 'all', true));
 -- @end
 
@@ -91,13 +87,9 @@ SELECT sv_save(NULL, NULL, '{"screen_key": "sites", "name": "To all", "audience"
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 wf:(not_found|action_forbidden)
-DO $$
-DECLARE v uuid;
-BEGIN
-  v := (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Shared by admin", "audience": {"everyone": true}}'::jsonb, NULL) ->> 'id')::uuid;
-  PERFORM set_config('app.user_id', '{{ALICE}}', true);
-  PERFORM sv_set_active(v, NULL, false, 'not mine');
-END $$;
+SELECT (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Shared by admin", "audience": {"everyone": true}}'::jsonb, NULL) ->> 'id') AS v \gset
+\ctx ALICE
+SELECT sv_set_active(:'v'::uuid, NULL, false, 'not mine');
 -- @end
 
 -- @case SV-10
@@ -106,13 +98,9 @@ END $$;
 -- @actor ADMIN
 -- @region *
 -- @expect error P0001 wf:(not_found|action_forbidden)
-DO $$
-DECLARE v uuid;
-BEGIN
-  v := (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Take me", "audience": {"everyone": true}}'::jsonb, NULL) ->> 'id')::uuid;
-  PERFORM set_config('app.user_id', '{{ALICE}}', true);
-  PERFORM sv_transfer(v, NULL, '{{ALICE}}', 'mine now');
-END $$;
+SELECT (sv_save(NULL, NULL, '{"screen_key": "sites", "name": "Take me", "audience": {"everyone": true}}'::jsonb, NULL) ->> 'id') AS v \gset
+\ctx ALICE
+SELECT sv_transfer(:'v'::uuid, NULL, '{{ALICE}}', 'mine now');
 -- @end
 
 -- @case SV-11
@@ -140,7 +128,7 @@ INSERT INTO permission_grants (profile_id, module_key, action) SELECT id, 'views
 -- @region *
 -- @expect output none
 SELECT dr_save('form.secret', '{"note": "admin draft"}'::jsonb, NULL) IS NOT NULL;
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT coalesce(dr_get('form.secret')::text, 'none');
 -- @end
 
@@ -160,8 +148,8 @@ INSERT INTO user_drafts (user_id, draft_key, payload) VALUES ('{{BOB}}', 'form.x
 -- @region *
 -- @expect output 1
 SELECT dr_save('form.keep', '{"a": 1}'::jsonb, NULL) IS NOT NULL;
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT dr_discard('form.keep');
-SET app.user_id = '{{ADMIN}}';
+\ctx ADMIN
 SELECT count(*) FROM jsonb_array_elements(dr_list()) d WHERE d ->> 'key' = 'form.keep';
 -- @end

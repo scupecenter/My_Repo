@@ -6,6 +6,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
 import { boolParam, oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
+import { applyContext } from '../logs/context';
 import { z } from 'zod';
 import { parse } from '../common/zod';
 
@@ -196,22 +197,20 @@ export class DashboardService {
   }
 
   /**
-   * Runs a calculation that only reads in a transaction of its own that carries exactly the request's user and regions (app.user_id and app.region_ids are
-   * copied from the request transaction, never resolved again), so it sees what the request sees and can run beside it.
+   * Runs a calculation that only reads in a transaction of its own that begins the same verified context as the request (app_begin, migration 0069: the same
+   * user, so the database derives the same regions), so it sees what the request sees and can run beside it.
    */
   private async sideRead<T>(fn: () => Promise<T>): Promise<T> {
-    const c = await this.db.tx.$queryRaw<{ u: string | null; r: string | null }[]>`SELECT current_setting('app.user_id', true) AS u, current_setting('app.region_ids', true) AS r`;
-    const u = c[0]?.u ?? '';
-    const r = c[0]?.r ?? '';
-    if (!u) throw new Error('dashboard: no request context for a side read');
+    const rc = this.db.requestContext;
+    if (!rc?.userId) throw new Error('dashboard: no request context for a side read');
     // Always rolled back: the calculation uses temporary tables (so it cannot be a READ ONLY transaction), and nothing it does may be kept.
     const rollback = new Error('dashboard side read: rolled back');
     let out: { v: T } | undefined;
     try {
       await this.db.client.$transaction(
         async (tx) => {
-          await tx.$queryRaw`SELECT set_config('app.user_id', ${u}, true), set_config('app.region_ids', ${r}, true)`;
-          out = { v: await this.db.runIn(tx, fn) };
+          await applyContext(tx, rc);
+          out = { v: await this.db.runIn(tx, fn, rc) };
           throw rollback;
         },
         { maxWait: 10_000, timeout: 30_000 },
