@@ -42,18 +42,22 @@ repo1-type=posix
 repo1-retention-full=14
 repo1-retention-full-type=count
 repo1-cipher-type=aes-256-cbc
-repo1-cipher-pass=test-only-$(openssl rand -hex 16)
 log-path=$WORK/log
 [gsdn-pmis]
 pg1-path=/var/lib/postgresql/16/$CLUSTER
 pg1-port=$TEST_PORT
 EOF
+# as on the server: the cipher key lives in conf.d/secret.conf, read only through --config-include-path (command-line only)
+mkdir -p "$WORK/conf.d"
+printf '[global]\nrepo1-cipher-pass=test-only-%s\n' "$(openssl rand -hex 16)" >"$WORK/conf.d/secret.conf"
+chown -R root:postgres "$WORK/conf.d"; chmod 750 "$WORK/conf.d"; chmod 640 "$WORK/conf.d/secret.conf"
 mkdir -p "$WORK/repo1" "$WORK/log" "$WORK/state"
 chown -R postgres:postgres "$WORK/repo1" "$WORK/log" "$WORK/state"
 chown root:postgres "$CFG"
 chmod 640 "$CFG"
 cat >"$ENVF" <<EOF
 PGBACKREST_CONFIG=$CFG
+PGBACKREST_INCLUDE=$WORK/conf.d
 DB_BACKUP_STANZA=gsdn-pmis
 DB_BACKUP_REPOS="1"
 PMIS_DB_PORT=$TEST_PORT
@@ -76,11 +80,11 @@ as_pg psql -X -q -v ON_ERROR_STOP=1 -p "$TEST_PORT" -d postgres <<SQL
 ALTER SYSTEM SET wal_level = 'replica';
 ALTER SYSTEM SET archive_mode = 'on';
 ALTER SYSTEM SET archive_timeout = '60s';
-ALTER SYSTEM SET archive_command = 'pgbackrest --config=$CFG --stanza=gsdn-pmis archive-push %p';
+ALTER SYSTEM SET archive_command = 'pgbackrest --config=$CFG --config-include-path=$WORK/conf.d --stanza=gsdn-pmis archive-push %p';
 CREATE DATABASE pmis;
 SQL
 pg_ctlcluster 16 "$CLUSTER" restart
-as_pg pgbackrest --config="$CFG" --stanza=gsdn-pmis --log-level-console=warn stanza-create
+as_pg pgbackrest --config="$CFG" --config-include-path="$WORK/conf.d" --stanza=gsdn-pmis --log-level-console=warn stanza-create
 ok "stanza created"
 
 # Stub of the job_runs and System Log functions (the real ones are in db/migrations 0045); same names and signatures.

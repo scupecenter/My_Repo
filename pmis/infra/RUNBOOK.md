@@ -198,8 +198,8 @@ Non-interactive: `sudo env DB_BACKUP_REPO1=/mnt/backup-b/pgbackrest DB_BACKUP_RE
 Checks after the install:
 
 ```bash
-sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=gsdn-pmis info
-sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=gsdn-pmis check
+sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --config-include-path=/etc/pgbackrest/conf.d --stanza=gsdn-pmis info
+sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --config-include-path=/etc/pgbackrest/conf.d --stanza=gsdn-pmis check
 sudo systemctl start gsdn-pmis-db-basebackup.service      # the first full backup now
 sudo journalctl -u gsdn-pmis-db-basebackup -n 30 --no-pager
 ```
@@ -212,7 +212,7 @@ the secret key and stores them only in `conf.d/secret.conf`.
 
 - Logs > Job runs (`db_basebackup`, `db_dump`); Logs > System log, source `backup`, for alerts.
 - A manual full or differential backup: `sudo -u postgres /usr/local/lib/gsdn-pmis/db-backup.sh full` (or `diff`).
-- Backups and WAL ranges: `sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --stanza=gsdn-pmis info`.
+- Backups and WAL ranges: `sudo -u postgres pgbackrest --config=/etc/pgbackrest/pgbackrest.conf --config-include-path=/etc/pgbackrest/conf.d --stanza=gsdn-pmis info`.
 
 ### 8.4 Key custody (Q198)
 
