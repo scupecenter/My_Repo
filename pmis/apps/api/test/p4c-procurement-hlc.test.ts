@@ -5,6 +5,7 @@ import { allLocked, open, q, taskId, taskRow } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { G, GECOL, HLC_PR, PROC, Team, createRec, otherSite, patch, post, recPath, regCell, team } from './reg-helpers';
 import { Actor, actor, plainAdmin, setCell } from './wf-helpers';
+import { partyWithContract } from './p4b-helpers';
 
 /**
  * Migration 0063 (work package P4c of the owner answers 2026-11-04): Q150 several HLC purchase requests and C3, Q148 execution needs the approved request(s),
@@ -33,7 +34,8 @@ const R = 7;
 /** An HLC execution record with no date (a survey / status only), so no ordering warning of 0042 shows. */
 const HLC = { fiber_status: 'Exchange' };
 const codesOf = (body: { errors?: { code: string }[] }): string[] => (body.errors ?? []).map((e) => e.code).sort();
-const warnOf = (body: { warnings?: { code: string }[] }): string[] => (body.warnings ?? []).map((e) => e.code).sort();
+// list_other (P5, 0057) flags free-text list values such as the order status; it is not a P4c warning
+const warnOf = (body: { warnings?: { code: string }[] }): string[] => (body.warnings ?? []).map((e) => e.code).filter((c) => c !== 'list_other').sort();
 
 interface HlcTeam { proc: Team; hlc: Team; fiber: Team }
 
@@ -290,8 +292,9 @@ describe('Q114: the Dismantle contractor (FO / FT) comes from the Procurement or
   async function dismantleTeam() {
     const proc = await team(app, db, 'procurement', 'procurement', R);
     const dis = await team(app, db, 'dismantle', 'dismantle', R);
-    const p1 = await q<{ id: string }>(db, `INSERT INTO external_parties (name, type) VALUES ($1, 'cw_contractor') RETURNING id::text`, [`Dismantle Co ${Date.now()}`]);
-    const p2 = await q<{ id: string }>(db, `INSERT INTO external_parties (name, type) VALUES ($1, 'cw_contractor') RETURNING id::text`, [`Other Co ${Date.now()}`]);
+    // an outsourced order with a PO / WO names a party with an active contract for its scope (P4b, 0061: Q146, Q147)
+    const p1 = [{ id: await partyWithContract(db, { name: `Dismantle Co ${Date.now()}` }) }];
+    const p2 = [{ id: await partyWithContract(db, { name: `Other Co ${Date.now()}` }) }];
     const order = async (scope: string, party: string, no: string) => {
       const r = await createRec({ ...proc, site: dis.site }, { scope, delivery: 'Outsourced', pr_no: `PR-${no}`, pr_date: '2026-01-05', po_wo_no: `PO-${no}`, po_wo_date: '2026-01-06', order_status: 'Open' }, { external_party_id: party });
       return pass('procurement', proc.entry, proc.approve, r.id, r.version);

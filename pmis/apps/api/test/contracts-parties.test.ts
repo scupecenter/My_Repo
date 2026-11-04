@@ -210,8 +210,12 @@ describe('Q142 and Q110: teams, companies and contracts in the Contractors regis
     expect(et[0]).toMatchObject({ party_id: party, specialization: 'Tower RT, Fiber, Survey', safety_cert_expiry: '2027-03-01', lead_user_id: lead.user.id });
     expect(codes(await q(db, 'SELECT code FROM external_team_specializations WHERE team_id = $1 ORDER BY code', [done.body.entity_id]))).toEqual(['FIBER', 'SURVEY', 'TOWER_RT']);
     // the old group text CW is not a specialization (the field offers the catalogue labels only)
+    // (since 0057 CW is an inactive value of the TeamSpecialization list: a draft keeps it, the submit refuses it with this reason)
     const grp = await create({ record_type: 'team', external_party_id: party, data: { team_name: 'Group', specialization: 'CW' } });
-    expect(grp.status).toBe(422);
+    expect(grp.status).toBe(201);
+    const grpSub = await post(t.entry.api, 'contractors', grp.body.id, 'submit', grp.body.version);
+    expect(grpSub.status).toBe(422);
+    expect(grpSub.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/data/specialization', code: 'unknown_specialization' })]));
   });
 
   it('Q110: an explicit type mapping; an unknown type becomes other with a review alert to the System Admins', async () => {

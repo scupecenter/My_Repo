@@ -209,7 +209,7 @@ export function initRegisters() {
     // contract 0.12.5 (Q111): a meeting entered with the old free text, to convert after a review (recId(15))
     rec('meetings', null, 0, 'entry', { meeting_date: '2026-10-01', title: 'Weekly progress', attendees: 'Ahmed Salem, Mona Fathi', linked_sites: 'TR101',
       minutes_ref: 'MoM-07 on the share', action_items: '- Send the LLD\n- Book the crane' }, { site_index: null }),
-    // migration 0063 (Q114): the approved TE Dismantle order of site 1, which the TE Dismantle part takes its contractor (FT) from
+    // migration 0063 (Q114): (recId(16), after the P5 meeting) the approved TE Dismantle order of site 1, which the TE Dismantle part takes its contractor (FT) from
     rec('procurement', 'wo', 1, 'approved', { scope: 'TE Dismantle', delivery: 'Outsourced', pr_no: 'PR-2026-061', pr_date: '2026-09-25', po_wo_no: 'WO-2026-061', po_wo_date: '2026-09-28', order_status: 'Open' },
       { external_party: { id: 'e0000000-0000-4000-8000-000000000061', name: 'Desert Lift Services (synthetic)', type: 'cw_contractor' } }),
   ];

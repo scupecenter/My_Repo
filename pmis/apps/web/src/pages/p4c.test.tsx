@@ -94,12 +94,12 @@ describe('Q114: the Dismantle contractor comes from the Procurement order', () =
     await u.selectOptions(await screen.findByTestId('reg-field-execution_mode', {}, { timeout: 15000 }), 'Outsourced');
     const sel = await screen.findByTestId('reg-field-procurement_order_id');
     await waitFor(() => expect(within(sel).getByText(/WO-2026-061 · Desert Lift Services/)).toBeInTheDocument());
-    await u.selectOptions(sel, recId(15));
+    await u.selectOptions(sel, recId(16));
     expect(screen.getByTestId('reg-dismantle-contractor')).toHaveTextContent('Desert Lift Services');
     await u.click(screen.getByTestId('reg-save'));
     await waitFor(async () => {
       const r = await api.get<RegisterRecord>(`/registers/dismantle/records/${recId(13)}`);
-      expect(r.data).toMatchObject({ execution_mode: 'Outsourced', procurement_order_id: recId(15) });
+      expect(r.data).toMatchObject({ execution_mode: 'Outsourced', procurement_order_id: recId(16) });
       expect(r.external_party?.name).toBe('Desert Lift Services (synthetic)');
     });
     // the CW part of the site has no CW Dismantle order

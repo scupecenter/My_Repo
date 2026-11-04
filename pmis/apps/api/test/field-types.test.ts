@@ -145,7 +145,8 @@ describe('Q104: the list catalogue', () => {
     expect(res.status).toBe(201);
     const sub = await post(t.entry.api, 'contractors', res.body.id, 'submit', res.body.version);
     expect(sub.status).toBe(422);
-    expect(sub.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/data/specialization', code: 'inactive_value' })]));
+    // since 0061 (P4b) the specialization catalogue gives the specific reason: CW is a functional group, not a value
+    expect(sub.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/data/specialization', code: 'unknown_specialization' })]));
   });
 
   it('blocks the final approval while a critical list of the register has no active value', async () => {
