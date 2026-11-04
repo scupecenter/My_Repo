@@ -1,10 +1,10 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { AlertTriangle, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Ban, Check, FilePlus2, HandMetal, Save, Undo2, UserMinus, X, Clock, Link2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
+import { useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
@@ -80,7 +80,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const lang = i18n.language;
   const session = useSession().data;
   const matrix = useMatrix().data;
-  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key), newVersion = useNewVersion(key);
+  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
@@ -100,7 +100,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
   // 0042: the form offers only the scopes the caller may enter (the HLC Fiber Team: scope HLC); a read-only view shows the record as it is
-  const def = editable ? forEntry(rawDef) : rawDef;
+  // 0.12.2 (Q222, D220b): the permit form offers only the permit types the caller may enter, and the streams they may choose for a purpose-based type
+  const def = editable ? forEntry(rawDef, data) : rawDef;
   const issues = { ...validateRecord(def, data, site?.id ?? null, tripoliToday()), ...server };
   const issueList = Object.keys(issues);
   const labelOf = (code: string) => { const f = def.fields.find((x) => x.code === code); return f ? fieldLabel(f, lang) : code; };
@@ -146,7 +147,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
-  const busy = create.isPending || update.isPending || op.isPending || claim.isPending || newVersion.isPending;
+  const busy = create.isPending || update.isPending || op.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
   const claimedBy = record?.ball_in_court?.claimed_by;
   const mine = claimedBy?.id === session?.user?.id;
   const canClaim = !!record && (act('review') || act('approve')) && !claimedBy && (record.ball_in_court?.holders.length ?? 0) > 1;
@@ -176,6 +177,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         )}
         {record && key === 'hlc' && <HlcPurchaseRequest record={record} />}
         {record && <Warnings record={record} labelOf={labelOf} />}
+        {record && act('transfer') && <p className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="reg-transfer-note">{t('registers.transfer_note')}</p>}
         {record?.last_return_note && record.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="reg-return-note">{t('approvals.returned_note', { note: record.last_return_note })}</div>}
         {record && record.state !== 'entry' && record.state !== 'approved' && record.state !== 'voided' && (
           <section aria-label={t('grid.ball')}>
@@ -253,7 +255,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           <section {...panelProps('history', tab)}>
             <h3 id="rg-history" className="mb-1 flex items-center gap-1 font-semibold"><Clock size={14} />{t('drawer.history')}</h3>
             <ol data-testid="reg-history" className="space-y-1 text-sm">
-              {hist.data?.items.map((x) => <li key={x.id}>{t(`step.${x.action}`, { defaultValue: x.action })} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}</li>)}
+              {hist.data?.items.map((x) => <li key={x.id} data-previous-path={x.previous_path ? 'true' : undefined}>{t(`step.${x.action}`, { defaultValue: x.action })} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}{x.previous_path && <span className="chip ms-2 bg-lockBg text-lockInk" data-testid="history-previous-path">{t('drawer.previous_path')}</span>}</li>)}
               {hist.isSuccess && !hist.data.items.length && <li className="text-mute">{t('drawer.no_history')}</li>}
               {hist.isError && <li className="text-mute">{t('registers.history_soon')}</li>}
             </ol>
@@ -266,6 +268,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
         {editable && tried && issueList.length > 0 && <p className="text-sm text-lateInk" data-testid="reg-missing">{t('registers.fix_list', { list: issueList.map((c) => (c === 'site_id' ? t('registers.site') : labelOf(c))).join(', ') })}</p>}
         <div className="flex flex-wrap gap-2">
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
+          {record && act('transfer') && <button className="btn" data-testid="reg-transfer" disabled={busy} onClick={() => transfer.mutate({ record }, { onSuccess: () => toast(t('registers.transferred')), onError: fail })}><ArrowRightLeft size={16} />{t('registers.transfer')}</button>}
           {record && act('void') && <button className="btn" data-testid="reg-void" disabled={busy} onClick={() => setVoiding(true)}><Ban size={16} />{t('registers.void')}</button>}
           {record && canClaim && <button className="btn" data-testid="reg-claim" disabled={busy} onClick={() => claim.mutate({ record, op: 'claim' }, { onError: fail })}><HandMetal size={16} />{t('drawer.claim')}</button>}
           {record && mine && <button className="btn" data-testid="reg-release" disabled={busy} onClick={() => claim.mutate({ record, op: 'release' }, { onError: fail })}><UserMinus size={16} />{t('drawer.release')}</button>}

@@ -8,8 +8,9 @@ import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
 import { AsBuiltItemsService } from './warehouse/as-built-items.service';
-import { AsBuiltItemsController, WarehouseController } from './warehouse/warehouse.controller';
+import { AsBuiltItemsController, NumberSequencesController, WarehouseController } from './warehouse/warehouse.controller';
 import { WarehouseService } from './warehouse/warehouse.service';
+import { WarehouseConfigService } from './warehouse/warehouse-config.service';
 import { ImportService } from './templates/import.service';
 import { ImportBatchesController, TemplatesController } from './templates/templates.controller';
 import { TemplatesService } from './templates/templates.service';
@@ -93,24 +94,28 @@ import { AuditLogController, LogsAdminController, SecurityLogController } from '
 import { LogsService } from './logs/logs.service';
 import { SecurityLogService } from './logs/security-log.service';
 import { JobRunsService } from './logs/job-runs.service';
+import { ScenarioSettingsController, SiteApplicabilityController } from './scenario/scenario.controller';
+import { ScenarioService } from './scenario/scenario.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
       AuthController, MeController, EmailChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController,
+      DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
+      ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, AsBuiltItemsService,
+      AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
+      ScenarioService, // P1 (0052)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

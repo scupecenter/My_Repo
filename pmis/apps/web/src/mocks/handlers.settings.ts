@@ -154,7 +154,9 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 
 const summary = () => {
   const h = C().holidays, tent = h.filter((x) => x.tentative && x.date >= TODAY).sort((a, b) => a.date.localeCompare(b.date));
-  return { tentative_count: h.filter((x) => x.tentative).length, next_tentative_date: tent[0]?.date ?? null, tentative_reminder_due: !!tent[0] && day(tent[0].date) - day(TODAY) <= 14 * 864e5, next_year: 2027, next_year_table_empty: !h.some((x) => x.date.startsWith('2027')) };
+  return { tentative_count: h.filter((x) => x.tentative).length, next_tentative_date: tent[0]?.date ?? null, tentative_reminder_due: !!tent[0] && day(tent[0].date) - day(TODAY) <= 14 * 864e5, next_year: 2027, next_year_table_empty: !h.some((x) => x.date.startsWith('2027')),
+    // contract 0.12.0 (Q4, D4b): the official calendar is pending owner data; tentative dates count now
+    official_calendar_pending: true, tentative_counted: true };
 };
 const changed = (holiday: Holiday) => HttpResponse.json({ holiday, affected_open_tasks: 12, recalculation_job_id: null });
 

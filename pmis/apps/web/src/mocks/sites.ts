@@ -94,7 +94,10 @@ function genTask(i: number, k: number): MockTask {
   return {
     id: taskIdOf(i, k), site_id: m.id, site_code: m.code, region_id: m.region_id as MockTask['region_id'], task_code: code, name_en: en, name_ar: ar, stage_code: STAGE_CODES[s], stream_code: STREAM_OF[s], state,
     current_level: state === 'approved' ? levels : 1, levels_required: levels, planned_date: planned, actual_date: actual,
-    sla: { colour, min_wd: sla?.[0] ?? null, max_wd: max, elapsed_wd: sla && state !== 'locked' ? elapsed : null, due_date: sla ? addDays(planned, max ?? 0) : null },
+    sla: { colour, min_wd: sla?.[0] ?? null, max_wd: max, elapsed_wd: sla && state !== 'locked' ? elapsed : null, due_date: sla ? addDays(planned, max ?? 0) : null,
+      // contract 0.12.0 (P1): Q135 C-3 Pending SLA Confirmation; Q2 D-1 not measured on Swap sites; D4b a tentative holiday inside every 11th open period
+      pending_confirmation: code === 'C3', measured: !(code === 'D1' && (m.scenario === 'hot_swap' || m.scenario === 'cold_swap')),
+      ...(sla && state !== 'approved' && state !== 'na' && (i + k) % 11 === 0 ? { tentative_holidays: [addDays(planned, Math.max(1, (max ?? 2) - 1))], due_date_tentative: true } : { tentative_holidays: [], due_date_tentative: false }) },
     slots_filled: slots.filter((x) => x.files.length).length, slots_required: slots.length, template_id: tpl, return_count: 0, version: 1,
     holder_absent: state === 'entry' && i % 17 === 0, submitted_by: '1102', waiting_since: `${TODAY}T08:00:00Z`, level_kind: 'review', docs: [], external: 'A&T Global', entered_by: '1102',
     gen: true, slots, locks,

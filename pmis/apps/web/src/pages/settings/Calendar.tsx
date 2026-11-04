@@ -60,6 +60,8 @@ export function Calendar() {
     <div data-testid="page-calendar" className="space-y-4">
       {sum?.tentative_reminder_due && <div role="status" className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="cal-banner-tentative"><AlertTriangle size={16} />{t('cal.banner_tentative', { date: sum.next_tentative_date })}</div>}
       {sum?.next_year_table_empty && <div role="status" className="flex gap-2 rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="cal-banner-empty"><AlertTriangle size={16} />{t('cal.banner_empty', { year: sum.next_year })}</div>}
+      {/* 0.12.0 (Q4, D4b): the official calendar is pending owner data; tentative dates count now and mark the due dates */}
+      {sum?.official_calendar_pending && <div role="status" className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="cal-banner-official"><AlertTriangle size={16} />{t('cal.banner_official')}</div>}
       <section className="card p-4" data-testid="cal-weekend">
         <h2 className="mb-2 font-bold">{t('cal.weekend')}</h2>
         <div className="flex flex-wrap gap-3 text-sm">

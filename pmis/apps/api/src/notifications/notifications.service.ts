@@ -14,6 +14,7 @@ const KINDS = new Set([
   'task_assigned', 'task_returned', 'task_approved', 'approval_due', 'reassigned', 'absence_alert', 'idle_task_alert', 'no_holder', 'holiday_tentative',
   'delegation', 'mfa_exemption', 'template_updated', 'import_batch', 'system', 'mention', 'task_rejected', 'no_eligible_holder', 'register_assigned',
   'register_rejected', 'gate_closed_again', 'sla_negative_duration', 'followed_change', 'email_change_requested', 'email_change_decided', 'security_alert',
+  'levels_converted', 'permit_transferred',
 ]);
 
 const snoozeSchema = z

@@ -19,15 +19,43 @@ import { DbService } from "../db/db.service";
 import { TaskViewService } from "../workflow/task-view.service";
 
 const reason = z.string().trim().min(3).max(1000);
+// Q107 (migration 0053): a need rule is confirmed only when the owner gave its quantity; otherwise it is pending configuration and never counts.
+const quantityRule = z
+  .object({
+    per: z.enum(["te_site", "rf_sector", "mw_half_link"]).optional(),
+    wl_vendor: z.enum(["Cambium", "Intracom"]).optional(),
+    group: z
+      .string()
+      .regex(/^[A-Z0-9][A-Z0-9_-]{0,39}$/)
+      .optional(),
+  })
+  .strict();
+const appliesWhen = z
+  .object({
+    scope: z.array(z.enum(["te_full", "router_only"])).max(2).optional(),
+    delivery_scenario: z
+      .array(
+        z.enum(["new_build", "expansion", "hot_swap", "cold_swap", "relocation"]),
+      )
+      .max(5)
+      .optional(),
+    region_ids: z.array(z.number().int().min(1).max(9999)).max(20).optional(),
+  })
+  .strict();
 const needRule = z
   .object({
     id: z.string().uuid().optional(),
     need_unit: z.string().trim().min(1).max(80),
     quantity: z.number().min(0).nullable().optional(),
-    quantity_rule: z.unknown().optional(),
-    applies_when: z.unknown().optional(),
+    status: z.enum(["confirmed", "pending_configuration"]).optional(),
+    quantity_rule: quantityRule.nullable().optional(),
+    applies_when: appliesWhen.nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((r) => r.status !== "confirmed" || typeof r.quantity === "number", {
+    message: "A confirmed need has a quantity.",
+    path: ["quantity"],
+  });
 const itemFields = {
   name_en: z.string().trim().min(2).max(200),
   name_ar: z.string().trim().min(1).max(200).nullable(),
@@ -42,6 +70,7 @@ const itemFields = {
     .nullable(),
   progress_item_code: z.string().trim().min(1).max(60).nullable(),
   need_rules: z.array(needRule).max(50),
+  code_source: z.enum(["master", "internal_provisional"]),
   is_active: z.boolean(),
 };
 const itemCreate = z
@@ -59,6 +88,7 @@ const itemCreate = z
     planned_delivery_date: true,
     progress_item_code: true,
     need_rules: true,
+    code_source: true,
     is_active: true,
   })
   .strict();
@@ -75,6 +105,7 @@ const itemPatch = z
     planned_delivery_date: true,
     progress_item_code: true,
     need_rules: true,
+    code_source: true,
     is_active: true,
   })
   .strict()
@@ -138,14 +169,15 @@ interface ItemRow {
   is_active: boolean;
   version: number;
   as_built_item_code: string | null;
+  code_source: string;
   need_rules: unknown;
 }
 
 const ITEM_SELECT = Prisma.sql`
   SELECT i.id::text AS id, i.item_code AS code, i.name AS name_en, i.name_ar, i.unit AS uom, i.item_group AS category, i.serialised AS serial_tracked, i.manufacturer,
-    i.contract_qty::float8 AS contract_qty, i.planned_delivery_date::text AS planned_delivery_date, i.progress_item_code, i.is_active, i.version,
+    i.contract_qty::float8 AS contract_qty, i.planned_delivery_date::text AS planned_delivery_date, i.progress_item_code, i.code_source, i.is_active, i.version,
     (SELECT ab.code FROM as_built_items ab WHERE ab.warehouse_item_id = i.id) AS as_built_item_code,
-    coalesce((SELECT jsonb_agg(jsonb_build_object('id', n.id, 'need_unit', n.need_unit, 'quantity', n.quantity::float8, 'quantity_rule', n.quantity_rule, 'applies_when', n.applies_when)
+    coalesce((SELECT jsonb_agg(jsonb_build_object('id', n.id, 'need_unit', n.need_unit, 'quantity', n.quantity::float8, 'status', n.status, 'quantity_rule', n.quantity_rule, 'applies_when', n.applies_when)
                               ORDER BY n.sort_order, n.id) FROM warehouse_item_need_rules n WHERE n.item_id = i.id), '[]'::jsonb) AS need_rules
   FROM warehouse_items i`;
 
@@ -166,6 +198,9 @@ interface MovementRow {
   doc_no: string | null;
   register_record_id: string | null;
   reserved: boolean;
+  doc_no_locked: boolean;
+  sequence_key: string | null;
+  doc_date: string | null;
   lines: unknown;
   ts: string;
 }
@@ -175,6 +210,8 @@ const MOVEMENT_SELECT = Prisma.sql`
     m.created_by::text AS created_by, m.created_at, m.posted_at, m.version,
     (SELECT r.data ->> 'doc_no' FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1) AS doc_no,
     (SELECT r.id::text FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1) AS register_record_id,
+    (m.status = 'posted' AND m.doc_no IS NOT NULL) AS doc_no_locked, m.sequence_key,
+    coalesce(m.doc_date::text, (SELECT r.data ->> 'doc_date' FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1)) AS doc_date,
     (m.status = 'pending' AND (m.kind = 'issue' OR (m.kind = 'adjustment' AND EXISTS (SELECT 1 FROM wh_movement_lines x WHERE x.movement_id = m.id AND x.qty < 0)))) AS reserved,
     coalesce((SELECT jsonb_agg(jsonb_build_object('item_id', l.item_id, 'item_code', w.item_code, 'description', w.name, 'uom', w.unit, 'qty', l.qty::float8,
                 'qty_approved', l.qty_approved::float8, 'condition', l.condition, 'serials', to_jsonb(l.serials)) ORDER BY l.sort_order)
@@ -377,10 +414,11 @@ export class WarehouseService {
         pending_issue: number;
         pending_return: number;
         available: number;
+        quarantine: number;
       }[]
     >(Prisma.sql`
       SELECT s.item_id::text AS item_id, i.item_code, i.name AS item_name, i.unit AS uom, s.on_hand::float8 AS on_hand, s.reserved::float8 AS reserved,
-        s.pending_issue::float8 AS pending_issue, s.pending_return::float8 AS pending_return, s.available::float8 AS available
+        s.pending_issue::float8 AS pending_issue, s.pending_return::float8 AS pending_return, s.available::float8 AS available, s.quarantine::float8 AS quarantine
       FROM wh_stock_levels(${item ?? null}::uuid, ${site ?? null}::uuid) s JOIN warehouse_items i ON i.id = s.item_id
       WHERE ${Prisma.join(conds, " AND ")} ORDER BY i.item_code COLLATE "C" LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
@@ -409,6 +447,9 @@ export class WarehouseService {
       site_code: r.site_code,
       form_id: r.form_id,
       doc_no: r.doc_no,
+      doc_no_locked: r.doc_no_locked,
+      sequence_key: r.sequence_key,
+      doc_date: r.doc_date,
       register_record_id: r.register_record_id,
       lines: r.lines,
       reserved: r.reserved,

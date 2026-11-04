@@ -86,6 +86,10 @@ export const siteHandlers = [
     if ((t.state !== 'entry' && t.state !== 'open') || !canEditTask(t)) return problem(403, 'forbidden', 'You cannot edit this task');
     const body = (await request.json()) as Record<string, unknown>;
     for (const k of ['planned_date', 'actual_start', 'actual_date'] as const) if (k in body && !validDate(body[k])) return invalid(`/${k}`, 'invalid_date');
+    // contract 0.12.0 (Q13): the Layout Submitted Date of B6, a typed date that is never in the future
+    const lsd = (body.values as Record<string, unknown> | undefined)?.layout_submitted_date;
+    if (lsd !== undefined && lsd !== null && (!validDate(lsd) || (lsd as string) > TODAY)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/values/layout_submitted_date', code: validDate(lsd) ? 'future_date' : 'invalid_date' }] });
+    if (body.values && typeof body.values === 'object') (t as MockTask & { values?: Record<string, unknown> }).values = { ...((t as MockTask & { values?: Record<string, unknown> }).values ?? {}), ...(body.values as Record<string, unknown>) };
     if ('planned_date' in body) t.planned_date = body.planned_date as string | null;
     if ('actual_start' in body) t.actual_start = body.actual_start as string | null;
     if ('actual_date' in body) t.actual_date = body.actual_date as string | null;

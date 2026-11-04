@@ -165,7 +165,7 @@ describe('the SLA clock of a task', () => {
     expect(t.due_date).toBe(await dbDate(db, `cal_add_workdays(DATE '${ms4}', 5)`));         // D-1 max 5
     const rule = await q<{ code: string; set_version: number; start_ref: string }>(db, `SELECT r.code, s.version AS set_version, r.start_ref FROM sla_rules r
       JOIN sla_rule_sets s ON s.id = r.rule_set_id WHERE r.id = $1`, [t.sla_rule_id]);
-    expect(rule[0]).toEqual({ code: 'D-1', set_version: 1, start_ref: 'MS4' });
+    expect(rule[0]).toEqual({ code: 'D-1', set_version: 1, start_ref: 'MS4|MS1' });   // 0052 (Q2)
   });
 
   it('starts D-1 from Site Release where the RFI is N/A (rules.md section 3.1)', async () => {
@@ -179,9 +179,9 @@ describe('the SLA clock of a task', () => {
     await makeTask(db, site, 'MS3', 'na');
     const d1 = await makeTask(db, site, 'D1', 'locked');
     await db.query(`UPDATE task_instances SET state = 'open' WHERE id = $1`, [d1]);
-    // MS4 hands over what its own predecessors give; with nothing dated behind the N/A tasks the clock waits for a date
+    // 0052 (Q2): with the Site RFI N/A the start event is Site Release itself
     const t = await taskRow(db, site, 'D1');
-    expect(t.sla_start_date === null || t.sla_start_date === ms1).toBe(true);
+    expect(t.sla_start_date).toBe(ms1);
   });
 
   it('colours the running task by the working days since the start event: green, amber, red', async () => {
@@ -198,7 +198,7 @@ describe('the SLA clock of a task', () => {
       expect(grid.status).toBe(200);
       const task = grid.body.stages.flatMap((s: { tasks: unknown[] }) => s.tasks).find((x: { task_code: string }) => x.task_code === 'D1');
       expect(task.sla, `start ${offset} wd ago`).toMatchObject({
-        code: 'D-1', min_wd: 3, max_wd: 5, start_event: 'MS4', start_date: ms4, elapsed_wd: -offset, colour, rule_set_version: 1,
+        code: 'D-1', min_wd: 3, max_wd: 5, start_event: 'MS4|MS1', start_date: ms4, elapsed_wd: -offset, colour, rule_set_version: 1,
       });
       expect(task.sla.due_date).toBe(await dbDate(db, `cal_add_workdays(DATE '${ms4}', 5)`));
     }

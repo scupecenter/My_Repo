@@ -25,7 +25,35 @@ const userHolds = (key: string, level: number, emp?: string | null, n?: number) 
 const canAt = (key: string, level: number, n?: number) => { const v = viewer(); return !!v && (v.key === 'pm' || userHolds(key, level, v.employee_id, n)); };
 /** Migration 0042: a Procurement record of scope HLC is decided by the Matrix row of its scope (the HLC Fiber Team's), every other record by its register's row. */
 const SCOPE_ROWS: Record<string, Record<string, string>> = { procurement: { HLC: 'procurement_hlc' } };
-const rowKey = (key: string, data: Record<string, unknown>) => (typeof data.scope === 'string' && SCOPE_ROWS[key]?.[data.scope]) || key;
+/** Migration 0054 (Q220, D220b): the stream of a permit type (fixed) or the streams a purpose-based type may be entered on (chosen per permit). */
+export const PERMIT_STREAM: Record<string, string | string[]> = {
+  'City Council Permit': 'ACQ', 'Civil Aviation Authority Permit': 'ACQ', 'Security Clearance': ['CW', 'TE', 'ACQ', 'OM'], 'Other Permit': ['CW', 'TE', 'ACQ', 'OM'],
+  'Access - Survey': ['ACQ', 'CW'], 'Access - CW': 'CW', 'Access - TE': 'TE', 'Access - Dismantle': ['CW', 'TE'], 'Access - QC / Maintenance': ['CW', 'TE', 'OM'],
+  'PTW - CW': 'CW', 'PTW - TE': 'TE', 'PTW - Dismantle': ['CW', 'TE'],
+};
+const STREAM_ROWS: Record<string, string> = { CW: 'permits_hse', TE: 'permits_hse_te', ACQ: 'permits_hse_acq', OM: 'permits_hse_om' };
+const permitStream = (d: Record<string, unknown>): string | null => {
+  const t = PERMIT_STREAM[String(d.permit_type ?? '')];
+  if (typeof t === 'string') return t;
+  return t && typeof d.permit_stream === 'string' && t.includes(d.permit_stream) ? d.permit_stream : null;
+};
+/** The stream refusals of the database trigger (0054), same path and codes. */
+function permitIssues(d: Record<string, unknown>): { path: string; code: string }[] {
+  const t = PERMIT_STREAM[String(d.permit_type ?? '')], s = typeof d.permit_stream === 'string' && d.permit_stream ? d.permit_stream : null;
+  if (!t) return [];
+  if (Array.isArray(t)) return !s ? [{ path: '/data/permit_stream', code: 'stream_required' }] : t.includes(s) ? [] : [{ path: '/data/permit_stream', code: 'stream_not_allowed' }];
+  return s && s !== t ? [{ path: '/data/permit_stream', code: 'stream_fixed' }] : [];
+}
+const rowKey = (key: string, data: Record<string, unknown>) =>
+  key === 'permits_hse' ? STREAM_ROWS[permitStream(data) ?? 'CW']! : (typeof data.scope === 'string' && SCOPE_ROWS[key]?.[data.scope]) || key;
+/** Q222: the permit types the viewer may enter, with the streams they may choose (RegisterDefinition.entry_permit_types). */
+function entryPermitTypes() {
+  const held = Object.keys(STREAM_ROWS).filter((s) => canAt(STREAM_ROWS[s]!, 1));
+  return Object.entries(PERMIT_STREAM).flatMap(([code, t]) => {
+    const streams = (Array.isArray(t) ? t : [t]).filter((s) => held.includes(s));
+    return streams.length ? [{ code, stream: Array.isArray(t) ? null : t, choose_stream: Array.isArray(t), streams }] : [];
+  });
+}
 const rk = (r: MockRecord) => rowKey(r.register_key, r.data);
 /** The scopes the viewer may enter (RegisterDefinition.entry_scopes): the scopes of the register row when they hold its L1, plus each scope whose row they hold. */
 function entryScopes(def: RegisterDefinition): string[] | undefined {
@@ -77,6 +105,8 @@ function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   if (r.state === 'in_approval' && canAt(row, L, L)) out.push('approve', 'reject');
   if (r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r) && canAt(row, 1, L)) out.push('new_version');
   if (r.state !== 'voided' && viewer()?.key === 'pm') out.push('void');
+  // Q221: a permit draft whose holder no longer holds L1 of its stream row is handed over (contract 0.12.2)
+  if (r.register_key === 'permits_hse' && r.state === 'entry' && !r.transferred && !canAt(row, 1, L) && r.created_by === viewer()?.employee_id) out.push('transfer');
   return out;
 }
 
@@ -128,7 +158,8 @@ export const registerHandlers = [
     const nav = viewer()!.nav;
     return HttpResponse.json({ items: REGISTER_DEFS.filter((d) => nav.includes(d.module_key)).map((d) => {
       const scopes = entryScopes(d);
-      return { ...d, approval_levels: levelsOf(d.register_key), record_count: R().records.filter((r) => r.register_key === d.register_key).length, ...(scopes ? { entry_scopes: scopes } : {}) };
+      return { ...d, approval_levels: levelsOf(d.register_key), record_count: R().records.filter((r) => r.register_key === d.register_key).length, ...(scopes ? { entry_scopes: scopes } : {}),
+        ...(d.register_key === 'permits_hse' ? { entry_permit_types: entryPermitTypes() } : {}) };
     }) });
   }),
 
@@ -153,6 +184,7 @@ export const registerHandlers = [
     const b = (await request.json()) as { site_id?: string; record_type?: string; data?: Record<string, unknown> };
     const si = b.site_id ? siteIndex(b.site_id) : null;
     if (def.site_scoped && (si === null || si < 0 || si >= SITE_COUNT)) return invalid([{ path: '/site_id', code: b.site_id ? 'site_not_found' : 'site_required' }]);
+    if (def.register_key === 'permits_hse') { const pe = permitIssues(b.data ?? {}); if (pe.length) return invalid(pe); }
     // the entry holders of the record's row: the row of its scope (0042), as the database decides
     if (!viewer() || !(viewer()!.key === 'pm' || userHolds(rowKey(def.register_key, b.data ?? {}), 1, viewer()!.employee_id))) return problem(403, 'not_eligible_holder', 'You are not an entry holder (L1) of this row of the Matrix');
     if (def.register_key === 'procurement' && b.data?.scope === 'GECOL') return invalid([{ path: '/data/scope', code: 'wrong_register' }]);
@@ -193,6 +225,7 @@ export const registerHandlers = [
     for (const [c, v] of Object.entries(b.data ?? {})) { if (v === null) delete merged[c]; else merged[c] = v; }
     const next = visibleData(def, merged);
     if (def.register_key === 'dismantle') { const errs = dismantleErrors(next); if (errs.length) return invalid(errs); }
+    if (def.register_key === 'permits_hse') { const pe = permitIssues(next); if (pe.length) return invalid(pe); }
     if (rowKey(def.register_key, next) !== rk(r) && viewer()?.key !== 'pm' && !userHolds(rowKey(def.register_key, next), 1, viewer()?.employee_id)) {
       return problem(403, 'not_eligible_holder', 'This scope is entered by another team (its own row of the Matrix)');
     }
@@ -271,6 +304,21 @@ export const registerHandlers = [
       touch(r); save();
       return tag(r);
     })),
+  // Q221 (contract 0.12.2): the draft goes to the entry holders of its stream row (one holder: pinned to them)
+  http.post(`${B}/registers/:key/records/:id/transfer`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);
+    if (!r) return problem(404, 'not_found', 'Record not found');
+    const bad = noMatch(request, r); if (bad) return bad;
+    if (!actions(r)!.includes('transfer')) return problem(403, 'not_eligible_holder', 'Only the person who holds this draft, or an entry holder (L1) of its row, can transfer it.');
+    const body = (await request.json().catch(() => ({}))) as { note?: string };
+    const holders = holdersOf(db().matrix, rk(r), 1, r.levels_required ?? levelsOf(r.register_key)).filter((h) => h.kind === 'user');
+    step(r, 'transfer', 1, body.note);
+    r.transferred = true;
+    if (holders.length === 1) r.claimed_by = { id: uid(holders[0]!.employee_id ?? '9999'), display_name: holders[0]!.label, employee_id: holders[0]!.employee_id ?? undefined };
+    touch(r); save();
+    return tag(r);
+  }),
   http.get(`${B}/registers/:key/records/:id/history`, ({ params }) => {
     const g = guard(); if (g) return g;
     const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);

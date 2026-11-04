@@ -36,7 +36,9 @@ The 9 gates are W, AX, BQ, CA, CV, DQ, EM, ET and EZ (BP §21; Master row 2).
 
 **Base rule (CLAUDE.md, BP §03):** the gate date equals the previous milestone date. Change Control can then shift it (§2.3).
 
-**Extra conditions that the Master adds to some gates** (Master row 5 formulas). For these gates the date is the latest of the previous milestone and the listed conditions, so it can be later than the previous milestone. This refines the CLAUDE.md wording (see open-questions Q9).
+**Extra conditions that the Master adds to some gates** (Master row 5 formulas). For these gates the date is the latest of the previous milestone and the listed conditions, so it can be later than the previous milestone. This refines the CLAUDE.md wording.
+
+**Owner answer Q9 (2026-11-04, ADR 0015):** the gate date is the latest of the previous milestone and **every** applicable safety and permit condition. While a condition is missing or a Stop Work is active the gate is blocked. A gate that closes again keeps its earlier opening date in the gate history (`site_gate_events`: opened, closed, date_moved; migration 0052); withdrawing an approval re-evaluates the later gates without deleting their history.
 
 | Gate | Opens from | Extra conditions (Master) | N/A when |
 |---|---|---|---|
@@ -67,6 +69,7 @@ if S > R:                      # suspended on G0
 else:
     gate = G0
 ```
+**Owner answer Q180 (2026-11-04), built in migration 0052:** the PMIS uses the **effective** dates, not the approval dates: the suspension starts on `suspension_start` and ends on the `resumption_date` of the first approved (or applied) resumption whose effective date is later; each falls back to its approval date when the effective date is empty. The window is **[start, resume)**: the start day is suspended, the resumption day is a working day again. A candidate date inside a window moves to the resumption date (and is checked again from there); inside a window without a resumption the gate stays locked. Both the effective and the approval dates are kept on the record (`cc_suspension_windows` flags a retroactive window). Drafts and rejected requests never count. The Master formula above stays the comparison value of the parallel run.
 - A suspension approved after the gate opened does not move that gate. It sets Overall Status to On Hold (§2.4), and the next gate is evaluated against it when that gate's candidate date arrives.
 - SLA during a suspension: the SLA counter stops in the contractor scorecard only. It keeps running in project KPIs. (BP §03)
   - ASSUMPTION: suspended working days are the working days between an approved Suspension and the next approved Resumption, and they are subtracted from the contractor-attributed delay (§8).
@@ -94,6 +97,11 @@ A cancelled site leaves the execution scope and the weights. It stays in the dis
 - **N/A steps** are excluded from SLA and from the end-to-end totals. (BP §06)
 - **SLA limits** are data in settings, with the codes of the SLA sheet: rows 6 and 7 hold Min and Max, plus planning links B01–B07. A change can be applied retroactively or from a chosen date. Saved weekly snapshots are never recalculated. (D64, D39, BP §06)
 - **Holidays table:** the Master holds no holiday rows (Setting F:G is empty). See open-questions Q4.
+- **Tentative holidays (owner decision D4b, 2026-11-04):** they count as holidays now; the due dates whose SLA period contains one carry a "tentative date" badge (`SlaInfo.tentative_holidays`, `due_date_tentative`) and are corrected when the date is confirmed. Until the official calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data C-1) the calendar screen shows a banner.
+- **Start event `A|B` (owner answer Q2):** the first of the codes whose task is not N/A on the site. D-1 starts at `MS4|MS1`: the Site RFI where it applies, Site Release where it is N/A. A missing start date is a data gap: the clock waits, it never starts today. D-1 is not measured for Hot / Cold Swap (scenario rule `sla_not_measured`).
+- **End events (owner answers Q13, Q136):** the actual date of the task, or `gecol.installation_finish`, `hlc.installation_date`, `hlc.in_service_date` (C-4 after the parallel run, under a new rule-set version) and `task.layout_submitted_date` (the Layout Submitted Date of B6, never filled from another date). The Master's B-6 AR → AR is kept as an inherited, Master-compatible value only (`sla_master_columns.inherited`).
+- **Pending SLA Confirmation (owner answer Q135):** a rule may carry `pending_confirmation` (C-3 keeps 0 / 1 working day as an inherited value); such rules are left out of the scorecard and the penalties.
+- **45 SLA columns (owner answer Q14):** the SLA sheet columns D:AV map to task codes in `sla_master_columns`; B-10a and B-10b are both B10, split by the Master O value RT / GF.
 
 ### 3.1 SLA steps and limits (working days)
 From SLA sheet rows 3–7 and D39 planning links. The task code each one belongs to is in `task-catalogue.csv`.
@@ -155,7 +163,9 @@ The Delivery Scenario is Master Z: New Build, Expansion, Hot Swap, Cold Swap or 
 | Hot Swap | Same as Cold Swap, but dismantle, install and cutover all happen inside one window (S-1, S-2, S-3). | BP §03 |
 | Relocation | Same Site ID. Stages 1–3 are done in full at the new location. RFI applies at the new site. Dismantle at the old site comes first (TE RN, then TE DN). It is recorded in Change Control (Relocation). On approval, a snapshot of the whole site is taken. | BP §03, §05 |
 
-- **Conflict:** BP says RFI is N/A for Hot / Cold Swap, but Site Calc F decides RFI from the flags only. See open-questions Q3.
+- **Hot / Cold Swap and RFI (owner answer Q3, 2026-11-04):** the Site RFI is N/A for Hot and Cold Swap by scenario. A Swap with any of AA:AD = Yes is a conflict that blocks applying the scope until it is reviewed (correct the flags, or approve a documented scope exception). The Master formula (flags only, Site Calc F) is shown only in the comparison (`master_rfi`).
+- **Swap and stage 1 (owner answer Q15):** on a Hot or Cold Swap on the same site, A1 and A3 are N/A by default; a scope exception (or the scenario template) enables them when a new candidate or contract is needed. They are never marked done.
+- **Where the rules live (migration 0052):** `scenario_task_rules` (per workflow version, task code, scenario: applies, na, sla_not_measured, flag), editable in Settings; `site_scope_exceptions` for the approved exceptions. The rules reach a site's tasks when its scope is applied (never an approved task or one in review or approval).
 - **Scope change (BP §03):** changing AA:AF, the Scenario, or a relocation needs a Change Control row (Scope Change / Relocation) with the old and new value and an approval.
   - On approval, N/A states, locks, weights and SLA are recalculated. The approved baseline does not change.
   - A re-plan is a "Baseline Re-plan" row. Affected values carry a "changed by scope" flag.

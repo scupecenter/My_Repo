@@ -4,6 +4,8 @@ import { API_BASE } from '@/api/client';
 import { db, viewer } from './db';
 import { guard, page, problem } from './handlers';
 import { uid } from './ids';
+import { SITE_COUNT, siteIndex } from './sites';
+import { dispatchOf } from './warehouseData';
 
 const B = API_BASE;
 const W = () => db().wh;
@@ -55,6 +57,33 @@ export const warehouseHandlers = [
     const g = guard(); if (g) return g;
     const q = new URL(request.url).searchParams.get('q') ?? '';
     return page(W().stock.filter((s) => has(q, s.item_code, s.item_name)));
+  }),
+  // Contract 0.12.1 (P7): the TE dispatch (D6) and the owner data still missing (Q107).
+  http.get(`${B}/warehouse/dispatch-status`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const st = new URL(request.url).searchParams.get('need_status');
+    const rows = Array.from({ length: Math.min(SITE_COUNT, 12) }, (_, i) => dispatchOf(i)).filter((d) => !st || d.need_status === st);
+    return page(rows.map(({ lines: _l, ...d }) => { void _l; return d; }));
+  }),
+  http.get(`${B}/warehouse/dispatch-status/:siteId`, ({ params }) => {
+    const g = guard(); if (g) return g;
+    const i = siteIndex(String(params.siteId));
+    if (i < 0 || i >= SITE_COUNT) return problem(404, 'not_found', 'The site does not exist or is not visible to you.');
+    return HttpResponse.json(dispatchOf(i));
+  }),
+  http.get(`${B}/warehouse/config-gaps`, () => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json(W().gaps);
+  }),
+  http.get(`${B}/warehouse/region-vendors`, () => {
+    const g = guard(); if (g) return g;
+    return HttpResponse.json({ items: [1, 2, 3, 4, 5, 6, 7].map((r) => ({ region_id: r, region_name: `Region ${r}`, wl_vendor: null, version: 0 })) });
+  }),
+  http.get(`${B}/number-sequences`, () => {
+    const g = guard(); if (g) return g;
+    const seq = (key: string, record_type: string | null, form_kind: string | null, region_id: number | null, pattern: string) =>
+      ({ key, record_type, form_kind, region_id, region_code: region_id ? 'TR' : null, pattern, reset: 'yearly', next_value: 1, next_preview: pattern.replace('{REGION}', 'TR').replace('{YYYY}', '2026').replace('{SEQ:4}', '0001'), last_issued: null, last_issued_at: null, is_active: true, version: 1, updated_at: '2026-11-04T08:00:00Z' });
+    return HttpResponse.json({ items: [seq('DN-CW-TR', 'cw_dn', 'dn', 1, 'DN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('RN-CW-TR', 'cw_rn', 'rn', 1, 'RN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('PL-WH', 'pl', null, null, 'PL-WH-{YYYY}-{SEQ:4}')] });
   }),
   http.get(`${B}/warehouse/movements`, ({ request }) => {
     const g = guard(); if (g) return g;

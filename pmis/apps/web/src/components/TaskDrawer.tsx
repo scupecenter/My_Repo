@@ -35,7 +35,7 @@ function History({ task }: { task: TaskDetail }) {
     <section aria-labelledby="dr-history">
       <h3 id="dr-history" className="mb-1 flex items-center gap-1 font-semibold"><Clock size={14} />{t('drawer.history')}</h3>
       <ol data-testid="history-list" className="space-y-1 text-sm">
-        {h.data?.items.map((x) => <li key={x.id}>{t(`step.${x.action}`)} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}</li>)}
+        {h.data?.items.map((x) => <li key={x.id} data-previous-path={x.previous_path ? 'true' : undefined}>{t(`step.${x.action}`)} · L{x.level} · {x.acted_by?.display_name}{x.self_approval ? ` · ${t('drawer.self_approval')}` : ''}{x.note ? ` — ${x.note}` : ''}{x.previous_path && <span className="chip ms-2 bg-lockBg text-lockInk" data-testid="history-previous-path">{t('drawer.previous_path')}</span>}</li>)}
         {h.isSuccess && !h.data.items.length && <li className="text-mute">{t('drawer.no_history')}</li>}
       </ol>
     </section>
@@ -60,8 +60,11 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
   });
   const [draft, setDraft] = useState({ planned_date: task.planned_date ?? '', actual_start: task.actual_start ?? '', actual_date: task.actual_date ?? '' });
   const dirty = (['planned_date', 'actual_start', 'actual_date'] as const).filter((k) => (draft[k] || null) !== (task[k] ?? null));
-  useReportDirty(dirty.length > 0);
-  const save = () => date.mutate({ task, patch: Object.fromEntries(dirty.map((k) => [k, draft[k] || null])) }, { onSuccess: () => toast(t('drawer.saved')), onError: fail });
+  const layout0 = typeof task.values?.layout_submitted_date === 'string' ? task.values.layout_submitted_date : '';
+  const [layout, setLayout] = useState(layout0);
+  const layoutDirty = task.task_code === 'B6' && layout !== layout0;
+  useReportDirty(dirty.length > 0 || layoutDirty);
+  const save = () => date.mutate({ task, patch: { ...Object.fromEntries(dirty.map((k) => [k, draft[k] || null])), ...(layoutDirty ? { values: { layout_submitted_date: layout || null } } : {}) } }, { onSuccess: () => toast(t('drawer.saved')), onError: fail });
   const name = (i18n.language === 'ar' && task.name_ar) || task.name_en;
   const final = (a?: { final?: boolean }) => !!a?.final;
   const review = act('review'), approve = act('approve'), start = act('start'), claim = act('claim'), release = act('release');
@@ -103,8 +106,21 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
               <FieldHistory entityType="task" entityId={task.id} field={f} label={t(label)} />
             </div>
           ))}
-          <div><span className="text-mute">{t('grid.sla')}</span><div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span></div></div>
-          {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={!dirty.length || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}
+          <div><span className="text-mute">{t('grid.sla')}</span>{task.sla?.measured === false
+            ? <div className="font-semibold" data-testid="drawer-sla-not-measured">{t('sla.not_measured')}</div>
+            : <div className="font-semibold">{task.sla?.min_wd ?? '–'}–{task.sla?.max_wd ?? '–'} {t('approvals.wd')} <span className={`chip ${task.sla?.colour === 'red' ? 'bg-lateBg text-lateInk' : 'bg-doneBg text-doneInk'}`}>{task.sla?.elapsed_wd ?? 0}</span>
+              {task.sla?.pending_confirmation && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-sla-pending">{t('sla.pending_confirmation')}</span>}</div>}</div>
+          {task.sla?.due_date && <div><span className="text-mute">{t('sla.due_date')}</span><div className="mono font-semibold" data-testid="drawer-due-date">{task.sla.due_date}
+            {task.sla.due_date_tentative && <span className="chip ms-1 bg-waitBg text-waitInk" data-testid="drawer-due-tentative" title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}</div></div>}
+          {task.task_code === 'B6' && (
+            /* 0.12.0 (Q13): the Layout Submitted Date, its own field (never taken from another date) */
+            <div>
+              <label className="block"><span className="text-mute">{t('drawer.layout_submitted')}</span>
+                <input type="date" className="input mono" data-testid="drawer-layout-date" disabled={!edit} value={layout} onChange={(e) => setLayout(e.target.value)} />
+              </label>
+            </div>
+          )}
+          {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={(!dirty.length && !layoutDirty) || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}
         </section>
 
         <TaskRegisterFields fields={regFields} siteId={task.site_id} />

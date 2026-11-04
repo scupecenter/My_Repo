@@ -241,7 +241,10 @@
     "no_local_account": "This account has no local sign-in, so two-factor does not apply.",
     "team_scope_mismatch": "A team of this specialization cannot take an order of this scope (Settings, team / scope match).",
     "field_read_only": "An administrator manages this field.",
-    "two_factor_enforced": "An administrator enforces two-factor on this account."
+    "two_factor_enforced": "An administrator enforces two-factor on this account.",
+    "scope_scenario_conflict": "The scenario and the scope flags disagree. Review them first.",
+    "not_na_by_scenario": "The scenario of this site does not make this task N/A.",
+    "change_not_approved": "Name an approved Change Control record of this site."
   },
   "common": {
     "cancel": "Cancel",
@@ -362,7 +365,8 @@
     "admin_override": "Admin override",
     "override_revert": "Override reverted",
     "reopen": "Reopened",
-    "migrate": "Migrated"
+    "migrate": "Migrated",
+    "transfer": "Transferred"
   },
   "level": {
     "entry": "Entry",
@@ -473,7 +477,9 @@
     "discard_body": "You changed fields that are not saved yet.",
     "discard_keep": "Keep editing",
     "discard_go": "Discard",
-    "open_site": "Open site page"
+    "open_site": "Open site page",
+    "layout_submitted": "Layout Submitted Date",
+    "previous_path": "Previous path before conversion"
   },
   "matrix": {
     "title": "Responsibility Matrix",
@@ -911,7 +917,9 @@
     "effective_date_not_after_current": "The date must be after the version already in force.",
     "no_changes": "Nothing changed compared with the version in force.",
     "unknown_specialization": "Not one of the listed specializations.",
-    "too_many": "Too many entries."
+    "too_many": "Too many entries.",
+    "unknown_end_event": "Unknown end event.",
+    "future_date": "The date cannot be in the future."
   },
   "cal": {
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",
@@ -940,7 +948,8 @@
     "announced_hint": "Only if the announced day is different.",
     "recalc_note": "Open tasks get their SLA due dates recalculated. Closed tasks keep their values.",
     "recalculated": "{{count}} open task(s) recalculated.",
-    "empty": "No holidays for this year."
+    "empty": "No holidays for this year.",
+    "banner_official": "The official holiday calendar is not confirmed yet. Tentative dates count as holidays and the affected due dates show a \"tentative date\" badge until they are confirmed."
   },
   "rules": {
     "col_version": "Version",
@@ -1132,7 +1141,14 @@
     "vcol_why": "Reason",
     "vcol_applied": "Open tasks",
     "applied": "Applied to {{count}}",
-    "not_applied": "Not applied"
+    "not_applied": "Not applied",
+    "col_end": "End event",
+    "col_pending": "Pending",
+    "end_actual": "Actual date of the task",
+    "end_gecol_installation_finish": "GECOL installation finish",
+    "end_hlc_installation_date": "HLC installation date",
+    "end_hlc_in_service_date": "HLC in-service date",
+    "end_task_layout_submitted_date": "Layout Submitted Date"
   },
   "wtSet": {
     "set": "Set",
@@ -1512,7 +1528,10 @@
     "hlc_legacy_title": "Request entered before the move to Procurement",
     "hlc_legacy_body": "Request {{no}} of {{date}}. Read only: the HLC purchase request is now entered in Procurement (scope HLC).",
     "warnings_title": "For the reviewer (not blocking)",
-    "scope_hlc_only": "You may enter scope HLC only (HLC Fiber Team)."
+    "scope_hlc_only": "You may enter scope HLC only (HLC Fiber Team).",
+    "transfer": "Transfer the draft",
+    "transferred": "The draft was moved to a qualified holder.",
+    "transfer_note": "The person holding this draft no longer holds Data Entry (L1) of the permit's stream. Transfer it so a qualified holder can finish it; nothing in it is lost."
   },
   "regErrors": {
     "required": "{{field}} is required.",
@@ -1584,7 +1603,10 @@
     "task_approved": "The task is approved. An approved task is changed only by an admin reopening it.",
     "gate_locked": "The task is locked by a closed gate: it takes no entry until the gate opens.",
     "actual_date_required": "The actual date is required: the task is submitted with its row, as on the task screen.",
-    "mandatory_slots_missing": "Mandatory documents are missing. Upload them on the task first."
+    "mandatory_slots_missing": "Mandatory documents are missing. Upload them on the task first.",
+    "stream_required": "Choose the stream of this permit by its purpose.",
+    "stream_not_allowed": "This permit type cannot be entered on that stream.",
+    "stream_fixed": "This permit type always belongs to its own stream."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -1722,7 +1744,47 @@
     "code_taken": "This code is already used.",
     "yes": "Yes",
     "no": "No",
-    "name": "Name"
+    "name": "Name",
+    "tab_dispatch": "TE dispatch",
+    "tab_gaps": "Missing configuration",
+    "quarantine": "Quarantine",
+    "quarantine_hint": "Faulty or damaged returns: not available for issue.",
+    "code_source": "Code source",
+    "cs_master": "Master code",
+    "cs_internal_provisional": "Internal provisional code",
+    "need": "Need",
+    "need_pending_n": "{{count}} need(s) pending configuration",
+    "need_confirmed": "Need confirmed",
+    "locked": "Locked",
+    "locked_hint": "The Doc No. is locked after posting.",
+    "auto_number": "Numbered by the system",
+    "dispatch_date": "TE Dispatch Complete date",
+    "dispatch_date_hint": "Date of the latest approved TE DN (used for the Master comparison).",
+    "need_status": "Need status (PMIS)",
+    "need_status_hint": "Compared with the approved need of the site.",
+    "ns_complete": "Complete",
+    "ns_short": "Short",
+    "ns_pending_configuration": "Pending configuration",
+    "ns_not_applicable": "Not applicable",
+    "router_only": "IP Router Only",
+    "latest_dn": "Latest TE DN",
+    "need_unit": "Need unit",
+    "items": "Items",
+    "delivered": "Delivered",
+    "short": "Short",
+    "rs_confirmed": "Confirmed",
+    "rs_pending_configuration": "Pending configuration",
+    "miss_need_quantity": "Need quantity not given",
+    "miss_region_wl_vendor": "Region WL vendor not set",
+    "miss_rf_design_sectors": "Sectors missing in RF & Design",
+    "miss_rf_design": "No approved RF & Design record",
+    "no_te": "TE does not apply to this site.",
+    "gaps_pending": "Need quantities not given",
+    "gaps_codes": "Internal provisional codes",
+    "gaps_vendor": "Regions without a WL vendor",
+    "gaps_sequence": "Regions without a numbering sequence",
+    "gaps_none": "Nothing missing.",
+    "site_tab": "Warehouse"
   },
   "asb": {
     "title": "As-Built items",
@@ -2742,5 +2804,56 @@
     "calculated_column": "Calculated or register-owned column: the value was not read.",
     "held_predecessor": "The row waits until its predecessor is approved.",
     "held_open_submission": "The task is in review: the row waits until that is decided."
+  },
+  "scope": {
+    "tab": "Scope",
+    "rfi_title": "Site RFI",
+    "rfi_pmis": "PMIS (scenario, then flags)",
+    "rfi_master": "Master formula (comparison only)",
+    "rfi_differs": "Differs from the Master",
+    "applies": "Applies",
+    "na": "N/A",
+    "conflicts_title": "The scenario and the scope flags disagree. Review them before the scope is applied.",
+    "conflict": "{{task}}: the scenario {{scenario}} makes it N/A, but the flags ({{flag}}) say the work exists. Correct the flags or approve a scope exception.",
+    "tasks_title": "Tasks by scenario and flags",
+    "would_change": "{{count}} task(s) would change",
+    "apply": "Apply the scope",
+    "apply_title": "Apply the scope to the tasks of this site",
+    "apply_note": "Tasks the rules make N/A become N/A; approved tasks and tasks in review or approval never change. Needs your password again.",
+    "applied": "{{count}} task(s) changed.",
+    "col_task": "Task",
+    "col_state": "State",
+    "col_applies": "Applies",
+    "col_source": "Decided by",
+    "col_sla": "SLA",
+    "will_na": "will be N/A",
+    "will_applies": "will apply again",
+    "src_exception": "Scope exception",
+    "src_scenario": "Scenario",
+    "src_flag": "Scope flags",
+    "src_none": "No rule",
+    "add_exception": "Scope exception",
+    "exception_title": "Approve a scope exception for {{task}}",
+    "exception_note": "The task applies on this site although the scenario makes it N/A. It is never marked done: apply the scope afterwards to reopen it.",
+    "exception_saved": "Scope exception approved.",
+    "exceptions_title": "Scope exceptions",
+    "revoke": "Revoke",
+    "revoke_title": "Revoke the scope exception for {{task}}",
+    "revoked": "Revoked",
+    "exception_revoked": "Scope exception revoked.",
+    "none_by_scenario": "The scenario of this site makes no task N/A.",
+    "gate_history": "Gate history",
+    "ev_opened": "opened",
+    "ev_closed": "closed",
+    "ev_date_moved": "date moved",
+    "shifted": "moved by a suspension",
+    "no_events": "No gate change recorded yet."
+  },
+  "sla": {
+    "tentative_date": "Tentative date",
+    "tentative_title": "Counts tentative holidays ({{dates}}); corrected when they are confirmed.",
+    "pending_confirmation": "Pending SLA Confirmation",
+    "not_measured": "SLA not measured",
+    "due_date": "Due date"
   }
 }

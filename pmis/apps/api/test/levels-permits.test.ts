@@ -206,7 +206,7 @@ describe('Permits & HSE: each stream enters its own permits, L2 is the Team Lead
     expect(await q(db, `SELECT 1 FROM register_records WHERE site_id = $1`, [s.site.id])).toHaveLength(0);
     const ok = await s.teEntry.api.call('post', recPath('permits_hse'), { site_id: s.site.id, data: TE });
     expect(ok.status).toBe(201);
-    // the TE user cannot enter a CW permit, a PTW of CW, or a permit with no stream (they stay on the CW row)
+    // the TE user cannot enter a CW permit, a PTW of CW, or a City Council permit (0054, Q220: the Acquisition / RF & Design row)
     for (const permit_type of ['Access - CW', 'PTW - CW', 'City Council Permit']) {
       const no = await s.teEntry.api.call('post', recPath('permits_hse'), { site_id: s.site.id, data: { ...PERMIT_CW, permit_type } });
       expect(no.status, permit_type).toBe(403);
@@ -234,7 +234,7 @@ describe('Permits & HSE: each stream enters its own permits, L2 is the Team Lead
     expect(ok.status).toBe(200);
     expect(ok.body.state).toBe('approved');
 
-    const cw = await s.cwEntry.api.call('post', recPath('permits_hse'), { site_id: s.site.id, data: { ...PERMIT_CW, permit_type: 'City Council Permit', has_expiry: false, valid_to: undefined } });
+    const cw = await s.cwEntry.api.call('post', recPath('permits_hse'), { site_id: s.site.id, data: { ...PERMIT_CW, permit_type: 'PTW - CW' } });
     expect(cw.status).toBe(201);
     const csub = await s.cwEntry.api.call('post', recPath('permits_hse', cw.body.id, '/submit'), {}, { 'If-Match': `"${cw.body.version}"` });
     expect(csub.status).toBe(200);
@@ -248,13 +248,15 @@ describe('Permits & HSE: each stream enters its own permits, L2 is the Team Lead
     // the TE row is a row of the Matrix with a global L1 and L2 cell
     expect(Number((await q<{ n: string }>(db, `SELECT count(*) AS n FROM matrix_cells WHERE register_key = 'permits_hse_te' AND region_id IS NULL AND level IN (1, 3)`))[0]!.n)).toBe(2);
     const types = await q<{ code: string; stream: string | null }>(db, `SELECT code, stream FROM permit_types WHERE stream IS NOT NULL ORDER BY code COLLATE "C"`);
-    expect(types).toEqual([{ code: 'Access - CW', stream: 'CW' }, { code: 'Access - TE', stream: 'TE' }, { code: 'PTW - CW', stream: 'CW' }, { code: 'PTW - TE', stream: 'TE' }]);
+    // 0054 (Q220): City Council and Civil Aviation are entered on the Acquisition / RF & Design stream; the purpose-based types have no fixed stream
+    expect(types).toEqual([{ code: 'Access - CW', stream: 'CW' }, { code: 'Access - TE', stream: 'TE' }, { code: 'City Council Permit', stream: 'ACQ' },
+      { code: 'Civil Aviation Authority Permit', stream: 'ACQ' }, { code: 'PTW - CW', stream: 'CW' }, { code: 'PTW - TE', stream: 'TE' }]);
   });
 
   it('has the TE row as a Matrix-only row (not an enabled register) mapped from Permits & HSE by permit stream', async () => {
     expect(await q(db, `SELECT 1 FROM register_definitions WHERE register_key = 'permits_hse_te' AND NOT enabled AND approval_levels = 2`)).toHaveLength(1);
     const rules = (await q<{ rules: Record<string, unknown> }>(db, `SELECT rules FROM register_definitions WHERE register_key = 'permits_hse'`))[0]!.rules;
-    expect(rules).toMatchObject({ scope_from: 'permit_stream', scope_rows: { TE: 'permits_hse_te' } });
+    expect(rules).toMatchObject({ scope_from: 'permit_stream', scope_rows: { TE: 'permits_hse_te', ACQ: 'permits_hse_acq', OM: 'permits_hse_om' } });
     // the Matrix screen (GET /matrix) lists the row: see matrix.test.ts
   });
 });

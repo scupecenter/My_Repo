@@ -237,6 +237,25 @@ export const REAL_API_AUTH_USERS = [
   ['post', '/snags/:id/review'],
   ['post', '/snags/:id/approve'],
   ['post', '/snags/:id/reject'],
+  // Contract 0.12.0 (P1): scenario applicability, scope exceptions, the gate history, the scenario rules and the SLA sheet columns (apps/api: scenario; migration 0052).
+  ['get', '/sites/:id/applicability'],
+  ['post', '/sites/:id/applicability/apply'],
+  ['post', '/sites/:id/scope-exceptions'],
+  ['post', '/sites/:id/scope-exceptions/:exceptionId/revoke'],
+  ['get', '/sites/:id/gate-events'],
+  ['get', '/settings/scenario-rules'],
+  ['put', '/settings/scenario-rules'],
+  ['get', '/settings/sla-master-columns'],
+  // Contract 0.12.1: work package P7 (apps/api: warehouse; migration 0053). The TE dispatch of the sites (D6), the region WL vendors (D58), the owner data still
+  // missing (Q107) and the numbering service (Q106).
+  ['get', '/warehouse/dispatch-status'],
+  ['get', '/warehouse/dispatch-status/:id'],
+  ['get', '/warehouse/region-vendors'],
+  ['put', '/warehouse/region-vendors/:id'],
+  ['get', '/warehouse/config-gaps'],
+  ['get', '/number-sequences'],
+  ['post', '/number-sequences'],
+  ['patch', '/number-sequences/:id'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

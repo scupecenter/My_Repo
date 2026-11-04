@@ -84,6 +84,12 @@ export class RegistersController {
     return this.tag(res, await this.registers.claim(auth, key, id, ifMatch, true));
   }
 
+  @Post(':key/records/:id/transfer')
+  @HttpCode(200)
+  async transfer(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.registers.transfer(auth, key, id, ifMatch, body));
+  }
+
   @Post(':key/records/:id/void')
   @HttpCode(200)
   async void(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {

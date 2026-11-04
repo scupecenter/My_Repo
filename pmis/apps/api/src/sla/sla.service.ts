@@ -17,6 +17,7 @@ const reason = z.string().trim().min(3).max(1000);
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD.').refine((s) => !Number.isNaN(Date.parse(`${s}T00:00:00Z`)), 'Not a date.');
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'] as const;
 const days = z.number().int().min(0).max(365);
+const END_EVENTS = ['gecol.installation_finish', 'hlc.installation_date', 'hlc.in_service_date', 'task.layout_submitted_date'] as const;
 
 const overrideSchema = z.object({
   scenario: z.enum(SCENARIOS).optional(),
@@ -32,6 +33,10 @@ const ruleSchema = z.object({
   start_event: z.string().min(1).max(60),
   calendar_code: z.string().min(1).max(60),
   overrides: z.array(overrideSchema).max(47).optional(),
+  /** 0052 (Q13, Q136): the end event; null = the actual date of the task; omitted = kept as it is in the draft. */
+  end_event: z.enum(END_EVENTS).nullable().optional(),
+  /** 0052 (Q135): an inherited value waiting for the owner's confirmation; omitted = kept as it is in the draft. */
+  pending_confirmation: z.boolean().optional(),
 }).strict();
 
 const draftSchema = z.object({ reason }).strict();
@@ -82,6 +87,8 @@ interface RuleRow {
   changed_at: Date;
   open_task_count: bigint;
   set_version: number | null;
+  end_event: string | null;
+  pending_confirmation: boolean;
 }
 
 const ref = (id: string | null, name: string | null, emp: string | null): UserRef | undefined =>
@@ -123,7 +130,7 @@ export class SlaService {
         r.scenario::text AS scenario, r.region_id, c.code AS calendar_code, r.effective_from::text AS effective_from, r.effective_to::text AS effective_to,
         r.reason, r.changed_by::text AS changed_by, u.display_name AS cb_name, u.employee_id AS cb_emp, r.changed_at,
         (SELECT count(*) FROM task_instances t WHERE t.sla_rule_id = r.id AND t.state IN ('open', 'entry', 'in_review', 'in_approval', 'rejected', 'suspended')) AS open_task_count,
-        rs.version AS set_version
+        rs.version AS set_version, r.end_ref AS end_event, r.pending_confirmation
       FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id JOIN work_calendars c ON c.id = r.calendar_id
       LEFT JOIN users u ON u.id = r.changed_by LEFT JOIN sla_rule_sets rs ON rs.id = r.rule_set_id
       WHERE td.workflow_id = sla_workflow()
@@ -139,6 +146,7 @@ export class SlaService {
         scenario: r.scenario, region_id: r.region_id, calendar_code: r.calendar_code, effective_from: r.effective_from, effective_to: r.effective_to,
         reason: r.reason, changed_by: ref(r.changed_by, r.cb_name, r.cb_emp), changed_at: r.changed_at, open_task_count: Number(r.open_task_count),
         ...(r.set_version !== null ? { set_version: r.set_version } : {}),
+        end_event: r.end_event, pending_confirmation: r.pending_confirmation,
       })),
       page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.task_code, last.id]) : null },
     };
@@ -163,13 +171,14 @@ export class SlaService {
   }
 
   private async items(setId: string): Promise<unknown[]> {
-    const rows = await this.db.tx.$queryRaw<{ task_code: string; min_working_days: number; max_working_days: number; start_ref: string; calendar_code: string; overrides: unknown }[]>(Prisma.sql`
-      SELECT td.code AS task_code, i.min_working_days, i.max_working_days, i.start_ref, c.code AS calendar_code, i.overrides
+    const rows = await this.db.tx.$queryRaw<{ task_code: string; min_working_days: number; max_working_days: number; start_ref: string; end_ref: string | null; calendar_code: string; overrides: unknown; pending_confirmation: boolean }[]>(Prisma.sql`
+      SELECT td.code AS task_code, i.min_working_days, i.max_working_days, i.start_ref, i.end_ref, c.code AS calendar_code, i.overrides, i.pending_confirmation
       FROM sla_rule_set_items i JOIN task_definitions td ON td.id = i.task_def_id JOIN work_calendars c ON c.id = i.calendar_id
       WHERE i.set_id = ${setId}::uuid ORDER BY td.code`);
     return rows.map((r) => ({
       task_code: r.task_code, min_working_days: r.min_working_days, max_working_days: r.max_working_days, start_event: r.start_ref, calendar_code: r.calendar_code,
       overrides: Array.isArray(r.overrides) ? r.overrides : [],
+      end_event: r.end_ref, pending_confirmation: r.pending_confirmation,
     }));
   }
 
