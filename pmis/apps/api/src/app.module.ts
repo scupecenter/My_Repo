@@ -22,6 +22,8 @@ import { ListCataloguesController } from './registers/list-catalogues.controller
 import { ListCataloguesService } from './registers/list-catalogues.service';
 import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
+import { SavedViewsController } from './views/saved-views.controller';
+import { SavedViewsService } from './views/saved-views.service';
 import { InsightsController } from './insights/insights.controller';
 import { InsightsService } from './insights/insights.service';
 import { NotificationsController } from './notifications/notifications.controller';
@@ -127,6 +129,7 @@ export function appModuleFor(config: AppConfig) {
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
+      SavedViewsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -142,6 +145,7 @@ export function appModuleFor(config: AppConfig) {
       { provide: MailPort, useClass: OutboxMail },
       MasterImportService, MappingService,
       ContractorsService,
+      SavedViewsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

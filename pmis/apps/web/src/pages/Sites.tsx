@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRegions, useSites, useStreams, useViews } from '@/api/sites';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { ViewTabs } from '@/components/ViewTabs';
+import { SavedViews } from '@/components/SavedViews';
 import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
 import { ActiveChips, BulkBar, ColumnMenu, Empty, HeaderRow, pin, QuickFilter, SelectBox, tracks, totalWidth, Trunc, useTablePrefs } from '@/components/TableKit';
 import { useToast } from '@/components/Toast';
@@ -20,6 +21,8 @@ const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id:
 const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
 const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone' };
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
+// P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
+const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
 // ExportColumnCode values (stable codes of the `sites` part).
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
@@ -138,6 +141,8 @@ export function Sites() {
       <ViewTabs views={viewsQ.data} value={view} onChange={setView} testid="view-tabs" />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
+        <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket }} empty={VIEW_EMPTY} table={tbl}
+          onApply={(v) => setParams({ ...Object.fromEntries(Object.keys(VIEW_EMPTY).map((k) => [k, String((v as Record<string, unknown>)[k] ?? '')])), sel: '' })} />
         <input className="input max-w-64" data-testid="sites-search" placeholder={t('sites.search')} aria-label={t('sites.search')} value={f.q} onChange={(e) => set('q')(e.target.value)} />
         <Select id="region" value={f.region_id} onChange={set('region_id')} all={t('sites.all_regions')} options={(regions.data ?? []).map((r) => [String(r.id), (i18n.language === 'ar' && r.name_ar) || r.name_en])} />
         <Select id="scenario" value={f.scenario} onChange={set('scenario')} all={t('sites.all_scenarios')} options={SCENARIOS.map((s) => [s, t(`scenario.${s}`)])} />

@@ -233,7 +233,7 @@ export const adminHandlers = [
         { key: 'admin', name_en: 'Administration', screens: [{ key: 'admin.users', name_en: 'Users and roles' }, { key: 'admin.roles', name_en: 'Roles and permission profiles' }], actions: ['view', 'create', 'edit', 'delete', 'administer'] },
       ],
       actions: [...op, 'administer'],
-      delegable_rights: ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit', 'users.two_factor'],
+      delegable_rights: ['unlock', 'skip', 'mark_na', 'accept_without_document', 'accept_without_workflow', 'reopen', 'edit_date', 'reassign', 'users.edit', 'assignments.edit', 'groups.edit', 'matrix.edit', 'roles.edit', 'profiles.edit', 'settings.edit', 'documents.edit', 'templates.edit', 'fields.edit', 'workflow.edit', 'workflow.publish', 'workflow.migrate', 'warehouse.items.edit', 'users.two_factor', 'views.share', 'views.manage'],
     });
   }),
   http.get(`${B}/permission-profiles`, ({ request }) => {

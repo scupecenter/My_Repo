@@ -94,7 +94,8 @@ describe('Audit Log screen', () => {
     await u.click(screen.getByTestId('chips-clear'));
     await u.selectOptions(screen.getByTestId('views-select'), screen.getByRole('option', { name: 'API writes' }));
     expect(screen.getByTestId('f-via')).toHaveValue('api');
-    expect(JSON.parse(localStorage.getItem('pmis.logviews.audit-log')!)).toHaveLength(1);
+    // P10: the view is kept on the server (mocked), never in the browser
+    expect(localStorage.getItem('pmis.logviews.audit-log')).toBeNull();
   });
 
   it('hides and shows a column through the column control', async () => {

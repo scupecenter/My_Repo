@@ -16,6 +16,7 @@ import { FieldHistory } from './logs/FieldHistory';
 import { FieldInput, fieldLabel, issueText, showValue, SitePicker } from './RegisterFields';
 import { CommentsPanel } from './Comments';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty } from './DrawerFrame';
+import { DraftBar, useDraft } from './DraftBar';
 import { FollowButton } from './FollowButton';
 import { RecordDocuments } from './RecordDocuments';
 import { DismantleOrderSelect, HlcPurchaseRequests } from './P4cPanels';
@@ -106,6 +107,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
 
   const act = (a: string) => !!record?.allowed_actions?.includes(a as never);
   const editable = !record || act('edit');
+  // Q115: unsaved input is a server-side draft of this user only (never a save, a submission or an input of a calculation)
+  const dr = useDraft(`record.${rawDef.register_key}.${record?.id ?? 'new'}`, { data, record_type: rtype }, dirty, editable);
   // 0042: the form offers only the scopes the caller may enter (the HLC Fiber Team: scope HLC); a read-only view shows the record as it is
   // 0.12.2 (Q222, D220b): the permit form offers only the permit types the caller may enter, and the streams they may choose for a purpose-based type
   const def = editable ? forEntry(rawDef, data) : rawDef;
@@ -134,9 +137,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     if (!site && def.site_scoped) { setServer({ site_id: { code: 'site_required' } }); return; }
     const body = visibleData(def, data);
     if (!record) create.mutate({ site_id: site?.id, site_code: site?.code, region_id: site?.region_id, ...(rtype ? { record_type: rtype } : {}), data: body }, {
-      onSuccess: (r) => { toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
+      onSuccess: (r) => { dr.clear(); toast(t('registers.saved')); setDirty(false); onCreated(r.id); }, onError: fail,
     });
-    else update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: () => { toast(t('registers.saved')); setDirty(false); }, onError: fail });
+    else update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: () => { dr.clear(); toast(t('registers.saved')); setDirty(false); }, onError: fail });
   };
   const run = (o: RecordOp, r: RegisterRecord, note?: string) => op.mutate({ record: r, op: o, note }, {
     onSuccess: () => { toast(t(o === 'void' ? 'registers.voided' : 'approvals.done')); setRejecting(false); setVoiding(false); },
@@ -175,6 +178,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       {record && <DrawerTabs value={tab} onChange={setTab} tabs={[{ id: 'data', label: t('drawer.tab_data') }, { id: 'documents', label: t('docs.tab') }, { id: 'comments', label: t('drawer.comments') }, { id: 'history', label: t('drawer.history') }]} />}
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
         <div {...panelProps('data', tab)} className="space-y-4">
+        {editable && <DraftBar draft={dr} onRestore={(v) => { if (v.data && typeof v.data === 'object') setData(v.data as Data); if (typeof v.record_type === 'string') setRtype(v.record_type); setDirty(true); }} />}
         {OWNER_NOTE[key] && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="reg-owner-note">{t(OWNER_NOTE[key])}</p>}
         {src && record?.site_id && (
           <p className="flex items-center gap-2 rounded-md bg-openBg p-3 text-sm text-openInk" data-testid="reg-source">

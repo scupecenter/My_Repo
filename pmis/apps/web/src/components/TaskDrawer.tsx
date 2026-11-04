@@ -9,6 +9,7 @@ import { errText } from './FormDialog';
 import { useAddComment, useComments, useDatePatch, useHistory, useTaskOp, type TaskOp } from '@/api/sites';
 import type { TaskDetail, TaskRegisterField } from '@/api/types';
 import { DocSlots } from './DocSlots';
+import { DraftBar, useDraft } from './DraftBar';
 import { DrawerFrame, DrawerTabs, panelProps, useReportDirty, type DrawerNav } from './DrawerFrame';
 import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
@@ -64,7 +65,9 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
   const [layout, setLayout] = useState(layout0);
   const layoutDirty = task.task_code === 'B6' && layout !== layout0;
   useReportDirty(dirty.length > 0 || layoutDirty);
-  const save = () => date.mutate({ task, patch: { ...Object.fromEntries(dirty.map((k) => [k, draft[k] || null])), ...(layoutDirty ? { values: { layout_submitted_date: layout || null } } : {}) } }, { onSuccess: () => toast(t('drawer.saved')), onError: fail });
+  // Q115: unsaved dates are kept as a server-side draft of this user (never a save of the task), with a last-saved time and an optional restore
+  const dr = useDraft(`task.${task.id}`, draft, dirty.length > 0, edit);
+  const save = () => date.mutate({ task, patch: { ...Object.fromEntries(dirty.map((k) => [k, draft[k] || null])), ...(layoutDirty ? { values: { layout_submitted_date: layout || null } } : {}) } }, { onSuccess: () => { dr.clear(); toast(t('drawer.saved')); }, onError: fail });
   const name = (i18n.language === 'ar' && task.name_ar) || task.name_en;
   const final = (a?: { final?: boolean }) => !!a?.final;
   const review = act('review'), approve = act('approve'), start = act('start'), claim = act('claim'), release = act('release');
@@ -120,6 +123,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
               </label>
             </div>
           )}
+          {edit && <div className="col-span-2"><DraftBar draft={dr} onRestore={(v) => setDraft((d) => ({ ...d, ...v }))} /></div>}
           {edit && <div className="col-span-2"><button className="btn" data-testid="drawer-save" disabled={(!dirty.length && !layoutDirty) || date.isPending} onClick={save}><Save size={16} />{t('drawer.save')}</button></div>}
         </section>
 

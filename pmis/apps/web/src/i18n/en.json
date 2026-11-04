@@ -783,7 +783,9 @@
     "workflow.publish": "Publish workflow",
     "workflow.migrate": "Migrate sites",
     "warehouse.items.edit": "Edit warehouse items",
-    "users.two_factor": "Turn two-factor on or off for users"
+    "users.two_factor": "Turn two-factor on or off for users",
+    "views.share": "Share saved views",
+    "views.manage": "Manage everyone's shared views"
   },
   "absence": {
     "title": "Absence & cover",
@@ -3416,5 +3418,46 @@
     "outcome_duplicate": "already entered in Procurement (linked)",
     "outcome_already_migrated": "moved before",
     "date_dropped": "date not copied"
+  },
+  "savedViews": {
+    "label": "Saved views",
+    "default": "Default view",
+    "mine": "My views",
+    "shared_with_me": "Shared with me",
+    "shared_mark": "shared",
+    "save": "Save view",
+    "name": "View name",
+    "saved": "View saved",
+    "updated": "View updated with the current filters and columns",
+    "update": "Save the current filters and columns into this view",
+    "share": "Share",
+    "deactivate": "Deactivate this view",
+    "deactivated": "View deactivated",
+    "imported_one": "{{count}} view from this browser moved to your account",
+    "imported_other": "{{count}} views from this browser moved to your account",
+    "stripped_one": "{{count}} hidden column left out",
+    "stripped_other": "{{count}} hidden columns left out",
+    "stripped_hint": "This view has columns you may not see; they are not shown to you.",
+    "owner_left": "Owner left",
+    "share_title": "Share “{{name}}”",
+    "share_hint": "The people you choose see this view only if they may open this screen, and only the rows and columns their own rights allow.",
+    "everyone": "Everyone",
+    "limited_hint": "Sharing with everyone needs the share right for all regions. Choose people, roles or groups.",
+    "people": "People",
+    "roles": "Roles",
+    "groups": "Groups",
+    "share_save": "Save sharing",
+    "share_saved": "Sharing saved",
+    "transfer": "Hand over",
+    "transfer_title": "Hand over “{{name}}”",
+    "transfer_hint": "The new owner must be active and hold the right to share views.",
+    "transferred": "View handed over"
+  },
+  "draft": {
+    "found": "You have an unsaved draft from {{at}}.",
+    "restore": "Restore",
+    "discard": "Discard",
+    "saved_at": "Draft saved {{at}} (not submitted)",
+    "error": "The draft could not be saved. Your input is still here."
   }
 }
