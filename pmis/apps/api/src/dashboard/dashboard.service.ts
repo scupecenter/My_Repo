@@ -187,6 +187,42 @@ export class DashboardService {
     return r[0];
   }
 
+  /** The codes among `codes` that a published workflow has as a view, in the order given (the same list as filters().views). */
+  private async publishedViews(codes: string[]): Promise<string[]> {
+    const r = await this.db.tx.$queryRaw<{ code: string }[]>`
+      SELECT DISTINCT v.code FROM workflow_views v JOIN workflow_definitions wd ON wd.id = v.workflow_id WHERE wd.status = 'published' AND v.code = ANY(${codes}::text[])`;
+    const have = new Set(r.map((x) => x.code));
+    return codes.filter((c) => have.has(c));
+  }
+
+  /**
+   * Runs a calculation that only reads in a transaction of its own that carries exactly the request's user and regions (app.user_id and app.region_ids are
+   * copied from the request transaction, never resolved again), so it sees what the request sees and can run beside it.
+   */
+  private async sideRead<T>(fn: () => Promise<T>): Promise<T> {
+    const c = await this.db.tx.$queryRaw<{ u: string | null; r: string | null }[]>`SELECT current_setting('app.user_id', true) AS u, current_setting('app.region_ids', true) AS r`;
+    const u = c[0]?.u ?? '';
+    const r = c[0]?.r ?? '';
+    if (!u) throw new Error('dashboard: no request context for a side read');
+    // Always rolled back: the calculation uses temporary tables (so it cannot be a READ ONLY transaction), and nothing it does may be kept.
+    const rollback = new Error('dashboard side read: rolled back');
+    let out: { v: T } | undefined;
+    try {
+      await this.db.client.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT set_config('app.user_id', ${u}, true), set_config('app.region_ids', ${r}, true)`;
+          out = { v: await this.db.runIn(tx, fn) };
+          throw rollback;
+        },
+        { maxWait: 10_000, timeout: 30_000 },
+      );
+    } catch (e) {
+      if (e !== rollback) throw e;
+    }
+    if (!out) throw new Error('dashboard side read: no result');
+    return out.v;
+  }
+
   /** The values the filter bar offers: the caller's regions, the clusters of the sites they see, the scenarios and the streams. */
   private async filters(regions: number[] | null): Promise<Json> {
     const regs = await this.db.tx.$queryRaw<{ id: number; name_en: string; name_ar: string | null }[]>(Prisma.sql`
@@ -222,6 +258,11 @@ export class DashboardService {
     if (format !== 'xlsx' && format !== 'csv') throw problems.validation([{ path: '/format', code: 'invalid', message: 'format is xlsx or csv.' }]);
     const query: Query = { ...q };
     delete query.format;
+    // Q187: the CW and TE sheets are the same calculation with the view CW or TE. They are computed at the same time as the view on screen, each
+    // in a transaction of its own with the request's own user and regions that is always rolled back (sideRead), so the workbook costs one calculation, not three.
+    const viewCodes = format === 'xlsx' ? await this.publishedViews(['CW', 'TE']) : [];
+    const sides = viewCodes.map((code) => this.sideRead(() => this.get(auth, { ...query, view: code })).then((data) => ({ name: code, data })));
+    for (const p of sides) p.catch(() => undefined); // awaited below; a failure of the view on screen first must not leave them unhandled
     const d = await this.get(auth, query);
     const basis = d.basis as Json;
     const rows = exportRows(d);
@@ -232,11 +273,7 @@ export class DashboardService {
       return { filename: `${name}.csv`, body: Buffer.from(`${String.fromCharCode(0xfeff)}${csv}\r\n`, 'utf8'), contentType: 'text/csv; charset=utf-8' };
     }
     // Q187: the Project Overview is the view on screen; the CW and TE sheets are the same filters with the view CW or TE (when the workflow has it)
-    const views = ((d.filters as Json).views ?? []) as { code: string }[];
-    const streamSheets: { name: string; data: Json }[] = [];
-    for (const code of ['CW', 'TE']) {
-      if (views.some((v) => v.code === code)) streamSheets.push({ name: code, data: await this.get(auth, { ...query, view: code }) });
-    }
+    const streamSheets: { name: string; data: Json }[] = await Promise.all(sides);
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL,
       ${JSON.stringify({ filters: query, format, rows: rows.length - 1, sheets: ['Project Overview', ...streamSheets.map((x) => x.name), ...DETAIL_SHEETS, 'About'] })}::jsonb, NULL)`);
     return { filename: `${name}.xlsx`, body: await exportWorkbook(d, streamSheets, query), contentType: XLSX_TYPE };
