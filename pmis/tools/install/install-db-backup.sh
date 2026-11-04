@@ -32,6 +32,9 @@ CONF=/etc/gsdn-pmis/pmis.env
 DIR=/etc/pgbackrest
 CFG=$DIR/pgbackrest.conf
 SECRET=$DIR/conf.d/secret.conf
+# config-include-path is a command-line-only option of pgBackRest (it is ignored, with a warning, inside the config file): every call
+# passes it, or the cipher keys in conf.d are never read.
+INC=$DIR/conf.d
 ENV_FILE=$DIR/db-backup.env
 DUMP_PASS=$DIR/restic-db.password
 STANZA=gsdn-pmis
@@ -162,7 +165,6 @@ EOF
 [$STANZA]
 pg1-path=/var/lib/postgresql/$PG_VER/$PG_CLUSTER
 pg1-port=$PMIS_DB_PORT
-config-include-path=$DIR/conf.d
 EOF
 } >"$CFG.new"
 chown root:postgres "$CFG.new"
@@ -188,6 +190,7 @@ echo "==> Settings in $ENV_FILE (no secret)"
 {
   echo "# Written by install-db-backup.sh on $(date -Is). Keep it free of secrets."
   echo "PGBACKREST_CONFIG=$CFG"
+  echo "PGBACKREST_INCLUDE=$INC"
   echo "DB_BACKUP_STANZA=$STANZA"
   echo "DB_BACKUP_REPOS=\"$DB_BACKUP_REPOS\""
   echo "DB_BACKUP_WEEKLY_REPO=${DB_BACKUP_WEEKLY_REPO:-}"
@@ -217,8 +220,10 @@ psql_su <<SQL >/dev/null
 ALTER SYSTEM SET wal_level = 'replica';
 ALTER SYSTEM SET archive_mode = 'on';
 ALTER SYSTEM SET archive_timeout = '5min';
-ALTER SYSTEM SET archive_command = 'pgbackrest --config=$CFG --stanza=$STANZA archive-push %p';
+ALTER SYSTEM SET archive_command = 'pgbackrest --config=$CFG --config-include-path=$INC --stanza=$STANZA archive-push %p';
 SQL
+# archive_command and archive_timeout take effect on a reload (no connection drops); archive_mode and wal_level need the restart below.
+psql_su -c "SELECT pg_reload_conf()" >/dev/null
 
 NEED_RESTART=$(psql_su -c "SELECT CASE WHEN current_setting('archive_mode') IN ('on','always') AND current_setting('wal_level') IN ('replica','logical') THEN 0 ELSE 1 END")
 if [[ $NEED_RESTART == 1 ]]; then
@@ -232,8 +237,8 @@ if [[ $NEED_RESTART == 1 ]]; then
 fi
 
 echo "==> Stanza, check"
-sudo -u postgres pgbackrest --config="$CFG" --stanza="$STANZA" --log-level-console=warn stanza-create
-sudo -u postgres pgbackrest --config="$CFG" --stanza="$STANZA" --log-level-console=warn check
+sudo -u postgres pgbackrest --config="$CFG" --config-include-path="$INC" --stanza="$STANZA" --log-level-console=warn stanza-create
+sudo -u postgres pgbackrest --config="$CFG" --config-include-path="$INC" --stanza="$STANZA" --log-level-console=warn check
 
 echo "==> Timers"
 unit_timer() { # unit_timer NAME ONCALENDAR DESCRIPTION EXEC_ARG
@@ -294,7 +299,7 @@ cat <<EOF
 
 Database backup is set up (pgBackRest, stanza $STANZA).
   Repositories:       1 = $DB_BACKUP_REPO1${DB_BACKUP_REPO2:+, 2 = $DB_BACKUP_REPO2}${DB_BACKUP_WEEKLY_REPO:+, weekly = 3}${DB_BACKUP_MONTHLY_REPO:+, monthly = 4}
-  Check now:          sudo -u postgres pgbackrest --config=$CFG --stanza=$STANZA info
+  Check now:          sudo -u postgres pgbackrest --config=$CFG --config-include-path=$INC --stanza=$STANZA info
   First full backup:  sudo systemctl start gsdn-pmis-db-basebackup.service
   Logs:               sudo journalctl -u gsdn-pmis-db-basebackup -n 30 --no-pager   (and Logs > Job runs)
   Alerts:             Logs > System log (source backup), written by gsdn-pmis-db-check every 15 minutes

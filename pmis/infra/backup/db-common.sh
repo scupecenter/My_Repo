@@ -16,6 +16,8 @@ if [[ -r $DB_BACKUP_ENV ]]; then
 fi
 
 PGBACKREST_CONFIG=${PGBACKREST_CONFIG:-/etc/pgbackrest/pgbackrest.conf}
+# Where the cipher keys are (conf.d/secret.conf). config-include-path is command-line only in pgBackRest, so it is passed on every call.
+PGBACKREST_INCLUDE=${PGBACKREST_INCLUDE:-$(dirname "$PGBACKREST_CONFIG")/conf.d}
 DB_BACKUP_STANZA=${DB_BACKUP_STANZA:-gsdn-pmis}
 DB_BACKUP_REPOS=${DB_BACKUP_REPOS:-1}              # repositories that get a full backup every night
 DB_BACKUP_WEEKLY_REPO=${DB_BACKUP_WEEKLY_REPO:-}   # optional: weekly full copy (8 kept)
@@ -30,7 +32,7 @@ PG_BIN=${PG_BIN:-/usr/lib/postgresql/16/bin}
 db_psql() { psql -X -q -At -v ON_ERROR_STOP=1 -p "$PMIS_DB_PORT" -d "$PMIS_DB_NAME" "$@"; }
 
 # pgBackRest for this stanza. Options go before the command.
-db_pgbackrest() { pgbackrest --config="$PGBACKREST_CONFIG" --stanza="$DB_BACKUP_STANZA" --log-level-console=warn "$@"; }
+db_pgbackrest() { pgbackrest --config="$PGBACKREST_CONFIG" --config-include-path="$PGBACKREST_INCLUDE" --stanza="$DB_BACKUP_STANZA" --log-level-console=warn "$@"; }
 
 # db_job_start NAME: opens a job_runs row (shown in Logs > Job runs). Prints its id, or nothing when it cannot be written.
 db_job_start() {
