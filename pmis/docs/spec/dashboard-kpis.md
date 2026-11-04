@@ -393,4 +393,4 @@ Open points: Q175 to Q187 in `open-questions.md`.
 | D16 | `components[].draft` on every health factor not approved (all but D and I; setting `dashboard.health_approved_factors`). | `dash_core` |
 | Q116 | Previews of variant A (rings, default) and B (flat segmented track); setting `dashboard.pipeline_variant`. | `Pipeline.tsx`, `dash_set_pipeline_variant` |
 
-Open points: Q340 to Q351 in `open-questions.md`.
+Open points: Q340 to Q393 in `open-questions.md`.
