@@ -80,6 +80,15 @@ if [[ -n $SET ]]; then ARGS+=(--set="$SET"); fi
 echo "db-restore: restoring repository $REPO into $PGDATA (target: ${TARGET:-end of WAL})"
 db_pgbackrest --repo="$REPO" "${ARGS[@]}" restore
 
+# The live server's ALTER SYSTEM settings (archive_mode = on, archive_command = pgbackrest archive-push) come back in the restored
+# postgresql.auto.conf, which overrides config_file: a scratch copy would then push its WAL into the live repositories and fork the
+# stanza's history. Drop every archive_* line (restore_command, which pgBackRest adds for recovery, stays) and force archiving off on
+# the command line below as well, which wins over every file.
+AUTO="$PGDATA/postgresql.auto.conf"
+if [[ -f $AUTO ]]; then
+  sed -i -E '/^[[:space:]]*archive_(mode|command|library|timeout)[[:space:]]*=/d' "$AUTO"
+fi
+
 # A minimal scratch configuration: the restored tree has no postgresql.conf (Ubuntu keeps it in /etc), and the live one must not be
 # read, because its external_pid_file and archive settings belong to the live server.
 # Authentication files of the live cluster are read only (Ubuntu keeps them in /etc/postgresql/16/<cluster>).
@@ -103,7 +112,7 @@ EOF
 chmod 600 "$CONF"
 
 echo "db-restore: starting the scratch server on port $PORT"
-"$PG_BIN/pg_ctl" -D "$PGDATA" -l "$LOG" -w -t 3600 -o "-c config_file=$CONF" start >/dev/null \
+"$PG_BIN/pg_ctl" -D "$PGDATA" -l "$LOG" -w -t 3600 -o "-c config_file=$CONF -c archive_mode=off -c archive_command=" start >/dev/null \
   || { echo "db-restore: the scratch server did not start; last lines of $LOG:" >&2; tail -n 20 "$LOG" >&2 || true; exit 1; }
 
 STATUS=0

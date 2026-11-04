@@ -134,11 +134,17 @@ if run_as_pg "$HERE/db-restore.sh" --pgdata "/var/lib/postgresql/16/$CLUSTER/res
 ok "restore refuses port 5432 and the live data directory"
 
 VERIFY="$WORK/verify.sql"
-echo "SELECT count(*) AS rows, max(batch) AS last_batch FROM evidence;" >"$VERIFY"
+printf '%s\n' "SELECT count(*) AS rows, max(batch) AS last_batch FROM evidence;" "SELECT 'archive_mode=' || current_setting('archive_mode');" >"$VERIFY"
 chmod 644 "$VERIFY"
 as_pg bash -c "DB_BACKUP_ENV='$ENVF' bash '$HERE/db-restore.sh' --pgdata '$WORK/restore' --port $RESTORE_PORT --target-time '$TARGET' --verify-sql '$VERIFY'" \
   >"$WORK/restore.out" 2>&1 || { cat "$WORK/restore.out"; die "point-in-time restore failed"; }
 grep -q '^1500|2$' "$WORK/restore.out" || { cat "$WORK/restore.out"; die "restored rows are not the 1500 rows before the target"; }
 ok "point-in-time restore to $TARGET returned 1500 rows (batches 1 and 2; batch 3 excluded)"
+# the scratch copy never archives into the live repository: the live ALTER SYSTEM archive settings are gone and archiving is off
+grep -q '^archive_mode=off$' "$WORK/restore.out" || { cat "$WORK/restore.out"; die "the restored server has archiving on"; }
+if as_pg grep -Eq '^[[:space:]]*archive_(mode|command)[[:space:]]*=' "$WORK/restore/postgresql.auto.conf" 2>/dev/null; then
+  die "the restored postgresql.auto.conf still carries the live archive settings"
+fi
+ok "the restored server runs with archiving off (live archive settings removed from postgresql.auto.conf)"
 
 echo "All database backup tests passed."
