@@ -1,4 +1,4 @@
-import { KeyRound, Lock, Mail, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
+import { KeyRound, Lock, Mail, Phone, ShieldCheck, ShieldOff, UserRound } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { fieldErrors } from '@/api/auth';
@@ -6,8 +6,8 @@ import { ApiError } from '@/api/client';
 import { useSession } from '@/api/hooks';
 import type { TwoFactorEnrolment } from '@/api/types';
 import {
-  type MyProfile, useCancelEmailChange, useChangeMyPassword, useMyProfile, useRequestEmailChange, useSelfDisableTwoFactor, useSelfEnrolConfirm,
-  useSelfEnrolStart, useUpdateMyProfile,
+  type MyProfile, useCancelEmailChange, useCancelPhoneChange, useChangeMyPassword, useMyProfile, useRequestEmailChange, useRequestPhoneChange,
+  useResendEmailCode, useSelfDisableTwoFactor, useSelfEnrolConfirm, useSelfEnrolStart, useUpdateMyProfile, useVerifyEmailChange,
 } from '@/api/profile';
 import { errText } from '@/components/FormDialog';
 import { PageHeader } from '@/components/PageHeader';
@@ -34,7 +34,10 @@ function Err({ id, msg }: { id: string; msg?: string | null }) {
   return msg ? <p role="alert" data-testid={id} className="mt-1 text-sm text-lateInk">{msg}</p> : null;
 }
 
-/** "My profile" (contract 0.9.2): the user's own details, email change request, password and two-factor. Admin-owned data is read-only. */
+/**
+ * "My profile" (contract 0.9.2, 0.12.6): the user's own details, the email and phone change requests, password and two-factor. Admin-owned data
+ * is read-only; the phone is a sign-in identifier and changes only through a request an admin approves (D156).
+ */
 export function Profile() {
   const { t } = useTranslation();
   const q = useMyProfile();
@@ -47,6 +50,7 @@ export function Profile() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Details key={p.version} p={p} />
         <EmailSection p={p} />
+        <PhoneSection p={p} />
         <PasswordSection p={p} />
         <TwoFactorSection p={p} />
       </div>
@@ -58,20 +62,17 @@ function Details({ p }: { p: MyProfile }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const save = useUpdateMyProfile();
-  const [f, setF] = useState({ name: p.display_name, phone: p.phone ?? '', locale: p.locale, theme: p.theme });
-  const phone = f.phone.replace(/[\s().-]/g, '');
-  const bad = { name: !f.name.trim() || f.name.trim().length > 200, phone: !!phone && !E164.test(phone) };
+  const [f, setF] = useState({ name: p.display_name, locale: p.locale, theme: p.theme });
+  const bad = { name: !f.name.trim() || f.name.trim().length > 200 };
   const patch = {
     ...(f.name.trim() !== p.display_name ? { display_name: f.name.trim() } : {}),
-    ...((phone || null) !== (p.phone ?? null) ? { phone: phone || null } : {}),
     ...(f.locale !== p.locale ? { locale: f.locale } : {}),
     ...(f.theme !== p.theme ? { theme: f.theme } : {}),
   };
   const dirty = Object.keys(patch).length > 0;
-  const srv = fieldErrors(save.error);
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (!dirty || bad.name || bad.phone || save.isPending) return;
+    if (!dirty || bad.name || save.isPending) return;
     save.mutate({ version: p.version, patch }, { onSuccess: () => toast(t('profile.saved')) });
   };
   const ar = i18n.language === 'ar';
@@ -85,12 +86,6 @@ function Details({ p }: { p: MyProfile }) {
           <input id="pf-name" data-testid="pf-name" className="input mt-1" value={f.name} maxLength={200} onChange={(e) => setF({ ...f, name: e.target.value })} aria-invalid={bad.name} />
           <Err id="pf-name-error" msg={bad.name ? t('profile.err_name') : null} />
         </div>
-        <div>
-          <label className="block text-sm font-semibold" htmlFor="pf-phone">{t('profile.phone')}</label>
-          <input id="pf-phone" data-testid="pf-phone" className="input mt-1" dir="ltr" type="tel" placeholder="+218911234567" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} aria-invalid={bad.phone || !!srv.phone} />
-          <p className="mt-1 text-xs text-mute">{t('profile.phone_hint')}</p>
-          <Err id="pf-phone-error" msg={bad.phone ? t('profile.err_phone') : srv.phone?.includes('duplicate') ? t('profile.err_phone_dup') : null} />
-        </div>
         <div className="grid grid-cols-2 gap-3">
           <label className="block text-sm font-semibold">{t('profile.locale')}
             <select className="input mt-1 font-normal" data-testid="pf-locale" value={f.locale} onChange={(e) => setF({ ...f, locale: e.target.value as 'en' | 'ar' })}>
@@ -101,8 +96,8 @@ function Details({ p }: { p: MyProfile }) {
               <option value="light">{t('profile.theme_light')}</option><option value="dark">{t('profile.theme_dark')}</option>
             </select></label>
         </div>
-        <Err id="pf-error" msg={save.isError && !srv.phone ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
-        <div className="flex justify-end"><button type="submit" className="btn btn-accent" data-testid="pf-save" disabled={!dirty || bad.name || bad.phone || save.isPending}>{t('common.save')}</button></div>
+        <Err id="pf-error" msg={save.isError ? (save.error.status === 412 ? t('profile.err_stale') : errText(save.error, t)) : null} />
+        <div className="flex justify-end"><button type="submit" className="btn btn-accent" data-testid="pf-save" disabled={!dirty || bad.name || save.isPending}>{t('common.save')}</button></div>
       </form>
       <div className="rounded-md bg-card2 p-3 text-sm" data-testid="profile-admin-owned">
         <p className="mb-2 flex items-center gap-1 font-semibold"><Lock size={14} aria-hidden />{t('profile.admin_owned')}</p>
@@ -147,8 +142,9 @@ function EmailSection({ p }: { p: MyProfile }) {
       <p className="text-sm">{t('profile.email_current')}: <b dir="ltr" data-testid="pf-email">{p.email}</b></p>
       <p className="text-sm text-mute">{t('profile.email_note')}</p>
       {pending && (
-        <div className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="pf-email-pending">
+        <div className="space-y-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="pf-email-pending">
           <p>{t('profile.email_pending', { email: pending.new_email, date: fmtDateTime(pending.requested_at, i18n.language) })}</p>
+          <EmailVerify pending={pending} />
           <button className="btn mt-2" data-testid="pf-email-cancel" disabled={cancel.isPending} onClick={() => cancel.mutate(undefined, { onSuccess: () => toast(t('profile.email_cancelled')) })}>{t('profile.email_cancel')}</button>
           <Err id="pf-email-cancel-error" msg={cancel.isError ? errText(cancel.error, t) : null} />
         </div>
@@ -170,6 +166,98 @@ function EmailSection({ p }: { p: MyProfile }) {
             </div>
             <Err id="pf-email-error" msg={askErr} />
             <div className="flex justify-end"><button type="submit" className="btn btn-accent" data-testid="pf-email-submit" disabled={!EMAIL.test(email.trim()) || !pw || ask.isPending}>{t('profile.email_submit')}</button></div>
+          </form>
+        )}
+    </Section>
+  );
+}
+
+/** 0.12.6 (Q158): the code mailed to the new address; until it is entered the admin cannot approve (except with a documented identity check). */
+function EmailVerify({ pending }: { pending: NonNullable<MyProfile['email_change']> }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const verify = useVerifyEmailChange(), resend = useResendEmailCode();
+  const [code, setCode] = useState('');
+  if (pending.verified_at) return <p data-testid="pf-email-verified">{t('profile.email_verified')}</p>;
+  const reason = verify.isError ? (fieldErrors(verify.error).code?.[0] ?? '') : '';
+  const err = !verify.isError ? null
+    : reason === 'locked' ? t('profile.email_code_locked') : reason === 'expired' ? t('profile.email_code_expired')
+      : verify.error.code === 'invalid_code' ? t('profile.email_code_bad') : errText(verify.error, t);
+  const ready = code.replace(/[\s-]/g, '').length === 8;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready || verify.isPending) return;
+    verify.mutate({ code: code.trim() }, { onSuccess: () => { setCode(''); toast(t('profile.email_verified_done')); }, onError: () => setCode('') });
+  };
+  return (
+    <form onSubmit={submit} className="space-y-2" noValidate data-testid="pf-email-verify-form">
+      <p>{t('profile.email_code_note')}</p>
+      <label className="block font-semibold" htmlFor="pf-email-code">{t('profile.email_code')}</label>
+      <input id="pf-email-code" data-testid="pf-email-code" className="input mono" dir="ltr" autoComplete="one-time-code" placeholder="XXXX-XXXX" maxLength={16} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+      <Err id="pf-email-code-error" msg={err ?? (resend.isError ? errText(resend.error, t) : null)} />
+      <div className="flex flex-wrap gap-2">
+        <button type="submit" className="btn btn-accent" data-testid="pf-email-verify" disabled={!ready || verify.isPending}>{t('profile.email_verify')}</button>
+        <button type="button" className="btn" data-testid="pf-email-resend" disabled={resend.isPending} onClick={() => { verify.reset(); resend.mutate(undefined, { onSuccess: () => toast(t('profile.email_code_sent')) }); }}>{t('profile.email_resend')}</button>
+      </div>
+    </form>
+  );
+}
+
+/** 0.12.6 (D156): the sign-in phone changes through a request an admin approves (password re-entered; empty = remove the phone). */
+function PhoneSection({ p }: { p: MyProfile }) {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const ask = useRequestPhoneChange(), cancel = useCancelPhoneChange();
+  const [phone, setPhone] = useState('');
+  const [pw, setPw] = useState('');
+  const local = p.auth_method === 'local' && p.local_sign_in;
+  const ch = p.phone_change;
+  const pending = ch?.status === 'pending' ? ch : null;
+  const clean = phone.replace(/[\s().-]/g, '');
+  const remove = !clean;
+  const bad = !!clean && !E164.test(clean);
+  const ready = !!pw && !bad && (remove ? !!p.phone : clean !== p.phone);
+  const srv = fieldErrors(ask.error);
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready || ask.isPending) return;
+    ask.mutate({ new_phone: remove ? null : clean, password: pw }, { onSuccess: () => { setPhone(''); setPw(''); toast(t('profile.phone_sent')); }, onError: () => setPw('') });
+  };
+  const askErr = !ask.isError ? null
+    : ask.error.status === 401 ? t('profile.err_password')
+      : srv.new_phone?.includes('duplicate') ? t('profile.err_phone_dup')
+        : srv.new_phone?.includes('same_as_current') ? t('profile.err_phone_same')
+          : ask.error.status === 429 ? t('login.rate') : errText(ask.error, t);
+  const shown = (v: string | null | undefined) => v ?? t('profile.phone_none');
+  return (
+    <Section id="phone" icon={<Phone size={18} aria-hidden />} title={t('profile.phone')}>
+      <p className="text-sm">{t('profile.phone_current')}: <b dir="ltr" data-testid="pf-phone">{shown(p.phone)}</b></p>
+      <p className="text-sm text-mute">{t('profile.phone_note')}</p>
+      {pending && (
+        <div className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="pf-phone-pending">
+          <p>{t('profile.phone_pending', { phone: shown(pending.new_phone), date: fmtDateTime(pending.requested_at, i18n.language) })}</p>
+          <button className="btn mt-2" data-testid="pf-phone-cancel" disabled={cancel.isPending} onClick={() => cancel.mutate(undefined, { onSuccess: () => toast(t('profile.phone_cancelled')) })}>{t('profile.phone_cancel')}</button>
+          <Err id="pf-phone-cancel-error" msg={cancel.isError ? errText(cancel.error, t) : null} />
+        </div>
+      )}
+      {ch && ch.status === 'rejected' && <p className="rounded-md bg-lateBg p-2 text-sm text-lateInk" data-testid="pf-phone-rejected">{t('profile.phone_rejected', { phone: shown(ch.new_phone), reason: ch.decision_reason ?? '' })}</p>}
+      {ch && ch.status === 'approved' && <p className="rounded-md bg-doneBg p-2 text-sm text-doneInk" data-testid="pf-phone-approved">{t('profile.phone_approved', { phone: shown(ch.new_phone) })}</p>}
+      {!local
+        ? <p className="text-sm text-mute" data-testid="pf-phone-m365">{t('profile.phone_m365')}</p>
+        : !pending && (
+          <form onSubmit={submit} className="space-y-3" noValidate data-testid="pf-phone-form">
+            <div>
+              <label className="block text-sm font-semibold" htmlFor="pf-new-phone">{t('profile.phone_new')}</label>
+              <input id="pf-new-phone" data-testid="pf-new-phone" className="input mt-1" dir="ltr" type="tel" placeholder="+218911234567" value={phone} onChange={(e) => setPhone(e.target.value)} aria-invalid={bad} />
+              <p className="mt-1 text-xs text-mute">{t('profile.phone_hint')}</p>
+              <Err id="pf-new-phone-error" msg={bad ? t('profile.err_phone') : null} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold" htmlFor="pf-phone-password">{t('profile.password_confirm')}</label>
+              <input id="pf-phone-password" data-testid="pf-phone-password" className="input mt-1" dir="ltr" type="password" autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+            </div>
+            <Err id="pf-phone-error" msg={askErr} />
+            <div className="flex justify-end"><button type="submit" className="btn btn-accent" data-testid="pf-phone-submit" disabled={!ready || ask.isPending}>{remove && p.phone ? t('profile.phone_remove') : t('profile.phone_submit')}</button></div>
           </form>
         )}
     </Section>

@@ -99,7 +99,11 @@ const fresh = () => ({
   pending: null as null | { account: string; kind: 'two_factor' | 'enrol'; until: number },
   /** 0.9.2 self-service profile: the user's own edits (keyed by account) and the email change requests. */
   profiles: {} as Record<string, { display_name?: string; phone?: string | null; locale?: 'en' | 'ar'; theme?: 'light' | 'dark'; email?: string; version: number }>,
-  emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null }[],
+  emailChanges: [] as { id: string; account: string; old_email: string; new_email: string; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null;
+    /** 0.12.6 (Q158): the code "mailed" to the new address (the mock has no mail: it is always the demo code), and the check made. */
+    code?: string | null; attempts?: number; verify_sent_at?: string | null; verify_expires_at?: string | null; verified_at?: string | null; verified_via?: 'code' | 'admin_check' | null; identity_check?: string | null }[],
+  /** 0.12.6 (D156): phone change requests (the phone is a sign-in identifier, changed only on an admin's approval). */
+  phoneChanges: [] as { id: string; account: string; old_phone: string | null; new_phone: string | null; status: 'pending' | 'approved' | 'rejected' | 'cancelled'; requested_at: string; decided_at: string | null; decision_reason: string | null; decided_by: string | null }[],
 });
 
 export type Db = ReturnType<typeof fresh>;

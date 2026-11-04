@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import { ProblemException, FieldError } from './problem';
+import { ProblemException, FieldError, problems } from './problem';
 
 interface PgInfo {
   sqlstate?: string;
@@ -235,6 +235,25 @@ export function mapDbError(e: unknown): ProblemException | null {
       if (/two-factor is off for this user: turn it on first/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'Two-factor is off for this user: turn it on first.' });
       if (/an email change is already pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'An email change is already waiting for approval. Cancel it first.' });
       if (/this email change is not pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This email change is no longer waiting for a decision.' });
+      // P8 (0058): phone change requests and the verified email address
+      if (/email_not_verified/i.test(msg)) {
+        return new ProblemException(409, 'email_not_verified', {
+          detail: 'The new address is not confirmed yet. The user enters the code mailed to it, or you record the identity check you made.',
+          errors: [{ path: '/identity_check', code: 'required', message: 'Record how you confirmed that the address belongs to the user.' }],
+        });
+      }
+      if (/this email change is already verified/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'The new address is already confirmed.' });
+      if (/identity_check: /i.test(msg)) return problems.validation([{ path: '/identity_check', code: 'invalid', message: '3 to 1000 characters.' }]);
+      if (/a phone change is already pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'A phone change is already waiting for approval. Cancel it first.' });
+      if (/this phone change is not pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This phone change is no longer waiting for a decision.' });
+      if (/new_phone: already used or requested/i.test(msg)) {
+        return new ProblemException(409, 'duplicate', { detail: 'This phone is already used or requested by another account.', errors: [{ path: '/new_phone', code: 'duplicate', message: 'Already used or requested by another account.' }] });
+      }
+      if (/new_phone: /i.test(msg)) {
+        const same = /already your phone/i.test(msg);
+        return problems.validation([{ path: '/new_phone', code: same ? 'same_as_current' : 'invalid', message: same ? 'This is already your phone.' : 'Use the E.164 form, for example +218912345678.' }],
+          same ? 'This is already your phone.' : 'The phone is not valid.');
+      }
       if (/email: already used by another account/i.test(msg)) {
         return new ProblemException(409, 'duplicate', { detail: 'This email is already used or requested by another account.', errors: [{ path: '/new_email', code: 'duplicate', message: 'Already used or requested by another account.' }] });
       }

@@ -43,3 +43,6 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON snag_severities, snag_level_voters FR
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON snag_severities, snag_level_voters FROM pmis_app;  -- 0056 (P6): the snag severity catalogue only through admin_save_snag_severities, the all-members votes of a snag L2 only through qc_transition_snag; the documents and QC settings only through admin_save_documents_qc (audited)
 -- P5 (migration 0057, Q104): the list catalogue is written only through admin_save_list_catalogue and admin_save_list_value (fields.edit for all regions, a reason, If-Match, audited)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON list_catalogues, list_values FROM pmis_app;
+-- P8 (0058): identity and profile
+REVOKE ALL ON phone_change_requests FROM pmis_app;  -- 0058: phone change requests (D156) only through idm_request_phone_change, idm_cancel_phone_change, idm_decide_phone_change, idm_my_phone_changes and idm_phone_change_list
+REVOKE ALL ON email_change_requests FROM pmis_app;  -- 0058: still no right; the address check (Q158) only through idm_email_change_set_verification and idm_email_change_verify

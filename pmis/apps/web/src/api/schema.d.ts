@@ -704,9 +704,10 @@ export interface paths {
         head?: never;
         /**
          * Change my own name, phone, language or theme (0.9.2)
-         * @description Only `display_name`, `phone` (E.164 or null, unique: 409 `duplicate`), `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+         * @description Only `display_name`, `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
          *     `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
-         *     naming them; the email changes only through `POST /me/email-change`. Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
+         *     naming them; the email changes only through `POST /me/email-change`, and **0.12.6 (D156):** the phone only through
+         *     `POST /me/phone-change` (`phone` here is 403 `field_read_only`). Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
          *     with the before and after values of what really changed (`profile_updated`); sending the current values changes nothing.
          */
         patch: operations["updateMyProfile"];
@@ -751,6 +752,8 @@ export interface paths {
          *     One pending request per user (409 `invalid_transition`: cancel it first). The address must be free: not the email of any account and
          *     not asked for in another pending request (409 `duplicate`); the current email is 422. The deciders are told in the inbox
          *     (`email_change_requested`). Audited. Local accounts only (an M365 session gets 403).
+         *     **0.12.6 (Q158):** a one-time code (XXXX-XXXX) is mailed to the new address, valid `email_change.verify_hours` (default 24); only its
+         *     keyed hash is stored. The old address gets a notice. The user enters the code with `POST /me/email-change/verify`.
          */
         post: operations["requestMyEmailChange"];
         /**
@@ -758,6 +761,78 @@ export interface paths {
          * @description 404 when no request is pending. Audited (`email_change_cancelled`).
          */
         delete: operations["cancelMyEmailChange"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/email-change/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm the new address with the code mailed to it (0.12.6)
+         * @description Q158. The code that reached the new address of the pending request (case and dash do not matter). A wrong code is 422 `invalid_code`
+         *     (`errors[0].code` `invalid`) and is counted; after five wrong codes, or once it expired, it no longer works (`errors[0].code` `locked`
+         *     or `expired`): send a new one. 404 when nothing is pending, 409 when no code was sent. Entering it again after success returns the
+         *     request. Audited (`email_change_verified`).
+         */
+        post: operations["verifyMyEmailChange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/email-change/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mail a new code to the new address (0.12.6)
+         * @description Q158. A new code for the pending, unverified request; the previous code stops working and the attempts start again. Rate-limited.
+         *     404 when nothing is pending, 409 when the address is already confirmed. Audited (`email_change_verification_sent`).
+         */
+        post: operations["resendMyEmailChangeCode"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/phone-change": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask for a new sign-in phone (an admin approves it) (0.12.6)
+         * @description D156: the phone is a sign-in identifier. The new phone in E.164 form, or null to remove it, and the password re-entered (a wrong
+         *     password is 401 `invalid_credentials` and counts toward the lock). Stored as `pending`; the phone does not change until an admin
+         *     approves it. One pending request per user (409 `invalid_transition`: cancel it first). The number must be free: not the phone of any
+         *     account and not asked for in another pending request (409 `duplicate`, `errors[0].path` `/new_phone`); the current phone is 422. The
+         *     deciders are told in the inbox (`phone_change_requested`) and the user by mail. Audited. Local accounts only (an M365 session gets 403).
+         */
+        post: operations["requestMyPhoneChange"];
+        /**
+         * Cancel my pending phone change (0.12.6)
+         * @description 404 when no request is pending. Audited (`phone_change_cancelled`).
+         */
+        delete: operations["cancelMyPhoneChange"];
         options?: never;
         head?: never;
         patch?: never;
@@ -824,7 +899,8 @@ export interface paths {
          * @description Needs the password and a TOTP `code` or one `recovery_code` (missing: 422, nothing counted). **403 `two_factor_enforced` when an admin
          *     enforces it** (`User.two_factor_enforced`), answered before anything is counted. A wrong password (401 `invalid_credentials`) or code
          *     (401 `invalid_code`) counts toward the lock. On success the secret, the recovery codes and pending sign-ins are deleted. 409 when
-         *     two-factor is not on. Audited (`two_factor_self_disabled`).
+         *     two-factor is not on. Audited (`two_factor_self_disabled`). **0.12.6 (Q161):** the user's other sessions end (this one stays), and a
+         *     `security_notice` goes to the inbox and by mail; the audit row records `sessions_ended`.
          */
         post: operations["disableMyTwoFactor"];
         delete?: never;
@@ -999,7 +1075,8 @@ export interface paths {
          *     code. **0.6.0:** the answer carries a one-time `enrol_code` (and `enrol_code_expires_at`), shown only in this answer and never cached: the
          *     admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
          *     recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
-         *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
+         *     no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one). **0.12.6 (Q161):** off also ends every session of the user
+         *     and writes a `security_notice` (inbox and mail).
          *     The change is audited with before and after (never the secret).
          *     **0.9.2:** turning it on also marks it **enforced by admin** (`User.two_factor_enforced`), so the user cannot turn it off; "on" for a user who
          *     already turned it on themselves marks it enforced and returns no code. Turning it off clears the mark. A user whose two-factor is not
@@ -1075,8 +1152,55 @@ export interface paths {
          *     first M365 sign-in matches); uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409
          *     `invalid_transition`. The user is told in the inbox (`email_change_decided`). Audited (`email_changed` or `email_change_rejected`) with
          *     before and after.
+         *     **0.12.6 (Q158):** `approve` needs a verified address (the user entered the mailed code); otherwise 409 `email_not_verified`, unless
+         *     `identity_check` records the documented check the admin made while mail is unavailable (stored and audited). The old and the new
+         *     address are told of the decision by mail (no reason in the mail).
          */
         post: operations["decideEmailChangeRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone-change-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Phone change requests to decide (0.12.6)
+         * @description D156. System Admin, or a delegate holding `users.edit` for all regions (403 otherwise). `status` defaults to `pending`; `all` lists every
+         *     request. Newest first, at most 200.
+         */
+        get: operations["listPhoneChangeRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/phone-change-requests/{request_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject a phone change (0.12.6)
+         * @description D156. System Admin, or a delegate holding `users.edit` for all regions; a delegate never for an admin or a delegate. **Never on one's own
+         *     account** (403 `self_beneficiary`). Needs a reason and step-up. Only `approve` changes the user's phone (a sign-in identifier);
+         *     uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409 `invalid_transition`. The user is told in the
+         *     inbox (`phone_change_decided`) and by mail. Audited (`phone_changed` or `phone_change_rejected`) with before and after.
+         */
+        post: operations["decidePhoneChangeRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1202,7 +1326,10 @@ export interface paths {
         put?: never;
         /**
          * Assign one role to many people, or many roles to one person
-         * @description Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11).
+         * @description Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11). **0.12.6 (Q18):** a row
+         *     overlaps only when the same person holds the same role in an overlapping period **and** the two rows share a region **and** a module
+         *     (`all` shares everything); rows for other regions or modules are created. The skipped item lists the conflicting assignment ids in
+         *     `conflicts`. `bulk-update` refuses (failed, `already_assigned`) a change that makes a row overlap another row, and `copy` skips the same way.
          *     Rows whose beneficiary is the caller are refused with `self_beneficiary` unless the caller is a System Admin without delegation.
          *     All rows share one `bulk_action_id` in the audit log. `dry_run=true` returns the same result without writing.
          */
@@ -6256,7 +6383,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -6290,6 +6417,8 @@ export interface components {
             ref: string;
             code: components["schemas"]["ErrorCode"];
             message?: string;
+            /** @description 0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module). */
+            conflicts?: string[];
         };
         Reason: string;
         /** @description Typed confirmation of a dangerous action (0.2.5). Must equal the target code or name named by the operation; a mismatch is 422 `confirmation_mismatch`. Optional: omitted means no typed check. */
@@ -6592,16 +6721,47 @@ export interface components {
             /** Format: date-time */
             decided_at: string | null;
             decision_reason: string | null;
+            /**
+             * Format: date-time
+             * @description 0.12.6 (Q158): when the new address was confirmed.
+             */
+            verified_at: string | null;
+            /**
+             * @description `code`: the user entered the mailed code; `admin_check`: the admin recorded an identity check.
+             * @enum {string|null}
+             */
+            verified_via: "code" | "admin_check" | null;
+            /** Format: date-time */
+            verify_sent_at: string | null;
+            /** Format: date-time */
+            verify_expires_at: string | null;
         };
         EmailChangeRequestAdmin: components["schemas"]["EmailChangeRequest"] & {
             user: components["schemas"]["UserRef"];
             decided_by: components["schemas"]["UserRef"] | null;
+            /** @description 0.12.6: the documented identity check of an approval without a code. */
+            identity_check: string | null;
         };
-        /** @description 0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. */
+        /** @description 0.12.6 (D156). A request to change the sign-in phone; `new_phone` null removes it. */
+        PhoneChangeRequest: {
+            /** Format: uuid */
+            id: string;
+            old_phone: string | null;
+            new_phone: string | null;
+            status: components["schemas"]["EmailChangeStatus"];
+            /** Format: date-time */
+            requested_at: string;
+            /** Format: date-time */
+            decided_at: string | null;
+            decision_reason: string | null;
+        };
+        PhoneChangeRequestAdmin: components["schemas"]["PhoneChangeRequest"] & {
+            user: components["schemas"]["UserRef"];
+            decided_by: components["schemas"]["UserRef"] | null;
+        };
+        /** @description 0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. 0.12.6 (D156): `phone` is no longer here (403 `field_read_only`); use `POST /me/phone-change`. */
         MyProfilePatch: {
             display_name?: string;
-            /** @description E.164; a local sign-in identifier, unique. */
-            phone?: string | null;
             /** @enum {string} */
             locale?: "en" | "ar";
             /** @enum {string} */
@@ -6619,6 +6779,7 @@ export interface components {
             email: string;
             /** @description Admin-owned. */
             employee_id: string | null;
+            /** @description The sign-in phone. 0.12.6: changes only through an approved phone change request. */
             phone: string | null;
             /** @enum {string} */
             locale: "en" | "ar";
@@ -6628,7 +6789,7 @@ export interface components {
             /** @enum {string} */
             auth_method: "local" | "m365" | "break_glass";
             local_sign_in: boolean;
-            editable_fields: ("display_name" | "phone" | "locale" | "theme")[];
+            editable_fields: ("display_name" | "locale" | "theme")[];
             admin_owned: {
                 roles: components["schemas"]["RoleRef"][];
                 teams: components["schemas"]["TeamKind"][];
@@ -6639,6 +6800,8 @@ export interface components {
             two_factor: components["schemas"]["MyTwoFactor"];
             /** @description The newest request, any status. */
             email_change: components["schemas"]["EmailChangeRequest"] | null;
+            /** @description 0.12.6: the newest phone change request, any status. */
+            phone_change: components["schemas"]["PhoneChangeRequest"] | null;
             version: number;
         };
         Me: {
@@ -10923,7 +11086,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -13098,6 +13261,114 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    verifyMyEmailChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Verified. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    resendMyEmailChangeCode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    requestMyPhoneChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    new_phone: string | null;
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Pending. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneChangeRequest"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    cancelMyPhoneChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     startMyTwoFactorEnrolment: {
         parameters: {
             query?: never;
@@ -13595,6 +13866,8 @@ export interface operations {
                     /** @enum {string} */
                     decision: "approve" | "reject";
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.6: how the admin confirmed the address when it is not verified by code. */
+                    identity_check?: string;
                 };
             };
         };
@@ -13606,6 +13879,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmailChangeRequestAdmin"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listPhoneChangeRequests: {
+        parameters: {
+            query?: {
+                status?: "pending" | "approved" | "rejected" | "cancelled" | "all";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["PhoneChangeRequestAdmin"][];
+                        page: components["schemas"]["PageInfo"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    decidePhoneChangeRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "reject";
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Decided. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PhoneChangeRequestAdmin"];
                 };
             };
             401: components["responses"]["Unauthorized"];

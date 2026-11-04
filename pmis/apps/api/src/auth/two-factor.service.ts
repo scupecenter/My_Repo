@@ -163,6 +163,19 @@ export class TwoFactorService {
     return { code, hash: hashEnrolCode(this.key, userId, normaliseEnrolCode(code)) };
   }
 
+  /**
+   * P8 (Q158): the one-time code mailed to a requested new email address (same XXXX-XXXX form as an enrolment code). The keyed hash is bound
+   * to the request (`email-verify:<request id>` in place of the user id), so it never matches an enrolment code or another request.
+   */
+  newEmailVerifyCode(requestId: string): { code: string; hash: string } {
+    const code = generateEnrolCode();
+    return { code, hash: this.emailVerifyHash(requestId, code) };
+  }
+
+  emailVerifyHash(requestId: string, typed: string): string {
+    return hashEnrolCode(this.key, `email-verify:${requestId}`, normaliseEnrolCode(typed));
+  }
+
   /** Hash of what the user typed. A text that is not a well-formed code is hashed too, so the database counts it as a wrong code. */
   private enrolHash(userId: string, typed: string): string {
     return hashEnrolCode(this.key, userId, normaliseEnrolCode(typed));
@@ -243,8 +256,10 @@ export class TwoFactorService {
   }
 
   /** Turns two-factor off; the password and a code were checked just before in this transaction. Refused when an admin enforces it. */
-  async selfDisable(userId: string, sessionId: string): Promise<void> {
-    await this.db.tx.$executeRaw`SELECT auth_totp_self_disable(${userId}::uuid, ${sessionId}::uuid)`;
+  /** Turns it off (0058, Q161: the other sessions end). Returns how many other sessions ended. */
+  async selfDisable(userId: string, sessionId: string): Promise<number> {
+    const rows = await this.db.tx.$queryRaw<{ n: number }[]>`SELECT auth_totp_self_disable(${userId}::uuid, ${sessionId}::uuid) AS n`;
+    return Number(rows[0]?.n ?? 0);
   }
 
   // ------------------------------------------------------------------ outcomes

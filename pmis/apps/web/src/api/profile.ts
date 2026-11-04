@@ -1,4 +1,4 @@
-// The self-service "My profile" page (contract 0.9.2): details, email change request, password, two-factor on/off.
+// The self-service "My profile" page (contract 0.9.2, 0.12.6): details, email and phone change requests, password, two-factor on/off.
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, setCsrfToken } from './client';
 import type { components } from './schema';
@@ -11,6 +11,8 @@ export type MyTwoFactor = S['MyTwoFactor'];
 export type EmailChangeRequest = S['EmailChangeRequest'];
 export type EmailChangeRequestAdmin = S['EmailChangeRequestAdmin'];
 export type EmailChangeStatus = S['EmailChangeStatus'];
+export type PhoneChangeRequest = S['PhoneChangeRequest'];
+export type PhoneChangeRequestAdmin = S['PhoneChangeRequestAdmin'];
 
 const PROFILE = ['my-profile'] as const;
 
@@ -56,6 +58,34 @@ export function useCancelEmailChange() {
   return useMutation<void, ApiError, void>({ mutationFn: () => api.del<void>('/me/email-change'), onSuccess: refresh });
 }
 
+/** 0.12.6 (Q158): the code mailed to the new address, and a new code. */
+export function useVerifyEmailChange() {
+  const refresh = useRefreshSelf();
+  return useMutation<EmailChangeRequest, ApiError, { code: string }>({
+    mutationFn: (body) => api.post<EmailChangeRequest>('/me/email-change/verify', { body }),
+    onSuccess: refresh,
+  });
+}
+
+export function useResendEmailCode() {
+  const refresh = useRefreshSelf();
+  return useMutation<EmailChangeRequest, ApiError, void>({ mutationFn: () => api.post<EmailChangeRequest>('/me/email-change/resend'), onSuccess: refresh });
+}
+
+/** 0.12.6 (D156): the phone is a sign-in identifier; a change is a request an admin approves. `new_phone` null removes it. */
+export function useRequestPhoneChange() {
+  const refresh = useRefreshSelf();
+  return useMutation<PhoneChangeRequest, ApiError, { new_phone: string | null; password: string }>({
+    mutationFn: (body) => api.post<PhoneChangeRequest>('/me/phone-change', { body }),
+    onSuccess: refresh,
+  });
+}
+
+export function useCancelPhoneChange() {
+  const refresh = useRefreshSelf();
+  return useMutation<void, ApiError, void>({ mutationFn: () => api.del<void>('/me/phone-change'), onSuccess: refresh });
+}
+
 /** The secret is shown once: it must not stay in the mutation cache (`gcTime: 0`). The step-up is asked by the client handler. */
 export const useSelfEnrolStart = () => useMutation<TwoFactorEnrolment, ApiError, void>({ gcTime: 0, mutationFn: () => api.post<TwoFactorEnrolment>('/me/two-factor/enrol/start') });
 
@@ -82,9 +112,20 @@ export const useEmailChangeRequests = (enabled: boolean, status: EmailChangeStat
 
 export function useDecideEmailChange() {
   const qc = useQueryClient();
-  return useMutation<EmailChangeRequestAdmin, ApiError, { id: string; decision: 'approve' | 'reject'; reason: string }>({
+  return useMutation<EmailChangeRequestAdmin, ApiError, { id: string; decision: 'approve' | 'reject'; reason: string; identity_check?: string }>({
     mutationFn: ({ id, ...body }) => api.post<EmailChangeRequestAdmin>(`/email-change-requests/${id}/decide`, { body }),
     onSuccess: () => { void qc.invalidateQueries({ queryKey: ['email-change-requests'] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
+  });
+}
+
+export const usePhoneChangeRequests = (enabled: boolean, status: EmailChangeStatus | 'all' = 'pending') =>
+  useQuery({ queryKey: ['phone-change-requests', status], enabled, retry: false, queryFn: () => api.get<{ items: PhoneChangeRequestAdmin[] }>('/phone-change-requests', { query: { status } }) });
+
+export function useDecidePhoneChange() {
+  const qc = useQueryClient();
+  return useMutation<PhoneChangeRequestAdmin, ApiError, { id: string; decision: 'approve' | 'reject'; reason: string }>({
+    mutationFn: ({ id, ...body }) => api.post<PhoneChangeRequestAdmin>(`/phone-change-requests/${id}/decide`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['phone-change-requests'] }); void qc.invalidateQueries({ queryKey: ['users'] }); },
   });
 }
 

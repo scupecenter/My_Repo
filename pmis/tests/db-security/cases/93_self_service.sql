@@ -85,11 +85,11 @@ SELECT idm_update_own_profile('{"display_name": "Nobody"}'::jsonb);
 -- @end
 
 -- @case SP-10
--- @title Alice takes Bob's phone number through the profile function (uniqueness)
+-- @title Alice takes Bob's phone number through the profile function (0058: the phone is no longer self-edited at all)
 -- @category self-service
 -- @actor ALICE
 -- @region 1
--- @expect error P0001 phone: already used by another account
+-- @expect error 42501 ask for a phone change
 SELECT idm_update_own_profile('{"phone": "+218910000003"}'::jsonb);
 -- @end
 
@@ -306,5 +306,5 @@ SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE spok2 AS SELECT idm_request_email_change('bob.approved@example.test') AS id;
 SET app.user_id = '{{ADMIN}}';
 SET app.region_ids = '*';
-SELECT idm_decide_email_change((SELECT id FROM spok2), true, 'Verified by phone');
+SELECT idm_decide_email_change((SELECT id FROM spok2), true, 'Verified by phone', 'Called the user on the registered phone (0058)');
 -- @end

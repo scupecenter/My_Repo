@@ -14,6 +14,8 @@ import { checkIfMatch } from '../common/etag';
 import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { MailPort } from '../mail/mail.port';
+import { notifyByMail, PROFILE_MAIL } from '../me/profile.service';
 import { AssignmentDto, GroupRef, PickerItem, UserDto, UsersRepo } from './users.repo';
 
 const reason = z.string().trim().min(3).max(1000);
@@ -85,6 +87,7 @@ export class UsersService {
     private readonly stepUp: StepUpService,
     private readonly syslog: SyslogService,
     private readonly twoFactor: TwoFactorService,
+    private readonly mail: MailPort,
   ) {}
 
   async list(auth: AuthContext, q: Query): Promise<{ items: UserDto[]; page: { limit: number; next_cursor: string | null; total: number } }> {
@@ -285,6 +288,8 @@ export class UsersService {
     await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
     this.states.invalidate(user.id);
     await this.syslog.write('info', body.enabled ? 'two_factor_enabled_by_admin' : 'two_factor_disabled_by_admin', { target_user: user.id }, auth.user.id);
+    // 0058 (Q161): turning it off ended the user's sessions and wrote a security notice; the user is also told by mail
+    if (!body.enabled && user.two_factor !== 'off') await notifyByMail(this.mail, this.syslog, [user.email], PROFILE_MAIL.twoFactorOff(true), auth.user.id);
     return changeOf(rows[0]!, fresh.code);
   }
 

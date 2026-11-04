@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.5
+  version: 0.12.6
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.6 (2026-11-04): identity and profile follow-up of the owner answers of 2026-11-04 (work package P8, migration 0058, CHANGELOG 86). **Not additive for the phone:** (1) D156: the phone is a sign-in identifier, so `PATCH /me/profile` no longer takes `phone` (403 `field_read_only`, `errors[]` names `/phone` and points to the request) and `MyProfile.editable_fields` is `display_name`, `locale`, `theme`. A phone change is a request an admin approves, like the email: `POST /me/phone-change` (new E.164 phone or null, the password re-entered; one pending request per user; the number must be free), `DELETE /me/phone-change` (cancel while pending), `GET /phone-change-requests` and `POST /phone-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account); `MyProfile.phone_change`; notification kinds `phone_change_requested` and `phone_change_decided`. (2) Q158: the new email address is verified before an approval. `POST /me/email-change` mails a one-time code (XXXX-XXXX, valid `email_change.verify_hours`, default 24) to the new address and a notice to the old one; `POST /me/email-change/verify` and `POST /me/email-change/resend`; `EmailChangeRequest` carries `verified_at`, `verified_via` (`code`, `admin_check`), `verify_sent_at` and `verify_expires_at`. An approval of an unverified address is 409 `email_not_verified` unless the admin sends `identity_check` (the documented check made while mail is unavailable; stored in `EmailChangeRequestAdmin.identity_check` and audited). Old and new addresses are told of the decision by mail. (3) Q161: turning two-factor off ends the other sessions (self, from the profile) or all the user's sessions (admin, `PUT /users/{user_id}/two-factor`), and writes a `security_notice` to the user's inbox and by mail. (4) Q18: an assignment overlaps only when the same person and role overlap in dates **and** share a region **and** a module; `BulkItemIssue.conflicts` lists the conflicting assignment ids. New error code `email_not_verified`.
     - 0.12.5 (2026-11-04): additive. The register framework of work package P5 (owner answers Q12, Q104, Q111 and D108b; migration 0057; CHANGELOG 85). (1) Q104, lists are data: new tag `lists` with `GET`/`POST /list-catalogues`, `GET`/`PATCH /list-catalogues/{catalogue_code}`, `POST /list-catalogues/{catalogue_code}/values` and `PATCH /list-catalogues/{catalogue_code}/values/{value_id}` (System Admin or a delegate of `fields` edit for all regions; a reason; If-Match; audited with before and after). A value has a stable `code` (the text stored in the records), EN/AR labels, `aliases` (old names that map to it), `groups` and `is_active` (deactivated, never deleted). A list has `critical`, `status` (`pending` = a draft for the owner's review, `confirmed`) and `allow_other`. Every list field of a register now reads its catalogue: `RegisterField.list` names it and `options` lists its active values with their Arabic labels; a value may be typed as its code, its label or an alias. A list that accepts another value keeps it as typed and the record shows the warning `list_other`; a critical list accepts only its values, and while it has no active value the final approval of a record of a register that uses it answers 422 `list_not_configured` (new error code; `lists` names them). An inactive value may stay only where the previous version had it (422 `validation_failed`, code `inactive_value`, at submit). (2) Field types: `RegisterField.type` gains `multi_user`, `multi_site`, `child_list` and `warehouse_item`; `file` and `multi_list` are now used by register fields. Values: `multi_user` and `multi_site` are arrays of ids (users may be given by employee ID or e-mail, sites by code); `warehouse_item` is an item id (or its code on input); `file` is the id of a file uploaded to a document slot of the record (checked at submit, code `file_not_attached`: a typed reference is not an upload); `child_list` is an array of row objects with the columns of `RegisterField.columns` and a stable `id` given by the server. `RegisterRecord.refs` resolves the ids of a record to names and codes for display. (3) Q12 / Q111, Meetings: new fields `organiser`, `attendee_users`, `linked_site_ids` (empty = a project-wide meeting), `minutes_file` and `action_items_list` (action, owner, due date, status, closed date, task link; a closed status needs the closed date). The old free-text fields `attendees`, `linked_sites`, `minutes_ref` and `action_items` are read-only; `GET /registers/{register_key}/records/{record_id}/legacy-conversion` proposes the structured values from them and `POST` of the same path applies the reviewed values once (409 `duplicate` when done already; a reason; audited). (4) D108b: As-Built gains `rf_height_note` beside the number `rf_height`. (5) Templates: multi values are separated by ";"; file and child-list columns are grey and never read.
     - 0.12.4 (2026-11-04): additive, plus two rule changes the owner decided. Work package P6 of the owner answers of 2026-11-04 (documents, QC snags and storage; migration 0056; CHANGELOG 82). (1) Storage (Q195, Q199): a file stored while the virus scanner was down (`pending_rescan`) stays in quarantine: `GET /files/{file_id}/download` answers 409 `file_pending_scan` until the rescan passes it, and a zip export leaves it out and lists it in its `manifest.csv`; CSV log exports are generated content and no longer pass the scanner; every download is released only after the GCM tag, the size and the SHA-256 of the plaintext are verified. (2) Documents: `DocumentSlot.determination_pending` (Q226: B1 reads only the approved Procurement orders in force; with no approved order, an order without a delivery or mixed values the PR e-mail rule is pending, shown as not required with this flag, and the task cannot be approved: 422 `document_rule_pending`, unless Data Entry declared that the document applies); `DocumentSlot.shared_with` (Q227: a document type placed on a task and on the register of its source record is one requirement; a current file on either slot fills both); slots on global register records (Q228: Contractors, Risks, Meetings; `site_code` `GLOBAL`; visibility from the register module); `DocumentSlot.inherited_approval` and the setting `new_version_inherit` (Q229). (3) `GET` and `PUT /settings/documents-qc` (`DocumentsQcSettings`: `new_version_inherit`, `exif_tolerance_hours`, the read-only scan scope; System Admin or a delegate of `document_types` edit, reason, If-Match). (4) QC snags: `SnagInput.severity` is required and `found_by` optional (Q233, Q230); `GET` and `PUT /snag-severities` (the editable severity catalogue); `SnagType.stream` and `blocking_rule` (`always`, `by_severity`, `never`; QC_GENERAL stays `always`); `Snag.severity`, `severity_missing`, `blocks_acceptance`, `found_by`, `fixed_by`, `approved_by`, `register_record`, `approval_blocked`; **rule change D230b**: a snag is never self-approved: whoever raised, found or fixed it answers 403 `self_approval_forbidden` on approve, and the submission never closes it (B5 stays for every other task and record); an L2 cell set to `all_members` is honoured (Q231, `BallInCourt.votes_needed` / `votes_done`); `MatrixRowKey` gains `quality_te` (the Quality - TE row of QC snags, Q230); **rule change Q232**: a fix photo whose EXIF date (read in Africa/Tripoli) is in the future beyond the tolerance is kept as `pending_evidence` and decided by L2 through `POST /snags/{snag_id}/photos/{photo_id}/evidence`. (5) `RegisterRecord.qc_snag` (Q234, Q103): the approval of a Quality record of type snag creates or updates its QC snag; the snag is closed only by the QC photo flow.
     - 0.12.3 (2026-11-04): additive except where noted. Logs, monitoring and the mail service (work package P9, owner answers Q165 and Q167 to Q171 of 2026-11-04; migration 0055; CHANGELOG 81). (1) Q165: `Role.capabilities` (`audit_full_reader`, `team_lead`) decide who reads the whole Audit Log and who reads it as a Team Lead; `RolePatch.capabilities` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up, audited as `role_capabilities_set`). The settings `logs.audit.full_reader_roles` and `logs.audit.team_lead_roles` are used only while no role carries the capability. (2) Q167: the outbound mail service (SMTP from the environment). Security alerts are mailed to every active System Admin from `email_min_severity` up; other notification kinds only when listed in the setting `mail.notification_kinds` (empty during development). New `GET /admin/mail/status`, `POST /admin/mail/test` (System Admin; 422 `mail_not_configured` without SMTP), `GET /admin/mail/outbox` (no bodies) and `POST /admin/mail/outbox/{mail_id}/retry`. The channel reads `verified` only after a test mail went out with the current settings. New `GET /health` (no session; words only) for an external monitor. (3) Q168: `SecurityAlertSettings` gains `severity` (per rule), `mandatory_severity`, `email_min_severity` and `trusted_networks`; the input takes `severity`, `email_min_severity` and `trusted_networks` optionally (left out = kept); lowering a severity, raising the mail floor or adding a network is a weakening (step-up, alert). `SecurityAlert.severity` gains `info` (a new address inside a trusted network is softened one level, never dropped); `SecurityAlertRule` gains `malware_upload` (0.11.2) and `break_glass_used` (critical). Sign-in limiting per address is progressive: failures only, free up to 10 in 15 minutes, then a wait from 2 s doubling up to 60 s (429 `rate_limited` with `Retry-After`). (4) Q169: `GET /reports/activity?format=xlsx` answers the workbook (Summary, User Activity, Module Activity, Exports, Exceptions, About; no security log; audited as `report.activity_export`). (5) Q170: an Audit Log or security log export that matches more than 100 000 rows answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `*.export_refused`); nothing is cut. (6) Q171: `POST /admin/log-integrity/runs` starts the check as a job (202, `LogIntegrityRun` with `progress`), `GET /admin/log-integrity/runs` and `GET /admin/log-integrity/runs/{run_id}`; the same check runs every night (job `audit_integrity_check`) with the stored result and an external anchor; a break or `anchor_mismatch` raises `audit_integrity_failure`. `GET /audit-log/integrity` and `GET /security-log/integrity` answer 422 `integrity_too_large` above the setting `logs.integrity.sync_max_rows` (default 200 000). `ErrorCode` gains `too_many_rows`, `integrity_too_large` and `mail_not_configured`.
@@ -1042,9 +1043,10 @@ paths:
       operationId: updateMyProfile
       summary: Change my own name, phone, language or theme (0.9.2)
       description: |
-        Only `display_name`, `phone` (E.164 or null, unique: 409 `duplicate`), `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
+        Only `display_name`, `locale` and `theme`. Admin-owned fields (`email`, `employee_id`,
         `status`, `team`, `region_ids`, `roles`, `department_id`, `manager_id` and the like) answer 403 `field_read_only` with `errors[]`
-        naming them; the email changes only through `POST /me/email-change`. Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
+        naming them; the email changes only through `POST /me/email-change`, and **0.12.6 (D156):** the phone only through
+        `POST /me/phone-change` (`phone` here is 403 `field_read_only`). Unknown keys are 422. Needs `If-Match` (428 / 412). Audited once
         with the before and after values of what really changed (`profile_updated`); sending the current values changes nothing.
       x-db-path: idm_update_own_profile
       parameters:
@@ -1111,6 +1113,8 @@ paths:
         One pending request per user (409 `invalid_transition`: cancel it first). The address must be free: not the email of any account and
         not asked for in another pending request (409 `duplicate`); the current email is 422. The deciders are told in the inbox
         (`email_change_requested`). Audited. Local accounts only (an M365 session gets 403).
+        **0.12.6 (Q158):** a one-time code (XXXX-XXXX) is mailed to the new address, valid `email_change.verify_hours` (default 24); only its
+        keyed hash is stored. The old address gets a notice. The user enters the code with `POST /me/email-change/verify`.
       x-db-path: idm_request_email_change
       requestBody:
         required: true
@@ -1140,6 +1144,101 @@ paths:
       summary: Cancel my pending email change (0.9.2)
       description: 404 when no request is pending. Audited (`email_change_cancelled`).
       x-db-path: idm_cancel_email_change
+      responses:
+        '204': { description: Cancelled. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/email-change/verify:
+    post:
+      tags: [me]
+      operationId: verifyMyEmailChange
+      summary: Confirm the new address with the code mailed to it (0.12.6)
+      description: |
+        Q158. The code that reached the new address of the pending request (case and dash do not matter). A wrong code is 422 `invalid_code`
+        (`errors[0].code` `invalid`) and is counted; after five wrong codes, or once it expired, it no longer works (`errors[0].code` `locked`
+        or `expired`): send a new one. 404 when nothing is pending, 409 when no code was sent. Entering it again after success returns the
+        request. Audited (`email_change_verified`).
+      x-db-path: idm_email_change_verify
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, maxLength: 16 }
+      responses:
+        '200':
+          description: Verified.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/email-change/resend:
+    post:
+      tags: [me]
+      operationId: resendMyEmailChangeCode
+      summary: Mail a new code to the new address (0.12.6)
+      description: |
+        Q158. A new code for the pending, unverified request; the previous code stops working and the attempts start again. Rate-limited.
+        404 when nothing is pending, 409 when the address is already confirmed. Audited (`email_change_verification_sent`).
+      x-db-path: idm_email_change_set_verification
+      responses:
+        '200':
+          description: Sent.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /me/phone-change:
+    post:
+      tags: [me]
+      operationId: requestMyPhoneChange
+      summary: Ask for a new sign-in phone (an admin approves it) (0.12.6)
+      description: |
+        D156: the phone is a sign-in identifier. The new phone in E.164 form, or null to remove it, and the password re-entered (a wrong
+        password is 401 `invalid_credentials` and counts toward the lock). Stored as `pending`; the phone does not change until an admin
+        approves it. One pending request per user (409 `invalid_transition`: cancel it first). The number must be free: not the phone of any
+        account and not asked for in another pending request (409 `duplicate`, `errors[0].path` `/new_phone`); the current phone is 422. The
+        deciders are told in the inbox (`phone_change_requested`) and the user by mail. Audited. Local accounts only (an M365 session gets 403).
+      x-db-path: idm_request_phone_change
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [new_phone, password]
+              properties:
+                new_phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$' }
+                password: { type: string, format: password, maxLength: 128 }
+      responses:
+        '201':
+          description: Pending.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PhoneChangeRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [me]
+      operationId: cancelMyPhoneChange
+      summary: Cancel my pending phone change (0.12.6)
+      description: 404 when no request is pending. Audited (`phone_change_cancelled`).
+      x-db-path: idm_cancel_phone_change
       responses:
         '204': { description: Cancelled. }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -1214,7 +1313,8 @@ paths:
         Needs the password and a TOTP `code` or one `recovery_code` (missing: 422, nothing counted). **403 `two_factor_enforced` when an admin
         enforces it** (`User.two_factor_enforced`), answered before anything is counted. A wrong password (401 `invalid_credentials`) or code
         (401 `invalid_code`) counts toward the lock. On success the secret, the recovery codes and pending sign-ins are deleted. 409 when
-        two-factor is not on. Audited (`two_factor_self_disabled`).
+        two-factor is not on. Audited (`two_factor_self_disabled`). **0.12.6 (Q161):** the user's other sessions end (this one stays), and a
+        `security_notice` goes to the inbox and by mail; the audit row records `sessions_ended`.
       x-db-path: auth_totp_self_disable
       requestBody:
         required: true
@@ -1496,7 +1596,8 @@ paths:
         code. **0.6.0:** the answer carries a one-time `enrol_code` (and `enrol_code_expires_at`), shown only in this answer and never cached: the
         admin hands it to the user in person or by phone, and the user cannot enrol without it. Only a keyed hash is stored. Off: the secret, the
         recovery codes and any outstanding enrolment code are deleted. Setting what is already set changes nothing, writes no audit row and returns
-        no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one).
+        no code (use `POST /users/{user_id}/two-factor/enrol-code` for a new one). **0.12.6 (Q161):** off also ends every session of the user
+        and writes a `security_notice` (inbox and mail).
         The change is audited with before and after (never the secret).
         **0.9.2:** turning it on also marks it **enforced by admin** (`User.two_factor_enforced`), so the user cannot turn it off; "on" for a user who
         already turned it on themselves marks it enforced and returns no code. Turning it off clears the mark. A user whose two-factor is not
@@ -1607,8 +1708,78 @@ paths:
         first M365 sign-in matches); uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409
         `invalid_transition`. The user is told in the inbox (`email_change_decided`). Audited (`email_changed` or `email_change_rejected`) with
         before and after.
+        **0.12.6 (Q158):** `approve` needs a verified address (the user entered the mailed code); otherwise 409 `email_not_verified`, unless
+        `identity_check` records the documented check the admin made while mail is unavailable (stored and audited). The old and the new
+        address are told of the decision by mail (no reason in the mail).
       x-step-up: true
       x-db-path: idm_decide_email_change
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision, reason]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                reason: { $ref: '#/components/schemas/Reason' }
+                identity_check: { type: string, minLength: 3, maxLength: 1000, description: '0.12.6: how the admin confirmed the address when it is not verified by code.' }
+      responses:
+        '200':
+          description: Decided.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmailChangeRequestAdmin' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /phone-change-requests:
+    get:
+      tags: [users]
+      operationId: listPhoneChangeRequests
+      summary: Phone change requests to decide (0.12.6)
+      description: |
+        D156. System Admin, or a delegate holding `users.edit` for all regions (403 otherwise). `status` defaults to `pending`; `all` lists every
+        request. Newest first, at most 200.
+      x-db-path: idm_phone_change_list
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, approved, rejected, cancelled, all], default: pending }
+      responses:
+        '200':
+          description: Requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, page]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/PhoneChangeRequestAdmin' } }
+                  page: { $ref: '#/components/schemas/PageInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /phone-change-requests/{request_id}/decide:
+    post:
+      tags: [users]
+      operationId: decidePhoneChangeRequest
+      summary: Approve or reject a phone change (0.12.6)
+      description: |
+        D156. System Admin, or a delegate holding `users.edit` for all regions; a delegate never for an admin or a delegate. **Never on one's own
+        account** (403 `self_beneficiary`). Needs a reason and step-up. Only `approve` changes the user's phone (a sign-in identifier);
+        uniqueness is checked again (409 `duplicate`). A request that is no longer pending is 409 `invalid_transition`. The user is told in the
+        inbox (`phone_change_decided`) and by mail. Audited (`phone_changed` or `phone_change_rejected`) with before and after.
+      x-step-up: true
+      x-db-path: idm_decide_phone_change
       parameters:
         - name: request_id
           in: path
@@ -1630,7 +1801,7 @@ paths:
           description: Decided.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/EmailChangeRequestAdmin' }
+              schema: { $ref: '#/components/schemas/PhoneChangeRequestAdmin' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -1795,7 +1966,10 @@ paths:
       operationId: bulkAssign
       summary: Assign one role to many people, or many roles to one person
       description: |
-        Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11).
+        Creates one row per (user, role). Existing overlapping rows are skipped with `already_assigned` (AU-11). **0.12.6 (Q18):** a row
+        overlaps only when the same person holds the same role in an overlapping period **and** the two rows share a region **and** a module
+        (`all` shares everything); rows for other regions or modules are created. The skipped item lists the conflicting assignment ids in
+        `conflicts`. `bulk-update` refuses (failed, `already_assigned`) a change that makes a row overlap another row, and `copy` skips the same way.
         Rows whose beneficiary is the caller are refused with `self_beneficiary` unless the caller is a System Admin without delegation.
         All rows share one `bulk_action_id` in the audit log. `dry_run=true` returns the same result without writing.
       x-step-up: true
@@ -10125,6 +10299,7 @@ components:
         - document_rule_pending
         - file_pending_scan
         - list_not_configured
+        - email_not_verified
     PageEnvelope:
       type: object
       required: [items, page]
@@ -10172,6 +10347,7 @@ components:
         ref: { type: string, description: 'The item id, or `user_id:role_id` for assign rows.' }
         code: { $ref: '#/components/schemas/ErrorCode' }
         message: { type: string }
+        conflicts: { type: array, items: { type: string, format: uuid }, description: '0.12.6 (Q18): the existing assignments this row overlaps (dates, region and module).' }
     Reason:
       type: string
       minLength: 3
@@ -10437,7 +10613,7 @@ components:
       enum: [pending, approved, rejected, cancelled]
     EmailChangeRequest:
       type: object
-      required: [id, old_email, new_email, status, requested_at, decided_at, decision_reason]
+      required: [id, old_email, new_email, status, requested_at, decided_at, decision_reason, verified_at, verified_via, verify_sent_at, verify_expires_at]
       properties:
         id: { type: string, format: uuid }
         old_email: { type: string, format: email }
@@ -10446,9 +10622,34 @@ components:
         requested_at: { type: string, format: date-time }
         decided_at: { type: [string, 'null'], format: date-time }
         decision_reason: { type: [string, 'null'] }
+        verified_at: { type: [string, 'null'], format: date-time, description: '0.12.6 (Q158): when the new address was confirmed.' }
+        verified_via: { type: [string, 'null'], enum: [code, admin_check, null], description: '`code`: the user entered the mailed code; `admin_check`: the admin recorded an identity check.' }
+        verify_sent_at: { type: [string, 'null'], format: date-time }
+        verify_expires_at: { type: [string, 'null'], format: date-time }
     EmailChangeRequestAdmin:
       allOf:
         - $ref: '#/components/schemas/EmailChangeRequest'
+        - type: object
+          required: [user, decided_by, identity_check]
+          properties:
+            user: { $ref: '#/components/schemas/UserRef' }
+            decided_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+            identity_check: { type: [string, 'null'], description: '0.12.6: the documented identity check of an approval without a code.' }
+    PhoneChangeRequest:
+      type: object
+      description: '0.12.6 (D156). A request to change the sign-in phone; `new_phone` null removes it.'
+      required: [id, old_phone, new_phone, status, requested_at, decided_at, decision_reason]
+      properties:
+        id: { type: string, format: uuid }
+        old_phone: { type: [string, 'null'] }
+        new_phone: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/EmailChangeStatus' }
+        requested_at: { type: string, format: date-time }
+        decided_at: { type: [string, 'null'], format: date-time }
+        decision_reason: { type: [string, 'null'] }
+    PhoneChangeRequestAdmin:
+      allOf:
+        - $ref: '#/components/schemas/PhoneChangeRequest'
         - type: object
           required: [user, decided_by]
           properties:
@@ -10458,28 +10659,27 @@ components:
       type: object
       additionalProperties: false
       minProperties: 1
-      description: '0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`.'
+      description: '0.9.2. Only these fields are self-editable. Any admin-owned field is 403 `field_read_only`. 0.12.6 (D156): `phone` is no longer here (403 `field_read_only`); use `POST /me/phone-change`.'
       properties:
         display_name: { type: string, minLength: 1, maxLength: 200 }
-        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$', description: 'E.164; a local sign-in identifier, unique.' }
         locale: { type: string, enum: [en, ar] }
         theme: { type: string, enum: [light, dark] }
     MyProfile:
       type: object
       description: '0.9.2. The "My profile" page.'
-      required: [id, display_name, email, employee_id, phone, locale, theme, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, version]
+      required: [id, display_name, email, employee_id, phone, locale, theme, status, auth_method, local_sign_in, editable_fields, admin_owned, two_factor, email_change, phone_change, version]
       properties:
         id: { type: string, format: uuid }
         display_name: { type: string }
         email: { type: string, format: email, description: 'The login email. Changes only through an approved email change request.' }
         employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$', description: 'Admin-owned.' }
-        phone: { type: [string, 'null'] }
+        phone: { type: [string, 'null'], description: 'The sign-in phone. 0.12.6: changes only through an approved phone change request.' }
         locale: { type: string, enum: [en, ar] }
         theme: { type: string, enum: [light, dark] }
         status: { $ref: '#/components/schemas/UserStatus' }
         auth_method: { type: string, enum: [local, m365, break_glass] }
         local_sign_in: { type: boolean }
-        editable_fields: { type: array, items: { type: string, enum: [display_name, phone, locale, theme] } }
+        editable_fields: { type: array, items: { type: string, enum: [display_name, locale, theme] } }
         admin_owned:
           type: object
           required: [roles, teams, region_ids, department, manager]
@@ -10494,6 +10694,7 @@ components:
             manager: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
         two_factor: { $ref: '#/components/schemas/MyTwoFactor' }
         email_change: { oneOf: [{ $ref: '#/components/schemas/EmailChangeRequest' }, { type: 'null' }], description: 'The newest request, any status.' }
+        phone_change: { oneOf: [{ $ref: '#/components/schemas/PhoneChangeRequest' }, { type: 'null' }], description: '0.12.6: the newest phone change request, any status.' }
         version: { type: integer }
     Me:
       type: object
@@ -14445,7 +14646,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]
