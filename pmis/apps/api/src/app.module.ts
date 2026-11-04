@@ -96,6 +96,9 @@ import { SecurityLogService } from './logs/security-log.service';
 import { JobRunsService } from './logs/job-runs.service';
 import { ScenarioSettingsController, SiteApplicabilityController } from './scenario/scenario.controller';
 import { ScenarioService } from './scenario/scenario.service';
+import { IntegrityService } from './logs/integrity.service';
+import { HealthController, MailController } from './mail/mail.controller';
+import { MailService } from './mail/mail.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -106,6 +109,7 @@ export function appModuleFor(config: AppConfig) {
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
+      MailController, HealthController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -114,7 +118,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService,
+      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },

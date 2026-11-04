@@ -16,4 +16,5 @@ import { logsHandlers } from './handlers.logs';
 import { orgHandlers } from './handlers.org';
 import { realApiHandlers } from './realApi';
 import { logsWebHandlers } from './handlers.logsWeb';
-export const worker = setupWorker(...realApiHandlers(), ...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);
+import { p9Handlers } from './handlers.p9';
+export const worker = setupWorker(...realApiHandlers(), ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);

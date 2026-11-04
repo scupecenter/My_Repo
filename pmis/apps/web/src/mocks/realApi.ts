@@ -217,6 +217,15 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/settings/security-alerts'],
   ['put', '/settings/security-alerts'],
   ['get', '/reports/activity'],
+  // Contract 0.12.3: logs, monitoring and the mail service (apps/api: logs, mail; migration 0055). Mail delivery, the integrity checks as jobs, the health check.
+  ['get', '/admin/mail/status'],
+  ['post', '/admin/mail/test'],
+  ['get', '/admin/mail/outbox'],
+  ['post', '/admin/mail/outbox/:id/retry'],
+  ['get', '/admin/log-integrity/runs'],
+  ['post', '/admin/log-integrity/runs'],
+  ['get', '/admin/log-integrity/runs/:id'],
+  ['get', '/health'],
   // Contract 0.11.1: the documents follow-up of Q130 to Q132 (apps/api: sites, documents, qc; migration 0047). The site's custom fields (near_airport),
   // document slots on register records, QC snags and the photos of their fix.
   ['patch', '/sites/:id'],

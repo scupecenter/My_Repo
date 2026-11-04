@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.2
+  version: 0.12.3
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.3 (2026-11-04): additive except where noted. Logs, monitoring and the mail service (work package P9, owner answers Q165 and Q167 to Q171 of 2026-11-04; migration 0055; CHANGELOG 81). (1) Q165: `Role.capabilities` (`audit_full_reader`, `team_lead`) decide who reads the whole Audit Log and who reads it as a Team Lead; `RolePatch.capabilities` sets them (System Admin only, 403 `delegate_forbidden` for a delegate; reason, step-up, audited as `role_capabilities_set`). The settings `logs.audit.full_reader_roles` and `logs.audit.team_lead_roles` are used only while no role carries the capability. (2) Q167: the outbound mail service (SMTP from the environment). Security alerts are mailed to every active System Admin from `email_min_severity` up; other notification kinds only when listed in the setting `mail.notification_kinds` (empty during development). New `GET /admin/mail/status`, `POST /admin/mail/test` (System Admin; 422 `mail_not_configured` without SMTP), `GET /admin/mail/outbox` (no bodies) and `POST /admin/mail/outbox/{mail_id}/retry`. The channel reads `verified` only after a test mail went out with the current settings. New `GET /health` (no session; words only) for an external monitor. (3) Q168: `SecurityAlertSettings` gains `severity` (per rule), `mandatory_severity`, `email_min_severity` and `trusted_networks`; the input takes `severity`, `email_min_severity` and `trusted_networks` optionally (left out = kept); lowering a severity, raising the mail floor or adding a network is a weakening (step-up, alert). `SecurityAlert.severity` gains `info` (a new address inside a trusted network is softened one level, never dropped); `SecurityAlertRule` gains `malware_upload` (0.11.2) and `break_glass_used` (critical). Sign-in limiting per address is progressive: failures only, free up to 10 in 15 minutes, then a wait from 2 s doubling up to 60 s (429 `rate_limited` with `Retry-After`). (4) Q169: `GET /reports/activity?format=xlsx` answers the workbook (Summary, User Activity, Module Activity, Exports, Exceptions, About; no security log; audited as `report.activity_export`). (5) Q170: an Audit Log or security log export that matches more than 100 000 rows answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `*.export_refused`); nothing is cut. (6) Q171: `POST /admin/log-integrity/runs` starts the check as a job (202, `LogIntegrityRun` with `progress`), `GET /admin/log-integrity/runs` and `GET /admin/log-integrity/runs/{run_id}`; the same check runs every night (job `audit_integrity_check`) with the stored result and an external anchor; a break or `anchor_mismatch` raises `audit_integrity_failure`. `GET /audit-log/integrity` and `GET /security-log/integrity` answer 422 `integrity_too_large` above the setting `logs.integrity.sync_max_rows` (default 200 000). `ErrorCode` gains `too_many_rows`, `integrity_too_large` and `mail_not_configured`.
     - 0.12.2 (2026-11-04): additive. Work package P11 of the owner answers of 2026-11-04 (Q215, Q216, Q217, Q220, Q221, Q222, decision D220b; migration 0054; CHANGELOG 87). (1) Q215: every task or register record converted to the two fixed levels (by 0050 or now) sends one in-app notice, `NotificationKind` `levels_converted`, to the old reviewer and to the entry person, saying what changed and who is asked now. (2) Q216: `WorkflowStep.previous_path` and `RegisterRecordStep.previous_path` are true for the review and approve acts of the old 3-level path recorded before the conversion; the screens label them "previous path before conversion". (3) Q217: open items frozen on a one-level snapshot are converted to L1 / L2 after an impact report; an item whose L2 has no holder is held: its submission answers 422 `empty_cell` until the Responsibility Matrix names an L2 holder (System Admins alerted with `no_eligible_holder`). (4) Q220 / D220b: a permit's stream follows the activity. New Matrix rows `permits_hse_acq` (Acquisition / RF & Design; default L1 Acquisition Team and RF Engineer, L2 RF & Design / Acquisition Team Lead) and `permits_hse_om` (O&M; no default holder) beside `permits_hse` (CW) and `permits_hse_te`. City Council and Civil Aviation are on Acquisition / RF & Design; the purpose-based types (Access / PTW - Dismantle, Access - Survey, Access - QC / Maintenance, Security Clearance, Other Permit) carry the new Permits & HSE field `permit_stream` (`CW`, `TE`, `ACQ`, `OM`), chosen by the person entering the permit and required for those types; it decides the Matrix row. Refusals (422 `validation_failed`, path `/data/permit_stream`): `stream_required`, `stream_not_allowed`, `stream_fixed`. (5) Q221: the entry check of a permit runs at every save and at submit (403 `not_eligible_holder`). New `POST /registers/{register_key}/records/{record_id}/transfer` (Permits & HSE drafts only; `If-Match`, optional `note`): the holder of a draft who no longer holds L1 of its row hands it over, or a qualified holder takes over a draft held by such a person; the draft is pinned to the only qualified holder (or left to all of them), and both sides get `NotificationKind` `permit_transferred`; `RegisterRecord.allowed_actions` gains `transfer` and `RegisterRecordStep.action` gains `transfer`. (6) Q222: `RegisterDefinition.entry_permit_types` (Permits & HSE only) lists the permit types the caller may enter and the streams they may choose (`PermitEntryType`); the form offers only those, the database decides again on every write.
     - 0.12.1 (2026-11-04): work package P7, the Warehouse follow-up of the owner answers Q105, Q106, Q107 and decision D6 (migration 0053; CHANGELOG 83). Additive except where noted. (1) Q105: a Faulty or Damaged return goes to quarantine, never back to the available stock: `StockLevel.quarantine` is new and `on_hand` / `available` count only Good returns; the effective condition of each return line is written on the line when the RN posts; an RN with the reason "Faulty or Damaged" is refused on submit (422 `validation_failed`, `errors[].code` `condition_required` on `/lines/<n>/condition`) until every line or the document names a condition. (2) Q106: the numbering service is built: `GET /number-sequences`, `POST /number-sequences` and `PATCH /number-sequences/{sequence_key}` (System Admin or a delegate of `settings.edit` for all regions, a reason, audited; unknown keys 422; `next_value` only up, `only_up`; a pattern needs `{SEQ:n}` once and, for a yearly reset, the year: `sequence_token`, `year_required`). `NumberSequence` gains `record_type`, `region_id`, `region_code`, `last_issued_at` and `updated_at`; `form_kind` is now optional (a sequence numbers a form kind, a warehouse document type, or both). Seed: the Q32 CW sequences of Tripoli (`DN-CW-TR`, `RN-CW-TR`, `PAC-CW-TR`, `FAC-CW-TR`, `SL-CW-TR`) and, as assumptions, `DN-TE-TR`, `RN-TE-TR`, `PL-WH`, `OPEN-WH`, `ADJ-WH`. `POST /warehouse/movements` without `doc_no` takes the next number of the active sequence of its type and region (none = it stays empty and is typed before the submit); a typed number is still accepted when it is unique and was never issued by a sequence (409 otherwise). `StockMovement` gains `doc_no_locked`, `sequence_key` and `doc_date`: once posted, the Doc No. is locked, and an edit or a new version of its record that changes it answers 422 `validation_failed` with `doc_no_locked` on `/data/doc_no`. (3) Q107: `WarehouseItem.code_source` (`master`, `internal_provisional`); `NeedRule.status` (`confirmed`, `pending_configuration`, the default; a confirmed need has a quantity); `NeedRule.quantity_rule` and `applies_when` are now `NeedQuantityRule` and `NeedAppliesWhen` (documented shapes, unknown keys 422; they replace the generic `ConditionRule`, which no server ever read). (4) D6: `GET /warehouse/dispatch-status` (TE sites of the caller's regions, filters `need_status`, `region_id`, `q`) and `GET /warehouse/dispatch-status/{site_id}` (`SiteDispatch` with its lines): `te_dispatch_complete_date` is the date of the latest posted TE DN (Q65, for the Master comparison); `need_status` is the separate PMIS status `complete`, `short`, `pending_configuration` (a pending need, or a count that cannot be made yet: never complete) or `not_applicable`. (5) `GET /warehouse/region-vendors` and `PUT /warehouse/region-vendors/{region_id}` (Setting tblRegionVendor, D58; System Admin or a delegate of `warehouse.items.edit`; a reason; audited), and `GET /warehouse/config-gaps` (the owner data still missing).
     - 0.12.0 (2026-11-04): additive. Work package P1 of the owner answers of 2026-11-04 (migration 0052; CHANGELOG 80). (1) Q15, Q3: scenario applicability. `GET /sites/{site_id}/applicability` (`SiteApplicability`): per task whether it applies (`applies`, `source` scenario / flag / exception / none), whether its SLA is measured, the Site RFI decision (`rfi.applies` by scenario then flags, `rfi.master_rfi` the Master flags-only value for the comparison only), the scope conflicts and the scope exceptions. `POST /sites/{site_id}/applicability/apply` (step-up, reason; System Admin or a delegate of `task_definitions` edit in the site region) sets tasks N/A or applicable again: never an approved task or one in review or approval (listed in `result.kept`); audited per task. A Hot / Cold Swap with any of AA:AD = Yes is a conflict: 422 `scope_scenario_conflict` (new error code, `conflicts[]`) until the flags are corrected or `POST /sites/{site_id}/scope-exceptions` approves an exception (step-up, reason, optional approved Change Control record of the site; 422 `not_na_by_scenario`, `change_not_approved`, `duplicate`); `POST /sites/{site_id}/scope-exceptions/{exception_id}/revoke` revokes it (409 when already revoked). `GET/PUT /settings/scenario-rules` lists and replaces the rule list (ETag / If-Match, step-up, reason, audited). (2) Q2: D-1 starts at `MS4|MS1` (new start event grammar `A|B`: the first event that is not N/A on the site) and is not measured for Hot / Cold Swap: `SlaInfo.measured` false, no clock. (3) Q135: `SlaRule.pending_confirmation`, `SlaTaskRule.pending_confirmation` and `SlaInfo.pending_confirmation` (C-3 is "Pending SLA Confirmation"). (4) Q13, Q136: `SlaTaskRule.end_event` (`SlaEndEvent`: `gecol.installation_finish`, `hlc.installation_date`, `hlc.in_service_date`, `task.layout_submitted_date`; omitted = kept; 422 `unknown_end_event`), also on `SlaRule` and `SlaInfo`. The B6 task value `layout_submitted_date` (Layout Submitted Date; 422 `invalid_date` or `future_date` at `/values/layout_submitted_date`). (5) Q14: `GET /settings/sla-master-columns` (`SlaMasterColumn`, the 45 SLA sheet columns D:AV). (6) Q9: `GET /sites/{site_id}/gate-events` (`GateEvent`: opened, closed, date_moved). (7) Q180: gate dates use the effective dates of suspension and resumption (fallback: the approval date), window [start, resume). (8) D4b: `SlaInfo.tentative_holidays` and `due_date_tentative` ("tentative date" badge); `HolidaySummary.official_calendar_pending` (setting `calendar.official_confirmed`, pending owner data) and `tentative_counted`.
@@ -3795,7 +3796,7 @@ paths:
       tags: [audit]
       operationId: exportAuditLog
       summary: Export the filtered Audit Log as CSV (job; the export is itself audited)
-      description: Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows (at most 100 000). The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
+      description: Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows. **At most 100 000 rows per file (Q170, 0.12.3).** A filter that matches more answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `audit_log.export_refused`); narrow the filters or export the period in parts. Nothing is ever cut; when the rows grew above the cap between the start and the run, the job fails with `too_many_rows`. The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -3825,6 +3826,7 @@ paths:
               schema: { $ref: '#/components/schemas/Job' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
 
   /audit-log/exports/{export_id}/download:
     get:
@@ -3906,7 +3908,7 @@ paths:
       operationId: getAuditLogIntegrity
       summary: Verify the hash chain of the Audit Log (System Admins only)
       description: |
-        The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+        The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`. A range above the setting `logs.integrity.sync_max_rows` (default 200 000) answers 422 `integrity_too_large` with `row_count` and `max_rows` (0.12.3, Q171): start it as a job with `POST /admin/log-integrity/runs`, or give `from_seq` and `to_seq`.
       parameters:
         - { name: from_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
         - { name: to_seq, in: query, schema: { type: integer, format: int64, minimum: 1 } }
@@ -3957,7 +3959,7 @@ paths:
       tags: [security]
       operationId: exportSecurityLog
       summary: Export the filtered security log as CSV (job; the export is itself audited)
-      description: Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`.
+      description: Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`. At most 100 000 rows per file; more answers 422 `too_many_rows` with `row_count` and `max_rows` (0.12.3, Q170).
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -3982,6 +3984,7 @@ paths:
               schema: { $ref: '#/components/schemas/Job' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /security-log/integrity:
     get:
       tags: [security]
@@ -4069,7 +4072,7 @@ paths:
       tags: [system]
       operationId: listJobRuns
       summary: Job run log (every scheduled job run, newest first)
-      description: System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes) and `log_purge` (daily).
+      description: System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes), `log_purge` (daily, also the mail outbox), `mail_send` (one row per run that had mail to send; 0.12.3) and `audit_integrity_check` (nightly and on demand, `detail.progress` 0 to 100; 0.12.3).
       parameters:
         - { name: name, in: query, schema: { type: string } }
         - { name: outcome, in: query, schema: { type: string, enum: [running, ok, failed, skipped] } }
@@ -4118,7 +4121,7 @@ paths:
       operationId: listSecurityAlerts
       summary: Security alerts (newest first; `page.total` counts the matching alerts)
       description: |
-        System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`). Thresholds: `GET /settings/security-alerts`.
+        System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`), an infected upload (`malware_upload`) and every use of the break-glass account (`break_glass_used`, 0.12.3). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`) and, from `email_min_severity` up, by mail (0.12.3). The severity is the rule's setting (`severity`); a new address inside a `trusted_networks` range is one level softer (`info` from `low`). Thresholds: `GET /settings/security-alerts`.
       parameters:
         - $ref: '#/components/parameters/LivePoll'
         - { name: status, in: query, schema: { type: string, enum: [open, acknowledged] } }
@@ -4138,6 +4141,172 @@ paths:
                       items: { type: array, items: { $ref: '#/components/schemas/SecurityAlert' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/mail/status:
+    get:
+      tags: [system]
+      operationId: getMailStatus
+      summary: Mail delivery status (0.12.3, Q167)
+      description: System Admin or `view` on `admin.system_log`. The SMTP settings come from the server environment (`SMTP_*` in the env file) and are never edited here; the password is never shown.
+      responses:
+        '200':
+          description: Status.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/mail/test:
+    post:
+      tags: [system]
+      operationId: sendTestMail
+      summary: Send a test mail to the caller now (System Admin; audited as `mail_test_sent`)
+      description: The mail is sent inside the request and the outcome is answered. Without SMTP configured, 422 `mail_not_configured`. A failed test is not retried.
+      responses:
+        '200':
+          description: Outcome.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MailTestResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/mail/outbox:
+    get:
+      tags: [system]
+      operationId: listMailOutbox
+      summary: The mail outbox, newest first (no bodies)
+      description: System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [queued, retrying, sending, sent, dead, logged, suppressed] } }
+        - { name: kind, in: query, schema: { type: string } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Mails.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/MailOutboxItem' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/mail/outbox/{mail_id}/retry:
+    post:
+      tags: [system]
+      operationId: retryMail
+      summary: Queue a given-up mail again (System Admin; reason; audited as `mail_retry`)
+      parameters:
+        - { name: mail_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: Queued.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, const: queued }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/log-integrity/runs:
+    get:
+      tags: [system]
+      operationId: listLogIntegrityRuns
+      summary: Integrity check runs, newest first (0.12.3, Q171)
+      description: System Admin or `view` on `admin.system_log`.
+      parameters:
+        - { name: log, in: query, schema: { type: string, enum: [audit, security] } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Runs.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/LogIntegrityRun' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    post:
+      tags: [system]
+      operationId: startLogIntegrityRun
+      summary: Check a whole chain as a job with progress (System Admin; audited)
+      description: Checks the live chain (after the purged prefix, up to the head when it starts) in steps; the result is stored with its range and head, and the head is appended to the external anchor file (`LOG_ANCHOR_DIR`). The previous anchor must still match the chain (else `anchor_mismatch`). A break raises the mandatory alert `audit_integrity_failure`. One run per log at a time (409 `invalid_transition` while one runs). The same check runs every night at 03:00 Africa/Tripoli.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [log]
+              properties:
+                log: { type: string, enum: [audit, security] }
+      responses:
+        '202':
+          description: Started; poll `GET /admin/log-integrity/runs/{run_id}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogIntegrityRun' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /admin/log-integrity/runs/{run_id}:
+    get:
+      tags: [system]
+      operationId: getLogIntegrityRun
+      summary: One integrity check run (progress and result)
+      parameters:
+        - { name: run_id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: Run.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LogIntegrityRun' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /health:
+    get:
+      tags: [system]
+      operationId: getHealth
+      summary: Health for an external monitor (no session; words only)
+      description: 'For a monitor outside the PMIS (owner answer Q167). No counts, names or addresses. 200 with `ok` or `degraded` (mail failing, an integrity break, a failed job in the last 24 hours); 503 `down` when the database does not answer. The API itself does not limit it; a reverse proxy in front may answer 429.'
+      security: []
+      responses:
+        '200':
+          description: Up.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+        '503':
+          description: The database does not answer.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
   /admin/security-alerts/{alert_id}/ack:
     post:
       tags: [security]
@@ -5604,7 +5773,7 @@ paths:
       tags: [settings]
       operationId: setSecurityAlertSettings
       summary: Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after)
-      description: 'Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up.'
+      description: 'Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up. 0.12.3 (Q167, Q168): lowering a rule `severity`, raising `email_min_severity` or adding a network to `trusted_networks` is a weakening too. A rule that is not configurable is 422 (`unknown_field`, or `mandatory_locked` for `retention_reduced` and `audit_integrity_failure`); a network that is not CIDR (host bits set, for example) is 422 `invalid`.'
       x-step-up: when a threshold is weakened
       x-db-path: log_set_alert_settings
       parameters:
@@ -8605,17 +8774,21 @@ paths:
     get:
       tags: [audit]
       operationId: getActivityReport
-      summary: Monthly activity report (per-user counts and the sensitive changes of the month; JSON only)
+      summary: Monthly activity report (per-user counts and the sensitive changes of the month; JSON, or the xlsx workbook)
       description: |
-        Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`). No xlsx variant yet.
+        Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`).
+        **xlsx (0.12.3, Q169):** `format=xlsx` answers a workbook with the sheets Summary, User Activity (employee ID, name, actions, field changes, approvals), Module Activity, Exports (the export and download rows of the month), Exceptions (admin overrides, self-approvals and the sensitive changes) and About (period, time zone, regions, scope, filters, generation time and person). Same reader rules; the security log is never part of it (export it separately from `/security-log/exports`). Exports and Exceptions list at most 5000 rows each. Text is never a formula. Audited as `report.activity_export` with the row count (the large-export rule applies).
       parameters:
         - { name: month, in: query, required: true, schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$', examples: ['2026-11'] } }
+        - { name: format, in: query, description: '0.12.3. Another value is 422.', schema: { type: string, enum: [json, xlsx], default: json } }
       responses:
         '200':
-          description: Report.
+          description: Report (JSON), or the workbook when `format=xlsx`.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ActivityReport'}
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: { type: string, format: binary }
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -9626,6 +9799,9 @@ components:
         - team_scope_mismatch
         - two_factor_enforced
         - scope_scenario_conflict
+        - too_many_rows
+        - integrity_too_large
+        - mail_not_configured
     PageEnvelope:
       type: object
       required: [items, page]
@@ -10134,6 +10310,7 @@ components:
                 - type: array
                   items: { $ref: '#/components/schemas/ModuleKey' }
             can_hold_matrix_levels: { type: boolean }
+            capabilities: { type: array, items: { $ref: '#/components/schemas/RoleCapability' }, description: '0.12.3 (Q165).' }
             is_active: { type: boolean }
             active_assignment_count: { type: integer }
             version: { type: integer }
@@ -10185,6 +10362,11 @@ components:
               items: { $ref: '#/components/schemas/ModuleKey' }
         can_hold_matrix_levels: { type: boolean }
         is_active: { type: boolean }
+        capabilities: { type: array, maxItems: 2, uniqueItems: true, items: { $ref: '#/components/schemas/RoleCapability' }, description: '0.12.3 (Q165). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_capabilities_set`.' }
+    RoleCapability:
+      type: string
+      enum: [audit_full_reader, team_lead]
+      description: '`audit_full_reader` reads the whole Audit Log (seed: PM); `team_lead` reads the Audit Log of the modules and regions of its assignments while they are valid (seed: RFD_ACQ_TL, CW_TL, TE_TL). Neither gives the security log.'
     Assignment:
       type: object
       required: [id, user, role, permission_level, region_ids, module_keys, profile_ids, valid_from, version]
@@ -13293,10 +13475,103 @@ components:
             required: [seq, kind]
             properties:
               seq: { type: [integer, 'null'], format: int64, description: 'First row at which the chain no longer holds; null for `unsealed`.' }
-              kind: { type: string, enum: [hash_mismatch, sequence_gap, previous_hash_mismatch, row_missing, unsealed] }
+              kind: { type: string, enum: [hash_mismatch, sequence_gap, previous_hash_mismatch, row_missing, unsealed, anchor_mismatch], description: '`anchor_mismatch` (0.12.3): only in a job run; the chain no longer holds the hash of the last external anchor at its position.' }
               row_id: { type: [integer, 'null'], format: int64, description: 'The log row (audit or security id).' }
               expected_hash: { type: [string, 'null'] }
               found_hash: { type: [string, 'null'] }
+    LogIntegrityRun:
+      type: object
+      required: [id, log, trigger, status, started_at, from_seq, to_seq, checked_through, row_count, progress, break_count, breaks]
+      description: 'One integrity check run as a job (0.12.3, Q171). Its job_runs row is `audit_integrity_check` with the same progress.'
+      properties:
+        id: { type: string, format: uuid }
+        log: { type: string, enum: [audit, security] }
+        trigger: { type: string, enum: [nightly, manual] }
+        status: { type: string, enum: [running, ok, broken, failed] }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        requested_by: { type: [string, 'null'], format: uuid }
+        from_seq: { type: integer, format: int64, description: 'First position (after the purged prefix).' }
+        to_seq: { type: integer, format: int64, description: 'The chain head when the run started.' }
+        checked_through: { type: integer, format: int64 }
+        row_count: { type: integer, format: int64 }
+        progress: { type: integer, minimum: 0, maximum: 100 }
+        break_count: { type: integer }
+        breaks: { type: array, items: { type: object, additionalProperties: true }, description: 'At most 100, same shape as `LogIntegrity.breaks`.' }
+        head_hash: { type: [string, 'null'] }
+        anchor_check: { type: [object, 'null'], additionalProperties: true, description: 'The previous external anchor: `seq`, `ref`, `ok`.' }
+        anchor_ref: { type: [string, 'null'], description: 'Line of the anchor file this run appended (`anchor-<log>.jsonl#<line>:<sha256 prefix>`).' }
+        error: { type: [string, 'null'] }
+        job_run_id: { type: [string, 'null'], format: uuid }
+    MailStatus:
+      type: object
+      required: [enabled, state, settings, verified_at, counts, last_sent_at, last_error]
+      properties:
+        enabled: { type: boolean, description: 'SMTP_HOST is set.' }
+        state: { type: string, enum: [disabled, unverified, verified, failing], description: '`verified` only after a test mail went out with the current settings; `failing` when a mail was given up in the last 24 hours.' }
+        settings:
+          oneOf:
+            - type: 'null'
+            - type: object
+              required: [host, port, tls, from, auth, verify_certificate]
+              properties:
+                host: { type: string }
+                port: { type: integer }
+                tls: { type: string, enum: [starttls, tls, none] }
+                from: { type: string }
+                auth: { type: boolean, description: 'The server is given a user name and password (never shown).' }
+                verify_certificate: { type: boolean }
+        verified_at: { type: [string, 'null'], format: date-time }
+        counts:
+          type: object
+          properties:
+            queued: { type: integer }
+            retrying: { type: integer }
+            sending: { type: integer }
+            dead: { type: integer }
+            dead_24h: { type: integer }
+            sent_24h: { type: integer }
+            logged_24h: { type: integer }
+            suppressed_24h: { type: integer }
+        last_sent_at: { type: [string, 'null'], format: date-time }
+        last_error: { type: [string, 'null'] }
+    MailOutboxItem:
+      type: object
+      required: [id, created_at, kind, to, subject, status, attempts]
+      properties:
+        id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        kind: { type: string, examples: [security_alert, mail.test, identity.email_verify] }
+        to: { type: string, format: email }
+        to_user_id: { type: [string, 'null'], format: uuid }
+        subject: { type: string, description: '`(hidden)` for a mail that holds a secret.' }
+        sensitive: { type: boolean }
+        status: { type: string, enum: [queued, retrying, sending, sent, dead, logged, suppressed], description: '`logged`: no SMTP configured, recorded only; `suppressed`: above the hourly cap of the address.' }
+        attempts: { type: integer }
+        next_attempt_at: { type: [string, 'null'], format: date-time }
+        last_error: { type: [string, 'null'] }
+        sent_at: { type: [string, 'null'], format: date-time }
+    MailTestResult:
+      type: object
+      required: [mail_id, outcome, error, to]
+      properties:
+        mail_id: { type: string, format: uuid }
+        outcome: { type: string, enum: [sent, failed] }
+        error: { type: [string, 'null'], description: 'The server reply of the failing step (never a credential).' }
+        to: { type: string, description: 'The masked address of the caller.' }
+    Health:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        checks:
+          type: object
+          required: [database, mail, integrity, jobs]
+          properties:
+            database: { type: string, enum: [ok, down] }
+            mail: { type: string, enum: [ok, disabled, unverified, failing, unknown] }
+            integrity: { type: string, enum: [ok, broken, unknown] }
+            jobs: { type: string, enum: [ok, failing, unknown] }
     ActiveSession:
       type: object
       required: [session_id, user, status, last_activity_at, signed_in_at, client_type]
@@ -13403,7 +13678,24 @@ components:
         host: { type: [string, 'null'] }
     SecurityAlertRule:
       type: string
-      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure]
+      enum: [failed_sign_ins, failed_sign_ins_ip, new_ip, large_export, admin_set_changed, retention_reduced, alert_settings_weakened, audit_integrity_failure, malware_upload, break_glass_used]
+    AlertSeverity:
+      type: string
+      enum: [info, low, medium, high, critical]
+      description: '`info` (0.12.3): a new address inside a trusted network.'
+    AlertSeverityMap:
+      type: object
+      additionalProperties: false
+      description: 'Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical.'
+      properties:
+        failed_sign_ins: { $ref: '#/components/schemas/AlertSeverity' }
+        failed_sign_ins_ip: { $ref: '#/components/schemas/AlertSeverity' }
+        new_ip: { $ref: '#/components/schemas/AlertSeverity' }
+        large_export: { $ref: '#/components/schemas/AlertSeverity' }
+        admin_set_changed: { $ref: '#/components/schemas/AlertSeverity' }
+        alert_settings_weakened: { $ref: '#/components/schemas/AlertSeverity' }
+        malware_upload: { $ref: '#/components/schemas/AlertSeverity' }
+        break_glass_used: { $ref: '#/components/schemas/AlertSeverity' }
     SecurityAlert:
       type: object
       required: [id, at, rule, severity, summary, status]
@@ -13411,7 +13703,7 @@ components:
         id: { type: string, format: uuid }
         at: { type: string, format: date-time }
         rule: { $ref: '#/components/schemas/SecurityAlertRule' }
-        severity: { type: string, enum: [low, medium, high, critical] }
+        severity: { $ref: '#/components/schemas/AlertSeverity' }
         summary: { type: string }
         detail: { type: [string, 'null'], description: 'One line for the list.' }
         data: { type: [object, 'null'], additionalProperties: true, description: 'The structured facts behind the alert.' }
@@ -13437,6 +13729,10 @@ components:
         failed_by_ip: { $ref: '#/components/schemas/SecurityAlertThreshold', description: 'count 5..1000 (default 20), minutes 1..1440 (default 15).' }
         large_export_rows: { type: integer, minimum: 100, maximum: 1000000, default: 5000 }
         new_ip: { type: boolean, default: true }
+        severity: { $ref: '#/components/schemas/AlertSeverityMap' }
+        mandatory_severity: { type: object, readOnly: true, additionalProperties: { $ref: '#/components/schemas/AlertSeverity' }, description: 'The rules whose severity is fixed (always critical).' }
+        email_min_severity: { allOf: [{ $ref: '#/components/schemas/AlertSeverity' }], description: 'Alerts from this severity up are mailed to every active System Admin (default low; 0.12.3, Q167).' }
+        trusted_networks: { type: array, maxItems: 50, items: { type: string, examples: ['10.20.0.0/16'] }, description: 'Internal ranges (CIDR) that soften a new-address alert by one level; the other rules are unchanged (0.12.3, Q168).' }
         version: { type: integer }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
@@ -13450,6 +13746,9 @@ components:
         failed_by_ip: { $ref: '#/components/schemas/SecurityAlertThreshold' }
         large_export_rows: { type: integer, minimum: 100, maximum: 1000000 }
         new_ip: { type: boolean }
+        severity: { $ref: '#/components/schemas/AlertSeverityMap' }
+        email_min_severity: { $ref: '#/components/schemas/AlertSeverity' }
+        trusted_networks: { type: array, maxItems: 50, items: { type: string, maxLength: 64 } }
     ActivityReport:
       type: object
       required: [month, users, sensitive]

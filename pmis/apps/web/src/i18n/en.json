@@ -69,7 +69,9 @@
     "logs.alerts": "Security alerts",
     "logs.job_runs": "Job runs",
     "logs.deployments": "Deployments",
-    "logs.activity_report": "Monthly activity report"
+    "logs.activity_report": "Monthly activity report",
+    "logs.mail": "Mail delivery",
+    "logs.integrity": "Integrity checks"
   },
   "top": {
     "search": "Search or jump to…",
@@ -244,7 +246,9 @@
     "two_factor_enforced": "An administrator enforces two-factor on this account.",
     "scope_scenario_conflict": "The scenario and the scope flags disagree. Review them first.",
     "not_na_by_scenario": "The scenario of this site does not make this task N/A.",
-    "change_not_approved": "Name an approved Change Control record of this site."
+    "change_not_approved": "Name an approved Change Control record of this site.",
+    "integrity_too_large": "The chain is too long to check in one request. Start it as a job on the Integrity checks screen.",
+    "mail_not_configured": "Mail is not configured on the server (SMTP settings in the env file)."
   },
   "common": {
     "cancel": "Cancel",
@@ -703,7 +707,11 @@
     "no_profile": "None",
     "default_regions": "Default regions",
     "default_modules": "Default modules",
-    "in_use_hint": "A role with assignments that have not ended cannot be deactivated."
+    "in_use_hint": "A role with assignments that have not ended cannot be deactivated.",
+    "capabilities": "Audit Log reading (System Admin only)",
+    "cap_audit_full_reader": "Reads the whole Audit Log",
+    "cap_team_lead": "Team Lead: reads the Audit Log of its modules and regions",
+    "cap_hint": "Neither gives the security log. Saving needs a reason and a fresh sign-in check."
   },
   "groups": {
     "title": "Groups",
@@ -983,7 +991,15 @@
     "idle_note": "A task with no activity for this many working days alerts the Team Lead.",
     "idle_enabled": "Alert the lead about idle tasks",
     "idle_days": "Working days",
-    "range": "Allowed: {{min}} to {{max}}"
+    "range": "Allowed: {{min}} to {{max}}",
+    "title": "Alert rules",
+    "hint": "The severity of each rule, the lowest severity mailed to the System Admins, and the internal networks that soften a new-address alert by one level.",
+    "mandatory": "Log retention reduced and a broken log chain are always critical.",
+    "floor": "Mail alerts from this severity up",
+    "networks": "Trusted networks (CIDR, one per line)",
+    "networks_hint": "A sign-in from a new address inside them is still recorded and raised, one level lower. The other rules are not changed.",
+    "bad_net": "Not a network in CIDR form:",
+    "weaker": "This lowers a protection: it needs a fresh sign-in check and raises a high alert."
   },
   "np": {
     "title": "Notification policy",
@@ -2684,7 +2700,9 @@
     "r_sign_ins": "Sign-ins",
     "r_failed": "Failed sign-ins",
     "r_sensitive": "Sensitive changes",
-    "r_none": "No sensitive changes this month."
+    "r_none": "No sensitive changes this month.",
+    "r_xlsx": "Excel workbook",
+    "sev_info": "Info"
   },
   "siteFields": {
     "title": "Site details",
@@ -2855,5 +2873,72 @@
     "pending_confirmation": "Pending SLA Confirmation",
     "not_measured": "SLA not measured",
     "due_date": "Due date"
+  },
+  "mail": {
+    "subtitle": "Outbound mail: security alerts to the System Admins and the notices that are sent by email.",
+    "channel": "Mail channel",
+    "test": "Send a test mail to me",
+    "test_sent": "Test mail sent to {{to}}.",
+    "test_failed": "The test mail was not delivered.",
+    "state_disabled": "Not configured",
+    "state_unverified": "Not yet verified",
+    "state_verified": "Verified",
+    "state_failing": "Failing",
+    "hint_disabled": "No SMTP server is set on the server. Mails are recorded, not sent. Ask IT to fill the SMTP settings in the env file.",
+    "hint_unverified": "The server is set, but no test mail has gone out with these settings yet. Send one before relying on email.",
+    "hint_verified": "A test mail went out with these settings.",
+    "hint_failing": "At least one mail was given up in the last 24 hours. Check the error and the server.",
+    "server": "Server",
+    "from": "Sender",
+    "auth": "Sign-in to the server",
+    "auth_yes": "Yes (user name and password, never shown)",
+    "auth_no": "No",
+    "verified_at": "Last test mail",
+    "filter": "Filter by status",
+    "c_queued": "Queued",
+    "c_retrying": "Retrying",
+    "c_dead_24h": "Given up (24 h)",
+    "c_sent_24h": "Sent (24 h)",
+    "c_logged_24h": "Recorded only (24 h)",
+    "c_suppressed_24h": "Above the hourly cap (24 h)",
+    "s_all": "All",
+    "s_queued": "Queued",
+    "s_retrying": "Retrying",
+    "s_sending": "Sending",
+    "s_sent": "Sent",
+    "s_dead": "Given up",
+    "s_logged": "Recorded only",
+    "s_suppressed": "Above the cap",
+    "h_at": "Queued at",
+    "h_kind": "Kind",
+    "h_to": "To",
+    "h_subject": "Subject",
+    "h_status": "Status",
+    "h_attempts": "Attempts",
+    "h_error": "Last error",
+    "hidden": "Hidden (holds a secret)",
+    "retry": "Send again",
+    "retried": "The mail is queued again."
+  },
+  "integ": {
+    "subtitle": "Each chain is checked every night, and on demand. The result stays, with its range and the check of the external anchor.",
+    "check_audit": "Check the Audit Log",
+    "check_security": "Check the security log",
+    "started": "The check started. Progress shows below.",
+    "s_running": "Running",
+    "s_ok": "Intact",
+    "s_broken": "Broken",
+    "s_failed": "Failed",
+    "log_audit": "Audit Log",
+    "log_security": "Security log",
+    "t_nightly": "nightly",
+    "t_manual": "on demand",
+    "progress": "Progress",
+    "range": "Positions {{from}} to {{to}}, {{rows}} rows checked",
+    "breaks": "{{count}} break(s): the mandatory alert was raised",
+    "anchor_ok": "The external anchor matches.",
+    "anchor_bad": "The external anchor does not match the chain.",
+    "anchor_none": "No external anchor to compare yet.",
+    "none": "No check has run yet."
   }
 }

@@ -2395,7 +2395,7 @@ export interface paths {
         put?: never;
         /**
          * Export the filtered Audit Log as CSV (job; the export is itself audited)
-         * @description Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows (at most 100 000). The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
+         * @description Needs the `export` grant on `audit` (or a System Admin) and the reader rules of `GET /audit-log`, which also limit the rows. **At most 100 000 rows per file (Q170, 0.12.3).** A filter that matches more answers 422 `too_many_rows` with `row_count` and `max_rows` (audited as `audit_log.export_refused`); narrow the filters or export the period in parts. Nothing is ever cut; when the rows grew above the cap between the start and the run, the job fails with `too_many_rows`. The job (kind `audit_export`) is polled with `GET /jobs/{job_id}`; when done, `result` holds `export_id`, `row_count`, `size_bytes`, `expires_at` (7 days) and `download_path`. Audit rows `audit_log.export_start`, `audit_log.export_done` (with `row_count`; above the alert threshold it raises `large_export`) and `audit_log.export_download`.
          */
         post: operations["exportAuditLog"];
         delete?: never;
@@ -2470,7 +2470,7 @@ export interface paths {
         };
         /**
          * Verify the hash chain of the Audit Log (System Admins only)
-         * @description The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`.
+         * @description The Audit Log is an append-only hash chain: each row is sealed at commit (in commit order, under an advisory lock) with hash = sha256(previous hash || canonical row), and the database refuses update and delete. Rows present before 0.10.0 were chained in id order. This recomputes the chain and reports the row count, the sequence range, the head hash and every break. Without `from_seq` and `to_seq` the whole chain is checked. Needs a System Admin (a delegate is not enough). The check is itself audited. A break found by the scheduled check raises the mandatory alert `audit_integrity_failure`. A range above the setting `logs.integrity.sync_max_rows` (default 200 000) answers 422 `integrity_too_large` with `row_count` and `max_rows` (0.12.3, Q171): start it as a job with `POST /admin/log-integrity/runs`, or give `from_seq` and `to_seq`.
          */
         get: operations["getAuditLogIntegrity"];
         put?: never;
@@ -2513,7 +2513,7 @@ export interface paths {
         put?: never;
         /**
          * Export the filtered security log as CSV (job; the export is itself audited)
-         * @description Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`.
+         * @description Goes through the existing export service (job kind `security_export`). Needs a System Admin, or `view_security_log` with the `export` grant on `admin.security_log`. `ip` follows the same rule as the list. When done, `result.download_path` points at `GET /security-log/exports/{export_id}/download`. At most 100 000 rows per file; more answers 422 `too_many_rows` with `row_count` and `max_rows` (0.12.3, Q170).
          */
         post: operations["exportSecurityLog"];
         delete?: never;
@@ -2608,7 +2608,7 @@ export interface paths {
         };
         /**
          * Job run log (every scheduled job run, newest first)
-         * @description System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes) and `log_purge` (daily).
+         * @description System Admin or `view` on `admin.system_log`. Jobs today are `daily` (SLA versions, holiday reminders), `dashboard_snapshot`, `security_alerts` (every 5 minutes), `log_purge` (daily, also the mail outbox), `mail_send` (one row per run that had mail to send; 0.12.3) and `audit_integrity_check` (nightly and on demand, `detail.progress` 0 to 100; 0.12.3).
          */
         get: operations["listJobRuns"];
         put?: never;
@@ -2648,9 +2648,147 @@ export interface paths {
         };
         /**
          * Security alerts (newest first; `page.total` counts the matching alerts)
-         * @description System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`). Thresholds: `GET /settings/security-alerts`.
+         * @description System Admin or `view_security_log`. The rules run every 5 minutes (job `security_alerts`) over the rows sealed since the last run: repeated failed sign-ins for one identifier or account (`failed_sign_ins`) or one address (`failed_sign_ins_ip`), a sign-in from an address the person never used (`new_ip`), an export above the row threshold (`large_export`), a change of the System Admins group (`admin_set_changed`), retention reduced (`retention_reduced`, also raised at once) and a broken chain (`audit_integrity_failure`), an infected upload (`malware_upload`) and every use of the break-glass account (`break_glass_used`, 0.12.3). Each alert is raised once and notifies every active System Admin in-app (kind `security_alert`) and, from `email_min_severity` up, by mail (0.12.3). The severity is the rule's setting (`severity`); a new address inside a `trusted_networks` range is one level softer (`info` from `low`). Thresholds: `GET /settings/security-alerts`.
          */
         get: operations["listSecurityAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Mail delivery status (0.12.3, Q167)
+         * @description System Admin or `view` on `admin.system_log`. The SMTP settings come from the server environment (`SMTP_*` in the env file) and are never edited here; the password is never shown.
+         */
+        get: operations["getMailStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a test mail to the caller now (System Admin; audited as `mail_test_sent`)
+         * @description The mail is sent inside the request and the outcome is answered. Without SMTP configured, 422 `mail_not_configured`. A failed test is not retried.
+         */
+        post: operations["sendTestMail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/outbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The mail outbox, newest first (no bodies)
+         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+         */
+        get: operations["listMailOutbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/mail/outbox/{mail_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue a given-up mail again (System Admin; reason; audited as `mail_retry`) */
+        post: operations["retryMail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/log-integrity/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Integrity check runs, newest first (0.12.3, Q171)
+         * @description System Admin or `view` on `admin.system_log`.
+         */
+        get: operations["listLogIntegrityRuns"];
+        put?: never;
+        /**
+         * Check a whole chain as a job with progress (System Admin; audited)
+         * @description Checks the live chain (after the purged prefix, up to the head when it starts) in steps; the result is stored with its range and head, and the head is appended to the external anchor file (`LOG_ANCHOR_DIR`). The previous anchor must still match the chain (else `anchor_mismatch`). A break raises the mandatory alert `audit_integrity_failure`. One run per log at a time (409 `invalid_transition` while one runs). The same check runs every night at 03:00 Africa/Tripoli.
+         */
+        post: operations["startLogIntegrityRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/log-integrity/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One integrity check run (progress and result) */
+        get: operations["getLogIntegrityRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health for an external monitor (no session; words only)
+         * @description For a monitor outside the PMIS (owner answer Q167). No counts, names or addresses. 200 with `ok` or `degraded` (mail failing, an integrity break, a failed job in the last 24 hours); 503 `down` when the database does not answer. The API itself does not limit it; a reverse proxy in front may answer 429.
+         */
+        get: operations["getHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3546,7 +3684,7 @@ export interface paths {
         get: operations["getSecurityAlertSettings"];
         /**
          * Set the thresholds (closed schema, allowed ranges, reason, If-Match; audited with before and after)
-         * @description Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up.
+         * @description Weakening any threshold (a higher failure count, a shorter window, a higher export limit, or `new_ip` turned off) is a reduction of a security control: it needs a fresh step-up (401 `step_up_required` otherwise, checked again in the database), is audited as `security_alert_settings_weakened` and raises a high `alert_settings_weakened` alert. Tightening needs no step-up. 0.12.3 (Q167, Q168): lowering a rule `severity`, raising `email_min_severity` or adding a network to `trusted_networks` is a weakening too. A rule that is not configurable is 422 (`unknown_field`, or `mandatory_locked` for `retention_reduced` and `audit_integrity_failure`); a network that is not CIDR (host bits set, for example) is 422 `invalid`.
          */
         put: operations["setSecurityAlertSettings"];
         post?: never;
@@ -5423,8 +5561,9 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Monthly activity report (per-user counts and the sensitive changes of the month; JSON only)
-         * @description Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`). No xlsx variant yet.
+         * Monthly activity report (per-user counts and the sensitive changes of the month; JSON, or the xlsx workbook)
+         * @description Needs `view` on `reports` and the Audit Log reader rules (B4): the counts cover only the rows the caller may read. The month is a calendar month in the project time zone (setting `calc.timezone`, Africa/Tripoli). Per user: audit actions, field changes, approvals (actions containing `approve`), and, when the caller may read the security log, sign-ins and failed sign-ins (null otherwise). Sensitive changes: roles, assignments, groups, delegations, profiles, the matrix, settings, workflow versions and admin overrides (at most 2000). The read is audited (`report.activity_read`).
+         *     **xlsx (0.12.3, Q169):** `format=xlsx` answers a workbook with the sheets Summary, User Activity (employee ID, name, actions, field changes, approvals), Module Activity, Exports (the export and download rows of the month), Exceptions (admin overrides, self-approvals and the sensitive changes) and About (period, time zone, regions, scope, filters, generation time and person). Same reader rules; the security log is never part of it (export it separately from `/security-log/exports`). Exports and Exceptions list at most 5000 rows each. Text is never a formula. Audited as `report.activity_export` with the row count (the large-export rule applies).
          */
         get: operations["getActivityReport"];
         put?: never;
@@ -5926,7 +6065,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -6418,6 +6557,8 @@ export interface components {
             default_region_ids?: "all" | components["schemas"]["RegionId"][];
             default_module_keys?: "all" | components["schemas"]["ModuleKey"][];
             can_hold_matrix_levels: boolean;
+            /** @description 0.12.3 (Q165). */
+            capabilities?: components["schemas"]["RoleCapability"][];
             is_active: boolean;
             active_assignment_count?: number;
             version?: number;
@@ -6451,7 +6592,14 @@ export interface components {
             default_module_keys?: "all" | components["schemas"]["ModuleKey"][];
             can_hold_matrix_levels?: boolean;
             is_active?: boolean;
+            /** @description 0.12.3 (Q165). System Admin only (403 `delegate_forbidden` for a delegate); with the reason and step-up of the patch; audited as `role_capabilities_set`. */
+            capabilities?: components["schemas"]["RoleCapability"][];
         };
+        /**
+         * @description `audit_full_reader` reads the whole Audit Log (seed: PM); `team_lead` reads the Audit Log of the modules and regions of its assignments while they are valid (seed: RFD_ACQ_TL, CW_TL, TE_TL). Neither gives the security log.
+         * @enum {string}
+         */
+        RoleCapability: "audit_full_reader" | "team_lead";
         Assignment: {
             /** Format: uuid */
             id: string;
@@ -9841,8 +9989,11 @@ export interface components {
                  * @description First row at which the chain no longer holds; null for `unsealed`.
                  */
                 seq: number | null;
-                /** @enum {string} */
-                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch" | "row_missing" | "unsealed";
+                /**
+                 * @description `anchor_mismatch` (0.12.3): only in a job run; the chain no longer holds the hash of the last external anchor at its position.
+                 * @enum {string}
+                 */
+                kind: "hash_mismatch" | "sequence_gap" | "previous_hash_mismatch" | "row_missing" | "unsealed" | "anchor_mismatch";
                 /**
                  * Format: int64
                  * @description The log row (audit or security id).
@@ -9851,6 +10002,141 @@ export interface components {
                 expected_hash?: string | null;
                 found_hash?: string | null;
             }[];
+        };
+        /** @description One integrity check run as a job (0.12.3, Q171). Its job_runs row is `audit_integrity_check` with the same progress. */
+        LogIntegrityRun: {
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            log: "audit" | "security";
+            /** @enum {string} */
+            trigger: "nightly" | "manual";
+            /** @enum {string} */
+            status: "running" | "ok" | "broken" | "failed";
+            /** Format: date-time */
+            started_at: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            /** Format: uuid */
+            requested_by?: string | null;
+            /**
+             * Format: int64
+             * @description First position (after the purged prefix).
+             */
+            from_seq: number;
+            /**
+             * Format: int64
+             * @description The chain head when the run started.
+             */
+            to_seq: number;
+            /** Format: int64 */
+            checked_through: number;
+            /** Format: int64 */
+            row_count: number;
+            progress: number;
+            break_count: number;
+            /** @description At most 100, same shape as `LogIntegrity.breaks`. */
+            breaks: {
+                [key: string]: unknown;
+            }[];
+            head_hash?: string | null;
+            /** @description The previous external anchor: `seq`, `ref`, `ok`. */
+            anchor_check?: {
+                [key: string]: unknown;
+            } | null;
+            /** @description Line of the anchor file this run appended (`anchor-<log>.jsonl#<line>:<sha256 prefix>`). */
+            anchor_ref?: string | null;
+            error?: string | null;
+            /** Format: uuid */
+            job_run_id?: string | null;
+        };
+        MailStatus: {
+            /** @description SMTP_HOST is set. */
+            enabled: boolean;
+            /**
+             * @description `verified` only after a test mail went out with the current settings; `failing` when a mail was given up in the last 24 hours.
+             * @enum {string}
+             */
+            state: "disabled" | "unverified" | "verified" | "failing";
+            settings: null | {
+                host: string;
+                port: number;
+                /** @enum {string} */
+                tls: "starttls" | "tls" | "none";
+                from: string;
+                /** @description The server is given a user name and password (never shown). */
+                auth: boolean;
+                verify_certificate: boolean;
+            };
+            /** Format: date-time */
+            verified_at: string | null;
+            counts: {
+                queued?: number;
+                retrying?: number;
+                sending?: number;
+                dead?: number;
+                dead_24h?: number;
+                sent_24h?: number;
+                logged_24h?: number;
+                suppressed_24h?: number;
+            };
+            /** Format: date-time */
+            last_sent_at: string | null;
+            last_error: string | null;
+        };
+        MailOutboxItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * @example security_alert
+             * @example mail.test
+             * @example identity.email_verify
+             */
+            kind: string;
+            /** Format: email */
+            to: string;
+            /** Format: uuid */
+            to_user_id?: string | null;
+            /** @description `(hidden)` for a mail that holds a secret. */
+            subject: string;
+            sensitive?: boolean;
+            /**
+             * @description `logged`: no SMTP configured, recorded only; `suppressed`: above the hourly cap of the address.
+             * @enum {string}
+             */
+            status: "queued" | "retrying" | "sending" | "sent" | "dead" | "logged" | "suppressed";
+            attempts: number;
+            /** Format: date-time */
+            next_attempt_at?: string | null;
+            last_error?: string | null;
+            /** Format: date-time */
+            sent_at?: string | null;
+        };
+        MailTestResult: {
+            /** Format: uuid */
+            mail_id: string;
+            /** @enum {string} */
+            outcome: "sent" | "failed";
+            /** @description The server reply of the failing step (never a credential). */
+            error: string | null;
+            /** @description The masked address of the caller. */
+            to: string;
+        };
+        Health: {
+            /** @enum {string} */
+            status: "ok" | "degraded" | "down";
+            checks: {
+                /** @enum {string} */
+                database: "ok" | "down";
+                /** @enum {string} */
+                mail: "ok" | "disabled" | "unverified" | "failing" | "unknown";
+                /** @enum {string} */
+                integrity: "ok" | "broken" | "unknown";
+                /** @enum {string} */
+                jobs: "ok" | "failing" | "unknown";
+            };
         };
         ActiveSession: {
             /** Format: uuid */
@@ -10002,15 +10288,30 @@ export interface components {
             host?: string | null;
         };
         /** @enum {string} */
-        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure";
+        SecurityAlertRule: "failed_sign_ins" | "failed_sign_ins_ip" | "new_ip" | "large_export" | "admin_set_changed" | "retention_reduced" | "alert_settings_weakened" | "audit_integrity_failure" | "malware_upload" | "break_glass_used";
+        /**
+         * @description `info` (0.12.3): a new address inside a trusted network.
+         * @enum {string}
+         */
+        AlertSeverity: "info" | "low" | "medium" | "high" | "critical";
+        /** @description Severity per configurable rule (0.12.3, Q168). Defaults: failed_sign_ins medium, failed_sign_ins_ip medium, new_ip low, large_export medium, admin_set_changed high, alert_settings_weakened high, malware_upload high, break_glass_used critical. */
+        AlertSeverityMap: {
+            failed_sign_ins?: components["schemas"]["AlertSeverity"];
+            failed_sign_ins_ip?: components["schemas"]["AlertSeverity"];
+            new_ip?: components["schemas"]["AlertSeverity"];
+            large_export?: components["schemas"]["AlertSeverity"];
+            admin_set_changed?: components["schemas"]["AlertSeverity"];
+            alert_settings_weakened?: components["schemas"]["AlertSeverity"];
+            malware_upload?: components["schemas"]["AlertSeverity"];
+            break_glass_used?: components["schemas"]["AlertSeverity"];
+        };
         SecurityAlert: {
             /** Format: uuid */
             id: string;
             /** Format: date-time */
             at: string;
             rule: components["schemas"]["SecurityAlertRule"];
-            /** @enum {string} */
-            severity: "low" | "medium" | "high" | "critical";
+            severity: components["schemas"]["AlertSeverity"];
             summary: string;
             /** @description One line for the list. */
             detail?: string | null;
@@ -10042,6 +10343,15 @@ export interface components {
             large_export_rows: number;
             /** @default true */
             new_ip: boolean;
+            severity?: components["schemas"]["AlertSeverityMap"];
+            /** @description The rules whose severity is fixed (always critical). */
+            readonly mandatory_severity?: {
+                [key: string]: components["schemas"]["AlertSeverity"];
+            };
+            /** @description Alerts from this severity up are mailed to every active System Admin (default low; 0.12.3, Q167). */
+            email_min_severity?: components["schemas"]["AlertSeverity"];
+            /** @description Internal ranges (CIDR) that soften a new-address alert by one level; the other rules are unchanged (0.12.3, Q168). */
+            trusted_networks?: string[];
             version: number;
             /** Format: date-time */
             updated_at?: string | null;
@@ -10053,6 +10363,9 @@ export interface components {
             failed_by_ip: components["schemas"]["SecurityAlertThreshold"];
             large_export_rows: number;
             new_ip: boolean;
+            severity?: components["schemas"]["AlertSeverityMap"];
+            email_min_severity?: components["schemas"]["AlertSeverity"];
+            trusted_networks?: string[];
         };
         ActivityReport: {
             /** @example 2026-11 */
@@ -15306,6 +15619,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     downloadAuditLogExport: {
@@ -15503,6 +15817,7 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getSecurityLogIntegrity: {
@@ -15709,6 +16024,234 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getMailStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    sendTestMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Outcome. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailTestResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listMailOutbox: {
+        parameters: {
+            query?: {
+                status?: "queued" | "retrying" | "sending" | "sent" | "dead" | "logged" | "suppressed";
+                kind?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mails. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MailOutboxItem"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    retryMail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mail_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Queued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @constant */
+                        status: "queued";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listLogIntegrityRuns: {
+        parameters: {
+            query?: {
+                log?: "audit" | "security";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["LogIntegrityRun"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    startLogIntegrityRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    log: "audit" | "security";
+                };
+            };
+        };
+        responses: {
+            /** @description Started; poll `GET /admin/log-integrity/runs/{run_id}`. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrityRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getLogIntegrityRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogIntegrityRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Up. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            429: components["responses"]["TooManyRequests"];
+            /** @description The database does not answer. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
         };
     };
     ackSecurityAlert: {
@@ -21083,6 +21626,8 @@ export interface operations {
         parameters: {
             query: {
                 month: string;
+                /** @description 0.12.3. Another value is 422. */
+                format?: "json" | "xlsx";
             };
             header?: never;
             path?: never;
@@ -21090,13 +21635,14 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Report. */
+            /** @description Report (JSON), or the workbook when `format=xlsx`. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityReport"];
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
                 };
             };
             401: components["responses"]["Unauthorized"];

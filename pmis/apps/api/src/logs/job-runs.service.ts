@@ -81,8 +81,9 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
 
   purge(): Promise<number | null> {
     return this.run('log_purge', async (tx) => {
-      const r = await tx.$queryRaw<{ a: bigint; b: bigint }[]>`SELECT log_purge_system_log() AS a, log_purge_security_log() AS b`;
-      return Number(r[0]?.a ?? 0) + Number(r[0]?.b ?? 0);
+      // migration 0055: the mail outbox (sent, given up, logged and suppressed mails older than mail.retention_days) goes with the logs
+      const r = await tx.$queryRaw<{ a: bigint; b: bigint; c: bigint }[]>`SELECT log_purge_system_log() AS a, log_purge_security_log() AS b, mail_purge() AS c`;
+      return Number(r[0]?.a ?? 0) + Number(r[0]?.b ?? 0) + Number(r[0]?.c ?? 0);
     });
   }
 }

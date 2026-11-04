@@ -47,6 +47,8 @@ import { FieldChanges } from '@/pages/logs/FieldChanges';
 import { Deployments, JobRuns } from '@/pages/logs/JobRuns';
 import { OnlineSessions } from '@/pages/logs/OnlineSessions';
 import { SecurityAlerts } from '@/pages/logs/SecurityAlerts';
+import { MailDelivery } from '@/pages/logs/MailDelivery';
+import { IntegrityRuns } from '@/pages/logs/IntegrityRuns';
 import { SettingsRoutes } from '@/pages/settings/Settings';
 
 function Soon() {
@@ -114,6 +116,8 @@ function gated(session: Session) {
         <Route path="admin/logs/job-runs" element={<JobRuns />} />
         <Route path="admin/logs/deployments" element={<Deployments />} />
         <Route path="admin/logs/activity-report" element={<ActivityReport />} />
+        <Route path="admin/logs/mail" element={<MailDelivery />} />
+        <Route path="admin/logs/integrity" element={<IntegrityRuns />} />
         <Route path="*" element={<Soon />} />
       </Route>
     </Routes>

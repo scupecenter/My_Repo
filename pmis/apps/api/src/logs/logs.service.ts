@@ -16,6 +16,7 @@ import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { attachmentHeader } from '../documents/naming';
 import { parseDevice } from './context';
+import { WorkbookInput, activityWorkbook } from './activity-workbook';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:?\d{2})$/;
@@ -25,7 +26,9 @@ const SEC_EVENTS = ['sign_in_started', 'sign_in_succeeded', 'callback_account_mi
   'break_glass_used', 'two_factor_passed', 'two_factor_failed', 'recovery_code_used', 'two_factor_enrolled', 'password_changed', 'password_reset'];
 /** "Online" = real activity inside this window (contract ActiveSession.status). */
 export const PRESENCE_MINUTES = 5;
-const EXPORT_MAX_ROWS = 100_000;
+/** Rows per log export file (owner answer Q170): a larger export is refused with 422 `too_many_rows`, never cut. */
+export const EXPORT_MAX_ROWS = 100_000;
+const SEVERITIES = ['info', 'low', 'medium', 'high', 'critical'] as const;
 
 type UserRef = { id: string; display_name: string; employee_id: string | null } | null;
 
@@ -115,6 +118,10 @@ const alertInput = z.object({
   failed_by_ip: z.object({ count: z.number().int(), minutes: z.number().int() }).strict(),
   large_export_rows: z.number().int(),
   new_ip: z.boolean(),
+  // 0.12.3 (Q167, Q168): optional; left out = kept. The database checks the rule names, the networks and the weakening.
+  severity: z.record(z.string().max(60), z.enum(SEVERITIES)).optional(),
+  email_min_severity: z.enum(SEVERITIES).optional(),
+  trusted_networks: z.array(z.string().trim().min(3).max(64)).max(50).optional(),
 }).strict();
 const ackInput = z.object({ note: z.string().trim().min(3).max(1000) }).strict();
 const withReason = z.object({ reason: reasonSchema }).strict();
@@ -146,6 +153,8 @@ interface JobRow { id: string; requested_by: string; scope: { kind?: string; fil
 export class LogsService {
   private readonly log = new Logger('Logs');
   private readonly running = new Set<Promise<void>>();
+  /** The cap per export file (EXPORT_MAX_ROWS; a test lowers it instead of writing 100 000 rows). */
+  exportMaxRows = EXPORT_MAX_ROWS;
 
   constructor(
     private readonly db: DbService,
@@ -278,6 +287,17 @@ export class LogsService {
     };
     const from = num('from_seq');
     const to = num('to_seq');
+    // Q171: a large check runs as a job with progress (POST /admin/log-integrity/runs), not inside one request
+    const span = await this.db.tx.$queryRaw<{ n: bigint; max: number | null }[]>(Prisma.sql`
+      SELECT log_integrity_span(${log}::text, ${from}::bigint, ${to}::bigint) AS n,
+             (SELECT CASE WHEN jsonb_typeof(value) = 'number' THEN (value #>> '{}')::int END FROM settings WHERE key = 'logs.integrity.sync_max_rows') AS max`);
+    const max = span[0]?.max ?? 200_000;
+    if (Number(span[0]?.n ?? 0) > max) {
+      throw new ProblemException(422, 'integrity_too_large', {
+        detail: `The check covers ${Number(span[0]?.n)} rows, more than ${max} at once: start it as a job (POST /admin/log-integrity/runs) or give from_seq and to_seq.`,
+        extra: { row_count: Number(span[0]?.n), max_rows: max },
+      });
+    }
     const r = await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>(Prisma.sql`SELECT log_verify_chain(${log}::text, ${from}::bigint, ${to}::bigint) AS j`);
     return r[0]!.j;
   }
@@ -512,10 +532,14 @@ export class LogsService {
     const { reason, ...rest } = b;
     // weakening any threshold is a reduction of a security control: step-up first (the database checks it again and raises an alert)
     type Win = { count: number; minutes: number };
-    const c = (await this.db.tx.$queryRaw<{ j: { failed_sign_ins?: Win; failed_by_ip?: Win; large_export_rows?: number; new_ip?: boolean } }[]>`SELECT log_alert_settings_json() AS j`)[0]!.j;
+    const c = (await this.db.tx.$queryRaw<{ j: { failed_sign_ins?: Win; failed_by_ip?: Win; large_export_rows?: number; new_ip?: boolean; severity?: Record<string, string>;
+      email_min_severity?: string; trusted_networks?: string[] } }[]>`SELECT log_alert_settings_json() AS j`)[0]!.j;
     const weakened = rest.failed_sign_ins.count > (c.failed_sign_ins?.count ?? Infinity) || rest.failed_sign_ins.minutes < (c.failed_sign_ins?.minutes ?? 0)
       || rest.failed_by_ip.count > (c.failed_by_ip?.count ?? Infinity) || rest.failed_by_ip.minutes < (c.failed_by_ip?.minutes ?? 0)
-      || rest.large_export_rows > (c.large_export_rows ?? Infinity) || (c.new_ip !== false && rest.new_ip === false);
+      || rest.large_export_rows > (c.large_export_rows ?? Infinity) || (c.new_ip !== false && rest.new_ip === false)
+      || (rest.email_min_severity !== undefined && SEVERITIES.indexOf(rest.email_min_severity) > SEVERITIES.indexOf((c.email_min_severity ?? 'low') as (typeof SEVERITIES)[number]))
+      || Object.entries(rest.severity ?? {}).some(([k, v]) => c.severity?.[k] !== undefined && SEVERITIES.indexOf(v) < SEVERITIES.indexOf(c.severity[k] as (typeof SEVERITIES)[number]))
+      || (rest.trusted_networks ?? []).some((n) => !(c.trusted_networks ?? []).includes(n));
     if (weakened) await this.stepUp.require(auth);
     const r = await this.db.tx.$queryRaw<{ j: Record<string, unknown> }[]>(Prisma.sql`
       SELECT log_set_alert_settings(${JSON.stringify(rest)}::jsonb, ${reason}::text, ${version}::int) AS j`);
@@ -543,6 +567,25 @@ export class LogsService {
     };
   }
 
+  /** GET /reports/activity?format=xlsx (owner answer Q169): the six sheets; the security log is not part of it. Audited as report.activity_export. */
+  async activityXlsx(auth: AuthContext, q: Query): Promise<{ filename: string; body: Buffer }> {
+    const rep = await this.activity(q);
+    const month = rep.month;
+    const r = await this.db.tx.$queryRaw<{ j: { from: string; to: string; time_zone: string; scope: string; regions: 'all' | number[]; modules: WorkbookInput['modules'];
+      exports: WorkbookInput['exports']; exceptions: WorkbookInput['exceptions']; exports_truncated: boolean; exceptions_truncated: boolean } }[]>(Prisma.sql`
+      SELECT log_activity_workbook(${`${month}-01`}::date) AS j`);
+    const j = r[0]!.j;
+    const people = await this.users([...j.exports.map((x) => x.actor_id), ...j.exceptions.flatMap((x) => [x.actor_id, x.on_behalf_of])]);
+    const regions = await this.db.tx.$queryRaw<{ id: number; name_en: string }[]>`SELECT id, name_en FROM regions ORDER BY id`;
+    const body = await activityWorkbook({
+      month, from: j.from, to: j.to, timeZone: j.time_zone, scope: j.scope, regions: j.regions, regionNames: new Map(regions.map((x) => [x.id, x.name_en])),
+      generatedAt: new Date(), generatedBy: { id: auth.user.id, display_name: auth.user.displayName, employee_id: auth.user.employeeId ?? null },
+      users: rep.users.map((u) => ({ user: u.user, actions: u.actions, field_changes: u.field_changes, approvals: u.approvals })),
+      modules: j.modules, exports: j.exports, exceptions: j.exceptions, exportsTruncated: j.exports_truncated, exceptionsTruncated: j.exceptions_truncated, people,
+    });
+    return { filename: `GSDN_ActivityReport_${month}.xlsx`, body };
+  }
+
   // ------------------------------------------------------------------ exports (CSV jobs through document_export_jobs and the object storage)
   private async requireExport(auth: AuthContext, kind: 'audit_export' | 'security_export'): Promise<void> {
     if (auth.state.isAdmin) return;
@@ -559,10 +602,22 @@ export class LogsService {
     for (const [k, v] of Object.entries(body)) asQuery[k] = Array.isArray(v) ? v.join(',') : v === undefined ? undefined : String(v);
     const f = filters(asQuery, kind === 'audit_export' ? AUDIT_FILTERS : SEC_FILTERS);
     return this.idem.run(auth.user.id, kind === 'audit_export' ? 'exportAuditLog' : 'exportSecurityLog', idemKey, body, async () => {
-      // the reader right is checked now (a forbidden reader gets 403 at once), with an audited read of one row
-      await this.db.tx.$queryRaw(kind === 'audit_export'
-        ? Prisma.sql`SELECT count(*) FROM log_audit_read(${JSON.stringify({ ...f, no_audit: true })}::jsonb, 1)`
-        : Prisma.sql`SELECT count(*) FROM sec_log_read(${JSON.stringify({ ...f, no_audit: true })}::jsonb, 1)`);
+      // the reader right is checked now (a forbidden reader gets 403 at once), and the exact count of the rows (owner answer Q170: above the cap the export
+      // is refused with the count, never cut; the refusal is audited)
+      const counted = await this.db.tx.$queryRaw<{ n: bigint }[]>(kind === 'audit_export'
+        ? Prisma.sql`SELECT log_audit_count(${JSON.stringify(f)}::jsonb) AS n`
+        : Prisma.sql`SELECT sec_log_count(${JSON.stringify(f)}::jsonb) AS n`);
+      const total = Number(counted[0]?.n ?? 0);
+      if (total > this.exportMaxRows) {
+        await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write(${kind === 'audit_export' ? 'audit_log.export_refused' : 'security_log.export_refused'}::text,
+          ${kind === 'audit_export' ? 'audit_log' : 'security_log'}::text, NULL, NULL, ${JSON.stringify({ filters: f, matching_rows: total, max_rows: this.exportMaxRows })}::jsonb, NULL)`);
+        throw new ProblemException(422, 'too_many_rows', {
+          detail: `${total} rows match, more than ${this.exportMaxRows} per file. Narrow the filters (for example a shorter date range) or export the period in parts.`,
+          extra: { row_count: total, max_rows: this.exportMaxRows },
+          errors: [{ path: '/from', code: 'too_many_rows', message: 'Choose a shorter period or more filters.' }],
+          commit: true,
+        });
+      }
       const r = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT doc_job_create(${JSON.stringify({ kind, filters: f })}::jsonb)::text AS id`);
       const id = r[0]!.id;
       await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write(${kind === 'audit_export' ? 'audit_log.export_start' : 'security_log.export_start'}::text,
@@ -596,7 +651,8 @@ export class LogsService {
         let header: string[];
         let lines: unknown[][];
         if (kind === 'audit_export') {
-          const rows = await this.db.tx.$queryRaw<AuditRow[]>(this.auditSql({ ...f, no_audit: true }, EXPORT_MAX_ROWS));
+          const rows = await this.db.tx.$queryRaw<AuditRow[]>(this.auditSql({ ...f, no_audit: true }, this.exportMaxRows + 1));
+          if (rows.length > this.exportMaxRows) throw new Error(`too_many_rows: more than ${this.exportMaxRows} rows match now; narrow the filters`);
           const u = await this.users(rows.flatMap((r) => [r.actor_id, r.on_behalf_of]));
           header = ['id', 'at', 'actor', 'actor_employee_id', 'on_behalf_of', 'action', 'entity_type', 'entity_id', 'site_code', 'region_id', 'module_key', 'reason', 'admin_override',
             'via', 'ip', 'device', 'session_id', 'auth_method', 'mfa', 'request_id', 'before', 'after'];
@@ -608,7 +664,8 @@ export class LogsService {
         } else {
           const res = await this.db.tx.$queryRaw<{ id: bigint; at_text: string; event: string; outcome: string; user_id: string | null; identifier_hash: string | null; ip: string | null; user_agent: string | null;
             session_id: string | null; request_id: string | null; detail: unknown }[]>(Prisma.sql`
-            SELECT s.*, log_ts_text(s.at) AS at_text FROM sec_log_read(${JSON.stringify({ ...f, no_audit: true })}::jsonb, ${EXPORT_MAX_ROWS}::int) s ORDER BY s.at DESC, s.id DESC`);
+            SELECT s.*, log_ts_text(s.at) AS at_text FROM sec_log_read(${JSON.stringify({ ...f, no_audit: true })}::jsonb, ${this.exportMaxRows + 1}::int) s ORDER BY s.at DESC, s.id DESC`);
+          if (res.length > this.exportMaxRows) throw new Error(`too_many_rows: more than ${this.exportMaxRows} rows match now; narrow the filters`);
           const u = await this.users(res.map((r) => r.user_id));
           header = ['id', 'at', 'event', 'outcome', 'user', 'employee_id', 'identifier_masked', 'ip', 'device', 'session_id', 'request_id', 'details'];
           lines = res.map((r) => [Number(r.id), r.at_text, r.event, r.outcome, r.user_id ? u.get(r.user_id)?.display_name : '', r.user_id ? u.get(r.user_id)?.employee_id : '',

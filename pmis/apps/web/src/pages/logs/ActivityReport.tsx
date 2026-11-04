@@ -1,7 +1,7 @@
-import { Download } from 'lucide-react';
+import { Download, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useActivityReport, type ActivityReport as Report } from '@/api/logs';
+import { downloadActivityXlsx, useActivityReport, type ActivityReport as Report } from '@/api/logs';
 import { stamp, Who } from '@/components/logs/bits';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
@@ -34,7 +34,8 @@ export function ActivityReport() {
       <PageHeader title={t('nav.logs.activity_report')} subtitle={t('logs.report_subtitle')} />
       <div className="flex flex-wrap items-end gap-3">
         <label className="text-sm font-semibold">{t('logs.r_month')}<input type="month" className="input mt-1 font-normal" data-testid="report-month" value={month} onChange={(e) => e.target.value && setMonth(e.target.value)} /></label>
-        <button className="btn ms-auto" data-testid="report-csv" disabled={!r.data} onClick={download}><Download size={14} />{t('logs.r_csv')}</button>
+        <button className="btn btn-accent ms-auto" data-testid="report-xlsx" onClick={() => void downloadActivityXlsx(month).catch(() => undefined)}><FileSpreadsheet size={14} />{t('logs.r_xlsx')}</button>
+        <button className="btn" data-testid="report-csv" disabled={!r.data} onClick={download}><Download size={14} />{t('logs.r_csv')}</button>
       </div>
       {r.isError ? <ErrorState onRetry={() => void r.refetch()} /> : r.isLoading ? <LoadingSkeleton /> : r.data && (
         <>

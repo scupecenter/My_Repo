@@ -15,4 +15,5 @@ import { warehouseHandlers } from './handlers.warehouse';
 import { xHandlers } from './handlers.x';
 import { logsHandlers } from './handlers.logs';
 import { logsWebHandlers } from './handlers.logsWeb';
-export const server = setupServer(...logsWebHandlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);
+import { p9Handlers } from './handlers.p9';
+export const server = setupServer(...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...registerHandlers, ...warehouseHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);

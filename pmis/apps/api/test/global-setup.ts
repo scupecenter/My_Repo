@@ -109,7 +109,15 @@ export default async function setup(): Promise<() => Promise<void>> {
   const docs = `${dbName}_docs`;
   // The logs database (migration 0045): the suite breaks and restores a hash chain, changes the retention and the alert thresholds.
   const logs = `${dbName}_logs`;
-  const [docsDb, logsDb] = await Promise.all([buildDatabase(adminUrl, docs, appPassword, true), buildDatabase(adminUrl, logs, appPassword)]);
+  // The P9 databases (migration 0055): the logs suite changes the alert settings and breaks a chain; the mail suite counts the mails it queues.
+  const p9 = `${dbName}_p9`;
+  const p9m = `${dbName}_p9m`;
+  const [docsDb, logsDb, p9Db, p9mDb] = await Promise.all([buildDatabase(adminUrl, docs, appPassword, true), buildDatabase(adminUrl, logs, appPassword),
+    buildDatabase(adminUrl, p9, appPassword), buildDatabase(adminUrl, p9m, appPassword)]);
+  process.env.TEST_DATABASE_URL_P9 = p9Db.appUrl;
+  process.env.TEST_SUPER_URL_P9 = p9Db.superUrl;
+  process.env.TEST_DATABASE_URL_P9M = p9mDb.appUrl;
+  process.env.TEST_SUPER_URL_P9M = p9mDb.superUrl;
   // The P1 database (migration 0052): the scenario applicability suite changes the scenario rules, publishes SLA rule sets and adds tentative holidays.
   const p1 = `${dbName}_p1`;
   const p1Db = await buildDatabase(adminUrl, p1, appPassword);
@@ -148,6 +156,8 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${docs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${logs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p1} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${p9} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
     await a.end();
   };
 }
