@@ -128,6 +128,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const dashP2Db = await buildDatabase(adminUrl, dashP2, appPassword);
   process.env.TEST_DATABASE_URL_DASHP2 = dashP2Db.appUrl;
   process.env.TEST_SUPER_URL_DASHP2 = dashP2Db.superUrl;
+  // The follow-up B database (migration 0067): the suite runs the daily job and the integrity check, sets the calendar confirmation and counts the mails it queues.
+  const fb = `${dbName}_fb`;
+  const fbDb = await buildDatabase(adminUrl, fb, appPassword);
+  process.env.TEST_DATABASE_URL_FB = fbDb.appUrl;
+  process.env.TEST_SUPER_URL_FB = fbDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -161,6 +166,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${docs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${logs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p1} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${fb} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);

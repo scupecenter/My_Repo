@@ -16,6 +16,15 @@ export const useDispatchList = (need_status: string) =>
   useQuery({ queryKey: ['wh-dispatch', need_status], queryFn: () => api.get<Page<SiteDispatch>>('/warehouse/dispatch-status', { query: { ...(need_status ? { need_status } : {}), limit: 200 } }) });
 export const useSiteDispatch = (siteId: string) =>
   useQuery({ queryKey: ['wh-dispatch-site', siteId], enabled: !!siteId, retry: false, queryFn: () => api.get<SiteDispatch>(`/warehouse/dispatch-status/${siteId}`) });
+/** Q270 (contract 0.13.1): takes quarantined stock out again; the document waits for L2 like every warehouse document. */
+export type QuarantineExitBody = { exit_kind: 'repaired' | 'written_off' | 'returned_to_supplier'; reason: string; lines: { item_id: string; qty: number; serials?: string[] }[] };
+export function useQuarantineExit() {
+  const qc = useQueryClient();
+  return useMutation<StockMovement, ApiError, QuarantineExitBody>({
+    mutationFn: (body) => api.post<StockMovement>('/warehouse/quarantine-exits', { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wh-stock'] }); void qc.invalidateQueries({ queryKey: ['wh-movements'] }); },
+  });
+}
 export const useConfigGaps = () => useQuery({ queryKey: ['wh-gaps'], queryFn: () => api.get<WarehouseConfigGaps>('/warehouse/config-gaps') });
 export const useAsBuiltItems = (f: { section: string; include_inactive: boolean }) =>
   useQuery({ queryKey: ['asbuilt-items', f], queryFn: () => api.get<List<AsBuiltItem>>('/as-built/items', { query: f }) });

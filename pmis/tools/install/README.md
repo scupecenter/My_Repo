@@ -108,5 +108,40 @@ After filling them: `sudo systemctl restart gsdn-pmis-api`, then **Logs → Mail
 "Verified" only after a test mail went out with the current settings. A failed mail is retried after 1, 5, 15, 60 and 240 minutes (setting
 `mail.retry_minutes`), then given up; the System Admins are told in-app and `GET /api/v1/health` reports `mail: failing` for an external monitor.
 
-Copy the files in `LOG_ANCHOR_DIR` off the server (for example with the file backup): they are the reference that shows a rewrite of the whole
-Audit Log or security log chain by someone with database superuser rights.
+The files in `LOG_ANCHOR_DIR` are the reference that shows a rewrite of the whole Audit Log or security log chain by someone with database
+superuser rights (technical decision Q257, 2026-11-04). They are kept in two places the database cannot rewrite:
+
+- **The nightly file backup copies `LOG_ANCHOR_DIR`** in the same snapshot as the stored files (`infra/backup/files-backup.sh`, run by
+  `gsdn-pmis-files-backup.timer` after `install-file-backup.sh`). **Without the file backup nothing copies them off the server**: install it
+  (it is optional at install time) or copy the directory yourself every night.
+- **Every finished integrity check mails the chain head hash** to the System Admins (the P9 mail outbox, a mandatory system mail, outbox kind
+  `integrity_head`; two mails a night per admin, one per chain). Keep these mails: the hash in the mail is the last line of the anchor file for
+  that run.
+
+The mail bodies in the outbox are kept 30 days (`mail.retention_days`, default 30 since migration 0067; it was 90). A value saved by a person is not changed.
+
+### Mail kinds at go-live (`mail.notification_kinds`, Q250)
+
+Security alerts are mailed to the System Admins by their own rule. Every other notification is in-app only while the setting
+`mail.notification_kinds` is empty, which is the development default and stays so. **At go-live** set it to the kinds that ask a person to act:
+an approval waiting for them, and an item returned to them with a note. These are the codes the system writes today:
+
+| Kind | What the person is asked |
+|---|---|
+| `task_assigned` | A task is waiting for your approval (L2), or is ready for you to start |
+| `register_assigned` | A register record waits for you (the next level opened) |
+| `snag_review` | Photos of a snag fix wait for your approval (L2) |
+| `task_rejected` | A task was returned to you with a note |
+| `register_rejected` | A register record was returned to you with a note |
+| `snag_rejected` | A snag fix was returned to you with a note |
+
+Everything else stays in-app (`no_eligible_holder`, `mention`, `followed_change`, `levels_converted`, `permit_transferred`, `snag_raised`, `snag_closed`,
+and so on). `task_returned` and `approval_due` are in the contract's list of kinds but nothing writes them yet; add them only when a later release does.
+There is no settings screen for this yet, so it is a deployment step, written in the deployment record. On the server, as the database owner:
+
+```bash
+sudo -u postgres psql pmis -c "UPDATE settings SET value = '[\"task_assigned\", \"register_assigned\", \"snag_review\", \"task_rejected\", \"register_rejected\", \"snag_rejected\"]'::jsonb, updated_at = now() WHERE key = 'mail.notification_kinds';"
+```
+
+The mails need SMTP (above); with `SMTP_HOST` empty they are only logged. The recipient limit per hour (`mail.cap_per_recipient_per_hour`, 30) still applies
+to these kinds, so a person with many waiting items gets the first 30 mails in an hour and the rest stay in-app.

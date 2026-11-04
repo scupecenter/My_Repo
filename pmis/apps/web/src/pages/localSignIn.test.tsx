@@ -309,6 +309,7 @@ describe('hybrid mode list', () => {
       'GET /warehouse/region-vendors',
       'PUT /warehouse/region-vendors/:id',
       'GET /warehouse/config-gaps',
+      'POST /warehouse/quarantine-exits',
       'GET /number-sequences',
       'POST /number-sequences',
       'PATCH /number-sequences/:id',

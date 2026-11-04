@@ -4,7 +4,7 @@ import { API_BASE } from '@/api/client';
 import { db, viewer } from './db';
 import { guard, page, problem } from './handlers';
 import { uid } from './ids';
-import { SITE_COUNT, siteIndex } from './sites';
+import { SITE_COUNT, siteIndex, siteMeta } from './sites';
 import { dispatchOf } from './warehouseData';
 
 const B = API_BASE;
@@ -62,7 +62,8 @@ export const warehouseHandlers = [
   http.get(`${B}/warehouse/dispatch-status`, ({ request }) => {
     const g = guard(); if (g) return g;
     const st = new URL(request.url).searchParams.get('need_status');
-    const rows = Array.from({ length: Math.min(SITE_COUNT, 12) }, (_, i) => dispatchOf(i)).filter((d) => !st || d.need_status === st);
+    // Q281 (0.13.1): a site whose overall status is Cancelled is left out of the list; its own page (below) still answers
+    const rows = Array.from({ length: Math.min(SITE_COUNT, 12) }, (_, i) => i).filter((i) => siteMeta(i).status !== 'cancelled').map((i) => dispatchOf(i)).filter((d) => !st || d.need_status === st);
     return page(rows.map(({ lines: _l, ...d }) => { void _l; return d; }));
   }),
   http.get(`${B}/warehouse/dispatch-status/:siteId`, ({ params }) => {
@@ -84,6 +85,32 @@ export const warehouseHandlers = [
     const seq = (key: string, record_type: string | null, form_kind: string | null, region_id: number | null, pattern: string) =>
       ({ key, record_type, form_kind, region_id, region_code: region_id ? 'TR' : null, pattern, reset: 'yearly', next_value: 1, next_preview: pattern.replace('{REGION}', 'TR').replace('{YYYY}', '2026').replace('{SEQ:4}', '0001'), last_issued: null, last_issued_at: null, is_active: true, version: 1, updated_at: '2026-11-04T08:00:00Z' });
     return HttpResponse.json({ items: [seq('DN-CW-TR', 'cw_dn', 'dn', 1, 'DN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('RN-CW-TR', 'cw_rn', 'rn', 1, 'RN-CW-{REGION}-{YYYY}-{SEQ:4}'), seq('PL-WH', 'pl', null, null, 'PL-WH-{YYYY}-{SEQ:4}')] });
+  }),
+  // Contract 0.13.1 (Q270): a quarantine exit is a pending document that holds its quantity; L2 approves it in the register (not mocked here).
+  http.post(`${B}/warehouse/quarantine-exits`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!admin()) return problem(403, 'forbidden', 'Not allowed');
+    const b = (await request.json()) as { exit_kind?: string; reason?: string; lines?: { item_id: string; qty: number; serials?: string[] }[] };
+    if (!['repaired', 'written_off', 'returned_to_supplier'].includes(b.exit_kind ?? '')) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/exit_kind', code: 'not_in_list' }] });
+    const e = bad(b as Body); if (e) return e;
+    const lines = b.lines ?? [];
+    if (!lines.length) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/lines', code: 'required' }] });
+    for (const [i, l] of lines.entries()) {
+      const s = W().stock.find((x) => x.item_id === l.item_id);
+      if (!s) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: `/lines/${i}/item_id`, code: 'unknown_item' }] });
+      if (!(l.qty > 0)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: `/lines/${i}/qty`, code: 'not_positive' }] });
+      const free = (s.quarantine ?? 0) - (s.quarantine_pending ?? 0);
+      if (l.qty > free) return problem(422, 'insufficient_stock', `Not enough quarantined stock: ${free} can leave quarantine.`, { errors: [{ path: `/lines/${i}/qty`, code: 'insufficient_quarantine', message: `In quarantine: ${free}` }] });
+    }
+    for (const l of lines) { const s = W().stock.find((x) => x.item_id === l.item_id)!; s.quarantine_pending = (s.quarantine_pending ?? 0) + l.qty; }
+    const n = W().movements.length + 1;
+    const mvt = {
+      id: uid(`wh-exit-${n}`), doc_no: `${b.exit_kind === 'returned_to_supplier' ? 'DN-SUP-WH' : 'ADJ-WH'}-2026-${String(n).padStart(4, '0')}`, record_type: b.exit_kind === 'returned_to_supplier' ? 'sup_dn' : 'adj',
+      kind: 'quarantine_exit', exit_kind: b.exit_kind, exit_reason: b.reason, status: 'pending', site_id: null, site_code: null, register_record_id: uid(`wh-exit-rec-${n}`), reserved: false, version: 1, doc_no_locked: false, sequence_key: null, doc_date: '2026-11-04',
+      lines: lines.map((l) => ({ item_id: l.item_id, item_code: W().stock.find((x) => x.item_id === l.item_id)!.item_code, qty: l.qty })), created_by: { id: uid('user-pm'), display_name: 'Ahmed Salem' }, created_at: '2026-11-04T08:00:00Z', posted_at: null,
+    } as never as (typeof W extends () => infer R ? R : never)['movements'][number];
+    W().movements.push(mvt);
+    return HttpResponse.json(mvt, { status: 201, ...tag(1) });
   }),
   http.get(`${B}/warehouse/movements`, ({ request }) => {
     const g = guard(); if (g) return g;

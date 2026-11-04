@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.12
+  version: 0.13.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.13.1 (2026-11-04): additive except where noted. Follow-up group B of the technical decisions of 2026-11-04 (docs/spec/technical-decisions-2026-11-04.md; migration 0067; CHANGELOG 95). (1) Q270: quarantined Warehouse stock leaves quarantine through three movements, each a Warehouse document with a reason, approved by L2 like any other: `POST /warehouse/quarantine-exits` (`QuarantineExitInput`: `exit_kind` `repaired` = quarantine to available (an ADJ), `written_off` = quarantine to gone (an ADJ), `returned_to_supplier` = quarantine to out (a DN to the vendor, new record type `sup_dn`, numbered by the new sequence `DN-SUP-WH`); `reason` 3 to 500 characters, required; `lines[]` of `item_id`, `qty` above zero and `serials` (one per unit for a serial-tracked item, each in quarantine)). It answers the pending `StockMovement` (201); the movement is submitted, reviewed and approved through its register record and posts on the final approval. Refusals: 403 without the Warehouse `create` right, 422 `insufficient_stock` (`errors[].code` `insufficient_quarantine`) above the quantity in quarantine that is not already in another pending exit, 422 `validation_failed` (`required` on `/reason`, `serial_count`, `serial_not_quarantined`, `serial_reserved`, `unknown_serial`, `not_serial_tracked`, `whole_units`, `not_positive`, `duplicate`, `unknown_item`) and, at submit, `exit_kind_fixed` and `required` on `/data/exit_kind` and `/data/exit_reason`. `StockMovement.kind` gains `quarantine_exit`, `record_type` gains `sup_dn` (not accepted by `POST /warehouse/movements`), and there are the new `exit_kind` and `exit_reason`; `GET /warehouse/movements` takes `kind=quarantine_exit`; `StockLevel.quarantine` now counts what is still in quarantine (posted exits take their quantity out) and the new `StockLevel.quarantine_pending` is the quantity held by pending exits; a repaired exit adds to `on_hand`. The Warehouse register gains the types `sup_dn`, and the header fields `exit_kind` and `exit_reason`. (2) Q281: `GET /warehouse/dispatch-status` leaves out the sites whose overall status is Cancelled (also with `need_status`); `GET /warehouse/dispatch-status/{site_id}` still answers for them. (3) Q245: the setting `calendar.official_confirmed` resets to false when a new year begins (1 January, Africa/Tripoli; the daily job, job `calendar_year_reset`, audited as `calendar_official_confirmed_reset`), so `HolidaySummary.official_calendar_pending` is true again until the new year is confirmed. (4) Q253: the default of `mail.retention_days` is 30 (was 90). (5) Q257: every finished integrity check (nightly or manual) queues a mandatory system mail with the chain head hash to every active System Admin (outbox kind `integrity_head`, never capped); no HTTP change. Q250 is documentation only (tools/install/README.md).
     - 0.12.12 (2026-11-04): additive. Shared saved views and server-side drafts (P10, owner answers Q115 and Q117; migration 0065; CHANGELOG 84). (1) Saved views move from the browser to the server: `GET/POST /saved-views`, `GET/PATCH /saved-views/{view_id}`, `POST .../deactivate`, `.../restore`, `.../transfer`, `GET .../versions` and `POST /saved-views/import`. A view holds the filters, columns (order, hidden, width, density) and sort of one list screen (`screen_key`). Every user has private views that nobody else reads; sharing with roles, groups, users or everyone needs `views.share` (grant `views`/`create`, seeded for System Admin, Team Leads and Project Manager, delegable), `everyone` needs it for all regions, a region filter must lie in the sharer's regions, and a view reaches only recipients who may open the screen's module. Hidden columns are stripped server-side for every reader (`stripped_columns`). Views are versioned, audited and deactivated, never deleted. Editing, deactivating and transferring other people's shared views needs `views.manage` (`views`/`administer`); when an owner leaves, their shared views move to their active direct manager, or show `owner_left`. The browser's old local views are imported once per screen (idempotent per `local_id`). (2) Drafts (Q115): `GET /me/drafts`, `GET/PUT/DELETE /me/drafts/{draft_key}` keep unsaved input of a task, a register record or a form on the server for the caller only (setting `drafts.retention_days`, default 30); a draft is never a submission, an approval or an input of any calculation. `DelegableRight` gains `views.share` and `views.manage`; `ModuleKey` examples gain `views`.
     - 0.12.11 (2026-11-04): additive. Work package P4c of the owner answers 2026-11-04 (migration 0063; CHANGELOG 92). (1) Q150: an HLC record names the HLC purchase requests it covers, `PUT /registers/hlc/records/{record_id}/purchase-requests` (If-Match, L1 of the record while in entry; an empty list = every submitted request of the site), and `RegisterRecord.purchase_requests` (HLC records) shows the required set, the candidates and whether all are approved by HLC. C3 now closes only when every required request has an HLC approval date, on the latest one; a cancelled request (order status `Cancel...`) is ignored. New warnings `hlc_prs_incomplete`, `hlc_prs_not_linked`. (2) Q148: an HLC record with an installation, TX link test or in-service date is refused at submit and at the final approval (`no_approved_hlc_pr`, 422) until the required requests are approved by HLC; the new fields `pr_exception` / `pr_exception_reason` are the emergency exception (only a holder of `administer` on HLC or a System Admin, `pr_exception_forbidden`), warned to the reviewer (`pr_exception_used`) and audited at the approval. (3) Q139: `POST /registers/hlc/legacy-migration` previews (`dry_run`) or runs (reason, step-up) the one-time move of the legacy HLC requests into Procurement drafts of scope HLC. (4) Q114: Dismantle fields `execution_mode`, `procurement_order_id`, `internal_team`; for Outsourced work the contractor (FO / FT, `external_party`) is derived from the chosen approved Procurement order (`contractor_from_order`, `order_choice_required`, `no_active_order`, `order_not_active`), In-House names the internal team; `GET /registers/dismantle/order-options` lists the active orders. (5) Q151: `GET` / `PUT /settings/gecol-order-warnings` (off by default); warnings `gecol_order` and `billing_before_event` carry `related_path`.
     - 0.12.10 (2026-11-04): additive, work package P4a of the owner answers of 2026-11-04 (Q103 except Quality, Q108, Q113, Q225; migration 0062; CHANGELOG 89). (1) Q225: a site field that changes rules (permits, scope; `requires_approval`, seed `near_airport`) is no longer edited directly: `PATCH /sites/{site_id}` answers 422 `validation_failed` with `/custom/<code>` and the field code `approval_required`; the new `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`, a reason is required) opens one Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, old and new value), entered by the caller as L1 (an L1 holder of the Change Control row with its `create` right); the value applies to the site on the L2 approval, audited, and the site is recalculated. `SiteCustomField` gains `requires_approval`. (2) An approved register record feeds the calculation layer (no new path): Change Control writes `change_requests` (suspensions and resumptions with their effective dates `suspension_start` / `resumption_date` and the approval date; withdrawn with a new version where `withdrawn` = Yes; a Cancellation cancels the site; a site field change applies), RF & Design the site identity, Acquisition Master T and A3, Readiness & Handover D17 and Z1, Issues and Risks their tables. Change Control gains the fields `suspension_start`, `resumption_date` and `withdrawn`; field codes at submit `before_suspension`, `no_open_suspension`, `resumed_already`, `old_value_changed`, `unknown_site_field`, `scope_scenario_conflict`. (3) Q113: As-Built has the record types `cw_part` and `te_part` (one each per site, each approved on its own; a record created without a type takes it from its values); `cw_as_built_submitted` (BU) is filled by the CW part's submission (never typed) with `cw_submitted_date`; `as_built_date` (EF) is the TE part's submission date unless L1 typed the vendor's earlier date; `part_not_applicable` with `na_reason` gives BU N/A. Write-through fields that the system fills answer `edit_via` `none`. (4) Q108: the As-Built fields `wl_antenna_type`, `mw_antenna_type` and `router_type` list the active Warehouse items of their group (WL, MW, IP); quantities of unit `qty` are whole numbers.
@@ -4393,7 +4394,7 @@ paths:
       tags: [system]
       operationId: listMailOutbox
       summary: The mail outbox, newest first (no bodies)
-      description: System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+      description: System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (30 since 0.13.1; it was 90).
       parameters:
         - { name: status, in: query, schema: { type: string, enum: [queued, retrying, sending, sent, dead, logged, suppressed] } }
         - { name: kind, in: query, schema: { type: string } }
@@ -8279,7 +8280,8 @@ paths:
       tags: [warehouse]
       operationId: listSiteDispatch
       summary: TE dispatch of the sites (D6), the Q65 date and the need-based status
-      description: TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`.
+      description: >-
+        TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`. 0.13.1 (Q281): a site whose overall status is Cancelled is left out (also with `need_status`); it stays visible on its own page, `GET /warehouse/dispatch-status/{site_id}`.
       parameters:
       - name: need_status
         in: query
@@ -8923,7 +8925,7 @@ paths:
         in: query
         schema:
           type: string
-          enum: [issue, return, receipt, adjustment]
+          enum: [issue, return, receipt, adjustment, quarantine_exit]
       - name: status
         in: query
         schema:
@@ -8977,6 +8979,38 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/quarantine-exits:
+    post:
+      tags: [warehouse]
+      operationId: createQuarantineExit
+      summary: Take quarantined stock out of quarantine (repaired, written off or returned to the supplier)
+      description: |
+        Q270 (0.13.1). One Warehouse document with a reason, a record of the Warehouse register in entry state; submit, review and approve it through
+        `/registers/warehouse/records/{register_record_id}/...` (L2 approves, as for every warehouse document). `exit_kind`: `repaired` moves the quantity from
+        quarantine to the available stock (an ADJ, record type `adj`), `written_off` takes it out for good (an ADJ), `returned_to_supplier` sends it back to the
+        vendor (a DN to the vendor, record type `sup_dn`). A pending exit holds its quantity (`StockLevel.quarantine_pending`), so the same units cannot be taken
+        twice; cancelling it (`POST /warehouse/movements/{movement_id}/cancel`) releases them. The stock and the serials move on the final approval. Without
+        `doc_no` the next number of the sequence of the type is issued (`ADJ-WH`, `DN-SUP-WH`); without `doc_date` it is today (Africa/Tripoli).
+      x-db-path: wh_create_quarantine_exit
+      parameters:
+      - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/QuarantineExitInput'}
+      responses:
+        '201':
+          description: Pending.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StockMovement'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /warehouse/movements/{movement_id}:
@@ -14251,7 +14285,7 @@ components:
         tentative_reminder_due: { type: boolean, description: 'A tentative date falls within 14 days.' }
         next_year: { type: integer }
         next_year_table_empty: { type: boolean, description: 'Drives the empty-table banner.' }
-        official_calendar_pending: { type: boolean, description: '0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner.' }
+        official_calendar_pending: { type: boolean, description: '0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. 0.13.1 (Q245): the setting resets to false on 1 January (Africa/Tripoli), so this is true again until the new year is confirmed.' }
         tentative_counted: { type: boolean, description: '0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge.' }
     WeekendDaysRequest:
       allOf:
@@ -15036,7 +15070,7 @@ components:
       properties:
         key: { type: string, examples: [DN-CW-TR] }
         form_kind: { oneOf: [{ $ref: '#/components/schemas/FormKind' }, { type: 'null' }] }
-        record_type: { type: [string, 'null'], enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj, null], description: 'The warehouse document type this sequence numbers (one active sequence per type and region).' }
+        record_type: { type: [string, 'null'], enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj, sup_dn, null], description: 'The warehouse document type this sequence numbers (one active sequence per type and region). 0.13.1: sup_dn (seed DN-SUP-WH) numbers the DN to the vendor of a quarantine exit; it cannot be created, only its pattern edited.' }
         region_id: { type: [integer, 'null'], description: 'null for PL, OPEN and ADJ.' }
         region_code: { type: [string, 'null'], pattern: '^[A-Z]{1,6}$', description: 'The {REGION} token (Q32: only TR is known).' }
         last_issued_at: { type: [string, 'null'], format: date-time }
@@ -15136,7 +15170,8 @@ components:
         pending_issue: { type: number }
         pending_return: { type: number }
         available: { type: number, description: 'on_hand minus reserved.' }
-        quarantine: { type: number, description: 'Q105: returned Faulty or Damaged, held outside on_hand and available. Always 0 for a site.' }
+        quarantine: { type: number, description: 'Q105: returned Faulty or Damaged, held outside on_hand and available. 0.13.1 (Q270): what is still in quarantine, after the posted quarantine exits. Always 0 for a site.' }
+        quarantine_pending: { type: number, description: '0.13.1 (Q270): the quantity held by pending quarantine exits; it can no longer be taken by another exit. Always 0 for a site.' }
     DispatchNeedStatus:
       type: string
       enum: [complete, short, pending_configuration, not_applicable]
@@ -15237,8 +15272,10 @@ components:
       required: [id, kind, status, site_id, lines, version]
       properties:
         id: { type: string, format: uuid }
-        kind: { type: string, enum: [issue, return, receipt, adjustment] }
-        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj] }
+        kind: { type: string, enum: [issue, return, receipt, adjustment, quarantine_exit], description: '0.13.1 (Q270): quarantine_exit takes quarantined stock out again (see exit_kind).' }
+        record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj, sup_dn], description: '0.13.1: sup_dn = the DN to the vendor of an exit returned to the supplier (no site).' }
+        exit_kind: { type: [string, 'null'], enum: [repaired, written_off, returned_to_supplier, null], description: '0.13.1 (Q270). Set on a quarantine_exit only: repaired = quarantine to available, written_off = quarantine to gone, returned_to_supplier = quarantine to out.' }
+        exit_reason: { type: [string, 'null'], description: '0.13.1 (Q270). The reason of a quarantine exit.' }
         doc_no: { type: [string, 'null'] }
         doc_no_locked: { type: boolean, description: 'Q106: true once posted; the Doc No. can no longer change.' }
         sequence_key: { type: [string, 'null'], description: 'The numbering sequence that issued the Doc No.; null = typed by hand.' }
@@ -15255,6 +15292,29 @@ components:
         created_at: { type: string, format: date-time }
         posted_at: { type: [string, 'null'], format: date-time }
         version: { type: integer }
+    QuarantineExitInput:
+      type: object
+      additionalProperties: false
+      required: [exit_kind, reason, lines]
+      description: '0.13.1 (Q270). Unknown keys are refused (422).'
+      properties:
+        exit_kind: { type: string, enum: [repaired, written_off, returned_to_supplier] }
+        reason: { type: string, minLength: 3, maxLength: 500, description: 'Why the stock leaves quarantine. Required; kept on the document and in the audit row.' }
+        doc_no: { type: string, maxLength: 80, description: 'Optional: without it the next number of the sequence of the type is issued. A typed number must be unique and never issued by a sequence (409 otherwise).' }
+        doc_date: { type: string, format: date, description: 'Optional: default today (Africa/Tripoli).' }
+        remark: { type: string, maxLength: 2000 }
+        lines:
+          type: array
+          minItems: 1
+          maxItems: 500
+          items:
+            type: object
+            additionalProperties: false
+            required: [item_id, qty]
+            properties:
+              item_id: { type: string, format: uuid }
+              qty: { type: number, exclusiveMinimum: 0, description: 'At most the quantity in quarantine that is not already in a pending exit (422 insufficient_stock).' }
+              serials: { type: array, maxItems: 5000, items: { type: string }, description: 'A serial-tracked item names one serial per unit, each in quarantine (status Returned) and in no other pending exit. Other items name none.' }
     StockMovementInput:
       type: object
       required: [record_type, lines]

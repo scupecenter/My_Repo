@@ -5,12 +5,12 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useMe } from '@/api/hooks';
 import { useRegions } from '@/api/sites';
-import type { WarehouseItem } from '@/api/types';
-import { useConfigGaps, useDispatchList, useMovements, useSaveItem, useStock, useWhItems } from '@/api/warehouse';
+import type { StockLevel, WarehouseItem } from '@/api/types';
+import { useConfigGaps, useDispatchList, useMovements, useQuarantineExit, useSaveItem, useStock, useWhItems, type QuarantineExitBody } from '@/api/warehouse';
 import { NEED_TONE } from '@/components/SiteDispatch';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
-import { isAdmin } from '@/lib/perm';
+import { hasGrant, isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 
 type Tab = 'items' | 'movements' | 'stock' | 'dispatch' | 'gaps';
@@ -149,8 +149,8 @@ function Movements() {
   const { t } = useTranslation();
   const [status, setStatus] = useState('');
   const list = useMovements(status);
-  // DN and RN only: the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
-  const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return');
+  // DN and RN, and the quarantine exits (Q270); the other documents (PL, OPEN, ADJ) have no site and are kept in the register.
+  const items = (list.data?.items ?? []).filter((m) => m.kind === 'issue' || m.kind === 'return' || m.kind === 'quarantine_exit');
   return (
     <div data-testid="wh-movements">
       <div className="mb-3 flex gap-2">
@@ -165,7 +165,7 @@ function Movements() {
             {items.map((m) => (
               <tr key={m.id} data-testid={`wh-mv-${m.doc_no ?? m.id}`} data-status={m.status} className="border-b border-line">
                 <td className="mono px-3 py-2 font-bold">{m.register_record_id ? <Link className="underline" to={`/registers/warehouse?record=${m.register_record_id}`}>{m.doc_no ?? '—'}</Link> : (m.doc_no ?? '—')}</td>
-                <td className="px-3 py-2">{(m.record_type ?? m.kind).toUpperCase()}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</td><td className="px-3 py-2">{m.site_code ?? '—'}</td>
+                <td className="px-3 py-2">{(m.record_type ?? m.kind).toUpperCase()}{m.exit_kind && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-mv-exit-${m.doc_no ?? m.id}`} title={m.exit_reason ?? undefined}>{t(`wh.qx_${m.exit_kind}`)}</span>}{m.doc_no_locked && <Lock size={12} className="ms-1 inline text-mute" aria-label={t('wh.locked_hint')} data-testid={`wh-mv-locked-${m.doc_no ?? m.id}`} />}</td><td className="px-3 py-2">{m.site_code ?? '—'}</td>
                 <td className="px-3 py-2">{m.lines.reduce((a, l) => a + l.qty, 0)}</td>
                 <td className="px-3 py-2"><span className={`chip ${TONE[m.status]}`} data-testid={`wh-mv-status-${m.doc_no ?? m.id}`}>{t(`wh.st_${m.status}`)}</span></td>
               </tr>
@@ -179,9 +179,59 @@ function Movements() {
   );
 }
 
+type ExitKind = QuarantineExitBody['exit_kind'];
+const EXIT_KINDS: ExitKind[] = ['repaired', 'written_off', 'returned_to_supplier'];
+
+/** Q270 (contract 0.13.1): one Warehouse document that takes quarantined stock out again, with a reason; L2 approves it in the register. */
+function ExitDialog({ row, onClose }: { row: StockLevel; onClose: () => void }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const save = useQuarantineExit();
+  const free = (row.quarantine ?? 0) - (row.quarantine_pending ?? 0);
+  const [kind, setKind] = useState<ExitKind>('repaired');
+  const [qty, setQty] = useState(String(free));
+  const [serials, setSerials] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const n = Number(qty);
+  const submit = (reason: string) => {
+    const list = serials.split('\n').map((x) => x.trim()).filter(Boolean);
+    save.mutate({ exit_kind: kind, reason, lines: [{ item_id: row.item_id, qty: n, ...(list.length ? { serials: list } : {}) }] }, {
+      onSuccess: (m) => { toast(t('wh.qx_done', { doc_no: m.doc_no ?? '' }), 'ok'); onClose(); },
+      onError: (e) => {
+        if (e instanceof ApiError) {
+          if (e.code === 'insufficient_stock') return setErr(t('wh.qx_err_too_many'));
+          const code = (e.problem.errors ?? []).map((x) => x.code).find((c) => t(`wh.qx_err_${c}`) !== `wh.qx_err_${c}`);
+          if (code) return setErr(t(`wh.qx_err_${code}`));
+        }
+        setErr(errText(e, t));
+      },
+    });
+  };
+  return (
+    <FormDialog open onClose={onClose} testid="wh-qx" busy={save.isPending} error={err} onSubmit={submit} title={t('wh.qx_title')} submitLabel={t('wh.qx_submit')} disabled={!(n > 0) || n > free}>
+      <p className="text-sm"><b className="mono">{row.item_code}</b> {row.item_name}</p>
+      <p className="text-sm text-mute" data-testid="wh-qx-free">{t('wh.qx_available', { count: free })}</p>
+      <label className="block text-sm font-semibold">{t('wh.qx_kind')}
+        <select className="input mt-1 font-normal" data-testid="wh-qx-kind" value={kind} onChange={(e) => setKind(e.target.value as ExitKind)}>
+          {EXIT_KINDS.map((k) => <option key={k} value={k}>{t(`wh.qx_${k}`)}</option>)}
+        </select>
+      </label>
+      <label className="block text-sm font-semibold">{t('wh.qx_qty')}
+        <input type="number" min={0} step="any" className="input mt-1 font-normal" data-testid="wh-qx-qty" value={qty} onChange={(e) => setQty(e.target.value)} />
+      </label>
+      <label className="block text-sm font-semibold">{t('wh.qx_serials')}
+        <textarea className="input mt-1 min-h-16 font-normal" dir="ltr" data-testid="wh-qx-serials" value={serials} onChange={(e) => setSerials(e.target.value)} />
+      </label>
+    </FormDialog>
+  );
+}
+
 function Stock() {
   const { t, i18n } = useTranslation();
+  const me = useMe(true).data;
+  const canExit = isAdmin(me) || hasGrant(me, 'create');
   const [q, setQ] = useState('');
+  const [exit, setExit] = useState<StockLevel | null>(null);
   const list = useStock(q);
   const items = list.data?.items ?? [];
   const cols = ['on_hand', 'reserved', 'pending_issue', 'pending_return', 'available', 'quarantine'] as const;
@@ -190,12 +240,16 @@ function Stock() {
       <input className="input mb-3 max-w-64" data-testid="wh-stock-search" placeholder={t('wh.search')} aria-label={t('wh.search')} value={q} onChange={(e) => setQ(e.target.value)} />
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-line bg-card2 text-mute"><th className="px-3 py-2 text-start font-semibold">{t('wh.code')}</th><th className="px-3 py-2 text-start font-semibold">{t('wh.uom')}</th>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}</tr></thead>
+          <thead><tr className="border-b border-line bg-card2 text-mute"><th className="px-3 py-2 text-start font-semibold">{t('wh.code')}</th><th className="px-3 py-2 text-start font-semibold">{t('wh.uom')}</th>{cols.map((c) => <th key={c} className="px-3 py-2 text-start font-semibold">{t(`wh.${c}`)}</th>)}<th /></tr></thead>
           <tbody>
             {items.map((s) => (
               <tr key={s.item_id} data-testid={`wh-stock-${s.item_code}`} className="border-b border-line">
                 <td className="px-3 py-2"><b className="mono">{s.item_code}</b> {s.item_name}</td><td className="px-3 py-2">{s.uom}</td>
-                {cols.map((c) => <td key={c} data-testid={`wh-stock-${s.item_code}-${c}`} className={`px-3 py-2 ${c === 'quarantine' && (s[c] ?? 0) > 0 ? 'text-lateInk' : ''}`} title={c === 'quarantine' ? t('wh.quarantine_hint') : undefined}>{(s[c] ?? 0).toLocaleString(i18n.language)}</td>)}
+                {cols.map((c) => <td key={c} data-testid={`wh-stock-${s.item_code}-${c}`} className={`px-3 py-2 ${c === 'quarantine' && (s[c] ?? 0) > 0 ? 'text-lateInk' : ''}`} title={c === 'quarantine' ? t('wh.quarantine_hint') : undefined}>
+                  {(s[c] ?? 0).toLocaleString(i18n.language)}
+                  {c === 'quarantine' && (s.quarantine_pending ?? 0) > 0 && <span className="chip ms-2 bg-waitBg font-normal text-waitInk" data-testid={`wh-stock-${s.item_code}-qx-pending`}>{t('wh.qx_pending_n', { count: s.quarantine_pending })}</span>}
+                </td>)}
+                <td className="px-3 py-2 text-end">{canExit && (s.quarantine ?? 0) - (s.quarantine_pending ?? 0) > 0 && <button className="btn" data-testid={`wh-qx-open-${s.item_code}`} onClick={() => setExit(s)}>{t('wh.qx_action')}</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -203,6 +257,7 @@ function Stock() {
         {list.isSuccess && !items.length && <p className="p-6 text-center text-mute">{t('wh.empty')}</p>}
         {list.isError && <p role="alert" className="p-6 text-center text-lateInk">{t('errors.generic')}</p>}
       </div>
+      {exit && <ExitDialog row={exit} onClose={() => setExit(null)} />}
     </div>
   );
 }

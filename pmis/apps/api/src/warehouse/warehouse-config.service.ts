@@ -205,6 +205,8 @@ export class WarehouseConfigService {
       ]);
     const conds: Prisma.Sql[] = [
       Prisma.sql`s.is_active`,
+      // Q281: a site whose overall status is Cancelled is left out of the list (and of any need total built from it); its own site page still shows it
+      Prisma.sql`s.overall_status <> 'cancelled'`,
       Prisma.sql`(s.scope_te_full = 'yes' OR s.scope_te_ip_router_only = 'yes')`,
     ];
     if (regs !== null)

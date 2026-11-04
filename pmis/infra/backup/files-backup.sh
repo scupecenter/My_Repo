@@ -6,11 +6,16 @@
 # Retention: 14 daily, 8 weekly, 12 monthly snapshots (CLAUDE.md, non-functional requirements). One copy goes to another building: point
 # RESTIC_REPOSITORY at that building (sftp:user@host:/path or a mounted share); the repository password is kept offline as well.
 #
+# The log anchors (Q257, technical decision 2026-11-04): LOG_ANCHOR_DIR holds the chain heads that the nightly integrity check appends (anchor-audit.jsonl,
+# anchor-security.jsonl). It is copied in the same snapshot, so the reference that shows a rewrite of the Audit Log chain also exists off the server, where
+# the database cannot rewrite it. Skipped (with a note) when LOG_ANCHOR_DIR is not set or does not exist yet.
+#
 # Each run writes a job_runs row (name files_backup) through job_run_start and job_run_finish, as the API's own jobs do.
 #
 # Configuration (environment, normally /etc/gsdn-pmis/backup.env and /etc/gsdn-pmis/pmis.env; never in the repository):
 #   RESTIC_REPOSITORY, RESTIC_PASSWORD_FILE           where and how the repository is encrypted
 #   STORAGE_DIR                                        local disk store (when S3_ENDPOINT is not set)
+#   LOG_ANCHOR_DIR                                     the integrity anchor files, copied in the same snapshot (optional; /etc/gsdn-pmis/pmis.env sets it)
 #   S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY, S3_SECRET_KEY   MinIO store (all four)
 #   DATABASE_URL                                       the pmis_app URL, only to write the job_runs row (optional)
 #   FILES_BACKUP_STAGING                               scratch directory for the MinIO copy (default /var/tmp/gsdn-pmis-files-staging)
@@ -70,11 +75,23 @@ else
   SOURCE=$STORAGE_DIR
 fi
 
+# The integrity anchors travel with the files (Q257): a second path of the same snapshot.
+SOURCES=("$SOURCE")
+if [[ -n ${LOG_ANCHOR_DIR:-} ]]; then
+  if [[ -d $LOG_ANCHOR_DIR ]]; then
+    SOURCES+=("$LOG_ANCHOR_DIR")
+  else
+    echo "files-backup: LOG_ANCHOR_DIR $LOG_ANCHOR_DIR does not exist yet: the anchors are not in this snapshot" >&2
+  fi
+else
+  echo "files-backup: LOG_ANCHOR_DIR is not set: the integrity anchors are not in this snapshot" >&2
+fi
+
 # A repository that does not exist yet is created here; the password file must already be in place.
 if ! restic cat config >/dev/null 2>&1; then
   restic init >/dev/null 2>&1 || fail "restic init failed (check RESTIC_REPOSITORY and the password file)"
 fi
-if ! restic backup --tag files --tag daily --host "$(hostname)" --json "$SOURCE" >"$SUMMARY_FILE" 2>/dev/null; then
+if ! restic backup --tag files --tag daily --host "$(hostname)" --json "${SOURCES[@]}" >"$SUMMARY_FILE" 2>/dev/null; then
   [[ $SOURCE == "$STAGING" ]] && rm -rf "$STAGING"
   fail "restic backup failed"
 fi
@@ -83,4 +100,4 @@ restic forget --tag files --keep-daily 14 --keep-weekly 8 --keep-monthly 12 --pr
 
 FILES=$(tail -n 1 "$SUMMARY_FILE" | sed -n 's/.*"total_files_processed":\([0-9]*\).*/\1/p')
 echo "files-backup: snapshot taken; retention 14 daily, 8 weekly, 12 monthly applied"
-record ok "${FILES:-0}" "" '{"retention":"14d/8w/12m"}'
+record ok "${FILES:-0}" "" "{\"retention\":\"14d/8w/12m\",\"paths\":${#SOURCES[@]}}"

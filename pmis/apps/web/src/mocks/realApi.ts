@@ -280,6 +280,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/region-vendors'],
   ['put', '/warehouse/region-vendors/:id'],
   ['get', '/warehouse/config-gaps'],
+  // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
+  ['post', '/warehouse/quarantine-exits'],
   ['get', '/number-sequences'],
   ['post', '/number-sequences'],
   ['patch', '/number-sequences/:id'],

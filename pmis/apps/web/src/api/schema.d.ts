@@ -2864,7 +2864,7 @@ export interface paths {
         };
         /**
          * The mail outbox, newest first (no bodies)
-         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (30 since 0.13.1; it was 90).
          */
         get: operations["listMailOutbox"];
         put?: never;
@@ -5324,7 +5324,7 @@ export interface paths {
         };
         /**
          * TE dispatch of the sites (D6), the Q65 date and the need-based status
-         * @description TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`.
+         * @description TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`. 0.13.1 (Q281): a site whose overall status is Cancelled is left out (also with `need_status`); it stays visible on its own page, `GET /warehouse/dispatch-status/{site_id}`.
          */
         get: operations["listSiteDispatch"];
         put?: never;
@@ -5692,6 +5692,31 @@ export interface paths {
          *     Duplicate Doc No. answers 409.
          */
         post: operations["createStockMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/quarantine-exits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take quarantined stock out of quarantine (repaired, written off or returned to the supplier)
+         * @description Q270 (0.13.1). One Warehouse document with a reason, a record of the Warehouse register in entry state; submit, review and approve it through
+         *     `/registers/warehouse/records/{register_record_id}/...` (L2 approves, as for every warehouse document). `exit_kind`: `repaired` moves the quantity from
+         *     quarantine to the available stock (an ADJ, record type `adj`), `written_off` takes it out for good (an ADJ), `returned_to_supplier` sends it back to the
+         *     vendor (a DN to the vendor, record type `sup_dn`). A pending exit holds its quantity (`StockLevel.quarantine_pending`), so the same units cannot be taken
+         *     twice; cancelling it (`POST /warehouse/movements/{movement_id}/cancel`) releases them. The stock and the serials move on the final approval. Without
+         *     `doc_no` the next number of the sequence of the type is issued (`ADJ-WH`, `DN-SUP-WH`); without `doc_date` it is today (Africa/Tripoli).
+         */
+        post: operations["createQuarantineExit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -10154,7 +10179,7 @@ export interface components {
             next_year: number;
             /** @description Drives the empty-table banner. */
             next_year_table_empty: boolean;
-            /** @description 0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. */
+            /** @description 0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. 0.13.1 (Q245): the setting resets to false on 1 January (Africa/Tripoli), so this is true again until the new year is confirmed. */
             official_calendar_pending?: boolean;
             /** @description 0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge. */
             tentative_counted?: boolean;
@@ -10945,10 +10970,10 @@ export interface components {
             key: string;
             form_kind?: components["schemas"]["FormKind"] | null;
             /**
-             * @description The warehouse document type this sequence numbers (one active sequence per type and region).
+             * @description The warehouse document type this sequence numbers (one active sequence per type and region). 0.13.1: sup_dn (seed DN-SUP-WH) numbers the DN to the vendor of a quarantine exit; it cannot be created, only its pattern edited.
              * @enum {string|null}
              */
-            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | null;
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | "sup_dn" | null;
             /** @description null for PL, OPEN and ADJ. */
             region_id?: number | null;
             /** @description The {REGION} token (Q32: only TR is known). */
@@ -11067,8 +11092,10 @@ export interface components {
             pending_return: number;
             /** @description on_hand minus reserved. */
             available: number;
-            /** @description Q105: returned Faulty or Damaged, held outside on_hand and available. Always 0 for a site. */
+            /** @description Q105: returned Faulty or Damaged, held outside on_hand and available. 0.13.1 (Q270): what is still in quarantine, after the posted quarantine exits. Always 0 for a site. */
             quarantine?: number;
+            /** @description 0.13.1 (Q270): the quantity held by pending quarantine exits; it can no longer be taken by another exit. Always 0 for a site. */
+            quarantine_pending?: number;
         };
         /**
          * @description D6: the PMIS status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.
@@ -11180,10 +11207,23 @@ export interface components {
         StockMovement: {
             /** Format: uuid */
             id: string;
-            /** @enum {string} */
-            kind: "issue" | "return" | "receipt" | "adjustment";
-            /** @enum {string} */
-            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
+            /**
+             * @description 0.13.1 (Q270): quarantine_exit takes quarantined stock out again (see exit_kind).
+             * @enum {string}
+             */
+            kind: "issue" | "return" | "receipt" | "adjustment" | "quarantine_exit";
+            /**
+             * @description 0.13.1: sup_dn = the DN to the vendor of an exit returned to the supplier (no site).
+             * @enum {string}
+             */
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | "sup_dn";
+            /**
+             * @description 0.13.1 (Q270). Set on a quarantine_exit only: repaired = quarantine to available, written_off = quarantine to gone, returned_to_supplier = quarantine to out.
+             * @enum {string|null}
+             */
+            exit_kind?: "repaired" | "written_off" | "returned_to_supplier" | null;
+            /** @description 0.13.1 (Q270). The reason of a quarantine exit. */
+            exit_reason?: string | null;
             doc_no?: string | null;
             /** @description Q106: true once posted; the Doc No. can no longer change. */
             doc_no_locked?: boolean;
@@ -11218,6 +11258,29 @@ export interface components {
             /** Format: date-time */
             posted_at?: string | null;
             version: number;
+        };
+        /** @description 0.13.1 (Q270). Unknown keys are refused (422). */
+        QuarantineExitInput: {
+            /** @enum {string} */
+            exit_kind: "repaired" | "written_off" | "returned_to_supplier";
+            /** @description Why the stock leaves quarantine. Required; kept on the document and in the audit row. */
+            reason: string;
+            /** @description Optional: without it the next number of the sequence of the type is issued. A typed number must be unique and never issued by a sequence (409 otherwise). */
+            doc_no?: string;
+            /**
+             * Format: date
+             * @description Optional: default today (Africa/Tripoli).
+             */
+            doc_date?: string;
+            remark?: string;
+            lines: {
+                /** Format: uuid */
+                item_id: string;
+                /** @description At most the quantity in quarantine that is not already in a pending exit (422 insufficient_stock). */
+                qty: number;
+                /** @description A serial-tracked item names one serial per unit, each in quarantine (status Returned) and in no other pending exit. Other items name none. */
+                serials?: string[];
+            }[];
         };
         StockMovementInput: {
             /**
@@ -23836,7 +23899,7 @@ export interface operations {
         parameters: {
             query?: {
                 site_id?: string;
-                kind?: "issue" | "return" | "receipt" | "adjustment";
+                kind?: "issue" | "return" | "receipt" | "adjustment" | "quarantine_exit";
                 status?: "pending" | "posted" | "cancelled";
                 item_id?: string;
                 limit?: components["parameters"]["Limit"];
@@ -23892,6 +23955,37 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createQuarantineExit: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuarantineExitInput"];
+            };
+        };
+        responses: {
+            /** @description Pending. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovement"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
