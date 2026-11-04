@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError } from '@/api/client';
 import { snagError } from '@/components/SiteSnags';
-import { resetQcMocks } from '@/mocks/handlers.qc';
+import { resetQcMocks, siteProposals } from '@/mocks/handlers.qc';
 import { recId } from '@/mocks/registersData';
 import { siteIdOf } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
@@ -22,16 +22,23 @@ const pdf = (name = 'permit.pdf') => new File(['%PDF-1.4 body'], name, { type: '
 beforeEach(() => resetQcMocks());
 
 describe('Q130: the site field near_airport', () => {
-  it('shows the yes/no field on the site and saves it with the site version', async () => {
+  it('shows the yes/no field on the site; since Q225 (contract 0.12.10) a change is proposed with a reason and the site keeps its value', async () => {
     await signIn('engineer');
     const u = userEvent.setup();
     renderApp(<SiteAt />, { route: `/sites/${SITE}` });
     const box = await screen.findByTestId('site-field-input-near_airport');
     expect(screen.getByTestId('site-fields')).toHaveTextContent('Near an airport');
+    expect(screen.getByTestId('site-field-approval-near_airport')).toHaveTextContent('Needs approval');
     expect(box).not.toBeChecked();
     await u.click(box);
-    await waitFor(() => expect(screen.getByTestId('site-field-input-near_airport')).toBeChecked());
-    expect(await screen.findByText(/Site saved/)).toBeInTheDocument();
+    const send = await screen.findByTestId('site-field-proposal-send');
+    expect(send).toBeDisabled();                                                     // a reason is required
+    await u.type(screen.getByTestId('site-field-proposal-reason'), 'airport survey');
+    await u.click(send);
+    expect(await screen.findByText(/Proposal SFC-NEAR_AIRPORT-1 created in Change Control/)).toBeInTheDocument();
+    expect(siteProposals).toEqual([expect.objectContaining({ site_id: SITE, field: 'near_airport', old_value: '(none)', new_value: 'Yes', reason: 'airport survey' })]);
+    await waitFor(() => expect(screen.getByTestId('site-field-input-near_airport')).not.toBeChecked());
+    expect(screen.queryByTestId('site-field-proposal')).toBeNull();
   });
 
   it('is in Arabic in the Arabic interface', async () => {

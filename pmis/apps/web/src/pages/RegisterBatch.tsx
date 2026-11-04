@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toast';
 import { registerErrorMessage } from '@/lib/registerErrors';
 
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
-const DECISION_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', pending: 'bg-waitBg text-waitInk', pending_previous_approval: 'bg-lockBg text-lockInk' };
+const DECISION_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', pending: 'bg-waitBg text-waitInk', pending_previous_approval: 'bg-lockBg text-lockInk', saved: 'bg-openBg text-openInk' };
 const SENT = ['in_approval', 'partially_approved', 'approved', 'rejected', 'in_review'];
 /** One file row of a stream batch gives one batch row per touched task, so a row is identified by its number and its task. */
 export const rowId = (r: Pick<ImportRow, 'row_no' | 'task_code'>): string => (r.task_code ? `${r.row_no}-${r.task_code}` : String(r.row_no));

@@ -6,6 +6,8 @@ import type { AuthContext } from '../auth/auth.types';
 import { problems } from '../common/problem';
 import { boolParam, oneParam, Query } from '../common/query';
 import { DbService } from '../db/db.service';
+import { z } from 'zod';
+import { parse } from '../common/zod';
 
 export const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'] as const;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -110,7 +112,9 @@ export class DashboardService {
     const ms6 = milestones.find((m) => m.code === 'MS6');
     const weightSet = await this.weightSetRef(meta.weight_set_id as string | undefined);
     const delay = (r.delay ?? { items: [] }) as Json;
+    const health = (r.health ?? {}) as Json;
     const source = basis.source as string;
+    const variant = await this.db.tx.$queryRaw<{ v: string }[]>`SELECT dash_pipeline_variant() AS v`;
     return {
       meta: {
         as_of: new Date().toISOString(),
@@ -122,8 +126,13 @@ export class DashboardService {
         central_items_hidden: Number(((headline.project_status ?? {}) as Json).central_items_hidden ?? 0),
         manual_items_measured: Number(((headline.project_status ?? {}) as Json).manual_items_measured ?? 0),
         scope_regions: regions,
-        // Q121: health index factors D and I are approved; the index is no longer a draft
+        // Q121: health index factors D and I are approved; the index carries no draft label. D16: the other factors carry one each
         health_draft: false,
+        health_draft_factors: health.draft_factors ?? [],
+        // Q186: blocked gates are known live, or from a snapshot taken on its own date; otherwise historically unavailable (null), not 0
+        blocked_gates_available: meta.blocked_gates_available === true,
+        // Q116: the pipeline style chosen by the owner (A rings, the default; B flat segmented track)
+        pipeline_variant: variant[0]?.v === 'B' ? 'B' : 'A',
       },
       basis: {
         ref_date: basis.ref_date,
@@ -133,8 +142,8 @@ export class DashboardService {
         snapshot_dates: basis.snapshots ?? [],
         snapshot_kinds: basis.snapshot_kinds ?? [],
         note: source === 'live' ? null
-          : source === 'snapshot' ? 'Headline, pipeline and stream figures come from the weekly snapshot of this date; SLA, issues, delay attribution and health are computed as of the date from dated facts.'
-            : 'No snapshot exists for this date: every figure is computed as of the date from dated facts (actual dates up to the date). Blocked gates are not available for a past date.',
+          : source === 'snapshot' ? `Headline, pipeline and stream figures come from the snapshot of this date; SLA, issues, delay attribution and health are computed as of the date from dated facts.${meta.blocked_gates_available === true ? '' : ' The snapshot was rebuilt after its date, so blocked gates are historically unavailable.'}`
+            : 'No snapshot exists for this date: every figure is computed as of the date from dated facts (actual dates up to the date). Blocked gates are historically unavailable for a past date.',
       },
       filters: await this.filters(regions),
       headline: {
@@ -164,11 +173,54 @@ export class DashboardService {
     };
   }
 
+  /** PUT /dashboard/pipeline-variant (Q116): the database checks the right (System Admin or dashboard administer), the value, and audits it. */
+  async setPipelineVariant(_auth: AuthContext, raw: unknown): Promise<Json> {
+    const b = parse(z.object({ variant: z.enum(['A', 'B']), reason: z.string().trim().min(3).max(1000) }).strict(), raw);
+    const r = await this.db.tx.$queryRaw<{ v: string }[]>(Prisma.sql`SELECT dash_set_pipeline_variant(${b.variant}::text, ${b.reason}::text) AS v`);
+    return { variant: r[0]!.v };
+  }
+
   private async weightSetRef(id: string | undefined): Promise<Json | undefined> {
     if (!id) return undefined;
     const r = await this.db.tx.$queryRaw<{ id: string; code: string; version: number; effective_from: string; is_active: boolean }[]>`
       SELECT id::text AS id, code::text AS code, version, effective_from::text AS effective_from, (id = weight_set_in_force(code::text, cal_today())) AS is_active FROM weight_sets WHERE id = ${id}::uuid`;
     return r[0];
+  }
+
+  /** The codes among `codes` that a published workflow has as a view, in the order given (the same list as filters().views). */
+  private async publishedViews(codes: string[]): Promise<string[]> {
+    const r = await this.db.tx.$queryRaw<{ code: string }[]>`
+      SELECT DISTINCT v.code FROM workflow_views v JOIN workflow_definitions wd ON wd.id = v.workflow_id WHERE wd.status = 'published' AND v.code = ANY(${codes}::text[])`;
+    const have = new Set(r.map((x) => x.code));
+    return codes.filter((c) => have.has(c));
+  }
+
+  /**
+   * Runs a calculation that only reads in a transaction of its own that carries exactly the request's user and regions (app.user_id and app.region_ids are
+   * copied from the request transaction, never resolved again), so it sees what the request sees and can run beside it.
+   */
+  private async sideRead<T>(fn: () => Promise<T>): Promise<T> {
+    const c = await this.db.tx.$queryRaw<{ u: string | null; r: string | null }[]>`SELECT current_setting('app.user_id', true) AS u, current_setting('app.region_ids', true) AS r`;
+    const u = c[0]?.u ?? '';
+    const r = c[0]?.r ?? '';
+    if (!u) throw new Error('dashboard: no request context for a side read');
+    // Always rolled back: the calculation uses temporary tables (so it cannot be a READ ONLY transaction), and nothing it does may be kept.
+    const rollback = new Error('dashboard side read: rolled back');
+    let out: { v: T } | undefined;
+    try {
+      await this.db.client.$transaction(
+        async (tx) => {
+          await tx.$queryRaw`SELECT set_config('app.user_id', ${u}, true), set_config('app.region_ids', ${r}, true)`;
+          out = { v: await this.db.runIn(tx, fn) };
+          throw rollback;
+        },
+        { maxWait: 10_000, timeout: 30_000 },
+      );
+    } catch (e) {
+      if (e !== rollback) throw e;
+    }
+    if (!out) throw new Error('dashboard side read: no result');
+    return out.v;
   }
 
   /** The values the filter bar offers: the caller's regions, the clusters of the sites they see, the scenarios and the streams. */
@@ -206,16 +258,25 @@ export class DashboardService {
     if (format !== 'xlsx' && format !== 'csv') throw problems.validation([{ path: '/format', code: 'invalid', message: 'format is xlsx or csv.' }]);
     const query: Query = { ...q };
     delete query.format;
+    // Q187: the CW and TE sheets are the same calculation with the view CW or TE. They are computed at the same time as the view on screen, each
+    // in a transaction of its own with the request's own user and regions that is always rolled back (sideRead), so the workbook costs one calculation, not three.
+    const viewCodes = format === 'xlsx' ? await this.publishedViews(['CW', 'TE']) : [];
+    const sides = viewCodes.map((code) => this.sideRead(() => this.get(auth, { ...query, view: code })).then((data) => ({ name: code, data })));
+    for (const p of sides) p.catch(() => undefined); // awaited below; a failure of the view on screen first must not leave them unhandled
     const d = await this.get(auth, query);
     const basis = d.basis as Json;
     const rows = exportRows(d);
-    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL, ${JSON.stringify({ filters: query, format, rows: rows.length - 1 })}::jsonb, NULL)`);
     const name = `GSDN_Dashboard_${String(basis.ref_date)}`;
     if (format === 'csv') {
+      await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL, ${JSON.stringify({ filters: query, format, rows: rows.length - 1 })}::jsonb, NULL)`);
       const csv = rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
       return { filename: `${name}.csv`, body: Buffer.from(`${String.fromCharCode(0xfeff)}${csv}\r\n`, 'utf8'), contentType: 'text/csv; charset=utf-8' };
     }
-    return { filename: `${name}.xlsx`, body: await exportWorkbook(rows, d), contentType: XLSX_TYPE };
+    // Q187: the Project Overview is the view on screen; the CW and TE sheets are the same filters with the view CW or TE (when the workflow has it)
+    const streamSheets: { name: string; data: Json }[] = await Promise.all(sides);
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('export', 'dashboard', ${String(basis.ref_date)}::text, NULL,
+      ${JSON.stringify({ filters: query, format, rows: rows.length - 1, sheets: ['Project Overview', ...streamSheets.map((x) => x.name), ...DETAIL_SHEETS, 'About'] })}::jsonb, NULL)`);
+    return { filename: `${name}.xlsx`, body: await exportWorkbook(d, streamSheets, query), contentType: XLSX_TYPE };
   }
 }
 
@@ -237,6 +298,8 @@ export function exportRows(d: Json): Cell[][] {
   for (const [k, v] of Object.entries((h.by_overall_status ?? {}) as Json)) add('headline', 'overall status', k, v);
   const ps = (h.project_status ?? {}) as Json;
   add('project status', 'project', 'progress %', ps.progress_pct);
+  add('project status', 'project', 'planned %', ps.planned_pct ?? null);
+  add('project status', 'project', 'progress vs plan index', ps.progress_vs_plan_index ?? null);
   for (const a of ((ps.activities ?? []) as Json[])) {
     for (const i of ((a.items ?? []) as Json[])) if (i.manual) add('project status', `${String(i.code)} ${String(i.name_en)}`, 'manual %', (i.manual as Json).value_pct);
   }
@@ -260,9 +323,18 @@ export function exportRows(d: Json): Cell[][] {
   const hl = d.health as Json;
   add('health index', 'index', 'score', hl.score);
   add('health index', 'index', 'band', hl.band);
-  for (const c of ((hl.components ?? []) as Json[])) add('health index', `${String(c.code)} ${String(c.name_en)}`, 'value', c.value);
+  for (const c of ((hl.components ?? []) as Json[])) add('health index', `${String(c.code)} ${String(c.name_en)}${c.draft === true ? ' (draft)' : ''}`, 'value', c.value);
   const dl = d.delay as Json;
-  for (const i of ((dl.items ?? []) as Json[])) add('delay attribution (draft)', String(i.party), 'late working days', i.late_working_days);
+  for (const i of ((dl.items ?? []) as Json[])) {
+    const sug = (i.suggested_party ?? null) as Json | null;
+    // Q7: an unattributed row names its suggested party only as a suggestion; the item text goes through the formula guard like any name
+    if (i.kind === 'period') add('delay attribution (draft)', String(i.party), 'attributed late working days', i.late_working_days);
+    else if (i.data_gap === true) add('delay attribution (draft)', 'data gap', 'unattributed late working days', i.late_working_days);
+    else if (sug) add('delay attribution (draft)', String(sug.name), 'unattributed late working days (suggested party, not attributed)', i.late_working_days);
+    else add('delay attribution (draft)', 'unattributed', 'unattributed late working days', i.late_working_days);
+  }
+  add('delay attribution (draft)', 'attributed', 'share %', dl.attributed_pct ?? 0);
+  add('delay attribution (draft)', 'unattributed', 'share %', dl.unattributed_pct ?? 0);
   add('delay attribution (draft)', 'suspension', 'working days left out', dl.suspended_working_days ?? 0);
   for (const r of (((d.regions as Json).items ?? []) as Json[])) {
     add('regions', String(r.region_name), 'sites', r.sites_total);
@@ -271,29 +343,70 @@ export function exportRows(d: Json): Cell[][] {
   return rows;
 }
 
-/**
- * The workbook: the sheet "Dashboard" with the rows and the sheet "About" with the basis. Text is always written as a text cell (number format @), never as a
- * formula, so a site code or a party name that starts with "=", "+", "-" or "@" stays text in Excel (no formula injection).
- */
-export async function exportWorkbook(rows: Cell[][], d: Json): Promise<Buffer> {
-  const wb = new ExcelJS.Workbook();
-  wb.creator = 'GSDN PMIS';
-  wb.created = new Date();
-  const ws = wb.addWorksheet('Dashboard', { views: [{ state: 'frozen', ySplit: 1 }] });
-  ws.columns = [{ width: 24 }, { width: 44 }, { width: 24 }, { width: 16 }];
+export const DETAIL_SHEETS = ['Late tasks', 'Delay attribution', 'Project Status items', 'Regions'] as const;
+const CONTRACT_VERSION = '0.12.7';
+
+/** Writes the rows of a sheet: text is always a text cell (number format @), never a formula, so "=..." stays text (no formula injection). */
+function fillSheet(ws: ExcelJS.Worksheet, rows: Cell[][], widths: number[]): void {
+  ws.columns = widths.map((width) => ({ width }));
   for (const r of rows) {
     const row = ws.addRow(r.map((c) => (c === null ? null : typeof c === 'number' ? c : String(c))));
     row.eachCell((cell) => { if (typeof cell.value === 'string') cell.numFmt = '@'; });
   }
   ws.getRow(1).font = { bold: true };
-  ws.autoFilter = { from: 'A1', to: 'D1' };
-  const about = wb.addWorksheet('About');
+  if (rows.length > 0) ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: widths.length } };
+  // printable: landscape, one page wide, the header repeated on every page; no dark fill (Q187: a dark screen never prints dark)
+  ws.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: '1:1', paperSize: 9 };
+  ws.views = [{ state: 'frozen', ySplit: 1 }];
+}
+
+/**
+ * The workbook (Q187): Project Overview (the rows of the view on screen), CW and TE (the same rows for the views CW and TE), the detail sheets
+ * (late tasks, delay attribution, Project Status items, regions) and About (filters, reference date, basis, definitions, versions). The figures
+ * are those of GET /dashboard, the same calculation as the screen.
+ */
+export async function exportWorkbook(d: Json, streams: { name: string; data: Json }[], filters: Query): Promise<Buffer> {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'GSDN PMIS';
+  wb.created = new Date();
+  fillSheet(wb.addWorksheet('Project Overview'), exportRows(d), [24, 44, 24, 16]);
+  for (const s of streams) fillSheet(wb.addWorksheet(s.name), exportRows(s.data), [24, 44, 24, 16]);
+  const sla = (d.sla ?? {}) as Json;
+  fillSheet(wb.addWorksheet('Late tasks'), [['site', 'region', 'task', 'name', 'stage', 'due date', 'working days late', 'party'],
+    ...(((sla.top_late ?? []) as Json[]).map((x) => [x.site_code, x.region_id, x.task_code, x.task_name, x.stage_code, x.due_date, x.days_late_wd, x.party ?? null] as Cell[]))],
+  [16, 8, 8, 36, 8, 12, 12, 24]);
+  const dl = (d.delay ?? {}) as Json;
+  fillSheet(wb.addWorksheet('Delay attribution'), [['kind', 'party', 'suggested party (not an attribution)', 'data gap', 'late tasks', 'late working days', 'share %'],
+    ...(((dl.items ?? []) as Json[]).map((i) => [i.kind, i.party, ((i.suggested_party ?? null) as Json | null)?.name ?? null, i.data_gap === true ? 'yes' : 'no', i.late_tasks, i.late_working_days, i.share_pct] as Cell[]))],
+  [14, 28, 30, 10, 12, 16, 10]);
+  const ps = ((d.headline as Json).project_status ?? {}) as Json;
+  const psRows: Cell[][] = [['activity', 'item', 'name', 'weight', 'measured', 'progress %', 'done', 'applicable', 'manual %', 'planned % (plan)', 'reason']];
+  for (const a of (ps.activities ?? []) as Json[]) {
+    for (const i of (a.items ?? []) as Json[]) {
+      psRows.push([a.code, i.code, i.name_en, i.weight, i.measured ? 'yes' : 'no', i.progress_pct, i.done ?? null, i.applicable ?? null,
+        ((i.manual ?? null) as Json | null)?.value_pct ?? null, ((i.plan ?? null) as Json | null)?.planned_pct ?? null, i.reason ?? null] as Cell[]);
+    }
+  }
+  fillSheet(wb.addWorksheet('Project Status items'), psRows, [8, 8, 34, 8, 10, 12, 8, 10, 10, 14, 16]);
+  fillSheet(wb.addWorksheet('Regions'), [['region', 'sites', 'completed', 'in progress', 'late tasks', 'progress %', 'health'],
+    ...((((d.regions as Json).items ?? []) as Json[]).map((r) => [r.region_name, r.sites_total, r.completed ?? null, r.in_progress ?? null, r.late ?? null, r.progress_pct, r.health_score ?? null] as Cell[]))],
+  [16, 8, 10, 12, 10, 12, 10]);
   const basis = d.basis as Json;
   const meta = d.meta as Json;
-  for (const [k, v] of [['reference date', basis.ref_date], ['basis', basis.source], ['project wide', meta.project_wide], ['as of', meta.as_of]] as const) {
-    const row = about.addRow([k, v === null || v === undefined ? null : String(v)]);
-    row.eachCell((cell) => { cell.numFmt = '@'; });
-  }
+  const ws = (meta.weight_set ?? null) as Json | null;
+  const about: Cell[][] = [['item', 'value'],
+    ['reference date', String(basis.ref_date)], ['basis', String(basis.source)], ['snapshot date', basis.snapshot_date ? String(basis.snapshot_date) : null],
+    ['project wide', String(meta.project_wide)], ['as of', String(meta.as_of)],
+    ...Object.entries(filters).map(([k, v]) => [`filter ${k}`, Array.isArray(v) ? v.join(',') : String(v)] as Cell[]),
+    ['contract version', CONTRACT_VERSION], ['workflow versions', JSON.stringify(meta.workflow_versions ?? [])],
+    ['weight set', ws ? `${String(ws.code)} v${String(ws.version)} from ${String(ws.effective_from)}` : null],
+    ['health formula version', String(((d.health ?? {}) as Json).formula_version ?? '')],
+    ['definition: progress', 'Project Status, weighted by the weight set in force; ends at HOTO. Central items count in the project-wide figure only (Q175).'],
+    ['definition: progress vs plan index', 'Actual / Planned over the same items and weights (Q177); not an EVM SPI.'],
+    ['definition: delay attribution', 'Working days after the due date, minus suspension days; approved periods are attributed, the rest is unattributed (Q7). Draft.'],
+    ['definition: working days', 'Default work calendar: weekend Friday and Saturday, holidays table.'],
+    ['sheets', `Project Overview, ${streams.map((x) => x.name).join(', ')}${streams.length ? ', ' : ''}${DETAIL_SHEETS.join(', ')}, About`]];
+  fillSheet(wb.addWorksheet('About'), about, [36, 90]);
   return Buffer.from(await wb.xlsx.writeBuffer());
 }
 

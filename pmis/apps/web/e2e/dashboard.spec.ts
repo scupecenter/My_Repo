@@ -57,7 +57,7 @@ for (const c of CASES) {
     // reference date: a saved snapshot, then back to today
     await page.getByTestId('dash-reset').click();
     await expect(page.getByTestId('dash-snapshot-kind-2026-10-31')).toBeVisible(); // Q127: the kind of each snapshot
-    await page.getByTestId('dash-snapshot-2026-10-25').click();
+    await page.getByTestId('dash-snapshot-2026-10-29').click();
     await expect(page.getByTestId('dash-basis')).toHaveAttribute('data-source', 'snapshot');
     await expect(page.getByTestId('dash-basis-note')).toBeVisible();
     await page.getByTestId('dash-today').click();

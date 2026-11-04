@@ -604,6 +604,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 - **Template:** `TPL-ISS` (ASSUMPTION). Columns Site ID, GA:GE and the added fields, plus Issue ID for updates.
 - **Form sections:** Issue · Ownership and dates · Resolution · Attachments.
 - **Validation:** owner, raised date and status are required (DQ24). Display order follows D41.
+- **Master columns GA:GE (owner answer Q11, 2026-11-04; built as `mx_issue_cells`, migration 0060).** For Master compatibility only, one issue of the site fills GA:GE: the **oldest open issue** (earliest raised date; ties broken by the record id), and when none is open, the **latest closed issue** (latest resolution date, else raised date; ties broken by the record id). An issue is closed when its status is Closed, Resolved, Done or Cancelled. The remark keeps its text and gets " (+N more)" when the site has N other issues; the text is never replaced. The full Issue Log is exported separately (its own register export, `TPL-ISS`). The PMIS screens show critical issues first, so the Master rule never hides the most important one. The comparison report of the parallel run (Q211) compares GA:GE with this projection (reason `issue_projection`).
 
 ### 3.13 Risk Register (`risks`) — sheet Risk Register, `tblRiskRegister` (18 columns, D70)
 - **Key:** Risk ID (unique; DQ25). **No site key**: E Affected Sites is a number, not a list of sites (Q69).

@@ -16,7 +16,7 @@ import { loadPref, savePref as storePref } from '@/lib/localPref';
 import { ExportDialog } from './ExportDialog';
 import { CommandPalette } from './CommandPalette';
 import { firstPeopleTab, PEOPLE_KEYS, PEOPLE_TABS } from './PeopleAdmin';
-import { ADMIN_ONLY, BY_GRANT, NAV } from './navItems';
+import { ADMIN_ONLY, ANY_OF, BY_GRANT, NAV } from './navItems';
 import { SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SidebarBody, SidebarSplitter } from './Sidebar';
 
 export { NAV };
@@ -54,7 +54,7 @@ export function Shell() {
 
   const allowed = new Set(me.data?.effective.nav ?? []);
   const unread = useUnreadTotal(allowed.has('messages')).data ?? 0;
-  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
+  const items = NAV.filter((n) => (BY_GRANT[n.key] ? hasGrant(me.data, BY_GRANT[n.key]) : ANY_OF[n.key] ? ANY_OF[n.key]!.some((m) => allowed.has(m)) : ADMIN_ONLY.has(n.key) ? isAdmin(me.data) : allowed.has(n.key)));
   const alerts = useOpenAlertCount(isAdmin(me.data)).data ?? 0;
   // Users, Online now, Roles, Groups, Delegation and the Matrix are tabs of one screen: one sidebar entry, opening the first allowed tab.
   const peopleTo = firstPeopleTab(me.data);

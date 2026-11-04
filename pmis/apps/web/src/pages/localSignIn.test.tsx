@@ -265,6 +265,10 @@ describe('hybrid mode list', () => {
       // contract 0.7.0: approved-template entry (templates and import batches)
       'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
+      // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
+      'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
+      'GET /master-import/runs/:id/file', 'POST /master-import/runs/:id/apply', 'PATCH /master-import/diffs/:id',
+      'GET /template-mapping', 'POST /template-mapping', 'GET /import-aliases', 'PUT /import-aliases',
       // contract 0.4.10 and 0.7.1: phase 4b (inbox, follow, register comments, time in state, workload, blocked-by, status updates)
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',
@@ -282,6 +286,8 @@ describe('hybrid mode list', () => {
       'GET /document-library/:id/versions', 'GET /document-library/:id/blank-form', 'POST /document-library/:id/blank-form',
       // contract 0.9.1: the team / scope match of Procurement (Q97)
       'GET /settings/team-scope-match', 'PUT /settings/team-scope-match',
+      // contract 0.12.9: P4b contractor rules and the two reports
+      'GET /settings/contractor-rules', 'PUT /settings/contractor-rules', 'GET /reports/team-scope-mismatch', 'GET /reports/contractors-completeness',
       // contract 0.9.2: the self-service profile (details, email change and its decision, password, two-factor self-service, enforced mark)
       'GET /me/profile', 'PATCH /me/profile', 'POST /me/password', 'POST /me/email-change', 'DELETE /me/email-change',
       'POST /me/two-factor/enrol/start', 'POST /me/two-factor/enrol/confirm', 'POST /me/two-factor/disable',
@@ -317,6 +323,8 @@ describe('hybrid mode list', () => {
       // contract 0.12.6 (P8): email code, phone change and its decision
       'POST /me/email-change/verify', 'POST /me/email-change/resend', 'POST /me/phone-change', 'DELETE /me/phone-change',
       'GET /phone-change-requests', 'POST /phone-change-requests/:id/decide',
+      // contract 0.12.10: P4a (Q225 site change proposals)
+      'POST /sites/:id/change-proposals',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

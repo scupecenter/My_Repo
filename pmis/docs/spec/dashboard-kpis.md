@@ -360,7 +360,7 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | Delay attribution | PX-02 (draft) | Attribution periods and suspension days since 0046 (Q122, section 11). |
 | Regions | OV-14 reduced to counts reached per milestone, progress, health and late tasks per region | No applicable and plan counts per cell (G-D06 stays open). |
 | Reference date | Q34: default today; a past date reads the weekly snapshot dated that day, otherwise it is computed from dated facts; `basis.source` says which | The legacy "period from" is not kept. |
-| Snapshots | PX-08 and DB-12: `site_snapshots` per site, `progress_snapshots` per region and for the project (Project Status, headline, pipeline, streams, health); written by `dash_snapshot_take`, never rewritten | Every Sunday and on the last day of each month since 0046 (Q127, section 11). |
+| Snapshots | PX-08 and DB-12: `site_snapshots` per site, `progress_snapshots` per region and for the project (Project Status, headline, pipeline, streams, health); written by `dash_snapshot_take`, never rewritten | Every Thursday (D186, since 0059; Sunday from 0046) and on the last day of each month (Q127, sections 11 and 12). |
 
 Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-12 (map), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source the PMIS does not hold yet; none was invented.
 
@@ -375,3 +375,22 @@ Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (foreca
 | Q127 | **Excel export** (default; `format=csv` keeps the CSV) built with exceljs: sheet `Dashboard` (the same rows as the CSV) and sheet `About`; text cells are text (format `@`), never formulas. **Snapshots** every Sunday (setting `dashboard.snapshot_weekday`, 0) and on the last day of each month, recorded once per (date, kind) in `dash_snapshot_runs`; a date is snapshotted once even when it is both; the daily job catches up a due date missed within `dashboard.snapshot_catchup_days` (7). `ProjectStatusSnapshot.kind` / `kinds` and `basis.snapshot_kinds`; the snapshot chips of the dashboard show the kind. | `dash_snapshot_kinds`, `dash_snapshot_due`, `dash_snapshot_scheduled`, `dash_snapshot_weekly` |
 
 Open points: Q175 to Q187 in `open-questions.md`.
+
+## 12. Owner answers of 2026-11-04, package P2, built in contract 0.12.7 (migration 0059)
+
+| Q | What is built | Where |
+|---|---|---|
+| Q7 | Days no approved period covers are **unattributed** (`kind = unattributed`); the task's R party (its external party, else the default party type) is only `suggested_party`. They stay in the total delay and out of `delay.scorecard`; `attributed_pct` and `unattributed_pct` add up to 100. | `dash_sec_delay` |
+| Q175 | A manual central value counts in the **project-wide figure only**; a region, a site or a filtered view leaves every central item out (`central_hidden`) and shows the values on `central_line`. | `dash_ps_rows`, `dash_ps_card` |
+| Q176 | `source` is required on every manual value. | `ps_manual_set` |
+| Q177 | `ps_manual_plans`: points (date, planned %), cumulative, versioned; 0% before the first point, a straight line by calendar day between points, the last value after. Planned and the index work once every measured item has a plan. The index is `progress_vs_plan_index` (Actual / Planned over the same items; `spi` kept as the same value); `partial_index` is the ratio over the items that have a plan, with its coverage. | `ps_manual_plan_set`, `ps_plan_pct`, `dash_build_manual` |
+| Q178 | An effective date before the first day of the current month is a historical correction: `dashboard.historical_correction` edit, flag `historical_correction`. | `ps_manual_set` |
+| Q180 (delay side) | Suspension: `coalesce(suspension_start, approval_date)` up to the first later `coalesce(resumption_date, approval_date)` of the same site, [start, resume), approved or applied records only. | `dash_sec_delay` |
+| Q181 | A late task without a due date: the due day is rebuilt as the SLA start plus the rule's maximum on the default calendar; an empty window is a data gap (unattributed, no suggestion). | `dash_sec_delay` |
+| Q182, Q184 | Periods are proposed (L1 too, optional evidence) and decided (approve or reject with a note) by L2, a System Admin or `dashboard.delay` edit, never by the proposer; a contractor or external period needs its named party to be approved. | `delay_period_propose`, `delay_period_decide` |
+| Q186 (B part) | Blocked gates are null ("historically unavailable") for a past date or a snapshot stored after its date (`gates.status`, `blocked_available`, `snapshot_kinds[].rebuilt`). | `dash_core`, `dash_snapshot_take` |
+| Q187 | Workbook: Project Overview, CW, TE, Late tasks, Delay attribution, Project Status items, Regions, About. | `DashboardService.export` |
+| D16 | `components[].draft` on every health factor not approved (all but D and I; setting `dashboard.health_approved_factors`). | `dash_core` |
+| Q116 | Previews of variant A (rings, default) and B (flat segmented track); setting `dashboard.pipeline_variant`. | `Pipeline.tsx`, `dash_set_pipeline_variant` |
+
+Open points: Q340 to Q393 in `open-questions.md`.

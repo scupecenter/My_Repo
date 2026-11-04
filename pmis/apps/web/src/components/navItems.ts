@@ -15,6 +15,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'reg
   { key: 'permits_hse', to: '/registers/permits_hse', icon: 'permit', group: 'registers' },
   { key: 'dismantle', to: '/registers/dismantle', icon: 'dismantle', group: 'registers' },
   { key: 'contractors', to: '/registers/contractors', icon: 'contractor', group: 'registers' },
+  { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'warehouse', to: '/warehouse', icon: 'warehouse', group: 'registers' },
   { key: 'quality', to: '/registers/quality', icon: 'quality', group: 'registers' },
   { key: 'issues', to: '/registers/issues', icon: 'issue', group: 'registers' },
@@ -51,6 +52,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'reg
 export const BY_GRANT: Record<string, string> = {
   'admin.security_log': 'view_security_log', 'admin.online': 'manage_users', audit: 'view_audit', 'logs.field_changes': 'view_audit', 'logs.activity_report': 'view_audit',
 };
+/** Entries shown when the caller may use any one of these modules (0.12.9, P4b: the contractors reports and the read-only match table, Q147). */
+export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'] };
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
 export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];

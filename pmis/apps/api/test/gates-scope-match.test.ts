@@ -91,30 +91,40 @@ describe('gate-lock exempt list (owner decision 2026-11-02)', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------------- Q97
+// Since 0061 (P4b, Q143, Q144, Q110): the columns are the codes of the specialization catalogue, a row may allow a functional group (CW, TE), HLC
+// checks a named team (Fiber), and a named team's company needs an active contract for the scope at submit (contracts-parties.test.ts covers those).
 const R = 7;
 let teamSeq = 0;
 
-/** A contractor and one of its teams, written as the approved projection of the Contractors register would write them. */
-async function makeTeam(specialization: string | null): Promise<{ party: string; team: string }> {
+/** A contractor with a contract for every scope and one of its teams, written as the approved projection of the Contractors register would write them. */
+async function makeTeam(codes: string[], legacy: string | null = null): Promise<{ party: string; team: string }> {
   teamSeq += 1;
   const p = await db.query(`INSERT INTO external_parties (name, type) VALUES ($1, 'cw_contractor') RETURNING id`, [`GSM Contractor ${process.pid}-${teamSeq}`]);
-  const t = await db.query(`INSERT INTO external_teams (party_id, name, specialization) VALUES ($1, $2, $3) RETURNING id`, [p.rows[0].id, `GSM Team ${teamSeq}`, specialization]);
+  await db.query(`INSERT INTO external_party_contracts (id, party_id, contract_ref, scopes, start_date, status, origin) VALUES (gen_random_uuid(), $1, 'GSM-1', NULL, '2025-01-01', 'active', 'contract')`, [p.rows[0].id]);
+  const t = await db.query(`INSERT INTO external_teams (party_id, name, specialization) VALUES ($1, $2, $3) RETURNING id`, [p.rows[0].id, `GSM Team ${teamSeq}`, legacy]);
+  for (const c of codes) await db.query('INSERT INTO external_team_specializations (team_id, code) VALUES ($1, $2)', [t.rows[0].id, c]);
   return { party: p.rows[0].id as string, team: t.rows[0].id as string };
 }
 
-const SEED = {
-  specializations: ['CW', 'TE'],
+type Row = { scope: string; exempt: boolean; allowed: string[]; allowed_groups: string[] };
+const CODES = ['TOWER_RT', 'TOWER_GF', 'ADAPTION', 'TE', 'DISMANTLE', 'GECOL', 'FIBER', 'SURVEY'];
+/** The seed after the 0061 conversion: the old column CW became the group CW, TE the code TE; HLC, GECOL and the dismantle rows gained their codes. */
+const SEED: { specializations: string[]; scopes: Row[] } = {
+  specializations: CODES,
   scopes: [
-    { scope: 'CW', exempt: false, allowed: ['CW'] }, { scope: 'Tower Erection', exempt: false, allowed: ['CW'] }, { scope: 'Site Adaption', exempt: false, allowed: ['CW'] },
-    { scope: 'TE Installation', exempt: false, allowed: ['TE'] }, { scope: 'CW Dismantle', exempt: false, allowed: ['CW'] }, { scope: 'TE Dismantle', exempt: false, allowed: ['CW', 'TE'] },
-    { scope: 'STA', exempt: false, allowed: [] }, { scope: 'ST', exempt: false, allowed: [] }, { scope: 'GECOL', exempt: false, allowed: ['CW'] }, { scope: 'HLC', exempt: true, allowed: [] },
+    { scope: 'CW', exempt: false, allowed: [], allowed_groups: ['CW'] }, { scope: 'Tower Erection', exempt: false, allowed: [], allowed_groups: ['CW'] },
+    { scope: 'Site Adaption', exempt: false, allowed: [], allowed_groups: ['CW'] }, { scope: 'TE Installation', exempt: false, allowed: ['TE'], allowed_groups: [] },
+    { scope: 'CW Dismantle', exempt: false, allowed: ['DISMANTLE'], allowed_groups: ['CW'] }, { scope: 'TE Dismantle', exempt: false, allowed: ['TE', 'DISMANTLE'], allowed_groups: ['CW'] },
+    { scope: 'STA', exempt: false, allowed: [], allowed_groups: [] }, { scope: 'ST', exempt: false, allowed: [], allowed_groups: [] },
+    { scope: 'GECOL', exempt: false, allowed: ['GECOL'], allowed_groups: ['CW'] }, { scope: 'HLC', exempt: true, allowed: ['FIBER'], allowed_groups: [] },
   ],
 };
 
 const getMatch = () => admin.api.call('get', '/settings/team-scope-match');
 const putMatch = (who: Actor, version: number | string, body: unknown) => who.api.call('put', '/settings/team-scope-match', body, { 'If-Match': `"${version}"` });
-/** Puts the seed back (other tests of this file rely on it). */
+/** Puts the seed back (other tests of this file rely on it). A restore may change eligibility: step-up first. */
 async function restoreSeed(): Promise<void> {
+  await admin.api.stepUp(admin.user.password);
   const cur = await getMatch();
   const r = await putMatch(admin, cur.body.version, { reason: 'test: back to the seed', ...SEED });
   expect(r.status).toBe(200);
@@ -129,8 +139,8 @@ describe('Q97: the team / scope match table in Settings', () => {
     expect(res.body.scopes).toEqual(SEED.scopes);
   });
 
-  it('refuses a reader without the Settings screen and a writer without admin.settings edit', async () => {
-    const nobody = await actor(app, db, { grants: G('procurement', 'view'), regions: [R], modules: null });
+  it('refuses a reader without the Settings, Procurement or Contractors screen and a writer without admin.settings edit', async () => {
+    const nobody = await actor(app, db, { grants: G('gecol', 'view'), regions: [R], modules: null });
     const denied = await nobody.api.call('get', '/settings/team-scope-match');
     expect(denied.status).toBe(403);
     expect(denied.body.code).toBe('module_forbidden');
@@ -156,26 +166,29 @@ describe('Q97: the team / scope match table in Settings', () => {
     expect(noReason.body.errors.map((e: { path: string }) => e.path)).toContain('/reason');
     const unknownKey = await putMatch(admin, cur.body.version, { reason: 'extra key', ...SEED, colour: 'red' });
     expect(unknownKey.status).toBe(422);
-    const badCell = await putMatch(admin, cur.body.version, { reason: 'bad cell', specializations: ['CW'], scopes: [{ scope: 'CW', exempt: false, allowed: ['TE'] }] });
+    const badCell = await putMatch(admin, cur.body.version, { reason: 'bad cell', specializations: ['TE'], scopes: [{ scope: 'CW', exempt: false, allowed: ['TOWER_RT'] }] });
     expect(badCell.status).toBe(422);
     expect(badCell.body.errors[0]).toMatchObject({ path: '/scopes/0/allowed/0', code: 'unknown_specialization' });
-    const dup = await putMatch(admin, cur.body.version, { reason: 'twice', specializations: ['CW', 'cw'], scopes: [{ scope: 'CW', allowed: [] }, { scope: 'CW', allowed: [] }] });
+    const dup = await putMatch(admin, cur.body.version, { reason: 'twice', specializations: ['TE', 'te'], scopes: [{ scope: 'CW', allowed: [] }, { scope: 'CW', allowed: [] }] });
     expect(dup.status).toBe(422);
-    expect(dup.body.errors.map((e: { code: string }) => e.code)).toEqual(['duplicate', 'duplicate']);
+    expect(dup.body.errors.map((e: { code: string }) => e.code)).toEqual(['duplicate']);
 
-    const changed = { specializations: ['CW', 'TE', 'Civil'], scopes: [...SEED.scopes.slice(0, 1).map((s) => ({ ...s, allowed: ['CW', 'Civil'] })), ...SEED.scopes.slice(1)] };
+    // a new column (an approved analysis specialization, for example) becomes a catalogue code
+    const changed = { specializations: [...CODES, 'Civil'], scopes: [...SEED.scopes.slice(0, 1).map((s) => ({ ...s, allowed: ['Civil'] })), ...SEED.scopes.slice(1)] };
     try {
+      await admin.api.stepUp(admin.user.password);
       const ok = await putMatch(admin, cur.body.version, { reason: 'Civil teams may take CW orders', ...changed });
       expect(ok.status).toBe(200);
       expect(ok.body.version).toBe(cur.body.version + 1);
       expect(ok.headers.etag).toBe(`"${cur.body.version + 1}"`);
-      expect(ok.body.scopes[0]).toEqual({ scope: 'CW', exempt: false, allowed: ['CW', 'Civil'] });
+      expect(ok.body.scopes[0]).toEqual({ scope: 'CW', exempt: false, allowed: ['CIVIL'], allowed_groups: ['CW'] });
+      expect(ok.body.catalogue.find((c: { code: string }) => c.code === 'CIVIL')).toMatchObject({ label_en: 'Civil', is_active: true });
       expect(ok.body.updated_by).toMatchObject({ id: admin.user.id });
       const au = await q<{ reason: string; actor_id: string; before: { scopes: { allowed: string[] }[] }; after: { specializations: string[] } }>(db,
         `SELECT reason, actor_id, before, after FROM audit_log WHERE action = 'team_scope_match_update' ORDER BY id DESC LIMIT 1`);
       expect(au[0]).toMatchObject({ reason: 'Civil teams may take CW orders', actor_id: admin.user.id });
-      expect(au[0]!.before.scopes[0]!.allowed).toEqual(['CW']);
-      expect(au[0]!.after.specializations).toEqual(['CW', 'TE', 'Civil']);
+      expect(au[0]!.before.scopes[0]!.allowed).toEqual([]);
+      expect(au[0]!.after.specializations).toEqual([...CODES, 'CIVIL']);
       // a delegate of admin.settings edit for all regions may change it too
       const del = await actor(app, db, { grants: G('admin.settings', 'view'), regions: [R], modules: null });
       await delegate(db, del.user.id, G('admin.settings', 'edit'));
@@ -183,6 +196,8 @@ describe('Q97: the team / scope match table in Settings', () => {
     } finally {
       await restoreSeed();
     }
+    // the code that is no longer a column is kept, deactivated (never deleted)
+    expect((await getMatch()).body.catalogue.find((c: { code: string }) => c.code === 'CIVIL')).toMatchObject({ is_active: false });
   });
 });
 
@@ -192,15 +207,15 @@ describe('Q97: Procurement refuses a team whose specialization does not match th
     t ??= await team(app, db, 'procurement', 'procurement', R);
   });
 
-  it('refuses a CW team on a TE Installation order at save (422 team_scope_mismatch) and keeps nothing', async () => {
-    const cw = await makeTeam('CW');
+  it('refuses a Tower RT team on a TE Installation order at save (422 team_scope_mismatch) and keeps nothing', async () => {
+    const cw = await makeTeam(['TOWER_RT']);
     const res = await t.entry.api.call('post', recPath('procurement'), {
       site_id: t.site.id, external_party_id: cw.party, data: { scope: 'TE Installation', delivery: 'TE Vendor', order_status: 'Open', team_id: cw.team },
     });
     expect(res.status).toBe(422);
     expect(res.body.code).toBe('team_scope_mismatch');
-    expect(res.body.detail).toMatch(/CW team .* cannot take a TE Installation order/);
-    expect(res.body).toMatchObject({ order_scope: 'TE Installation', team_specialization: 'CW' });
+    expect(res.body.detail).toMatch(/Tower RT team .* cannot take a TE Installation order/);
+    expect(res.body).toMatchObject({ order_scope: 'TE Installation', team_specialization: 'Tower RT' });
     expect(res.body.errors).toEqual([expect.objectContaining({ path: '/data/team_id', code: 'team_scope_mismatch' })]);
     expect((await q(db, `SELECT 1 FROM register_records WHERE register_key = 'procurement' AND site_id = $1 AND data ->> 'team_id' = $2`, [t.site.id, cw.team])).length).toBe(0);
     // the same refusal when an existing draft is edited to the wrong team
@@ -210,9 +225,9 @@ describe('Q97: Procurement refuses a team whose specialization does not match th
     expect(edit.body.code).toBe('team_scope_mismatch');
   });
 
-  it('accepts a matching team (CW on CW, TE on TE Installation, CW or TE on TE Dismantle) and submits it', async () => {
-    const cw = await makeTeam('CW');
-    const te = await makeTeam(' te ');   // trimmed and case-insensitive
+  it('accepts a matching team (a CW-group team on CW, TE on TE Installation, CW group or TE on TE Dismantle) and submits it', async () => {
+    const cw = await makeTeam(['ADAPTION']);
+    const te = await makeTeam([], ' te ');   // a legacy text resolves through the catalogue (trimmed, case-insensitive)
     const ok = await createRec(t, { ...PROC, team_id: cw.team }, { external_party_id: cw.party });
     expect(ok.data.team_id).toBe(cw.team);
     const sub = await post(t.entry.api, 'procurement', ok.id, 'submit', ok.version);
@@ -225,28 +240,29 @@ describe('Q97: Procurement refuses a team whose specialization does not match th
     await createRec(t, { scope: 'STA', delivery: 'Outsourced', pr_no: 'PR-STA', pr_date: '2026-01-05', order_status: 'Open' });
   });
 
-  it('refuses a team without a specialization and a team on a scope that accepts none (STA)', async () => {
-    const blank = await makeTeam(null);
+  it('refuses a team without a specialization, a team on a scope that accepts none (STA), and checks a named team on HLC (Q144)', async () => {
+    const blank = await makeTeam([]);
     const r1 = await t.entry.api.call('post', recPath('procurement'), { site_id: t.site.id, external_party_id: blank.party, data: { ...PROC, team_id: blank.team } });
     expect(r1.status).toBe(422);
     expect(r1.body.code).toBe('team_scope_mismatch');
     expect(r1.body.detail).toMatch(/has no specialization/);
-    const cw = await makeTeam('CW');
+    const cw = await makeTeam(['TOWER_GF']);
     const r2 = await t.entry.api.call('post', recPath('procurement'), { site_id: t.site.id, external_party_id: cw.party, data: { scope: 'STA', delivery: 'Outsourced', order_status: 'Open', team_id: cw.team } });
     expect(r2.status).toBe(422);
     expect(r2.body.code).toBe('team_scope_mismatch');
-    // HLC is exempt (the HLC request has no contractor team): the check lets any team through
-    const p = await q<{ p: unknown }>(db, `SELECT team_scope_problem('HLC', $1) AS p`, [cw.team]);
-    expect(p[0]!.p).toBeNull();
+    // Q144: HLC needs no team, but a named team is checked (only a Fiber team may take it)
+    expect((await q<{ p: { message: string } }>(db, `SELECT team_scope_problem('HLC', $1) AS p`, [cw.team]))[0]!.p.message).toMatch(/cannot take a HLC order/);
+    expect((await q<{ p: unknown }>(db, `SELECT team_scope_problem('HLC', $1) AS p`, [(await makeTeam(['FIBER'])).team]))[0]!.p).toBeNull();
     expect((await q<{ p: { message: string } }>(db, `SELECT team_scope_problem('Unknown Scope', $1) AS p`, [cw.team]))[0]!.p.message).toMatch(/not in the team \/ scope match table/);
   });
 
   it('checks again at submit, so a draft saved before the admin changed the table is refused then', async () => {
-    const cw = await makeTeam('CW');
+    const cw = await makeTeam(['TOWER_RT']);
     const draft = await createRec(t, { ...PROC, team_id: cw.team }, { external_party_id: cw.party });
     const cur = await getMatch();
     try {
-      const noCw = { specializations: SEED.specializations, scopes: SEED.scopes.map((s) => (s.scope === 'CW' ? { ...s, allowed: ['TE'] } : s)) };
+      const noCw = { specializations: SEED.specializations, scopes: SEED.scopes.map((s) => (s.scope === 'CW' ? { ...s, allowed: ['TE'], allowed_groups: [] } : s)) };
+      await admin.api.stepUp(admin.user.password);
       expect((await putMatch(admin, cur.body.version, { reason: 'CW orders need a TE team for this test', ...noCw })).status).toBe(200);
       const sub = await post(t.entry.api, 'procurement', draft.id, 'submit', draft.version);
       expect(sub.status).toBe(422);

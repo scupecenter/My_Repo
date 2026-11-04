@@ -116,6 +116,13 @@ export class TemplatesService {
     return rows[0] ?? null;
   }
 
+  /** D112: the column-level diff between an issued version and the current one (null when the version was never issued). */
+  async compat(templateId: string, version: number): Promise<{ compatible: boolean; input_changes: { key: string; header: string | null; change: string }[]; other_changes: unknown[] } | null> {
+    const rows = await this.db.tx.$queryRaw<{ r: { compatible: boolean; input_changes: { key: string; header: string | null; change: string }[]; other_changes: unknown[] } | null }[]>(
+      Prisma.sql`SELECT tpl_version_compat(${templateId}::text, ${version}::int) AS r`);
+    return rows[0]?.r ?? null;
+  }
+
   /** Does the caller have the right to use the template of this register (view on its module)? */
   private async usable(t: TemplateRow): Promise<boolean> {
     if (t.kind === 'register' && t.module_key) {
@@ -590,8 +597,9 @@ export class TemplatesService {
         'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
         'Grey columns are calculated, set by the workflow (submitted and approved dates), or owned by a register (for example As-Built): they are shown for information and are never read. Enter register data in its register.',
         'Leave a cell empty to keep the current value. An empty cell never clears a value.',
-        'Each task you fill is entered as the Data Entry holder (L1) and submitted: it needs its actual date and its mandatory documents (upload them on the task first), exactly as on the task screen.',
-        'A task that is locked by a closed gate is refused. A task that waits for a predecessor, or is already in review, is held until that is decided. Nothing is approved until L2 (Data Reviewer & Approver) decides each task.',
+        'Submit for Review (the default): each task you fill is entered as the Data Entry holder (L1) and submitted; it needs its actual date and its mandatory documents (upload them on the task first), exactly as on the task screen. Save Draft / Planning (chosen at upload) saves the planned dates and values without submitting (Q206).',
+        'A pending task is started with its Actual Start (or, for a task without an Actual Start column, its actual date); today is never used (Q209).',
+        'A task that is locked by a closed gate, waits for a predecessor, or is already in review is held, never refused; send the batch again once it opens (Q208). Nothing is approved until L2 (Data Reviewer & Approver) decides each task.',
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas. The sheet "Columns" lists every header with its Master column and task.',
         ...(t.kind === 'master' ? ['Columns that the PMIS does not own are ignored with a warning. The upload is split into one batch per stream and per register sheet; each follows its own flow.'] : []),
         '',

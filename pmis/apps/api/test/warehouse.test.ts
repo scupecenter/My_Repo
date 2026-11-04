@@ -967,7 +967,7 @@ describe("the As-Built item list", () => {
     const field = `q_${code.toLowerCase()}`;
     const rec = await ab.entry.api.call("post", recPath("as_built"), {
       site_id: ab.site.id,
-      data: { q_tower: 12.5, [field]: 3, configuration: "WL" },
+      data: { q_tower: 12.5, [field]: 3 }, // the CW part (Q113, migration 0062): TE values such as configuration belong to the TE part
     });
     expect(rec.status, JSON.stringify(rec.body)).toBe(201);
     const frac = await ab.entry.api.call(
@@ -1014,7 +1014,7 @@ describe("the As-Built item list", () => {
       site_id: ab.site.id,
       data: {},
     });
-    expect(second.status).toBe(409); // one record per site
+    expect(second.status).toBe(409); // one record per site and part (Q113)
     const away = await actor(app, db, {
       level: "entry",
       grants: G("as_built", "view"),

@@ -61,7 +61,7 @@ describe('Q130: conditional documents judge themselves', () => {
     const taskId = await makeTask(db, site, 'A3', 'entry');
     await setCell(db, 'A3', R, 'entry', { user: [e.user.id] });
 
-    let detail = await e.api.call('get', `/sites/${site.id}`);
+    const detail = await e.api.call('get', `/sites/${site.id}`);
     expect(detail.status).toBe(200);
     expect(detail.body.custom_fields).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'near_airport', type: 'bool', label_ar: 'قريب من مطار', can_edit: true })]));
     expect((await slotOfTask(e, taskId, 'A3_CAA'))).toMatchObject({ status: 'not_required', conditional: true });
@@ -74,17 +74,15 @@ describe('Q130: conditional documents judge themselves', () => {
     expect(bad.status).toBe(422);
     expect(bad.body.errors.map((x: { path: string; code: string }) => `${x.path}:${x.code}`).sort()).toEqual(['/custom/near_airport:invalid', '/custom/no_such_field:unknown_field']);
 
+    // Q225 (migration 0062): near_airport changes the permits, so the direct edit is refused; the approved Change Control applies it (register-feeds.test.ts)
     const yes = await e.api.call('patch', `/sites/${site.id}`, { custom: { near_airport: true }, reason: 'site survey: airport 2 km' }, { 'If-Match': String(detail.headers.etag) });
-    expect(yes.status).toBe(200);
-    expect(yes.body.custom).toEqual({ near_airport: true });
-    expect(yes.headers.etag).not.toBe(detail.headers.etag);
+    expect(yes.status).toBe(422);
+    expect(yes.body.errors[0]).toMatchObject({ path: '/custom/near_airport', code: 'approval_required' });
+    expect((await q(`SELECT 1 FROM audit_log WHERE action = 'site_custom_update' AND entity_id = $1`, [site.id]))).toHaveLength(0);
+    await db.query(`UPDATE sites SET custom = custom || '{"near_airport": true}'::jsonb WHERE id = $1`, [site.id]);   // as an approved change does
     expect(await slotOfTask(e, taskId, 'A3_CAA')).toMatchObject({ status: 'missing', mandatory: true });
     expect((await e.api.call('get', `/tasks/${taskId}`)).body.missing_for_submit).toContain('A3_CAA');
-    const audit = await q<{ before: unknown; after: unknown; reason: string; actor_id: string }>(`SELECT before, after, reason, actor_id::text FROM audit_log WHERE action = 'site_custom_update' AND entity_id = $1`, [site.id]);
-    expect(audit).toEqual([{ before: { custom: { near_airport: null } }, after: { custom: { near_airport: true } }, reason: 'site survey: airport 2 km', actor_id: e.user.id }]);
-
-    detail = await e.api.call('get', `/sites/${site.id}`);
-    expect((await e.api.call('patch', `/sites/${site.id}`, { custom: { near_airport: false } }, { 'If-Match': String(detail.headers.etag) })).status).toBe(200);
+    await db.query(`UPDATE sites SET custom = custom || '{"near_airport": false}'::jsonb WHERE id = $1`, [site.id]);
     expect(await slotOfTask(e, taskId, 'A3_CAA')).toMatchObject({ status: 'not_required' });
   });
 

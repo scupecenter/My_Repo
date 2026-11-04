@@ -57,8 +57,8 @@ describe('Dashboard follow-up of the owner answers (Q118 to Q127)', () => {
     await signIn('pm');
     page();
     expect(await screen.findByTestId('dash-snapshot-kind-2026-10-31')).toHaveTextContent('month-end');
-    expect(screen.getByTestId('dash-snapshot-2026-10-25')).toHaveAttribute('data-kind', 'weekly');
-    expect(screen.getByTestId('dash-snapshot-kind-2026-10-25')).toHaveTextContent('weekly');
+    expect(screen.getByTestId('dash-snapshot-2026-10-29')).toHaveAttribute('data-kind', 'weekly');
+    expect(screen.getByTestId('dash-snapshot-kind-2026-10-29')).toHaveTextContent('weekly');
   });
 
   it('Q122: the delay attribution names the party of a period and the suspension days left out', async () => {
@@ -81,6 +81,8 @@ describe('Dashboard follow-up of the owner answers (Q118 to Q127)', () => {
     expect(within(form).getByTestId('manual-save')).toBeDisabled();
     await u.type(within(form).getByTestId('manual-value'), '50');
     await u.type(within(form).getByTestId('manual-reason'), 'half of the courses given');
+    expect(within(form).getByTestId('manual-save')).toBeDisabled(); // Q176: the source is required
+    await u.type(within(form).getByTestId('manual-source'), 'training log');
     expect(within(form).getByTestId('manual-date')).toHaveValue(tripoliToday());
     await u.click(within(form).getByTestId('manual-save'));
     expect(await screen.findByText('The value was saved.')).toBeInTheDocument();
@@ -100,6 +102,7 @@ describe('Dashboard follow-up of the owner answers (Q118 to Q127)', () => {
     await u.click(await screen.findByTestId('manual-add-1.3'));
     await u.type(screen.getByTestId('manual-value'), '10');
     await u.type(screen.getByTestId('manual-reason'), 'a reason');
+    await u.type(screen.getByTestId('manual-source'), 'a report');
     await u.click(screen.getByTestId('manual-save'));
     expect(await screen.findByTestId('manual-error')).toBeInTheDocument();
   });
@@ -120,7 +123,7 @@ describe('Q122: delay attribution periods in the task drawer', () => {
   const TASK = '00000000-0000-4000-8000-0000000000b1';
   const panel = (locale: 'en' | 'ar' = 'en') => renderApp(<DelayPeriodsPanel taskId={TASK} />, { locale });
 
-  it('the reviewer records a period, sees an overlap refused, and voids a period with a reason', async () => {
+  it('the Project Manager proposes a period, sees an overlap refused, and withdraws it with a reason', async () => {
     await signIn('pm');
     const u = userEvent.setup();
     panel();
@@ -135,7 +138,7 @@ describe('Q122: delay attribution periods in the task drawer', () => {
     expect(screen.getByTestId('delayp-add')).toBeDisabled();
     await fill('2026-09-25', '2026-10-05', 'gecol', 'no power from GECOL');
     await u.click(screen.getByTestId('delayp-add'));
-    expect(await screen.findByText('The period was recorded.')).toBeInTheDocument();
+    expect(await screen.findByText('The period was proposed. It counts once it is approved.')).toBeInTheDocument();
     const list = await screen.findByTestId('delayp-list');
     expect(list).toHaveTextContent('2026-09-25 → 2026-10-05');
     expect(list).toHaveTextContent('GECOL');
@@ -155,7 +158,7 @@ describe('Q122: delay attribution periods in the task drawer', () => {
   it('is read-only for someone who is not the reviewer, in Arabic too', async () => {
     await signIn('reviewer');
     panel('ar');
-    expect(await screen.findByTestId('delayp-readonly')).toHaveTextContent('يسجّل الفترات مراجع المهمة فقط.');
+    expect(await screen.findByTestId('delayp-readonly')).toHaveTextContent('يقترح الفترات L1 أو L2 للمهمة، ويعتمدها L2.');
     expect(screen.queryByTestId('delayp-form')).toBeNull();
   });
 });

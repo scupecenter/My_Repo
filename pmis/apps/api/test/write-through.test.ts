@@ -40,52 +40,36 @@ const fieldsOf = async (api: { call: (m: 'get', p: string) => Promise<any> }, si
 };
 
 describe('BU on B13 and EF on D15 are As-Built fields (Q99)', () => {
-  it('shows the field with a pointer to the source, edits land in the register record, audited, and the approval path is unchanged', async () => {
+  it('shows BU with a pointer to the source; since Q113 (migration 0062) it is filled by the CW part submission, never typed, and the approval path is unchanged', async () => {
     const { t, editor, site } = await setup('as_built', 'as_built', 'B13');
     let f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
     expect(f).toHaveLength(1);
-    expect(f[0]).toMatchObject({ code: 'cw_as_built_submitted', master_column: 'BU', type: 'list', value: null, editable: true, edit_via: 'create',
-      source: { register_key: 'as_built', record_id: null, field: 'data.cw_as_built_submitted', site_id: site.id } });
+    expect(f[0]).toMatchObject({ code: 'cw_as_built_submitted', master_column: 'BU', type: 'list', value: null, editable: false, edit_via: 'none',
+      source: { register_key: 'as_built', record_type: 'cw_part', record_id: null, field: 'data.cw_as_built_submitted', site_id: site.id } });
     expect(f[0].options.map((o: { value: string }) => o.value)).toEqual(['Yes', 'N/A']);
+    const typed = await editor.api.call('post', recPath('as_built'), { site_id: site.id, record_type: 'cw_part', data: { cw_as_built_submitted: 'N/A' } });
+    expect(typed.status).toBe(422);
+    expect(typed.body.errors[0]).toMatchObject({ path: '/data/cw_as_built_submitted', code: 'field_read_only' });
 
-    // create from the view: the same register endpoint
-    const created = await editor.api.call('post', recPath('as_built'), { site_id: site.id, data: { cw_as_built_submitted: 'N/A' } });
+    // the CW part is entered in the register; BU shows the part's state
+    const created = await editor.api.call('post', recPath('as_built'), { site_id: site.id, record_type: 'cw_part', data: { q_tower: 24 } });
     expect(created.status).toBe(201);
     f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0]).toMatchObject({ value: 'N/A', edit_via: 'patch', source: { record_id: created.body.id, record_state: 'entry', record_version: created.body.version } });
-
-    // edit through the view's descriptor: PATCH the source record
-    const upd = await patch(editor.api, 'as_built', f[0].source.record_id, f[0].source.record_version, { data: { cw_as_built_submitted: 'Yes' } });
-    expect(upd.status).toBe(200);
-    expect(upd.body.data.cw_as_built_submitted).toBe('Yes');
-    f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0].value).toBe('Yes');
-    const row = await db.query(`SELECT data FROM register_records WHERE id = $1`, [created.body.id]);
-    expect(row.rows[0].data.cw_as_built_submitted).toBe('Yes');
-    expect((await db.query(`SELECT 1 FROM audit_log WHERE entity_type = 'register_record' AND entity_id = $1 AND action = 'register_record_update' AND (after -> 'data' ->> 'cw_as_built_submitted') = 'Yes'`, [created.body.id])).rowCount).toBe(1);
+    expect(f[0]).toMatchObject({ value: null, edit_via: 'none', source: { record_id: created.body.id, record_state: 'entry', record_version: created.body.version } });
     // the task itself keeps no copy
     expect((await db.query(`SELECT values FROM task_instances WHERE site_id = $1`, [site.id])).rows[0].values ?? {}).not.toHaveProperty('cw_as_built_submitted');
 
-    // L1 Data Entry -> L2 Data Reviewer & Approver, then a new version is the only way to change it
-    const sub = await post(editor.api, 'as_built', created.body.id, 'submit', upd.body.version);
+    // L1 Data Entry submits: BU = Yes from the submission; L2 Data Reviewer & Approver approves
+    const sub = await post(editor.api, 'as_built', created.body.id, 'submit', created.body.version);
     expect(sub.status).toBe(200);
     f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0]).toMatchObject({ editable: false, edit_via: 'none', source: { record_state: 'in_approval' } });
-    const rejectedEdit = await patch(editor.api, 'as_built', created.body.id, sub.body.version, { data: { cw_as_built_submitted: 'N/A' } });
-    expect(rejectedEdit.status).toBe(409);
+    expect(f[0]).toMatchObject({ value: 'Yes', editable: false, edit_via: 'none', source: { record_state: 'in_approval' } });
     await t.approve.api.stepUp(t.approve.user.password);
     const res = await post(t.approve.api, 'as_built', created.body.id, 'approve', sub.body.version);
     expect(res.status).toBe(200);
     expect(res.body.state).toBe('approved');
     f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0]).toMatchObject({ value: 'Yes', edit_via: 'new_version', source: { record_state: 'approved' } });
-    const nv = await editor.api.call('post', recPath('as_built', created.body.id, '/versions'), undefined, { 'If-Match': `"${res.body.version}"` });
-    expect(nv.status).toBe(201);
-    const upd2 = await patch(editor.api, 'as_built', nv.body.id, nv.body.version, { data: { cw_as_built_submitted: 'N/A' } });
-    expect(upd2.status).toBe(200);
-    f = (await fieldsOf(editor.api, site.id, 'B13')) as any[];
-    expect(f[0]).toMatchObject({ value: 'N/A', edit_via: 'patch', source: { record_id: nv.body.id } });
-    // the approved version is untouched
+    expect(f[0]).toMatchObject({ value: 'Yes', edit_via: 'none', source: { record_state: 'approved' } });
     expect((await db.query(`SELECT state, data FROM register_records WHERE id = $1`, [created.body.id])).rows[0]).toMatchObject({ state: 'approved', data: { cw_as_built_submitted: 'Yes' } });
   });
 
@@ -123,32 +107,32 @@ describe('FO and FT on E2 are the contractor of the Dismantle parts (Q52, Q99)',
 
 describe('permissions are the register\'s', () => {
   it('leaves the field out without view on the register, makes it read-only without edit, and refuses a write outside the grant or the region', async () => {
-    const { editor, site } = await setup('as_built', 'as_built', 'B13');
-    const rec = await editor.api.call('post', recPath('as_built'), { site_id: site.id, data: { cw_as_built_submitted: 'Yes' } });
+    const { editor, site } = await setup('as_built', 'as_built', 'D15');
+    const rec = await editor.api.call('post', recPath('as_built'), { site_id: site.id, record_type: 'te_part', data: { as_built_date: '2026-03-01' } });
     expect(rec.status).toBe(201);
 
     // sites.view only: no as_built grant, the register fields are not shown
     const noReg = await actor(app, db, { level: 'view', grants: G('sites', 'view'), regions: [R], modules: null });
-    expect(await fieldsOf(noReg.api, site.id, 'B13')).toBeUndefined();
+    expect(await fieldsOf(noReg.api, site.id, 'D15')).toBeUndefined();
 
     // view without edit: the value shows, nothing is editable, the register refuses the write (403)
     const viewer = await actor(app, db, { level: 'view', grants: [...G('sites', 'view'), ...G('as_built', 'view')], regions: [R], modules: null });
-    const vf = (await fieldsOf(viewer.api, site.id, 'B13')) as any[];
-    expect(vf[0]).toMatchObject({ value: 'Yes', editable: false, edit_via: 'none' });
-    const denied = await patch(viewer.api, 'as_built', rec.body.id, rec.body.version, { data: { cw_as_built_submitted: 'N/A' } });
+    const vf = (await fieldsOf(viewer.api, site.id, 'D15')) as any[];
+    expect(vf[0]).toMatchObject({ value: '2026-03-01', editable: false, edit_via: 'none' });
+    const denied = await patch(viewer.api, 'as_built', rec.body.id, rec.body.version, { data: { as_built_date: '2026-03-02' } });
     expect(denied.status).toBe(403);
     expect((await viewer.api.call('post', recPath('as_built'), { site_id: site.id, data: {} })).status).toBe(403);
 
     // edit rights in another region only: the site and its record are not reachable
     const other = await actor(app, db, { level: 'entry', grants: [...G('sites', 'view'), ...G('as_built', 'view', 'edit', 'create')], regions: [2], modules: null });
     expect((await other.api.call('get', `/sites/${site.id}/tasks`)).status).toBe(404);
-    expect([403, 404]).toContain((await patch(other.api, 'as_built', rec.body.id, rec.body.version, { data: { cw_as_built_submitted: 'N/A' } })).status);
-    expect((await db.query(`SELECT data FROM register_records WHERE id = $1`, [rec.body.id])).rows[0].data.cw_as_built_submitted).toBe('Yes');
+    expect([403, 404]).toContain((await patch(other.api, 'as_built', rec.body.id, rec.body.version, { data: { as_built_date: '2026-03-02' } })).status);
+    expect((await db.query(`SELECT data FROM register_records WHERE id = $1`, [rec.body.id])).rows[0].data.as_built_date).toBe('2026-03-01');
 
     // edit grant but not an entry holder of the Matrix row: the register refuses
     const notHolder = await actor(app, db, { level: 'entry', grants: [...G('sites', 'view'), ...G('as_built', 'view', 'edit', 'create')], regions: [R], modules: null });
-    const nf = (await fieldsOf(notHolder.api, site.id, 'B13')) as any[];
+    const nf = (await fieldsOf(notHolder.api, site.id, 'D15')) as any[];
     expect(nf[0].editable).toBe(false);
-    expect((await patch(notHolder.api, 'as_built', rec.body.id, rec.body.version, { data: { cw_as_built_submitted: 'N/A' } })).status).toBe(403);
+    expect((await patch(notHolder.api, 'as_built', rec.body.id, rec.body.version, { data: { as_built_date: '2026-03-02' } })).status).toBe(403);
   });
 });

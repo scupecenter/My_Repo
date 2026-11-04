@@ -120,6 +120,19 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/import-batches/:id/rows'],
   ['post', '/import-batches/:id/submit'],
   ['post', '/import-batches/:id/decisions'],
+  // Contract 0.12.8 (P3, migration 0060): the legacy Master import and its comparison report, the template mapping screen and the import aliases.
+  ['get', '/master-import/runs'],
+  ['post', '/master-import/runs'],
+  ['get', '/master-import/runs/:id'],
+  ['get', '/master-import/runs/:id/diffs'],
+  ['get', '/master-import/runs/:id/export'],
+  ['get', '/master-import/runs/:id/file'],
+  ['post', '/master-import/runs/:id/apply'],
+  ['patch', '/master-import/diffs/:id'],
+  ['get', '/template-mapping'],
+  ['post', '/template-mapping'],
+  ['get', '/import-aliases'],
+  ['put', '/import-aliases'],
   // Contract 0.4.10 and 0.7.1, phase 4b (apps/api: notifications, follow, insights, status-updates; migrations 0031 and 0040).
   ['get', '/notifications'],
   ['post', '/notifications/read-all'],
@@ -179,6 +192,11 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.9.1: the team / scope match of Procurement (apps/api: settings; migration 0043, Q97).
   ['get', '/settings/team-scope-match'],
   ['put', '/settings/team-scope-match'],
+  // Contract 0.12.9: P4b contractors, contracts and the team / scope match (apps/api: contractors; migration 0061, Q110, Q142 to Q147, D145b).
+  ['get', '/settings/contractor-rules'],
+  ['put', '/settings/contractor-rules'],
+  ['get', '/reports/team-scope-mismatch'],
+  ['get', '/reports/contractors-completeness'],
   // Contract 0.9.2: the self-service profile (apps/api: me, users; migration 0044). Details, email change request and its decision, password, two-factor self-service, enforced mark.
   ['get', '/me/profile'],
   ['patch', '/me/profile'],
@@ -288,6 +306,8 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/me/phone-change'],
   ['get', '/phone-change-requests'],
   ['post', '/phone-change-requests/:id/decide'],
+  // Contract 0.12.10: P4a (apps/api: sites; migration 0062). Q225: a change to a site field that requires approval opens Change Control drafts.
+  ['post', '/sites/:id/change-proposals'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

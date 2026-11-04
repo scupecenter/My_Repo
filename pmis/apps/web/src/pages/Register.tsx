@@ -1,4 +1,4 @@
-import { Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
+import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import type { RegisterDefinition } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { Holders } from '@/components/HolderChip';
+import { HlcLegacyDialog } from '@/components/P4cPanels';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
 import { useToast } from '@/components/Toast';
@@ -44,6 +45,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const list = useRegisterRecords(key, f);
   const templates = useTemplates();
   const [uploading, setUploading] = useState(false);
+  const [legacy, setLegacy] = useState(false);   // 0063 (Q139): the one-time migration of the legacy HLC requests
   const items = list.data?.pages.flatMap((p) => p.items) ?? [];
   const total = list.data?.pages[0]?.page.total ?? items.length;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
@@ -110,12 +112,14 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           { id: 'tpl-up', label: t('registers.template_upload'), icon: <FileUp size={16} />, testid: 'register-template-upload', disabled: !tpl, onSelect: () => setUploading(true) },
           { id: 'tpl-batches', label: t('registers.template_batches'), icon: <ListChecks size={16} />, testid: 'register-template-batches', onSelect: () => nav(`/templates?register=${key}`) },
           ...(key === 'as_built' ? [{ id: 'items', label: t('asb.items_link'), icon: <Ruler size={16} />, testid: 'register-asbuilt-items', onSelect: () => nav('/as-built/items') }] : []),
+          ...(key === 'hlc' ? [{ id: 'hlc-legacy', label: t('p4c.legacy_menu'), icon: <ArrowRightLeft size={16} />, testid: 'register-hlc-legacy', onSelect: () => setLegacy(true) }] : []),
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />
         </>} />
       {tpl && <TemplateUploadDialog open={uploading} onClose={() => setUploading(false)} templateId={tpl.template_id} templateName={`${name} · v${tpl.current_version}`}
         onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
+      {key === 'hlc' && <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />}
       <ActiveChips chips={chips} onClear={clearAll} />
       <div className="card overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">

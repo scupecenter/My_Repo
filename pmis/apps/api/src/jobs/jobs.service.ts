@@ -15,6 +15,8 @@ export interface DailyJobResult {
   reminders: number;
   /** sites stored by the weekly dashboard snapshot of this run (absent when no snapshot was due) */
   snapshots?: number;
+  /** P4b (migration 0061): team safety certificate alerts (D145b, information only) and running-order mismatch alerts (Q145) written by this run */
+  contractorAlerts?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -43,7 +45,7 @@ export function nextRunAt(now: Date, tz: string = JOB_TIME_ZONE, hour: number = 
  * holidays to the System Admins (cal_tentative_reminders). It runs once at start-up and then every day at 02:00 Africa/Tripoli, only when
  * JOBS_ENABLED is on (default on, off when NODE_ENV=test). It is a plain timer inside the API process: the stack names BullMQ with Redis, which is
  * not installed on the server yet; the two database functions are idempotent, so a later move to BullMQ changes only who calls them.
- * The dashboard snapshots (dash_snapshot_weekly, migration 0046, Q127) are taken by the same run: the weekly one on Sunday (setting dashboard.snapshot_weekday)
+ * The dashboard snapshots (dash_snapshot_weekly, migration 0046, Q127) are taken by the same run: the weekly one on Thursday (setting dashboard.snapshot_weekday, 4 since 0059, D186)
  * and the month-end one on the last day of the month, each date once, with a catch-up of a due date missed in the last dashboard.snapshot_catchup_days (7);
  * a failure there is logged and does not stop the rest.
  * Safe to repeat: a second run the same day finds nothing to apply and nobody left to remind. An advisory lock keeps two API processes from running it together.
@@ -107,10 +109,12 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       if (result) {
         const snapshots = await this.snapshot();
         if (snapshots > 0) result.snapshots = snapshots;
+        const alerts = await this.contractorAlerts();
+        if (alerts > 0) result.contractorAlerts = alerts;
       }
       this.lastRun = { at: new Date(), result };
-      await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) : null, null,
-        result ? { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 } : { reason: 'locked' });
+      await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) : null, null,
+        result ? { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0, contractor_alerts: result.contractorAlerts ?? 0 } : { reason: 'locked' });
       if (result && (result.slaApplied > 0 || result.reminders > 0 || (result.snapshots ?? 0) > 0)) {
         await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 });
       }
@@ -139,6 +143,24 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
       this.log.warn(`dashboard snapshot failed: ${message}`);
       await this.syslog.write('error', 'dashboard snapshot failed', { error: message });
+      return 0;
+    }
+  }
+
+  /** P4b (migration 0061): contractors_daily_alerts in its own transaction and lock; a failure is logged and leaves the other steps alone. */
+  private async contractorAlerts(): Promise<number> {
+    try {
+      return await this.db.client.$transaction(async (tx) => {
+        const lock = await tx.$queryRaw<{ ok: boolean }[]>`SELECT pg_try_advisory_xact_lock(hashtext('pmis.contractor_alerts')) AS ok`;
+        if (!lock[0]?.ok) return 0;
+        await this.runs.context(tx, 'contractor_alerts');
+        const r = await tx.$queryRaw<{ n: number }[]>`SELECT contractors_daily_alerts() AS n`;
+        return Number(r[0]?.n ?? 0);
+      }, { maxWait: 10_000, timeout: 60_000 });
+    } catch (e) {
+      const message = e instanceof Error ? e.message.split('\n')[0] ?? 'failed' : 'failed';
+      this.log.warn(`contractor alerts failed: ${message}`);
+      await this.syslog.write('error', 'contractor alerts failed', { error: message });
       return 0;
     }
   }

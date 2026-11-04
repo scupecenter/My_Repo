@@ -271,8 +271,9 @@ describe('delay attribution (draft)', () => {
     expect(dl.total_late_working_days).toBeGreaterThan(0);
     expect(dl.items.reduce((a: number, i: J) => a + i.late_working_days, 0)).toBe(dl.total_late_working_days);
     expect(dl.items.reduce((a: number, i: J) => a + i.share_pct, 0)).toBeGreaterThan(99.9);
-    // the late B8 tasks have the contractor type as their default party, the late A2 clock at T2 has none
-    expect(dl.items.map((i: J) => i.party)).toContain('cw_contractor');
+    // the late B8 tasks have the contractor type as their default party: since 0059 (Q7) only a suggestion on unattributed days
+    expect(dl.items.map((i: J) => i.suggested_party?.name)).toContain('cw_contractor');
+    expect(dl.items.every((i: J) => i.kind === 'unattributed')).toBe(true);
   });
 });
 

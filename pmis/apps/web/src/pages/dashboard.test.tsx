@@ -105,9 +105,9 @@ describe('Dashboard', () => {
     await screen.findByTestId('dash-progress-value');
     expect(screen.getByTestId('dash-ref-date')).toHaveAttribute('max', tripoliToday());
     expect(screen.getByTestId('dash-today')).toBeDisabled();
-    await u.click(screen.getByTestId('dash-snapshot-2026-10-25'));
+    await u.click(screen.getByTestId('dash-snapshot-2026-10-29'));
     await waitFor(() => expect(screen.getByTestId('dash-basis')).toHaveAttribute('data-source', 'snapshot'));
-    expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('weekly snapshot of 2026-10-25');
+    expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('weekly snapshot of 2026-10-29');
     fireEvent.change(screen.getByTestId('dash-ref-date'), { target: { value: '2026-09-01' } });
     await waitFor(() => expect(screen.getByTestId('dash-basis')).toHaveAttribute('data-source', 'as_of_computed'));
     expect(screen.getByTestId('dash-basis-note')).toHaveTextContent('computed as of that date');

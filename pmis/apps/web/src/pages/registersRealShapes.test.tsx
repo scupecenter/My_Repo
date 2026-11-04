@@ -233,7 +233,7 @@ describe('Dismantle register (migration 0021): CW / TE parts and the server rule
     const defs = await api.get<{ items: RegisterDefinition[] }>('/registers');
     const d = defs.items.find((x) => x.register_key === 'dismantle')!;
     expect(d.record_types).toEqual(['cw', 'te']);
-    expect(d.fields.map((f) => f.code)).toEqual(['rfd_date', 'rfd_document_ref', 'dismantle_reason', 'supervising_engineer', 'work_start_date', 'work_end_date', 'closing_rn_ref', 'closed']);
+    expect(d.fields.map((f) => f.code)).toEqual(['rfd_date', 'rfd_document_ref', 'dismantle_reason', 'execution_mode', 'procurement_order_id', 'internal_team', 'supervising_engineer', 'work_start_date', 'work_end_date', 'closing_rn_ref', 'closed']);
     renderApp(<Routed />, at('dismantle'));
     expect(await screen.findByTestId('page-register-dismantle')).toBeInTheDocument();
     expect(await screen.findByTestId(`reg-row-${recId(12)}`)).toHaveTextContent('CW');

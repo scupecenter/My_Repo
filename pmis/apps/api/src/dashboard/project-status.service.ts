@@ -16,7 +16,25 @@ const manualSchema = z.object({
   value_pct: z.number().min(0).max(100).refine((n) => Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6, 'At most 3 decimals.'),
   effective_date: z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.'),
   reason: z.string().trim().min(3).max(1000),
+  // Q176: where the value comes from (required since 0.12.7)
+  source: z.string().trim().min(2).max(500),
 }).strict();
+const threeDecimals = (n: number): boolean => Math.abs(Math.round(n * 1000) - n * 1000) < 1e-6;
+/** Q177: a plan is 1..120 points (date, planned %), or a target date (100% on that date, from 0% on an optional start date). */
+const planSchema = z.object({
+  points: z.array(z.object({
+    date: z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.'),
+    planned_pct: z.number().min(0).max(100).refine(threeDecimals, 'At most 3 decimals.'),
+  }).strict()).min(1).max(120).optional(),
+  target_date: z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.').optional(),
+  start_date: z.string().refine(isCalendarDate, 'Use YYYY-MM-DD.').optional(),
+  reason: z.string().trim().min(3).max(1000),
+  source: z.string().trim().min(2).max(500),
+}).strict().superRefine((b, ctx) => {
+  if ((b.points === undefined) === (b.target_date === undefined)) ctx.addIssue({ code: 'custom', path: ['points'], message: 'Send points or target_date, one of them.' });
+  if (b.start_date !== undefined && b.target_date === undefined) ctx.addIssue({ code: 'custom', path: ['start_date'], message: 'start_date goes with target_date.' });
+  if (b.start_date !== undefined && b.target_date !== undefined && b.start_date >= b.target_date) ctx.addIssue({ code: 'custom', path: ['start_date'], message: 'start_date is before target_date.' });
+});
 
 /** Project Status (ends at HOTO): the weighted progress of rules.md section 6, computed with the weight set in force, or with one named for a comparison. */
 @Injectable()
@@ -81,9 +99,14 @@ export class ProjectStatusService {
       weight_set: weightSet,
       progress_pct: card.progress_pct ?? 0,
       planned_pct: card.planned_pct ?? null,
+      // Q177: Actual / Planned over the same items is named "progress vs plan index"; `spi` keeps the same value for older clients
+      progress_vs_plan_index: card.progress_vs_plan_index ?? null,
       spi: card.spi ?? null,
+      partial_index: card.partial_index ?? null,
       plan_coverage_pct: card.plan_coverage_pct ?? 0,
       central_items_hidden: Number(card.central_items_hidden ?? 0),
+      // Q175: below the whole project the manual central values are shown apart, outside the figure
+      central_line: card.central_line ?? null,
       sites_in_scope: Number(ps.sites_in_scope ?? 0),
       activities: card.activities ?? [],
       ...(group !== 'none'
@@ -93,35 +116,56 @@ export class ProjectStatusService {
   }
 
   // ------------------------------------------------------------------ Q118: manual percentage of the central items
-  /** GET /project-status/manual-items: the central items of the weight set in force, the value in force today and the full history of each. */
+  /**
+   * GET /project-status/manual-items: the central items of the weight set in force, the value in force today and the full history of each (with its
+   * source, Q176, and the historical-correction flag, Q178), and the plan of each item (Q177).
+   */
   async manualItems(): Promise<Json> {
     await this.access.requireRegions('dashboard', 'view');
     const items = await this.db.tx.$queryRaw<{ item_code: string; name_en: string; name_ar: string | null; weight: string; activity_code: string; activity_name_en: string; activity_name_ar: string | null }[]>`
       SELECT item_code, name_en, name_ar, weight::text AS weight, activity_code, activity_name_en, activity_name_ar FROM ps_central_items(cal_today()) ORDER BY sort`;
     const hist = await this.db.tx.$queryRaw<{ id: string; item_code: string; version: number; value_pct: string; effective_date: string; reason: string; created_at: Date;
-      by_id: string; by_name: string | null; by_emp: string | null; in_force: boolean }[]>`
+      by_id: string; by_name: string | null; by_emp: string | null; in_force: boolean; source: string; corr: boolean }[]>`
       SELECT v.id::text AS id, v.item_code, v.version, v.value_pct::text AS value_pct, v.effective_date::text AS effective_date, v.reason, v.created_at,
+        v.source, v.historical_correction AS corr,
         v.entered_by::text AS by_id, u.display_name AS by_name, u.employee_id AS by_emp,
         (v.id = (SELECT x.id FROM ps_manual_values x WHERE x.item_code = v.item_code AND x.effective_date <= cal_today() ORDER BY x.effective_date DESC, x.version DESC LIMIT 1)) AS in_force
       FROM ps_manual_values v LEFT JOIN users u ON u.id = v.entered_by
       ORDER BY v.item_code, v.version DESC`;
-    const can = await this.db.tx.$queryRaw<{ ok: boolean; today: string }[]>`SELECT ps_manual_can_edit() AS ok, cal_today()::text AS today`;
+    const plans = await this.db.tx.$queryRaw<{ id: string; item_code: string; version: number; points: { date: string; planned_pct: number }[]; reason: string; source: string;
+      created_at: Date; by_id: string; by_name: string | null; by_emp: string | null; today_pct: string }[]>`
+      SELECT DISTINCT ON (p.item_code) p.id::text AS id, p.item_code, p.version, p.points, p.reason, p.source, p.created_at, p.entered_by::text AS by_id,
+        u.display_name AS by_name, u.employee_id AS by_emp, round(ps_plan_pct(p.points, cal_today()), 3)::text AS today_pct
+      FROM ps_manual_plans p LEFT JOIN users u ON u.id = p.entered_by ORDER BY p.item_code, p.version DESC`;
+    const can = await this.db.tx.$queryRaw<{ ok: boolean; corr: boolean; today: string; month: string }[]>`
+      SELECT ps_manual_can_edit() AS ok, ps_manual_can_correct() AS corr, cal_today()::text AS today, date_trunc('month', cal_today())::date::text AS month`;
     const out = items.map((i) => {
       const h = hist.filter((x) => x.item_code === i.item_code).map((x) => ({
         id: x.id, version: x.version, value_pct: Number(x.value_pct), effective_date: x.effective_date, reason: x.reason, created_at: x.created_at.toISOString(), in_force: x.in_force,
         entered_by: { id: x.by_id, display_name: x.by_name ?? '', employee_id: x.by_emp?.trim() ?? null },
+        source: x.source, historical_correction: x.corr,
       }));
       const cur = h.find((x) => x.in_force);
+      const pl = plans.find((x) => x.item_code === i.item_code);
       return {
         item_code: i.item_code, name_en: i.name_en, name_ar: i.name_ar, weight: Number(i.weight), activity_code: i.activity_code,
         activity_name_en: i.activity_name_en, activity_name_ar: i.activity_name_ar,
-        current: cur ? { value_pct: cur.value_pct, effective_date: cur.effective_date, version: cur.version } : null,
+        current: cur ? { value_pct: cur.value_pct, effective_date: cur.effective_date, version: cur.version, source: cur.source } : null,
         history: h,
+        plan: pl ? {
+          id: pl.id, version: pl.version, points: pl.points.map((p) => ({ date: p.date, planned_pct: Number(p.planned_pct) })), reason: pl.reason, source: pl.source,
+          created_at: pl.created_at.toISOString(), planned_pct_today: Number(pl.today_pct),
+          entered_by: { id: pl.by_id, display_name: pl.by_name ?? '', employee_id: pl.by_emp?.trim() ?? null },
+        } : null,
       };
     });
     return {
       as_of: can[0]!.today,
       can_edit: can[0]!.ok,
+      // Q178: a date before this day is a historical correction (closed month); can_correct_history says whether the caller may enter one
+      open_period_from: can[0]!.month,
+      can_correct_history: can[0]!.ok && can[0]!.corr,
+      without_plan: out.filter((i) => i.weight > 0 && !i.plan).length,
       items: out,
       without_value: out.filter((i) => i.weight > 0 && !i.current).length,
     };
@@ -133,9 +177,23 @@ export class ProjectStatusService {
     const item = /^[A-Za-z0-9._-]{1,20}$/.test(rawItem) ? rawItem : null;
     if (!item) throw problems.notFound('There is no such central item.');
     const b = parse(manualSchema, raw);
-    const r = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`SELECT ps_manual_set(${item}::text, ${b.value_pct}::numeric, ${b.effective_date}::date, ${b.reason}::text) AS r`);
+    const r = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+      SELECT ps_manual_set(${item}::text, ${b.value_pct}::numeric, ${b.effective_date}::date, ${b.reason}::text, ${b.source}::text) AS r`);
     const v = r[0]!.r;
     return { ...v, value_pct: Number(v.value_pct) };
+  }
+
+  /** POST /project-status/manual-items/{item_code}/plan (Q177): a new version of the item's plan. The database checks who may, the points and audits it. */
+  async setManualPlan(_auth: AuthContext, rawItem: string, raw: unknown): Promise<Json> {
+    await this.access.requireRegions('dashboard', 'view');
+    const item = /^[A-Za-z0-9._-]{1,20}$/.test(rawItem) ? rawItem : null;
+    if (!item) throw problems.notFound('There is no such central item.');
+    const b = parse(planSchema, raw);
+    const points = b.points ?? [...(b.start_date ? [{ date: b.start_date, planned_pct: 0 }] : []), { date: b.target_date as string, planned_pct: 100 }];
+    const r = await this.db.tx.$queryRaw<{ r: Json }[]>(Prisma.sql`
+      SELECT ps_manual_plan_set(${item}::text, ${JSON.stringify(points)}::jsonb, ${b.reason}::text, ${b.source}::text) AS r`);
+    const v = r[0]!.r;
+    return { ...v, points: ((v.points ?? []) as { date: string; planned_pct: number }[]).map((p) => ({ date: p.date, planned_pct: Number(p.planned_pct) })) };
   }
 
   // ------------------------------------------------------------------ GET /project-status/snapshots
@@ -171,7 +229,7 @@ export class ProjectStatusService {
       items: page.map((r) => ({
         id: r.id,
         taken_on: r.taken_on,
-        // Q127: weekly (every Sunday), month_end (last day of the month; wins when both), manual (taken by hand, no scheduled run)
+        // Q127, D186: weekly (every Thursday by default), month_end (last day of the month; wins when both), manual (taken by hand, no scheduled run)
         kind: r.kinds.includes('month_end') ? 'month_end' : r.kinds.includes('weekly') ? 'weekly' : 'manual',
         kinds: r.kinds,
         scope: r.is_global ? 'project' : 'region',

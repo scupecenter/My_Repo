@@ -322,7 +322,7 @@ describe('upload: match and validate', () => {
     expect(rows2[1]!.errors[0].message).toContain('Row 2');
   });
 
-  it('needs the actual date, refuses an approved or N/A task, holds a task that waits for a predecessor or is in review, and refuses a gate-locked task (Q81)', async () => {
+  it('needs the actual date, refuses an approved or N/A task, holds a task that waits for a predecessor, is in review or is locked by a closed gate (Q81, Q208)', async () => {
     const t = await streamTeam(app, db, { B4: 'open', B5: 'locked', B9: 'in_review', B13: 'approved', B10: 'open' });
     await makeTask(db, t.site, 'B7', 'approved');                                    // predecessor of B8 and B9
     t.tasks.B8 = await makeTask(db, t.site, 'B8', 'locked');
@@ -346,18 +346,19 @@ describe('upload: match and validate', () => {
     expect(byTask(rows, 'B5').warnings[0]).toMatchObject({ code: 'held_predecessor' });
     expect(byTask(rows, 'B5').warnings[0].message).toContain('B4');
     expect(byTask(rows, 'B9')).toMatchObject({ action: 'update', decision: 'pending_previous_approval', hold_reason: 'open_submission' });
-    expect(byTask(rows, 'B8')).toMatchObject({ action: 'error' });
-    expect(byTask(rows, 'B8').errors[0]).toMatchObject({ code: 'gate_locked', column: 'B8 CW MOS Actual' });
-    expect(byTask(rows, 'B8').errors[0].message).toContain('G3');
+    // Q208: a gate-locked row is held, never refused; it is applied only when the batch is sent again after the gate opens
+    expect(byTask(rows, 'B8')).toMatchObject({ action: 'update', decision: 'pending_previous_approval', hold_reason: 'gate_locked' });
+    expect(byTask(rows, 'B8').warnings[0]).toMatchObject({ code: 'held_gate_locked', column: 'B8 CW MOS Actual' });
+    expect(byTask(rows, 'B8').warnings[0].message).toContain('G3');
     expect(byTask(rows, 'B13')).toMatchObject({ action: 'error' });
     expect(byTask(rows, 'B13').errors[0]).toMatchObject({ code: 'task_approved' });
     expect(byTask(rows, 'B10')).toMatchObject({ action: 'error' });
     expect(byTask(rows, 'B10').errors[0]).toMatchObject({ code: 'task_not_open' });
-    expect(batch.counts).toMatchObject({ held: 2, error: 4, update: 2 });
+    expect(batch.counts).toMatchObject({ held: 3, error: 3, update: 3 });
     // only the held rows and the errors: nothing can be sent
     const sub = await submit(t.entry.api, batch.id, batch.version);
     expect(sub.outcome).toMatchObject({ submitted: 0 });
-    expect(sub.outcome.held.map((h: { reason: string }) => h.reason).sort()).toEqual(['open_submission', 'predecessor_open']);
+    expect(sub.outcome.held.map((h: { reason: string }) => h.reason).sort()).toEqual(['gate_locked', 'open_submission', 'predecessor_open']);
     expect((await taskRow(db, t.tasks.B8!)).state).toBe('locked');
   });
 
@@ -617,15 +618,20 @@ describe('submit into the flow, and L2 decisions', () => {
     expect(list.body.items.map((i: { id: string }) => i.id)).toContain(batch.id);
     expect((await decide(viewer.api, batch.id, batch.version, { action: 'approve', scope: 'all' })).status).toBe(403);
 
-    // the task changes between the preview and the send: it is locked by a closed gate now
+    // the task changes between the preview and the send: it is locked by a closed gate now. Q208: the row is held, nothing is entered
     await db.query(`UPDATE task_instances SET state = 'locked', lock_reason = 'gate_closed:G2' WHERE id = $1`, [t.tasks.B4]);
     const sent = await submit(t.entry.api, batch.id, batch.version);
     expect(sent.outcome.submitted).toBe(0);
-    expect(sent.outcome.failed).toEqual([expect.objectContaining({ code: 'gate_locked' })]);
+    expect(sent.outcome.held).toEqual([expect.objectContaining({ reason: 'gate_locked' })]);
     const row = (await rowsOf(t.entry.api, batch.id))[0]!;
-    expect(row).toMatchObject({ action: 'error' });
-    expect(row.errors[0]).toMatchObject({ code: 'gate_locked' });
+    expect(row).toMatchObject({ action: 'update', decision: 'pending_previous_approval', hold_reason: 'gate_locked' });
     expect((await taskRow(db, t.tasks.B4!)).actual_date).toBeNull();
+    // the gate opens: the row is applied only when the uploader sends the batch again (every check runs again)
+    await db.query(`UPDATE task_instances SET state = 'open', lock_reason = NULL WHERE id = $1`, [t.tasks.B4]);
+    expect((await taskRow(db, t.tasks.B4!)).actual_date).toBeNull();
+    const again = await submit(t.entry.api, batch.id, sent.version);
+    expect(again.outcome.submitted).toBe(1);
+    expect((await taskRow(db, t.tasks.B4!)).actual_date).toBe('2026-01-10');
   });
 });
 
@@ -646,7 +652,7 @@ describe('template versions', () => {
       const list = (await admin.api.call('get', '/templates')).body.items as { template_id: string; current_version: number; versions: { version: number }[] }[];
       const cw = list.find((i) => i.template_id === 'TPL-SITE-CW')!;
       expect(cw.current_version).toBe(v0 + 1);
-      expect(cw.versions.map((v) => v.version)).toEqual([v0 + 1, v0]);
+      expect(cw.versions.map((v) => v.version).slice(0, 2)).toEqual([v0 + 1, v0]);
       expect(list.find((i) => i.template_id === 'TPL-MASTER')!.current_version).toBe(m0);   // the Master header text comes from the Master, not from the label: same columns
       expect(list.find((i) => i.template_id === 'TPL-SITE-TE')!.current_version).toBe(te0);   // another stream is not touched
       const res = await uploadFile(t.entry.api, oldFile);

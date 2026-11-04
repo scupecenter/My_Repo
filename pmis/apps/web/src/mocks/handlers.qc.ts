@@ -21,7 +21,11 @@ const isPm = () => viewer()?.key === 'pm';
 
 // ---------------------------------------------------------------- Q130: the site's custom fields
 const siteCustom = new Map<string, { custom: Record<string, unknown>; version: number }>();
-const SITE_FIELDS = [{ code: 'near_airport', label_en: 'Near an airport', label_ar: 'قريب من مطار', type: 'bool' as const, section: 'Site', required: false }];
+// contract 0.12.10 (Q225): near_airport changes the permits, so it is changed by a Change Control proposal, never by PATCH
+const SITE_FIELDS = [{ code: 'near_airport', label_en: 'Near an airport', label_ar: 'قريب من مطار', type: 'bool' as const, section: 'Site', required: false, requires_approval: true }];
+/** Change Control drafts opened by POST /sites/{id}/change-proposals (mock store). */
+export const siteProposals: { site_id: string; field: string; record_id: string; change_id: string; old_value: string; new_value: string; reason: string }[] = [];
+const asText = (v: unknown): string => (v === true ? 'Yes' : v === false ? 'No' : v === null || v === undefined ? '(none)' : String(v));
 
 /** The detail of a mock site with its custom fields (and the open snags of the mock store). */
 export function qcSiteDetail(d: SiteDetail): SiteDetail {
@@ -135,6 +139,7 @@ export const qcHandlers = [
       const f = SITE_FIELDS.find((x) => x.code === k);
       if (!f) errs.push({ path: `/custom/${k}`, code: 'unknown_field' });
       else if (v !== null && typeof v !== 'boolean') errs.push({ path: `/custom/${k}`, code: 'invalid' });
+      else if (f.requires_approval && (cur.custom[k] ?? null) !== v) errs.push({ path: `/custom/${k}`, code: 'approval_required' });
     }
     if (errs.length || !b.custom || !Object.keys(b.custom).length) return fields(...(errs.length ? errs : [{ path: '/custom', code: 'required' }]));
     const custom = { ...cur.custom };
@@ -142,6 +147,32 @@ export const qcHandlers = [
     const next = { custom, version: cur.version + 1 };
     siteCustom.set(id, next);
     return HttpResponse.json(qcSiteDetail(detail(siteIndex(id))), { headers: { ETag: `"${next.version}"` } });
+  }),
+
+  // ---- Q225 (contract 0.12.10): one Change Control draft per field; the site keeps its value until L2 approves
+  http.post(`${B}/sites/:id/change-proposals`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const id = params.id as string;
+    if (siteIndex(id) < 0) return problem(404, 'not_found', 'Site not found');
+    if (viewer()!.key === 'viewer') return problem(403, 'action_forbidden', 'You need the Change Control create right in this region');
+    const cur = siteCustom.get(id) ?? { custom: {}, version: 1 };
+    const b = (await request.json().catch(() => ({}))) as { custom?: Record<string, unknown>; reason?: string };
+    const errs: { path: string; code: string }[] = [];
+    if (!b.reason?.trim()) errs.push({ path: '/reason', code: 'required' });
+    for (const [k, v] of Object.entries(b.custom ?? {})) {
+      const f = SITE_FIELDS.find((x) => x.code === k);
+      if (!f) errs.push({ path: `/custom/${k}`, code: 'unknown_field' });
+      else if (!f.requires_approval) errs.push({ path: `/custom/${k}`, code: 'no_approval_needed' });
+      else if ((cur.custom[k] ?? null) === v) errs.push({ path: `/custom/${k}`, code: 'unchanged' });
+    }
+    if (errs.length || !b.custom || !Object.keys(b.custom).length) return fields(...(errs.length ? errs : [{ path: '/custom', code: 'required' }]));
+    const items = Object.entries(b.custom).map(([k, v], i) => {
+      const it = { field: k, record_id: `cc000000-0000-4000-8000-${String(siteProposals.length + i + 1).padStart(12, '0')}`, change_id: `SFC-${k.toUpperCase()}-${siteProposals.length + i + 1}`,
+        old_value: asText(cur.custom[k]), new_value: asText(v) };
+      siteProposals.push({ ...it, site_id: id, reason: b.reason!.trim() });
+      return it;
+    });
+    return HttpResponse.json({ items }, { status: 201 });
   }),
 
   // ---- Q131
@@ -319,7 +350,7 @@ export const qcHandlers = [
 
 /** Test helper: an empty snag store and no edited site field. */
 export function resetQcMocks() {
-  SNAGS.clear(); siteCustom.clear(); recSlots.clear();
+  SNAGS.clear(); siteCustom.clear(); recSlots.clear(); siteProposals.length = 0;
   severities = { items: SEVERITIES_SEED.map((x) => ({ ...x })), version: 1 };
   qcSettings = { ...SETTINGS_SEED };
 }

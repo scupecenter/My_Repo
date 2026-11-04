@@ -8,6 +8,7 @@ import { startApp, superDb } from './helpers';
 import { GECOL, G, Team, approveAll, createRec, post, recPath } from './reg-helpers';
 import { CellMap, day, downloadTemplate, fillTemplate, getBinary, load, tplTeam, uploadFile } from './tpl-helpers';
 import { actor, addAssignment, makeSite, plainAdmin } from './wf-helpers';
+import { partyWithContract } from './p4b-helpers';
 
 /**
  * Migration 0037: approved-template entry. Registers: GECOL (one record per site, key = Site ID), Procurement and Meetings for the version rule.
@@ -17,9 +18,14 @@ import { actor, addAssignment, makeSite, plainAdmin } from './wf-helpers';
 let app: NestExpressApplication;
 let db: PgClient;
 
+/** 0061 (Q146): a GECOL record is approved with its party and an active contract for GECOL; rows of a file name it by its unique name. */
+let gecolParty = '';
+const GECOL_UNIT = `TPL GECOL Unit ${process.pid}-${Date.now()}`;
+
 beforeAll(async () => {
   app = await startApp();
   db = await superDb();
+  gecolParty = await partyWithContract(db, { name: GECOL_UNIT, type: 'gecol', scopes: ['GECOL'] });
 });
 beforeEach(async () => {
   await db.query('SELECT pg_advisory_lock(770101)');
@@ -46,7 +52,7 @@ const logRows = (reason: string): Promise<{ message: string; source: string; con
   q(db, `SELECT message, source, context, user_id FROM system_log WHERE source = 'template-check' AND context ->> 'reason' = $1 ORDER BY id DESC LIMIT 5`, [reason]);
 
 async function approved(t: Team, site: { id: string }, extra: Record<string, unknown> = {}): Promise<Record<string, any>> {
-  const c = await createRec(t, { ...GECOL, ...extra }, { site_id: site.id });
+  const c = await createRec(t, { ...GECOL, ...extra }, { site_id: site.id, external_party_id: gecolParty });
   return approveAll(t, c.id, c.version);
 }
 
@@ -423,8 +429,8 @@ describe('batch: into the normal flow, row by row and all at once', () => {
     const base = await approved(t, s1, { remark: 'old' });
     const dl = await downloadTemplate(t.entry.api, 'TPL-GECOL', `?site_ids=${s1.id}`);
     const filled = await fillTemplate(dl.buffer, [
-      { [H.site]: s2.code, [H.pr]: 'GP-2', [H.req]: day('2026-01-06') },
-      { [H.site]: s3.code, [H.pr]: 'GP-3', [H.req]: day('2026-01-07') },
+      { [H.site]: s2.code, [H.pr]: 'GP-2', [H.req]: day('2026-01-06'), [H.contractor]: GECOL_UNIT },
+      { [H.site]: s3.code, [H.pr]: 'GP-3', [H.req]: day('2026-01-07'), [H.contractor]: GECOL_UNIT },
     ], { edit: (wb) => { wb.getWorksheet('Data')!.getRow(2).getCell(16).value = 'changed by file'; } });
     const up = await uploadFile(t.entry.api, filled, 'flow.xlsx');
     expect(up.body.counts).toMatchObject({ create: 2, update: 1, error: 0 });
@@ -610,7 +616,7 @@ describe('batch: into the normal flow, row by row and all at once', () => {
     const s2 = await makeSite(db, R, { prefix: 'TPL' });
     await db.query(`UPDATE sites SET scope_gecol_power = 'yes' WHERE id = $1`, [s2.id]);
     const dl = await downloadTemplate(both.api, 'TPL-GECOL');
-    const up = await uploadFile(both.api, await fillTemplate(dl.buffer, [{ [H.site]: s2.code, [H.pr]: 'GP-S', [H.req]: day('2026-01-06') }]));
+    const up = await uploadFile(both.api, await fillTemplate(dl.buffer, [{ [H.site]: s2.code, [H.pr]: 'GP-S', [H.req]: day('2026-01-06'), [H.contractor]: GECOL_UNIT }]));
     expect(up.status).toBe(202);
     const no = await both.api.call('post', `/import-batches/${up.body.id}/submit`, undefined, { 'If-Match': '"1"' });
     expect(no.status).toBe(401);

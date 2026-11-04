@@ -5,6 +5,7 @@ import { allLocked, open, q, taskId, taskRow } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { G, GECOL, HLC, HLC_PR, PROC, Team, createRec, patch, post, recPath, regCell, team } from './reg-helpers';
 import { Actor, actor, setCell } from './wf-helpers';
+import { partyWithContract } from './p4b-helpers';
 
 /**
  * Migration 0042: the HLC fiber purchasing redesign (owner decision 2026-11-02) and Q91.
@@ -267,11 +268,12 @@ describe('the HLC register: execution only, linked to the HLC request; C4 on the
   it('closes C4 on the in-service date (not on the TX link test), after C3; C4 locked refuses the in-service record (Q92)', async () => {
     const { hlc, fiber } = await hlcTeam();
     const stage = await withTasks(hlc, ['C3', 'C4'], ['C3'], ['procurement', 'hlc']);
-    // C4 is locked while C3 is open: an in-service record is refused, the draft is kept
+    // C4 is locked while C3 is open: an in-service record is refused, the draft is kept. Since 0063 (Q148) the execution dates are refused first, because the
+    // HLC request of the site is not approved yet (C3 open).
     const early = await createRec(fiber, { ...HLC, installation_date: '2026-01-14', tx_link_tested_date: '2026-01-15', in_service_date: '2026-01-16' });
     const refused = await post(fiber.entry.api, 'hlc', early.id, 'submit', early.version);
-    expect(refused.status).toBe(409);
-    expect(refused.body.detail).toContain('C4');
+    expect(refused.status).toBe(422);
+    expect(codesOf(refused.body)).toEqual(['no_approved_hlc_pr']);
     // C3 closes with the HLC request; C4 opens
     const pr = await createRec(hlc, HLC_PR);
     let res = (await post(hlc.entry.api, 'procurement', pr.id, 'submit', pr.version)).body;
@@ -309,9 +311,10 @@ describe('the HLC register: execution only, linked to the HLC request; C4 on the
     const v2 = await post(fiber.entry.api, 'hlc', rec.id, 'versions', rec.version);
     expect(v2.body.data).toMatchObject({ request_no: 'HR-OLD', request_date: '2025-12-20' });
     expect(codesOf((await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { request_no: 'HR-NEW' } })).body)).toEqual(['unknown_field']);
-    const v2b = await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { installation_date: '2026-01-20' } });
+    // (0063, Q148: an execution date would need the approved HLC request first, so the new version records the handover from HLC)
+    const v2b = await patch(fiber.entry.api, 'hlc', v2.body.id, v2.body.version, { data: { link_received_date: '2026-01-20' } });
     await pass('hlc', fiber.entry, fiber.approve, v2.body.id, v2b.body.version);
-    expect((await q(db, `SELECT request_no, installation_date::text AS i FROM hlc_records WHERE id = $1`, [rec.entity_id]))[0]).toEqual({ request_no: 'HR-OLD', i: '2026-01-20' });
+    expect((await q(db, `SELECT request_no, link_received_date::text AS l FROM hlc_records WHERE id = $1`, [rec.entity_id]))[0]).toEqual({ request_no: 'HR-OLD', l: '2026-01-20' });
     // once the HLC team has entered the request in Procurement, it is counted there only
     await pass('procurement', hlc.entry, hlc.approve, (await createRec(hlc, HLC_PR)).id, 1);
     expect(await prs()).toEqual([{ k: 'procurement', n: 'HPR-1' }]);
@@ -322,7 +325,8 @@ describe('Q91: an approved GECOL request closes C1 with the request date', () =>
   it('closes C1 and, in the same approval, C2 when the record also holds the Power-On date and C2 has the same L2', async () => {
     const g = await team(app, db, 'gecol', 'gecol', R);
     const stage = await withTasks(g, ['C1', 'C2'], ['C1']);
-    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-01-20', power_on_date: '2026-01-25' });
+    // 0061 (Q146): approved with its GECOL party and an active contract for GECOL
+    const rec = await createRec(g, { ...GECOL, installation_finish: '2026-01-20', power_on_date: '2026-01-25' }, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });
     let res = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;
     expect(res.task.task_code).toBe('C1');
     await stage.api.stepUp(stage.user.password);
@@ -339,7 +343,7 @@ describe('Q91: an approved GECOL request closes C1 with the request date', () =>
     const stage = await withTasks(g, ['C1'], ['C1']);
     const other = await actor(app, db, { level: 'approve', grants: G('gecol', 'view', 'approve'), regions: [R], modules: null });
     await setCell(db, 'C2', R, 'approve', { user: [other.user.id] });
-    const rec = await createRec(g, { ...GECOL, power_on_date: '2026-01-25' });
+    const rec = await createRec(g, { ...GECOL, power_on_date: '2026-01-25' }, { external_party_id: await partyWithContract(db, { type: 'gecol', scopes: ['GECOL'] }) });   // 0061 (Q146)
     const sub = (await post(g.entry.api, 'gecol', rec.id, 'submit', rec.version)).body;
     await stage.api.stepUp(stage.user.password);
     expect((await post(stage.api, 'gecol', rec.id, 'approve', sub.version)).body.state).toBe('approved');

@@ -1,7 +1,44 @@
 // Synthetic state for phase 3b: calendar, rules, freeze, DLP, notification policy, retention, sessions, security log.
-import type { ActiveSession, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule, StaffVisibility, TaskDefinition, TeamScopeMatch, WeightSet, WorkflowGate, WorkflowMilestone } from '@/api/types';
+import type {
+  ActiveSession, ContractorRules, ContractorsCompletenessReport, DlpSettings, IdleTaskAlertSetting, LogRetention, NotificationPolicy, NotificationTypeDef, SecurityLogEntry, SlaRuleSet, SlaTaskRule,
+  StaffVisibility, TaskDefinition, TeamScopeMatch, TeamScopeMismatchReport, WeightSet, WorkflowGate, WorkflowMilestone,
+} from '@/api/types';
 import { HOLIDAYS } from './holidaysSeed';
 import { byId, uid } from './ids';
+
+/** Q143 (migration 0061): the 8 agreed team specializations and their functional groups. */
+export const SPEC_SEED: { code: string; label_en: string; label_ar: string; group: 'CW' | 'TE' | null }[] = [
+  { code: 'TOWER_RT', label_en: 'Tower RT', label_ar: 'برج سطح', group: 'CW' }, { code: 'TOWER_GF', label_en: 'Tower GF', label_ar: 'برج أرضي', group: 'CW' },
+  { code: 'ADAPTION', label_en: 'Adaption', label_ar: 'تهيئة الموقع', group: 'CW' }, { code: 'TE', label_en: 'TE', label_ar: 'تركيب المعدات', group: 'TE' },
+  { code: 'DISMANTLE', label_en: 'Dismantle', label_ar: 'تفكيك', group: null }, { code: 'GECOL', label_en: 'GECOL', label_ar: 'كهرباء GECOL', group: null },
+  { code: 'FIBER', label_en: 'Fiber', label_ar: 'ألياف', group: null }, { code: 'SURVEY', label_en: 'Survey', label_ar: 'مسح', group: null },
+];
+
+/** Q145 (synthetic): two running orders that no longer match. */
+export const MISMATCH: TeamScopeMismatchReport = {
+  as_of: '2026-11-04', match_version: 2,
+  items: [
+    { record_id: '9b400000-0000-4000-8000-000000000001', entity_id: '9b400000-0000-4000-8000-000000000011', site_id: '9b400000-0000-4000-8000-000000000021', site_code: 'TRP-0012', region_id: 1,
+      scope: 'CW', delivery: 'Outsourced', order_status: 'Open', team: { id: '9b400000-0000-4000-8000-000000000031', name: 'Falcon Survey Crew', specializations: ['SURVEY'] },
+      party: { id: '9b400000-0000-4000-8000-000000000041', name: 'Falcon Builders' }, checked_match_version: 1,
+      problems: [{ code: 'specialization_mismatch', severity: 'eligibility', message: 'A Survey team (Falcon Survey Crew) cannot take a CW order (Settings, team / scope match).' },
+        { code: 'safety_cert_expired', severity: 'info', message: 'The safety certificate of the team expired on 2026-10-01 (information only).' }] },
+    { record_id: '9b400000-0000-4000-8000-000000000002', entity_id: '9b400000-0000-4000-8000-000000000012', site_id: '9b400000-0000-4000-8000-000000000022', site_code: 'TRP-0031', region_id: 1,
+      scope: 'Tower Erection', delivery: 'Outsourced', order_status: 'Open', team: null, party: { id: '9b400000-0000-4000-8000-000000000042', name: 'Atlas Towers' }, checked_match_version: 2,
+      problems: [{ code: 'stop_work', severity: 'eligibility', message: 'A Stop Work is active on the site (Permits & HSE).' }] },
+  ],
+};
+
+/** Q142, Q110 (synthetic): contractors data to complete. */
+export const COMPLETENESS: ContractorsCompletenessReport = {
+  as_of: '2026-11-04',
+  teams: [
+    { team_id: '9b400000-0000-4000-8000-000000000051', name: 'Old Civil Team', party: { id: '9b400000-0000-4000-8000-000000000041', name: 'Falcon Builders' }, record_id: null, specialization_text: 'CW', safety_cert_expiry: null, issues: ['unknown_specialization'] },
+    { team_id: '9b400000-0000-4000-8000-000000000052', name: 'Rooftop Crew B', party: { id: '9b400000-0000-4000-8000-000000000042', name: 'Atlas Towers' }, record_id: null, specialization_text: 'Tower RT', safety_cert_expiry: '2026-11-20', issues: ['safety_cert_due'] },
+  ],
+  parties: [{ party_id: '9b400000-0000-4000-8000-000000000043', name: 'Desert Works House', type: 'other', company_type: 'Civil Works House', record_id: null, issues: ['type_review', 'no_active_contract'] }],
+  contracts: [{ contract_id: '9b400000-0000-4000-8000-000000000041', party: { id: '9b400000-0000-4000-8000-000000000041', name: 'Falcon Builders' }, contract_ref: 'FB-2025', origin: 'company', start_date: '2025-01-01', end_date: '2027-12-31', status: 'active', issues: ['scope_not_specified'] }],
+};
 
 const ref = (e: string) => ({ id: uid(e), display_name: byId(e).name_en, employee_id: e });
 const at = (h: number, m = 0, d = 25) => `2026-10-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00Z`;
@@ -43,16 +80,25 @@ export function initCfg() {
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },
       { version: 1, cw_months: 3, te_months: 12, effective_from: '2026-01-01', reason: 'Seed', changed_by: ref('1001'), changed_at: '2026-01-01T08:00:00Z' }] } as DlpSettings,
     idle: { enabled: true, working_days: 2, version: 1 } as IdleTaskAlertSetting,
-    // Q97 seed of migration 0043 (D37): CW scopes and GECOL need CW, TE Installation needs TE, TE Dismantle accepts both, STA / ST none, HLC exempt.
+    // Q97 seed of migration 0043 as converted by 0061 (P4b, Q143, Q144): the 8 catalogue codes, the old column CW as the group CW, HLC takes a Fiber team.
     scopeMatch: {
-      specializations: ['CW', 'TE'],
+      specializations: SPEC_SEED.map((s) => s.code),
+      groups: ['CW', 'TE'],
+      catalogue: SPEC_SEED.map((s) => ({ ...s, aliases: [], is_active: true })),
       scopes: [
-        { scope: 'CW', exempt: false, allowed: ['CW'] }, { scope: 'Tower Erection', exempt: false, allowed: ['CW'] }, { scope: 'Site Adaption', exempt: false, allowed: ['CW'] },
-        { scope: 'TE Installation', exempt: false, allowed: ['TE'] }, { scope: 'CW Dismantle', exempt: false, allowed: ['CW'] }, { scope: 'TE Dismantle', exempt: false, allowed: ['CW', 'TE'] },
-        { scope: 'STA', exempt: false, allowed: [] }, { scope: 'ST', exempt: false, allowed: [] }, { scope: 'GECOL', exempt: false, allowed: ['CW'] }, { scope: 'HLC', exempt: true, allowed: [] },
+        { scope: 'CW', exempt: false, allowed: [], allowed_groups: ['CW'] }, { scope: 'Tower Erection', exempt: false, allowed: [], allowed_groups: ['CW'] },
+        { scope: 'Site Adaption', exempt: false, allowed: [], allowed_groups: ['CW'] }, { scope: 'TE Installation', exempt: false, allowed: ['TE'], allowed_groups: [] },
+        { scope: 'CW Dismantle', exempt: false, allowed: ['DISMANTLE'], allowed_groups: ['CW'] }, { scope: 'TE Dismantle', exempt: false, allowed: ['TE', 'DISMANTLE'], allowed_groups: ['CW'] },
+        { scope: 'STA', exempt: false, allowed: [], allowed_groups: [] }, { scope: 'ST', exempt: false, allowed: [], allowed_groups: [] },
+        { scope: 'GECOL', exempt: false, allowed: ['GECOL'], allowed_groups: ['CW'] }, { scope: 'HLC', exempt: true, allowed: ['FIBER'], allowed_groups: [] },
       ],
-      version: 1, updated_at: '2026-11-02T08:00:00Z', updated_by: null,
+      version: 2, can_edit: true, updated_at: '2026-11-04T08:00:00Z', updated_by: null,
     } as TeamScopeMatch,
+    // 0.12.9 (P4b, Q145, Q147, D145b): the contractor rules
+    contractorRules: {
+      safety_cert_lead_days: 30, recipient_roles: ['PROC_TEAM'], cw_delivery_scopes: ['CW', 'Tower Erection', 'Site Adaption', 'CW Dismantle'],
+      internal_team_types: ['Internal', 'In-House'], closed_order_statuses: ['Closed', 'Cancelled', 'Completed'], version: 1, updated_at: '2026-11-04T08:00:00Z', updated_by: null,
+    } as ContractorRules,
     policy: {
       enabled: true, timezone: 'Africa/Tripoli', digest_hour: 8, work_days_follow_calendar: true, work_days: [0, 1, 2, 3, 4],
       thresholds: { approval_remind_hours: 48, approval_escalate_days: 5, sla_warning_days_before_max: 2, rate_cap_per_hour: 50, retention_days: 180 }, columns: COLUMNS,

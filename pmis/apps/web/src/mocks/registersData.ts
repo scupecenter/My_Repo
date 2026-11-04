@@ -46,6 +46,8 @@ const hlc: RegisterDefinition = {
     F('pr_no', 'HLC PR No.', 'رقم طلب شراء HLC', 'text', 'Purchase request', { in_list: true, read_only: true }),
     F('hlc_approval_date', 'HLC Approval Date', 'تاريخ موافقة HLC', 'date', 'Purchase request', { read_only: true }),
     F('procurement_record_id', 'Procurement record', 'سجل المشتريات', 'text', 'Purchase request', { read_only: true }),
+    F('pr_exception', 'Emergency Exception (no approved PR)', 'استثناء طارئ (بدون طلب شراء معتمد)', 'yes_no', 'Purchase request'),
+    F('pr_exception_reason', 'Emergency Exception Reason', 'سبب الاستثناء الطارئ', 'text', 'Purchase request'),
     F('fiber_uplink', 'Fiber Uplink (Exchange / Post)', 'وصلة الألياف (مقسم / عمود)', 'text', 'Status and team'),
     F('fiber_status', 'Fiber Status', 'حالة الألياف', 'list', 'Status and team', { in_list: true }), F('internal_fiber_team', 'Internal Fiber Team', 'فريق الألياف الداخلي', 'text', 'Status and team'),
     F('link_received_date', 'Link Received (handover from HLC)', 'استلام الوصلة (تسليم من HLC)', 'date', 'Installation and test', { in_list: true }),
@@ -79,6 +81,10 @@ const dismantle: RegisterDefinition = {
     F('rfd_date', 'RFD Date', 'تاريخ طلب الفك (RFD)', 'date', 'RFD', { required: true, in_list: true }),
     F('rfd_document_ref', 'RFD Document Reference', 'مرجع مستند طلب الفك', 'text', 'RFD'),
     F('dismantle_reason', 'Dismantle Reason', 'سبب الفك', 'list', 'Reason', { in_list: true, options: ['Swap', 'Relocation', 'Cancellation', 'Other'] }),
+    // migration 0063 (Q114): the execution mode; outsourced work takes its contractor (FO / FT) from the chosen Procurement order
+    F('execution_mode', 'Execution Mode', 'طريقة التنفيذ', 'list', 'Execution', { in_list: true, options: ['Outsourced', 'In-House'] }),
+    F('procurement_order_id', 'Procurement Order', 'أمر المشتريات', 'text', 'Execution'),
+    F('internal_team', 'Internal Team (In-House)', 'الفريق الداخلي المنفذ', 'text', 'Execution'),
     F('supervising_engineer', 'Supervising Engineer', 'مهندس الإشراف', 'user', 'Supervision and work'),
     F('work_start_date', 'Work Start Date', 'تاريخ بدء العمل', 'date', 'Supervision and work', { in_list: true }),
     F('work_end_date', 'Work End Date', 'تاريخ انتهاء العمل', 'date', 'Supervision and work', { in_list: true }),
@@ -123,7 +129,7 @@ export const REGISTER_DEFS: RegisterDefinition[] = [
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
-  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true), meetings,
+  more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
   more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
@@ -147,6 +153,10 @@ export type MockRecord = {
   transferred?: boolean;
   /** Entered through a template batch (contract 0.7.0): the import row the version came from. */
   source?: 'manual' | 'template'; batch_row_id?: string;
+  /** The contractor of the record (RegisterRecord.external_party); 0063 (Q114): derived from the Procurement order for an outsourced Dismantle part. */
+  external_party?: { id: string; name: string; type: 'cw_contractor' | 'te_vendor' | 'gecol' | 'hlc' | 'supplier' | 'landlord' | 'other' } | null;
+  /** 0063 (Q150): the HLC purchase requests (Procurement entity ids) an HLC record names. */
+  pr_links?: string[];
 };
 export type MockBatchRow = {
   id: string; row_no: number; key: string; action: 'create' | 'update' | 'unchanged' | 'error'; decision: 'pending' | 'approved' | 'rejected' | 'pending_previous_approval';
@@ -199,6 +209,9 @@ export function initRegisters() {
     // contract 0.12.5 (Q111): a meeting entered with the old free text, to convert after a review (recId(15))
     rec('meetings', null, 0, 'entry', { meeting_date: '2026-10-01', title: 'Weekly progress', attendees: 'Ahmed Salem, Mona Fathi', linked_sites: 'TR101',
       minutes_ref: 'MoM-07 on the share', action_items: '- Send the LLD\n- Book the crane' }, { site_index: null }),
+    // migration 0063 (Q114): (recId(16), after the P5 meeting) the approved TE Dismantle order of site 1, which the TE Dismantle part takes its contractor (FT) from
+    rec('procurement', 'wo', 1, 'approved', { scope: 'TE Dismantle', delivery: 'Outsourced', pr_no: 'PR-2026-061', pr_date: '2026-09-25', po_wo_no: 'WO-2026-061', po_wo_date: '2026-09-28', order_status: 'Open' },
+      { external_party: { id: 'e0000000-0000-4000-8000-000000000061', name: 'Desert Lift Services (synthetic)', type: 'cw_contractor' } }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

@@ -2,6 +2,8 @@ import { FileDown, FileSpreadsheet, FileUp } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMe } from '@/api/hooks';
+import { isAdmin } from '@/lib/perm';
 import { downloadTemplate, useBatches, useTemplates } from '@/api/registers';
 import { batchPath, type ImportBatch, type Template } from '@/api/types';
 import { PageHeader } from '@/components/PageHeader';
@@ -32,6 +34,7 @@ export function TemplatesPage() {
   const batches = useBatches({ status, template_id: '', register_key: register, stream });
   const [uploadFor, setUploadFor] = useState<Template | null>(null);
   const lang = i18n.language;
+  const me = useMe(true);
   const nameOf = (x: { name_en: string; name_ar?: string | null }) => (lang === 'ar' && x.name_ar) || x.name_en;
   const down = (x: Template, prefill: boolean) => downloadTemplate(x.template_id, { prefill }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
   const set = (k: string, v: string) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
@@ -43,7 +46,11 @@ export function TemplatesPage() {
 
   return (
     <div data-testid="page-templates">
-      <PageHeader title={t('tpl.title')} subtitle={t('tpl.subtitle')} />
+      <PageHeader title={t('tpl.title')} subtitle={t('tpl.subtitle')} context={
+        <span className="ms-auto flex flex-wrap gap-1">
+          <Link className="btn px-2 py-1 text-xs" to="/templates/mapping" data-testid="tpl-mapping-link">{t('tmap.title')}</Link>
+          {isAdmin(me.data) && <Link className="btn px-2 py-1 text-xs" to="/templates/master-import" data-testid="tpl-master-import-link">{t('mi.title')}</Link>}
+        </span>} />
       <section aria-labelledby="tpl-cat" className="mb-6">
         <h2 id="tpl-cat" className="mb-2 text-lg font-bold">{t('tpl.catalogue')}</h2>
         <div className="card overflow-x-auto">
@@ -109,7 +116,7 @@ export function TemplatesPage() {
                   </td>
                   <td className="p-2">{tplName(b.template_id)} <span className="mono text-mute">v{b.template_version}</span></td>
                   <td className="p-2"><span className={`chip ${TONE[b.status] ?? 'bg-lockBg text-lockInk'}`}>{t(`batchStatus.${b.status}`, { defaultValue: b.status })}</span></td>
-                  <td className="p-2 text-mute">{t('batch.diff', { create: b.counts.create ?? 0, update: b.counts.update ?? 0, unchanged: b.counts.unchanged ?? 0 })}{!!b.counts.error && ` · ${t('batch.invalid', { count: b.counts.error })}`}{!!b.counts.held && ` · ${t('batch.held_count', { count: b.counts.held })}`}</td>
+                  <td className="p-2 text-mute">{t('batch.diff', { create: b.counts.create ?? 0, update: b.counts.update ?? 0, unchanged: b.counts.unchanged ?? 0 })}{!!b.counts.error && ` · ${t('batch.invalid', { count: b.counts.error })}`}{!!b.counts.held && ` · ${t('batch.held_count', { count: b.counts.held })}`}{!!b.counts.saved && ` · ${t('batch.saved_count', { count: b.counts.saved })}`}{b.mode === 'draft' && <span className="chip ms-1 bg-card2 text-mute" data-testid={`batch-draft-${b.id}`}>{t('tpl.mode_draft')}</span>}</td>
                   <td className="p-2 text-mute">{b.uploaded_by?.display_name ?? '—'} · {dateOf(b.uploaded_at)}</td>
                 </tr>
               ))}

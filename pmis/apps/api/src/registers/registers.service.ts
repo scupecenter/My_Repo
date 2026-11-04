@@ -114,6 +114,7 @@ interface RecordRow {
   pin_holds: boolean | null;
   has_open: boolean;
   warnings: unknown[] | null;
+  purchase_requests: Record<string, unknown> | null;
   total: bigint | null;
   ts: string;
 }
@@ -328,6 +329,7 @@ export class RegistersService {
         reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
         CASE WHEN r.ball_in_court_user_id IS NOT NULL AND r.state = 'entry' THEN reg_is_eligible(r.id, 'entry', r.ball_in_court_user_id) END AS pin_holds,
         reg_warnings(r.id) AS warnings,
+        CASE WHEN r.register_key = 'hlc' THEN hlc_pr_view(r.id) END AS purchase_requests,
         EXISTS (SELECT 1 FROM register_records o WHERE o.entity_id = r.entity_id AND o.state IN ('entry', 'in_review', 'in_approval')) AS has_open,
         ${Prisma.raw(TS_TEXT('r.created_at'))} AS ts
       FROM register_records r
@@ -542,6 +544,8 @@ export class RegistersService {
         dto.qc_snag = qs ? { id: qs.id, state: QC_STATE[qs.status] ?? qs.status, scope: qs.scope, link: 'linked' }
           : { id: null, state: null, scope: null, link: r.state === 'approved' ? 'needs_review' : 'on_approval' };
       }
+      // 0063 (Q150): the HLC purchase requests the record covers, and whether all are approved by HLC (C3)
+      if (r.purchase_requests) dto.purchase_requests = r.purchase_requests;
       if (party) dto.external_party = party;
       if (r.created_by && refs.get(r.created_by)) dto.created_by = refs.get(r.created_by);
       if (r.approved_by && refs.get(r.approved_by)) dto.approved_by = refs.get(r.approved_by);
@@ -652,7 +656,7 @@ export class RegistersService {
 
   // ------------------------------------------------------------------ writes
   /** The database decides every transition; a savepoint keeps the request transaction usable after a refusal. */
-  private async call<T>(auth: AuthContext, sql: Prisma.Sql): Promise<T> {
+  async call<T>(auth: AuthContext, sql: Prisma.Sql): Promise<T> {
     await this.db.tx.$executeRaw`SAVEPOINT reg_call`;
     try {
       const rows = await this.db.tx.$queryRaw<{ r: T }[]>(sql);

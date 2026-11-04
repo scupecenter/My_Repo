@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -93,6 +93,18 @@ export const useSetIdle = () => {
 
 // ---------------------------------------------------------------- team / scope match of Procurement (0.9.1, Q97)
 export const useTeamScopeMatch = () => useQuery({ queryKey: ['teamScopeMatch'], queryFn: () => api.get<TeamScopeMatch>('/settings/team-scope-match') });
+// 0.12.9 (P4b): the contractor rules and the two reports
+export const useContractorRules = () => useQuery({ queryKey: ['contractorRules'], queryFn: () => api.get<ContractorRules>('/settings/contractor-rules') });
+export const useSetContractorRules = () => {
+  const qc = useQueryClient();
+  return useMutation<ContractorRules, ApiError, { version: number; body: ContractorRulesInput & { reason: string } }>({
+    mutationFn: ({ version, body }) => api.put('/settings/contractor-rules', { version, body }), onSettled: () => refresh(qc, 'contractorRules'),
+  });
+};
+export const useTeamScopeMismatch = (enabled = true) =>
+  useQuery({ queryKey: ['teamScopeMismatch'], enabled, retry: false, queryFn: () => api.get<TeamScopeMismatchReport>('/reports/team-scope-mismatch') });
+export const useContractorsCompleteness = (enabled = true) =>
+  useQuery({ queryKey: ['contractorsCompleteness'], enabled, retry: false, queryFn: () => api.get<ContractorsCompletenessReport>('/reports/contractors-completeness') });
 export const useSetTeamScopeMatch = () => {
   const qc = useQueryClient();
   return useMutation<TeamScopeMatch, ApiError, { version: number; body: TeamScopeMatchInput & { reason: string } }>({

@@ -95,6 +95,15 @@ export type DlpVersionInput = S['DlpVersionInput'];
 export type IdleTaskAlertSetting = S['IdleTaskAlertSetting'];
 export type TeamScopeMatch = S['TeamScopeMatch'];
 export type TeamScopeMatchInput = S['TeamScopeMatchInput'];
+// 0.12.9 (P4b): specialization catalogue, contractor rules and the two reports
+export type TeamSpecialization = S['TeamSpecialization'];
+export type SpecializationGroup = S['SpecializationGroup'];
+export type ContractorRules = S['ContractorRules'];
+export type ContractorRulesInput = S['ContractorRulesInput'];
+export type ContractorProblem = S['ContractorProblem'];
+export type TeamScopeMismatchReport = S['TeamScopeMismatchReport'];
+export type TeamScopeMismatchRow = S['TeamScopeMismatchRow'];
+export type ContractorsCompletenessReport = S['ContractorsCompletenessReport'];
 export type NotificationPolicy = S['NotificationPolicy'];
 export type NotificationPolicyInput = S['NotificationPolicyInput'];
 export type NotificationPolicyRow = S['NotificationPolicyRow'];

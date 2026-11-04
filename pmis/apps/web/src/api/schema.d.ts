@@ -1686,6 +1686,8 @@ export interface paths {
          * @description Needs `sites` edit in the site's region; each field follows its field-level rule (hidden, read, edit). A value is checked like every custom field
          *     (type, list, validation); `null` clears it. Audited with before and after. Conditional documents whose rule reads a site field (A3 civil aviation
          *     permit: `site.custom.near_airport`) follow on the next read of the task's slots.
+         *     **Q225 (0.12.10):** a field with `requires_approval` (seed `near_airport`) is refused with the field code `approval_required` (an invalid value is still `invalid`);
+         *     propose it with `POST /sites/{site_id}/change-proposals`.
          */
         patch: operations["updateSite"];
         trace?: never;
@@ -1792,6 +1794,33 @@ export interface paths {
         get: operations["listSiteGateEvents"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/change-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose a change to site fields that require approval (Q225)
+         * @description One Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, the site's value now as Old Value, the proposed one as New Value, the
+         *     reason, today as Request Date), entered by the caller as L1: the caller needs `sites` view in the site's region, edit access to the field, the `create` right
+         *     of Change Control in the region and to be an L1 holder of the Change Control row (403 / 422 `not_eligible_holder` otherwise). The site keeps its approved value
+         *     until L2 approves the record; the approval applies it (audited `site_change_applied`), recalculates the site and re-judges its conditional documents. A stale
+         *     Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
+         *     `required`, `unchanged`; `/reason` `required`.
+         */
+        post: operations["proposeSiteChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3723,17 +3752,96 @@ export interface paths {
         };
         /**
          * Team specialization / scope match of Procurement (Q97)
-         * @description 0.9.1. The rows are the order scopes, the columns the team specializations, each cell allowed yes / no. A scope marked `exempt` is not checked
-         *     (seed: HLC, whose request has no contractor team). Reading needs the Settings screen (`admin.settings` view).
+         * @description 0.9.1, 0.12.9. The rows are the order scopes, the columns the codes of the specialization catalogue (Q143), each cell allowed yes / no; a row may
+         *     also allow a functional group (CW, TE), which accepts every code of that group. `exempt` means that the order needs no team; a named team is
+         *     always checked (Q144, seed: HLC accepts a Fiber team). Reading needs the Settings screen (`admin.settings` view), or, read-only, `procurement`
+         *     or `contractors` view (Q147); `can_edit` tells whether the caller may save.
          */
         get: operations["getTeamScopeMatch"];
         /**
          * Replace the team specialization / scope match (reason, If-Match, audited)
-         * @description 0.9.1. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. Field-level errors: `unknown_key`,
-         *     `duplicate` (a specialization or a scope listed twice; specializations compare case-insensitively), `unknown_specialization` (an allowed value
-         *     that is not one of the columns), `invalid`, `too_many`. Records already approved are not re-checked; drafts are checked again at submit.
+         * @description 0.9.1, 0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. `specializations` lists the
+         *     active columns in order: each is a catalogue code, label or alias, or a new name that becomes a new code; a code not listed is deactivated, never
+         *     deleted. `catalogue` (optional) edits the labels, the group and the aliases of listed codes. A change that affects eligibility needs a fresh
+         *     step-up (401 `step_up_required`, checked in the database); labels alone do not. Field-level errors: `unknown_key`, `duplicate`,
+         *     `unknown_specialization` (an allowed value that is not one of the columns), `is_a_group` (CW or TE named as a column), `name_clash` (a name of
+         *     two codes), `not_a_column`, `invalid`, `too_many`. Records already approved are not re-checked (they are listed by
+         *     `GET /reports/team-scope-mismatch`); drafts are checked again at submit.
          */
         put: operations["setTeamScopeMatch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/contractor-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contractor rules (certificate alert lead time, alert roles, CW Delivery Model, internal team types, closed order statuses)
+         * @description 0.12.9 (Q145, Q147, D145b). Needs the Settings screen (`admin.settings` view).
+         */
+        get: operations["getContractorRules"];
+        /**
+         * Save the contractor rules (reason, If-Match, audited)
+         * @description 0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. A change of `cw_delivery_scopes` or `internal_team_types` decides
+         *     eligibility and needs a fresh step-up (401 `step_up_required`, Q147); the lead days, the roles and the closed statuses do not. Field errors:
+         *     `unknown_key`, `out_of_range`, `invalid`, `unknown_role`, `unknown_scope`. Audited as `contractor_rules_update` with before and after.
+         */
+        put: operations["setContractorRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/team-scope-mismatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Running Procurement orders that no longer match their team, contract or site (Q145)
+         * @description 0.12.9. Approved orders are never changed; this lists the running ones (order status not in `ContractorRules.closed_order_statuses`) that have a
+         *     problem today: `specialization_mismatch`, `team_inactive`, `party_inactive`, `no_active_contract`, `stop_work` (an active Stop Work on the site,
+         *     Permits & HSE) with severity `eligibility`, and `safety_cert_expired` with severity `info` (D145b: information only). Needs `procurement` view; the
+         *     rows are those of the caller's Procurement regions (B3). The daily job alerts Procurement once per order and `eligibility` problem.
+         */
+        get: operations["getTeamScopeMismatchReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/contractors-completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contractors data to complete (Q142, Q110)
+         * @description 0.12.9. Active teams without a specialization (`no_specialization`), with an old text that is no catalogue specialization
+         *     (`unknown_specialization`), with a safety certificate expired or due within the lead days (`safety_cert_expired`, `safety_cert_due`; information
+         *     only); active parties to review (`type_review`: the Company Type was not a known type) or without an active contract today
+         *     (`no_active_contract`); contracts without a scope list (`scope_not_specified`: the company record's own contract) or past their end date while
+         *     active (`past_end_date`). Needs `contractors` view (the register is global).
+         */
+        get: operations["getContractorsCompletenessReport"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4070,6 +4178,103 @@ export interface paths {
          * @description Counted from the PAC date. A PAC keeps the version in force on its issue date.
          */
         post: operations["publishDlpVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/hlc/records/{record_id}/purchase-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Name the HLC purchase requests an HLC record covers (Q150)
+         * @description 0.12.11. The L1 holder of the HLC record, while it is in entry, names the Procurement records of scope HLC (of the same site) that the execution covers.
+         *     The list replaces the previous one; an empty list means every submitted HLC request of the site is required. An approved version keeps its list
+         *     (history); a new version starts with the same list. C3 closes when every required request has an approved version with an HLC approval date.
+         *     Field errors: `not_hlc_pr`, `too_many`.
+         */
+        put: operations["setHlcPurchaseRequests"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/hlc/legacy-migration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move the legacy HLC requests into Procurement drafts (Q139, one-time)
+         * @description 0.12.11. System Admin, or a delegation of `administer` on Procurement (its regions). `dry_run: true` is the preview and writes nothing. A run needs a
+         *     reason and a recent step-up. Each legacy HLC request (request_no / request_date kept since 0042) becomes a draft Procurement record of scope HLC with
+         *     only the number and the date that exist (no approver, no HLC approval date); a request already entered in Procurement with the same PR No. is linked
+         *     instead (`duplicate`); a request migrated before is `already_migrated`. The HLC team completes the drafts and they go through the usual approval.
+         */
+        post: operations["migrateLegacyHlcRequests"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/dismantle/order-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The approved, active Procurement orders a Dismantle part may take its contractor from (Q114)
+         * @description 0.12.11. The approved Procurement versions in force of the site with scope `CW Dismantle` (part `cw`) or `TE Dismantle` (part `te`), not cancelled.
+         *     Needs the Dismantle module in the site's region.
+         */
+        get: operations["listDismantleOrderOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/gecol-order-warnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The order warnings of the GECOL register (Q151)
+         * @description 0.12.11. Each chain lists GECOL date fields in their expected order; a step without a date is skipped; a later step dated before an earlier one is a
+         *     reviewer warning `gecol_order` (never blocking). `billing_after` names the contract event the billing conversion follows (`billing_before_event`).
+         *     The draft order of the owner answer is seeded and off (`enabled: false`) until the GECOL team confirms it. Reading needs the Settings screen.
+         */
+        get: operations["getGecolOrderWarnings"];
+        /**
+         * Save the GECOL order warnings (reason, If-Match, audited)
+         * @description 0.12.11. System Admin, or a delegation of `admin.settings` edit for all regions. Field errors: `unknown_key`, `unknown_field` (not a GECOL date
+         *     field; `billing_after` cannot be the billing conversion itself), `duplicate`, `invalid`, `too_many`.
+         */
+        put: operations["setGecolOrderWarnings"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4760,6 +4965,202 @@ export interface paths {
          * @description Not built yet (0.7.0). With records entering through the register flow, an undo is a new version of each record that restores its before values, reviewed like any other.
          */
         post: operations["undoImportBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Legacy Master imports and reconciliation runs (Q1, Q211)
+         * @description System Admin or a delegate of `administer` on `templates` (403 otherwise). Newest first.
+         */
+        get: operations["listMasterImportRuns"];
+        put?: never;
+        /**
+         * Upload the real Site Master (no _tpl): identify, check, compare; nothing is applied
+         * @description Admin-only path for the real Master (Q1): System Admin or a delegate of `administer` on `templates` (403 before the file is read). The package guard of the templates applies (size 5 MB, no macros, embedded objects, external links or zip bomb).
+         *     The file is identified by its sheet names (`Master`) and the three Master header rows (group, sub-group, name), and its structure is checked against the 187 Master columns: a missing typed column refuses it (`structure_mismatch`); a moved or extra column is reported. A file with a `_tpl` sheet is a PMIS template (`is_pmis_template`: upload it on the Templates page).
+         *     The original is stored as uploaded with its SHA-256. Every Master row is compared with what the PMIS holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
+         *     Each refusal answers 422 `template_rejected` with `reason` and writes a System Log row (`source = master-import`); each accepted upload is audited and logged.
+         */
+        post: operations["uploadLegacyMaster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** One run with its structure check and summary */
+        get: operations["getMasterImportRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/diffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** The comparison report: differences and exceptions of a run (Q211) */
+        get: operations["listMasterImportDiffs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The comparison report as XLSX (site, field, both values, source, reason, resolution)
+         * @description Same filters as the list. A sheet `Run` holds the file name, SHA-256, user and time. Values are written as text. Audited.
+         */
+        get: operations["exportMasterImportDiffs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** The original file of a run, as uploaded (audited) */
+        get: operations["downloadMasterImportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter the typed task columns of a run through the normal batch flow
+         * @description The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
+         */
+        post: operations["applyMasterImportRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/diffs/{diff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                diff_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Record the resolution of one difference (who, when, why)
+         * @description A note is required for every resolution except `open`. Audited with before and after. Nothing is applied from here.
+         */
+        patch: operations["resolveMasterImportDiff"];
+        trace?: never;
+    };
+    "/template-mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The task fields the stream templates and the Master sheet carry (Q207)
+         * @description Needs `view` on `templates`. `can_edit` says whether the caller holds `edit` on `templates` for all regions.
+         */
+        get: operations["getTemplateMapping"];
+        put?: never;
+        /**
+         * Test (dry run) or save a change of the template mapping
+         * @description System Admin or a delegate of `edit` on `templates` for all regions (403 otherwise). A reason is required. `dry_run: true` applies the change in a transaction that is rolled back and answers the impact per template (columns added, removed, changed; the version a save would issue; batches still in preview). A save issues the next versions of the templates whose columns change, with the reason, and is audited with before and after.
+         *     Field-level errors: `calculated_field` (a field the workflow sets, a calculated or register-owned field, or a task a template never writes, cannot become typed), `column_not_owned` (a Master column the PMIS does not own), `unknown_task`.
+         */
+        post: operations["saveTemplateMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The values of other files that mean a region or a PMIS role (Q8, Q10) */
+        get: operations["listImportAliases"];
+        /**
+         * Create or change one alias (reason, audited)
+         * @description System Admin or a delegate of `edit` on `templates` for all regions. A role alias with a target is `mapped`; without one it is `ambiguous` or `unmapped` and stays an import exception. A mapping never grants a right.
+         */
+        put: operations["saveImportAlias"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6174,10 +6575,30 @@ export interface paths {
         };
         /**
          * Export exactly the current dashboard view as an Excel workbook (0.11.0) or a CSV file
-         * @description Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (sheets `Dashboard` with the rows and `About` with the basis; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+         * @description Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (since 0.12.7, Q187: sheets `Project Overview` with the rows of the view, `CW` and `TE` with the rows of the same filters for those views, `Late tasks`, `Delay attribution`, `Project Status items`, `Regions`, and `About` with the filters, reference date, basis, definitions and versions; landscape, one page wide; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
          */
         get: operations["exportDashboard"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/pipeline-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose the pipeline style of the dashboard (0.12.7, Q116)
+         * @description A = progress rings (the default), B = flat segmented track. A System Admin or a holder of `dashboard` administer for all regions; anyone else is 403 `action_forbidden`. Audited (`settings.updated`, entity `dashboard.pipeline_variant`, before and after). The value is `meta.pipeline_variant` of `GET /dashboard`.
+         */
+        put: operations["setDashboardPipelineVariant"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6255,9 +6676,31 @@ export interface paths {
         put?: never;
         /**
          * Enter a manual percentage for a central item (0.11.0, Q118)
-         * @description A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
+         * @description A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason and its `source` (required since 0.12.7, Q176). An effective date before the first day of the current month (Africa/Tripoli) is a historical correction (0.12.7, Q178): it needs `dashboard.historical_correction` edit (403 `action_forbidden` otherwise) and is flagged `historical_correction`. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
          */
         post: operations["addManualProjectStatusValue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/project-status/manual-items/{item_code}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the approved plan of a central item (0.12.7, Q177)
+         * @description A new version of the item's plan, by the same people as the manual values. Send `points` (1 to 120 dates with a planned %, cumulative: the planned % never falls with the date; 422 `/points/<i>/planned_pct` `not_cumulative`, `/points/<i>/date` `duplicate`) or a `target_date` (100% on that date; with `start_date`, 0% on the start date). The planned % on a date is 0 before the first point, a straight line by calendar day between two points, and the last value after the last point. Future dates are allowed. Plans are never changed or deleted; a snapshot reads the plan known when it was taken. Audited (`project_status.manual_plan_set`, with the plan it replaces).
+         */
+        post: operations["setManualProjectStatusPlan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6280,10 +6723,33 @@ export interface paths {
         get: operations["listTaskDelayPeriods"];
         put?: never;
         /**
-         * Record a delay attribution period on a task (0.11.0, Q122)
-         * @description By the task's reviewer (a holder of its L2 level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. From and To are inclusive; a period of the same task that overlaps an active one is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.added`).
+         * Propose a delay attribution period on a task (0.11.0, Q122; a proposal since 0.12.7, Q182)
+         * @description Since 0.12.7 this proposes a period (status `proposed`) with no effect until it is approved (`.../decision`). By L1 of the task (an entry holder), L2 (a holder of its approve level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. The external party may stay empty in a proposal (Q184). From and To are inclusive; a period that overlaps an active proposal or approved period of the task is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Once approved, delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.proposed`).
          */
         post: operations["addTaskDelayPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/delay-periods/{period_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject a proposed delay period (0.12.7, Q182, Q184)
+         * @description By L2 of the task, a System Admin or a holder of `dashboard.delay` edit in the region (403 `action_forbidden` otherwise), never by the person who proposed it, an admin included (403 `self_beneficiary`). A rejection needs `note` (422 `/note` `required`). Approving a `contractor` or `external` period needs its external party: the proposal's, or `external_party_id` here when the proposal has none (422 `/external_party_id` `external_party_required`; another party than the proposal's is 422 `already_named`). An approval that overlaps an approved period is 422 `period_overlap`. A period that is not waiting for a decision is 409 `invalid_transition`. Audited (`delay_period.approved` / `delay_period.rejected`, before and after).
+         */
+        post: operations["decideTaskDelayPeriod"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6304,7 +6770,7 @@ export interface paths {
         put?: never;
         /**
          * Void a delay attribution period, with a reason (0.11.0, Q122)
-         * @description Same rights as recording one. The period stays in the history and stops counting. A period voided already is 409 `invalid_transition`. Audited (`delay_period.voided`).
+         * @description The deciders (see `.../decision`); the proposer may also withdraw an open proposal (0.12.7). The period stays in the history and stops counting. A period voided already, or a rejected one, is 409 `invalid_transition`. Audited (`delay_period.voided`).
          */
         post: operations["voidTaskDelayPeriod"];
         delete?: never;
@@ -8758,7 +9224,7 @@ export interface components {
          * @description Closed list returned as `reason` on 422 `template_rejected`. Each rejection is also written to the System Log (`source = template-check`).
          * @enum {string}
          */
-        TemplateRejectReason: "size_or_rows_exceeded" | "tpl_missing" | "template_unknown_or_inactive" | "outdated_version" | "wrong_template" | "checksum_mismatch" | "import_not_allowed" | "not_xlsx" | "macros_not_allowed" | "tpl_invalid";
+        TemplateRejectReason: "size_or_rows_exceeded" | "tpl_missing" | "template_unknown_or_inactive" | "outdated_version" | "wrong_template" | "checksum_mismatch" | "import_not_allowed" | "not_xlsx" | "macros_not_allowed" | "tpl_invalid" | "not_a_master" | "structure_mismatch" | "is_pmis_template";
         /** @description A note about a whole TPL-MASTER upload. Never blocking. */
         UploadWarning: {
             /**
@@ -8775,6 +9241,8 @@ export interface components {
         ImportBatchOutcome: {
             /** @description Rows sent into the flow (submit only). */
             submitted?: number;
+            /** @description Rows saved without submission (a Save Draft / Planning batch, 0.12.8). */
+            saved?: number;
             decided?: number;
             approved?: number;
             rejected?: number;
@@ -8784,10 +9252,10 @@ export interface components {
                 row_no: number;
                 key?: string | null;
                 /**
-                 * @description `open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor.
+                 * @description `open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor; `gate_locked`: a task a closed gate locks (Q208, 0.12.8).
                  * @enum {string}
                  */
-                reason: "open_version" | "open_submission" | "predecessor_open";
+                reason: "open_version" | "open_submission" | "predecessor_open" | "gate_locked";
                 /**
                  * Format: uuid
                  * @description The open version that blocks the row (a register row only).
@@ -8836,6 +9304,13 @@ export interface components {
             part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
+            /**
+             * @description Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.
+             * @enum {string}
+             */
+            mode?: "submit" | "draft";
+            /** @description D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed. */
+            file_template_version?: number | null;
             counts: {
                 create?: number;
                 update?: number;
@@ -8846,6 +9321,8 @@ export interface components {
                 rejected?: number;
                 /** @description Rows held `pending_previous_approval`. */
                 held?: number;
+                /** @description Rows saved without submission (draft batch). */
+                saved?: number;
             };
             /** @description Parse job (`GET /jobs/{job_id}`) while status is `parsing`. */
             job_id?: string | null;
@@ -8893,7 +9370,7 @@ export interface components {
             site_id?: string | null;
             /** @description Where the row came from in the file, `Sheet!row` (the comparison report of the parallel run). */
             source_ref?: string | null;
-            /** @description Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`. */
+            /** @description Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`, `held_gate_locked` (0.12.8). */
             warnings?: {
                 column?: string;
                 field?: string;
@@ -8914,19 +9391,225 @@ export interface components {
                 column?: string;
                 /** @description The code of the field. */
                 field?: string;
-                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `gate_locked`, `actual_date_required`, `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`). */
+                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `actual_date_required`, `actual_start_required` (Q209), `ambiguous_mapping` (Q205), `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`). */
                 code: string;
                 message?: string;
             }[];
-            /** @enum {string} */
-            decision: "pending" | "approved" | "rejected" | "pending_previous_approval";
+            /**
+             * @description `saved`: a Save Draft / Planning row was saved without submission (0.12.8).
+             * @enum {string}
+             */
+            decision: "pending" | "approved" | "rejected" | "pending_previous_approval" | "saved";
             /**
              * @description Why a row is held `pending_previous_approval`.
              * @enum {string}
              */
-            hold_reason?: "open_version" | "open_submission" | "predecessor_open";
+            hold_reason?: "open_version" | "open_submission" | "predecessor_open" | "gate_locked";
             decided_by?: components["schemas"]["UserRef"];
             note?: string | null;
+        };
+        /** @description One upload of the real Site Master through the legacy path (Q1, Q211, 0.12.8). */
+        MasterImportRun: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            file_sha256: string;
+            file_size: number;
+            /** @enum {string} */
+            status: "previewed" | "applied";
+            /** @description The identification and structure check: `identified`, `columns_expected`, `columns_found`, `missing` [{letter, header, typed}], `moved` [{header, expected, found}], `extra` [headers], `missing_typed`, `sheets`, `register_sheets_missing`, `has_tpl`. */
+            structure: {
+                [key: string]: unknown;
+            };
+            /** @description `rows`, `sites_matched`, `sites_unknown`, `cells_compared`, `matches`, `cells_not_compared`, `diffs`, `missing_in_pmis`, `missing_in_master`, `exceptions`, `applicable`, `staff_mapped`, `staff_rows`, `by_reason` {reason: count}. */
+            summary: {
+                [key: string]: unknown;
+            };
+            created_by?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            created_at: string;
+            applied_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            applied_at?: string | null;
+            apply_reason?: string | null;
+            /** @enum {string|null} */
+            apply_mode?: "submit" | "draft" | null;
+            /**
+             * Format: uuid
+             * @description The import batches the apply created (`GET /import-batches?group_id=`).
+             */
+            group_id?: string | null;
+            outcome?: components["schemas"]["MasterImportOutcome"] | null;
+            /** @description The original file is stored. */
+            has_file?: boolean;
+            version: number;
+        };
+        MasterImportOutcome: {
+            /** Format: uuid */
+            group_id?: string;
+            /** @enum {string} */
+            mode?: "submit" | "draft";
+            batches?: {
+                /** Format: uuid */
+                id?: string;
+                /** @description The stream. */
+                ref?: string;
+                template_id?: string;
+                submitted?: number;
+                saved?: number;
+                held?: number;
+                failed?: number;
+                /** @description Rows the staging refused. */
+                errors?: number;
+            }[];
+            skipped?: {
+                [key: string]: unknown;
+            }[];
+        };
+        MasterImportDiff: {
+            /** Format: uuid */
+            id: string;
+            sheet: string;
+            row_no?: number | null;
+            /** @description `Sheet!row` of the file. */
+            source_ref?: string | null;
+            site_code?: string | null;
+            /** Format: uuid */
+            site_id?: string | null;
+            region_id?: number | null;
+            /** @description The Master column letter. */
+            master_col?: string | null;
+            header?: string | null;
+            /** @description Where the PMIS holds the value (`B4:actual_date`, a site field, the issue projection). */
+            field?: string | null;
+            /** @description The value of the file (the cached value of a formula cell). */
+            master_value?: string | null;
+            pmis_value?: string | null;
+            /** @enum {string} */
+            kind: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+            /** @description `value_differs`, `empty_in_master`, `calculated`, `owned_elsewhere`, `issue_projection`, `site_not_in_pmis`, `site_not_in_master`, `duplicate_in_file`, `formula_in_input`, `ambiguous_mapping`, `region_alias_unknown`, `role_unmapped`, `role_ambiguous`, `role_unknown`. */
+            reason: string;
+            /** @description A typed task column the apply can enter. */
+            applicable?: boolean;
+            /** @enum {string} */
+            resolution: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+            resolution_note?: string | null;
+            resolved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            resolved_at?: string | null;
+        };
+        MasterImportApplyRequest: {
+            /** @enum {string} */
+            mode: "submit" | "draft";
+            reason: string;
+        };
+        MasterImportDiffResolve: {
+            /** @enum {string} */
+            resolution: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+            note?: string;
+        };
+        TemplateTaskField: {
+            /** Format: uuid */
+            id?: string;
+            task_code: string;
+            /** @description planned_date, planned_start, actual_start, actual_date, submitted_date, approved_date, external_party, v:<key> or r:<register>.<field>. */
+            field_key: string;
+            label: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            field_type: "text" | "number" | "date" | "list" | "yes_no";
+            options?: string[] | null;
+            master_col?: string | null;
+            master_header?: string | null;
+            read_only: boolean;
+            is_active: boolean;
+            scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
+            /** @enum {string|null} */
+            projection?: "earliest" | "latest" | null;
+        };
+        TemplateMapping: {
+            fields: components["schemas"]["TemplateTaskField"][];
+            master_columns: {
+                letter?: string;
+                header?: string;
+                owner?: string;
+                fields?: number;
+            }[];
+            tasks: {
+                code?: string;
+                name_en?: string;
+                name_ar?: string | null;
+                stream?: string | null;
+                /** @enum {string} */
+                mode?: "edit" | "register" | "readonly" | "exclude";
+            }[];
+            can_edit: boolean;
+        };
+        TemplateMappingChange: {
+            /** @enum {string} */
+            op: "upsert" | "deactivate";
+            task_code: string;
+            field_key: string;
+            label?: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            field_type?: "text" | "number" | "date" | "list" | "yes_no";
+            options?: string[] | null;
+            master_col?: string | null;
+            read_only?: boolean;
+            scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
+            /** @enum {string|null} */
+            projection?: "earliest" | "latest" | null;
+        };
+        TemplateMappingRequest: {
+            changes: components["schemas"]["TemplateMappingChange"][];
+            reason: string;
+            /** @default false */
+            dry_run: boolean;
+        };
+        TemplateMappingResult: {
+            dry_run: boolean;
+            changes: number;
+            impact: {
+                template_id?: string;
+                kind?: string;
+                version_before?: number;
+                version_after?: number;
+                columns_added?: string[];
+                columns_removed?: string[];
+                columns_changed?: string[];
+                /** @description Batches of the template still in preview. */
+                open_batches?: number;
+            }[];
+        };
+        ImportAlias: {
+            /** @enum {string} */
+            kind: "region" | "role";
+            /** @description The value in lower case. */
+            alias: string;
+            label: string;
+            /** @description The region id, or the role code. */
+            target?: string | null;
+            target_name?: string | null;
+            /** @enum {string} */
+            status: "mapped" | "ambiguous" | "unmapped";
+            is_active: boolean;
+            note?: string | null;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        ImportAliasInput: {
+            /** @enum {string} */
+            kind: "region" | "role";
+            alias: string;
+            label?: string;
+            target?: string | null;
+            /** @enum {string} */
+            status?: "ambiguous" | "unmapped";
+            /** @default true */
+            is_active: boolean;
+            note?: string | null;
+            reason: string;
         };
         ImportDecisionRequest: {
             /**
@@ -9049,24 +9732,149 @@ export interface components {
             /** @description An order scope of Procurement (the scope list), for example CW or TE Installation. */
             scope: string;
             /**
-             * @description true = no team check for this scope (seed: HLC).
+             * @description 0.12.9: true = the order needs no team (seed: HLC); a named team is still checked (Q144).
              * @default false
              */
             exempt: boolean;
-            /** @description The specializations whose teams may take an order of this scope. Empty = no team is accepted. */
+            /** @description The specialization codes whose teams may take an order of this scope (a label or alias is accepted on input). Empty with no group = no team is accepted. */
             allowed: string[];
+            /** @description 0.12.9 (Q143): the functional groups whose every specialization may take an order of this scope, including codes added later. */
+            allowed_groups?: components["schemas"]["SpecializationGroup"][];
+        };
+        /** @enum {string} */
+        SpecializationGroup: "CW" | "TE";
+        TeamSpecialization: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            group?: components["schemas"]["SpecializationGroup"] | null;
+            /** @description Other names (an old Master value, a spelling) that resolve to this code. */
+            aliases?: string[];
+            /** @description false = not a column any more (kept, never deleted). */
+            readonly is_active?: boolean;
         };
         TeamScopeMatchInput: {
-            /** @description The columns, in order: the team specializations of the Contractors register (compared trimmed and case-insensitively). */
+            /** @description 0.12.9: the active columns, in order: catalogue codes (or a label or alias of one); a new name becomes a new code; a code that is not listed is deactivated. CW and TE are groups, not columns. */
             specializations: string[];
             scopes: components["schemas"]["TeamScopeMatchRow"][];
+            /** @description 0.12.9, optional: labels, group and aliases of listed codes. */
+            catalogue?: components["schemas"]["TeamSpecialization"][];
         };
-        /** @description 0.9.1 (Q97). Seed: CW, Tower Erection, Site Adaption, CW Dismantle and GECOL allow CW; TE Installation allows TE; TE Dismantle allows CW and TE; STA and ST allow none; HLC is exempt. */
+        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. */
         TeamScopeMatch: components["schemas"]["TeamScopeMatchInput"] & {
+            groups: components["schemas"]["SpecializationGroup"][];
+            version: number;
+            /** @description 0.12.9: the caller may save (System Admin or admin.settings edit for all regions); Procurement and Contractors read only. */
+            can_edit: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ContractorRulesInput: {
+            /** @description D145b: days before the safety certificate expiry at which the team lead and Procurement are alerted (default 30). Information only. */
+            safety_cert_lead_days: number;
+            /** @description Role codes whose holders get the certificate and mismatch alerts ("Procurement"; default PROC_TEAM). Nobody: the System Admins. */
+            recipient_roles: string[];
+            /** @description Q147: the order scopes of the CW Delivery Model (default CW, Tower Erection, Site Adaption, CW Dismantle). */
+            cw_delivery_scopes: string[];
+            /** @description Q147: the Team Type values of an internal (Aljeel) team for an In-House order (default Internal, In-House). */
+            internal_team_types: string[];
+            /** @description Q145: the order statuses that end an order (default Closed, Cancelled, Completed). */
+            closed_order_statuses: string[];
+        };
+        ContractorRules: components["schemas"]["ContractorRulesInput"] & {
             version: number;
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ContractorProblem: {
+            /** @enum {string} */
+            code: "specialization_mismatch" | "team_inactive" | "party_inactive" | "no_active_contract" | "stop_work" | "safety_cert_expired";
+            /**
+             * @description `info` never blocks (D145b).
+             * @enum {string}
+             */
+            severity: "eligibility" | "info";
+            message: string;
+        };
+        NamedRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        TeamScopeMismatchRow: {
+            /**
+             * Format: uuid
+             * @description The approved version in force.
+             */
+            record_id: string;
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            region_id: number;
+            scope: string | null;
+            delivery?: string | null;
+            order_status?: string | null;
+            team?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                specializations: string[];
+            } | null;
+            party?: components["schemas"]["NamedRef"] | null;
+            problems: components["schemas"]["ContractorProblem"][];
+            /** @description The match table version the order was checked under at submit (Q145). */
+            checked_match_version?: number | null;
+        };
+        TeamScopeMismatchReport: {
+            /** Format: date */
+            as_of: string;
+            match_version: number;
+            items: components["schemas"]["TeamScopeMismatchRow"][];
+        };
+        ContractorsCompletenessReport: {
+            /** Format: date */
+            as_of: string;
+            teams: {
+                /** Format: uuid */
+                team_id: string;
+                name: string;
+                party: components["schemas"]["NamedRef"];
+                /** Format: uuid */
+                record_id?: string | null;
+                specialization_text?: string | null;
+                /** Format: date */
+                safety_cert_expiry?: string | null;
+                issues: ("no_specialization" | "unknown_specialization" | "safety_cert_expired" | "safety_cert_due")[];
+            }[];
+            parties: {
+                /** Format: uuid */
+                party_id: string;
+                name: string;
+                type: string;
+                company_type?: string | null;
+                /** Format: uuid */
+                record_id?: string | null;
+                issues: ("type_review" | "no_active_contract")[];
+            }[];
+            contracts: {
+                /** Format: uuid */
+                contract_id: string;
+                party: components["schemas"]["NamedRef"];
+                contract_ref?: string | null;
+                /** @enum {string} */
+                origin: "company" | "contract";
+                /** Format: date */
+                start_date?: string | null;
+                /** Format: date */
+                end_date?: string | null;
+                /** @enum {string} */
+                status: "active" | "suspended" | "terminated" | "expired";
+                issues: ("scope_not_specified" | "past_end_date")[];
+            }[];
         };
         IdleTaskAlertSetting: {
             enabled: boolean;
@@ -9507,13 +10315,16 @@ export interface components {
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
-            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none. */
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). 0.12.11: HLC `hlc_prs_incomplete`, `hlc_prs_not_linked`, `pr_exception_used`; GECOL `gecol_order`, `billing_before_event` (setting, off by default); Dismantle `execution_mode_missing`, `order_not_chosen`, `order_without_contractor`. Empty when there is none. */
             warnings?: {
                 /** @description JSON pointer of the field, as in `Problem.errors`. */
                 path: string;
                 code: string;
                 message?: string;
+                /** @description 0.12.11. The field the value is compared with (GECOL `gecol_order`, `billing_before_event`). */
+                related_path?: string;
             }[];
+            purchase_requests?: components["schemas"]["HlcPurchaseRequests"];
             /** @description Present on the answer of a transition (submit, review, approve, reject, claim, release). */
             last_transition?: {
                 step_ids?: string[];
@@ -9529,6 +10340,112 @@ export interface components {
             updated_at?: string;
             /** @description ETag (If-Match). */
             version: number;
+        };
+        /** @description 0.12.11 (Q150), HLC records only. `items` = the required requests (the named ones, or every submitted one while none is named; cancelled ones left out); `candidates` = every HLC request of the site the L1 may name. */
+        HlcPurchaseRequests: {
+            linked_explicitly: boolean;
+            /** @description Every required request has an approved version with an HLC approval date (C3 closes). */
+            complete: boolean;
+            required: number;
+            approved_by_hlc: number;
+            /**
+             * Format: date
+             * @description The latest HLC approval date, once complete.
+             */
+            hlc_approval_date?: string | null;
+            items: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                pr_no?: string;
+                /** Format: date */
+                pr_date?: string;
+                /** Format: date */
+                hlc_approval_date?: string;
+                approved: boolean;
+                state?: components["schemas"]["RegisterRecordState"];
+            }[];
+            candidates: {
+                /** Format: uuid */
+                entity_id: string;
+                /** Format: uuid */
+                record_id: string;
+                pr_no?: string;
+                /** Format: date */
+                pr_date?: string;
+                state?: components["schemas"]["RegisterRecordState"];
+                cancelled: boolean;
+                linked: boolean;
+            }[];
+        };
+        /** @description 0.12.11 (Q139). */
+        HlcLegacyMigration: {
+            dry_run: boolean;
+            counts: {
+                create: number;
+                duplicate: number;
+                already_migrated: number;
+            };
+            items: {
+                /** Format: uuid */
+                hlc_record_id: string;
+                /** Format: uuid */
+                hlc_entity_id?: string;
+                /** Format: uuid */
+                site_id: string;
+                site_code?: string;
+                region_id?: components["schemas"]["RegionId"];
+                request_no?: string;
+                request_date?: string;
+                /** @enum {string} */
+                outcome: "create" | "duplicate" | "already_migrated";
+                /**
+                 * Format: uuid
+                 * @description The draft created (run), the request matched, or the draft of an earlier run.
+                 */
+                procurement_record_id?: string;
+                /** @description The legacy date was not a valid past date and was not copied. */
+                date_dropped?: boolean;
+            }[];
+        };
+        /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
+        DismantleOrderOption: {
+            /**
+             * Format: uuid
+             * @description The value of the Dismantle field `procurement_order_id`.
+             */
+            entity_id: string;
+            /** Format: uuid */
+            record_id: string;
+            /** @enum {string} */
+            scope: "CW Dismantle" | "TE Dismantle";
+            delivery?: string;
+            pr_no?: string;
+            po_wo_no?: string;
+            /** Format: date */
+            po_wo_date?: string;
+            order_status?: string;
+            external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        GecolOrderWarningsInput: {
+            enabled: boolean;
+            chains: string[][];
+            /** @description The GECOL date field the billing conversion follows (the contract event), or null. */
+            billing_after: string | null;
+        };
+        /** @description 0.12.11 (Q151). Seed: enabled false; chains [request_date, survey_date, layout_received, layout_approved] and [installation_finish, aat_acceptance_date, power_on_date]; billing_after null. */
+        GecolOrderWarnings: components["schemas"]["GecolOrderWarningsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The GECOL date fields a chain may name. */
+            fields: {
+                code: string;
+                label_en: string;
+                label_ar?: string | null;
+            }[];
         };
         RegisterRecordStep: {
             /** Format: uuid */
@@ -10374,6 +11291,27 @@ export interface components {
             section?: string | null;
             required?: boolean;
             can_edit: boolean;
+            /** @description Q225 (0.12.10): the field changes permits or scope, so it is changed by a proposal (`POST /sites/{site_id}/change-proposals`) and its L2 approval, never by `PATCH /sites/{site_id}`. */
+            requires_approval?: boolean;
+        };
+        SiteChangeProposal: {
+            /** @description Field code -> proposed value; null clears. */
+            custom: components["schemas"]["CustomValues"];
+            reason: string;
+        };
+        SiteChangeProposalResult: {
+            items: {
+                field: string;
+                /**
+                 * Format: uuid
+                 * @description The Change Control draft (register `change_control`), in entry.
+                 */
+                record_id: string;
+                change_id: string;
+                /** @description The site's value now as text ('(none)' when empty). */
+                old_value: string;
+                new_value: string;
+            }[];
         };
         RegisterRecordSlots: {
             items: components["schemas"]["DocumentSlot"][];
@@ -11441,12 +12379,19 @@ export interface components {
             progress_pct: number;
             /** @description 0.7.2. Null ("not available") until every measured item has a baseline for all its units. */
             planned_pct?: number | null;
-            /** @description 0.7.2. Actual divided by planned. */
+            /**
+             * @deprecated
+             * @description 0.7.2. Actual divided by planned. Since 0.12.7 the same value as `progress_vs_plan_index` (Q177: it is not an EVM SPI).
+             */
             spi?: number | null;
+            /** @description 0.12.7 (Q177): Actual / Planned over the same items and weights; null while Planned is not available. */
+            progress_vs_plan_index?: number | null;
+            partial_index?: components["schemas"]["PartialPlanIndex"] | null;
             /** @description 0.7.2. Share of the weight whose plan dates are complete. */
             plan_coverage_pct?: number;
             /** @description 0.7.2. Project-wide items left out because the scope is below the whole project (VI-04). */
             central_items_hidden?: number;
+            central_line?: components["schemas"]["CentralLine"] | null;
             /** @description 0.7.2. Active sites behind the figure. */
             sites_in_scope?: number;
             activities: components["schemas"]["ProjectStatusActivity"][];
@@ -11484,10 +12429,57 @@ export interface components {
             kinds?: ("weekly" | "month_end")[];
         };
         /**
-         * @description 0.11.0 (Q127): `weekly` (every Sunday, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).
+         * @description 0.11.0 (Q127): `weekly` (every Thursday since 0.12.7, D186: setting `dashboard.snapshot_weekday` 4, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).
          * @enum {string}
          */
         SnapshotKind: "weekly" | "month_end" | "manual";
+        /**
+         * @description 0.12.7 (Q116): A = progress rings (default), B = flat segmented track.
+         * @enum {string}
+         */
+        PipelineVariant: "A" | "B";
+        /** @description 0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover. */
+        PartialPlanIndex: {
+            value: number | null;
+            coverage_pct: number;
+            actual_pct: number;
+            planned_pct: number;
+        };
+        /** @description 0.12.7 (Q175): the manual central values in force, shown apart from a regional, site or filtered figure (they count in the project-wide figure only). progress_pct weighs each value by its share of the project figure (activity weight x item weight / the item weights of the activity). */
+        CentralLine: {
+            total: number;
+            measured: number;
+            progress_pct?: number | null;
+            items: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                activity_code: string;
+                weight: number;
+                value_pct: number;
+                /** Format: date */
+                effective_date: string;
+                version: number;
+            }[];
+        };
+        ManualPlanPoint: {
+            /** Format: date */
+            date: string;
+            planned_pct: number;
+        };
+        ManualPlan: {
+            /** Format: uuid */
+            id: string;
+            item_code: string;
+            version: number;
+            points: components["schemas"]["ManualPlanPoint"][];
+            reason: string;
+            source: string;
+            /** Format: uuid */
+            entered_by?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
         ManualItemValue: {
             /** Format: uuid */
             id: string;
@@ -11497,6 +12489,10 @@ export interface components {
             /** Format: date */
             effective_date: string;
             reason: string;
+            /** @description 0.12.7 (Q176). */
+            source?: string;
+            /** @description 0.12.7 (Q178): dated before the current month. */
+            historical_correction?: boolean;
             /** Format: uuid */
             entered_by?: string;
             /** Format: date-time */
@@ -11515,6 +12511,10 @@ export interface components {
             /** @description The entry in force today. */
             in_force: boolean;
             entered_by: components["schemas"]["UserRef"];
+            /** @description 0.12.7 (Q176). Entries before migration 0059 read "not recorded (entered before 0059)". */
+            source?: string;
+            /** @description 0.12.7 (Q178). */
+            historical_correction?: boolean;
         };
         ManualItem: {
             item_code: string;
@@ -11530,8 +12530,23 @@ export interface components {
                 /** Format: date */
                 effective_date: string;
                 version: number;
+                source?: string;
             } | null;
             history: components["schemas"]["ManualItemHistoryEntry"][];
+            /** @description 0.12.7 (Q177): the plan in force (latest version), null while the owner has given none. */
+            plan?: {
+                /** Format: uuid */
+                id: string;
+                version: number;
+                points: components["schemas"]["ManualPlanPoint"][];
+                reason: string;
+                source: string;
+                /** Format: date-time */
+                created_at: string;
+                /** @description The planned % of the plan today. */
+                planned_pct_today: number;
+                entered_by: components["schemas"]["UserRef"];
+            } | null;
         };
         ManualItemList: {
             /** Format: date */
@@ -11539,6 +12554,15 @@ export interface components {
             can_edit: boolean;
             /** @description Weighted central items with no value in force today. */
             without_value: number;
+            /** @description 0.12.7 (Q177): weighted central items with no plan. */
+            without_plan?: number;
+            /**
+             * Format: date
+             * @description 0.12.7 (Q178): the first day of the current month; an earlier effective date is a historical correction.
+             */
+            open_period_from?: string;
+            /** @description 0.12.7 (Q178): the caller may enter a historical correction (dashboard.historical_correction edit). */
+            can_correct_history?: boolean;
             items: components["schemas"]["ManualItem"][];
         };
         /**
@@ -11547,6 +12571,19 @@ export interface components {
          */
         DelayParty: "gecol" | "hlc" | "client" | "contractor" | "external" | "aljeel";
         DelayPeriod: {
+            /**
+             * @description 0.12.7 (Q182). Periods recorded before migration 0059 are approved.
+             * @enum {string}
+             */
+            status?: "proposed" | "approved" | "rejected";
+            evidence?: string | null;
+            proposed_by?: components["schemas"]["UserRef"];
+            decided_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_note?: string | null;
+            /** @description 0.12.7: approved, not voided, and (for contractor / external) with its external party (Q184). */
+            counts?: boolean;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -11577,7 +12614,24 @@ export interface components {
              * @description Delay days are the working days after it.
              */
             due_date?: string | null;
+            /** @description Since 0.12.7 the same as can_decide. */
             can_edit: boolean;
+            /** @description 0.12.7: may approve, reject and void. */
+            can_decide?: boolean;
+            /** @description 0.12.7: may propose (L1 too). */
+            can_propose?: boolean;
+            /**
+             * Format: uuid
+             * @description 0.12.7: the caller, so a screen can hide the decision of their own proposal.
+             */
+            me?: string | null;
+            /** @description 0.12.7: the registry of external parties to name one (Q184). */
+            external_parties?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                type: string;
+            }[];
             parties: components["schemas"]["DelayParty"][];
             items: components["schemas"]["DelayPeriod"][];
         };
@@ -11601,6 +12655,10 @@ export interface components {
                 date: string;
                 kind: components["schemas"]["SnapshotKind"];
                 kinds: ("weekly" | "month_end")[];
+                /** @description 0.12.7 (Q186): stored after its own date (a catch-up, or taken by hand for an earlier date); its blocked gates are historically unavailable. */
+                rebuilt?: boolean;
+                /** Format: date-time */
+                taken_at?: string;
             }[];
             /** @description English sentence that says how a past date was made. Null for today. */
             note?: string | null;
@@ -11616,6 +12674,11 @@ export interface components {
             scope_regions?: components["schemas"]["RegionId"][] | null;
             /** @description False since 0.11.0 (Q121). */
             health_draft?: boolean;
+            /** @description 0.12.7 (D16): the health factors not yet approved, each shown with a draft label. */
+            health_draft_factors?: string[];
+            /** @description 0.12.7 (Q186): false when blocked gates cannot be known for the reference date. */
+            blocked_gates_available?: boolean;
+            pipeline_variant?: components["schemas"]["PipelineVariant"];
         };
         DashboardFilters: {
             regions: {
@@ -11640,8 +12703,10 @@ export interface components {
         /** @description One milestone of the pipeline for the reference date. Sites for which the milestone does not apply are counted in `not_applicable` only. */
         DashboardMilestone: components["schemas"]["MilestonePipelineNode"] & {
             stream_code?: string | null;
-            /** @description Open, previous milestone done, and the gate holds it (live only). */
-            blocked?: number;
+            /** @description Open, previous milestone done, and the gate holds it. Null since 0.12.7 when it cannot be known for the date (Q186): a past date, or a snapshot rebuilt after its date. */
+            blocked?: number | null;
+            /** @description 0.12.7 (Q186). */
+            blocked_available?: boolean;
             /** @description Sites whose baseline is due by the reference date. */
             plan?: number;
             /** @description `completed` minus `plan`. */
@@ -11686,8 +12751,13 @@ export interface components {
             applicable?: number;
             /** @enum {string|null} */
             reason?: "not_weighted" | "no_data" | "central_hidden" | "not_applicable" | null;
-            /** @description 0.11.0: a project-wide item measured by a manual percentage (Q118). */
+            /** @description 0.11.0: a project-wide item measured by a manual percentage (Q118). Since 0.12.7 (Q175) it counts in the project-wide figure only; elsewhere `reason` is central_hidden. */
             central?: boolean;
+            /** @description 0.12.7 (Q177): the planned % of the item's plan on the reference date (project-wide only). */
+            plan?: {
+                planned_pct: number;
+                version: number;
+            } | null;
             /** @description 0.11.0 (Q118): the manual value in force on the reference date; null when none. */
             manual?: {
                 value_pct: number;
@@ -11710,11 +12780,22 @@ export interface components {
             progress_pct: number;
             /** @description Null ("not available") until every measured item has a baseline for all its units. */
             planned_pct?: number | null;
+            /**
+             * @deprecated
+             * @description Since 0.12.7 the same value as progress_vs_plan_index.
+             */
             spi?: number | null;
+            /** @description 0.12.7 (Q177): Actual / Planned over the same items; not EVM. */
+            progress_vs_plan_index?: number | null;
+            partial_index?: components["schemas"]["PartialPlanIndex"] | null;
             plan_coverage_pct: number;
             central_items_hidden?: number;
-            /** @description 0.11.0. */
+            /** @description 0.11.0. Since 0.12.7 (Q175) 0 below the whole project. */
             manual_items_measured?: number;
+            /** @description 0.12.7 (Q177). */
+            manual_items_planned?: number;
+            /** @description 0.12.7 (Q175): null for the project-wide figure. */
+            central_line?: components["schemas"]["CentralLine"] | null;
             activities: components["schemas"]["DashboardProjectStatusActivity"][];
         };
         /** @description The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`. */
@@ -11815,7 +12896,12 @@ export interface components {
         DashboardGates: {
             /** @description False for a past reference date: the state of a gate on a past date is not kept. */
             available: boolean;
-            blocked_total: number;
+            /**
+             * @description 0.12.7 (Q186): `snapshot` = the count of a snapshot taken on its own date (no reasons); `historically_unavailable` = cannot be known, `blocked_total` is null.
+             * @enum {string}
+             */
+            status?: "live" | "snapshot" | "historically_unavailable";
+            blocked_total: number | null;
             by_gate?: {
                 gate_code?: string;
                 name_en?: string;
@@ -11885,7 +12971,13 @@ export interface components {
                 /** @description No data: left out and its weight redistributed. */
                 excluded: boolean;
                 contribution: number;
+                /** @description 0.12.7 (D16): the factor is not yet approved by the owner (every factor except D and I; setting dashboard.health_approved_factors). */
+                draft?: boolean;
             }[];
+            /** @description 0.12.7 (D16). */
+            draft_factors?: string[];
+            /** @description 0.12.7 (D16). */
+            approved_factors?: string[];
             by_region: {
                 region_id: components["schemas"]["RegionId"];
                 score: number;
@@ -11893,12 +12985,36 @@ export interface components {
                 band: "green" | "amber" | "red";
             }[];
         };
-        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party, day by day (0.11.0, Q122): the working days after the due date, minus the days of a Change Control suspension of the site, go to the party of the task's attribution period that covers them, otherwise to the external party of the task, its default party type, or unassigned. */
+        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days, day by day (0.11.0, Q122; 0.12.7, Q7, Q180 to Q184): the working days after the due date (rebuilt from the SLA start plus the maximum when there is none), minus the days of a Change Control suspension of the site (effective start to effective resumption, falling back to the approval dates), go to the party of the task's approved attribution period that covers them (a contractor or external one only with its named party); every other day is unattributed, with the task's R party (external party, else default party type) as a suggestion only. A task whose window holds no day is a data gap. */
         DashboardDelay: {
             draft: boolean;
             total_late_working_days: number;
-            /** @description Share of the days on tasks with no external party and no default party type. */
+            /** @description Since 0.12.7 (Q7): share of the days no approved period covers. */
             unattributed_pct: number;
+            /** @description 0.12.7 (Q7): share of the days given to a party by an approved period. */
+            attributed_pct?: number;
+            /** @description 0.12.7. */
+            attributed_working_days?: number;
+            /** @description 0.12.7. */
+            unattributed_working_days?: number;
+            /** @description 0.12.7 (Q181): days of late tasks whose window could not be built. */
+            data_gap_working_days?: number;
+            /** @description 0.12.7 (Q182): unattributed days a pending proposal covers (no effect). */
+            proposed_working_days?: number;
+            /** @description 0.12.7. */
+            proposals_count?: number;
+            /** @description 0.12.7 (Q184): approved contractor / external periods from before 0059 without their party; they do not count. */
+            pending_party_count?: number;
+            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. */
+            scorecard?: {
+                party: string;
+                period_party?: components["schemas"]["DelayParty"];
+                /** Format: uuid */
+                external_party_id?: string | null;
+                party_type?: string | null;
+                late_tasks: number;
+                late_working_days: number;
+            }[];
             /** @description Always 0: overlapping periods of one task are refused at entry. */
             overlapping_periods?: number;
             /** @description True since 0.11.0. */
@@ -11910,10 +13026,24 @@ export interface components {
             /** @description 0.11.0: active periods on the late tasks of the view. */
             periods_count?: number;
             items: {
-                /** @description The external party name, the default party type of the task, the party of the period (its external party name when one is named), or `unassigned`. */
+                /** @description The party of the period (its external party name when one is named), or `unattributed` (0.12.7). */
                 party: string;
-                /** @enum {string} */
-                kind: "period" | "external" | "default_type" | "unassigned";
+                /**
+                 * @description Since 0.12.7 only `period` and `unattributed` are sent; the other three are the 0.11.0 values.
+                 * @enum {string}
+                 */
+                kind: "period" | "unattributed" | "external" | "default_type" | "unassigned";
+                /** @description 0.12.7 (Q181). */
+                data_gap?: boolean;
+                /** @description 0.12.7 (Q7): the R party of the unattributed days, shown as a suggestion, never an attribution. Null for a data gap or a task with no R party. */
+                suggested_party?: {
+                    name: string;
+                    /** @enum {string} */
+                    kind: "external" | "default_type";
+                    /** Format: uuid */
+                    external_party_id?: string | null;
+                    party_type?: string | null;
+                } | null;
                 /** @description 0.11.0: the party of the period when `kind` is `period`. */
                 period_party?: components["schemas"]["DelayParty"] | null;
                 /** Format: uuid */
@@ -15058,6 +16188,36 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["GateEvent"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    proposeSiteChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteChangeProposal"];
+            };
+        };
+        responses: {
+            /** @description The drafts. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteChangeProposalResult"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -18718,6 +19878,106 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getContractorRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setContractorRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ContractorRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getTeamScopeMismatchReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamScopeMismatchReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getContractorsCompletenessReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorsCompletenessReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getNotificationPolicy: {
         parameters: {
             query?: never;
@@ -19382,6 +20642,163 @@ export interface operations {
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    setHlcPurchaseRequests: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The `entity_id` of each Procurement record (scope HLC). */
+                    procurement_entity_ids: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The record, with its `purchase_requests`. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    migrateLegacyHlcRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    dry_run: boolean;
+                    /** @description Required for a run. */
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The preview or the result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HlcLegacyMigration"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listDismantleOrderOptions: {
+        parameters: {
+            query: {
+                site_id: string;
+                record_type: "cw" | "te";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The orders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["DismantleOrderOption"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getGecolOrderWarnings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setGecolOrderWarnings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["GecolOrderWarningsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     listRegisters: {
@@ -20472,6 +21889,12 @@ export interface operations {
                      * @description Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.
                      */
                     task_id?: string;
+                    /**
+                     * @description Q206 (0.12.8): `draft` = Save Draft / Planning (stream templates and the Master sheet only; a register file is always submitted, 422 otherwise).
+                     * @default submit
+                     * @enum {string}
+                     */
+                    mode?: "submit" | "draft";
                 };
             };
         };
@@ -20523,7 +21946,7 @@ export interface operations {
         parameters: {
             query?: {
                 action?: "create" | "update" | "unchanged" | "error";
-                decision?: "pending" | "approved" | "rejected" | "pending_previous_approval";
+                decision?: "pending" | "approved" | "rejected" | "pending_previous_approval" | "saved";
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -20666,6 +22089,354 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMasterImportRuns: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MasterImportRun"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    uploadLegacyMaster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The run, in status `previewed`. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMasterImportRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMasterImportDiffs: {
+        parameters: {
+            query?: {
+                kind?: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+                reason?: string;
+                resolution?: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+                site_code?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Differences in file order. Inside the caller's regions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MasterImportDiff"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportMasterImportDiffs: {
+        parameters: {
+            query?: {
+                kind?: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+                reason?: string;
+                resolution?: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+                site_code?: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The xlsx file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadMasterImportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The xlsx file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyMasterImportRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MasterImportApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"] & {
+                        outcome?: components["schemas"]["MasterImportOutcome"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    resolveMasterImportDiff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                diff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MasterImportDiffResolve"];
+            };
+        };
+        responses: {
+            /** @description The difference. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportDiff"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getTemplateMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mapping. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateMapping"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveTemplateMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description Tested or saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateMappingResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listImportAliases: {
+        parameters: {
+            query?: {
+                kind?: "region" | "role";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aliases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ImportAlias"][];
+                        can_edit: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveImportAlias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportAliasInput"];
+            };
+        };
+        responses: {
+            /** @description The alias. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportAlias"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listGeneratedForms: {
@@ -23377,6 +25148,38 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    setDashboardPipelineVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    variant: components["schemas"]["PipelineVariant"];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The style in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        variant: components["schemas"]["PipelineVariant"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getProjectStatus: {
         parameters: {
             query?: {
@@ -23478,6 +25281,8 @@ export interface operations {
                     /** Format: date */
                     effective_date: string;
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.7 (Q176): where the value comes from, for example a report or a log. */
+                    source?: string;
                 };
             };
         };
@@ -23489,6 +25294,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualItemValue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setManualProjectStatusPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    points?: components["schemas"]["ManualPlanPoint"][];
+                    /** Format: date */
+                    target_date?: string;
+                    /**
+                     * Format: date
+                     * @description Only with target_date, before it.
+                     */
+                    start_date?: string;
+                    reason: components["schemas"]["Reason"];
+                    source: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPlan"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -23541,15 +25387,17 @@ export interface operations {
                     party: components["schemas"]["DelayParty"];
                     /**
                      * Format: uuid
-                     * @description Optional: the contractor or external party by name.
+                     * @description Optional in a proposal; required to approve a contractor or external period (Q184).
                      */
                     external_party_id?: string | null;
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.7 (Q182): what supports the proposal (a reference, a document, a note). */
+                    evidence?: string | null;
                 };
             };
         };
         responses: {
-            /** @description The period. */
+            /** @description The proposed period. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -23561,6 +25409,44 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    decideTaskDelayPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "reject";
+                    note?: string | null;
+                    /** Format: uuid */
+                    external_party_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The decided period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelayPeriod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

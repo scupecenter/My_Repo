@@ -21,6 +21,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
   const upload = useUploadBatch();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [mode, setMode] = useState<'submit' | 'draft'>('submit');
   const [result, setResult] = useState<UploadedBatch | null>(null);
   const [error, setError] = useState<{ text: string; detail?: string; reason?: string } | null>(null);
   const reset = () => { setFile(null); setError(null); setResult(null); upload.reset(); };
@@ -28,7 +29,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
   const send = () => {
     if (!file) return;
     setError(null);
-    upload.mutate({ file, template_id: templateId, task_id: taskId }, {
+    upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' ? 'submit' : mode }, {
       onSuccess: (b) => { if (b.parts?.length || b.warnings?.length) setResult(b); else { reset(); onDone(b); } },
       onError: (e) => setError({
         text: registerErrorMessage(t, e),
@@ -55,6 +56,17 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
                 {kind !== 'register' && <li data-testid="template-upload-rule-tasks">{t('tpl.rule_tasks')}</li>}
                 {kind === 'master' && <li data-testid="template-upload-rule-master">{t('tpl.rule_master')}</li>}
               </ul>
+              {kind !== 'register' && (
+                <fieldset className="space-y-1 text-sm" data-testid="template-upload-mode">
+                  <legend className="font-semibold">{t('tpl.mode')}</legend>
+                  {(['submit', 'draft'] as const).map((m) => (
+                    <label key={m} className="flex items-start gap-2">
+                      <input type="radio" name="tpl-mode" value={m} data-testid={`template-upload-mode-${m}`} checked={mode === m} onChange={() => setMode(m)} />
+                      <span><span className="font-semibold">{t(`tpl.mode_${m}`)}</span><span className="block text-mute">{t(`tpl.mode_${m}_hint`)}</span></span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               <div>
                 <label htmlFor="tpl-file" className="text-sm font-semibold">{t('tpl.file')}</label>
                 <input ref={input} id="tpl-file" type="file" accept=".xlsx" data-testid="template-upload-file" className="input mt-1" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }} />

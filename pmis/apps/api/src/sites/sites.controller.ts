@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -30,6 +30,13 @@ export class SitesController {
     const site = await this.sites.update(auth, id, ifMatch, body);
     res.setHeader('ETag', etagHeader(site.version as number));
     return site;
+  }
+
+  /** Q225: propose a change to a site field that requires approval (one Change Control draft per field). */
+  @Post(':id/change-proposals')
+  @HttpCode(201)
+  propose(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.sites.propose(auth, id, body);
   }
 
   @Get(':id/tasks')

@@ -11,6 +11,7 @@ import { PeopleAdminLayout } from '@/components/PeopleAdmin';
 import { Approvals } from '@/pages/Approvals';
 import { Inbox } from '@/pages/Inbox';
 import { StatusUpdates } from '@/pages/StatusUpdates';
+import { ContractorsReports } from '@/pages/ContractorsReports';
 import { Workload } from '@/pages/Workload';
 import { Dashboard } from '@/pages/Dashboard';
 import { ManualItems } from '@/pages/ManualItems';
@@ -23,6 +24,8 @@ import { MyWork } from '@/pages/MyWork';
 import { RegisterPage } from '@/pages/Register';
 import { RegisterBatch } from '@/pages/RegisterBatch';
 import { TemplatesPage } from '@/pages/Templates';
+import { ReconciliationPage } from '@/pages/Reconciliation';
+import { TemplateMappingPage } from '@/pages/TemplateMapping';
 import { AsBuiltItems } from '@/pages/AsBuiltItems';
 import { Warehouse } from '@/pages/Warehouse';
 import { Site } from '@/pages/Site';
@@ -80,6 +83,7 @@ function gated(session: Session) {
         <Route path="approvals" element={<Approvals />} />
         <Route path="inbox" element={<Inbox />} />
         <Route path="workload" element={<Workload />} />
+        <Route path="reports/contractors" element={<ContractorsReports />} />
         <Route path="status-updates" element={<StatusUpdates />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="dashboard/manual-items" element={<ManualItems />} />
@@ -91,6 +95,8 @@ function gated(session: Session) {
         <Route path="registers/:key/batches/:batchId" element={<RegisterBatch />} />
         <Route path="templates" element={<TemplatesPage />} />
         <Route path="templates/batches/:batchId" element={<RegisterBatch />} />
+        <Route path="templates/master-import" element={<ReconciliationPage />} />
+        <Route path="templates/mapping" element={<TemplateMappingPage />} />
         <Route path="absence" element={<Absence />} />
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:threadId" element={<Messages />} />

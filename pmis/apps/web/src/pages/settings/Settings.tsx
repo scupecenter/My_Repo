@@ -9,9 +9,11 @@ import { SlaRules } from './SlaRules';
 import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
 import { TeamScopeMatch } from './TeamScopeMatch';
+import { GecolOrderWarnings } from './GecolOrderWarnings';
+import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -44,6 +46,8 @@ export function SettingsRoutes() {
         <Route path="documents" element={<DocumentLibrary />} />
         <Route path="team-scope" element={<TeamScopeMatch />} />
         <Route path="lists" element={<Lists />} />
+        <Route path="contractor-rules" element={<ContractorRules />} />
+        <Route path="gecol-order" element={<GecolOrderWarnings />} />
       </Route>
     </Routes>
   );

@@ -64,6 +64,10 @@ import { WeightsController } from './dashboard/weights.controller';
 import { WeightsService } from './dashboard/weights.service';
 import { TeamScopeMatchController } from './settings/team-scope-match.controller';
 import { TeamScopeMatchService } from './settings/team-scope-match.service';
+import { GecolOrderWarningsController } from './settings/gecol-order-warnings.controller';
+import { GecolOrderWarningsService } from './settings/gecol-order-warnings.service';
+import { P4cController } from './registers/p4c.controller';
+import { P4cService } from './registers/p4c.service';
 import { DelegationsController } from './delegations/delegations.controller';
 import { DelegationsService } from './delegations/delegations.service';
 import { DepartmentsController } from './departments/departments.controller';
@@ -104,6 +108,11 @@ import { ScenarioService } from './scenario/scenario.service';
 import { IntegrityService } from './logs/integrity.service';
 import { HealthController, MailController } from './mail/mail.controller';
 import { MailService } from './mail/mail.service';
+import { MappingService } from './master-import/mapping.service';
+import { MasterImportController, TemplateMappingController } from './master-import/master-import.controller';
+import { MasterImportService } from './master-import/master-import.service';
+import { ContractorsController } from './contractors/contractors.controller';
+import { ContractorsService } from './contractors/contractors.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -112,10 +121,12 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
-      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, AuditLogController, SecurityLogController, LogsAdminController,
+      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, P4cController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
+      MasterImportController, TemplateMappingController,
+      ContractorsController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -124,11 +135,13 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
+      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, P4cService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
       { provide: MailPort, useClass: OutboxMail },
+      MasterImportService, MappingService,
+      ContractorsService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

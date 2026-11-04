@@ -1,11 +1,11 @@
-import { Body, Controller, Get, Header, HttpCode, Param, Post, Query, Res, StreamableFile } from '@nestjs/common';
+import { Body, Controller, Get, Header, HttpCode, Param, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { DashboardService } from './dashboard.service';
 import { ProjectStatusService } from './project-status.service';
 
-/** The main dashboard and Project Status (contract tags `dashboard` and `project-status`, 0.7.2; 0.11.0 for the owner answers Q118 to Q127). */
+/** The main dashboard and Project Status (contract tags `dashboard` and `project-status`, 0.7.2; 0.11.0 for the owner answers Q118 to Q127; 0.12.7 for P2 of the answers of 2026-11-04). */
 @Controller()
 export class DashboardController {
   constructor(
@@ -27,6 +27,12 @@ export class DashboardController {
     return new StreamableFile(f.body);
   }
 
+  /** Q116: the pipeline style (A rings, B flat segmented track), set by a System Admin or a dashboard administer holder. */
+  @Put('dashboard/pipeline-variant')
+  setPipelineVariant(@Auth() auth: AuthContext, @Body() body: unknown) {
+    return this.dash.setPipelineVariant(auth, body);
+  }
+
   @Get('project-status')
   projectStatus(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.ps.get(auth, q);
@@ -46,5 +52,11 @@ export class DashboardController {
   @HttpCode(201)
   addManualValue(@Auth() auth: AuthContext, @Param('item_code') item: string, @Body() body: unknown) {
     return this.ps.addManualValue(auth, item, body);
+  }
+
+  @Post('project-status/manual-items/:item_code/plan')
+  @HttpCode(201)
+  setManualPlan(@Auth() auth: AuthContext, @Param('item_code') item: string, @Body() body: unknown) {
+    return this.ps.setManualPlan(auth, item, body);
   }
 }
