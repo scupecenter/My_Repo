@@ -3723,17 +3723,96 @@ export interface paths {
         };
         /**
          * Team specialization / scope match of Procurement (Q97)
-         * @description 0.9.1. The rows are the order scopes, the columns the team specializations, each cell allowed yes / no. A scope marked `exempt` is not checked
-         *     (seed: HLC, whose request has no contractor team). Reading needs the Settings screen (`admin.settings` view).
+         * @description 0.9.1, 0.12.9. The rows are the order scopes, the columns the codes of the specialization catalogue (Q143), each cell allowed yes / no; a row may
+         *     also allow a functional group (CW, TE), which accepts every code of that group. `exempt` means that the order needs no team; a named team is
+         *     always checked (Q144, seed: HLC accepts a Fiber team). Reading needs the Settings screen (`admin.settings` view), or, read-only, `procurement`
+         *     or `contractors` view (Q147); `can_edit` tells whether the caller may save.
          */
         get: operations["getTeamScopeMatch"];
         /**
          * Replace the team specialization / scope match (reason, If-Match, audited)
-         * @description 0.9.1. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. Field-level errors: `unknown_key`,
-         *     `duplicate` (a specialization or a scope listed twice; specializations compare case-insensitively), `unknown_specialization` (an allowed value
-         *     that is not one of the columns), `invalid`, `too_many`. Records already approved are not re-checked; drafts are checked again at submit.
+         * @description 0.9.1, 0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. The whole table is replaced. `specializations` lists the
+         *     active columns in order: each is a catalogue code, label or alias, or a new name that becomes a new code; a code not listed is deactivated, never
+         *     deleted. `catalogue` (optional) edits the labels, the group and the aliases of listed codes. A change that affects eligibility needs a fresh
+         *     step-up (401 `step_up_required`, checked in the database); labels alone do not. Field-level errors: `unknown_key`, `duplicate`,
+         *     `unknown_specialization` (an allowed value that is not one of the columns), `is_a_group` (CW or TE named as a column), `name_clash` (a name of
+         *     two codes), `not_a_column`, `invalid`, `too_many`. Records already approved are not re-checked (they are listed by
+         *     `GET /reports/team-scope-mismatch`); drafts are checked again at submit.
          */
         put: operations["setTeamScopeMatch"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/contractor-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contractor rules (certificate alert lead time, alert roles, CW Delivery Model, internal team types, closed order statuses)
+         * @description 0.12.9 (Q145, Q147, D145b). Needs the Settings screen (`admin.settings` view).
+         */
+        get: operations["getContractorRules"];
+        /**
+         * Save the contractor rules (reason, If-Match, audited)
+         * @description 0.12.9. System Admin, or a delegation of `admin.settings` edit for all regions. A change of `cw_delivery_scopes` or `internal_team_types` decides
+         *     eligibility and needs a fresh step-up (401 `step_up_required`, Q147); the lead days, the roles and the closed statuses do not. Field errors:
+         *     `unknown_key`, `out_of_range`, `invalid`, `unknown_role`, `unknown_scope`. Audited as `contractor_rules_update` with before and after.
+         */
+        put: operations["setContractorRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/team-scope-mismatch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Running Procurement orders that no longer match their team, contract or site (Q145)
+         * @description 0.12.9. Approved orders are never changed; this lists the running ones (order status not in `ContractorRules.closed_order_statuses`) that have a
+         *     problem today: `specialization_mismatch`, `team_inactive`, `party_inactive`, `no_active_contract`, `stop_work` (an active Stop Work on the site,
+         *     Permits & HSE) with severity `eligibility`, and `safety_cert_expired` with severity `info` (D145b: information only). Needs `procurement` view; the
+         *     rows are those of the caller's Procurement regions (B3). The daily job alerts Procurement once per order and `eligibility` problem.
+         */
+        get: operations["getTeamScopeMismatchReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/contractors-completeness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contractors data to complete (Q142, Q110)
+         * @description 0.12.9. Active teams without a specialization (`no_specialization`), with an old text that is no catalogue specialization
+         *     (`unknown_specialization`), with a safety certificate expired or due within the lead days (`safety_cert_expired`, `safety_cert_due`; information
+         *     only); active parties to review (`type_review`: the Company Type was not a known type) or without an active contract today
+         *     (`no_active_contract`); contracts without a scope list (`scope_not_specified`: the company record's own contract) or past their end date while
+         *     active (`past_end_date`). Needs `contractors` view (the register is global).
+         */
+        get: operations["getContractorsCompletenessReport"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -9527,24 +9606,149 @@ export interface components {
             /** @description An order scope of Procurement (the scope list), for example CW or TE Installation. */
             scope: string;
             /**
-             * @description true = no team check for this scope (seed: HLC).
+             * @description 0.12.9: true = the order needs no team (seed: HLC); a named team is still checked (Q144).
              * @default false
              */
             exempt: boolean;
-            /** @description The specializations whose teams may take an order of this scope. Empty = no team is accepted. */
+            /** @description The specialization codes whose teams may take an order of this scope (a label or alias is accepted on input). Empty with no group = no team is accepted. */
             allowed: string[];
+            /** @description 0.12.9 (Q143): the functional groups whose every specialization may take an order of this scope, including codes added later. */
+            allowed_groups?: components["schemas"]["SpecializationGroup"][];
+        };
+        /** @enum {string} */
+        SpecializationGroup: "CW" | "TE";
+        TeamSpecialization: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            group?: components["schemas"]["SpecializationGroup"] | null;
+            /** @description Other names (an old Master value, a spelling) that resolve to this code. */
+            aliases?: string[];
+            /** @description false = not a column any more (kept, never deleted). */
+            readonly is_active?: boolean;
         };
         TeamScopeMatchInput: {
-            /** @description The columns, in order: the team specializations of the Contractors register (compared trimmed and case-insensitively). */
+            /** @description 0.12.9: the active columns, in order: catalogue codes (or a label or alias of one); a new name becomes a new code; a code that is not listed is deactivated. CW and TE are groups, not columns. */
             specializations: string[];
             scopes: components["schemas"]["TeamScopeMatchRow"][];
+            /** @description 0.12.9, optional: labels, group and aliases of listed codes. */
+            catalogue?: components["schemas"]["TeamSpecialization"][];
         };
-        /** @description 0.9.1 (Q97). Seed: CW, Tower Erection, Site Adaption, CW Dismantle and GECOL allow CW; TE Installation allows TE; TE Dismantle allows CW and TE; STA and ST allow none; HLC is exempt. */
+        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. */
         TeamScopeMatch: components["schemas"]["TeamScopeMatchInput"] & {
+            groups: components["schemas"]["SpecializationGroup"][];
+            version: number;
+            /** @description 0.12.9: the caller may save (System Admin or admin.settings edit for all regions); Procurement and Contractors read only. */
+            can_edit: boolean;
+            /** Format: date-time */
+            updated_at?: string;
+            updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ContractorRulesInput: {
+            /** @description D145b: days before the safety certificate expiry at which the team lead and Procurement are alerted (default 30). Information only. */
+            safety_cert_lead_days: number;
+            /** @description Role codes whose holders get the certificate and mismatch alerts ("Procurement"; default PROC_TEAM). Nobody: the System Admins. */
+            recipient_roles: string[];
+            /** @description Q147: the order scopes of the CW Delivery Model (default CW, Tower Erection, Site Adaption, CW Dismantle). */
+            cw_delivery_scopes: string[];
+            /** @description Q147: the Team Type values of an internal (Aljeel) team for an In-House order (default Internal, In-House). */
+            internal_team_types: string[];
+            /** @description Q145: the order statuses that end an order (default Closed, Cancelled, Completed). */
+            closed_order_statuses: string[];
+        };
+        ContractorRules: components["schemas"]["ContractorRulesInput"] & {
             version: number;
             /** Format: date-time */
             updated_at?: string;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        ContractorProblem: {
+            /** @enum {string} */
+            code: "specialization_mismatch" | "team_inactive" | "party_inactive" | "no_active_contract" | "stop_work" | "safety_cert_expired";
+            /**
+             * @description `info` never blocks (D145b).
+             * @enum {string}
+             */
+            severity: "eligibility" | "info";
+            message: string;
+        };
+        NamedRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+        };
+        TeamScopeMismatchRow: {
+            /**
+             * Format: uuid
+             * @description The approved version in force.
+             */
+            record_id: string;
+            /** Format: uuid */
+            entity_id: string;
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            region_id: number;
+            scope: string | null;
+            delivery?: string | null;
+            order_status?: string | null;
+            team?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                specializations: string[];
+            } | null;
+            party?: components["schemas"]["NamedRef"] | null;
+            problems: components["schemas"]["ContractorProblem"][];
+            /** @description The match table version the order was checked under at submit (Q145). */
+            checked_match_version?: number | null;
+        };
+        TeamScopeMismatchReport: {
+            /** Format: date */
+            as_of: string;
+            match_version: number;
+            items: components["schemas"]["TeamScopeMismatchRow"][];
+        };
+        ContractorsCompletenessReport: {
+            /** Format: date */
+            as_of: string;
+            teams: {
+                /** Format: uuid */
+                team_id: string;
+                name: string;
+                party: components["schemas"]["NamedRef"];
+                /** Format: uuid */
+                record_id?: string | null;
+                specialization_text?: string | null;
+                /** Format: date */
+                safety_cert_expiry?: string | null;
+                issues: ("no_specialization" | "unknown_specialization" | "safety_cert_expired" | "safety_cert_due")[];
+            }[];
+            parties: {
+                /** Format: uuid */
+                party_id: string;
+                name: string;
+                type: string;
+                company_type?: string | null;
+                /** Format: uuid */
+                record_id?: string | null;
+                issues: ("type_review" | "no_active_contract")[];
+            }[];
+            contracts: {
+                /** Format: uuid */
+                contract_id: string;
+                party: components["schemas"]["NamedRef"];
+                contract_ref?: string | null;
+                /** @enum {string} */
+                origin: "company" | "contract";
+                /** Format: date */
+                start_date?: string | null;
+                /** Format: date */
+                end_date?: string | null;
+                /** @enum {string} */
+                status: "active" | "suspended" | "terminated" | "expired";
+                issues: ("scope_not_specified" | "past_end_date")[];
+            }[];
         };
         IdleTaskAlertSetting: {
             enabled: boolean;
@@ -19386,6 +19590,106 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getContractorRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setContractorRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["ContractorRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorRules"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getTeamScopeMismatchReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamScopeMismatchReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getContractorsCompletenessReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContractorsCompletenessReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getNotificationPolicy: {
