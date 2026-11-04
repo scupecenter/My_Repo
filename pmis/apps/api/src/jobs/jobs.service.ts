@@ -17,6 +17,8 @@ export interface DailyJobResult {
   snapshots?: number;
   /** P4b (migration 0061): team safety certificate alerts (D145b, information only) and running-order mismatch alerts (Q145) written by this run */
   contractorAlerts?: number;
+  /** Q245 (migration 0067): 1 when calendar.official_confirmed was reset because a new year began (job_runs row `calendar_year_reset`, audited) */
+  calendarReset?: number;
 }
 
 /** The wall-clock parts of an instant in a time zone, and the zone's offset from UTC at that instant (milliseconds). */
@@ -111,12 +113,14 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
         if (snapshots > 0) result.snapshots = snapshots;
         const alerts = await this.contractorAlerts();
         if (alerts > 0) result.contractorAlerts = alerts;
+        const reset = await this.calendarYearReset();
+        if (reset > 0) result.calendarReset = reset;
       }
       this.lastRun = { at: new Date(), result };
-      await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) : null, null,
-        result ? { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0, contractor_alerts: result.contractorAlerts ?? 0 } : { reason: 'locked' });
-      if (result && (result.slaApplied > 0 || result.reminders > 0 || (result.snapshots ?? 0) > 0)) {
-        await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0 });
+      await this.runs.finish(run, result ? 'ok' : 'skipped', result ? result.slaApplied + result.reminders + (result.snapshots ?? 0) + (result.contractorAlerts ?? 0) + (result.calendarReset ?? 0) : null, null,
+        result ? { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0, contractor_alerts: result.contractorAlerts ?? 0, calendar_reset: result.calendarReset ?? 0 } : { reason: 'locked' });
+      if (result && (result.slaApplied > 0 || result.reminders > 0 || (result.snapshots ?? 0) > 0 || (result.calendarReset ?? 0) > 0)) {
+        await this.syslog.write('info', 'daily job ran', { sla_applied: result.slaApplied, holiday_reminders: result.reminders, dashboard_snapshot_sites: result.snapshots ?? 0, calendar_reset: result.calendarReset ?? 0 });
       }
       return result;
     } catch (e) {
@@ -163,6 +167,21 @@ export class JobsService implements OnApplicationBootstrap, OnModuleDestroy {
       await this.syslog.write('error', 'contractor alerts failed', { error: message });
       return 0;
     }
+  }
+
+  /**
+   * Q245 (migration 0067): the setting calendar.official_confirmed goes back to false when a new year began (1 January, Africa/Tripoli), so the "calendar not
+   * confirmed" banner returns until the new year's dates are confirmed. A job of its own: its own job_runs row `calendar_year_reset` (rows = 1 when it reset)
+   * and an audit row written by the database; a failure is logged and leaves the other steps alone.
+   */
+  private async calendarYearReset(): Promise<number> {
+    const n = await this.runs.run('calendar_year_reset', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT cal_official_confirmed_reset() AS n`)[0]?.n ?? 0));
+    if (n === null) {
+      this.log.warn('calendar year reset failed');
+      await this.syslog.write('error', 'calendar year reset failed', {});
+      return 0;
+    }
+    return n;
   }
 
   private async timeZone(): Promise<string> {

@@ -150,6 +150,29 @@ const movementInput = z
     lines: z.array(line).min(1).max(500),
   })
   .strict();
+// Q270 (migration 0067): a quarantine exit takes quarantined stock out again. repaired = back to the available stock (ADJ), written_off = gone (ADJ),
+// returned_to_supplier = out to the vendor (DN to the vendor, record type sup_dn). A reason is required; the document is approved by L2 like any other.
+const EXIT_KINDS = ["repaired", "written_off", "returned_to_supplier"] as const;
+const exitLine = z
+  .object({
+    item_id: z.string().uuid(),
+    qty: z.number().positive(),
+    serials: z.array(z.string().trim().min(1).max(80)).max(5000).optional(),
+  })
+  .strict();
+const exitInput = z
+  .object({
+    exit_kind: z.enum(EXIT_KINDS),
+    reason: z.string().trim().min(3).max(500),
+    doc_no: z.string().trim().min(1).max(80).optional(),
+    doc_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    remark: z.string().trim().min(1).max(2000).optional(),
+    lines: z.array(exitLine).min(1).max(500),
+  })
+  .strict();
 const cancelInput = z
   .object({ reason, confirm_text: z.string().optional() })
   .passthrough();
@@ -201,6 +224,8 @@ interface MovementRow {
   doc_no_locked: boolean;
   sequence_key: string | null;
   doc_date: string | null;
+  exit_kind: string | null;
+  exit_reason: string | null;
   lines: unknown;
   ts: string;
 }
@@ -210,7 +235,8 @@ const MOVEMENT_SELECT = Prisma.sql`
     m.created_by::text AS created_by, m.created_at, m.posted_at, m.version,
     (SELECT r.data ->> 'doc_no' FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1) AS doc_no,
     (SELECT r.id::text FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1) AS register_record_id,
-    (m.status = 'posted' AND m.doc_no IS NOT NULL) AS doc_no_locked, m.sequence_key,
+    (m.status = 'posted' AND m.doc_no IS NOT NULL) AS doc_no_locked, m.sequence_key, m.exit_kind,
+    CASE WHEN m.exit_kind IS NULL THEN NULL ELSE (SELECT r.data ->> 'exit_reason' FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1) END AS exit_reason,
     coalesce(m.doc_date::text, (SELECT r.data ->> 'doc_date' FROM register_records r WHERE r.entity_id = m.entity_id ORDER BY r.version_no DESC LIMIT 1)) AS doc_date,
     (m.status = 'pending' AND (m.kind = 'issue' OR (m.kind = 'adjustment' AND EXISTS (SELECT 1 FROM wh_movement_lines x WHERE x.movement_id = m.id AND x.qty < 0)))) AS reserved,
     coalesce((SELECT jsonb_agg(jsonb_build_object('item_id', l.item_id, 'item_code', w.item_code, 'description', w.name, 'uom', w.unit, 'qty', l.qty::float8,
@@ -415,10 +441,12 @@ export class WarehouseService {
         pending_return: number;
         available: number;
         quarantine: number;
+        quarantine_pending: number;
       }[]
     >(Prisma.sql`
       SELECT s.item_id::text AS item_id, i.item_code, i.name AS item_name, i.unit AS uom, s.on_hand::float8 AS on_hand, s.reserved::float8 AS reserved,
-        s.pending_issue::float8 AS pending_issue, s.pending_return::float8 AS pending_return, s.available::float8 AS available, s.quarantine::float8 AS quarantine
+        s.pending_issue::float8 AS pending_issue, s.pending_return::float8 AS pending_return, s.available::float8 AS available, s.quarantine::float8 AS quarantine,
+        s.quarantine_pending::float8 AS quarantine_pending
       FROM wh_stock_levels(${item ?? null}::uuid, ${site ?? null}::uuid) s JOIN warehouse_items i ON i.id = s.item_id
       WHERE ${Prisma.join(conds, " AND ")} ORDER BY i.item_code COLLATE "C" LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
@@ -450,6 +478,8 @@ export class WarehouseService {
       doc_no_locked: r.doc_no_locked,
       sequence_key: r.sequence_key,
       doc_date: r.doc_date,
+      exit_kind: r.exit_kind,
+      exit_reason: r.exit_reason,
       register_record_id: r.register_record_id,
       lines: r.lines,
       reserved: r.reserved,
@@ -491,12 +521,13 @@ export class WarehouseService {
     }
     const kind = oneParam(q, "kind");
     if (kind !== undefined) {
-      if (!["issue", "return", "receipt", "adjustment"].includes(kind))
+      if (!["issue", "return", "receipt", "adjustment", "quarantine_exit"].includes(kind))
         throw problems.validation([
           {
             path: "/kind",
             code: "invalid",
-            message: "kind is issue, return, receipt or adjustment.",
+            message:
+              "kind is issue, return, receipt, adjustment or quarantine_exit.",
           },
         ]);
       conds.push(Prisma.sql`m.kind = ${kind}`);
@@ -600,6 +631,23 @@ export class WarehouseService {
     const id = await this.call<string>(
       auth,
       Prisma.sql`SELECT wh_create_movement(${b.record_type}::text, ${b.site_id ?? null}::uuid, ${JSON.stringify(data)}::jsonb, ${JSON.stringify(b.lines)}::jsonb)::text AS r`,
+    );
+    return this.getMovement(auth, id);
+  }
+
+  /** Q270: POST /warehouse/quarantine-exits. The database checks the grant, the quarantined quantity and the serials; L2 approves through the register record. */
+  async createQuarantineExit(
+    auth: AuthContext,
+    raw: unknown,
+  ): Promise<Record<string, unknown>> {
+    await this.access.requireModuleView(auth, "warehouse");
+    const b = parse(exitInput, raw);
+    const data: Record<string, unknown> = { exit_reason: b.reason };
+    for (const k of ["doc_no", "doc_date", "remark"] as const)
+      if (b[k] !== undefined) data[k] = b[k];
+    const id = await this.call<string>(
+      auth,
+      Prisma.sql`SELECT wh_create_quarantine_exit(${b.exit_kind}::text, ${JSON.stringify(data)}::jsonb, ${JSON.stringify(b.lines)}::jsonb)::text AS r`,
     );
     return this.getMovement(auth, id);
   }

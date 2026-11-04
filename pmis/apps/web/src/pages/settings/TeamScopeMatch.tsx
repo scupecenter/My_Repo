@@ -34,9 +34,11 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
   if (!cur) return <section className="card p-4" data-testid="page-team-scope">…</section>;
   const editable = !readOnly && !!q.data?.can_edit;
   const spec = (code: string) => cur.catalogue.find((c) => c.code === code);
+  // 0.13.0 (Q292): a specialization may belong to both groups (Dismantle is CW and TE); `group` is only the first one
+  const groupsOf = (code: string): SpecializationGroup[] => { const c = spec(code); return c?.groups ?? (c?.group ? [c.group] : []); };
   const label = (code: string) => { const c = spec(code); return (i18n.language === 'ar' && c?.label_ar) || c?.label_en || code; };
   // columns: CW group first, then TE, then the codes without a group
-  const cols = [...cur.specializations].sort((a, b) => { const r = (c: string) => { const g = spec(c)?.group; return g === 'CW' ? 0 : g === 'TE' ? 1 : 2; }; return r(a) - r(b); });
+  const cols = [...cur.specializations].sort((a, b) => { const r = (c: string) => { const g = groupsOf(c)[0]; return g === 'CW' ? 0 : g === 'TE' ? 1 : 2; }; return r(a) - r(b); });
 
   const toggle = (scope: string, code: string, on: boolean) => setDraft({
     ...cur, scopes: cur.scopes.map((s) => (s.scope !== scope ? s : { ...s, allowed: on ? [...s.allowed, code] : s.allowed.filter((x) => x !== code) })),
@@ -49,7 +51,7 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
     if (!v || cur.catalogue.some((c) => cur.specializations.includes(c.code) && [c.code, c.label_en, c.label_ar ?? '', ...(c.aliases ?? [])].some((x) => x && norm(x) === norm(v)))) return;
     const known = cur.catalogue.find((c) => [c.code, c.label_en, c.label_ar ?? '', ...(c.aliases ?? [])].some((x) => x && norm(x) === norm(v)));
     if (known) setDraft({ ...cur, specializations: [...cur.specializations, known.code] });   // an inactive code comes back
-    else setDraft({ ...cur, specializations: [...cur.specializations, v], catalogue: [...cur.catalogue, { code: v, label_en: v, label_ar: null, group: null, aliases: [], is_new: true }] });
+    else setDraft({ ...cur, specializations: [...cur.specializations, v], catalogue: [...cur.catalogue, { code: v, label_en: v, label_ar: null, group: null, groups: [], aliases: [], is_new: true }] });
     setNewSpec('');
   };
   const addScope = () => {
@@ -75,7 +77,7 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
               {cols.map((code) => (
                 <th key={code} className="p-2 text-center" data-testid={`tsm-col-${code}`}>
                   <span className="inline-flex items-center gap-1">{label(code)}
-                    {spec(code)?.group && <span className="chip px-1 text-[10px]">{spec(code)!.group}</span>}
+                    {groupsOf(code).length > 0 && <span className="chip px-1 text-[10px]">{groupsOf(code).join(' + ')}</span>}
                     {editable && <button type="button" className="btn btn-ghost p-0.5" aria-label={t('scopeMatch.remove', { name: label(code) })} data-testid={`tsm-remove-col-${code}`}
                       onClick={() => setDraft({ ...cur, specializations: cur.specializations.filter((x) => x !== code), scopes: cur.scopes.map((s) => ({ ...s, allowed: s.allowed.filter((x) => x !== code) })) })}><X size={12} /></button>}
                   </span>
@@ -104,11 +106,12 @@ export function TeamScopeMatch({ readOnly = false }: { readOnly?: boolean }) {
                   </td>
                 ))}
                 {cols.map((code) => {
-                  const viaGroup = !!spec(code)?.group && s.allowed_groups.includes(spec(code)!.group!);
+                  const viaGroupName = groupsOf(code).find((g) => s.allowed_groups.includes(g));
+                  const viaGroup = !!viaGroupName;
                   return (
                     <td key={code} className="p-2 text-center">
                       <input type="checkbox" data-testid={`tsm-cell-${s.scope}-${code}`} disabled={!editable || viaGroup} aria-label={t('scopeMatch.cell', { specialization: label(code), scope: s.scope })}
-                        title={viaGroup ? t('scopeMatch.via_group', { group: spec(code)!.group }) : undefined}
+                        title={viaGroup ? t('scopeMatch.via_group', { group: viaGroupName }) : undefined}
                         checked={viaGroup || s.allowed.includes(code)} onChange={(e) => toggle(s.scope, code, e.target.checked)} />
                     </td>
                   );

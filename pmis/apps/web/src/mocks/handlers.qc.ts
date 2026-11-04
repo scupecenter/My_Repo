@@ -293,6 +293,8 @@ export const qcHandlers = [
     if (!['accept', 'reject'].includes(b.decision ?? '') || (b.note ?? '').trim().length < 3) return fields({ path: '/note', code: 'required' });
     const v = view(h.s);
     if (!v.allowed_actions!.includes('decide_evidence')) return problem(403, v.approval_blocked || [h.s.raised_by?.id, h.s.fixed_by?.id].includes(me().id) ? 'self_approval_forbidden' : 'not_eligible_holder', 'Only L2 decides');
+    // contract 0.13.2 (Q265): accepting the evidence needs step-up, like the closure; rejecting does not
+    if (b.decision === 'accept' && !stepUpValid()) return stepUp();
     const next = update(h.s.id, (s) => ({ ...s, version: s.version + 1, photos: s.photos!.map((p) => p.id !== params.photo ? p
       : { ...p, status: b.decision === 'accept' ? 'accepted' : 'rejected', evidence_note: b.note!.trim(), reject_reason: b.decision === 'accept' ? null : b.note!.trim() }) }))!;
     return tagged(next);

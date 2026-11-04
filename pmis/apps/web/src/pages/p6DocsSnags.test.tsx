@@ -6,6 +6,7 @@ import { api, ApiError } from '@/api/client';
 import type { DocumentsQcSettings, SnagSeverityList } from '@/api/qc';
 import { SlotList } from '@/components/DocSlots';
 import { snagError } from '@/components/SiteSnags';
+import { db, save } from '@/mocks/db';
 import { resetQcMocks } from '@/mocks/handlers.qc';
 import { siteIdOf } from '@/mocks/sites';
 import { renderApp, signIn } from '@/test/utils';
@@ -69,6 +70,7 @@ describe('P6: QC snags', () => {
     expect(await screen.findAllByTestId(/^snag-photo-pending-/)).toHaveLength(1);
     cleanup();
     await signIn('pm');
+    db().session!.stepupAt = Date.now(); save();   // contract 0.13.2 (Q265): accepting pending evidence needs a recent step-up, like the closure
     renderApp(<SiteAt />, { route: `/sites/${SITE}?tab=snags` });
     const prompt = vi.spyOn(window, 'prompt').mockReturnValue('camera clock was wrong');
     const accept = (await screen.findAllByTestId(/^snag-evidence-accept-/))[0]!;

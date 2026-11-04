@@ -78,6 +78,12 @@ sudo -u gsdn-pmis bash -c 'set -a; . /etc/gsdn-pmis/backup.env; export RESTIC_PA
 
 Each run writes a `job_runs` row named `files_backup` (visible in Logs > Job runs).
 
+**The integrity anchors travel with the files (Q257).** The service reads `/etc/gsdn-pmis/pmis.env`, so the backup also copies the directory
+`LOG_ANCHOR_DIR` (the installer writes `/var/lib/gsdn-pmis/log-anchors`) as a second path of the same snapshot. These files hold the chain head
+hash of every integrity check; with the copy off the server and the mail of each head hash to the System Admins, the anchor exists in places the
+database cannot rewrite. If `LOG_ANCHOR_DIR` is unset or missing, the backup is still taken and says so in the journal. The smoke test is
+`bash infra/backup/test-files-backup.sh`.
+
 ## 4. Re-encrypt the files that were stored before this release
 
 Files stored before migration 0048 are plain. Encrypt them once. The step is idempotent: a second run skips what is done.
@@ -129,7 +135,9 @@ sudo bash -c 'set -a; . /etc/gsdn-pmis/backup.env; set +a; RESTIC_PASSWORD_FILE=
 ```
 
 The restored tree keeps the absolute path of the backed-up directory (restic stores paths), so the files are under
-`/var/restore/gsdn-files/<STORAGE_DIR path>` (or `<staging path>` for MinIO). Note the path that printed.
+`/var/restore/gsdn-files/<STORAGE_DIR path>` (or `<staging path>` for MinIO). Note the path that printed. The integrity anchors are in the same
+tree under `<LOG_ANCHOR_DIR path>` (`anchor-audit.jsonl`, `anchor-security.jsonl`): the last line of each must carry the head hash that the System
+Admins received by mail for that check.
 
 ```bash
 b. Restore the database from the dump taken the same day (a scratch database, never the live one)

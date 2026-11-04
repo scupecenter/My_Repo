@@ -1,8 +1,8 @@
 import type { AsBuiltItem, SiteDispatch, StockLevel, StockMovement, WarehouseConfigGaps, WarehouseItem } from '@/api/types';
 import { siteMeta } from './sites';
 
-/** Mock Warehouse (item master, DN/RN movements, stock) and As-Built items, in the shapes of contract 0.4.8 and 0.12.1 (P7: quarantine, code source, need
- * status, numbering lock, TE dispatch, missing configuration; synthetic data). */
+/** Mock Warehouse (item master, DN/RN movements, stock) and As-Built items, in the shapes of contract 0.4.8, 0.12.1 (P7: quarantine, code source, need
+ * status, numbering lock, TE dispatch, missing configuration) and 0.13.1 (Q270: quarantine exits, pending quarantine; synthetic data). */
 const id = (p: string, n: number) => `${p}0000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const item = (n: number, code: string, name_en: string, name_ar: string, uom: string, category: string | null, serial_tracked: boolean): WarehouseItem =>
   ({ id: id('b', n), code, name_en, name_ar, uom, category, serial_tracked, is_active: true, version: 1, as_built_item_code: null, code_source: 'master', need_rules: [] });
@@ -24,9 +24,9 @@ export function initWarehouse() {
   items[2]!.need_rules = [{ need_unit: 'Router', quantity: 1, status: 'confirmed', quantity_rule: { per: 'te_site', group: 'ROUTER' }, applies_when: { scope: ['te_full', 'router_only'] } }];
   items[1]!.code_source = 'internal_provisional';
   const stock: StockLevel[] = [
-    { item_id: items[0]!.id, item_code: 'ANT-900', item_name: items[0]!.name_en, uom: 'pcs', site_id: null, on_hand: 40, reserved: 6, pending_issue: 6, pending_return: 0, available: 34, quarantine: 2 },
-    { item_id: items[1]!.id, item_code: 'CBL-FEED', item_name: items[1]!.name_en, uom: 'm', site_id: null, on_hand: 1200, reserved: 0, pending_issue: 0, pending_return: 100, available: 1200, quarantine: 0 },
-    { item_id: items[2]!.id, item_code: 'RRU-3', item_name: items[2]!.name_en, uom: 'pcs', site_id: null, on_hand: 3, reserved: 0, pending_issue: 0, pending_return: 0, available: 3, quarantine: 0 },
+    { item_id: items[0]!.id, item_code: 'ANT-900', item_name: items[0]!.name_en, uom: 'pcs', site_id: null, on_hand: 40, reserved: 6, pending_issue: 6, pending_return: 0, available: 34, quarantine: 2, quarantine_pending: 0 },
+    { item_id: items[1]!.id, item_code: 'CBL-FEED', item_name: items[1]!.name_en, uom: 'm', site_id: null, on_hand: 1200, reserved: 0, pending_issue: 0, pending_return: 100, available: 1200, quarantine: 0, quarantine_pending: 0 },
+    { item_id: items[2]!.id, item_code: 'RRU-3', item_name: items[2]!.name_en, uom: 'pcs', site_id: null, on_hand: 3, reserved: 0, pending_issue: 0, pending_return: 0, available: 3, quarantine: 0, quarantine_pending: 0 },
   ];
   const movements = [
     mv(1, 'DN-2026-0101', 'te_dn', 'issue', 'pending', 'TR101', 1, 'ANT-900', 6),

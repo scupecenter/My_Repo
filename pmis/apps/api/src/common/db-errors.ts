@@ -196,6 +196,12 @@ export function mapDbError(e: unknown): ProblemException | null {
         errors: path ? [{ path, code: 'invalid', message: 'This value is not valid.' }] : [],
       });
     }
+    case '23P01':
+      // Q300 (migration 0066): the deferred check against overlapping assignments (same person and role, dates, a shared region and a shared top-level module)
+      if (/overlaps assignment/i.test(msg)) {
+        return new ProblemException(409, 'already_assigned', { detail: 'The person already holds this role for an overlapping region and module in that period.' });
+      }
+      return null;
     case '23503':
       return new ProblemException(409, 'invalid_transition', { detail: 'The change conflicts with related data.' });
     case 'P0001': {

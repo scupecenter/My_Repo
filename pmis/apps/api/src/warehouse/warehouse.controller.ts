@@ -123,6 +123,19 @@ export class WarehouseController {
     return r;
   }
 
+  // Q270 (migration 0067): the three movements that take quarantined stock out again.
+  @Post("quarantine-exits")
+  @HttpCode(201)
+  async createQuarantineExit(
+    @Auth() auth: AuthContext,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.wh.createQuarantineExit(auth, body);
+    res.setHeader("ETag", etagHeader(r.version as number));
+    return r;
+  }
+
   @Get("movements/:id")
   async movement(
     @Auth() auth: AuthContext,

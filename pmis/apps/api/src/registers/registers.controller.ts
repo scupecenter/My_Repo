@@ -96,6 +96,13 @@ export class RegistersController {
     return this.tag(res, await this.registers.void(auth, key, id, ifMatch, body));
   }
 
+  // Q267 (contract 0.13.2): a System Admin cancels an approved Quality snag record entered by mistake
+  @Post('quality/records/:id/cancel-snag')
+  @HttpCode(200)
+  async cancelSnag(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.registers.cancelSnagRecord(auth, id, ifMatch, body));
+  }
+
   @Get(':key/records/:id/history')
   history(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Query() q: Record<string, unknown>) {
     return this.registers.history(auth, key, id, q);

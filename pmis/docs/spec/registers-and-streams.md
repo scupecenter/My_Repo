@@ -635,7 +635,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 
 ### 3.15 Meetings (`meetings`) — no sheet (Q12)
 - **Key:** Meeting ID (generated). **Several sites per meeting** (multi-list), and no single site key (Q69).
-- **Fields (Q12 default, ASSUMPTION):** Date, Title, Type, Attendees (user, multi), Linked sites (multi), Minutes file (file), Action items (owner user, due date, status).
+- **Fields (Q12 default, ASSUMPTION):** Date, Title, Type, Attendees (user, multi), Linked sites (multi), Minutes file (file), Action items (owner user, due date, status). Technical decision Q291 (migration 0068): an optional free-text field External attendees (`external_attendees`, vendors, GECOL, HLC, landlords who are not users) beside Attendees; no links to Contractors.
 - **Template:** `TPL-MTG` (ASSUMPTION).
 - **Form sections:** Meeting · Attendees and sites · Minutes · Action items.
 - **Validation:** Date and Title are required. An action item needs an owner and a due date.

@@ -98,7 +98,7 @@ export function Site() {
               {st.milestone_date && <span className="mono">{t('site.milestone_date', { date: st.milestone_date })}</span>}
             </div>
           )}
-          <div className="card mb-4 p-3"><Pipeline nodes={nodes} selected={stage} onSelect={(c) => setParam('stage', stage === c ? null : c)} /></div>
+          <div className="card mb-4 p-3"><Pipeline nodes={nodes} variant={s?.pipeline_variant ?? 'A'} selected={stage} onSelect={(c) => setParam('stage', stage === c ? null : c)} /></div>
           </>}
         </>
       )}

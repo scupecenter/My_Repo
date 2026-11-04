@@ -94,6 +94,19 @@ export function useRecordOp(key: string) {
   });
 }
 
+/** Contract 0.13.2 (Q267): a System Admin cancels an approved Quality snag record entered by mistake (reason and step-up; its QC snag is cancelled with it). */
+export function useCancelSnagRecord() {
+  const qc = useQueryClient();
+  return useMutation<RegisterRecord, ApiError, { record: RegisterRecord; reason: string }>({
+    mutationFn: ({ record, reason }) => api.post(`/registers/quality/records/${record.id}/cancel-snag`, { version: record.version, body: { reason } }),
+    onSuccess: (r) => qc.setQueryData(['register-record', 'quality', r.id], r),
+    onSettled: (_d, _e, v) => {
+      settle(qc, 'quality', v.record.id);
+      void qc.invalidateQueries({ queryKey: ['site-snags'] });   // the QC snag of the record is cancelled with it
+    },
+  });
+}
+
 /** `POST .../claim` and `.../release` (contract 0.4.5): one member of a group level takes the level, or gives it back. If-Match = record version. */
 export function useRecordClaim(key: string) {
   const qc = useQueryClient();

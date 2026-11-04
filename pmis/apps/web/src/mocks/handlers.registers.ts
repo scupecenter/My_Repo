@@ -106,6 +106,8 @@ function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   if (r.state === 'in_approval' && canAt(row, L, L)) out.push('approve', 'reject');
   if (r.state === 'approved' && isCurrent(r) && !hasOpenVersion(r) && canAt(row, 1, L)) out.push('new_version');
   if (r.state !== 'voided' && viewer()?.key === 'pm') out.push('void');
+  // contract 0.13.2 (Q267): a System Admin (the `pm` account in the mock) cancels an approved Quality snag record entered by mistake
+  if (viewer()?.key === 'pm' && r.register_key === 'quality' && r.record_type === 'snag' && isCurrent(r) && !hasOpenVersion(r)) out.push('cancel_snag');
   // Q221: a permit draft whose holder no longer holds L1 of its stream row is handed over (contract 0.12.2)
   if (r.register_key === 'permits_hse' && r.state === 'entry' && !r.transferred && !canAt(row, 1, L) && r.created_by === viewer()?.employee_id) out.push('transfer');
   return out;
@@ -252,6 +254,20 @@ export const registerHandlers = [
     if (b.data && !hasExpiry(r.data)) delete r.data.valid_to;
     step(r, 'edit', 1);
     touch(r); save();
+    return tag(r);
+  }),
+
+  http.post(`${B}/registers/quality/records/:id/cancel-snag`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const r = R().records.find((x) => x.id === params.id && x.register_key === 'quality');
+    if (!r) return problem(404, 'not_found', 'Record not found');
+    const bad = noMatch(request, r); if (bad) return bad;
+    if (viewer()?.key !== 'pm') return problem(403, 'action_forbidden', 'Only a System Admin cancels an approved Quality snag record.');
+    const body = (await request.json().catch(() => ({}))) as { reason?: string };
+    if ((body.reason ?? '').trim().length < 3) return invalid([{ path: '/reason', code: 'required' }]);
+    if (r.record_type !== 'snag' || !isCurrent(r) || hasOpenVersion(r)) return problem(409, 'invalid_transition', 'Only the approved version in force of a Quality snag record can be cancelled.');
+    if (!stepUpValid()) return stepUp();
+    r.state = 'voided'; step(r, 'void', r.current_level, body.reason!.trim()); touch(r); save();
     return tag(r);
   }),
 

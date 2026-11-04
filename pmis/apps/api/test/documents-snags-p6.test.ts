@@ -7,7 +7,7 @@ import { ZipService } from '../src/documents/zip.service';
 import { PDF, PNG, jpegWithExif } from './doc-helpers';
 import { Api, adminApi, sleep, startApp } from './helpers';
 import { G, post, recPath, regCell } from './reg-helpers';
-import { Actor, actor, makeSite, makeTask, setCell } from './wf-helpers';
+import { Actor, actor, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
  * Work package P6 of the owner answers of 2026-11-04 (migration 0056, contract 0.12.4): Q195, Q199 (storage, see also storage-protection.test.ts), Q226
@@ -463,5 +463,259 @@ describe('documents: one requirement per purpose, global records, new versions, 
     expect(manifest).toContain('waits for the virus scan');
     expect(await q(`SELECT 1 FROM audit_log WHERE action = 'document_zip_skipped_unscanned' AND entity_id = $1`, [start.body.id])).toHaveLength(1);
     void clean;
+  });
+});
+
+// --------------------------------------------------------------------------------------------------------------------------------- follow-up group C (migration 0068, contract 0.13.2)
+describe('Q260: the Quality register Severity list mirrors the snag severities', () => {
+  it('reads CRITICAL, MAJOR and MINOR (and every severity the admin adds); the list is not written directly; a typed name becomes the code', async () => {
+    const cat = await admin.call('get', '/list-catalogues/Severity');
+    expect(cat.status).toBe(200);
+    const active = (cat.body.values as { code: string; label_en: string; label_ar: string | null; is_active: boolean }[]).filter((v) => v.is_active);
+    expect(active.slice(0, 3).map((v) => v.code)).toEqual(['CRITICAL', 'MAJOR', 'MINOR']);
+    expect(active.slice(0, 3).map((v) => v.label_en)).toEqual(['Critical', 'Major', 'Minor']);
+    expect(active[0]!.label_ar).toBe('حرجة');
+    expect(cat.body).toMatchObject({ critical: true, used_by: [{ register_key: 'quality', field_code: 'severity' }] });
+    // the severity added by the catalogue test above (COSM...) is on the register list too, with its name
+    expect(active.find((v) => v.code === `COSM${U}`)).toMatchObject({ label_en: 'Cosmetic' });
+    // the field of the register reads the same codes
+    const quality = (await admin.call('get', '/registers')).body.items.find((d: { register_key: string }) => d.register_key === 'quality');
+    const sev = quality.fields.find((f: { code: string }) => f.code === 'severity');
+    expect(sev).toMatchObject({ type: 'list', list: { code: 'Severity' } });
+    const opts = (sev.options as ({ value: string } | string)[]).map((o) => (typeof o === 'string' ? o : o.value));
+    expect(opts).toEqual(expect.arrayContaining(['CRITICAL', 'MAJOR', 'MINOR', `COSM${U}`]));
+    expect(opts).not.toContain('Critical');
+
+    // a direct write to a value of the list is refused (even by the System Admin): change the snag severities instead
+    const add = await admin.call('post', '/list-catalogues/Severity/values', { code: 'HUGE', label_en: 'Huge', reason: 'q260 test' });
+    expect(add.status).toBe(422);
+    expect(add.body.errors).toEqual([expect.objectContaining({ code: 'mirrored_list' })]);
+    const value = (cat.body.values as { id: string; version: number }[])[0]!;
+    const patch = await admin.call('patch', `/list-catalogues/Severity/values/${value.id}`, { label_en: 'Worse', reason: 'q260 test' }, ifm(value.version));
+    expect(patch.status).toBe(422);
+    expect(patch.body.errors).toEqual([expect.objectContaining({ code: 'mirrored_list' })]);
+    expect(await q(`SELECT 1 FROM list_values WHERE catalogue_code = 'Severity' AND code = 'HUGE'`)).toHaveLength(0);
+
+    // a record typed with a name or in lower case is stored as the code; an unknown text is refused
+    const { e, site } = await team();
+    const mk = (severity: string) => e.api.call('post', recPath('quality'), { site_id: site.id, record_type: 'snag', data: { record_code: `SV-${U}-${randomBytes(2).toString('hex')}`, description: 'Loose cover', severity, stage: 'CW QC' } });
+    const typed = await mk('critical');
+    expect(typed.status).toBe(201);
+    expect(typed.body.data.severity).toBe('CRITICAL');
+    expect((await mk('Minor')).body.data.severity).toBe('MINOR');
+    expect((await mk('HUGE')).status).toBe(422);
+  });
+
+  it('a severity the admin deactivates leaves the register list at once; an old text that names no code stays readable', async () => {
+    const cur = await admin.call('get', '/snag-severities');
+    const items = (cur.body.items as { code: string; name_en: string; name_ar: string | null; blocks: boolean; is_active: boolean }[])
+      .map(({ code, name_en, name_ar, blocks, is_active }) => ({ code, name_en, name_ar, blocks, is_active: code === `COSM${U}` ? false : is_active }));
+    const off = await admin.call('put', '/snag-severities', { reason: 'q260 test', items }, { 'If-Match': String(cur.headers.etag) });
+    expect(off.status).toBe(200);
+    const cat = await admin.call('get', '/list-catalogues/Severity');
+    expect((cat.body.values as { code: string; is_active: boolean }[]).find((v) => v.code === `COSM${U}`)).toMatchObject({ is_active: false });
+    const { e, site } = await team();
+    // a draft can still be saved with it, but it cannot be submitted with a deactivated value
+    const draft = await e.api.call('post', recPath('quality'), { site_id: site.id, record_type: 'snag', data: { record_code: `SV2-${U}`, description: 'x', severity: `COSM${U}`, stage: 'CW QC' } });
+    expect(draft.status).toBe(201);
+    const refused = await post(e.api, 'quality', draft.body.id, 'submit', draft.body.version);
+    expect(refused.status).toBe(422);
+    expect(refused.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/data/severity' })]));
+    // an old record whose text is not a code (it could not be mapped) is still read as it was written
+    const old = (await q<{ id: string }>(`INSERT INTO register_records (entity_id, version_no, is_current, register_key, record_type, site_id, region_id, state, current_level, levels_required, data, approved_at, created_by)
+      SELECT gen_random_uuid(), 1, true, 'quality', 'snag', s.id, s.region_id, 'approved', 2, 2, $2::jsonb, now(), $3::uuid FROM sites s WHERE s.id = $1 RETURNING id::text`,
+      [site.id, JSON.stringify({ record_code: `OLD-${U}-HI`, stage: 'CW QC', severity: 'High', description: 'old' }), e.user.id]))[0]!;
+    const read = await admin.call('get', recPath('quality', old.id));
+    expect(read.status).toBe(200);
+    expect(read.body.data.severity).toBe('High');
+    // restore the snag severity for the tests that follow
+    const back = await admin.call('put', '/snag-severities', { reason: 'q260 test', items: items.map((x) => (x.code === `COSM${U}` ? { ...x, is_active: true } : x)) }, { 'If-Match': String(off.headers.etag) });
+    expect(back.status).toBe(200);
+  });
+});
+
+describe('Q265: accepting pending evidence needs step-up, rejecting does not', () => {
+  it('an L2 without a fresh step-up cannot accept (401) but can reject; after the step-up the acceptance works and is audited with it', async () => {
+    const { e, a, i, site } = await team();
+    const a2 = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'approve'), stepUp: false });
+    await regCell(db, 'quality', R, 'approve', { user: [a.user.id, a2.user.id] });
+    const r = await i.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: generalType, scope: 'CW', title: 'Cable tray cover', severity: 'MAJOR' });
+    const f1 = await photo(e, r.body.id, jpegWithExif(exifText(new Date(Date.now() + 5 * 86400000))));
+    const f2 = await photo(e, r.body.id, jpegWithExif(exifText(new Date(Date.now() + 6 * 86400000))));
+    expect([f1.body.status, f2.body.status]).toEqual(['pending_evidence', 'pending_evidence']);
+    const ev = (who: Actor, photoId: string, decision: string) => who.api.call('post', `/snags/${r.body.id}/photos/${photoId}/evidence`, { decision, note: 'checked on site' });
+    // no step-up: the acceptance is refused, nothing changed
+    const noStep = await ev(a2, f1.body.id, 'accept');
+    expect(noStep.status).toBe(401);
+    expect(noStep.body.code).toBe('step_up_required');
+    expect((await snag(a, r.body.id)).photos.find((p) => p.id === f1.body.id)!.status).toBe('pending_evidence');
+    // rejecting needs none
+    const rej = await ev(a2, f2.body.id, 'reject');
+    expect(rej.status, JSON.stringify(rej.body)).toBe(200);
+    expect(rej.body.photos.find((p: { id: string }) => p.id === f2.body.id)).toMatchObject({ status: 'rejected' });
+    // someone who is not L2 of the snag is refused (403), step-up or not
+    const stranger = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'approve') });
+    expect((await ev(stranger, f1.body.id, 'accept')).status).toBe(403);
+    expect((await ev(e, f1.body.id, 'accept')).body.code).toBe('self_approval_forbidden');
+    // after the step-up the acceptance works
+    expect((await a2.api.stepUp(a2.user.password)).status).toBe(200);
+    const ok = await ev(a2, f1.body.id, 'accept');
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.photos.find((p: { id: string }) => p.id === f1.body.id)).toMatchObject({ status: 'accepted' });
+    const audit = await q<{ after: { stepup_verified?: boolean } }>(`SELECT after FROM audit_log WHERE action = 'snag_evidence_accept' AND entity_id = $1`, [r.body.id]);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]!.after.stepup_verified).toBe(true);
+    // the old four-argument function is gone: one function is left, and a call without the flag defaults to "no step-up"
+    expect(await q<{ pronargs: number; has_default: boolean }>(`SELECT pronargs, pronargdefaults > 0 AS has_default FROM pg_proc WHERE proname = 'qc_decide_evidence'`)).toEqual([{ pronargs: 5, has_default: true }]);
+  });
+});
+
+describe('Q267: a System Admin cancels an approved Quality snag record entered by mistake', () => {
+  const newRec = async (who: Actor, siteId: string, data: Record<string, unknown> = {}) => {
+    const r = await who.api.call('post', recPath('quality'), { site_id: siteId, record_type: 'snag', data: { record_code: `CX-${U}-${randomBytes(2).toString('hex')}`, description: 'Entered by mistake', severity: 'MAJOR', stage: 'CW QC', ...data } });
+    expect(r.status).toBe(201);
+    return r.body as { id: string; entity_id: string; version: number };
+  };
+  const approved = async (e: Actor, a: Actor, siteId: string) => {
+    const rec = await newRec(e, siteId);
+    const sub = await post(e.api, 'quality', rec.id, 'submit', rec.version);
+    expect(sub.status).toBe(200);
+    const ok = await post(a.api, 'quality', rec.id, 'approve', sub.body.version);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    return { ...rec, version: ok.body.version as number, snagId: ok.body.qc_snag.id as string };
+  };
+  const cancel = (who: Actor, id: string, version: number | null, body: unknown = { reason: 'entered by mistake' }) =>
+    who.api.call('post', recPath('quality', id, '/cancel-snag'), body, version === null ? {} : ifm(version));
+
+  it('is refused to everyone but a System Admin (403), needs step-up (401), a reason (422) and the current version (412, 428)', async () => {
+    const { e, a, site } = await team();
+    const rec = await approved(e, a, site.id);
+    // the people of the register cannot do it, the approver included
+    expect((await cancel(e, rec.id, rec.version)).status).toBe(403);
+    const denied = await cancel(a, rec.id, rec.version);
+    expect(denied.status).toBe(403);
+    expect(denied.body.code).toBe('action_forbidden');
+    expect((await e.api.call('get', recPath('quality', rec.id))).body.allowed_actions).not.toContain('cancel_snag');
+    // an admin without a fresh step-up
+    const soft = await plainAdmin(app, db, false);
+    expect((await soft.api.call('get', recPath('quality', rec.id))).body.allowed_actions).toContain('cancel_snag');
+    const noStep = await cancel(soft, rec.id, rec.version);
+    expect(noStep.status).toBe(401);
+    expect(noStep.body.code).toBe('step_up_required');
+    expect((await soft.api.stepUp(soft.user.password)).status).toBe(200);
+    expect((await cancel(soft, rec.id, rec.version, {})).status).toBe(422);
+    expect((await cancel(soft, rec.id, rec.version, { reason: 'x' })).status).toBe(422);
+    expect((await cancel(soft, rec.id, rec.version, { reason: 'entered by mistake', extra: 1 })).status).toBe(422);
+    expect((await cancel(soft, rec.id, rec.version + 5)).status).toBe(412);
+    expect((await cancel(soft, rec.id, null)).status).toBe(428);
+    // nothing happened
+    expect((await snag(e, rec.snagId)).state).toBe('open');
+    expect((await admin.call('get', recPath('quality', rec.id))).body.state).toBe('approved');
+  });
+
+  it('voids the record and cancels its QC snag with it: audited with before and after, the PAC is released, and it cannot be done twice', async () => {
+    const { e, a, site } = await team();
+    const boss = await plainAdmin(app, db, true);
+    const pac = await makeTask(db, site, 'B13', 'entry', { actualDate: '2026-01-05' });
+    const rec = await approved(e, a, site.id);
+    expect((await admin.call('get', `/tasks/${pac}`)).body.lock_reasons).toEqual([expect.objectContaining({ kind: 'open_snags', count: 1 })]);
+    const res = await cancel(boss, rec.id, rec.version, { reason: 'Duplicate of another snag, entered by mistake' });
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body).toMatchObject({ state: 'voided', is_current: false, qc_snag: { id: rec.snagId, state: 'cancelled' } });
+    expect(res.body.allowed_actions).not.toContain('cancel_snag');
+    // the QC snag is cancelled with the reason, and no longer blocks the PAC
+    const s = (await e.api.call('get', `/snags/${rec.snagId}`)).body;
+    expect(s).toMatchObject({ state: 'cancelled', cancel_reason: 'Duplicate of another snag, entered by mistake' });
+    expect((await admin.call('get', `/tasks/${pac}`)).body.lock_reasons).toEqual([]);
+    // audited with before and after, the actor and the reason; the history of the record shows the step
+    const au = await q<{ before: { state: string }; after: { state: string; qc_snag_id: string; stepup_verified: boolean }; reason: string; actor_id: string }>(
+      `SELECT before, after, reason, actor_id::text FROM audit_log WHERE action = 'register_record_cancel_snag' AND entity_id = $1`, [rec.id]);
+    expect(au).toHaveLength(1);
+    expect(au[0]).toMatchObject({ before: { state: 'approved' }, after: { state: 'voided', qc_snag_id: rec.snagId, stepup_verified: true }, reason: 'Duplicate of another snag, entered by mistake', actor_id: boss.user.id });
+    expect(await q(`SELECT 1 FROM audit_log WHERE action = 'snag_cancel' AND entity_id = $1`, [rec.snagId])).toHaveLength(1);
+    const hist = (await boss.api.call('get', recPath('quality', rec.id, '/history'))).body.items as { action: string; note: string; stepup_verified: boolean }[];
+    expect(hist.at(-1)).toMatchObject({ action: 'void', note: 'Duplicate of another snag, entered by mistake', stepup_verified: true });
+    // twice is refused
+    expect((await cancel(boss, rec.id, res.body.version)).status).toBe(409);
+  });
+
+  it('is refused for a draft, for a record with an open newer version and for a record whose QC snag is closed already', async () => {
+    const { e, a, site } = await team();
+    const boss = await plainAdmin(app, db, true);
+    // a draft is voided the normal way
+    const draft = await newRec(e, site.id);
+    const d = await cancel(boss, draft.id, draft.version);
+    expect(d.status).toBe(409);
+    expect(d.body.code).toBe('invalid_transition');
+    // an open newer version: void it first
+    const withNew = await approved(e, a, site.id);
+    const nv = await e.api.call('post', recPath('quality', withNew.id, '/versions'), {}, ifm(withNew.version));
+    expect(nv.status).toBe(201);
+    const o = await cancel(boss, withNew.id, withNew.version);
+    expect(o.status).toBe(409);
+    expect(o.body.detail).toMatch(/newer version/);
+    // a closed QC snag is history: the record stays
+    const closed = await approved(e, a, site.id);
+    expect((await photo(e, closed.snagId, jpegWithExif(null))).status).toBe(201);
+    const s = await snag(e, closed.snagId);
+    const sub = await act(e, closed.snagId, 'submit', s.version);
+    expect(sub.status).toBe(200);
+    expect((await act(a, closed.snagId, 'approve', sub.body.version)).body.state).toBe('closed');
+    expect((await boss.api.call('get', recPath('quality', closed.id))).body.allowed_actions).not.toContain('cancel_snag');
+    const c = await cancel(boss, closed.id, closed.version);
+    expect(c.status).toBe(409);
+    expect(c.body.detail).toMatch(/closed already/);
+    expect((await boss.api.call('get', recPath('quality', closed.id))).body.state).toBe('approved');
+  });
+});
+
+describe('Q296: the task fields of the stream templates read the CompletionStatus catalogue', () => {
+  const columnOf = async (field: string): Promise<{ options: string[] }> => {
+    const cols = (await q<{ columns: { field?: string; options?: string[] }[] }>(
+      `SELECT v.columns FROM template_versions v JOIN template_definitions d ON d.id = v.template_def_id WHERE d.template_id = 'TPL-SITE-CW' AND v.is_current`))[0]!.columns;
+    return cols.find((c) => c.field === field) as { options: string[] };
+  };
+  const version = async (): Promise<number> => (await q<{ v: number }>(`SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
+
+  it('links the Done / Pending / N/A fields to the catalogue and leaves the other lists alone; the mapping screen says so', async () => {
+    const rows = await q<{ field_key: string; list_catalogue: string | null; options: string[] }>(`SELECT field_key, list_catalogue, options FROM template_task_fields WHERE field_type = 'list' ORDER BY task_code, field_key`);
+    const linked = rows.filter((r) => r.list_catalogue === 'CompletionStatus');
+    expect(linked.length).toBeGreaterThanOrEqual(12);
+    expect(linked.map((r) => r.field_key)).toEqual(expect.arrayContaining(['v:tower_foundation', 'v:site_gnd', 'v:mts_cabinet', 'v:dc_of_cable']));
+    expect(linked.every((r) => JSON.stringify(r.options) === JSON.stringify(['Done', 'Pending', 'N/A']))).toBe(true);
+    const others = rows.filter((r) => r.list_catalogue === null);
+    expect(others.map((r) => r.field_key)).toEqual(expect.arrayContaining(['v:analysis_type', 'v:cutover_result']));
+    const map = await admin.call('get', '/template-mapping');
+    expect(map.status).toBe(200);
+    expect(map.body.fields.find((f: { field_key: string; list_catalogue: string | null }) => f.field_key === 'v:tower_foundation')).toMatchObject({ list_catalogue: 'CompletionStatus', options: ['Done', 'Pending', 'N/A'] });
+    expect(map.body.fields.find((f: { field_key: string; list_catalogue: string | null }) => f.field_key === 'v:analysis_type')).toMatchObject({ list_catalogue: null });
+  });
+
+  it('a value added to or deactivated in the catalogue moves the options of those fields and issues the next template version; the options cannot be set apart from the catalogue', async () => {
+    const v0 = await version();
+    expect((await columnOf('v:tower_foundation')).options).toEqual(['Done', 'Pending', 'N/A']);
+    const add = await admin.call('post', '/list-catalogues/CompletionStatus/values', { code: `Blocked${U}`, label_en: 'Blocked', reason: 'q296 test' });
+    expect(add.status, JSON.stringify(add.body)).toBe(201);
+    expect((await q<{ options: string[] }>(`SELECT options FROM template_task_fields WHERE field_key = 'v:tower_foundation'`))[0]!.options).toEqual(['Done', 'Pending', 'N/A', `Blocked${U}`]);
+    expect((await columnOf('v:tower_foundation')).options).toEqual(['Done', 'Pending', 'N/A', `Blocked${U}`]);
+    expect(await version()).toBeGreaterThan(v0);
+    // a field that does not read the catalogue is untouched
+    expect((await q<{ options: string[] }>(`SELECT options FROM template_task_fields WHERE field_key = 'v:analysis_type'`))[0]!.options).toEqual(['STA', 'ST', 'N/A']);
+    // the options of a linked field cannot be set apart from the list
+    await db.query('BEGIN');
+    try {
+      await db.query(`UPDATE template_task_fields SET options = '["X", "Y"]'::jsonb WHERE field_key = 'v:tower_foundation'`);
+      expect((await q<{ options: string[] }>(`SELECT DISTINCT options FROM template_task_fields WHERE field_key = 'v:tower_foundation'`))[0]!.options).toEqual(['Done', 'Pending', 'N/A', `Blocked${U}`]);
+      // a field that stops being a list leaves the catalogue
+      await db.query(`UPDATE template_task_fields SET field_type = 'text', options = NULL WHERE field_key = 'v:site_gnd'`);
+      expect((await q<{ list_catalogue: string | null }>(`SELECT list_catalogue FROM template_task_fields WHERE field_key = 'v:site_gnd'`))[0]!.list_catalogue).toBeNull();
+    } finally {
+      await db.query('ROLLBACK');
+    }
+    const cat = (await admin.call('get', '/list-catalogues/CompletionStatus')).body;
+    const v = cat.values.find((x: { code: string }) => x.code === `Blocked${U}`);
+    const off = await admin.call('patch', `/list-catalogues/CompletionStatus/values/${v.id}`, { is_active: false, reason: 'q296 test' }, ifm(v.version));
+    expect(off.status, JSON.stringify(off.body)).toBe(200);
+    expect((await columnOf('v:tower_foundation')).options).toEqual(['Done', 'Pending', 'N/A']);
   });
 });

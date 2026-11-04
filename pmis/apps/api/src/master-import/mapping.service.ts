@@ -77,7 +77,7 @@ export class MappingService {
     await this.access.requireModuleView(auth, 'templates');
     const fields = await this.db.tx.$queryRaw<Record<string, unknown>[]>(Prisma.sql`
       SELECT f.id::text AS id, f.task_code, f.field_key, f.label, f.label_ar, f.field_type, f.options, f.master_col, m.header AS master_header, f.read_only, f.is_active,
-        f.scenarios, f.projection
+        f.scenarios, f.projection, f.list_catalogue
       FROM template_task_fields f LEFT JOIN master_columns m ON m.letter = f.master_col
       ORDER BY coalesce(m.ord, 5000), f.task_code COLLATE "C", f.field_key COLLATE "C"`);
     const columns = await this.db.tx.$queryRaw<Record<string, unknown>[]>(Prisma.sql`

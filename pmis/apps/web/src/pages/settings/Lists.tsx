@@ -9,6 +9,8 @@ import { fieldErrors } from '@/lib/fields';
 
 const split = (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean);
 const nameOf = (c: ListCatalogue, lang: string) => (lang === 'ar' && c.name_ar) || c.name_en;
+/** 0.13.2 (Q260): the Severity list mirrors the snag severities; its values are changed in Settings, QC snag severities, never here. */
+const mirrored = (c: ListCatalogue) => c.code === 'Severity';
 
 type Dlg =
   | { kind: 'new-list' }
@@ -74,9 +76,10 @@ export function Lists() {
             <h3 className="font-bold">{nameOf(cur, lang)} <span className="mono text-sm text-mute">{cur.code}</span></h3>
             {cur.critical && cur.values.every((v) => !v.is_active) && <span role="alert" className="chip bg-lateBg text-lateInk" data-testid="lists-blocking">{t('lists.blocking')}</span>}
             <button type="button" className="btn ms-auto" data-testid="lists-edit" onClick={() => setDlg({ kind: 'edit-list', list: cur })}><Pencil size={14} />{t('lists.edit')}</button>
-            <button type="button" className="btn btn-accent" data-testid="lists-add-value" onClick={() => setDlg({ kind: 'new-value', list: cur })}><Plus size={14} />{t('lists.add_value')}</button>
+            {!mirrored(cur) && <button type="button" className="btn btn-accent" data-testid="lists-add-value" onClick={() => setDlg({ kind: 'new-value', list: cur })}><Plus size={14} />{t('lists.add_value')}</button>}
           </div>
           {cur.description && <p className="text-sm text-mute">{cur.description}</p>}
+          {mirrored(cur) && <p className="rounded-md bg-card2 p-3 text-sm" data-testid="lists-mirrored">{t('lists.mirrored')}</p>}
           <table className="w-full text-sm" data-testid="lists-values">
             <thead className="text-mute"><tr>
               <th className="p-2 text-start">{t('lists.code')}</th><th className="p-2 text-start">{t('lists.label_en')}</th><th className="p-2 text-start">{t('lists.label_ar')}</th>
@@ -88,7 +91,7 @@ export function Lists() {
                   <td className="p-2 mono">{v.code}{!v.is_active && <span className="chip ms-1 bg-lockBg text-lockInk">{t('lists.inactive')}</span>}</td>
                   <td className="p-2">{v.label_en}</td><td className="p-2" dir="rtl">{v.label_ar ?? '—'}</td>
                   <td className="p-2 text-mute">{v.aliases.join(', ') || '—'}</td><td className="p-2 text-mute">{v.groups.join(', ') || '—'}</td>
-                  <td className="p-2 text-end"><button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-edit-${v.code}`} aria-label={t('lists.edit_value', { code: v.code })} onClick={() => setDlg({ kind: 'edit-value', list: cur, value: v })}><Pencil size={14} /></button></td>
+                  <td className="p-2 text-end">{!mirrored(cur) && <button type="button" className="btn btn-ghost p-1" data-testid={`lists-value-edit-${v.code}`} aria-label={t('lists.edit_value', { code: v.code })} onClick={() => setDlg({ kind: 'edit-value', list: cur, value: v })}><Pencil size={14} /></button>}</td>
                 </tr>
               ))}
               {!cur.values.length && <tr><td colSpan={6} className="p-2 text-mute">{t('lists.no_values')}</td></tr>}

@@ -144,10 +144,10 @@ export const PROFILE_MAIL = {
     category: 'email_change_decided',
     subject: approved ? 'GSDN PMIS: your sign-in email was changed' : 'GSDN PMIS: your email change was rejected',
     text: (approved
-      ? 'The sign-in email of your GSDN PMIS account was changed after an administrator approved the request. '
+      ? 'The sign-in email of your GSDN PMIS account was changed after an administrator approved the request. Your sessions were signed out: sign in again with the new address. '
       : 'An administrator rejected the request to change the sign-in email of your GSDN PMIS account; it stays as it was. ')
       + 'See My profile for the details. If you did not ask for this, tell an administrator.\n\n'
-      + (approved ? 'تم تغيير بريد الدخول لحسابك بعد موافقة المسؤول.' : 'رفض المسؤول طلب تغيير بريد الدخول، ويبقى كما هو.'),
+      + (approved ? 'تم تغيير بريد الدخول لحسابك بعد موافقة المسؤول وتم إنهاء جلساتك، فسجّل الدخول من جديد بالعنوان الجديد.' : 'رفض المسؤول طلب تغيير بريد الدخول، ويبقى كما هو.'),
   }),
   phone: (what: 'requested' | 'approved' | 'rejected'): Omit<MailMessage, 'to'> => ({
     category: 'phone_change',

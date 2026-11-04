@@ -1155,6 +1155,8 @@ export interface paths {
          *     **0.12.6 (Q158):** `approve` needs a verified address (the user entered the mailed code); otherwise 409 `email_not_verified`, unless
          *     `identity_check` records the documented check the admin made while mail is unavailable (stored and audited). The old and the new
          *     address are told of the decision by mail (no reason in the mail).
+         *     **0.13.0 (Q303):** an approval ends every session of the user (the email is a sign-in identifier, as after a password change) and writes a
+         *     `security_notice` to the user's inbox; a rejection keeps them. The audit row is flagged as an admin override (Q307).
          */
         post: operations["decideEmailChangeRequest"];
         delete?: never;
@@ -2864,7 +2866,7 @@ export interface paths {
         };
         /**
          * The mail outbox, newest first (no bodies)
-         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (90).
+         * @description System Admin or `view` on `admin.system_log`. Every queued, sent, failed and given-up mail also writes a System Log row (source `mail`, masked address, never the body). Kept for the setting `mail.retention_days` (30 since 0.13.1; it was 90).
          */
         get: operations["listMailOutbox"];
         put?: never;
@@ -4580,6 +4582,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/quality/records/{record_id}/cancel-snag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an approved Quality snag record that was entered by mistake (System Admin, 0.13.2, Q267)
+         * @description 0.13.2 (Q267). A System Admin cancels the approved version in force of a Quality register record of type `snag` that was entered by mistake. A `reason`
+         *     (at least 3 characters) and step-up are required; `If-Match` is the record's version. The record becomes `voided` (never deleted) and its linked QC snag
+         *     is cancelled with it (`Snag.state` `cancelled`, `cancel_reason` = the reason); the QC snag then no longer blocks the PAC or FAC of its stream.
+         *     Audited with before and after (`register_record_cancel_snag`, with the id and status of the QC snag). Not allowed (409 `invalid_transition`):
+         *     a record that is not the approved version in force, one with a newer version still open (void it first), one whose QC snag is already closed (that
+         *     history stays), or one that is not a Quality record of type snag. A caller who is not a System Admin (a delegate included) is 403 `action_forbidden`;
+         *     a record outside the caller's regions is 404. `RegisterRecord.allowed_actions` lists `cancel_snag` for a System Admin when it applies.
+         */
+        post: operations["cancelQualitySnagRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/records/{record_id}/claim": {
         parameters: {
             query?: never;
@@ -5324,7 +5355,7 @@ export interface paths {
         };
         /**
          * TE dispatch of the sites (D6), the Q65 date and the need-based status
-         * @description TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`.
+         * @description TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`. 0.13.1 (Q281): a site whose overall status is Cancelled is left out (also with `need_status`); it stays visible on its own page, `GET /warehouse/dispatch-status/{site_id}`.
          */
         get: operations["listSiteDispatch"];
         put?: never;
@@ -5555,7 +5586,7 @@ export interface paths {
         put?: never;
         /**
          * Add a value to a list
-         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version.
+         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version. **0.13.0 (Q292):** the list `TeamSpecialization` mirrors the team specializations of Settings and is never edited here (422 `validation_failed`, field error `managed_elsewhere`).
          */
         post: operations["createListValue"];
         delete?: never;
@@ -5584,7 +5615,7 @@ export interface paths {
         head?: never;
         /**
          * Relabel, add aliases or groups, reorder or deactivate a value (never deleted; the code is fixed)
-         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`).
+         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`). **0.13.0 (Q292):** the values of the list `TeamSpecialization` cannot be edited here (422 `validation_failed`, field error `managed_elsewhere`); they follow `PUT /settings/team-scope-match`.
          */
         patch: operations["updateListValue"];
         trace?: never;
@@ -5692,6 +5723,31 @@ export interface paths {
          *     Duplicate Doc No. answers 409.
          */
         post: operations["createStockMovement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/quarantine-exits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Take quarantined stock out of quarantine (repaired, written off or returned to the supplier)
+         * @description Q270 (0.13.1). One Warehouse document with a reason, a record of the Warehouse register in entry state; submit, review and approve it through
+         *     `/registers/warehouse/records/{register_record_id}/...` (L2 approves, as for every warehouse document). `exit_kind`: `repaired` moves the quantity from
+         *     quarantine to the available stock (an ADJ, record type `adj`), `written_off` takes it out for good (an ADJ), `returned_to_supplier` sends it back to the
+         *     vendor (a DN to the vendor, record type `sup_dn`). A pending exit holds its quantity (`StockLevel.quarantine_pending`), so the same units cannot be taken
+         *     twice; cancelling it (`POST /warehouse/movements/{movement_id}/cancel`) releases them. The stock and the serials move on the final approval. Without
+         *     `doc_no` the next number of the sequence of the type is issued (`ADJ-WH`, `DN-SUP-WH`); without `doc_date` it is today (Africa/Tripoli).
+         */
+        post: operations["createQuarantineExit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5969,7 +6025,7 @@ export interface paths {
         put?: never;
         /**
          * Accept or reject a photo kept as pending evidence (L2)
-         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix. Reject: it leaves the set (kept on record).
+         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix, and needs step-up (0.13.2, Q265: 401 `step_up_required` without it, like the closure of a snag). Reject: it leaves the set (kept on record) and needs no step-up.
          */
         post: operations["decideSnagEvidence"];
         delete?: never;
@@ -7940,6 +7996,8 @@ export interface components {
                 te_full?: components["schemas"]["ScopeFlag"];
                 te_ip_router_only?: components["schemas"]["ScopeFlag"];
             };
+            /** @description 0.13.2 (Q349). The pipeline style of the site page: the same setting as the dashboard (`dashboard.pipeline_variant`, A = rings, B = flat track). */
+            pipeline_variant?: components["schemas"]["PipelineVariant"];
             /** @description Information only ("6 of 9 sites at TE PAC"). */
             cluster_progress?: {
                 cluster_code?: string;
@@ -9729,6 +9787,8 @@ export interface components {
             scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
             /** @enum {string|null} */
             projection?: "earliest" | "latest" | null;
+            /** @description 0.13.2 (Q296). The list catalogue a list field reads (for example `CompletionStatus`: Done, Pending, N/A); `options` are then its active codes and follow it. Null for a field with its own options. */
+            list_catalogue?: string | null;
         };
         TemplateMapping: {
             fields: components["schemas"]["TemplateTaskField"][];
@@ -9950,7 +10010,10 @@ export interface components {
             code: string;
             label_en: string;
             label_ar?: string | null;
+            /** @description Kept for older clients: the first of `groups`, or null. On input `groups` wins when both are sent. */
             group?: components["schemas"]["SpecializationGroup"] | null;
+            /** @description 0.13.0 (Q292): the functional groups of the specialization (CW, TE, both, or none). A scope that allows a group accepts every active specialization of it. */
+            groups?: components["schemas"]["SpecializationGroup"][];
             /** @description Other names (an old Master value, a spelling) that resolve to this code. */
             aliases?: string[];
             /** @description false = not a column any more (kept, never deleted). */
@@ -9963,7 +10026,7 @@ export interface components {
             /** @description 0.12.9, optional: labels, group and aliases of listed codes. */
             catalogue?: components["schemas"]["TeamSpecialization"][];
         };
-        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. */
+        /** @description 0.9.1 (Q97), 0.12.9 (Q143, Q144, Q147), 0.13.0 (Q292). Seed after the 0061 conversion: CW, Tower Erection and Site Adaption allow the group CW; CW Dismantle the group CW and Dismantle; TE Dismantle the group CW, TE and Dismantle; GECOL the group CW and GECOL; TE Installation TE; HLC Fiber (exempt: no team needed); STA and ST none. Since 0.13.0 the group of a specialization is `groups` (Dismantle is CW and TE). */
         TeamScopeMatch: components["schemas"]["TeamScopeMatchInput"] & {
             groups: components["schemas"]["SpecializationGroup"][];
             version: number;
@@ -10154,7 +10217,7 @@ export interface components {
             next_year: number;
             /** @description Drives the empty-table banner. */
             next_year_table_empty: boolean;
-            /** @description 0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. */
+            /** @description 0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. 0.13.1 (Q245): the setting resets to false on 1 January (Africa/Tripoli), so this is true again until the new year is confirmed. */
             official_calendar_pending?: boolean;
             /** @description 0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge. */
             tentative_counted?: boolean;
@@ -10483,7 +10546,7 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag")[];
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -10945,10 +11008,10 @@ export interface components {
             key: string;
             form_kind?: components["schemas"]["FormKind"] | null;
             /**
-             * @description The warehouse document type this sequence numbers (one active sequence per type and region).
+             * @description The warehouse document type this sequence numbers (one active sequence per type and region). 0.13.1: sup_dn (seed DN-SUP-WH) numbers the DN to the vendor of a quarantine exit; it cannot be created, only its pattern edited.
              * @enum {string|null}
              */
-            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | null;
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | "sup_dn" | null;
             /** @description null for PL, OPEN and ADJ. */
             region_id?: number | null;
             /** @description The {REGION} token (Q32: only TR is known). */
@@ -11067,8 +11130,10 @@ export interface components {
             pending_return: number;
             /** @description on_hand minus reserved. */
             available: number;
-            /** @description Q105: returned Faulty or Damaged, held outside on_hand and available. Always 0 for a site. */
+            /** @description Q105: returned Faulty or Damaged, held outside on_hand and available. 0.13.1 (Q270): what is still in quarantine, after the posted quarantine exits. Always 0 for a site. */
             quarantine?: number;
+            /** @description 0.13.1 (Q270): the quantity held by pending quarantine exits; it can no longer be taken by another exit. Always 0 for a site. */
+            quarantine_pending?: number;
         };
         /**
          * @description D6: the PMIS status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.
@@ -11180,10 +11245,23 @@ export interface components {
         StockMovement: {
             /** Format: uuid */
             id: string;
-            /** @enum {string} */
-            kind: "issue" | "return" | "receipt" | "adjustment";
-            /** @enum {string} */
-            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
+            /**
+             * @description 0.13.1 (Q270): quarantine_exit takes quarantined stock out again (see exit_kind).
+             * @enum {string}
+             */
+            kind: "issue" | "return" | "receipt" | "adjustment" | "quarantine_exit";
+            /**
+             * @description 0.13.1: sup_dn = the DN to the vendor of an exit returned to the supplier (no site).
+             * @enum {string}
+             */
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | "sup_dn";
+            /**
+             * @description 0.13.1 (Q270). Set on a quarantine_exit only: repaired = quarantine to available, written_off = quarantine to gone, returned_to_supplier = quarantine to out.
+             * @enum {string|null}
+             */
+            exit_kind?: "repaired" | "written_off" | "returned_to_supplier" | null;
+            /** @description 0.13.1 (Q270). The reason of a quarantine exit. */
+            exit_reason?: string | null;
             doc_no?: string | null;
             /** @description Q106: true once posted; the Doc No. can no longer change. */
             doc_no_locked?: boolean;
@@ -11218,6 +11296,29 @@ export interface components {
             /** Format: date-time */
             posted_at?: string | null;
             version: number;
+        };
+        /** @description 0.13.1 (Q270). Unknown keys are refused (422). */
+        QuarantineExitInput: {
+            /** @enum {string} */
+            exit_kind: "repaired" | "written_off" | "returned_to_supplier";
+            /** @description Why the stock leaves quarantine. Required; kept on the document and in the audit row. */
+            reason: string;
+            /** @description Optional: without it the next number of the sequence of the type is issued. A typed number must be unique and never issued by a sequence (409 otherwise). */
+            doc_no?: string;
+            /**
+             * Format: date
+             * @description Optional: default today (Africa/Tripoli).
+             */
+            doc_date?: string;
+            remark?: string;
+            lines: {
+                /** Format: uuid */
+                item_id: string;
+                /** @description At most the quantity in quarantine that is not already in a pending exit (422 insufficient_stock). */
+                qty: number;
+                /** @description A serial-tracked item names one serial per unit, each in quarantine (status Returned) and in no other pending exit. Other items name none. */
+                serials?: string[];
+            }[];
         };
         StockMovementInput: {
             /**
@@ -13331,7 +13432,11 @@ export interface components {
             proposals_count?: number;
             /** @description 0.12.7 (Q184): approved contractor / external periods from before 0059 without their party; they do not count. */
             pending_party_count?: number;
-            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. */
+            /** @description 0.13.2 (Q393): approved-period days left out of `scorecard` because the task's SLA rule is marked `pending_confirmation`; they stay in the total delay and in `items`. */
+            scorecard_excluded_working_days?: number;
+            /** @description 0.13.2 (Q393): late tasks with such a rule that had approved-period days. */
+            scorecard_excluded_tasks?: number;
+            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. 0.13.2 (Q393): the days of a task whose SLA rule is `pending_confirmation` are not counted. */
             scorecard?: {
                 party: string;
                 period_party?: components["schemas"]["DelayParty"];
@@ -21671,6 +21776,46 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    cancelQualitySnagRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The cancelled (voided) record. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     claimRegisterRecord: {
         parameters: {
             query?: never;
@@ -23836,7 +23981,7 @@ export interface operations {
         parameters: {
             query?: {
                 site_id?: string;
-                kind?: "issue" | "return" | "receipt" | "adjustment";
+                kind?: "issue" | "return" | "receipt" | "adjustment" | "quarantine_exit";
                 status?: "pending" | "posted" | "cancelled";
                 item_id?: string;
                 limit?: components["parameters"]["Limit"];
@@ -23892,6 +24037,37 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createQuarantineExit: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuarantineExitInput"];
+            };
+        };
+        responses: {
+            /** @description Pending. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockMovement"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };

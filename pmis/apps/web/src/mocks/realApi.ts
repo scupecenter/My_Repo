@@ -280,6 +280,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/warehouse/region-vendors'],
   ['put', '/warehouse/region-vendors/:id'],
   ['get', '/warehouse/config-gaps'],
+  // Contract 0.13.1 (follow-up B, Q270, migration 0067): the quarantine exit documents.
+  ['post', '/warehouse/quarantine-exits'],
   ['get', '/number-sequences'],
   ['post', '/number-sequences'],
   ['patch', '/number-sequences/:id'],
@@ -322,6 +324,8 @@ export const REAL_API_AUTH_USERS = [
   ['get', '/me/drafts/:key'],
   ['put', '/me/drafts/:key'],
   ['delete', '/me/drafts/:key'],
+  // Contract 0.13.2 (follow-up group C, migration 0068): a System Admin cancels an approved Quality snag record entered by mistake (Q267).
+  ['post', '/registers/quality/records/:id/cancel-snag'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */
