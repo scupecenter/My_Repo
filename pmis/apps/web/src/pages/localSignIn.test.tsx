@@ -265,6 +265,10 @@ describe('hybrid mode list', () => {
       // contract 0.7.0: approved-template entry (templates and import batches)
       'GET /templates', 'GET /templates/:id/download', 'GET /import-batches', 'POST /import-batches', 'GET /import-batches/:id', 'GET /import-batches/:id/rows',
       'POST /import-batches/:id/submit', 'POST /import-batches/:id/decisions',
+      // contract 0.12.8 (P3): the legacy Master import and its comparison report, the template mapping screen and the import aliases
+      'GET /master-import/runs', 'POST /master-import/runs', 'GET /master-import/runs/:id', 'GET /master-import/runs/:id/diffs', 'GET /master-import/runs/:id/export',
+      'GET /master-import/runs/:id/file', 'POST /master-import/runs/:id/apply', 'PATCH /master-import/diffs/:id',
+      'GET /template-mapping', 'POST /template-mapping', 'GET /import-aliases', 'PUT /import-aliases',
       // contract 0.4.10 and 0.7.1: phase 4b (inbox, follow, register comments, time in state, workload, blocked-by, status updates)
       'GET /notifications', 'POST /notifications/read-all', 'POST /notifications/:id/read', 'POST /notifications/:id/unread', 'POST /notifications/:id/snooze',
       'GET /me/follows', 'PUT /sites/:id/follow', 'DELETE /sites/:id/follow', 'PUT /registers/:key/records/:id/follow', 'DELETE /registers/:key/records/:id/follow',

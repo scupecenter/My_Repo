@@ -125,7 +125,7 @@ export function storageFor(cfg: AppConfig['storage']): ObjectStorage {
 }
 
 /** Random object key under a prefix: `docs/2026/11/<uuid>`. Never derived from a file name. */
-export function newObjectKey(prefix: 'docs' | 'forms' | 'exports', now: Date = new Date()): string {
+export function newObjectKey(prefix: 'docs' | 'forms' | 'exports' | 'imports', now: Date = new Date()): string {
   return `${prefix}/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}/${randomUUID()}`;
 }
 

@@ -4766,6 +4766,202 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/master-import/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Legacy Master imports and reconciliation runs (Q1, Q211)
+         * @description System Admin or a delegate of `administer` on `templates` (403 otherwise). Newest first.
+         */
+        get: operations["listMasterImportRuns"];
+        put?: never;
+        /**
+         * Upload the real Site Master (no _tpl): identify, check, compare; nothing is applied
+         * @description Admin-only path for the real Master (Q1): System Admin or a delegate of `administer` on `templates` (403 before the file is read). The package guard of the templates applies (size 5 MB, no macros, embedded objects, external links or zip bomb).
+         *     The file is identified by its sheet names (`Master`) and the three Master header rows (group, sub-group, name), and its structure is checked against the 187 Master columns: a missing typed column refuses it (`structure_mismatch`); a moved or extra column is reported. A file with a `_tpl` sheet is a PMIS template (`is_pmis_template`: upload it on the Templates page).
+         *     The original is stored as uploaded with its SHA-256. Every Master row is compared with what the PMIS holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
+         *     Each refusal answers 422 `template_rejected` with `reason` and writes a System Log row (`source = master-import`); each accepted upload is audited and logged.
+         */
+        post: operations["uploadLegacyMaster"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** One run with its structure check and summary */
+        get: operations["getMasterImportRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/diffs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** The comparison report: differences and exceptions of a run (Q211) */
+        get: operations["listMasterImportDiffs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * The comparison report as XLSX (site, field, both values, source, reason, resolution)
+         * @description Same filters as the list. A sheet `Run` holds the file name, SHA-256, user and time. Values are written as text. Audited.
+         */
+        get: operations["exportMasterImportDiffs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /** The original file of a run, as uploaded (audited) */
+        get: operations["downloadMasterImportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter the typed task columns of a run through the normal batch flow
+         * @description The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
+         */
+        post: operations["applyMasterImportRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/diffs/{diff_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                diff_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Record the resolution of one difference (who, when, why)
+         * @description A note is required for every resolution except `open`. Audited with before and after. Nothing is applied from here.
+         */
+        patch: operations["resolveMasterImportDiff"];
+        trace?: never;
+    };
+    "/template-mapping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The task fields the stream templates and the Master sheet carry (Q207)
+         * @description Needs `view` on `templates`. `can_edit` says whether the caller holds `edit` on `templates` for all regions.
+         */
+        get: operations["getTemplateMapping"];
+        put?: never;
+        /**
+         * Test (dry run) or save a change of the template mapping
+         * @description System Admin or a delegate of `edit` on `templates` for all regions (403 otherwise). A reason is required. `dry_run: true` applies the change in a transaction that is rolled back and answers the impact per template (columns added, removed, changed; the version a save would issue; batches still in preview). A save issues the next versions of the templates whose columns change, with the reason, and is audited with before and after.
+         *     Field-level errors: `calculated_field` (a field the workflow sets, a calculated or register-owned field, or a task a template never writes, cannot become typed), `column_not_owned` (a Master column the PMIS does not own), `unknown_task`.
+         */
+        post: operations["saveTemplateMapping"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/import-aliases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The values of other files that mean a region or a PMIS role (Q8, Q10) */
+        get: operations["listImportAliases"];
+        /**
+         * Create or change one alias (reason, audited)
+         * @description System Admin or a delegate of `edit` on `templates` for all regions. A role alias with a target is `mapped`; without one it is `ambiguous` or `unmapped` and stays an import exception. A mapping never grants a right.
+         */
+        put: operations["saveImportAlias"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/generated-forms": {
         parameters: {
             query?: never;
@@ -8823,7 +9019,7 @@ export interface components {
          * @description Closed list returned as `reason` on 422 `template_rejected`. Each rejection is also written to the System Log (`source = template-check`).
          * @enum {string}
          */
-        TemplateRejectReason: "size_or_rows_exceeded" | "tpl_missing" | "template_unknown_or_inactive" | "outdated_version" | "wrong_template" | "checksum_mismatch" | "import_not_allowed" | "not_xlsx" | "macros_not_allowed" | "tpl_invalid";
+        TemplateRejectReason: "size_or_rows_exceeded" | "tpl_missing" | "template_unknown_or_inactive" | "outdated_version" | "wrong_template" | "checksum_mismatch" | "import_not_allowed" | "not_xlsx" | "macros_not_allowed" | "tpl_invalid" | "not_a_master" | "structure_mismatch" | "is_pmis_template";
         /** @description A note about a whole TPL-MASTER upload. Never blocking. */
         UploadWarning: {
             /**
@@ -8840,6 +9036,8 @@ export interface components {
         ImportBatchOutcome: {
             /** @description Rows sent into the flow (submit only). */
             submitted?: number;
+            /** @description Rows saved without submission (a Save Draft / Planning batch, 0.12.8). */
+            saved?: number;
             decided?: number;
             approved?: number;
             rejected?: number;
@@ -8849,10 +9047,10 @@ export interface components {
                 row_no: number;
                 key?: string | null;
                 /**
-                 * @description `open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor.
+                 * @description `open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor; `gate_locked`: a task a closed gate locks (Q208, 0.12.8).
                  * @enum {string}
                  */
-                reason: "open_version" | "open_submission" | "predecessor_open";
+                reason: "open_version" | "open_submission" | "predecessor_open" | "gate_locked";
                 /**
                  * Format: uuid
                  * @description The open version that blocks the row (a register row only).
@@ -8901,6 +9099,13 @@ export interface components {
             part_sheet?: string | null;
             /** @description The last note of a return. */
             note?: string | null;
+            /**
+             * @description Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.
+             * @enum {string}
+             */
+            mode?: "submit" | "draft";
+            /** @description D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed. */
+            file_template_version?: number | null;
             counts: {
                 create?: number;
                 update?: number;
@@ -8911,6 +9116,8 @@ export interface components {
                 rejected?: number;
                 /** @description Rows held `pending_previous_approval`. */
                 held?: number;
+                /** @description Rows saved without submission (draft batch). */
+                saved?: number;
             };
             /** @description Parse job (`GET /jobs/{job_id}`) while status is `parsing`. */
             job_id?: string | null;
@@ -8958,7 +9165,7 @@ export interface components {
             site_id?: string | null;
             /** @description Where the row came from in the file, `Sheet!row` (the comparison report of the parallel run). */
             source_ref?: string | null;
-            /** @description Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`. */
+            /** @description Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`, `held_gate_locked` (0.12.8). */
             warnings?: {
                 column?: string;
                 field?: string;
@@ -8979,19 +9186,225 @@ export interface components {
                 column?: string;
                 /** @description The code of the field. */
                 field?: string;
-                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `gate_locked`, `actual_date_required`, `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`). */
+                /** @description For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `actual_date_required`, `actual_start_required` (Q209), `ambiguous_mapping` (Q205), `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`). */
                 code: string;
                 message?: string;
             }[];
-            /** @enum {string} */
-            decision: "pending" | "approved" | "rejected" | "pending_previous_approval";
+            /**
+             * @description `saved`: a Save Draft / Planning row was saved without submission (0.12.8).
+             * @enum {string}
+             */
+            decision: "pending" | "approved" | "rejected" | "pending_previous_approval" | "saved";
             /**
              * @description Why a row is held `pending_previous_approval`.
              * @enum {string}
              */
-            hold_reason?: "open_version" | "open_submission" | "predecessor_open";
+            hold_reason?: "open_version" | "open_submission" | "predecessor_open" | "gate_locked";
             decided_by?: components["schemas"]["UserRef"];
             note?: string | null;
+        };
+        /** @description One upload of the real Site Master through the legacy path (Q1, Q211, 0.12.8). */
+        MasterImportRun: {
+            /** Format: uuid */
+            id: string;
+            file_name: string;
+            file_sha256: string;
+            file_size: number;
+            /** @enum {string} */
+            status: "previewed" | "applied";
+            /** @description The identification and structure check: `identified`, `columns_expected`, `columns_found`, `missing` [{letter, header, typed}], `moved` [{header, expected, found}], `extra` [headers], `missing_typed`, `sheets`, `register_sheets_missing`, `has_tpl`. */
+            structure: {
+                [key: string]: unknown;
+            };
+            /** @description `rows`, `sites_matched`, `sites_unknown`, `cells_compared`, `matches`, `cells_not_compared`, `diffs`, `missing_in_pmis`, `missing_in_master`, `exceptions`, `applicable`, `staff_mapped`, `staff_rows`, `by_reason` {reason: count}. */
+            summary: {
+                [key: string]: unknown;
+            };
+            created_by?: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            created_at: string;
+            applied_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            applied_at?: string | null;
+            apply_reason?: string | null;
+            /** @enum {string|null} */
+            apply_mode?: "submit" | "draft" | null;
+            /**
+             * Format: uuid
+             * @description The import batches the apply created (`GET /import-batches?group_id=`).
+             */
+            group_id?: string | null;
+            outcome?: components["schemas"]["MasterImportOutcome"] | null;
+            /** @description The original file is stored. */
+            has_file?: boolean;
+            version: number;
+        };
+        MasterImportOutcome: {
+            /** Format: uuid */
+            group_id?: string;
+            /** @enum {string} */
+            mode?: "submit" | "draft";
+            batches?: {
+                /** Format: uuid */
+                id?: string;
+                /** @description The stream. */
+                ref?: string;
+                template_id?: string;
+                submitted?: number;
+                saved?: number;
+                held?: number;
+                failed?: number;
+                /** @description Rows the staging refused. */
+                errors?: number;
+            }[];
+            skipped?: {
+                [key: string]: unknown;
+            }[];
+        };
+        MasterImportDiff: {
+            /** Format: uuid */
+            id: string;
+            sheet: string;
+            row_no?: number | null;
+            /** @description `Sheet!row` of the file. */
+            source_ref?: string | null;
+            site_code?: string | null;
+            /** Format: uuid */
+            site_id?: string | null;
+            region_id?: number | null;
+            /** @description The Master column letter. */
+            master_col?: string | null;
+            header?: string | null;
+            /** @description Where the PMIS holds the value (`B4:actual_date`, a site field, the issue projection). */
+            field?: string | null;
+            /** @description The value of the file (the cached value of a formula cell). */
+            master_value?: string | null;
+            pmis_value?: string | null;
+            /** @enum {string} */
+            kind: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+            /** @description `value_differs`, `empty_in_master`, `calculated`, `owned_elsewhere`, `issue_projection`, `site_not_in_pmis`, `site_not_in_master`, `duplicate_in_file`, `formula_in_input`, `ambiguous_mapping`, `region_alias_unknown`, `role_unmapped`, `role_ambiguous`, `role_unknown`. */
+            reason: string;
+            /** @description A typed task column the apply can enter. */
+            applicable?: boolean;
+            /** @enum {string} */
+            resolution: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+            resolution_note?: string | null;
+            resolved_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            resolved_at?: string | null;
+        };
+        MasterImportApplyRequest: {
+            /** @enum {string} */
+            mode: "submit" | "draft";
+            reason: string;
+        };
+        MasterImportDiffResolve: {
+            /** @enum {string} */
+            resolution: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+            note?: string;
+        };
+        TemplateTaskField: {
+            /** Format: uuid */
+            id?: string;
+            task_code: string;
+            /** @description planned_date, planned_start, actual_start, actual_date, submitted_date, approved_date, external_party, v:<key> or r:<register>.<field>. */
+            field_key: string;
+            label: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            field_type: "text" | "number" | "date" | "list" | "yes_no";
+            options?: string[] | null;
+            master_col?: string | null;
+            master_header?: string | null;
+            read_only: boolean;
+            is_active: boolean;
+            scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
+            /** @enum {string|null} */
+            projection?: "earliest" | "latest" | null;
+        };
+        TemplateMapping: {
+            fields: components["schemas"]["TemplateTaskField"][];
+            master_columns: {
+                letter?: string;
+                header?: string;
+                owner?: string;
+                fields?: number;
+            }[];
+            tasks: {
+                code?: string;
+                name_en?: string;
+                name_ar?: string | null;
+                stream?: string | null;
+                /** @enum {string} */
+                mode?: "edit" | "register" | "readonly" | "exclude";
+            }[];
+            can_edit: boolean;
+        };
+        TemplateMappingChange: {
+            /** @enum {string} */
+            op: "upsert" | "deactivate";
+            task_code: string;
+            field_key: string;
+            label?: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            field_type?: "text" | "number" | "date" | "list" | "yes_no";
+            options?: string[] | null;
+            master_col?: string | null;
+            read_only?: boolean;
+            scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
+            /** @enum {string|null} */
+            projection?: "earliest" | "latest" | null;
+        };
+        TemplateMappingRequest: {
+            changes: components["schemas"]["TemplateMappingChange"][];
+            reason: string;
+            /** @default false */
+            dry_run: boolean;
+        };
+        TemplateMappingResult: {
+            dry_run: boolean;
+            changes: number;
+            impact: {
+                template_id?: string;
+                kind?: string;
+                version_before?: number;
+                version_after?: number;
+                columns_added?: string[];
+                columns_removed?: string[];
+                columns_changed?: string[];
+                /** @description Batches of the template still in preview. */
+                open_batches?: number;
+            }[];
+        };
+        ImportAlias: {
+            /** @enum {string} */
+            kind: "region" | "role";
+            /** @description The value in lower case. */
+            alias: string;
+            label: string;
+            /** @description The region id, or the role code. */
+            target?: string | null;
+            target_name?: string | null;
+            /** @enum {string} */
+            status: "mapped" | "ambiguous" | "unmapped";
+            is_active: boolean;
+            note?: string | null;
+            /** Format: date-time */
+            updated_at?: string;
+        };
+        ImportAliasInput: {
+            /** @enum {string} */
+            kind: "region" | "role";
+            alias: string;
+            label?: string;
+            target?: string | null;
+            /** @enum {string} */
+            status?: "ambiguous" | "unmapped";
+            /** @default true */
+            is_active: boolean;
+            note?: string | null;
+            reason: string;
         };
         ImportDecisionRequest: {
             /**
@@ -20729,6 +21142,12 @@ export interface operations {
                      * @description Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.
                      */
                     task_id?: string;
+                    /**
+                     * @description Q206 (0.12.8): `draft` = Save Draft / Planning (stream templates and the Master sheet only; a register file is always submitted, 422 otherwise).
+                     * @default submit
+                     * @enum {string}
+                     */
+                    mode?: "submit" | "draft";
                 };
             };
         };
@@ -20780,7 +21199,7 @@ export interface operations {
         parameters: {
             query?: {
                 action?: "create" | "update" | "unchanged" | "error";
-                decision?: "pending" | "approved" | "rejected" | "pending_previous_approval";
+                decision?: "pending" | "approved" | "rejected" | "pending_previous_approval" | "saved";
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -20923,6 +21342,354 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listMasterImportRuns: {
+        parameters: {
+            query?: {
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MasterImportRun"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    uploadLegacyMaster: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The run, in status `previewed`. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            413: components["responses"]["PayloadTooLarge"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getMasterImportRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Run. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMasterImportDiffs: {
+        parameters: {
+            query?: {
+                kind?: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+                reason?: string;
+                resolution?: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+                site_code?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Differences in file order. Inside the caller's regions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["MasterImportDiff"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    exportMasterImportDiffs: {
+        parameters: {
+            query?: {
+                kind?: "diff" | "missing_in_pmis" | "missing_in_master" | "exception";
+                reason?: string;
+                resolution?: "open" | "pmis_correct" | "master_correct" | "fixed" | "ignored";
+                site_code?: string;
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The xlsx file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadMasterImportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The xlsx file. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyMasterImportRun: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MasterImportApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Applied. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"] & {
+                        outcome?: components["schemas"]["MasterImportOutcome"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    resolveMasterImportDiff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                diff_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MasterImportDiffResolve"];
+            };
+        };
+        responses: {
+            /** @description The difference. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportDiff"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getTemplateMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Mapping. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateMapping"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveTemplateMapping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplateMappingRequest"];
+            };
+        };
+        responses: {
+            /** @description Tested or saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateMappingResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listImportAliases: {
+        parameters: {
+            query?: {
+                kind?: "region" | "role";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aliases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ImportAlias"][];
+                        can_edit: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    saveImportAlias: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportAliasInput"];
+            };
+        };
+        responses: {
+            /** @description The alias. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportAlias"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listGeneratedForms: {

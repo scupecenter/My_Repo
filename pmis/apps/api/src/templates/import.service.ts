@@ -26,7 +26,7 @@ export type RejectReason =
 
 const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded'];
 
-const uploadBody = z.object({ template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional() }).passthrough();
+const uploadBody = z.object({ template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional(), mode: z.enum(['submit', 'draft']).optional() }).passthrough();
 const decisionBody = z
   .object({
     action: z.enum(['review', 'approve', 'reject', 'discard']),
@@ -54,12 +54,15 @@ interface BatchRow {
   part_sheet: string | null;
   note: string | null;
   module_key: string | null;
-  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint;
+  mode: string;
+  file_template_version: number | null;
+  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint;
   ts: string;
 }
 
 interface Outcome {
   submitted?: number;
+  saved?: number;
   decided?: number;
   approved?: number;
   rejected?: number;
@@ -165,8 +168,14 @@ export class ImportService {
     const issued = await this.templates.version(templateId, version);
     if (!issued) return this.reject(auth, requestId, 'tpl_invalid', `This file names version ${version} of ${templateId}, which was never issued.`, ctx);
     if (!issued.is_current) {
-      return this.reject(auth, requestId, 'outdated_version', `This file was made from version ${version} of ${templateId}; the current version is ${current.current_version}. Download the template again.`,
-        { ...ctx, current_version: current.current_version });
+      // D112: an older version is accepted when only non-input columns changed since; any change of a typed column refuses it with the list
+      const compat = await this.templates.compat(templateId, version);
+      if (!compat || !compat.compatible) {
+        const changed = (compat?.input_changes ?? []).slice(0, 8).map((c) => `${c.header ?? c.key} (${c.change})`).join(', ');
+        return this.reject(auth, requestId, 'outdated_version',
+          `This file was made from version ${version} of ${templateId}; the current version is ${current.current_version}${changed ? `, and typed columns changed between them: ${changed}${(compat?.input_changes.length ?? 0) > 8 ? ' ...' : ''}` : ''}. Download the template again.`,
+          { ...ctx, current_version: current.current_version, input_changes: compat?.input_changes ?? [] });
+      }
     }
     // 3. the template the user selected
     if (body.template_id && body.template_id !== templateId) {
@@ -174,7 +183,7 @@ export class ImportService {
     }
     if (current.kind === 'master') {
       if (body.task_id) return this.reject(auth, requestId, 'wrong_template', 'TPL-MASTER has no per-task upload: upload the stream template of the task.', ctx);
-      return this.uploadMaster(auth, requestId, ctx, wb, kv, issued as unknown as { columns: unknown; header_checksum: string }, templateId, version, file.originalname);
+      return this.uploadMaster(auth, requestId, ctx, wb, kv, issued as unknown as { columns: unknown; header_checksum: string }, templateId, version, file.originalname, body.mode ?? 'submit');
     }
     // 4. the header row
     const ws = wb.getWorksheet(kv.get('data_sheet') || DATA_SHEET) ?? wb.getWorksheet(DATA_SHEET);
@@ -206,7 +215,7 @@ export class ImportService {
 
     // 6. staging in the database, which decides every row again
     const payload = JSON.stringify(rows);
-    const id = await this.stage(auth, requestId, ctx, templateId, version, issued.header_checksum, file.originalname, String(ctx.sha256), body.task_id ?? null, payload);
+    const id = await this.stage(auth, requestId, ctx, templateId, version, issued.header_checksum, file.originalname, String(ctx.sha256), body.task_id ?? null, payload, body.mode ?? 'submit');
     return this.getBatch(auth, id);
   }
 
@@ -230,10 +239,10 @@ export class ImportService {
     }
   }
 
-  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string): Promise<string> {
+  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string, mode: string): Promise<string> {
     const id = await this.guarded(auth, requestId, ctx, async () => {
       const r = await this.db.tx.$queryRaw<{ id: string | null }[]>(Prisma.sql`
-        SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb)::text AS id`);
+        SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb, ${mode}::text)::text AS id`);
       if (!r[0]) throw new ProblemException(500, 'internal_error', {});
       return r[0].id;
     });
@@ -249,7 +258,7 @@ export class ImportService {
    */
   private async uploadMaster(
     auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, wb: ExcelJS.Workbook, kv: Map<string, string>,
-    issued: { columns: unknown; header_checksum: string }, templateId: string, version: number, fileName: string,
+    issued: { columns: unknown; header_checksum: string }, templateId: string, version: number, fileName: string, mode: string,
   ): Promise<Record<string, unknown>> {
     const parts = issued.columns as TplPart[];
     const claimed = kv.get('header_checksum');
@@ -307,7 +316,7 @@ export class ImportService {
     const payload = JSON.stringify(staged);
     const result = await this.guarded(auth, requestId, ctx, async () => {
       const r = await this.db.tx.$queryRaw<{ r: { group_id: string; batches: { id: string }[]; skipped: { sheet: string; kind: string; ref: string; reason?: string; detail?: string }[] } }[]>(Prisma.sql`
-        SELECT imp_stage_master(${templateId}::text, ${version}::int, ${fileName}::text, ${String(ctx.sha256)}::text, ${payload}::jsonb) AS r`);
+        SELECT imp_stage_master(${templateId}::text, ${version}::int, ${fileName}::text, ${String(ctx.sha256)}::text, ${payload}::jsonb, ${mode}::text) AS r`);
       const out = r[0]?.r;
       if (!out) throw new ProblemException(500, 'internal_error', {});
       return out;
@@ -470,7 +479,7 @@ export class ImportService {
     return Prisma.sql`
       SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
         b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL THEN 'sites' END) AS module_key,
-        c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held,
+        b.mode, b.file_template_version, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
       JOIN template_versions v ON v.id = b.template_version_id
@@ -482,7 +491,8 @@ export class ImportService {
           count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending') AS c_pending,
           count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'approved') AS c_approved,
           count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'rejected') AS c_rejected,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending_previous_approval') AS c_held
+          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending_previous_approval') AS c_held,
+          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'saved') AS c_saved
         FROM v_import_rows x WHERE x.batch_id = b.id) c
       WHERE ${where}
       ${tail}`;
@@ -503,8 +513,10 @@ export class ImportService {
         levels_required: 2,
         counts: {
           create: Number(r.c_create), update: Number(r.c_update), unchanged: Number(r.c_unchanged), error: Number(r.c_error),
-          pending: Number(r.c_pending), approved: Number(r.c_approved), rejected: Number(r.c_rejected), held: Number(r.c_held),
+          pending: Number(r.c_pending), approved: Number(r.c_approved), rejected: Number(r.c_rejected), held: Number(r.c_held), saved: Number(r.c_saved),
         },
+        mode: r.mode,
+        file_template_version: r.file_template_version,
         job_id: null,
         task_id: r.task_id,
         site_id: r.site_id,
@@ -576,8 +588,8 @@ export class ImportService {
     const action = oneParam(q, 'action');
     if (action !== undefined && !['create', 'update', 'unchanged', 'error'].includes(action)) throw problems.validation([{ path: '/action', code: 'invalid', message: 'action is create, update, unchanged or error.' }]);
     const decision = oneParam(q, 'decision');
-    if (decision !== undefined && !['pending', 'approved', 'rejected', 'pending_previous_approval'].includes(decision)) {
-      throw problems.validation([{ path: '/decision', code: 'invalid', message: 'decision is pending, approved, rejected or pending_previous_approval.' }]);
+    if (decision !== undefined && !['pending', 'approved', 'rejected', 'pending_previous_approval', 'saved'].includes(decision)) {
+      throw problems.validation([{ path: '/decision', code: 'invalid', message: 'decision is pending, approved, rejected, pending_previous_approval or saved.' }]);
     }
     const rows = await this.db.tx.$queryRaw<{
       id: string; sheet: string; row_no: number; row_key: string | null; action: string; diff: Record<string, unknown> | null; errors: unknown[] | null; eff_decision: string;

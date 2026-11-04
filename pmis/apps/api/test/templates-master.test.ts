@@ -73,6 +73,9 @@ async function masterTeam(): Promise<MasterTeam> {
 }
 
 describe('download', () => {
+  // the version of a download is read while no other suite issues a new one
+  beforeEach(async () => { await db.query('SELECT pg_advisory_lock(770101)'); });
+  afterEach(async () => { await db.query('SELECT pg_advisory_unlock(770101)'); });
   it('issues the whole Master layout: 187 columns with the Master names in Master order, a sheet per register the caller may use, grey locked columns for what is not read', async () => {
     const m = await masterTeam();
     const dl = await downloadTemplate(m.as.entry.api, 'TPL-MASTER');
@@ -156,6 +159,9 @@ describe('download', () => {
 });
 
 describe('upload: split into one batch per part', () => {
+  // a download and its upload must see the same TPL-MASTER version: the suites that issue new versions hold the same lock
+  beforeEach(async () => { await db.query('SELECT pg_advisory_lock(770101)'); });
+  afterEach(async () => { await db.query('SELECT pg_advisory_unlock(770101)'); });
   it('stages the Master sheet as one batch per stream and each register sheet as its own, grouped; each follows its own flow; warnings for what the PMIS does not own', async () => {
     const m = await masterTeam();
     const dl = await downloadTemplate(m.as.entry.api, 'TPL-MASTER');
@@ -275,7 +281,7 @@ describe('upload: split into one batch per part', () => {
     const o = await uploadFile(m.as.entry.api, out);
     expect(o.status).toBe(202);
     expect((await rowsOf(m.as.entry.api, o.body.parts[0].id))[0]!.errors[0]).toMatchObject({ code: 'site_not_in_scope' });
-  });
+  }, 120_000); // waits for the template-version lock (770101) while the other suites issue versions
 });
 
 describe('template versions', () => {

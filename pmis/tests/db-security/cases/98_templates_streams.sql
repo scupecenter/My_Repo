@@ -102,7 +102,7 @@ SELECT imp_decide_register_batch('{{BATCH_TRI}}', NULL, 'approve', 'all', NULL, 
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied for function
-SELECT imp_stage_task_row('[]'::jsonb, '{}'::jsonb, NULL, NULL, NULL, NULL);
+SELECT imp_stage_task_row('[]'::jsonb, '{}'::jsonb, NULL, NULL, NULL, NULL, NULL);  -- 0060 added the mode
 -- @end
 
 -- @case TS-12
@@ -138,7 +138,7 @@ SELECT imp_decide_stream_batch('{{BATCH_STREAM_TRI}}', NULL, 'approve', 'all', N
 -- @actor ALICE
 -- @region 1
 -- @expect error 42501 permission denied for function
-SELECT imp_stage_stream_batch('TPL-SITE-CW', 1, NULL, 'x.xlsx', 'x', NULL, '[]'::jsonb);
+SELECT imp_stage_stream_batch('TPL-SITE-CW', 1, NULL, 'x.xlsx', 'x', NULL, '[]'::jsonb, NULL, NULL, NULL, NULL);  -- 0060 signature
 -- @end
 
 -- @case TS-16

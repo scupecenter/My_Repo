@@ -104,6 +104,9 @@ import { ScenarioService } from './scenario/scenario.service';
 import { IntegrityService } from './logs/integrity.service';
 import { HealthController, MailController } from './mail/mail.controller';
 import { MailService } from './mail/mail.service';
+import { MappingService } from './master-import/mapping.service';
+import { MasterImportController, TemplateMappingController } from './master-import/master-import.controller';
+import { MasterImportService } from './master-import/master-import.service';
 
 export function appModuleFor(config: AppConfig) {
   @Module({
@@ -116,6 +119,7 @@ export function appModuleFor(config: AppConfig) {
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
+      MasterImportController, TemplateMappingController,
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -129,6 +133,7 @@ export function appModuleFor(config: AppConfig) {
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
       { provide: MailPort, useClass: OutboxMail },
+      MasterImportService, MappingService,
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

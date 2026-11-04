@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.7
+  version: 0.12.8
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.8 (2026-11-04): additive. Work package P3 of the owner answers of 2026-11-04 (migration 0060; CHANGELOG 91). (1) Q1 / Q211, the admin-only legacy import of the real Site Master (no `_tpl`): `POST /master-import/runs` (System Admin or a delegate of `templates` `administer`; the same package guard as a template: macros, embedded objects, external links, size, zip bomb) identifies the file by its sheet names and the three Master header rows, checks the structure (422 `template_rejected` with `not_a_master`, `structure_mismatch` or `is_pmis_template`, written to the System Log, source `master-import`), stores the original file and its SHA-256, and writes the per-cell comparison with what the PMIS holds without changing anything (`MasterImportRun`, `MasterImportDiff`: site, field, both values, `Sheet!row`, kind, reason, resolution). `GET /master-import/runs`, `GET .../{run_id}`, `GET .../{run_id}/diffs`, `GET .../{run_id}/export` (the comparison report as XLSX), `GET .../{run_id}/file` (the original, audited), `PATCH /master-import/diffs/{diff_id}` (the resolution and its note, audited), and `POST .../{run_id}/apply` (reason, step-up, `mode` submit or draft; If-Match): the typed task columns enter through the TPL-MASTER staging and the batch flow (`ImportBatch.source` `master_import`, one `group_id`), so L1 holders, gates, dates, documents and L2 decide as for a person; a file is applied once. Every use is audited and logged. (2) Q8 / Q10: `GET /import-aliases?kind=region|role` and `PUT /import-aliases` (templates edit for all regions, a reason, audited): the Master values that mean a region or a PMIS role; unmapped and ambiguous values are import exceptions; an imported title never grants a right. (3) Q207: `GET /template-mapping` and `POST /template-mapping` (`dry_run` true tests the change and answers its impact per template without saving; a save issues the next template versions with the reason): a calculated or register-owned field never becomes typed (`calculated_field`), a Master column the PMIS does not own is never mapped (`column_not_owned`). (4) Q206: `uploadImportBatch` takes `mode` (`submit`, the default, or `draft` = Save Draft / Planning for the stream templates and the Master sheet): a draft row needs no actual date or document, is saved without submission (`ImportRow.decision` `saved`, `ImportBatch.counts.saved`, `ImportBatchOutcome.saved`), and the batch ends `applied`; it has no L2 decision (409). (5) Q208: a task locked by a closed gate is held (`hold_reason` `gate_locked`, warning `held_gate_locked`) instead of refused, and is applied only when the batch is sent again. (6) Q209: a pending task is started with the row's (or the task's) actual start; a task without an Actual Start column uses its actual date; today is never used (`actual_start_required`). (7) Q205: a Master column may carry several task fields (AY/AZ: B8 or B9; BK:BN: B10 or B11 with a documented projection); on upload the task that applies on the site is written, a projected column is not read, and an ambiguous one refuses the row (`ambiguous_mapping`). (8) D112: a file of an older template version is accepted when only non-input columns changed (`ImportBatch.file_template_version`); a changed typed column refuses it with `outdated_version`, the message naming the changed columns.
     - 0.12.7 (2026-11-04): work package P2 of the owner answers of 2026-11-04 (dashboard, Project Status, delay attribution; migration 0059; CHANGELOG 90). Additive except where noted. (1) Q7: delay that no approved period covers is `kind` `unattributed` (party `unattributed`) with the task's R party only as `suggested_party`; the kinds `external`, `default_type` and `unassigned` are no longer sent (not additive for a client that grouped by them). New `attributed_working_days`, `unattributed_working_days`, `attributed_pct`, `data_gap_working_days`, `proposed_working_days`, `proposals_count`, `pending_party_count` and `scorecard` (approved periods only). (2) Q180 (delay side): suspension days use `coalesce(suspension_start, approval_date)` to the first later `coalesce(resumption_date, approval_date)`. (3) Q181: a late task without a due date has its window rebuilt from the SLA start plus the maximum; when no day can be placed its days are a data gap (`data_gap`, no suggestion). (4) Q182, Q184: `POST /tasks/{task_id}/delay-periods` now **proposes** a period (status `proposed`, optional `evidence`; L1 may propose) with no effect; `POST /tasks/{task_id}/delay-periods/{period_id}/decision` approves or rejects it (L2, a System Admin or `dashboard.delay` edit; never the proposer: 403 `self_beneficiary`; a rejection needs `note`); approving a `contractor` or `external` period needs `external_party_id` (422 `external_party_required`). `DelayPeriod` gains `status`, `evidence`, `proposed_by`, `decided_by`, `decided_at`, `decision_note`, `counts`; `DelayPeriodList` gains `can_propose`, `can_decide`, `me`, `external_parties`. (5) Q175: a manual central value counts in the project-wide figure only; regional, site and filtered figures show it in `central_line` (not additive for clients that read the regional figure with manual values). (6) Q176: `source` is required on `POST /project-status/manual-items/{item_code}/values` (not additive). (7) Q177: `POST /project-status/manual-items/{item_code}/plan` (points or a target date), `ManualItem.plan`, `DashboardProjectStatusItem.plan`; `progress_vs_plan_index` (the old `spi`, same value, kept), `partial_index`. (8) Q178: an effective date before the current month needs `dashboard.historical_correction` edit (403 otherwise) and is flagged `historical_correction`; `ManualItemList.open_period_from`, `can_correct_history`, `without_plan`. (9) Q186: blocked gates that cannot be known for the date are null: `DashboardGates.status` (`live`, `snapshot`, `historically_unavailable`), `blocked_total` may be null, `DashboardMilestone.blocked` may be null with `blocked_available`; `DashboardBasis.snapshot_kinds[].rebuilt` and `taken_at`. (10) D186: the weekly snapshot is on Thursday (setting `dashboard.snapshot_weekday` 4). (11) D16: `DashboardHealth.components[].draft`, `draft_factors`, `approved_factors`; `meta.health_draft_factors`. (12) Q116: `meta.pipeline_variant` (A rings, default; B flat segmented track) and `PUT /dashboard/pipeline-variant`. (13) Q187: the xlsx export has the sheets Project Overview, CW, TE, Late tasks, Delay attribution, Project Status items, Regions and About.
     - 0.12.6 (2026-11-04): identity and profile follow-up of the owner answers of 2026-11-04 (work package P8, migration 0058, CHANGELOG 86). **Not additive for the phone:** (1) D156: the phone is a sign-in identifier, so `PATCH /me/profile` no longer takes `phone` (403 `field_read_only`, `errors[]` names `/phone` and points to the request) and `MyProfile.editable_fields` is `display_name`, `locale`, `theme`. A phone change is a request an admin approves, like the email: `POST /me/phone-change` (new E.164 phone or null, the password re-entered; one pending request per user; the number must be free), `DELETE /me/phone-change` (cancel while pending), `GET /phone-change-requests` and `POST /phone-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account); `MyProfile.phone_change`; notification kinds `phone_change_requested` and `phone_change_decided`. (2) Q158: the new email address is verified before an approval. `POST /me/email-change` mails a one-time code (XXXX-XXXX, valid `email_change.verify_hours`, default 24) to the new address and a notice to the old one; `POST /me/email-change/verify` and `POST /me/email-change/resend`; `EmailChangeRequest` carries `verified_at`, `verified_via` (`code`, `admin_check`), `verify_sent_at` and `verify_expires_at`. An approval of an unverified address is 409 `email_not_verified` unless the admin sends `identity_check` (the documented check made while mail is unavailable; stored in `EmailChangeRequestAdmin.identity_check` and audited). Old and new addresses are told of the decision by mail. (3) Q161: turning two-factor off ends the other sessions (self, from the profile) or all the user's sessions (admin, `PUT /users/{user_id}/two-factor`), and writes a `security_notice` to the user's inbox and by mail. (4) Q18: an assignment overlaps only when the same person and role overlap in dates **and** share a region **and** a module; `BulkItemIssue.conflicts` lists the conflicting assignment ids. New error code `email_not_verified`.
     - 0.12.5 (2026-11-04): additive. The register framework of work package P5 (owner answers Q12, Q104, Q111 and D108b; migration 0057; CHANGELOG 85). (1) Q104, lists are data: new tag `lists` with `GET`/`POST /list-catalogues`, `GET`/`PATCH /list-catalogues/{catalogue_code}`, `POST /list-catalogues/{catalogue_code}/values` and `PATCH /list-catalogues/{catalogue_code}/values/{value_id}` (System Admin or a delegate of `fields` edit for all regions; a reason; If-Match; audited with before and after). A value has a stable `code` (the text stored in the records), EN/AR labels, `aliases` (old names that map to it), `groups` and `is_active` (deactivated, never deleted). A list has `critical`, `status` (`pending` = a draft for the owner's review, `confirmed`) and `allow_other`. Every list field of a register now reads its catalogue: `RegisterField.list` names it and `options` lists its active values with their Arabic labels; a value may be typed as its code, its label or an alias. A list that accepts another value keeps it as typed and the record shows the warning `list_other`; a critical list accepts only its values, and while it has no active value the final approval of a record of a register that uses it answers 422 `list_not_configured` (new error code; `lists` names them). An inactive value may stay only where the previous version had it (422 `validation_failed`, code `inactive_value`, at submit). (2) Field types: `RegisterField.type` gains `multi_user`, `multi_site`, `child_list` and `warehouse_item`; `file` and `multi_list` are now used by register fields. Values: `multi_user` and `multi_site` are arrays of ids (users may be given by employee ID or e-mail, sites by code); `warehouse_item` is an item id (or its code on input); `file` is the id of a file uploaded to a document slot of the record (checked at submit, code `file_not_attached`: a typed reference is not an upload); `child_list` is an array of row objects with the columns of `RegisterField.columns` and a stable `id` given by the server. `RegisterRecord.refs` resolves the ids of a record to names and codes for display. (3) Q12 / Q111, Meetings: new fields `organiser`, `attendee_users`, `linked_site_ids` (empty = a project-wide meeting), `minutes_file` and `action_items_list` (action, owner, due date, status, closed date, task link; a closed status needs the closed date). The old free-text fields `attendees`, `linked_sites`, `minutes_ref` and `action_items` are read-only; `GET /registers/{register_key}/records/{record_id}/legacy-conversion` proposes the structured values from them and `POST` of the same path applies the reviewed values once (409 `duplicate` when done already; a reason; audited). (4) D108b: As-Built gains `rf_height_note` beside the number `rf_height`. (5) Templates: multi values are separated by ";"; file and child-list columns are grey and never read.
@@ -7306,6 +7307,7 @@ paths:
                 file: {type: string, format: binary}
                 template_id: {type: string, description: The template the user selected.}
                 task_id: {type: string, format: uuid, description: 'Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.'}
+                mode: {type: string, enum: [submit, draft], default: submit, description: 'Q206 (0.12.8): `draft` = Save Draft / Planning (stream templates and the Master sheet only; a register file is always submitted, 422 otherwise).'}
       responses:
         '202':
           description: Accepted. The file is parsed and staged in the request, so the batch is already `validated` (`job_id` stays null; `parsing` is kept for a future background parse).
@@ -7353,7 +7355,7 @@ paths:
         in: query
         schema:
           type: string
-          enum: [pending, approved, rejected, pending_previous_approval]
+          enum: [pending, approved, rejected, pending_previous_approval, saved]
       - {$ref: '#/components/parameters/Limit'}
       - {$ref: '#/components/parameters/Cursor'}
       responses:
@@ -7480,6 +7482,287 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /master-import/runs:
+    get:
+      tags: [templates]
+      operationId: listMasterImportRuns
+      summary: Legacy Master imports and reconciliation runs (Q1, Q211)
+      description: System Admin or a delegate of `administer` on `templates` (403 otherwise). Newest first.
+      parameters:
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Runs.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/MasterImportRun'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [templates]
+      operationId: uploadLegacyMaster
+      summary: 'Upload the real Site Master (no _tpl): identify, check, compare; nothing is applied'
+      description: |
+        Admin-only path for the real Master (Q1): System Admin or a delegate of `administer` on `templates` (403 before the file is read). The package guard of the templates applies (size 5 MB, no macros, embedded objects, external links or zip bomb).
+        The file is identified by its sheet names (`Master`) and the three Master header rows (group, sub-group, name), and its structure is checked against the 187 Master columns: a missing typed column refuses it (`structure_mismatch`); a moved or extra column is reported. A file with a `_tpl` sheet is a PMIS template (`is_pmis_template`: upload it on the Templates page).
+        The original is stored as uploaded with its SHA-256. Every Master row is compared with what the PMIS holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
+        Each refusal answers 422 `template_rejected` with `reason` and writes a System Log row (`source = master-import`); each accepted upload is audited and logged.
+      x-db-path: mi_stage_run
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        '201':
+          description: The run, in status `previewed`.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MasterImportRun'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '413': {$ref: '#/components/responses/PayloadTooLarge'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /master-import/runs/{run_id}:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [templates]
+      operationId: getMasterImportRun
+      summary: One run with its structure check and summary
+      responses:
+        '200':
+          description: Run.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MasterImportRun'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /master-import/runs/{run_id}/diffs:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [templates]
+      operationId: listMasterImportDiffs
+      summary: 'The comparison report: differences and exceptions of a run (Q211)'
+      parameters:
+      - {name: kind, in: query, schema: {type: string, enum: [diff, missing_in_pmis, missing_in_master, exception]}}
+      - {name: reason, in: query, schema: {type: string}}
+      - {name: resolution, in: query, schema: {type: string, enum: [open, pmis_correct, master_correct, fixed, ignored]}}
+      - {name: site_code, in: query, schema: {type: string}}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Differences in file order. Inside the caller's regions.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/MasterImportDiff'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /master-import/runs/{run_id}/export:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [templates]
+      operationId: exportMasterImportDiffs
+      summary: The comparison report as XLSX (site, field, both values, source, reason, resolution)
+      description: Same filters as the list. A sheet `Run` holds the file name, SHA-256, user and time. Values are written as text. Audited.
+      parameters:
+      - {name: kind, in: query, schema: {type: string, enum: [diff, missing_in_pmis, missing_in_master, exception]}}
+      - {name: reason, in: query, schema: {type: string}}
+      - {name: resolution, in: query, schema: {type: string, enum: [open, pmis_correct, master_correct, fixed, ignored]}}
+      - {name: site_code, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: The xlsx file.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, contentMediaType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /master-import/runs/{run_id}/file:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [templates]
+      operationId: downloadMasterImportFile
+      summary: The original file of a run, as uploaded (audited)
+      responses:
+        '200':
+          description: The xlsx file.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, contentMediaType: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /master-import/runs/{run_id}/apply:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [templates]
+      operationId: applyMasterImportRun
+      summary: Enter the typed task columns of a run through the normal batch flow
+      description: |
+        The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
+      x-step-up: true
+      x-db-path: mi_apply_run
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MasterImportApplyRequest'}
+      responses:
+        '200':
+          description: Applied.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/MasterImportRun'}
+                - type: object
+                  properties:
+                    outcome: {$ref: '#/components/schemas/MasterImportOutcome'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /master-import/diffs/{diff_id}:
+    parameters:
+    - {name: diff_id, in: path, required: true, schema: {type: string, format: uuid}}
+    patch:
+      tags: [templates]
+      operationId: resolveMasterImportDiff
+      summary: Record the resolution of one difference (who, when, why)
+      description: A note is required for every resolution except `open`. Audited with before and after. Nothing is applied from here.
+      x-db-path: mi_resolve_diff
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MasterImportDiffResolve'}
+      responses:
+        '200':
+          description: The difference.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MasterImportDiff'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /template-mapping:
+    get:
+      tags: [templates]
+      operationId: getTemplateMapping
+      summary: The task fields the stream templates and the Master sheet carry (Q207)
+      description: Needs `view` on `templates`. `can_edit` says whether the caller holds `edit` on `templates` for all regions.
+      responses:
+        '200':
+          description: Mapping.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateMapping'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [templates]
+      operationId: saveTemplateMapping
+      summary: Test (dry run) or save a change of the template mapping
+      description: |
+        System Admin or a delegate of `edit` on `templates` for all regions (403 otherwise). A reason is required. `dry_run: true` applies the change in a transaction that is rolled back and answers the impact per template (columns added, removed, changed; the version a save would issue; batches still in preview). A save issues the next versions of the templates whose columns change, with the reason, and is audited with before and after.
+        Field-level errors: `calculated_field` (a field the workflow sets, a calculated or register-owned field, or a task a template never writes, cannot become typed), `column_not_owned` (a Master column the PMIS does not own), `unknown_task`.
+      x-db-path: tpl_mapping_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/TemplateMappingRequest'}
+      responses:
+        '200':
+          description: Tested or saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/TemplateMappingResult'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /import-aliases:
+    get:
+      tags: [templates]
+      operationId: listImportAliases
+      summary: The values of other files that mean a region or a PMIS role (Q8, Q10)
+      parameters:
+      - {name: kind, in: query, schema: {type: string, enum: [region, role], default: region}}
+      responses:
+        '200':
+          description: Aliases.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, can_edit]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/ImportAlias'}
+                  can_edit: {type: boolean}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [templates]
+      operationId: saveImportAlias
+      summary: Create or change one alias (reason, audited)
+      description: System Admin or a delegate of `edit` on `templates` for all regions. A role alias with a target is `mapped`; without one it is `ambiguous` or `unmapped` and stays an import exception. A mapping never grants a right.
+      x-db-path: imp_alias_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ImportAliasInput'}
+      responses:
+        '200':
+          description: The alias.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportAlias'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /generated-forms:
     get:
       tags: [forms]
@@ -12706,7 +12989,7 @@ components:
     TemplateRejectReason:
       type: string
       description: Closed list returned as `reason` on 422 `template_rejected`. Each rejection is also written to the System Log (`source = template-check`).
-      enum: [size_or_rows_exceeded, tpl_missing, template_unknown_or_inactive, outdated_version, wrong_template, checksum_mismatch, import_not_allowed, not_xlsx, macros_not_allowed, tpl_invalid]
+      enum: [size_or_rows_exceeded, tpl_missing, template_unknown_or_inactive, outdated_version, wrong_template, checksum_mismatch, import_not_allowed, not_xlsx, macros_not_allowed, tpl_invalid, not_a_master, structure_mismatch, is_pmis_template]
     UploadWarning:
       type: object
       required: [code, message]
@@ -12722,6 +13005,7 @@ components:
       description: What a send or a decision did. `held` lists the rows held `pending_previous_approval`; `failed` the rows that could not be sent or decided.
       properties:
         submitted: { type: integer, description: Rows sent into the flow (submit only). }
+        saved: { type: integer, description: 'Rows saved without submission (a Save Draft / Planning batch, 0.12.8).' }
         decided: { type: integer }
         approved: { type: integer }
         rejected: { type: integer }
@@ -12734,7 +13018,7 @@ components:
               row_id: { type: string, format: uuid }
               row_no: { type: integer }
               key: { type: [string, 'null'] }
-              reason: { type: string, enum: [open_version, open_submission, predecessor_open], description: '`open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor.' }
+              reason: { type: string, enum: [open_version, open_submission, predecessor_open, gate_locked], description: '`open_version`: a register record with an open version; `open_submission`: a task in review or approval; `predecessor_open`: a task that waits for a predecessor; `gate_locked`: a task a closed gate locks (Q208, 0.12.8).' }
               record_id: { type: [string, 'null'], format: uuid, description: The open version that blocks the row (a register row only). }
         failed:
           type: array
@@ -12769,6 +13053,8 @@ components:
         group_id: { type: [string, 'null'], format: uuid, description: The batches of one TPL-MASTER file share it. }
         part_sheet: { type: [string, 'null'], description: The sheet of the file this batch came from. }
         note: { type: [string, 'null'], description: The last note of a return. }
+        mode: { type: string, enum: [submit, draft], description: 'Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.' }
+        file_template_version: { type: [integer, 'null'], description: 'D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed.' }
         counts:
           type: object
           properties:
@@ -12780,6 +13066,7 @@ components:
             approved: { type: integer }
             rejected: { type: integer }
             held: { type: integer, description: Rows held `pending_previous_approval`. }
+            saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
         job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
@@ -12803,7 +13090,7 @@ components:
         source_ref: { type: [string, 'null'], description: 'Where the row came from in the file, `Sheet!row` (the comparison report of the parallel run).' }
         warnings:
           type: array
-          description: 'Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`.'
+          description: 'Never blocking: `sla_negative`, `sla_late`, `date_order`, `calculated_column`, `held_predecessor`, `held_open_submission`, `held_gate_locked` (0.12.8).'
           items:
             type: object
             required: [code]
@@ -12829,12 +13116,207 @@ components:
             properties:
               column: { type: string, description: The header of the column in the file. }
               field: { type: string, description: The code of the field. }
-              code: { type: string, description: 'For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `gate_locked`, `actual_date_required`, `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`).' }
+              code: { type: string, description: 'For example `site_not_in_scope`, `invalid_date`, `not_in_list`, `required`, `duplicate_in_file`, `formula_not_allowed`, `not_entry_holder`, `action_forbidden`, `stale_base`; a task row also `task_not_on_site`, `task_not_open`, `task_approved`, `actual_date_required`, `actual_start_required` (Q209), `ambiguous_mapping` (Q205), `mandatory_slots_missing`, `future_date`; or a register rule (`in_house_with_pr`).' }
               message: { type: string }
-        decision: { type: string, enum: [pending, approved, rejected, pending_previous_approval] }
-        hold_reason: { type: string, enum: [open_version, open_submission, predecessor_open], description: Why a row is held `pending_previous_approval`. }
+        decision: { type: string, enum: [pending, approved, rejected, pending_previous_approval, saved], description: '`saved`: a Save Draft / Planning row was saved without submission (0.12.8).' }
+        hold_reason: { type: string, enum: [open_version, open_submission, predecessor_open, gate_locked], description: Why a row is held `pending_previous_approval`. }
         decided_by: { $ref: '#/components/schemas/UserRef' }
         note: { type: [string, 'null'] }
+    MasterImportRun:
+      type: object
+      required: [id, file_name, file_sha256, file_size, status, structure, summary, created_at, version]
+      description: 'One upload of the real Site Master through the legacy path (Q1, Q211, 0.12.8).'
+      properties:
+        id: { type: string, format: uuid }
+        file_name: { type: string }
+        file_sha256: { type: string }
+        file_size: { type: integer }
+        status: { type: string, enum: [previewed, applied] }
+        structure:
+          type: object
+          description: 'The identification and structure check: `identified`, `columns_expected`, `columns_found`, `missing` [{letter, header, typed}], `moved` [{header, expected, found}], `extra` [headers], `missing_typed`, `sheets`, `register_sheets_missing`, `has_tpl`.'
+          additionalProperties: true
+        summary:
+          type: object
+          description: '`rows`, `sites_matched`, `sites_unknown`, `cells_compared`, `matches`, `cells_not_compared`, `diffs`, `missing_in_pmis`, `missing_in_master`, `exceptions`, `applicable`, `staff_mapped`, `staff_rows`, `by_reason` {reason: count}.'
+          additionalProperties: true
+        created_by: { $ref: '#/components/schemas/UserRef' }
+        created_at: { type: string, format: date-time }
+        applied_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        applied_at: { type: [string, 'null'], format: date-time }
+        apply_reason: { type: [string, 'null'] }
+        apply_mode: { type: [string, 'null'], enum: [submit, draft, null] }
+        group_id: { type: [string, 'null'], format: uuid, description: The import batches the apply created (`GET /import-batches?group_id=`). }
+        outcome: { oneOf: [{ $ref: '#/components/schemas/MasterImportOutcome' }, { type: 'null' }] }
+        has_file: { type: boolean, description: The original file is stored. }
+        version: { type: integer }
+    MasterImportOutcome:
+      type: object
+      properties:
+        group_id: { type: string, format: uuid }
+        mode: { type: string, enum: [submit, draft] }
+        batches:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              ref: { type: string, description: The stream. }
+              template_id: { type: string }
+              submitted: { type: integer }
+              saved: { type: integer }
+              held: { type: integer }
+              failed: { type: integer }
+              errors: { type: integer, description: Rows the staging refused. }
+        skipped: { type: array, items: { type: object, additionalProperties: true } }
+    MasterImportDiff:
+      type: object
+      required: [id, sheet, kind, reason, resolution]
+      properties:
+        id: { type: string, format: uuid }
+        sheet: { type: string }
+        row_no: { type: [integer, 'null'] }
+        source_ref: { type: [string, 'null'], description: '`Sheet!row` of the file.' }
+        site_code: { type: [string, 'null'] }
+        site_id: { type: [string, 'null'], format: uuid }
+        region_id: { type: [integer, 'null'] }
+        master_col: { type: [string, 'null'], description: The Master column letter. }
+        header: { type: [string, 'null'] }
+        field: { type: [string, 'null'], description: 'Where the PMIS holds the value (`B4:actual_date`, a site field, the issue projection).' }
+        master_value: { type: [string, 'null'], description: The value of the file (the cached value of a formula cell). }
+        pmis_value: { type: [string, 'null'] }
+        kind: { type: string, enum: [diff, missing_in_pmis, missing_in_master, exception] }
+        reason: { type: string, description: '`value_differs`, `empty_in_master`, `calculated`, `owned_elsewhere`, `issue_projection`, `site_not_in_pmis`, `site_not_in_master`, `duplicate_in_file`, `formula_in_input`, `ambiguous_mapping`, `region_alias_unknown`, `role_unmapped`, `role_ambiguous`, `role_unknown`.' }
+        applicable: { type: boolean, description: A typed task column the apply can enter. }
+        resolution: { type: string, enum: [open, pmis_correct, master_correct, fixed, ignored] }
+        resolution_note: { type: [string, 'null'] }
+        resolved_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        resolved_at: { type: [string, 'null'], format: date-time }
+    MasterImportApplyRequest:
+      type: object
+      required: [mode, reason]
+      additionalProperties: false
+      properties:
+        mode: { type: string, enum: [submit, draft] }
+        reason: { type: string, minLength: 3, maxLength: 2000 }
+    MasterImportDiffResolve:
+      type: object
+      required: [resolution]
+      additionalProperties: false
+      properties:
+        resolution: { type: string, enum: [open, pmis_correct, master_correct, fixed, ignored] }
+        note: { type: string, maxLength: 1000 }
+    TemplateTaskField:
+      type: object
+      required: [task_code, field_key, label, field_type, read_only, is_active]
+      properties:
+        id: { type: string, format: uuid }
+        task_code: { type: string }
+        field_key: { type: string, description: 'planned_date, planned_start, actual_start, actual_date, submitted_date, approved_date, external_party, v:<key> or r:<register>.<field>.' }
+        label: { type: string }
+        label_ar: { type: [string, 'null'] }
+        field_type: { type: string, enum: [text, number, date, list, yes_no] }
+        options: { type: [array, 'null'], items: { type: string } }
+        master_col: { type: [string, 'null'] }
+        master_header: { type: [string, 'null'] }
+        read_only: { type: boolean }
+        is_active: { type: boolean }
+        scenarios: { type: [array, 'null'], items: { type: string, enum: [new_build, expansion, hot_swap, cold_swap, relocation] } }
+        projection: { type: [string, 'null'], enum: [earliest, latest, null] }
+    TemplateMapping:
+      type: object
+      required: [fields, master_columns, tasks, can_edit]
+      properties:
+        fields: { type: array, items: { $ref: '#/components/schemas/TemplateTaskField' } }
+        master_columns:
+          type: array
+          items:
+            type: object
+            properties:
+              letter: { type: string }
+              header: { type: string }
+              owner: { type: string }
+              fields: { type: integer }
+        tasks:
+          type: array
+          items:
+            type: object
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              stream: { type: [string, 'null'] }
+              mode: { type: string, enum: [edit, register, readonly, exclude] }
+        can_edit: { type: boolean }
+    TemplateMappingChange:
+      type: object
+      required: [op, task_code, field_key]
+      additionalProperties: false
+      properties:
+        op: { type: string, enum: [upsert, deactivate] }
+        task_code: { type: string }
+        field_key: { type: string }
+        label: { type: string, maxLength: 80 }
+        label_ar: { type: [string, 'null'], maxLength: 80 }
+        field_type: { type: string, enum: [text, number, date, list, yes_no] }
+        options: { type: [array, 'null'], items: { type: string } }
+        master_col: { type: [string, 'null'] }
+        read_only: { type: boolean }
+        scenarios: { type: [array, 'null'], items: { type: string, enum: [new_build, expansion, hot_swap, cold_swap, relocation] } }
+        projection: { type: [string, 'null'], enum: [earliest, latest, null] }
+    TemplateMappingRequest:
+      type: object
+      required: [changes, reason]
+      additionalProperties: false
+      properties:
+        changes: { type: array, minItems: 1, maxItems: 200, items: { $ref: '#/components/schemas/TemplateMappingChange' } }
+        reason: { type: string, maxLength: 500 }
+        dry_run: { type: boolean, default: false }
+    TemplateMappingResult:
+      type: object
+      required: [dry_run, changes, impact]
+      properties:
+        dry_run: { type: boolean }
+        changes: { type: integer }
+        impact:
+          type: array
+          items:
+            type: object
+            properties:
+              template_id: { type: string }
+              kind: { type: string }
+              version_before: { type: integer }
+              version_after: { type: integer }
+              columns_added: { type: array, items: { type: string } }
+              columns_removed: { type: array, items: { type: string } }
+              columns_changed: { type: array, items: { type: string } }
+              open_batches: { type: integer, description: Batches of the template still in preview. }
+    ImportAlias:
+      type: object
+      required: [kind, alias, label, status, is_active]
+      properties:
+        kind: { type: string, enum: [region, role] }
+        alias: { type: string, description: The value in lower case. }
+        label: { type: string }
+        target: { type: [string, 'null'], description: 'The region id, or the role code.' }
+        target_name: { type: [string, 'null'] }
+        status: { type: string, enum: [mapped, ambiguous, unmapped] }
+        is_active: { type: boolean }
+        note: { type: [string, 'null'] }
+        updated_at: { type: string, format: date-time }
+    ImportAliasInput:
+      type: object
+      required: [kind, alias, reason]
+      additionalProperties: false
+      properties:
+        kind: { type: string, enum: [region, role] }
+        alias: { type: string, maxLength: 80 }
+        label: { type: string, maxLength: 80 }
+        target: { type: [string, 'null'] }
+        status: { type: string, enum: [ambiguous, unmapped] }
+        is_active: { type: boolean, default: true }
+        note: { type: [string, 'null'], maxLength: 500 }
+        reason: { type: string, maxLength: 500 }
     ImportDecisionRequest:
       type: object
       required: [action, scope]
