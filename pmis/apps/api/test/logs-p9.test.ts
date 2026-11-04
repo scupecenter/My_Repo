@@ -220,6 +220,21 @@ describe('Q168: severities, trusted networks, progressive limiting', () => {
     expect(l.progressiveWait(k, 10, 900_000, 2, 60)).toBe(0);
   });
 
+  it('counts attempts still running as failures, so parallel attempts from one address cannot all pass the check', () => {
+    const l = new RateLimiter();
+    const now = 2_000_000;
+    l.setClock({ now: () => now });
+    const k = 'login:ip:198.51.100.8';
+    const releases: Array<() => void> = [];
+    for (let i = 0; i < 10; i++) {
+      expect(l.progressiveWait(k, 10, 900_000, 2, 60)).toBe(0);
+      releases.push(l.progressiveBegin(k));      // reserved before any await: nothing is recorded as failed yet
+    }
+    expect(l.progressiveWait(k, 10, 900_000, 2, 60)).toBe(2);
+    releases.forEach((r) => { r(); r(); });       // all succeeded; a second release is a no-op
+    expect(l.progressiveWait(k, 10, 900_000, 2, 60)).toBe(0);
+  });
+
   it('behind one address, correct sign-ins keep working while failures from it are slowed', async () => {
     app.get(RateLimiter).reset();
     const ip = '198.51.100.99';

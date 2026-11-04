@@ -116,6 +116,19 @@ describe('the SMTP client', () => {
     }
   });
 
+  it('refuses a server that sends plain-text data after its STARTTLS reply (response injection): no upgrade, no AUTH, no MAIL FROM', async () => {
+    const evil = new FakeSmtp({ starttls: true, starttlsInject: true });
+    await evil.listen();
+    try {
+      const err = await smtpSend({ ...mailCfg, port: evil.port, tls: 'starttls' }, { to: 'x@example.test', subject: 's', text: 't' }).catch((e: unknown) => e);
+      expect(err).toBeInstanceOf(SmtpError);
+      expect((err as Error).message).toMatch(/after its STARTTLS reply/);
+      expect(evil.commands.some((c) => c === 'AUTH' || c.startsWith('MAIL'))).toBe(false);
+    } finally {
+      await evil.close();
+    }
+  });
+
   it('a wrong password is a permanent refusal that never quotes the AUTH line', async () => {
     const err = await smtpSend({ ...mailCfg, pass: 'wrong-Secret-9' }, { to: 'x@example.test', subject: 's', text: 't' }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SmtpError);

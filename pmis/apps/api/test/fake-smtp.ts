@@ -15,6 +15,8 @@ export interface Received {
 export interface FakeSmtpOptions {
   /** Offer STARTTLS in the EHLO answer (the fake never upgrades; it is used to test the client's refusal to go without it). */
   starttls?: boolean;
+  /** Answer STARTTLS with 220 and, in the same write, a forged plain-text reply (the STARTTLS response injection the client must refuse). */
+  starttlsInject?: boolean;
   /** Reply code for RCPT TO (250 accepts; 451 is a temporary failure, 550 a permanent one). */
   rcptCode?: () => number;
   /** Required AUTH PLAIN credentials; others get 535. */
@@ -139,6 +141,7 @@ export class FakeSmtp {
           inData = true;
           say('354 go ahead');
         } else if (cmd === 'RSET' || cmd === 'NOOP') say('250 ok');
+        else if (cmd === 'STARTTLS' && this.opts.starttlsInject) s.write('220 2.0.0 go ahead\r\n250-injected\r\n250 AUTH PLAIN\r\n');
         else if (cmd === 'STARTTLS') say('454 4.7.0 TLS not available in the fake');
         else if (cmd === 'QUIT') {
           say('221 bye');

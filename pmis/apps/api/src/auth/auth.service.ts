@@ -148,12 +148,26 @@ export class AuthService {
     const ipKey = `login:ip:${ip ?? 'unknown'}`;
     const ipWait = this.limiter.progressiveWait(ipKey, LOGIN_LIMIT_PER_IP, LOGIN_IP_WINDOW_MS, LOGIN_IP_BASE_SECONDS, LOGIN_IP_MAX_SECONDS);
     const idWait = ipWait ? 0 : this.limiter.hit(`login:id:${masked}`, LOGIN_LIMIT_PER_IDENTIFIER);
-    const failed = (): void => this.limiter.progressiveFail(ipKey, LOGIN_IP_WINDOW_MS);
     if (ipWait || idWait) {
       await this.syslog.write('warn', 'local_sign_in_rate_limited', { identifier_hmac: masked, ip }, undefined, requestId);
       await this.securityLog.write({ event: 'sign_in_rate_limited', outcome: 'failure', identifier, ctx, detail: { by: ipWait ? 'ip' : 'identifier' } });
       throw problems.rateLimited(Math.max(ipWait, idWait));
     }
+    // Reserved before the first await: parallel attempts from one address count as failures until they end, so they cannot all pass the check above.
+    const release = this.limiter.progressiveBegin(ipKey);
+    const failed = (): void => {
+      this.limiter.progressiveFail(ipKey, LOGIN_IP_WINDOW_MS);
+      release();
+    };
+    try {
+      return await this.loginChecked(identifier, password, masked, ctx, ip, userAgent, requestId, failed);
+    } finally {
+      release();
+    }
+  }
+
+  private async loginChecked(identifier: string, password: string, masked: string, ctx: ReturnType<typeof signInCtx>, ip: string | null,
+    userAgent: string | undefined, requestId: string, failed: () => void): Promise<LoginResult> {
 
     const rows = await this.db.client.$queryRaw<LookupRow[]>(Prisma.sql`SELECT user_id::text AS user_id, password_hash, must_change, locked_until, status::text AS status
       FROM auth_local_lookup(${identifier})`);

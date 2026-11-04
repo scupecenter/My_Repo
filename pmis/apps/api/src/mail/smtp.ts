@@ -103,8 +103,17 @@ class Conversation {
     sock.on('close', () => this.fail(new SmtpError('the mail server closed the connection', null, false)));
   }
 
-  /** Stops listening on the plain socket before the TLS upgrade takes it over. */
+  /**
+   * Stops listening on the plain socket before the TLS upgrade takes it over. Anything the server sent after its 220 reply to STARTTLS arrived in
+   * plain text and must never be read as a reply inside TLS (STARTTLS response injection): the connection is refused instead.
+   */
   detach(): void {
+    if (this.buf.length > 0 || this.pending.length > 0 || this.lines.length > 0) {
+      this.buf = '';
+      this.pending = [];
+      this.lines = [];
+      throw new SmtpError('the mail server sent data after its STARTTLS reply; refused (possible injection)', null, false);
+    }
     this.sock.removeAllListeners('data');
     this.sock.removeAllListeners('timeout');
     this.sock.removeAllListeners('error');
