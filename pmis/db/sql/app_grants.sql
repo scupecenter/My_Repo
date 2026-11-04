@@ -46,3 +46,4 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON list_catalogues, list_values FROM pmi
 -- P8 (0058): identity and profile
 REVOKE ALL ON phone_change_requests FROM pmis_app;  -- 0058: phone change requests (D156) only through idm_request_phone_change, idm_cancel_phone_change, idm_decide_phone_change, idm_my_phone_changes and idm_phone_change_list
 REVOKE ALL ON email_change_requests FROM pmis_app;  -- 0058: still no right; the address check (Q158) only through idm_email_change_set_verification and idm_email_change_verify
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON ps_manual_plans FROM pmis_app;  -- 0059: the plans of the manual Project Status items only through ps_manual_plan_set (append-only, versioned); delay periods are proposed and decided only through delay_period_propose / delay_period_decide

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.12.6
+  version: 0.12.7
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.7 (2026-11-04): work package P2 of the owner answers of 2026-11-04 (dashboard, Project Status, delay attribution; migration 0059; CHANGELOG 90). Additive except where noted. (1) Q7: delay that no approved period covers is `kind` `unattributed` (party `unattributed`) with the task's R party only as `suggested_party`; the kinds `external`, `default_type` and `unassigned` are no longer sent (not additive for a client that grouped by them). New `attributed_working_days`, `unattributed_working_days`, `attributed_pct`, `data_gap_working_days`, `proposed_working_days`, `proposals_count`, `pending_party_count` and `scorecard` (approved periods only). (2) Q180 (delay side): suspension days use `coalesce(suspension_start, approval_date)` to the first later `coalesce(resumption_date, approval_date)`. (3) Q181: a late task without a due date has its window rebuilt from the SLA start plus the maximum; when no day can be placed its days are a data gap (`data_gap`, no suggestion). (4) Q182, Q184: `POST /tasks/{task_id}/delay-periods` now **proposes** a period (status `proposed`, optional `evidence`; L1 may propose) with no effect; `POST /tasks/{task_id}/delay-periods/{period_id}/decision` approves or rejects it (L2, a System Admin or `dashboard.delay` edit; never the proposer: 403 `self_beneficiary`; a rejection needs `note`); approving a `contractor` or `external` period needs `external_party_id` (422 `external_party_required`). `DelayPeriod` gains `status`, `evidence`, `proposed_by`, `decided_by`, `decided_at`, `decision_note`, `counts`; `DelayPeriodList` gains `can_propose`, `can_decide`, `me`, `external_parties`. (5) Q175: a manual central value counts in the project-wide figure only; regional, site and filtered figures show it in `central_line` (not additive for clients that read the regional figure with manual values). (6) Q176: `source` is required on `POST /project-status/manual-items/{item_code}/values` (not additive). (7) Q177: `POST /project-status/manual-items/{item_code}/plan` (points or a target date), `ManualItem.plan`, `DashboardProjectStatusItem.plan`; `progress_vs_plan_index` (the old `spi`, same value, kept), `partial_index`. (8) Q178: an effective date before the current month needs `dashboard.historical_correction` edit (403 otherwise) and is flagged `historical_correction`; `ManualItemList.open_period_from`, `can_correct_history`, `without_plan`. (9) Q186: blocked gates that cannot be known for the date are null: `DashboardGates.status` (`live`, `snapshot`, `historically_unavailable`), `blocked_total` may be null, `DashboardMilestone.blocked` may be null with `blocked_available`; `DashboardBasis.snapshot_kinds[].rebuilt` and `taken_at`. (10) D186: the weekly snapshot is on Thursday (setting `dashboard.snapshot_weekday` 4). (11) D16: `DashboardHealth.components[].draft`, `draft_factors`, `approved_factors`; `meta.health_draft_factors`. (12) Q116: `meta.pipeline_variant` (A rings, default; B flat segmented track) and `PUT /dashboard/pipeline-variant`. (13) Q187: the xlsx export has the sheets Project Overview, CW, TE, Late tasks, Delay attribution, Project Status items, Regions and About.
     - 0.12.6 (2026-11-04): identity and profile follow-up of the owner answers of 2026-11-04 (work package P8, migration 0058, CHANGELOG 86). **Not additive for the phone:** (1) D156: the phone is a sign-in identifier, so `PATCH /me/profile` no longer takes `phone` (403 `field_read_only`, `errors[]` names `/phone` and points to the request) and `MyProfile.editable_fields` is `display_name`, `locale`, `theme`. A phone change is a request an admin approves, like the email: `POST /me/phone-change` (new E.164 phone or null, the password re-entered; one pending request per user; the number must be free), `DELETE /me/phone-change` (cancel while pending), `GET /phone-change-requests` and `POST /phone-change-requests/{request_id}/decide` (System Admin or a delegate holding `users.edit` for all regions, a reason and step-up, never one's own account); `MyProfile.phone_change`; notification kinds `phone_change_requested` and `phone_change_decided`. (2) Q158: the new email address is verified before an approval. `POST /me/email-change` mails a one-time code (XXXX-XXXX, valid `email_change.verify_hours`, default 24) to the new address and a notice to the old one; `POST /me/email-change/verify` and `POST /me/email-change/resend`; `EmailChangeRequest` carries `verified_at`, `verified_via` (`code`, `admin_check`), `verify_sent_at` and `verify_expires_at`. An approval of an unverified address is 409 `email_not_verified` unless the admin sends `identity_check` (the documented check made while mail is unavailable; stored in `EmailChangeRequestAdmin.identity_check` and audited). Old and new addresses are told of the decision by mail. (3) Q161: turning two-factor off ends the other sessions (self, from the profile) or all the user's sessions (admin, `PUT /users/{user_id}/two-factor`), and writes a `security_notice` to the user's inbox and by mail. (4) Q18: an assignment overlaps only when the same person and role overlap in dates **and** share a region **and** a module; `BulkItemIssue.conflicts` lists the conflicting assignment ids. New error code `email_not_verified`.
     - 0.12.5 (2026-11-04): additive. The register framework of work package P5 (owner answers Q12, Q104, Q111 and D108b; migration 0057; CHANGELOG 85). (1) Q104, lists are data: new tag `lists` with `GET`/`POST /list-catalogues`, `GET`/`PATCH /list-catalogues/{catalogue_code}`, `POST /list-catalogues/{catalogue_code}/values` and `PATCH /list-catalogues/{catalogue_code}/values/{value_id}` (System Admin or a delegate of `fields` edit for all regions; a reason; If-Match; audited with before and after). A value has a stable `code` (the text stored in the records), EN/AR labels, `aliases` (old names that map to it), `groups` and `is_active` (deactivated, never deleted). A list has `critical`, `status` (`pending` = a draft for the owner's review, `confirmed`) and `allow_other`. Every list field of a register now reads its catalogue: `RegisterField.list` names it and `options` lists its active values with their Arabic labels; a value may be typed as its code, its label or an alias. A list that accepts another value keeps it as typed and the record shows the warning `list_other`; a critical list accepts only its values, and while it has no active value the final approval of a record of a register that uses it answers 422 `list_not_configured` (new error code; `lists` names them). An inactive value may stay only where the previous version had it (422 `validation_failed`, code `inactive_value`, at submit). (2) Field types: `RegisterField.type` gains `multi_user`, `multi_site`, `child_list` and `warehouse_item`; `file` and `multi_list` are now used by register fields. Values: `multi_user` and `multi_site` are arrays of ids (users may be given by employee ID or e-mail, sites by code); `warehouse_item` is an item id (or its code on input); `file` is the id of a file uploaded to a document slot of the record (checked at submit, code `file_not_attached`: a typed reference is not an upload); `child_list` is an array of row objects with the columns of `RegisterField.columns` and a stable `id` given by the server. `RegisterRecord.refs` resolves the ids of a record to names and codes for display. (3) Q12 / Q111, Meetings: new fields `organiser`, `attendee_users`, `linked_site_ids` (empty = a project-wide meeting), `minutes_file` and `action_items_list` (action, owner, due date, status, closed date, task link; a closed status needs the closed date). The old free-text fields `attendees`, `linked_sites`, `minutes_ref` and `action_items` are read-only; `GET /registers/{register_key}/records/{record_id}/legacy-conversion` proposes the structured values from them and `POST` of the same path applies the reviewed values once (409 `duplicate` when done already; a reason; audited). (4) D108b: As-Built gains `rf_height_note` beside the number `rf_height`. (5) Templates: multi values are separated by ";"; file and child-list columns are grey and never read.
     - 0.12.4 (2026-11-04): additive, plus two rule changes the owner decided. Work package P6 of the owner answers of 2026-11-04 (documents, QC snags and storage; migration 0056; CHANGELOG 82). (1) Storage (Q195, Q199): a file stored while the virus scanner was down (`pending_rescan`) stays in quarantine: `GET /files/{file_id}/download` answers 409 `file_pending_scan` until the rescan passes it, and a zip export leaves it out and lists it in its `manifest.csv`; CSV log exports are generated content and no longer pass the scanner; every download is released only after the GCM tag, the size and the SHA-256 of the plaintext are verified. (2) Documents: `DocumentSlot.determination_pending` (Q226: B1 reads only the approved Procurement orders in force; with no approved order, an order without a delivery or mixed values the PR e-mail rule is pending, shown as not required with this flag, and the task cannot be approved: 422 `document_rule_pending`, unless Data Entry declared that the document applies); `DocumentSlot.shared_with` (Q227: a document type placed on a task and on the register of its source record is one requirement; a current file on either slot fills both); slots on global register records (Q228: Contractors, Risks, Meetings; `site_code` `GLOBAL`; visibility from the register module); `DocumentSlot.inherited_approval` and the setting `new_version_inherit` (Q229). (3) `GET` and `PUT /settings/documents-qc` (`DocumentsQcSettings`: `new_version_inherit`, `exif_tolerance_hours`, the read-only scan scope; System Admin or a delegate of `document_types` edit, reason, If-Match). (4) QC snags: `SnagInput.severity` is required and `found_by` optional (Q233, Q230); `GET` and `PUT /snag-severities` (the editable severity catalogue); `SnagType.stream` and `blocking_rule` (`always`, `by_severity`, `never`; QC_GENERAL stays `always`); `Snag.severity`, `severity_missing`, `blocks_acceptance`, `found_by`, `fixed_by`, `approved_by`, `register_record`, `approval_blocked`; **rule change D230b**: a snag is never self-approved: whoever raised, found or fixed it answers 403 `self_approval_forbidden` on approve, and the submission never closes it (B5 stays for every other task and record); an L2 cell set to `all_members` is honoured (Q231, `BallInCourt.votes_needed` / `votes_done`); `MatrixRowKey` gains `quality_te` (the Quality - TE row of QC snags, Q230); **rule change Q232**: a fix photo whose EXIF date (read in Africa/Tripoli) is in the future beyond the tolerance is kept as `pending_evidence` and decided by L2 through `POST /snags/{snag_id}/photos/{photo_id}/evidence`. (5) `RegisterRecord.qc_snag` (Q234, Q103): the approval of a Quality record of type snag creates or updates its QC snag; the snag is closed only by the QC photo flow.
@@ -9678,7 +9679,7 @@ paths:
       operationId: exportDashboard
       summary: Export exactly the current dashboard view as an Excel workbook (0.11.0) or a CSV file
       description: |
-        Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (sheets `Dashboard` with the rows and `About` with the basis; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+        Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (since 0.12.7, Q187: sheets `Project Overview` with the rows of the view, `CW` and `TE` with the rows of the same filters for those views, `Late tasks`, `Delay attribution`, `Project Status items`, `Regions`, and `About` with the filters, reference date, basis, definitions and versions; landscape, one page wide; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
       parameters:
       - {name: ref_date, in: query, schema: {type: string, format: date}}
       - {name: region_id, in: query, schema: {$ref: '#/components/schemas/RegionId'}}
@@ -9698,6 +9699,37 @@ paths:
               schema: {type: string, format: binary}
             text/csv:
               schema: {type: string}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /dashboard/pipeline-variant:
+    put:
+      tags: [dashboard]
+      operationId: setDashboardPipelineVariant
+      summary: Choose the pipeline style of the dashboard (0.12.7, Q116)
+      description: 'A = progress rings (the default), B = flat segmented track. A System Admin or a holder of `dashboard` administer for all regions; anyone else is 403 `action_forbidden`. Audited (`settings.updated`, entity `dashboard.pipeline_variant`, before and after). The value is `meta.pipeline_variant` of `GET /dashboard`.'
+      x-db-path: dash_set_pipeline_variant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [variant, reason]
+              properties:
+                variant: {$ref: '#/components/schemas/PipelineVariant'}
+                reason: {$ref: '#/components/schemas/Reason'}
+      responses:
+        '200':
+          description: The style in force.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [variant]
+                properties:
+                  variant: {$ref: '#/components/schemas/PipelineVariant'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
@@ -9795,7 +9827,7 @@ paths:
       operationId: addManualProjectStatusValue
       summary: Enter a manual percentage for a central item (0.11.0, Q118)
       description: |
-        A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
+        A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason and its `source` (required since 0.12.7, Q176). An effective date before the first day of the current month (Africa/Tripoli) is a historical correction (0.12.7, Q178): it needs `dashboard.historical_correction` edit (403 `action_forbidden` otherwise) and is flagged `historical_correction`. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
       x-db-path: ps_manual_set
       requestBody:
         required: true
@@ -9809,12 +9841,51 @@ paths:
                 value_pct: {type: number, minimum: 0, maximum: 100}
                 effective_date: {type: string, format: date}
                 reason: {$ref: '#/components/schemas/Reason'}
+                source: {type: string, minLength: 2, maxLength: 500, description: '0.12.7 (Q176): where the value comes from, for example a report or a log.'}
       responses:
         '201':
           description: The entry.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ManualItemValue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /project-status/manual-items/{item_code}/plan:
+    parameters:
+    - {name: item_code, in: path, required: true, schema: {type: string, pattern: '^[A-Za-z0-9._-]{1,20}$'}}
+    post:
+      tags: [project-status]
+      operationId: setManualProjectStatusPlan
+      summary: Set the approved plan of a central item (0.12.7, Q177)
+      description: |
+        A new version of the item's plan, by the same people as the manual values. Send `points` (1 to 120 dates with a planned %, cumulative: the planned % never falls with the date; 422 `/points/<i>/planned_pct` `not_cumulative`, `/points/<i>/date` `duplicate`) or a `target_date` (100% on that date; with `start_date`, 0% on the start date). The planned % on a date is 0 before the first point, a straight line by calendar day between two points, and the last value after the last point. Future dates are allowed. Plans are never changed or deleted; a snapshot reads the plan known when it was taken. Audited (`project_status.manual_plan_set`, with the plan it replaces).
+      x-db-path: ps_manual_plan_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, source]
+              properties:
+                points:
+                  type: array
+                  minItems: 1
+                  maxItems: 120
+                  items: {$ref: '#/components/schemas/ManualPlanPoint'}
+                target_date: {type: string, format: date}
+                start_date: {type: string, format: date, description: 'Only with target_date, before it.'}
+                reason: {$ref: '#/components/schemas/Reason'}
+                source: {type: string, minLength: 2, maxLength: 500}
+      responses:
+        '201':
+          description: The plan.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ManualPlan'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -9839,10 +9910,10 @@ paths:
     post:
       tags: [dashboard]
       operationId: addTaskDelayPeriod
-      summary: Record a delay attribution period on a task (0.11.0, Q122)
+      summary: Propose a delay attribution period on a task (0.11.0, Q122; a proposal since 0.12.7, Q182)
       description: |
-        By the task's reviewer (a holder of its L2 level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. From and To are inclusive; a period of the same task that overlaps an active one is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.added`).
-      x-db-path: delay_period_add
+        Since 0.12.7 this proposes a period (status `proposed`) with no effect until it is approved (`.../decision`). By L1 of the task (an entry holder), L2 (a holder of its approve level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. The external party may stay empty in a proposal (Q184). From and To are inclusive; a period that overlaps an active proposal or approved period of the task is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Once approved, delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.proposed`).
+      x-db-path: delay_period_propose
       requestBody:
         required: true
         content:
@@ -9855,17 +9926,52 @@ paths:
                 from_date: {type: string, format: date}
                 to_date: {type: string, format: date}
                 party: {$ref: '#/components/schemas/DelayParty'}
-                external_party_id: {type: [string, 'null'], format: uuid, description: 'Optional: the contractor or external party by name.'}
+                external_party_id: {type: [string, 'null'], format: uuid, description: 'Optional in a proposal; required to approve a contractor or external period (Q184).'}
                 reason: {$ref: '#/components/schemas/Reason'}
+                evidence: {type: [string, 'null'], maxLength: 2000, description: '0.12.7 (Q182): what supports the proposal (a reference, a document, a note).'}
       responses:
         '201':
-          description: The period.
+          description: The proposed period.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/DelayPeriod'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /tasks/{task_id}/delay-periods/{period_id}/decision:
+    parameters:
+    - {name: task_id, in: path, required: true, schema: {type: string, format: uuid}}
+    - {name: period_id, in: path, required: true, schema: {type: string, format: uuid}}
+    post:
+      tags: [dashboard]
+      operationId: decideTaskDelayPeriod
+      summary: Approve or reject a proposed delay period (0.12.7, Q182, Q184)
+      description: |
+        By L2 of the task, a System Admin or a holder of `dashboard.delay` edit in the region (403 `action_forbidden` otherwise), never by the person who proposed it, an admin included (403 `self_beneficiary`). A rejection needs `note` (422 `/note` `required`). Approving a `contractor` or `external` period needs its external party: the proposal's, or `external_party_id` here when the proposal has none (422 `/external_party_id` `external_party_required`; another party than the proposal's is 422 `already_named`). An approval that overlaps an approved period is 422 `period_overlap`. A period that is not waiting for a decision is 409 `invalid_transition`. Audited (`delay_period.approved` / `delay_period.rejected`, before and after).
+      x-db-path: delay_period_decide
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [decision]
+              properties:
+                decision: {type: string, enum: [approve, reject]}
+                note: {type: [string, 'null'], maxLength: 1000}
+                external_party_id: {type: [string, 'null'], format: uuid}
+      responses:
+        '200':
+          description: The decided period.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DelayPeriod'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /tasks/{task_id}/delay-periods/{period_id}/void:
     parameters:
@@ -9875,7 +9981,7 @@ paths:
       tags: [dashboard]
       operationId: voidTaskDelayPeriod
       summary: Void a delay attribution period, with a reason (0.11.0, Q122)
-      description: Same rights as recording one. The period stays in the history and stops counting. A period voided already is 409 `invalid_transition`. Audited (`delay_period.voided`).
+      description: The deciders (see `.../decision`); the proposer may also withdraw an open proposal (0.12.7). The period stays in the history and stops counting. A period voided already, or a rejected one, is 409 `invalid_transition`. Audited (`delay_period.voided`).
       x-db-path: delay_period_void
       requestBody:
         required: true
@@ -15015,9 +15121,12 @@ components:
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
         progress_pct: { type: number }
         planned_pct: { type: [number, 'null'], description: '0.7.2. Null ("not available") until every measured item has a baseline for all its units.' }
-        spi: { type: [number, 'null'], description: '0.7.2. Actual divided by planned.' }
+        spi: { type: [number, 'null'], deprecated: true, description: '0.7.2. Actual divided by planned. Since 0.12.7 the same value as `progress_vs_plan_index` (Q177: it is not an EVM SPI).' }
+        progress_vs_plan_index: { type: [number, 'null'], description: '0.12.7 (Q177): Actual / Planned over the same items and weights; null while Planned is not available.' }
+        partial_index: { oneOf: [{ $ref: '#/components/schemas/PartialPlanIndex' }, { type: 'null' }] }
         plan_coverage_pct: { type: number, description: '0.7.2. Share of the weight whose plan dates are complete.' }
         central_items_hidden: { type: integer, description: '0.7.2. Project-wide items left out because the scope is below the whole project (VI-04).' }
+        central_line: { oneOf: [{ $ref: '#/components/schemas/CentralLine' }, { type: 'null' }] }
         sites_in_scope: { type: integer, description: '0.7.2. Active sites behind the figure.' }
         activities: { type: array, items: { $ref: '#/components/schemas/ProjectStatusActivity' } }
         rows:
@@ -15050,7 +15159,61 @@ components:
     SnapshotKind:
       type: string
       enum: [weekly, month_end, manual]
-      description: '0.11.0 (Q127): `weekly` (every Sunday, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).'
+      description: '0.11.0 (Q127): `weekly` (every Thursday since 0.12.7, D186: setting `dashboard.snapshot_weekday` 4, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).'
+    PipelineVariant:
+      type: string
+      enum: [A, B]
+      description: '0.12.7 (Q116): A = progress rings (default), B = flat segmented track.'
+    PartialPlanIndex:
+      description: '0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover.'
+      type: object
+      required: [value, coverage_pct, actual_pct, planned_pct]
+      properties:
+        value: {type: [number, 'null']}
+        coverage_pct: {type: number}
+        actual_pct: {type: number}
+        planned_pct: {type: number}
+    CentralLine:
+      description: '0.12.7 (Q175): the manual central values in force, shown apart from a regional, site or filtered figure (they count in the project-wide figure only). progress_pct weighs each value by its share of the project figure (activity weight x item weight / the item weights of the activity).'
+      type: object
+      required: [total, measured, items]
+      properties:
+        total: {type: integer}
+        measured: {type: integer}
+        progress_pct: {type: [number, 'null']}
+        items:
+          type: array
+          items:
+            type: object
+            required: [code, name_en, activity_code, weight, value_pct, effective_date, version]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              activity_code: {type: string}
+              weight: {type: number}
+              value_pct: {type: number}
+              effective_date: {type: string, format: date}
+              version: {type: integer}
+    ManualPlanPoint:
+      type: object
+      additionalProperties: false
+      required: [date, planned_pct]
+      properties:
+        date: {type: string, format: date}
+        planned_pct: {type: number, minimum: 0, maximum: 100}
+    ManualPlan:
+      type: object
+      required: [id, item_code, version, points, reason, source]
+      properties:
+        id: {type: string, format: uuid}
+        item_code: {type: string}
+        version: {type: integer, minimum: 1}
+        points: {type: array, items: {$ref: '#/components/schemas/ManualPlanPoint'}}
+        reason: {type: string}
+        source: {type: string}
+        entered_by: {type: string, format: uuid}
+        created_at: {type: string, format: date-time}
     ManualItemValue:
       type: object
       required: [id, item_code, version, value_pct, effective_date, reason]
@@ -15061,6 +15224,8 @@ components:
         value_pct: {type: number, minimum: 0, maximum: 100}
         effective_date: {type: string, format: date}
         reason: {type: string}
+        source: {type: string, description: '0.12.7 (Q176).'}
+        historical_correction: {type: boolean, description: '0.12.7 (Q178): dated before the current month.'}
         entered_by: {type: string, format: uuid}
         created_at: {type: string, format: date-time}
     ManualItemHistoryEntry:
@@ -15075,6 +15240,8 @@ components:
         created_at: {type: string, format: date-time}
         in_force: {type: boolean, description: 'The entry in force today.'}
         entered_by: {$ref: '#/components/schemas/UserRef'}
+        source: {type: string, description: '0.12.7 (Q176). Entries before migration 0059 read "not recorded (entered before 0059)".'}
+        historical_correction: {type: boolean, description: '0.12.7 (Q178).'}
     ManualItem:
       type: object
       required: [item_code, name_en, weight, activity_code, activity_name_en, current, history]
@@ -15093,7 +15260,23 @@ components:
             value_pct: {type: number}
             effective_date: {type: string, format: date}
             version: {type: integer}
+            source: {type: string}
         history: {type: array, items: {$ref: '#/components/schemas/ManualItemHistoryEntry'}}
+        plan:
+          description: '0.12.7 (Q177): the plan in force (latest version), null while the owner has given none.'
+          oneOf:
+          - type: object
+            required: [id, version, points, reason, source, created_at, planned_pct_today, entered_by]
+            properties:
+              id: {type: string, format: uuid}
+              version: {type: integer}
+              points: {type: array, items: {$ref: '#/components/schemas/ManualPlanPoint'}}
+              reason: {type: string}
+              source: {type: string}
+              created_at: {type: string, format: date-time}
+              planned_pct_today: {type: number, description: 'The planned % of the plan today.'}
+              entered_by: {$ref: '#/components/schemas/UserRef'}
+          - {type: 'null'}
     ManualItemList:
       type: object
       required: [as_of, can_edit, items, without_value]
@@ -15101,6 +15284,9 @@ components:
         as_of: {type: string, format: date}
         can_edit: {type: boolean}
         without_value: {type: integer, description: 'Weighted central items with no value in force today.'}
+        without_plan: {type: integer, description: '0.12.7 (Q177): weighted central items with no plan.'}
+        open_period_from: {type: string, format: date, description: '0.12.7 (Q178): the first day of the current month; an earlier effective date is a historical correction.'}
+        can_correct_history: {type: boolean, description: '0.12.7 (Q178): the caller may enter a historical correction (dashboard.historical_correction edit).'}
         items: {type: array, items: {$ref: '#/components/schemas/ManualItem'}}
     DelayParty:
       type: string
@@ -15110,6 +15296,16 @@ components:
       type: object
       required: [id, task_id, from_date, to_date, party, reason, created_at, created_by, voided]
       properties:
+        status: {type: string, enum: [proposed, approved, rejected], description: '0.12.7 (Q182). Periods recorded before migration 0059 are approved.'}
+        evidence: {type: [string, 'null']}
+        proposed_by: {$ref: '#/components/schemas/UserRef'}
+        decided_by:
+          oneOf:
+          - {$ref: '#/components/schemas/UserRef'}
+          - {type: 'null'}
+        decided_at: {type: [string, 'null'], format: date-time}
+        decision_note: {type: [string, 'null']}
+        counts: {type: boolean, description: '0.12.7: approved, not voided, and (for contractor / external) with its external party (Q184).'}
         id: {type: string, format: uuid}
         task_id: {type: string, format: uuid}
         from_date: {type: string, format: date}
@@ -15133,7 +15329,20 @@ components:
       properties:
         task_id: {type: string, format: uuid}
         due_date: {type: [string, 'null'], format: date, description: 'Delay days are the working days after it.'}
-        can_edit: {type: boolean}
+        can_edit: {type: boolean, description: 'Since 0.12.7 the same as can_decide.'}
+        can_decide: {type: boolean, description: '0.12.7: may approve, reject and void.'}
+        can_propose: {type: boolean, description: '0.12.7: may propose (L1 too).'}
+        me: {type: [string, 'null'], format: uuid, description: '0.12.7: the caller, so a screen can hide the decision of their own proposal.'}
+        external_parties:
+          type: array
+          description: '0.12.7: the registry of external parties to name one (Q184).'
+          items:
+            type: object
+            required: [id, name, type]
+            properties:
+              id: {type: string, format: uuid}
+              name: {type: string}
+              type: {type: string}
         parties: {type: array, items: {$ref: '#/components/schemas/DelayParty'}}
         items: {type: array, items: {$ref: '#/components/schemas/DelayPeriod'}}
     # ---------------------------------------------------------- main dashboard (0.7.2)
@@ -15156,6 +15365,8 @@ components:
               date: {type: string, format: date}
               kind: {$ref: '#/components/schemas/SnapshotKind'}
               kinds: {type: array, items: {type: string, enum: [weekly, month_end]}}
+              rebuilt: {type: boolean, description: '0.12.7 (Q186): stored after its own date (a catch-up, or taken by hand for an earlier date); its blocked gates are historically unavailable.'}
+              taken_at: {type: string, format: date-time}
         note: {type: [string, 'null'], description: 'English sentence that says how a past date was made. Null for today.'}
     DashboardMeta:
       allOf:
@@ -15167,6 +15378,9 @@ components:
           manual_items_measured: {type: integer, description: '0.11.0 (Q118): central items measured by a manual value in force on the reference date.'}
           scope_regions: {type: [array, 'null'], items: {$ref: '#/components/schemas/RegionId'}, description: 'The caller''s dashboard regions; null = every region.'}
           health_draft: {type: boolean, description: 'False since 0.11.0 (Q121).'}
+          health_draft_factors: {type: array, items: {type: string}, description: '0.12.7 (D16): the health factors not yet approved, each shown with a draft label.'}
+          blocked_gates_available: {type: boolean, description: '0.12.7 (Q186): false when blocked gates cannot be known for the reference date.'}
+          pipeline_variant: {$ref: '#/components/schemas/PipelineVariant'}
     DashboardFilters:
       type: object
       required: [regions, clusters, scenarios, streams]
@@ -15208,7 +15422,8 @@ components:
       - type: object
         properties:
           stream_code: {type: [string, 'null']}
-          blocked: {type: integer, description: 'Open, previous milestone done, and the gate holds it (live only).'}
+          blocked: {type: [integer, 'null'], description: 'Open, previous milestone done, and the gate holds it. Null since 0.12.7 when it cannot be known for the date (Q186): a past date, or a snapshot rebuilt after its date.'}
+          blocked_available: {type: boolean, description: '0.12.7 (Q186).'}
           plan: {type: integer, description: 'Sites whose baseline is due by the reference date.'}
           vs_plan: {type: integer, description: '`completed` minus `plan`.'}
           baseline_missing: {type: integer}
@@ -15251,7 +15466,14 @@ components:
         done: {type: integer}
         applicable: {type: integer}
         reason: {type: [string, 'null'], enum: [not_weighted, no_data, central_hidden, not_applicable, null]}
-        central: {type: boolean, description: '0.11.0: a project-wide item measured by a manual percentage (Q118).'}
+        central: {type: boolean, description: '0.11.0: a project-wide item measured by a manual percentage (Q118). Since 0.12.7 (Q175) it counts in the project-wide figure only; elsewhere `reason` is central_hidden.'}
+        plan:
+          description: '0.12.7 (Q177): the planned % of the item''s plan on the reference date (project-wide only).'
+          type: [object, 'null']
+          required: [planned_pct, version]
+          properties:
+            planned_pct: {type: number}
+            version: {type: integer}
         manual:
           description: '0.11.0 (Q118): the manual value in force on the reference date; null when none.'
           type: [object, 'null']
@@ -15277,10 +15499,14 @@ components:
       properties:
         progress_pct: {type: number}
         planned_pct: {type: [number, 'null'], description: 'Null ("not available") until every measured item has a baseline for all its units.'}
-        spi: {type: [number, 'null']}
+        spi: {type: [number, 'null'], deprecated: true, description: 'Since 0.12.7 the same value as progress_vs_plan_index.'}
+        progress_vs_plan_index: {type: [number, 'null'], description: '0.12.7 (Q177): Actual / Planned over the same items; not EVM.'}
+        partial_index: {oneOf: [{$ref: '#/components/schemas/PartialPlanIndex'}, {type: 'null'}]}
         plan_coverage_pct: {type: number}
         central_items_hidden: {type: integer}
-        manual_items_measured: {type: integer, description: '0.11.0.'}
+        manual_items_measured: {type: integer, description: '0.11.0. Since 0.12.7 (Q175) 0 below the whole project.'}
+        manual_items_planned: {type: integer, description: '0.12.7 (Q177).'}
+        central_line: {oneOf: [{$ref: '#/components/schemas/CentralLine'}, {type: 'null'}], description: '0.12.7 (Q175): null for the project-wide figure.'}
         activities: {type: array, items: {$ref: '#/components/schemas/DashboardProjectStatusActivity'}}
     DashboardFinalClosure:
       description: The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`.
@@ -15405,7 +15631,8 @@ components:
       required: [available, blocked_total, items]
       properties:
         available: {type: boolean, description: 'False for a past reference date: the state of a gate on a past date is not kept.'}
-        blocked_total: {type: integer}
+        status: {type: string, enum: [live, snapshot, historically_unavailable], description: '0.12.7 (Q186): `snapshot` = the count of a snapshot taken on its own date (no reasons); `historically_unavailable` = cannot be known, `blocked_total` is null.'}
+        blocked_total: {type: [integer, 'null']}
         by_gate:
           type: array
           items:
@@ -15493,6 +15720,9 @@ components:
               value: {type: [number, 'null']}
               excluded: {type: boolean, description: 'No data: left out and its weight redistributed.'}
               contribution: {type: number}
+              draft: {type: boolean, description: '0.12.7 (D16): the factor is not yet approved by the owner (every factor except D and I; setting dashboard.health_approved_factors).'}
+        draft_factors: {type: array, items: {type: string}, description: '0.12.7 (D16).'}
+        approved_factors: {type: array, items: {type: string}, description: '0.12.7 (D16).'}
         by_region:
           type: array
           items:
@@ -15503,13 +15733,33 @@ components:
               score: {type: number}
               band: {type: string, enum: [green, amber, red]}
     DashboardDelay:
-      description: 'Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party, day by day (0.11.0, Q122): the working days after the due date, minus the days of a Change Control suspension of the site, go to the party of the task''s attribution period that covers them, otherwise to the external party of the task, its default party type, or unassigned.'
+      description: 'Delay attribution, rules.md section 8 (draft). Overdue working days, day by day (0.11.0, Q122; 0.12.7, Q7, Q180 to Q184): the working days after the due date (rebuilt from the SLA start plus the maximum when there is none), minus the days of a Change Control suspension of the site (effective start to effective resumption, falling back to the approval dates), go to the party of the task''s approved attribution period that covers them (a contractor or external one only with its named party); every other day is unattributed, with the task''s R party (external party, else default party type) as a suggestion only. A task whose window holds no day is a data gap.'
       type: object
       required: [draft, total_late_working_days, unattributed_pct, items]
       properties:
         draft: {type: boolean}
         total_late_working_days: {type: integer}
-        unattributed_pct: {type: number, description: 'Share of the days on tasks with no external party and no default party type.'}
+        unattributed_pct: {type: number, description: 'Since 0.12.7 (Q7): share of the days no approved period covers.'}
+        attributed_pct: {type: number, description: '0.12.7 (Q7): share of the days given to a party by an approved period.'}
+        attributed_working_days: {type: integer, description: '0.12.7.'}
+        unattributed_working_days: {type: integer, description: '0.12.7.'}
+        data_gap_working_days: {type: integer, description: '0.12.7 (Q181): days of late tasks whose window could not be built.'}
+        proposed_working_days: {type: integer, description: '0.12.7 (Q182): unattributed days a pending proposal covers (no effect).'}
+        proposals_count: {type: integer, description: '0.12.7.'}
+        pending_party_count: {type: integer, description: '0.12.7 (Q184): approved contractor / external periods from before 0059 without their party; they do not count.'}
+        scorecard:
+          description: '0.12.7 (Q7): approved periods only, the input of a contractor scorecard.'
+          type: array
+          items:
+            type: object
+            required: [party, late_tasks, late_working_days]
+            properties:
+              party: {type: string}
+              period_party: {$ref: '#/components/schemas/DelayParty'}
+              external_party_id: {type: [string, 'null'], format: uuid}
+              party_type: {type: [string, 'null']}
+              late_tasks: {type: integer}
+              late_working_days: {type: integer}
         overlapping_periods: {type: integer, description: 'Always 0: overlapping periods of one task are refused at entry.'}
         periods_supported: {type: boolean, description: 'True since 0.11.0.'}
         suspended_working_days: {type: integer, description: '0.11.0: late working days left out because the site was suspended.'}
@@ -15521,8 +15771,18 @@ components:
             type: object
             required: [party, kind, late_tasks, late_working_days, share_pct]
             properties:
-              party: {type: string, description: 'The external party name, the default party type of the task, the party of the period (its external party name when one is named), or `unassigned`.'}
-              kind: {type: string, enum: [period, external, default_type, unassigned]}
+              party: {type: string, description: 'The party of the period (its external party name when one is named), or `unattributed` (0.12.7).'}
+              kind: {type: string, enum: [period, unattributed, external, default_type, unassigned], description: 'Since 0.12.7 only `period` and `unattributed` are sent; the other three are the 0.11.0 values.'}
+              data_gap: {type: boolean, description: '0.12.7 (Q181).'}
+              suggested_party:
+                description: '0.12.7 (Q7): the R party of the unattributed days, shown as a suggestion, never an attribution. Null for a data gap or a task with no R party.'
+                type: [object, 'null']
+                required: [name, kind]
+                properties:
+                  name: {type: string}
+                  kind: {type: string, enum: [external, default_type]}
+                  external_party_id: {type: [string, 'null'], format: uuid}
+                  party_type: {type: [string, 'null']}
               period_party:
                 description: '0.11.0: the party of the period when `kind` is `period`.'
                 oneOf:

@@ -2197,7 +2197,7 @@
     },
     "basis_note": {
       "snapshot": "Sites, milestones, streams and Project Status come from the weekly snapshot of {{date}}. SLA, issues, delay attribution and the health index are computed as of that date from dated facts.",
-      "as_of_computed": "No snapshot exists for {{date}}, so every figure is computed as of that date from dated facts (an actual date counts when it is on or before the date). Blocked gates are kept for today only.",
+      "as_of_computed": "No snapshot exists for {{date}}, so every figure is computed as of that date from dated facts (an actual date counts when it is on or before the date). Blocked gates are historically unavailable for a past date.",
       "live": ""
     },
     "filters": {
@@ -2214,7 +2214,7 @@
     "kpi": {
       "progress": "Weighted progress (to HOTO)",
       "planned": "Planned",
-      "spi": "SPI",
+      "spi": "Progress vs plan index",
       "na": "not available",
       "coverage": "Plan coverage {{n}}%",
       "ends_hoto": "ends at HOTO",
@@ -2228,7 +2228,9 @@
       "fac_cw": "Pending CW FAC",
       "fac_te": "Pending TE FAC",
       "oldest": "oldest {{n}} wd",
-      "not_due": "{{n}} not due"
+      "not_due": "{{n}} not due",
+      "not_evm": "Actual divided by Planned over the same items and weights; not an EVM SPI.",
+      "partial": "Partial index {{v}} over {{c}}% of the weight that has a plan"
     },
     "pipeline": {
       "title": "Delivery pipeline",
@@ -2237,7 +2239,13 @@
       "in_work": "{{n}} in work",
       "waiting": "{{n}} waiting",
       "blocked": "{{n}} blocked",
-      "overdue": "{{n}} overdue"
+      "overdue": "{{n}} overdue",
+      "blocked_unknown": "blocked: historically unavailable",
+      "variant": "Pipeline style",
+      "variant_A": "A: rings",
+      "variant_B": "B: flat track",
+      "preview": "Preview the style",
+      "preview_note": "Preview only. The style in force is {{v}}; it is a setting the System Admin changes once the owner picks."
     },
     "health": {
       "title": "Project health index",
@@ -2249,11 +2257,16 @@
       },
       "bands": "Green from {{green}}, amber from {{amber}}, red below",
       "excluded": "no data",
-      "note": "Six factors, each at most 100: progress, baseline adherence, SLA adherence, documentation, first-time approval, critical issues. A factor with no data is left out and its weight shared."
+      "note": "Six factors, each at most 100: progress, baseline adherence, SLA adherence, documentation, first-time approval, critical issues. A factor with no data is left out and its weight shared.",
+      "draft_factor": "Draft",
+      "draft_note": "A factor marked draft is not yet approved by the owner."
     },
     "ps": {
       "title": "Project Status by activity",
-      "no_data": "no data yet"
+      "no_data": "no data yet",
+      "central_line": "Central project-wide items, outside this figure: {{m}} of {{t}} have a value",
+      "central_pct": "their weighted progress {{pct}}%",
+      "central_hint": "They count in the project-wide figure only."
     },
     "streams": {
       "title": "Streams",
@@ -2287,7 +2300,9 @@
       "title": "Blocked gates",
       "unavailable": "The state of a gate is kept for today only; pick today to see the blocked gates.",
       "none": "No gate is blocked.",
-      "no_reason": "The calculation layer gave no reason."
+      "no_reason": "The calculation layer gave no reason.",
+      "historically_unavailable": "Historically unavailable: the state of the gates on {{date}} was not kept.",
+      "snapshot": "From the snapshot of {{date}}: {{n}} blocked. Reasons are kept for today only."
     },
     "issues": {
       "title": "Issues",
@@ -2319,8 +2334,8 @@
         "other": "Other"
       },
       "chart": "Overdue working days per party: {{list}}",
-      "total": "{{n}} overdue working days in total, {{pct}}% on tasks with no responsible party.",
-      "note": "The days of a task's attribution period go to its party; days under a Change Control suspension are left out.",
+      "total": "{{n}} overdue working days in total: {{a}}% attributed by approved periods, {{u}}% unattributed.",
+      "note": "Only an approved period attributes a day; a suggested party is not an attribution and does not enter the scorecard. Days under a Change Control suspension are left out.",
       "draft": "Draft",
       "suspended": "{{n}} working days left out for suspension.",
       "period": {
@@ -2330,7 +2345,12 @@
         "contractor": "Contractor",
         "external": "Other external party",
         "aljeel": "Aljeel"
-      }
+      },
+      "unattributed": "Unattributed",
+      "suggested": "suggested: {{name}}",
+      "data_gap": "Data gap (no window)",
+      "proposed": "{{n}} working days are covered by a proposal waiting for approval.",
+      "gap": "{{n}} working days are a data gap."
     },
     "regions": {
       "title": "Regions",
@@ -2856,27 +2876,47 @@
     "in_force": "in force",
     "by": "by {{name}}",
     "cancel": "Cancel",
-    "not_weighted": "not weighted"
+    "not_weighted": "not weighted",
+    "source": "Source",
+    "source_hint": "Where the value comes from, for example the warehouse report.",
+    "correction": "Historical correction",
+    "closed_month": "Dates before {{date}} correct a closed month: they need the historical-correction right.",
+    "plan": "Plan",
+    "plan_none": "No plan yet",
+    "plan_today": "planned today {{pct}}%",
+    "plan_add": "Set plan",
+    "plan_mode_target": "Target date",
+    "plan_mode_points": "Points",
+    "start_date": "Start date (optional)",
+    "target_date": "Target date (100%)",
+    "point_date": "Date",
+    "point_pct": "Planned %",
+    "add_point": "Add point",
+    "remove_point": "Remove point",
+    "plan_save": "Save plan",
+    "plan_saved": "The plan was saved.",
+    "plan_hint": "Cumulative: the planned % never falls with the date. Between two points it runs in a straight line.",
+    "without_plan": "{{n}} weighted items have no plan yet; Planned and the index stay not available until every measured item has one."
   },
   "delayp": {
     "tab": "Delay",
     "title": "Delay attribution periods",
-    "hint": "Working days after the due date that fall in a period go to its party in the delay attribution. Days under a suspension are left out.",
+    "hint": "A proposed period has no effect. Once approved, the working days after the due date that fall in it go to its party. Days under a suspension are left out.",
     "due": "Due date {{date}}",
     "no_due": "No due date yet.",
     "from": "From",
     "to": "To",
     "party": "Party",
     "reason": "Reason",
-    "add": "Add period",
-    "added": "The period was recorded.",
+    "add": "Propose period",
+    "added": "The period was proposed. It counts once it is approved.",
     "void": "Void",
     "void_reason": "Reason for voiding",
     "void_confirm": "Void the period",
     "voided": "Voided",
     "voided_done": "The period was voided.",
     "none": "No period recorded.",
-    "readonly": "Only the reviewer of the task records periods.",
+    "readonly": "L1 or L2 of the task proposes periods; L2 approves them.",
     "by": "by {{name}}",
     "parties": {
       "gecol": "GECOL",
@@ -2885,7 +2925,25 @@
       "contractor": "Contractor",
       "external": "Other external party",
       "aljeel": "Aljeel"
-    }
+    },
+    "evidence": "Evidence (optional)",
+    "status": {
+      "proposed": "Proposed",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "approve": "Approve",
+    "reject": "Reject",
+    "note": "Note",
+    "note_required": "A rejection needs a note.",
+    "external_party": "External party",
+    "external_required": "Name the contractor or external party to approve this period.",
+    "own": "You proposed it: someone else decides.",
+    "approved_done": "The period was approved.",
+    "rejected_done": "The period was rejected.",
+    "not_counting": "Does not count: the external party is not named.",
+    "proposed_by": "proposed by {{name}}",
+    "decided_by": "decided by {{name}}"
   },
   "batchWarn": {
     "sla_negative": "The actual date is before the SLA start: the duration is negative and raises a data-quality alert.",

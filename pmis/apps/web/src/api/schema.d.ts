@@ -6174,10 +6174,30 @@ export interface paths {
         };
         /**
          * Export exactly the current dashboard view as an Excel workbook (0.11.0) or a CSV file
-         * @description Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (sheets `Dashboard` with the rows and `About` with the basis; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
+         * @description Same query as `GET /dashboard`, plus `format` (0.11.0, Q127): `xlsx` (default) writes an Excel workbook (since 0.12.7, Q187: sheets `Project Overview` with the rows of the view, `CW` and `TE` with the rows of the same filters for those views, `Late tasks`, `Delay attribution`, `Project Status items`, `Regions`, and `About` with the filters, reference date, basis, definitions and versions; landscape, one page wide; text cells are text, never formulas), `csv` the CSV of 0.7.2 (a text that starts like a formula gets a leading quote). The file holds the rows `section,item,metric,value` of the headline figures, the milestones, the Final Closure KPI, the streams, the SLA, the issues, the health index (marked draft), the delay attribution (marked draft) and the regions of the view the caller sees. It is UTF-8 with a byte-order mark so Excel opens Arabic text. Needs `dashboard.export` as well as `dashboard.view` (403 `action_forbidden` otherwise). Scoped by the caller's regions exactly as the dashboard is. Every export writes an audit row (`export`, entity `dashboard`). The Master-format Excel export of `/exports/master` has no dashboard part.
          */
         get: operations["exportDashboard"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/pipeline-variant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose the pipeline style of the dashboard (0.12.7, Q116)
+         * @description A = progress rings (the default), B = flat segmented track. A System Admin or a holder of `dashboard` administer for all regions; anyone else is 403 `action_forbidden`. Audited (`settings.updated`, entity `dashboard.pipeline_variant`, before and after). The value is `meta.pipeline_variant` of `GET /dashboard`.
+         */
+        put: operations["setDashboardPipelineVariant"];
         post?: never;
         delete?: never;
         options?: never;
@@ -6255,9 +6275,31 @@ export interface paths {
         put?: never;
         /**
          * Enter a manual percentage for a central item (0.11.0, Q118)
-         * @description A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
+         * @description A new version of the item's value: 0 to 100 (3 decimals), an effective date today or earlier, a reason and its `source` (required since 0.12.7, Q176). An effective date before the first day of the current month (Africa/Tripoli) is a historical correction (0.12.7, Q178): it needs `dashboard.historical_correction` edit (403 `action_forbidden` otherwise) and is flagged `historical_correction`. The value in force on a date is the entry with the latest effective date on or before it (the highest version on the same date); entries are never changed or deleted, a correction is a new entry. A saved snapshot keeps the values known when it was taken. A caller who may not is 403 `action_forbidden`; an item that is not a weighted central item of the set in force is 422 with `/item_code` `not_central_item`; a future date is 422 `/effective_date` `in_future`. Audited (`project_status.manual_value_set`, with the value it replaces on that date).
          */
         post: operations["addManualProjectStatusValue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/project-status/manual-items/{item_code}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the approved plan of a central item (0.12.7, Q177)
+         * @description A new version of the item's plan, by the same people as the manual values. Send `points` (1 to 120 dates with a planned %, cumulative: the planned % never falls with the date; 422 `/points/<i>/planned_pct` `not_cumulative`, `/points/<i>/date` `duplicate`) or a `target_date` (100% on that date; with `start_date`, 0% on the start date). The planned % on a date is 0 before the first point, a straight line by calendar day between two points, and the last value after the last point. Future dates are allowed. Plans are never changed or deleted; a snapshot reads the plan known when it was taken. Audited (`project_status.manual_plan_set`, with the plan it replaces).
+         */
+        post: operations["setManualProjectStatusPlan"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6280,10 +6322,33 @@ export interface paths {
         get: operations["listTaskDelayPeriods"];
         put?: never;
         /**
-         * Record a delay attribution period on a task (0.11.0, Q122)
-         * @description By the task's reviewer (a holder of its L2 level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. From and To are inclusive; a period of the same task that overlaps an active one is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.added`).
+         * Propose a delay attribution period on a task (0.11.0, Q122; a proposal since 0.12.7, Q182)
+         * @description Since 0.12.7 this proposes a period (status `proposed`) with no effect until it is approved (`.../decision`). By L1 of the task (an entry holder), L2 (a holder of its approve level, or of the review level of an older 3-level task), a System Admin, or a holder of `dashboard.delay` edit in the task's region; anyone else is 403 `action_forbidden`. The external party may stay empty in a proposal (Q184). From and To are inclusive; a period that overlaps an active proposal or approved period of the task is 422 `/from_date` `period_overlap`; To before From is 422 `/to_date` `before_from`. Once approved, delay attribution gives every working day the period covers (after the task's due date, outside a Change Control suspension) to its party. Audited (`delay_period.proposed`).
          */
         post: operations["addTaskDelayPeriod"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{task_id}/delay-periods/{period_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject a proposed delay period (0.12.7, Q182, Q184)
+         * @description By L2 of the task, a System Admin or a holder of `dashboard.delay` edit in the region (403 `action_forbidden` otherwise), never by the person who proposed it, an admin included (403 `self_beneficiary`). A rejection needs `note` (422 `/note` `required`). Approving a `contractor` or `external` period needs its external party: the proposal's, or `external_party_id` here when the proposal has none (422 `/external_party_id` `external_party_required`; another party than the proposal's is 422 `already_named`). An approval that overlaps an approved period is 422 `period_overlap`. A period that is not waiting for a decision is 409 `invalid_transition`. Audited (`delay_period.approved` / `delay_period.rejected`, before and after).
+         */
+        post: operations["decideTaskDelayPeriod"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6304,7 +6369,7 @@ export interface paths {
         put?: never;
         /**
          * Void a delay attribution period, with a reason (0.11.0, Q122)
-         * @description Same rights as recording one. The period stays in the history and stops counting. A period voided already is 409 `invalid_transition`. Audited (`delay_period.voided`).
+         * @description The deciders (see `.../decision`); the proposer may also withdraw an open proposal (0.12.7). The period stays in the history and stops counting. A period voided already, or a rejected one, is 409 `invalid_transition`. Audited (`delay_period.voided`).
          */
         post: operations["voidTaskDelayPeriod"];
         delete?: never;
@@ -11441,12 +11506,19 @@ export interface components {
             progress_pct: number;
             /** @description 0.7.2. Null ("not available") until every measured item has a baseline for all its units. */
             planned_pct?: number | null;
-            /** @description 0.7.2. Actual divided by planned. */
+            /**
+             * @deprecated
+             * @description 0.7.2. Actual divided by planned. Since 0.12.7 the same value as `progress_vs_plan_index` (Q177: it is not an EVM SPI).
+             */
             spi?: number | null;
+            /** @description 0.12.7 (Q177): Actual / Planned over the same items and weights; null while Planned is not available. */
+            progress_vs_plan_index?: number | null;
+            partial_index?: components["schemas"]["PartialPlanIndex"] | null;
             /** @description 0.7.2. Share of the weight whose plan dates are complete. */
             plan_coverage_pct?: number;
             /** @description 0.7.2. Project-wide items left out because the scope is below the whole project (VI-04). */
             central_items_hidden?: number;
+            central_line?: components["schemas"]["CentralLine"] | null;
             /** @description 0.7.2. Active sites behind the figure. */
             sites_in_scope?: number;
             activities: components["schemas"]["ProjectStatusActivity"][];
@@ -11484,10 +11556,57 @@ export interface components {
             kinds?: ("weekly" | "month_end")[];
         };
         /**
-         * @description 0.11.0 (Q127): `weekly` (every Sunday, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).
+         * @description 0.11.0 (Q127): `weekly` (every Thursday since 0.12.7, D186: setting `dashboard.snapshot_weekday` 4, Africa/Tripoli), `month_end` (the last day of the month; wins when both), `manual` (taken by hand, without a scheduled run).
          * @enum {string}
          */
         SnapshotKind: "weekly" | "month_end" | "manual";
+        /**
+         * @description 0.12.7 (Q116): A = progress rings (default), B = flat segmented track.
+         * @enum {string}
+         */
+        PipelineVariant: "A" | "B";
+        /** @description 0.12.7 (Q177): Actual / Planned over the items that have a plan, with the share of the weight they cover. */
+        PartialPlanIndex: {
+            value: number | null;
+            coverage_pct: number;
+            actual_pct: number;
+            planned_pct: number;
+        };
+        /** @description 0.12.7 (Q175): the manual central values in force, shown apart from a regional, site or filtered figure (they count in the project-wide figure only). progress_pct weighs each value by its share of the project figure (activity weight x item weight / the item weights of the activity). */
+        CentralLine: {
+            total: number;
+            measured: number;
+            progress_pct?: number | null;
+            items: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+                activity_code: string;
+                weight: number;
+                value_pct: number;
+                /** Format: date */
+                effective_date: string;
+                version: number;
+            }[];
+        };
+        ManualPlanPoint: {
+            /** Format: date */
+            date: string;
+            planned_pct: number;
+        };
+        ManualPlan: {
+            /** Format: uuid */
+            id: string;
+            item_code: string;
+            version: number;
+            points: components["schemas"]["ManualPlanPoint"][];
+            reason: string;
+            source: string;
+            /** Format: uuid */
+            entered_by?: string;
+            /** Format: date-time */
+            created_at?: string;
+        };
         ManualItemValue: {
             /** Format: uuid */
             id: string;
@@ -11497,6 +11616,10 @@ export interface components {
             /** Format: date */
             effective_date: string;
             reason: string;
+            /** @description 0.12.7 (Q176). */
+            source?: string;
+            /** @description 0.12.7 (Q178): dated before the current month. */
+            historical_correction?: boolean;
             /** Format: uuid */
             entered_by?: string;
             /** Format: date-time */
@@ -11515,6 +11638,10 @@ export interface components {
             /** @description The entry in force today. */
             in_force: boolean;
             entered_by: components["schemas"]["UserRef"];
+            /** @description 0.12.7 (Q176). Entries before migration 0059 read "not recorded (entered before 0059)". */
+            source?: string;
+            /** @description 0.12.7 (Q178). */
+            historical_correction?: boolean;
         };
         ManualItem: {
             item_code: string;
@@ -11530,8 +11657,23 @@ export interface components {
                 /** Format: date */
                 effective_date: string;
                 version: number;
+                source?: string;
             } | null;
             history: components["schemas"]["ManualItemHistoryEntry"][];
+            /** @description 0.12.7 (Q177): the plan in force (latest version), null while the owner has given none. */
+            plan?: {
+                /** Format: uuid */
+                id: string;
+                version: number;
+                points: components["schemas"]["ManualPlanPoint"][];
+                reason: string;
+                source: string;
+                /** Format: date-time */
+                created_at: string;
+                /** @description The planned % of the plan today. */
+                planned_pct_today: number;
+                entered_by: components["schemas"]["UserRef"];
+            } | null;
         };
         ManualItemList: {
             /** Format: date */
@@ -11539,6 +11681,15 @@ export interface components {
             can_edit: boolean;
             /** @description Weighted central items with no value in force today. */
             without_value: number;
+            /** @description 0.12.7 (Q177): weighted central items with no plan. */
+            without_plan?: number;
+            /**
+             * Format: date
+             * @description 0.12.7 (Q178): the first day of the current month; an earlier effective date is a historical correction.
+             */
+            open_period_from?: string;
+            /** @description 0.12.7 (Q178): the caller may enter a historical correction (dashboard.historical_correction edit). */
+            can_correct_history?: boolean;
             items: components["schemas"]["ManualItem"][];
         };
         /**
@@ -11547,6 +11698,19 @@ export interface components {
          */
         DelayParty: "gecol" | "hlc" | "client" | "contractor" | "external" | "aljeel";
         DelayPeriod: {
+            /**
+             * @description 0.12.7 (Q182). Periods recorded before migration 0059 are approved.
+             * @enum {string}
+             */
+            status?: "proposed" | "approved" | "rejected";
+            evidence?: string | null;
+            proposed_by?: components["schemas"]["UserRef"];
+            decided_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_note?: string | null;
+            /** @description 0.12.7: approved, not voided, and (for contractor / external) with its external party (Q184). */
+            counts?: boolean;
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -11577,7 +11741,24 @@ export interface components {
              * @description Delay days are the working days after it.
              */
             due_date?: string | null;
+            /** @description Since 0.12.7 the same as can_decide. */
             can_edit: boolean;
+            /** @description 0.12.7: may approve, reject and void. */
+            can_decide?: boolean;
+            /** @description 0.12.7: may propose (L1 too). */
+            can_propose?: boolean;
+            /**
+             * Format: uuid
+             * @description 0.12.7: the caller, so a screen can hide the decision of their own proposal.
+             */
+            me?: string | null;
+            /** @description 0.12.7: the registry of external parties to name one (Q184). */
+            external_parties?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+                type: string;
+            }[];
             parties: components["schemas"]["DelayParty"][];
             items: components["schemas"]["DelayPeriod"][];
         };
@@ -11601,6 +11782,10 @@ export interface components {
                 date: string;
                 kind: components["schemas"]["SnapshotKind"];
                 kinds: ("weekly" | "month_end")[];
+                /** @description 0.12.7 (Q186): stored after its own date (a catch-up, or taken by hand for an earlier date); its blocked gates are historically unavailable. */
+                rebuilt?: boolean;
+                /** Format: date-time */
+                taken_at?: string;
             }[];
             /** @description English sentence that says how a past date was made. Null for today. */
             note?: string | null;
@@ -11616,6 +11801,11 @@ export interface components {
             scope_regions?: components["schemas"]["RegionId"][] | null;
             /** @description False since 0.11.0 (Q121). */
             health_draft?: boolean;
+            /** @description 0.12.7 (D16): the health factors not yet approved, each shown with a draft label. */
+            health_draft_factors?: string[];
+            /** @description 0.12.7 (Q186): false when blocked gates cannot be known for the reference date. */
+            blocked_gates_available?: boolean;
+            pipeline_variant?: components["schemas"]["PipelineVariant"];
         };
         DashboardFilters: {
             regions: {
@@ -11640,8 +11830,10 @@ export interface components {
         /** @description One milestone of the pipeline for the reference date. Sites for which the milestone does not apply are counted in `not_applicable` only. */
         DashboardMilestone: components["schemas"]["MilestonePipelineNode"] & {
             stream_code?: string | null;
-            /** @description Open, previous milestone done, and the gate holds it (live only). */
-            blocked?: number;
+            /** @description Open, previous milestone done, and the gate holds it. Null since 0.12.7 when it cannot be known for the date (Q186): a past date, or a snapshot rebuilt after its date. */
+            blocked?: number | null;
+            /** @description 0.12.7 (Q186). */
+            blocked_available?: boolean;
             /** @description Sites whose baseline is due by the reference date. */
             plan?: number;
             /** @description `completed` minus `plan`. */
@@ -11686,8 +11878,13 @@ export interface components {
             applicable?: number;
             /** @enum {string|null} */
             reason?: "not_weighted" | "no_data" | "central_hidden" | "not_applicable" | null;
-            /** @description 0.11.0: a project-wide item measured by a manual percentage (Q118). */
+            /** @description 0.11.0: a project-wide item measured by a manual percentage (Q118). Since 0.12.7 (Q175) it counts in the project-wide figure only; elsewhere `reason` is central_hidden. */
             central?: boolean;
+            /** @description 0.12.7 (Q177): the planned % of the item's plan on the reference date (project-wide only). */
+            plan?: {
+                planned_pct: number;
+                version: number;
+            } | null;
             /** @description 0.11.0 (Q118): the manual value in force on the reference date; null when none. */
             manual?: {
                 value_pct: number;
@@ -11710,11 +11907,22 @@ export interface components {
             progress_pct: number;
             /** @description Null ("not available") until every measured item has a baseline for all its units. */
             planned_pct?: number | null;
+            /**
+             * @deprecated
+             * @description Since 0.12.7 the same value as progress_vs_plan_index.
+             */
             spi?: number | null;
+            /** @description 0.12.7 (Q177): Actual / Planned over the same items; not EVM. */
+            progress_vs_plan_index?: number | null;
+            partial_index?: components["schemas"]["PartialPlanIndex"] | null;
             plan_coverage_pct: number;
             central_items_hidden?: number;
-            /** @description 0.11.0. */
+            /** @description 0.11.0. Since 0.12.7 (Q175) 0 below the whole project. */
             manual_items_measured?: number;
+            /** @description 0.12.7 (Q177). */
+            manual_items_planned?: number;
+            /** @description 0.12.7 (Q175): null for the project-wide figure. */
+            central_line?: components["schemas"]["CentralLine"] | null;
             activities: components["schemas"]["DashboardProjectStatusActivity"][];
         };
         /** @description The Final Closure KPI, apart from Project Status. Ages are in working days from the end of the DLP; a site whose DLP has not ended counts in `not_due`. */
@@ -11815,7 +12023,12 @@ export interface components {
         DashboardGates: {
             /** @description False for a past reference date: the state of a gate on a past date is not kept. */
             available: boolean;
-            blocked_total: number;
+            /**
+             * @description 0.12.7 (Q186): `snapshot` = the count of a snapshot taken on its own date (no reasons); `historically_unavailable` = cannot be known, `blocked_total` is null.
+             * @enum {string}
+             */
+            status?: "live" | "snapshot" | "historically_unavailable";
+            blocked_total: number | null;
             by_gate?: {
                 gate_code?: string;
                 name_en?: string;
@@ -11885,7 +12098,13 @@ export interface components {
                 /** @description No data: left out and its weight redistributed. */
                 excluded: boolean;
                 contribution: number;
+                /** @description 0.12.7 (D16): the factor is not yet approved by the owner (every factor except D and I; setting dashboard.health_approved_factors). */
+                draft?: boolean;
             }[];
+            /** @description 0.12.7 (D16). */
+            draft_factors?: string[];
+            /** @description 0.12.7 (D16). */
+            approved_factors?: string[];
             by_region: {
                 region_id: components["schemas"]["RegionId"];
                 score: number;
@@ -11893,12 +12112,36 @@ export interface components {
                 band: "green" | "amber" | "red";
             }[];
         };
-        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days per responsible party, day by day (0.11.0, Q122): the working days after the due date, minus the days of a Change Control suspension of the site, go to the party of the task's attribution period that covers them, otherwise to the external party of the task, its default party type, or unassigned. */
+        /** @description Delay attribution, rules.md section 8 (draft). Overdue working days, day by day (0.11.0, Q122; 0.12.7, Q7, Q180 to Q184): the working days after the due date (rebuilt from the SLA start plus the maximum when there is none), minus the days of a Change Control suspension of the site (effective start to effective resumption, falling back to the approval dates), go to the party of the task's approved attribution period that covers them (a contractor or external one only with its named party); every other day is unattributed, with the task's R party (external party, else default party type) as a suggestion only. A task whose window holds no day is a data gap. */
         DashboardDelay: {
             draft: boolean;
             total_late_working_days: number;
-            /** @description Share of the days on tasks with no external party and no default party type. */
+            /** @description Since 0.12.7 (Q7): share of the days no approved period covers. */
             unattributed_pct: number;
+            /** @description 0.12.7 (Q7): share of the days given to a party by an approved period. */
+            attributed_pct?: number;
+            /** @description 0.12.7. */
+            attributed_working_days?: number;
+            /** @description 0.12.7. */
+            unattributed_working_days?: number;
+            /** @description 0.12.7 (Q181): days of late tasks whose window could not be built. */
+            data_gap_working_days?: number;
+            /** @description 0.12.7 (Q182): unattributed days a pending proposal covers (no effect). */
+            proposed_working_days?: number;
+            /** @description 0.12.7. */
+            proposals_count?: number;
+            /** @description 0.12.7 (Q184): approved contractor / external periods from before 0059 without their party; they do not count. */
+            pending_party_count?: number;
+            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. */
+            scorecard?: {
+                party: string;
+                period_party?: components["schemas"]["DelayParty"];
+                /** Format: uuid */
+                external_party_id?: string | null;
+                party_type?: string | null;
+                late_tasks: number;
+                late_working_days: number;
+            }[];
             /** @description Always 0: overlapping periods of one task are refused at entry. */
             overlapping_periods?: number;
             /** @description True since 0.11.0. */
@@ -11910,10 +12153,24 @@ export interface components {
             /** @description 0.11.0: active periods on the late tasks of the view. */
             periods_count?: number;
             items: {
-                /** @description The external party name, the default party type of the task, the party of the period (its external party name when one is named), or `unassigned`. */
+                /** @description The party of the period (its external party name when one is named), or `unattributed` (0.12.7). */
                 party: string;
-                /** @enum {string} */
-                kind: "period" | "external" | "default_type" | "unassigned";
+                /**
+                 * @description Since 0.12.7 only `period` and `unattributed` are sent; the other three are the 0.11.0 values.
+                 * @enum {string}
+                 */
+                kind: "period" | "unattributed" | "external" | "default_type" | "unassigned";
+                /** @description 0.12.7 (Q181). */
+                data_gap?: boolean;
+                /** @description 0.12.7 (Q7): the R party of the unattributed days, shown as a suggestion, never an attribution. Null for a data gap or a task with no R party. */
+                suggested_party?: {
+                    name: string;
+                    /** @enum {string} */
+                    kind: "external" | "default_type";
+                    /** Format: uuid */
+                    external_party_id?: string | null;
+                    party_type?: string | null;
+                } | null;
                 /** @description 0.11.0: the party of the period when `kind` is `period`. */
                 period_party?: components["schemas"]["DelayParty"] | null;
                 /** Format: uuid */
@@ -23377,6 +23634,38 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    setDashboardPipelineVariant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    variant: components["schemas"]["PipelineVariant"];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The style in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        variant: components["schemas"]["PipelineVariant"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getProjectStatus: {
         parameters: {
             query?: {
@@ -23478,6 +23767,8 @@ export interface operations {
                     /** Format: date */
                     effective_date: string;
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.7 (Q176): where the value comes from, for example a report or a log. */
+                    source?: string;
                 };
             };
         };
@@ -23489,6 +23780,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualItemValue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setManualProjectStatusPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    points?: components["schemas"]["ManualPlanPoint"][];
+                    /** Format: date */
+                    target_date?: string;
+                    /**
+                     * Format: date
+                     * @description Only with target_date, before it.
+                     */
+                    start_date?: string;
+                    reason: components["schemas"]["Reason"];
+                    source: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The plan. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualPlan"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -23541,15 +23873,17 @@ export interface operations {
                     party: components["schemas"]["DelayParty"];
                     /**
                      * Format: uuid
-                     * @description Optional: the contractor or external party by name.
+                     * @description Optional in a proposal; required to approve a contractor or external period (Q184).
                      */
                     external_party_id?: string | null;
                     reason: components["schemas"]["Reason"];
+                    /** @description 0.12.7 (Q182): what supports the proposal (a reference, a document, a note). */
+                    evidence?: string | null;
                 };
             };
         };
         responses: {
-            /** @description The period. */
+            /** @description The proposed period. */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -23561,6 +23895,44 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    decideTaskDelayPeriod: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                period_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    decision: "approve" | "reject";
+                    note?: string | null;
+                    /** Format: uuid */
+                    external_party_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The decided period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DelayPeriod"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
         };
     };

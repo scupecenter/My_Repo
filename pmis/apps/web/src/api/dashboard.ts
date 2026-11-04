@@ -14,6 +14,9 @@ export type DelayPeriodList = S['DelayPeriodList'];
 export type DelayPeriod = S['DelayPeriod'];
 export type DelayParty = S['DelayParty'];
 export type SnapshotKind = S['SnapshotKind'];
+export type PipelineVariant = S['PipelineVariant'];
+export type ManualPlanPoint = S['ManualPlanPoint'];
+export type ManualPlan = S['ManualPlan'];
 
 /** The query of `GET /dashboard` (contract 0.7.2; `view` 0.11.0). Empty values are not sent. */
 export interface DashboardQuery {
@@ -47,12 +50,34 @@ export const useManualItems = () =>
 export function useAddManualValue() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ code, ...body }: { code: string; value_pct: number; effective_date: string; reason: string }) =>
+    mutationFn: ({ code, ...body }: { code: string; value_pct: number; effective_date: string; reason: string; source: string }) =>
       api.post<ManualItemValue>(`/project-status/manual-items/${encodeURIComponent(code)}/values`, { body }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['manual-items'] });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });
     },
+  });
+}
+
+// ---------------------------------------------------------------- Q177: the plan of a central item (points, or a target date with an optional start)
+export function useSetManualPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, ...body }: { code: string; reason: string; source: string } & ({ points: ManualPlanPoint[] } | { target_date: string; start_date?: string })) =>
+      api.post<ManualPlan>(`/project-status/manual-items/${encodeURIComponent(code)}/plan`, { body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['manual-items'] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------- Q116: the pipeline style (A rings, B flat track)
+export function useSetPipelineVariant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { variant: PipelineVariant; reason: string }) => api.put<{ variant: PipelineVariant }>('/dashboard/pipeline-variant', { body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['dashboard'] }),
   });
 }
 
@@ -63,7 +88,7 @@ export const useDelayPeriods = (taskId: string) =>
 export function useAddDelayPeriod(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: { from_date: string; to_date: string; party: DelayParty; external_party_id?: string | null; reason: string }) =>
+    mutationFn: (body: { from_date: string; to_date: string; party: DelayParty; external_party_id?: string | null; reason: string; evidence?: string | null }) =>
       api.post<DelayPeriod>(`/tasks/${taskId}/delay-periods`, { body }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['delay-periods', taskId] });
@@ -76,6 +101,19 @@ export function useVoidDelayPeriod(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) => api.post<DelayPeriod>(`/tasks/${taskId}/delay-periods/${id}/void`, { body: { reason } }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['delay-periods', taskId] });
+      void qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+}
+
+/** Q182, Q184: approve or reject a proposed period (never one's own; a rejection needs a note; a contractor or external one needs its party). */
+export function useDecideDelayPeriod(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; decision: 'approve' | 'reject'; note?: string | null; external_party_id?: string | null }) =>
+      api.post<DelayPeriod>(`/tasks/${taskId}/delay-periods/${id}/decision`, { body }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['delay-periods', taskId] });
       void qc.invalidateQueries({ queryKey: ['dashboard'] });

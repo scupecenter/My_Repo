@@ -40,7 +40,9 @@ const get = async (a: Actor, qs = ''): Promise<J> => {
 };
 const item = (d: J, code: string): J => d.headline.project_status.activities.flatMap((a: J) => a.items).find((i: J) => i.code === code);
 const act = (d: J, code: string): J => d.headline.project_status.activities.find((a: J) => a.code === code);
-const addValue = (a: Actor, code: string, body: J) => a.api.call('post', `${MANUAL}/${code}/values`).send(body);
+// 0059 (Q176): every value carries its source. The dates of this suite are "n days ago", which may fall in the previous month: the writers
+// below also hold dashboard.historical_correction (Q178), whose own rules are tested in dashboard-p2.test.ts.
+const addValue = (a: Actor, code: string, body: J) => a.api.call('post', `${MANUAL}/${code}/values`).send('reason' in body && !('source' in body) ? { source: 'test log', ...body } : body);
 
 beforeAll(async () => {
   app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_DASH2 as string });
@@ -50,10 +52,10 @@ beforeAll(async () => {
   fx = await buildFixture(db, x.id, y.id);
   admin = await plainAdmin(app, db, true);
   const view: [string, string][] = [['dashboard', 'view'], ['sites', 'view']];
-  pm = await actor(app, db, { regions: null, grants: view });
+  pm = await actor(app, db, { regions: null, grants: [...view, ['dashboard.historical_correction', 'edit']] });
   const pmRole = (await q<{ id: string }>(db, `SELECT id FROM roles WHERE code = 'PM'`))[0]!.id;
   await addAssignment(db, pm.user.id, { roleId: pmRole, level: 'view', regions: null, grants: view });
-  psEditor = await actor(app, db, { regions: null, grants: [...view, ['dashboard.project_status', 'edit']] });
+  psEditor = await actor(app, db, { regions: null, grants: [...view, ['dashboard.project_status', 'edit'], ['dashboard.historical_correction', 'edit']] });
   psEditorTripoli = await actor(app, db, { regions: [1], grants: [...view, ['dashboard.project_status', 'edit']] });
   tripoli = await actor(app, db, { regions: [1], grants: [...view, ['issues', 'view']] });
   reviewer = await actor(app, db, { regions: [1], level: 'approve', grants: [...view, ['sites', 'approve'], ['approvals', 'view'], ['approvals', 'approve']] });
@@ -131,14 +133,14 @@ describe('Q118: manual percentage of the central Project Status items', () => {
     expect(ps.body.progress_pct).toBeCloseTo(40.884, 2);
   });
 
-  it('counts them in a regional figure too: central_items_hidden falls by the items that have a value', async () => {
+  it('since 0059 (Q175) a regional figure leaves the manual values out again and shows them on a separate central line', async () => {
     const d = await get(tripoli);
-    // 0039 Tripoli: (12 + 17.5 + 0 + 3.0545 + 5.2 + 2) / 87 = 45.695 (8.2 at Tripoli = 2 of 5 sites); A8 becomes (50 x 0.5 + 50 x 0.4) / 100 = 0.45
-    const old = 0.45695 * 87;
-    expect(d.headline.project_status.progress_pct).toBeCloseTo(((old + 5 * 0.4 + 5 * (0.45 - 0.4)) / 92) * 100, 1);
-    expect(d.meta.central_items_hidden).toBe(12);
-    expect(item(d, '1.3')).toMatchObject({ measured: false });
-    expect(item(d, '8.1')).toMatchObject({ measured: true, progress_pct: 50 });
+    // 0039 Tripoli: (12 + 17.5 + 0 + 3.0545 + 5.2 + 2) / 87 = 45.695 (8.2 at Tripoli = 2 of 5 sites), unchanged by the manual values
+    expect(d.headline.project_status.progress_pct).toBeCloseTo(45.695, 2);
+    expect(d.meta.central_items_hidden).toBe(14);
+    expect(item(d, '1.3')).toMatchObject({ measured: false, reason: 'central_hidden' });
+    expect(item(d, '8.1')).toMatchObject({ measured: false, reason: 'central_hidden', manual: null });
+    expect(d.headline.project_status.central_line).toMatchObject({ total: 14, measured: 2 });
   });
 
   it('a past reference date uses the value in force on that date', async () => {
@@ -192,7 +194,7 @@ describe('Q118: manual percentage of the central Project Status items', () => {
     await appDb.connect();
     try {
       await expect(appDb.query(`INSERT INTO ps_manual_values (item_code, version, value_pct, effective_date, reason, entered_by) VALUES ('1.3', 9, 1, cal_today(), 'x', $1)`, [pm.user.id])).rejects.toThrow(/permission denied/);
-      await expect(appDb.query(`SELECT ps_manual_set('1.3', 1, cal_today(), 'no actor')`)).rejects.toThrow(/Project Manager/);
+      await expect(appDb.query(`SELECT ps_manual_set('1.3', 1, cal_today(), 'no actor', 'a source')`)).rejects.toThrow(/Project Manager/);
     } finally {
       await appDb.end();
     }
@@ -212,11 +214,15 @@ describe('Q121: the health index is approved', () => {
 });
 
 // ---------------------------------------------------------------------------------------------------------------------------- Q122
+// Since 0059 a period is proposed and decided by somebody else (Q182), and the days no approved period covers are unattributed (Q7).
 describe('Q122: delay attribution periods', () => {
   const periods = (a: Actor, task: string) => a.api.call('get', `/tasks/${task}/delay-periods`);
   const addPeriod = (a: Actor, task: string, body: J) => a.api.call('post', `/tasks/${task}/delay-periods`).send(body);
+  const decide = (a: Actor, task: string, id: string, body: J) => a.api.call('post', `/tasks/${task}/delay-periods/${id}/decision`).send(body);
+  // T2 A2 is closed with no due date: since 0059 its window is rebuilt (Q181): the working days after the SLA start (110 days ago) plus the A2 maximum (2)
+  const t2a2 = async (): Promise<number> => Math.max(0, (await wdBetween(db, 110, 100)) - 2);
 
-  it('before any period: every late day goes to the default rule; the suspension of B1 is left out of the delay', async () => {
+  it('before any period: every late day is unattributed, with the R party only as a suggestion; the suspension of B1 is left out', async () => {
     // B1 is suspended 40 days ago and resumed 30 days ago: inside the window of its late B8 (due 60 days ago)
     await db.query(`INSERT INTO change_requests (change_code, site_id, region_id, kind, status, approval_date, is_global, requested_by) VALUES
       ('DASH2-S', $1, 5, 'suspension', 'approved', cal_today() - 40, false, $2), ('DASH2-R', $1, 5, 'resumption', 'approved', cal_today() - 30, false, $2)`, [fx.site.B1!.id, fx.userX]);
@@ -224,34 +230,44 @@ describe('Q122: delay attribution periods', () => {
     const suspended = await wdBetween(db, 41, 31);          // working days from 40 to 31 days ago
     expect(dl.periods_supported).toBe(true);
     expect(dl.suspended_working_days).toBe(suspended);
-    // T1 B8 late since 30 days ago, B1 B8 since 60 days ago minus the suspension, T2 A2 (closed, no due date) its 4 days over the maximum
-    expect(dl.total_late_working_days).toBe(await wdBetween(db, 30) + await wdBetween(db, 60) - suspended + 4);
-    expect(dl.items.find((i: J) => i.party === 'cw_contractor')).toMatchObject({ kind: 'default_type', late_tasks: 2, late_working_days: await wdBetween(db, 30) + await wdBetween(db, 60) - suspended });
-    expect(dl.items.find((i: J) => i.kind === 'unassigned')).toMatchObject({ late_working_days: 4 });
+    expect(dl.total_late_working_days).toBe(await wdBetween(db, 30) + await wdBetween(db, 60) - suspended + await t2a2());
+    expect(dl.items.find((i: J) => i.suggested_party?.name === 'cw_contractor')).toMatchObject({ kind: 'unattributed', party: 'unattributed', late_tasks: 2,
+      late_working_days: await wdBetween(db, 30) + await wdBetween(db, 60) - suspended });
+    expect(dl.attributed_pct).toBe(0);
+    expect(dl.unattributed_pct).toBe(100);
+    expect(dl.scorecard).toEqual([]);
   });
 
-  it('the reviewer (L2 holder) records a period; another viewer may not; the panel says who may', async () => {
-    expect((await periods(reviewer, t1b8)).body).toMatchObject({ can_edit: true, items: [], parties: ['gecol', 'hlc', 'client', 'contractor', 'external', 'aljeel'] });
-    expect((await periods(tripoli, t1b8)).body.can_edit).toBe(false);
+  it('the reviewer (L2 holder) proposes a period; another viewer may not; the panel says who may', async () => {
+    expect((await periods(reviewer, t1b8)).body).toMatchObject({ can_edit: true, can_propose: true, items: [], parties: ['gecol', 'hlc', 'client', 'contractor', 'external', 'aljeel'] });
+    expect((await periods(tripoli, t1b8)).body).toMatchObject({ can_edit: false, can_propose: false });
     const body = { from_date: await ago(db, 20), to_date: await ago(db, 11), party: 'gecol', reason: 'no power from GECOL' };
     expect((await addPeriod(tripoli, t1b8, body)).status).toBe(403);
     const r = await addPeriod(reviewer, t1b8, body);
     expect(r.status, JSON.stringify(r.body)).toBe(201);
-    expect(r.body).toMatchObject({ party: 'gecol', from_date: body.from_date, to_date: body.to_date, voided: false, created_by: { id: reviewer.user.id } });
+    expect(r.body).toMatchObject({ party: 'gecol', from_date: body.from_date, to_date: body.to_date, voided: false, status: 'proposed', created_by: { id: reviewer.user.id } });
     const audit = await q<{ site_id: string; region_id: number; actor_id: string }>(db,
-      `SELECT site_id::text AS site_id, region_id, actor_id::text AS actor_id FROM audit_log WHERE action = 'delay_period.added' AND entity_id = $1`, [r.body.id]);
+      `SELECT site_id::text AS site_id, region_id, actor_id::text AS actor_id FROM audit_log WHERE action = 'delay_period.proposed' AND entity_id = $1`, [r.body.id]);
     expect(audit).toEqual([{ site_id: fx.site.T1!.id, region_id: 1, actor_id: reviewer.user.id }]);
+    // a proposal has no effect yet
+    expect((await get(admin)).delay.period_working_days).toBe(0);
+    // the proposer does not decide it; the delegate does
+    expect((await decide(reviewer, t1b8, r.body.id, { decision: 'approve' })).status).toBe(403);
+    const ok = await decide(delayDelegate, t1b8, r.body.id, { decision: 'approve' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body).toMatchObject({ status: 'approved', decided_by: { id: delayDelegate.user.id } });
   });
 
-  it('attributes the covered working days to the party of the period (computed by hand)', async () => {
+  it('attributes the covered working days to the party of the approved period (computed by hand)', async () => {
     const dl = (await get(admin)).delay;
     const gecol = await wdBetween(db, 21, 11);  // the working days from 20 to 11 days ago, all after the due date (30 days ago)
     const suspended = await wdBetween(db, 41, 31);
     expect(dl.items.find((i: J) => i.kind === 'period' && i.period_party === 'gecol')).toMatchObject({ party: 'gecol', late_tasks: 1, late_working_days: gecol });
-    expect(dl.items.find((i: J) => i.party === 'cw_contractor').late_working_days).toBe(await wdBetween(db, 30) - gecol + await wdBetween(db, 60) - suspended);
+    expect(dl.items.find((i: J) => i.suggested_party?.name === 'cw_contractor').late_working_days).toBe(await wdBetween(db, 30) - gecol + await wdBetween(db, 60) - suspended);
     expect(dl.period_working_days).toBe(gecol);
+    expect(dl.scorecard).toEqual([expect.objectContaining({ period_party: 'gecol', late_working_days: gecol })]);
     expect(dl.periods_count).toBe(1);
-    expect(dl.total_late_working_days).toBe(await wdBetween(db, 30) + await wdBetween(db, 60) - suspended + 4);
+    expect(dl.total_late_working_days).toBe(await wdBetween(db, 30) + await wdBetween(db, 60) - suspended + await t2a2());
     expect(dl.items.reduce((a: number, i: J) => a + i.share_pct, 0)).toBeCloseTo(100, 0);
   });
 
@@ -267,10 +283,11 @@ describe('Q122: delay attribution periods', () => {
     expect((await periods(reviewer, b1b8)).status).toBe(404);
   });
 
-  it('a holder of dashboard.delay edit in the region records one too; a voided period stops counting and stays in the history', async () => {
+  it('a holder of dashboard.delay edit proposes one too; a voided period stops counting and stays in the history', async () => {
     const r = await addPeriod(delayDelegate, t1b8, { from_date: await ago(db, 6), to_date: await ago(db, 2), party: 'contractor', external_party_id: fx.party, reason: 'crew not on site' });
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(r.body.external_party_name).toBe('Dash Test Vendor');
+    expect((await decide(reviewer, t1b8, r.body.id, { decision: 'approve' })).status).toBe(200);
     let dl = (await get(admin)).delay;
     expect(dl.items.find((i: J) => i.kind === 'period' && i.period_party === 'contractor')).toMatchObject({ party: 'Dash Test Vendor', late_working_days: await wdBetween(db, 7, 2) });
     expect((await reviewer.api.call('post', `/tasks/${t1b8}/delay-periods/${r.body.id}/void`).send({})).status).toBe(422); // a reason is required
@@ -283,7 +300,7 @@ describe('Q122: delay attribution periods', () => {
     expect(dl.periods_count).toBe(1);
     const list = (await periods(tripoli, t1b8)).body.items;
     expect(list.map((p: J) => [p.party, p.voided])).toEqual([['gecol', false], ['contractor', true]]);
-    // the same days may be recorded again once the first period is voided
+    // the same days may be proposed again once the first period is voided
     expect((await addPeriod(admin, t1b8, { from_date: await ago(db, 6), to_date: await ago(db, 6), party: 'client', reason: 'client closed the site' })).status).toBe(201);
     const audit = await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM audit_log WHERE action = 'delay_period.voided' AND entity_id = $1`, [r.body.id]);
     expect(audit[0]!.n).toBe(1);
@@ -323,7 +340,7 @@ describe('Q126: view filter (CW / TE / O&M)', () => {
     expect(d.meta.project_wide).toBe(false);
     expect(d.sla.by_stage.map((s: J) => s.stage_code)).toEqual(['MS3']); // B8 at T1 and B1; A2, D5 and D7 are not CW
     expect(d.sla.totals).toMatchObject({ open_late: 2, completed_late: 0, completed_on_time: 0, open_on_time: 0 });
-    expect(d.delay.items.some((i: J) => i.kind === 'unassigned')).toBe(false); // the late A2 is not a CW task
+    expect(d.delay.items.some((i: J) => i.kind === 'unattributed' && !i.suggested_party)).toBe(false); // the late A2 is not a CW task
   });
 
   it('TE keeps MS5 to MS9; O&M keeps Final Closure and the sites that have TE FAC or the closure task', async () => {
@@ -346,35 +363,37 @@ describe('Q126: view filter (CW / TE / O&M)', () => {
 
 // ---------------------------------------------------------------------------------------------------------------------------- Q127
 describe('Q127: snapshot schedule', () => {
-  it('a date is weekly on a Sunday and month_end on the last day of the month (fixed calendar dates)', async () => {
+  it('a date is weekly on a Thursday (D186, setting 4) and month_end on the last day of the month (fixed calendar dates)', async () => {
     const kinds = async (d: string) => (await q<{ k: string[] }>(db, 'SELECT dash_snapshot_kinds($1::date) AS k', [d]))[0]!.k;
-    expect(await kinds('2026-05-31')).toEqual(['weekly', 'month_end']); // a Sunday that ends May
+    expect((await q<{ v: unknown }>(db, `SELECT value AS v FROM settings WHERE key = 'dashboard.snapshot_weekday'`))[0]!.v).toBe(4);
+    expect(await kinds('2026-04-30')).toEqual(['weekly', 'month_end']); // a Thursday that ends April
+    expect(await kinds('2026-05-31')).toEqual(['month_end']);           // a Sunday: no longer weekly
     expect(await kinds('2026-10-31')).toEqual(['month_end']);           // a Saturday
-    expect(await kinds('2026-11-01')).toEqual(['weekly']);              // a Sunday
-    expect(await kinds('2026-10-28')).toEqual([]);                      // a Wednesday
+    expect(await kinds('2026-10-29')).toEqual(['weekly']);              // a Thursday
+    expect(await kinds('2026-11-01')).toEqual([]);                      // a Sunday
     expect(await kinds('2028-02-29')).toEqual(['month_end']);           // leap year
     await db.query(`UPDATE settings SET value = '3' WHERE key = 'dashboard.snapshot_weekday'`);
     try {
       expect(await kinds('2026-10-28')).toEqual(['weekly']);
     } finally {
-      await db.query(`UPDATE settings SET value = '0' WHERE key = 'dashboard.snapshot_weekday'`);
+      await db.query(`UPDATE settings SET value = '4' WHERE key = 'dashboard.snapshot_weekday'`);
     }
   });
 
   it('lists what is due within the catch-up window and not taken yet', async () => {
     const due = await q<{ d: string; kind: string }>(db, `SELECT snapshot_date::text AS d, kind FROM dash_snapshot_due('2026-11-03'::date)`);
-    expect(due).toEqual([{ d: '2026-10-31', kind: 'month_end' }, { d: '2026-11-01', kind: 'weekly' }]);
-    expect(await q(db, `SELECT * FROM dash_snapshot_due('2026-10-30'::date)`)).toEqual([{ snapshot_date: expect.anything(), kind: 'weekly' }]); // 2026-10-25
+    expect(due).toEqual([{ d: '2026-10-29', kind: 'weekly' }, { d: '2026-10-31', kind: 'month_end' }]);
+    expect(await q(db, `SELECT * FROM dash_snapshot_due('2026-10-30'::date)`)).toEqual([{ snapshot_date: expect.anything(), kind: 'weekly' }]); // 2026-10-29
   });
 
   it('takes a date once even when it is both weekly and month-end, and never again', async () => {
-    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-06-01'::date) AS n`))[0]!.n).toBe(9);
-    const runs = await q<{ kind: string; sites: number; source: string }>(db, `SELECT kind, sites, source FROM dash_snapshot_runs WHERE snapshot_date = '2026-05-31' ORDER BY kind`);
+    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-05-01'::date) AS n`))[0]!.n).toBe(9);
+    const runs = await q<{ kind: string; sites: number; source: string }>(db, `SELECT kind, sites, source FROM dash_snapshot_runs WHERE snapshot_date = '2026-04-30' ORDER BY kind`);
     // the first kind of the date stores the 9 sites; the second records its run and stores nothing new
     expect(runs).toEqual([{ kind: 'month_end', sites: 9, source: 'catch_up' }, { kind: 'weekly', sites: 0, source: 'catch_up' }]);
-    expect((await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM site_snapshots WHERE snapshot_date = '2026-05-31'`))[0]!.n).toBe(9);
-    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-06-01'::date) AS n`))[0]!.n).toBe(0);
-    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-06-04'::date) AS n`))[0]!.n).toBe(0);
+    expect((await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM site_snapshots WHERE snapshot_date = '2026-04-30'`))[0]!.n).toBe(9);
+    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-05-01'::date) AS n`))[0]!.n).toBe(0);
+    expect((await q<{ n: number }>(db, `SELECT dash_snapshot_scheduled('2026-05-04'::date) AS n`))[0]!.n).toBe(0);
     await expect(db.query(`SELECT dash_snapshot_scheduled(cal_today() + 1)`)).rejects.toThrow(/future date/);
     const full = await superDbDash2();
     try {
@@ -387,12 +406,12 @@ describe('Q127: snapshot schedule', () => {
   it('the snapshot lists show the kind: month_end wins over weekly, a snapshot taken by hand is manual', async () => {
     const list = await admin.api.call('get', '/project-status/snapshots?limit=200');
     expect(list.status).toBe(200);
-    const may = list.body.items.find((i: J) => i.taken_on === '2026-05-31' && i.scope === 'project');
+    const may = list.body.items.find((i: J) => i.taken_on === '2026-04-30' && i.scope === 'project');
     expect(may).toMatchObject({ kind: 'month_end', kinds: ['month_end', 'weekly'] });
     const d3 = await ago(db, 3);
     expect(list.body.items.find((i: J) => i.taken_on === d3 && i.scope === 'project')).toMatchObject({ kind: 'manual', kinds: [] });
     const basis = (await get(admin)).basis;
-    expect(basis.snapshot_kinds.find((s: J) => s.date === '2026-05-31')).toMatchObject({ kind: 'month_end' });
+    expect(basis.snapshot_kinds.find((s: J) => s.date === '2026-04-30')).toMatchObject({ kind: 'month_end', rebuilt: true });
     expect(basis.snapshot_kinds.find((s: J) => s.date === d3)).toMatchObject({ kind: 'manual' });
   });
 });
@@ -415,7 +434,7 @@ describe('Q127: Excel export', () => {
     expect(res.headers['content-disposition']).toMatch(/GSDN_Dashboard_\d{4}-\d{2}-\d{2}\.xlsx/);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(res.body as unknown as ExcelJS.Buffer);
-    const ws = wb.getWorksheet('Dashboard')!;
+    const ws = wb.getWorksheet('Project Overview')!; // 0059 (Q187): the sheet Dashboard became Project Overview
     expect(ws.getRow(1).values).toEqual([undefined, 'section', 'item', 'metric', 'value']);
     const rows: unknown[][] = [];
     ws.eachRow((r) => rows.push((r.values as unknown[]).slice(1)));
@@ -430,7 +449,7 @@ describe('Q127: Excel export', () => {
       }
     }));
     expect(found).toBe(true);
-    expect(wb.getWorksheet('About')).toBeDefined();
+    expect(wb.worksheets.map((w) => w.name)).toEqual(['Project Overview', 'CW', 'TE', 'Late tasks', 'Delay attribution', 'Project Status items', 'Regions', 'About']);
     const audit = await q<{ after: J }>(db, `SELECT after FROM audit_log WHERE action = 'export' AND entity_type = 'dashboard' AND actor_id = $1 ORDER BY id DESC LIMIT 1`, [exporter.user.id]);
     expect(audit[0]!.after).toMatchObject({ format: 'xlsx' });
   });

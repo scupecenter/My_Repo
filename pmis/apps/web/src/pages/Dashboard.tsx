@@ -70,6 +70,8 @@ export function Dashboard() {
   const d = dash.data;
   const [exporting, setExporting] = useState(false);
   const [format, setFormat] = useState<ExportFormat>('xlsx');
+  // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
+  const [preview, setPreview] = useState<'A' | 'B' | null>(null);
   const canExport = !!me.data && (!!me.data.is_system_admin || me.data.effective.grants.some((g) => g.module_key === 'dashboard' && (g.action as string) === 'export'));
   const setParam = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const activeFilters = ['region_id', 'cluster_code', 'scenario', 'stream', 'view'].filter((k) => sp.get(k)).length + (q.ref_date ? 1 : 0);
@@ -287,10 +289,20 @@ export function Dashboard() {
               <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-5xl font-bold tnum" data-testid="dash-progress-value">{pct(ps?.progress_pct)}</span>
                 <span className="chip border border-line" data-testid="dash-planned">{t('dash.kpi.planned')}: {ps?.planned_pct === null || ps?.planned_pct === undefined ? t('dash.kpi.na') : pct(ps.planned_pct)}</span>
-                <span className="chip border border-line" data-testid="dash-spi">{t('dash.kpi.spi')}: {ps?.spi === null || ps?.spi === undefined ? t('dash.kpi.na') : ps.spi}</span>
+                <span className="chip border border-line" data-testid="dash-spi" title={t('dash.kpi.not_evm')}>{t('dash.kpi.spi')}: {(ps?.progress_vs_plan_index ?? ps?.spi) == null ? t('dash.kpi.na') : (ps?.progress_vs_plan_index ?? ps?.spi)}</span>
               </div>
               <div className="my-3"><Bar value={ps?.progress_pct ?? 0} plan={ps?.planned_pct} /></div>
               <div className="text-sm text-mute">{t('dash.kpi.coverage', { n: Math.round(ps?.plan_coverage_pct ?? 0) })} · {t('dash.kpi.ends_hoto')}</div>
+              {ps?.partial_index && ps.partial_index.value != null && (ps.planned_pct == null) && (
+                <div className="text-sm text-mute" data-testid="dash-partial-index">{t('dash.kpi.partial', { v: ps.partial_index.value, c: Math.round(ps.partial_index.coverage_pct) })}</div>
+              )}
+              {ps?.central_line && (
+                <div className="mt-2 rounded-md border border-dashed border-line p-2 text-sm" data-testid="dash-central-line" role="note">
+                  {t('dash.ps.central_line', { m: ps.central_line.measured, t: ps.central_line.total })}
+                  {ps.central_line.progress_pct != null && <> · {t('dash.ps.central_pct', { pct: Number(ps.central_line.progress_pct.toFixed(1)) })}</>}
+                  <div className="text-xs text-mute">{t('dash.ps.central_hint')}</div>
+                </div>
+              )}
             </section>
             <section className="card p-4 xl:col-span-2" data-testid="dash-kpi-sites" aria-label={t('dash.kpi.sites')}>
               <div className="flex items-center gap-4">
@@ -322,9 +334,23 @@ export function Dashboard() {
           </div>
 
           {/* pipeline */}
-          <Card title={t('dash.pipeline.title')} testid="dash-pipeline" aside={<span className="text-sm text-mute">{t('dash.pipeline.hint')}</span>}>
+          <Card title={t('dash.pipeline.title')} testid="dash-pipeline" aside={
+            <span className="flex flex-wrap items-center gap-2 text-sm text-mute">
+              <span>{t('dash.pipeline.hint')}</span>
+              <span role="radiogroup" aria-label={t('dash.pipeline.preview')} className="inline-flex overflow-hidden rounded-md border border-line" data-testid="dash-pipe-preview">
+                {(['A', 'B'] as const).map((v) => {
+                  const on = (preview ?? d.meta.pipeline_variant ?? 'A') === v;
+                  return (
+                    <button key={v} type="button" role="radio" aria-checked={on} data-testid={`dash-pipe-variant-${v}`}
+                      className={`px-2 py-1 text-xs ${on ? 'bg-accentSoft text-accentText font-semibold' : 'bg-card text-ink'}`}
+                      onClick={() => setPreview(v === (d.meta.pipeline_variant ?? 'A') ? null : v)}>{t(`dash.pipeline.variant_${v}`)}</button>
+                  );
+                })}
+              </span>
+            </span>}>
+            {preview && preview !== (d.meta.pipeline_variant ?? 'A') && <p className="mb-2 text-xs text-waitInk" role="note" data-testid="dash-pipe-preview-note">{t('dash.pipeline.preview_note', { v: d.meta.pipeline_variant ?? 'A' })}</p>}
             {nodes.length === 0 ? <p className="text-mute">{t('dash.empty')}</p> : (
-              <Pipeline nodes={nodes}
+              <Pipeline nodes={nodes} variant={preview ?? d.meta.pipeline_variant ?? 'A'}
                 label={(m) => { const n = byCode.get(m.code); return `${ar && m.name_ar ? m.name_ar : m.name_en}: ${n ? t('dash.pipeline.done_of', { done: n.completed, app: n.sites_total }) : ''}`; }}
                 onSelect={(code) => nav(sites({ stage_code: code }))}
                 stats={(m) => {
@@ -335,7 +361,8 @@ export function Dashboard() {
                       <span className="mono">{n.completed}/{n.sites_total}</span>
                       {(n.vs_plan ?? 0) !== 0 && <span className={(n.vs_plan ?? 0) < 0 ? 'late' : ''}> {signed(n.vs_plan ?? 0)}</span>}
                       <br />{n.in_progress > 0 && <>{t('dash.pipeline.in_work', { n: n.in_progress })} </>}{n.not_started > 0 && <>{t('dash.pipeline.waiting', { n: n.not_started })} </>}
-                      {(n.blocked ?? 0) > 0 && <b className="late">{t('dash.pipeline.blocked', { n: n.blocked })} </b>}{(n.overdue_open ?? 0) > 0 && <b className="late">{t('dash.pipeline.overdue', { n: n.overdue_open })}</b>}
+                      {n.blocked_available === false ? <span className="text-mute" data-testid={`dash-node-blocked-unknown-${m.code}`}>{t('dash.pipeline.blocked_unknown')} </span>
+                        : (n.blocked ?? 0) > 0 && <b className="late">{t('dash.pipeline.blocked', { n: n.blocked })} </b>}{(n.overdue_open ?? 0) > 0 && <b className="late">{t('dash.pipeline.overdue', { n: n.overdue_open })}</b>}
                     </span>
                   );
                 }} />
@@ -354,13 +381,15 @@ export function Dashboard() {
                 <ul className="space-y-1 text-sm" data-testid="dash-health-components">
                   {d.health.components.map((c) => (
                     <li key={c.code} className="flex items-center justify-between gap-2" data-testid={`dash-health-${c.code}`}>
-                      <span>{ar && c.name_ar ? c.name_ar : c.name_en} <span className="text-mute">({Number(c.weight.toFixed(1))}%)</span></span>
+                      <span>{ar && c.name_ar ? c.name_ar : c.name_en} <span className="text-mute">({Number(c.weight.toFixed(1))}%)</span>
+                        {c.draft && <span className="chip ms-1 bg-waitBg text-waitInk text-xs" data-testid={`dash-health-draft-${c.code}`}>{t('dash.health.draft_factor')}</span>}</span>
                       {c.excluded ? <span className="chip bg-lockBg text-lockInk">{t('dash.health.excluded')}</span> : <b className="tnum">{c.value === null ? '–' : Number(c.value.toFixed(1))}</b>}
                     </li>
                   ))}
                 </ul>
               </div>
               <p className="mt-2 text-xs text-mute">{t('dash.health.note')}</p>
+              {d.health.components.some((c) => c.draft) && <p className="text-xs text-mute" data-testid="dash-health-draft-note">{t('dash.health.draft_note')}</p>}
             </Card>
             <Card title={t('dash.ps.title')} testid="dash-ps">
               <ul className="space-y-2">
@@ -439,8 +468,10 @@ export function Dashboard() {
 
           {/* gates, issues, delay */}
           <div className="grid gap-3 lg:grid-cols-3">
-            <Card title={t('dash.gates.title')} testid="dash-gates" aside={<span className="chip border border-line tnum" data-testid="dash-gates-total">{d.gates.blocked_total}</span>}>
-              {!d.gates.available ? <p className="text-mute" data-testid="dash-gates-unavailable">{t('dash.gates.unavailable')}</p>
+            <Card title={t('dash.gates.title')} testid="dash-gates" aside={<span className="chip border border-line tnum" data-testid="dash-gates-total">{d.gates.blocked_total ?? '–'}</span>}>
+              {d.gates.status === 'historically_unavailable' ? <p className="text-mute" data-testid="dash-gates-unavailable" data-status="historically_unavailable">{t('dash.gates.historically_unavailable', { date: refDate })}</p>
+                : d.gates.status === 'snapshot' ? <p className="text-mute" data-testid="dash-gates-unavailable" data-status="snapshot">{t('dash.gates.snapshot', { date: refDate, n: d.gates.blocked_total ?? 0 })}</p>
+                : !d.gates.available ? <p className="text-mute" data-testid="dash-gates-unavailable">{t('dash.gates.unavailable')}</p>
                 : d.gates.items.length === 0 ? <p className="text-mute">{t('dash.gates.none')}</p> : (
                   <ul className="space-y-2 text-sm">
                     {d.gates.items.slice(0, 8).map((g) => (
@@ -472,7 +503,11 @@ export function Dashboard() {
                 <>
                   <EChart build={delayBars} height={Math.max(90, Math.min(8, d.delay.items.length) * 28 + 16)} label={t('dash.delay.chart', { list: d.delay.items.map((i) => `${delayLabel(i)} ${i.late_working_days}`).join('; ') })} testid="dash-delay-chart" />
                   <div className="mt-2 text-xs text-mute" data-testid="dash-delay-note">
-                    {t('dash.delay.total', { n: d.delay.total_late_working_days, pct: d.delay.unattributed_pct })} {(d.delay.suspended_working_days ?? 0) > 0 && <span data-testid="dash-delay-suspended">{t('dash.delay.suspended', { n: d.delay.suspended_working_days })} </span>}{t('dash.delay.note')}
+                    <span data-testid="dash-delay-total">{t('dash.delay.total', { n: d.delay.total_late_working_days, a: d.delay.attributed_pct ?? 0, u: d.delay.unattributed_pct })}</span>{' '}
+                    {(d.delay.suspended_working_days ?? 0) > 0 && <span data-testid="dash-delay-suspended">{t('dash.delay.suspended', { n: d.delay.suspended_working_days })} </span>}
+                    {(d.delay.proposed_working_days ?? 0) > 0 && <span data-testid="dash-delay-proposed">{t('dash.delay.proposed', { n: d.delay.proposed_working_days })} </span>}
+                    {(d.delay.data_gap_working_days ?? 0) > 0 && <span data-testid="dash-delay-gap">{t('dash.delay.gap', { n: d.delay.data_gap_working_days })} </span>}
+                    {t('dash.delay.note')}
                   </div>
                 </>
               )}
@@ -508,8 +543,15 @@ export function Dashboard() {
 type DashStream = NonNullable<Dash['streams']['items'][number]['counts']>;
 type DelayItem = Dash['delay']['items'][number];
 
-/** A delay party in words: the period's party (or its named external party), the default type, or "not assigned". */
+/** A delay row in words: the period's party (or its named external party); unattributed days with their suggested party (Q7) or a data gap (Q181). */
 function delayName(t: TFunction, r: DelayItem): string {
+  if (r.kind === 'unattributed') {
+    if (r.data_gap) return t('dash.delay.data_gap');
+    const sug = r.suggested_party;
+    if (!sug) return t('dash.delay.unattributed');
+    const name = sug.kind === 'default_type' ? t(`dash.delay.type.${sug.name}`, { defaultValue: sug.name }) : sug.name;
+    return `${t('dash.delay.unattributed')} (${t('dash.delay.suggested', { name })})`;
+  }
   if (r.kind === 'unassigned') return t('dash.delay.unassigned');
   if (r.kind === 'default_type') return t(`dash.delay.type.${r.party}`, { defaultValue: r.party });
   if (r.kind === 'period' && !r.external_party_id && r.period_party) return t(`dash.delay.period.${r.period_party}`, { defaultValue: r.party });

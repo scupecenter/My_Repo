@@ -27,8 +27,10 @@ const STREAMS = [
   { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sort_order: 3 }, { code: 'CLOSURE', name_en: 'Handover & Closure', name_ar: 'التسليم والإغلاق', sort_order: 4 },
   { code: 'DISMANTLE', name_en: 'Dismantle', name_ar: 'الفك', sort_order: 99 },
 ];
-export const MOCK_SNAPSHOT_DATES = ['2026-10-31', '2026-10-25', '2026-10-18'];
-const SNAPSHOT_KINDS: Record<string, 'weekly' | 'month_end'> = { '2026-10-31': 'month_end', '2026-10-25': 'weekly', '2026-10-18': 'weekly' };
+// D186: the weekly snapshots are on Thursday (2026-10-29, 2026-10-22); 2026-10-22 was rebuilt by the catch-up (Q186: its gates are historically unavailable)
+export const MOCK_SNAPSHOT_DATES = ['2026-10-31', '2026-10-29', '2026-10-22'];
+const SNAPSHOT_KINDS: Record<string, 'weekly' | 'month_end'> = { '2026-10-31': 'month_end', '2026-10-29': 'weekly', '2026-10-22': 'weekly' };
+const REBUILT = new Set(['2026-10-22']);
 const VIEWS = [{ code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', ms: ['MS2', 'MS3', 'MS4'] }, { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', ms: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'] },
   { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', ms: ['MS10'] }];
 /** The central Project Status items of the seed weight set (Q118): project-wide, no data in the PMIS, a manual percentage each. */
@@ -46,7 +48,8 @@ const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocatio
 
 const sc = (n: number, f: number): number => Math.round(n * f);
 
-export function buildDashboard(q: URLSearchParams, scope: number[] | null = null, manual: (code: string, on: string) => { value_pct: number } | undefined = () => undefined): Dashboard {
+export function buildDashboard(q: URLSearchParams, scope: number[] | null = null, manual: (code: string, on: string) => { value_pct: number; effective_date?: string; version?: number } | undefined = () => undefined,
+  opts: { variant?: 'A' | 'B'; plan?: (code: string, on: string) => number | undefined } = {}): Dashboard {
   const today = tripoliToday();
   const ref = q.get('ref_date') || today;
   const region = q.get('region_id');
@@ -55,6 +58,8 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
   const f = (q.get('scenario') ? 0.35 : 1) * (q.get('cluster_code') ? 0.2 : 1);
   const snapshot = ref !== today && MOCK_SNAPSHOT_DATES.includes(ref);
   const source = ref === today ? 'live' : snapshot ? 'snapshot' : 'as_of_computed';
+  // Q186: blocked gates are known live, or from a snapshot taken on its own date
+  const blockedOk = ref === today || (snapshot && !REBUILT.has(ref));
   const rs = REGIONS.filter((r) => (scope === null || scope.includes(r.id)) && (!region || r.id === Number(region)));
   const past = ref === today ? 1 : 0.9;
   const total = rs.reduce((a, r) => a + sc(r.sites, f * past), 0);
@@ -67,7 +72,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
     const waiting = Math.round(open * 0.6), blocked = i === 4 || i === 6 ? Math.min(open - waiting, 2) : 0;
     return {
       code: m.code, name_en: m.en, name_ar: m.ar, order: i + 1, stream_code: m.stream, counts_in_project_status: i < 9, sites_total: total, completed: done,
-      in_progress: Math.max(0, open - waiting - blocked), late: Math.round(open * 0.2), not_started: waiting, not_applicable: 0, blocked,
+      in_progress: Math.max(0, open - waiting - blocked), late: Math.round(open * 0.2), not_started: waiting, not_applicable: 0, blocked: blockedOk ? blocked : null, blocked_available: blockedOk,
       completed_pct: total ? Math.round((done * 1000) / total) / 10 : 0, plan, vs_plan: done - plan, baseline_missing: i === 9 ? 3 : 0, overdue_open: Math.round(open * 0.2),
       achieved_late: Math.round(done * 0.3), on_time: Math.round(done * 0.7), avg_variance_wd: 1.5, avg_delay_wd: 4.2, avg_working_days: 1.5,
       gate: i === 0 ? null : { code: `G${i + 1}`, name_en: `${m.en} gate`, name_ar: m.ar },
@@ -75,8 +80,16 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
   });
   const nodes = (stream && stream !== 'DISMANTLE' ? nodesAll.filter((n) => n.stream_code === stream) : nodesAll).filter((n) => !view || view.ms.includes(n.code));
   const wide = !region && !q.get('scenario') && !q.get('cluster_code') && !stream && !view && scope === null;
-  const measuredManual = CENTRAL_ITEMS.filter((c) => c.weight > 0 && manual(c.code, ref));
-  const hidden = wide ? 0 : CENTRAL_ITEMS.filter((c) => c.weight > 0).length - measuredManual.length;
+  const withValue = CENTRAL_ITEMS.filter((c) => c.weight > 0 && manual(c.code, ref));
+  // Q175: a manual value counts in the project-wide figure only; elsewhere it is shown on the central line
+  const measuredManual = wide ? withValue : [];
+  const hidden = wide ? 0 : CENTRAL_ITEMS.filter((c) => c.weight > 0).length;
+  const centralLine = wide ? null : {
+    total: CENTRAL_ITEMS.filter((c) => c.weight > 0).length, measured: withValue.length,
+    progress_pct: withValue.length ? Math.round((withValue.reduce((a, c) => a + manual(c.code, ref)!.value_pct, 0) / withValue.length) * 1000) / 1000 : null,
+    items: withValue.map((c) => ({ code: c.code, name_en: c.name_en, name_ar: c.name_ar, activity_code: c.act, weight: c.weight, value_pct: manual(c.code, ref)!.value_pct,
+      effective_date: manual(c.code, ref)!.effective_date ?? ref, version: manual(c.code, ref)!.version ?? 1 })),
+  };
   const progress = total ? Math.round(rs.reduce((a, r) => a + r.progress * r.sites, 0) / rs.reduce((a, r) => a + r.sites, 0) * 10) / 10 : 0;
   const score = 74.3;
   const streams = STREAMS.map((s) => {
@@ -106,10 +119,11 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
   return {
     meta: { as_of: new Date().toISOString(), workflow_versions: [1], override_flagged_count: 0, overrides_excluded: true, project_wide: wide,
       central_items_hidden: hidden, manual_items_measured: measuredManual.length, scope_regions: scope, health_draft: false,
+      health_draft_factors: ['P', 'B', 'S', 'F'], blocked_gates_available: blockedOk, pipeline_variant: opts.variant ?? 'A',
       weight_set: { id: '00000000-0000-4000-8000-000000000001', code: 'project_status', version: 1, effective_from: '2024-01-01', is_active: true } },
     basis: {
       ref_date: ref, today, source, snapshot_date: snapshot ? ref : null, snapshot_dates: MOCK_SNAPSHOT_DATES,
-      snapshot_kinds: MOCK_SNAPSHOT_DATES.map((d) => ({ date: d, kind: SNAPSHOT_KINDS[d]!, kinds: [SNAPSHOT_KINDS[d]!] })),
+      snapshot_kinds: MOCK_SNAPSHOT_DATES.map((d) => ({ date: d, kind: SNAPSHOT_KINDS[d]!, kinds: [SNAPSHOT_KINDS[d]!], rebuilt: REBUILT.has(d), taken_at: `${d}T21:00:00Z` })),
       note: source === 'live' ? null : source === 'snapshot' ? 'Figures come from the weekly snapshot.' : 'No snapshot exists for this date: computed as of the date from dated facts.',
     },
     filters: {
@@ -128,7 +142,9 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
         pending_te_fac: { count: 2, not_due: 6, avg_age_days: 6, oldest_age_days: 8, sites: [] },
       },
       project_status: {
-        progress_pct: progress, planned_pct: null, spi: null, plan_coverage_pct: 42, central_items_hidden: hidden, manual_items_measured: measuredManual.length,
+        progress_pct: progress, planned_pct: null, spi: null, progress_vs_plan_index: null, plan_coverage_pct: 42, central_items_hidden: hidden, manual_items_measured: measuredManual.length,
+        manual_items_planned: measuredManual.filter((c) => opts.plan?.(c.code, ref) !== undefined).length,
+        partial_index: { value: 0.912, coverage_pct: 42, actual_pct: 58.3, planned_pct: 63.9 }, central_line: centralLine,
         activities: [
           { code: 'A1', name_en: 'Survey & Engineering', name_ar: 'المسح والهندسة', weight: 12, progress_pct: 82, measured: true, items: [] },
           { code: 'A2', name_en: 'Site Acquisition & Permits', name_ar: 'استحواذ الموقع والتصاريح', weight: 8, progress_pct: 74, measured: true, items: [] },
@@ -151,7 +167,7 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
       ],
     },
     gates: {
-      available: ref === today, blocked_total: ref === today ? 2 : 0, by_gate: [],
+      available: ref === today, status: ref === today ? 'live' : blockedOk ? 'snapshot' : 'historically_unavailable', blocked_total: ref === today ? 2 : blockedOk ? 1 : null, by_gate: [],
       items: ref === today ? [
         { site_id: '00000000-0000-4000-8000-0000000000a1', site_code: 'TR101', region_id: 1, gate_code: 'G5', name_en: 'TE Installation Readiness', name_ar: 'جاهزية تركيب TE', to_code: 'MS5', since: '2026-10-20T08:00:00Z',
           reasons: [{ kind: 'condition_not_met', ref_code: 'Access - TE', message: 'Access - TE must be approved and valid on the gate date.' }] },
@@ -161,26 +177,30 @@ export function buildDashboard(q: URLSearchParams, scope: number[] | null = null
     },
     issues,
     health: {
-      draft: false, formula_version: 1, bands: { green: 85, amber: 70 }, score, band: score >= 85 ? 'green' : score >= 70 ? 'amber' : 'red',
+      draft: false, formula_version: 1, bands: { green: 85, amber: 70 }, score, band: score >= 85 ? 'green' : score >= 70 ? 'amber' : 'red', draft_factors: ['P', 'B', 'S', 'F'], approved_factors: ['D', 'I'],
       components: [
-        { code: 'P', name_en: 'Progress', name_ar: 'التقدم', weight: 16.666, value: progress, excluded: false, contribution: 10.2 },
-        { code: 'B', name_en: 'Baseline adherence', name_ar: 'الالتزام بخط الأساس', weight: 16.666, value: 71.4, excluded: false, contribution: 11.9 },
-        { code: 'S', name_en: 'SLA adherence', name_ar: 'الالتزام بمدد SLA', weight: 16.667, value: 82.3, excluded: false, contribution: 13.7 },
-        { code: 'D', name_en: 'Documentation completeness', name_ar: 'اكتمال المستندات', weight: 16.667, value: null, excluded: true, contribution: 0 },
-        { code: 'F', name_en: 'First-time approval', name_ar: 'الاعتماد من أول مرة', weight: 16.667, value: 88.1, excluded: false, contribution: 14.7 },
-        { code: 'I', name_en: 'Critical issues', name_ar: 'المشاكل الحرجة', weight: 16.667, value: 90.2, excluded: false, contribution: 15 },
+        { code: 'P', name_en: 'Progress', name_ar: 'التقدم', weight: 16.666, value: progress, excluded: false, contribution: 10.2, draft: true },
+        { code: 'B', name_en: 'Baseline adherence', name_ar: 'الالتزام بخط الأساس', weight: 16.666, value: 71.4, excluded: false, contribution: 11.9, draft: true },
+        { code: 'S', name_en: 'SLA adherence', name_ar: 'الالتزام بمدد SLA', weight: 16.667, value: 82.3, excluded: false, contribution: 13.7, draft: true },
+        { code: 'D', name_en: 'Documentation completeness', name_ar: 'اكتمال المستندات', weight: 16.667, value: null, excluded: true, contribution: 0, draft: false },
+        { code: 'F', name_en: 'First-time approval', name_ar: 'الاعتماد من أول مرة', weight: 16.667, value: 88.1, excluded: false, contribution: 14.7, draft: true },
+        { code: 'I', name_en: 'Critical issues', name_ar: 'المشاكل الحرجة', weight: 16.667, value: 90.2, excluded: false, contribution: 15, draft: false },
       ],
       by_region: rs.map((r) => ({ region_id: r.id, score: Math.round((60 + r.progress / 4) * 10) / 10, band: 'amber' as const })),
     },
     delay: {
-      draft: true, total_late_working_days: 412, unattributed_pct: 18.5, overlapping_periods: 0, periods_supported: true, suspended_working_days: 12, period_working_days: 30, periods_count: 3,
+      // Q7: only approved periods attribute days; the rest is unattributed with the R party as a suggestion (Q181: a data gap has none)
+      draft: true, total_late_working_days: 412, attributed_working_days: 30, unattributed_working_days: 382, attributed_pct: 7.28, unattributed_pct: 92.72, data_gap_working_days: 6,
+      proposed_working_days: 9, proposals_count: 1, pending_party_count: 0, overlapping_periods: 0, periods_supported: true, suspended_working_days: 12, period_working_days: 30, periods_count: 3,
       items: [
-        { party: 'gecol', kind: 'period' as const, period_party: 'gecol' as const, external_party_id: null, party_type: null, late_tasks: 3, late_working_days: 30, share_pct: 7.3 },
-        { party: 'A&T Global', kind: 'external' as const, external_party_id: '00000000-0000-4000-8000-0000000000c1', party_type: 'te_vendor', late_tasks: 41, late_working_days: 190, share_pct: 46.1 },
-        { party: 'cw_contractor', kind: 'default_type' as const, late_tasks: 22, late_working_days: 98, share_pct: 23.8 },
-        { party: 'unassigned', kind: 'unassigned' as const, late_tasks: 19, late_working_days: 76, share_pct: 18.5 },
-        { party: 'gecol', kind: 'default_type' as const, late_tasks: 8, late_working_days: 48, share_pct: 11.6 },
+        { party: 'gecol', kind: 'period' as const, period_party: 'gecol' as const, external_party_id: null, party_type: null, data_gap: false, suggested_party: null, late_tasks: 3, late_working_days: 30, share_pct: 7.28 },
+        { party: 'unattributed', kind: 'unattributed' as const, period_party: null, data_gap: false, suggested_party: { name: 'A&T Global', kind: 'external' as const, external_party_id: '00000000-0000-4000-8000-0000000000c1', party_type: 'te_vendor' }, late_tasks: 41, late_working_days: 190, share_pct: 46.12 },
+        { party: 'unattributed', kind: 'unattributed' as const, period_party: null, data_gap: false, suggested_party: { name: 'cw_contractor', kind: 'default_type' as const, external_party_id: null, party_type: 'cw_contractor' }, late_tasks: 22, late_working_days: 98, share_pct: 23.79 },
+        { party: 'unattributed', kind: 'unattributed' as const, period_party: null, data_gap: false, suggested_party: null, late_tasks: 19, late_working_days: 70, share_pct: 16.99 },
+        { party: 'unattributed', kind: 'unattributed' as const, period_party: null, data_gap: false, suggested_party: { name: 'gecol', kind: 'default_type' as const, external_party_id: null, party_type: 'gecol' }, late_tasks: 2, late_working_days: 18, share_pct: 4.37 },
+        { party: 'unattributed', kind: 'unattributed' as const, period_party: null, data_gap: true, suggested_party: null, late_tasks: 1, late_working_days: 6, share_pct: 1.46 },
       ],
+      scorecard: [{ party: 'gecol', period_party: 'gecol' as const, external_party_id: null, party_type: null, late_tasks: 3, late_working_days: 30 }],
     },
     regions: {
       items: rs.map((r) => ({

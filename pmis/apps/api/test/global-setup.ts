@@ -123,6 +123,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const p1Db = await buildDatabase(adminUrl, p1, appPassword);
   process.env.TEST_DATABASE_URL_P1 = p1Db.appUrl;
   process.env.TEST_SUPER_URL_P1 = p1Db.superUrl;
+  // dashp2: the P2 suite of the owner answers of 2026-11-04 (migration 0059): delay proposals, plans, back-dating, the pipeline setting.
+  const dashP2 = `${dbName}_dashp2`;
+  const dashP2Db = await buildDatabase(adminUrl, dashP2, appPassword);
+  process.env.TEST_DATABASE_URL_DASHP2 = dashP2Db.appUrl;
+  process.env.TEST_SUPER_URL_DASHP2 = dashP2Db.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -158,6 +163,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${p1} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);
     await a.end();
   };
 }

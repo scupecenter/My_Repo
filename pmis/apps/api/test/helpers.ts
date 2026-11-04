@@ -89,6 +89,13 @@ export async function superDbDash2(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the P2 dashboard database (migration 0059; see global-setup). */
+export async function superDbDashP2(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_DASHP2 });
+  await c.connect();
+  return c;
+}
+
 export interface TestUser {
   id: string;
   email: string;

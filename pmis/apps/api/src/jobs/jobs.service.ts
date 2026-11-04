@@ -43,7 +43,7 @@ export function nextRunAt(now: Date, tz: string = JOB_TIME_ZONE, hour: number = 
  * holidays to the System Admins (cal_tentative_reminders). It runs once at start-up and then every day at 02:00 Africa/Tripoli, only when
  * JOBS_ENABLED is on (default on, off when NODE_ENV=test). It is a plain timer inside the API process: the stack names BullMQ with Redis, which is
  * not installed on the server yet; the two database functions are idempotent, so a later move to BullMQ changes only who calls them.
- * The dashboard snapshots (dash_snapshot_weekly, migration 0046, Q127) are taken by the same run: the weekly one on Sunday (setting dashboard.snapshot_weekday)
+ * The dashboard snapshots (dash_snapshot_weekly, migration 0046, Q127) are taken by the same run: the weekly one on Thursday (setting dashboard.snapshot_weekday, 4 since 0059, D186)
  * and the month-end one on the last day of the month, each date once, with a catch-up of a due date missed in the last dashboard.snapshot_catchup_days (7);
  * a failure there is logged and does not stop the rest.
  * Safe to repeat: a second run the same day finds nothing to apply and nobody left to remind. An advisory lock keeps two API processes from running it together.
