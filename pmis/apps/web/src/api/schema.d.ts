@@ -4968,6 +4968,128 @@ export interface paths {
         patch: operations["updateAsBuiltItem"];
         trace?: never;
     };
+    "/list-catalogues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The list catalogue (every list with its values)
+         * @description Any signed-in user may read the lists (their values appear in the forms). `include_inactive` also returns the deactivated lists and values.
+         */
+        get: operations["listListCatalogues"];
+        put?: never;
+        /** Add a list (System Admin or a delegate of fields edit for all regions) */
+        post: operations["createListCatalogue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        /** One list with its values and the fields that use it */
+        get: operations["getListCatalogue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, mark critical, confirm or deactivate a list (never deleted)
+         * @description A critical list accepts only its own values (`allow_other` false). A list is confirmed only with at least one active value. A list that an active field uses cannot be deactivated (422 `item_in_use`).
+         */
+        patch: operations["updateListCatalogue"];
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}/values": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a value to a list
+         * @description The code is the text stored in the records and never changes. A code, a label or an alias names one value only (ignoring case). The templates that use the list get a new version.
+         */
+        post: operations["createListValue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/list-catalogues/{catalogue_code}/values/{value_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Relabel, add aliases or groups, reorder or deactivate a value (never deleted; the code is fixed)
+         * @description The If-Match is the value's own `version`. A critical list keeps at least one active value (422 `validation_failed`, code `last_active_value`).
+         */
+        patch: operations["updateListValue"];
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/legacy-conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Q111. A proposal of the structured values from the old free text of a meeting
+         * @description Only `meetings`. Names, e-mails and employee IDs are matched to users, site codes to the sites of the caller's regions, and each line of the old action text becomes a proposed action (status Open, owner and due date to fill). Nothing is saved. A typed minutes reference is never an upload.
+         */
+        get: operations["getLegacyConversion"];
+        put?: never;
+        /**
+         * Q111. Apply the reviewed values (once per meeting)
+         * @description The record must be in entry and the caller its L1 holder with edit. Attendees and sites are added to the structured ones; an action whose text is already in the list is not added again. The old text stays read-only. 409 `duplicate` when the meeting was converted already. Audited (`meeting_legacy_convert`).
+         */
+        post: operations["applyLegacyConversion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/warehouse/items": {
         parameters: {
             query?: never;
@@ -6134,7 +6256,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -8933,10 +9055,13 @@ export interface components {
             label_en: string;
             label_ar?: string | null;
             /** @enum {string} */
-            type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file";
+            type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file" | "multi_user" | "multi_site" | "child_list" | "warehouse_item";
             required?: boolean;
             /** @description Field-level rule for the caller. */
             read_only?: boolean;
+            list?: components["schemas"]["ListRef"];
+            /** @description 0.12.5. Only for `child_list`: the columns of a row, in order. */
+            columns?: components["schemas"]["RegisterFieldColumn"][];
             in_list?: boolean;
             is_custom?: boolean;
             /** @description 0.4.6. The form section of a base field (for example `Request`, `Validity`, `PTW checks`), in English, in the order of the fields. Absent for custom fields. */
@@ -8945,7 +9070,184 @@ export interface components {
                 value: string;
                 label_en: string;
                 label_ar?: string | null;
+                /** @description 0.12.5. Functional groups of the value (for example CW, TE; closed for an action status). */
+                groups?: string[];
             }[];
+        };
+        /** @description 0.12.5 (Q104). The list catalogue a list field reads. */
+        ListRef: {
+            code: string;
+            /** @enum {string} */
+            status: "pending" | "confirmed";
+            critical: boolean;
+            /** @description Another value is accepted as typed (shown as the warning `list_other`). */
+            allow_other: boolean;
+        };
+        RegisterFieldColumn: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            /** @enum {string} */
+            type: "text" | "number" | "date" | "yes_no" | "user" | "list" | "task";
+            required?: boolean;
+            list?: components["schemas"]["ListRef"];
+            options?: {
+                value: string;
+                label_en: string;
+                label_ar?: string | null;
+                groups?: string[];
+            }[];
+        };
+        /** @description 0.12.5. Display data of the ids a record holds (people, sites, Warehouse items, files, tasks), keyed by id. */
+        RecordRefs: {
+            users?: {
+                [key: string]: {
+                    display_name: string;
+                    employee_id?: string | null;
+                };
+            };
+            /** @description id -> site code. */
+            sites?: {
+                [key: string]: string;
+            };
+            warehouse_items?: {
+                [key: string]: {
+                    item_code: string;
+                    name: string;
+                    is_active?: boolean;
+                };
+            };
+            /** @description id -> original file name. */
+            files?: {
+                [key: string]: string;
+            };
+            /** @description id -> task code. */
+            tasks?: {
+                [key: string]: string;
+            };
+        };
+        ListValue: {
+            /** Format: uuid */
+            id: string;
+            /** @description Stable: the text stored in the records. */
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            aliases: string[];
+            groups: string[];
+            sort_order: number;
+            is_active: boolean;
+            version: number;
+        };
+        ListCatalogue: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            description?: string | null;
+            /** @description Drives a calculation, a rule or a permission: only its own values, and approval waits until it has one. */
+            critical: boolean;
+            /**
+             * @description pending = a draft for the owner's review (Q104).
+             * @enum {string}
+             */
+            status: "pending" | "confirmed";
+            allow_other: boolean;
+            is_active: boolean;
+            /** @description ETag (If-Match). */
+            version: number;
+            values: components["schemas"]["ListValue"][];
+            used_by: {
+                register_key: string;
+                field_code: string;
+                /** @description The column of a child list. */
+                column?: string;
+            }[];
+        };
+        ListCatalogueInput: {
+            code: string;
+            name_en: string;
+            name_ar?: string | null;
+            description?: string | null;
+            critical?: boolean;
+            allow_other?: boolean;
+            reason: string;
+        };
+        ListCataloguePatch: {
+            name_en?: string;
+            name_ar?: string | null;
+            description?: string | null;
+            critical?: boolean;
+            /** @enum {string} */
+            status?: "pending" | "confirmed";
+            allow_other?: boolean;
+            is_active?: boolean;
+            reason: string;
+        };
+        ListValueInput: {
+            code: string;
+            label_en?: string;
+            label_ar?: string | null;
+            aliases?: string[];
+            groups?: string[];
+            sort_order?: number;
+            is_active?: boolean;
+            reason: string;
+        };
+        ListValuePatch: {
+            label_en?: string;
+            label_ar?: string | null;
+            aliases?: string[];
+            groups?: string[];
+            sort_order?: number;
+            is_active?: boolean;
+            reason: string;
+        };
+        LegacyConversionProposal: {
+            /** Format: uuid */
+            record_id: string;
+            /** @description The old text of this meeting was converted already. */
+            converted: boolean;
+            legacy?: {
+                attendees?: string | null;
+                linked_sites?: string | null;
+                minutes_ref?: string | null;
+                action_items?: string | null;
+            };
+            attendees: {
+                text: string;
+                /** Format: uuid */
+                user_id: string;
+                display_name: string;
+                employee_id?: string | null;
+            }[];
+            sites: {
+                text: string;
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+            }[];
+            action_items: {
+                description: string;
+                status: string;
+            }[];
+            unmatched: {
+                attendees: string[];
+                sites: string[];
+            };
+            /** @description The old minutes reference, shown with the advice to upload the file. */
+            minutes_note?: string | null;
+        };
+        LegacyConversionInput: {
+            values: {
+                /** Format: uuid */
+                organiser?: string;
+                attendee_users?: string[];
+                linked_site_ids?: string[];
+                action_items_list?: {
+                    [key: string]: unknown;
+                }[];
+            };
+            reason: string;
         };
         RegisterDefinition: {
             register_key: components["schemas"]["RegisterKey"];
@@ -9002,6 +9304,7 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+            refs?: components["schemas"]["RecordRefs"];
             custom?: components["schemas"]["CustomValues"];
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
@@ -9041,7 +9344,7 @@ export interface components {
             approved_at?: string | null;
             /** @enum {string} */
             source?: "manual" | "template";
-            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. Empty when there is none. */
+            /** @description 0.9.0. Ordering issues that do not block the record (Q96), shown to the reviewer: HLC `no_approved_hlc_pr`, `hlc_not_approved`, `before_hlc_approval`, `before_link_received`, `test_without_installation`, `in_service_without_test`; Procurement scope HLC `approval_before_pr`. 0.12.5: `list_other` (a value that is not in its list, accepted while the list allows another value). Empty when there is none. */
             warnings?: {
                 /** @description JSON pointer of the field, as in `Problem.errors`. */
                 path: string;
@@ -11662,6 +11965,10 @@ export interface components {
         WarehouseItemId: string;
         /** @description Stock movement. */
         MovementId: string;
+        /** @description List catalogue code (for example `TeamSpecialization`). */
+        CatalogueCode: string;
+        /** @description List value. */
+        ListValueId: string;
         /** @description As-Built item. */
         AsBuiltItemId: string;
         /** @description Snag type. */
@@ -20672,6 +20979,262 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listListCatalogues: {
+        parameters: {
+            query?: {
+                include_inactive?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lists. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["ListCatalogue"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createListCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListCatalogueInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getListCatalogue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateListCatalogue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListCataloguePatch"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    createListValue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListValueInput"];
+            };
+        };
+        responses: {
+            /** @description Created; the list with its values. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateListValue: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListValuePatch"];
+            };
+        };
+        responses: {
+            /** @description Updated; the list with its values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getLegacyConversion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Proposal. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LegacyConversionProposal"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applyLegacyConversion: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LegacyConversionInput"];
+            };
+        };
+        responses: {
+            /** @description The record. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

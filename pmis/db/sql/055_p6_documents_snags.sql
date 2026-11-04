@@ -901,6 +901,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
        WHEN p_kind = 'approve' AND public.qc_snag_has_votes(p_snag) THEN EXISTS (
          SELECT 1 FROM public.snag_level_voters v JOIN public.snags s ON s.id = v.snag_id AND v.round = s.level_round
          WHERE v.snag_id = p_snag AND v.user_id = public.app_actor() AND v.voted_at IS NULL)
+         AND public.qc_snag_is_eligible(p_snag, 'approve', public.app_actor())
        ELSE public.qc_snag_is_eligible(p_snag, p_kind, public.app_actor())
             OR (public.app_actor_is_system_admin() AND NOT public.qc_snag_has_holder(p_snag, p_kind)) END
 $$;
@@ -1078,6 +1079,15 @@ BEGIN
       PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(jsonb_build_object('path', '/severity', 'code', 'unknown_severity', 'message', 'No active severity has this code.'))));
     END IF;
   END IF;
+  -- A severity change that turns a blocking snag into a non-blocking one lifts a control: only an L2 holder of the snag who did not raise, find or fix
+  -- it may make it (D230b spirit), never the person whose work the snag is about.
+  IF p_patch ? 'severity' AND sev IS DISTINCT FROM s.severity
+     AND coalesce((SELECT blocks FROM public.snag_severities WHERE code = s.severity), true)
+     AND NOT coalesce((SELECT blocks FROM public.snag_severities WHERE code = sev), true) THEN
+    IF public.app_actor() = ANY (public.qc_snag_excluded(p_snag)) OR NOT public.qc_snag_is_eligible(p_snag, 'approve', public.app_actor()) THEN
+      PERFORM public.wf_err('self_approval_forbidden', jsonb_build_object('detail', 'Lowering this snag to a non-blocking severity needs an L2 holder who did not raise, find or fix it.'));
+    END IF;
+  END IF;
   before_ := public.qc_snag_snap(p_snag);
   UPDATE public.snags SET title = CASE WHEN p_patch ? 'title' THEN btrim(p_patch ->> 'title') ELSE title END,
     description = CASE WHEN p_patch ? 'description' THEN coalesce(p_patch ->> 'description', '') ELSE description END,
@@ -1209,12 +1219,15 @@ BEGIN
       IF actor = ANY (public.qc_snag_excluded(p_snag)) THEN
         PERFORM public.wf_err('self_approval_forbidden', jsonb_build_object('detail', 'You raised, found or fixed this snag: somebody else must approve its closure (owner decision D230b).'));
       END IF;
-      IF NOT EXISTS (SELECT 1 FROM public.snag_level_voters v WHERE v.snag_id = p_snag AND v.round = s.level_round AND v.user_id = actor AND v.voted_at IS NULL) THEN
+      -- a voter of the round must still hold L2 now: a person taken off the Matrix cell after the submission no longer votes
+      IF NOT EXISTS (SELECT 1 FROM public.snag_level_voters v WHERE v.snag_id = p_snag AND v.round = s.level_round AND v.user_id = actor AND v.voted_at IS NULL)
+         OR NOT public.qc_snag_is_eligible(p_snag, 'approve', actor) THEN
         PERFORM public.wf_err('not_eligible_holder', jsonb_build_object('detail', 'You are not a voter of this snag''s L2 (all members), or you have voted already.'));
       END IF;
       IF NOT coalesce(p_stepup, false) THEN PERFORM public.wf_err('step_up_required'); END IF;
       UPDATE public.snag_level_voters SET voted_at = now() WHERE snag_id = p_snag AND round = s.level_round AND user_id = actor;
-      SELECT count(*) INTO n_left FROM public.snag_level_voters v WHERE v.snag_id = p_snag AND v.round = s.level_round AND v.voted_at IS NULL;
+      SELECT count(*) INTO n_left FROM public.snag_level_voters v WHERE v.snag_id = p_snag AND v.round = s.level_round AND v.voted_at IS NULL
+        AND public.qc_snag_is_eligible(p_snag, 'approve', v.user_id);
       IF n_left > 0 THEN
         UPDATE public.snags SET version = version + 1, updated_at = now() WHERE id = p_snag;
         PERFORM public.qc_audit('snag_vote', p_snag, before_, public.qc_snag_snap(p_snag) || jsonb_build_object('votes_left', n_left, 'stepup_verified', true), p_note);
@@ -1238,7 +1251,7 @@ BEGIN
     PERFORM public.reg_require_grant('quality', s.region_id, 'approve');
     IF public.qc_snag_has_votes(p_snag) THEN
       IF NOT EXISTS (SELECT 1 FROM public.snag_level_voters v WHERE v.snag_id = p_snag AND v.round = s.level_round AND v.user_id = actor AND v.voted_at IS NULL)
-         OR actor = ANY (public.qc_snag_excluded(p_snag)) THEN
+         OR actor = ANY (public.qc_snag_excluded(p_snag)) OR NOT public.qc_snag_is_eligible(p_snag, 'approve', actor) THEN
         PERFORM public.wf_err('not_eligible_holder', jsonb_build_object('detail', 'You are not a voter of this snag''s L2 (all members), or you have voted already.'));
       END IF;
     ELSE

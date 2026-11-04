@@ -104,16 +104,24 @@ class Conversation {
   }
 
   /**
-   * Stops listening on the plain socket before the TLS upgrade takes it over. Anything the server sent after its 220 reply to STARTTLS arrived in
+   * Anything the server sent after its 220 reply to STARTTLS arrived in
    * plain text and must never be read as a reply inside TLS (STARTTLS response injection): the connection is refused instead.
+   * Called right after the 220 reply to STARTTLS, before detach.
    */
-  detach(): void {
+  assertNoBufferedData(): void {
     if (this.buf.length > 0 || this.pending.length > 0 || this.lines.length > 0) {
       this.buf = '';
       this.pending = [];
       this.lines = [];
       throw new SmtpError('the mail server sent data after its STARTTLS reply; refused (possible injection)', null, false);
     }
+  }
+
+  /** Removes the listeners and clears the read state. Never throws: it is also the cleanup path. */
+  detach(): void {
+    this.buf = '';
+    this.pending = [];
+    this.lines = [];
     this.sock.removeAllListeners('data');
     this.sock.removeAllListeners('timeout');
     this.sock.removeAllListeners('error');
@@ -226,6 +234,7 @@ export async function smtpSend(cfg: MailConfig, m: OutgoingMail): Promise<{ mess
     if (cfg.tls === 'starttls') {
       if (!caps.has('STARTTLS')) throw new SmtpError('the mail server does not offer STARTTLS (set SMTP_TLS=tls or fix the relay; no downgrade)', null, true);
       await c.cmd('STARTTLS', [220], 'STARTTLS');
+      c.assertNoBufferedData();
       c.detach();
       const t = await upgrade(c.sock as Socket, cfg, ca);
       c.attach(t);
@@ -255,7 +264,10 @@ export async function smtpSend(cfg: MailConfig, m: OutgoingMail): Promise<{ mess
     }
     return { messageId };
   } finally {
-    c.detach();
-    c.sock.destroy();
+    try {
+      c.detach();
+    } finally {
+      c.sock.destroy();
+    }
   }
 }

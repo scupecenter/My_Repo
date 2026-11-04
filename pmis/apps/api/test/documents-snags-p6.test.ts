@@ -163,6 +163,35 @@ describe('Q230 / D230b / Q231: the people of a snag', () => {
     expect(done.body.approved_by.id).toBe(a.user.id);
   });
 
+  it('all members: a voter taken off the L2 cell after the submission can no longer vote, and the snag closes without them', async () => {
+    const { e, a, i, site } = await team();
+    const a2 = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'approve') });
+    await regCell(db, 'quality', R, 'approve', { user: [a.user.id, a2.user.id] }, 'all_members');
+    const r = await i.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: generalType, scope: 'CW', title: 'Loose cable tray', severity: 'MAJOR' });
+    await photo(e, r.body.id, jpegWithExif(null));
+    const sub = await act(e, r.body.id, 'submit', (await snag(e, r.body.id)).version);
+    expect(sub.body.ball_in_court).toMatchObject({ votes_needed: 2, votes_done: 0 });
+    await regCell(db, 'quality', R, 'approve', { user: [a.user.id] }, 'all_members');      // a2 leaves the cell
+    expect((await act(a2, r.body.id, 'approve', sub.body.version)).status).toBe(403);
+    expect((await act(a2, r.body.id, 'reject', sub.body.version, { note: 'no' })).status).toBe(403);
+    const done = await act(a, r.body.id, 'approve', sub.body.version);
+    expect(done.status).toBe(200);
+    expect(done.body.state).toBe('closed');
+  });
+
+  it('a severity change that lifts the block needs an L2 holder who did not raise, find or fix the snag; raising the severity does not', async () => {
+    const { e, i, site } = await team();
+    const r = await i.api.call('post', `/sites/${site.id}/snags`, { snag_type_id: generalType, scope: 'CW', title: 'Missing earthing', severity: 'MAJOR' });
+    await photo(e, r.body.id, jpegWithExif(null));                                     // e is now the fixer
+    let s = await snag(e, r.body.id);
+    const low = await e.api.call('patch', `/snags/${r.body.id}`, { severity: 'MINOR' }, ifm(s.version));
+    expect(low.status).toBe(403);
+    expect(low.body.code).toBe('self_approval_forbidden');
+    expect((await snag(e, r.body.id)).severity).toBe('MAJOR');
+    s = await snag(e, r.body.id);
+    expect((await e.api.call('patch', `/snags/${r.body.id}`, { severity: 'CRITICAL' }, ifm(s.version))).status).toBe(200);
+  });
+
   it('all members: the snag closes with the last vote; a voter cannot vote twice; the votes are audited', async () => {
     const { e, a, i, site } = await team();
     const a2 = await actor(app, db, { level: 'approve', regions: [R], grants: G('quality', 'view', 'approve') });
