@@ -541,12 +541,28 @@ export class SnagsService {
     return this.get(auth, id);
   }
 
-  /** Q232: L2 accepts or rejects a photo kept as pending evidence (EXIF date in the future beyond the tolerance). */
+  /**
+   * Q232: L2 accepts or rejects a photo kept as pending evidence (EXIF date in the future beyond the tolerance).
+   * Q265: accepting needs step-up, like the closure of the snag; rejecting does not.
+   */
   async decideEvidence(auth: AuthContext, id: string, photoId: string, raw: unknown): Promise<Record<string, unknown>> {
     await this.snagRow(auth, id);
     if (!uuidSchema.safeParse(photoId).success) throw problems.notFound();
     const b = parse(evidenceBody, raw);
-    await this.call(auth, Prisma.sql`SELECT true AS r FROM (SELECT qc_decide_evidence(${id}::uuid, ${photoId}::uuid, ${b.decision === 'accept'}::boolean, ${b.note}::text)) x`);
+    const accept = b.decision === 'accept';
+    if (accept) {
+      // D230b before the step-up, as for the closure: a raiser, finder or fixer is refused whatever their password says
+      const ex = await this.db.tx.$queryRaw<{ ex: boolean }[]>(Prisma.sql`SELECT ${auth.user.id}::uuid = ANY (ARRAY(
+        SELECT u FROM (SELECT s.raised_by AS u FROM snags s WHERE s.id = ${id}::uuid UNION ALL SELECT s.found_by FROM snags s WHERE s.id = ${id}::uuid
+          UNION ALL SELECT s.fixed_by FROM snags s WHERE s.id = ${id}::uuid UNION ALL SELECT p.uploaded_by FROM snag_photos p WHERE p.snag_id = ${id}::uuid AND p.withdrawn_at IS NULL) x
+        WHERE u IS NOT NULL)) AS ex`);
+      if (ex[0]?.ex) {
+        throw new ProblemException(403, 'self_approval_forbidden', { detail: 'You raised, found or fixed this snag: somebody else decides its evidence (owner decision D230b).' });
+      }
+      await this.stepUp.require(auth);
+    }
+    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    await this.call(auth, Prisma.sql`SELECT true AS r FROM (SELECT qc_decide_evidence(${id}::uuid, ${photoId}::uuid, ${accept}::boolean, ${b.note}::text, ${stepOk}::boolean)) x`);
     return this.get(auth, id);
   }
 

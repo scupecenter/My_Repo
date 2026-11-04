@@ -1536,6 +1536,9 @@
     "voided": "Record voided.",
     "void": "Void",
     "void_title": "Void this record",
+    "cancel_snag": "Cancel snag record",
+    "cancel_snag_title": "Cancel this approved snag record (entered by mistake)",
+    "cancel_snag_done": "Snag record cancelled; its QC snag was cancelled with it.",
     "save_draft": "Save draft",
     "permanent": "Permanent (no expiry)",
     "fix_list": "Fix these first: {{list}}.",
@@ -3155,6 +3158,7 @@
     "none": "No check has run yet."
   },
   "lists": {
+    "mirrored": "This list follows the snag severities (CRITICAL, MAJOR, MINOR): its values, names and order are changed in Settings, QC snag severities, not here.",
     "title": "Lists",
     "note": "Every list of a register is data. A value keeps its code for ever (records store the code); rename its labels, add old names as aliases, deactivate it instead of deleting it. Pending lists are drafts for the owner's review. A critical list accepts only its own values and blocks approvals while it has none.",
     "filter": "Search lists",

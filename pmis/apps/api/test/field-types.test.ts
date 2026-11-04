@@ -310,5 +310,38 @@ describe('Q12 and Q111: Meetings with structured fields', () => {
     const rows = (await t.entry.api.call('get', `/import-batches/${bad.body.id}/rows`)).body.items;
     expect(rows[0].errors[0]).toMatchObject({ field: expect.stringMatching(/^attendee_users/), code: 'unknown_user' });
   });
+
+  it('Q291: external attendees are an optional free text beside the Aljeel attendees; they travel in the approved template', async () => {
+    const defs = (await admin.api.call('get', '/registers')).body.items;
+    const m = defs.find((d: { register_key: string }) => d.register_key === 'meetings');
+    expect(m.fields.find((x: { code: string }) => x.code === 'external_attendees')).toMatchObject({ type: 'text', required: false, label_en: 'External attendees', section: 'Attendees and sites' });
+    expect(m.fields.find((x: { code: string }) => x.code === 'attendee_users')).toMatchObject({ type: 'multi_user' });
+    const t = await meetingsTeam();
+    const base = { meeting_date: '2026-01-12', title: `P5X ${U}` };
+    const vendors = 'A&T Global (TE vendor); GECOL power team; HLC fiber lead; landlord of the Zawia site';
+    const res = await t.entry.api.call('post', recPath('meetings'), { data: { ...base, attendee_users: [t.entry.user.employeeId], external_attendees: `  ${vendors}  ` } });
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    expect(res.body.data).toMatchObject({ attendee_users: [t.entry.user.id], external_attendees: vendors });
+    // it is optional (only the date and the title are mandatory), and it is text of a bounded length
+    const plain = await t.entry.api.call('post', recPath('meetings'), { data: { ...base, title: `P5Y ${U}` } });
+    expect(plain.status).toBe(201);
+    expect(plain.body.data.external_attendees).toBeUndefined();
+    const long = await t.entry.api.call('post', recPath('meetings'), { data: { ...base, title: `P5Z ${U}`, external_attendees: 'x'.repeat(2001) } });
+    expect(long.status).toBe(422);
+    expect(long.body.errors).toEqual([expect.objectContaining({ path: '/data/external_attendees', code: 'invalid' })]);
+    // the person who may only view cannot write it
+    const viewer = await actor(app, db, { level: 'view', grants: G('meetings', 'view'), regions: [R], modules: null });
+    expect((await viewer.api.call('post', recPath('meetings'), { data: { ...base, title: `P5V ${U}`, external_attendees: 'GECOL' } })).status).toBe(403);
+    // the approved template has a column for it and reads it
+    const dl = await downloadTemplate(t.entry.api, 'TPL-MTG');
+    expect((await load(dl.buffer)).getWorksheet('Data')!.getRow(1).values as string[]).toEqual(expect.arrayContaining(['Attendees', 'External attendees']));
+    const title = `P5T ${U}`;
+    const up = await uploadFile(t.entry.api, await fillTemplate(dl.buffer, [{ Date: day('2026-02-05'), Title: title, 'External attendees': 'HLC fiber lead; GECOL' }]));
+    expect(up.status).toBe(202);
+    expect(up.body.counts).toMatchObject({ create: 1, error: 0 });
+    const sub = await t.entry.api.call('post', `/import-batches/${up.body.id}/submit`, undefined, { 'If-Match': '"1"' });
+    expect(sub.body.outcome).toMatchObject({ submitted: 1, failed: [] });
+    expect((await q<{ data: Record<string, unknown> }>(db, `SELECT data FROM register_records WHERE register_key = 'meetings' AND data ->> 'title' = $1`, [title]))[0]!.data).toMatchObject({ external_attendees: 'HLC fiber lead; GECOL' });
+  });
 });
 

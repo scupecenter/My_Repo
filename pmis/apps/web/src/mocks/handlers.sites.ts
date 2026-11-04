@@ -8,6 +8,7 @@ import { uid } from './ids';
 import { resolveMentions } from './handlers.x';
 import { rejectReason } from './handlers.documents';
 import { qcSiteDetail } from './handlers.qc';
+import { pipelineVariant } from './handlers.dashboard';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
 import { REGISTER_DEFS, TEMPLATE_OF_REGISTER } from './registersData';
@@ -66,7 +67,7 @@ export const siteHandlers = [
     const g = guard(); if (g) return g;
     const i = siteIndex(params.id as string);
     if (i < 0 || i >= SITE_COUNT) return problem(404, 'not_found', 'Site not found');
-    const d = qcSiteDetail(detail(i));
+    const d = { ...qcSiteDetail(detail(i)), pipeline_variant: pipelineVariant() };
     return HttpResponse.json(d, { headers: { ETag: `"${d.version}"` } });
   }),
   http.get(`${B}/sites/:id/tasks`, ({ params, request }) => {

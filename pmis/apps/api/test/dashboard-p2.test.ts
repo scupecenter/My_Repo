@@ -92,6 +92,28 @@ describe('Q116: the pipeline style is a setting, A by default', () => {
   });
 });
 
+// ---------------------------------------------------------------------------------------------------------------------------- Q349
+describe('Q349: the site page follows the same pipeline setting as the dashboard', () => {
+  it('SiteDetail.pipeline_variant is the setting dashboard.pipeline_variant, for every viewer of the site', async () => {
+    const site = async (a: Actor): Promise<J> => {
+      const r = await a.api.call('get', `/sites/${fx.site.T1!.id}`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return r.body;
+    };
+    expect((await site(tripoli)).pipeline_variant).toBe('A');
+    expect((await admin.api.call('put', `${DASH}/pipeline-variant`).send({ variant: 'B', reason: 'the owner picked the flat track' })).status).toBe(200);
+    expect((await site(tripoli)).pipeline_variant).toBe('B');
+    expect((await site(admin)).pipeline_variant).toBe('B');
+    expect((await get(tripoli)).meta.pipeline_variant).toBe('B');
+    // nobody but the admin path changes it; a site of another region stays invisible (404) whatever the setting
+    expect((await tripoli.api.call('put', `${DASH}/pipeline-variant`).send({ variant: 'A', reason: 'I do not like it' })).status).toBe(403);
+    expect((await site(tripoli)).pipeline_variant).toBe('B');
+    expect((await tripoli.api.call('get', `/sites/${fx.site.B1!.id}`)).status).toBe(404);
+    expect((await admin.api.call('put', `${DASH}/pipeline-variant`).send({ variant: 'A', reason: 'back to the default' })).status).toBe(200);
+    expect((await site(tripoli)).pipeline_variant).toBe('A');
+  });
+});
+
 // ---------------------------------------------------------------------------------------------------------------------------- Q175 - Q178
 describe('Q176, Q178: manual values carry a source; back-dating stops at the current month', () => {
   it('refuses a value without its source', async () => {
@@ -338,6 +360,34 @@ describe('Q182, Q184: a period is proposed, then decided by somebody else', () =
     // a day counts once: the shares still add up to the total
     expect(dl.items.reduce((a: number, i: J) => a + i.late_working_days, 0)).toBe(dl.total_late_working_days);
     expect((await decide(reviewer, t1b8, contractorId, { decision: 'reject', note: 'again' })).status).toBe(409);
+  });
+
+  it('Q393: a task whose SLA rule is pending_confirmation stays out of the scorecard (its days stay in the total delay and the items); its colour is unchanged', async () => {
+    const before = (await get(admin)).delay;
+    const covered = before.attributed_working_days as number;
+    expect(covered).toBeGreaterThan(0);
+    expect(before.scorecard).toEqual([expect.objectContaining({ party: 'Dash Test Vendor', late_working_days: covered })]);
+    expect(before).toMatchObject({ scorecard_excluded_working_days: 0, scorecard_excluded_tasks: 0 });
+    const colour = (await admin.api.call('get', `/tasks/${t1b8}`)).body.sla;
+    const ruleId = (await q<{ id: string }>(db, 'SELECT sla_rule_id AS id FROM task_instances WHERE id = $1', [t1b8]))[0]!.id;
+    await db.query('UPDATE sla_rules SET pending_confirmation = true WHERE id = $1', [ruleId]);
+    try {
+      const dl = (await get(admin)).delay;
+      expect(dl.scorecard).toEqual([]);
+      expect(dl).toMatchObject({ scorecard_excluded_working_days: covered, scorecard_excluded_tasks: 1 });
+      // the days are still late and still attributed: the total, the shares and the items do not move
+      expect(dl.total_late_working_days).toBe(before.total_late_working_days);
+      expect(dl.attributed_working_days).toBe(covered);
+      expect(dl.items.find((i: J) => i.kind === 'period')).toMatchObject({ party: 'Dash Test Vendor', late_working_days: covered });
+      // the task still shows the colour it had, and says its rule waits for the owner
+      const sla = (await admin.api.call('get', `/tasks/${t1b8}`)).body.sla;
+      expect(sla).toMatchObject({ colour: colour.colour, pending_confirmation: true });
+    } finally {
+      await db.query('UPDATE sla_rules SET pending_confirmation = false WHERE id = $1', [ruleId]);
+    }
+    const after = (await get(admin)).delay;
+    expect(after.scorecard).toEqual(before.scorecard);
+    expect(after).toMatchObject({ scorecard_excluded_working_days: 0, scorecard_excluded_tasks: 0 });
   });
 
   it('a rejection needs a note, has no effect and stays in the history; the proposer may withdraw an open proposal', async () => {

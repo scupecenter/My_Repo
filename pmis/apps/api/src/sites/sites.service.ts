@@ -421,6 +421,8 @@ export class SitesService {
       },
       cluster_progress: cluster,
       pipeline: nodes,
+      // Q349: the site page follows the same setting as the dashboard (dashboard.pipeline_variant: A = rings, B = flat track)
+      pipeline_variant: (await this.db.tx.$queryRaw<{ v: string }[]>`SELECT dash_pipeline_variant() AS v`)[0]?.v === 'B' ? 'B' : 'A',
       counts: {
         open_snags: Number(counts[0]?.open_snags ?? 0),
         open_issues: Number(counts[0]?.open_issues ?? 0),

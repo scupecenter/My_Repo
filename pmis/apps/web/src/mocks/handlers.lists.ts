@@ -24,7 +24,10 @@ export function seedLists(): ListCatalogue[] {
       [{ register_key: 'contractors', field_code: 'specialization' }]),
     cat('StaffStatus', 'Staff status', 'حالة الموظف', { critical: true, status: 'confirmed' }, vals(['Active', 'Inactive'])),
     cat('CompletionStatus', 'Execution status', 'حالة التنفيذ', { critical: true, status: 'confirmed' }, vals(['Done', 'Pending', 'N/A'])),
-    cat('Severity', 'Severity', 'الخطورة', { critical: true }, vals(['Critical', 'Major', 'Minor']), [{ register_key: 'quality', field_code: 'severity' }]),
+    // contract 0.13.2 (Q260): the list mirrors the snag severities (CRITICAL, MAJOR, MINOR); it is changed in Settings, QC snag severities, never directly
+    cat('Severity', 'Severity', 'الخطورة', { critical: true },
+      [val('CRITICAL', ++seq, { label_en: 'Critical', label_ar: 'حرجة' }), val('MAJOR', ++seq, { label_en: 'Major', label_ar: 'رئيسية' }), val('MINOR', ++seq, { label_en: 'Minor', label_ar: 'ثانوية' })],
+      [{ register_key: 'quality', field_code: 'severity' }]),
     cat('RiskStatus', 'Risk status', 'حالة الخطر', { allow_other: true }, vals(['Open', 'Monitoring', 'Closed', 'Materialized']), [{ register_key: 'risks', field_code: 'status' }]),
     cat('MeetingType', 'Meeting type', 'نوع الاجتماع', { allow_other: true }, [], [{ register_key: 'meetings', field_code: 'meeting_type' }]),
     cat('ActionStatus', 'Action status', 'حالة الإجراء', {},
@@ -85,6 +88,7 @@ export const listHandlers = [
     if (!c) return problem(404, 'not_found', 'The list does not exist.');
     const b = (await request.json()) as Partial<ListValue> & { reason?: string };
     if (!reasonOk(b)) return invalid('/reason', 'required');
+    if (c.code === 'Severity') return invalid('/', 'mirrored_list');   // 0.13.2 (Q260): the list follows the snag severities
     const code = b.code ?? '';
     if (!code || code !== code.trim() || code.includes(';') || code.length > 80) return invalid('/code', 'invalid');
     if (c.values.some((v) => v.code === code)) return problem(409, 'duplicate', 'This list has a value with this code already.');
@@ -103,6 +107,7 @@ export const listHandlers = [
     const b = (await request.json()) as Partial<ListValue> & { reason?: string };
     if (!reasonOk(b)) return invalid('/reason', 'required');
     if ('code' in b) return invalid('/code', 'field_read_only');
+    if (c.code === 'Severity') return invalid('/', 'mirrored_list');   // 0.13.2 (Q260): the list follows the snag severities
     if (c.critical && v.is_active && b.is_active === false && !c.values.some((x) => x !== v && x.is_active)) return invalid('/is_active', 'last_active_value');
     const next = { ...v, ...Object.fromEntries(Object.entries(b).filter(([k]) => k !== 'reason')), version: v.version + 1 } as ListValue;
     if (tokens(next).some((t) => c.values.some((x) => x !== v && tokens(x).includes(t)))) return invalid(b.aliases ? '/aliases' : '/label_en', 'duplicate');

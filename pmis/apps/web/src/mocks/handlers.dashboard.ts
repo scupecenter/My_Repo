@@ -37,6 +37,9 @@ const S = (): State => {
   return s;
 };
 
+/** Q349: the pipeline style in force (the site page follows the same setting as the dashboard). */
+export const pipelineVariant = (): PipelineVariant => S().variant;
+
 /** The value of an item in force on a date (latest effective date on or before it, then the highest version). */
 export function manualInForce(code: string, on: string): Value | undefined {
   return S().values.filter((v) => v.item_code === code && v.effective_date <= on).sort((a, b) => (b.effective_date.localeCompare(a.effective_date)) || b.version - a.version)[0];

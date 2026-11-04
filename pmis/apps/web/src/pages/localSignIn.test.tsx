@@ -329,6 +329,8 @@ describe('hybrid mode list', () => {
       'GET /saved-views', 'POST /saved-views', 'POST /saved-views/import', 'GET /saved-views/:id', 'PATCH /saved-views/:id', 'POST /saved-views/:id/deactivate',
       'POST /saved-views/:id/restore', 'POST /saved-views/:id/transfer', 'GET /saved-views/:id/versions', 'GET /me/drafts', 'GET /me/drafts/:key', 'PUT /me/drafts/:key',
       'DELETE /me/drafts/:key',
+      // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
+      'POST /registers/quality/records/:id/cancel-snag',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

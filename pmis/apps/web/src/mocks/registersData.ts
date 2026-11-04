@@ -106,7 +106,8 @@ export const meetings: RegisterDefinition = {
     F('meeting_date', 'Date', 'التاريخ', 'date', 'Meeting', { required: true, in_list: true }), F('title', 'Title', 'العنوان', 'text', 'Meeting', { required: true, in_list: true }),
     { ...F('meeting_type', 'Type', 'النوع', 'list', 'Meeting', { in_list: true }), list: { code: 'MeetingType', status: 'pending', critical: false, allow_other: true }, options: [] },
     F('organiser', 'Organiser', 'المنظم', 'user', 'Meeting', { in_list: true }),
-    F('attendee_users', 'Attendees', 'الحضور', 'multi_user', 'Attendees and sites'), F('linked_site_ids', 'Linked sites', 'المواقع المرتبطة', 'multi_site', 'Attendees and sites'),
+    F('attendee_users', 'Attendees', 'الحضور', 'multi_user', 'Attendees and sites'), F('external_attendees', 'External attendees', 'الحضور من خارج النظام', 'text', 'Attendees and sites'),
+    F('linked_site_ids', 'Linked sites', 'المواقع المرتبطة', 'multi_site', 'Attendees and sites'),
     F('minutes_file', 'Minutes file', 'ملف المحضر', 'file', 'Minutes'),
     { ...F('action_items_list', 'Action items', 'إجراءات المتابعة', 'child_list', 'Action items'), columns: [
       { code: 'description', label_en: 'Action', label_ar: 'الإجراء', type: 'text', required: true },
@@ -212,6 +213,8 @@ export function initRegisters() {
     // migration 0063 (Q114): (recId(16), after the P5 meeting) the approved TE Dismantle order of site 1, which the TE Dismantle part takes its contractor (FT) from
     rec('procurement', 'wo', 1, 'approved', { scope: 'TE Dismantle', delivery: 'Outsourced', pr_no: 'PR-2026-061', pr_date: '2026-09-25', po_wo_no: 'WO-2026-061', po_wo_date: '2026-09-28', order_status: 'Open' },
       { external_party: { id: 'e0000000-0000-4000-8000-000000000061', name: 'Desert Lift Services (synthetic)', type: 'cw_contractor' } }),
+    // contract 0.13.2 (Q267): (recId(17)) an approved Quality snag record; a System Admin can cancel it if it was entered by mistake
+    rec('quality', 'snag', 0, 'approved', { record_code: 'QS-2026-001', stage: 'CW QC', description: 'Grout missing at the base', severity: 'MAJOR', raised_date: '2026-10-10' }),
   ];
   return { records, batches: [] as MockBatch[], seq: 100 };
 }

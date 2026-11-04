@@ -533,6 +533,60 @@ describe('Q145 and D145b: the mismatch report and the daily alerts', () => {
     // and the team can still take an order
     expect((await q<{ p: unknown }>(db, `SELECT team_scope_problem('TE Installation', $1) AS p`, [gone]))[0]!.p).toBeNull();
   });
+
+  it('Q330: the certificate alert repeats every 7 days until the expiry date is renewed; a renewed date starts again', async () => {
+    const lead = await actor(app, db, { grants: G('contractors', 'view'), regions: [R], modules: null });
+    const proc = await actor(app, db, { grants: G('procurement', 'view'), regions: [R], modules: null });
+    await addAssignment(db, proc.user.id, { roleId: role.id, regions: [R], grants: G('procurement', 'view') });
+    const party = await partyWithContract(db, { scopes: ['CW'] });
+    const today = (await q<{ d: string }>(db, 'SELECT cal_today()::text AS d'))[0]!.d;
+    const tm = await teamOf(db, party, { codes: ['TE'], certExpiry: await_d(today, 10), lead: lead.user.id });
+    const name = (await q<{ name: string }>(db, 'SELECT name FROM external_teams WHERE id = $1', [tm]))[0]!.name;
+    const mine = (u: string) => q<{ title: string; body: string }>(db,
+      `SELECT title, body FROM notifications WHERE user_id = $1 AND kind = 'team_safety_cert' AND body LIKE $2 ORDER BY created_at, id`, [u, `${name}%`]);
+    const back = (days: number) => db.query(`UPDATE contractor_alerts_sent SET last_sent_on = cal_today() - $2::int WHERE ref_id = $1 AND kind LIKE 'safety_cert_%'`, [tm, days]);
+    await withRules({ recipient_roles: [role.code], safety_cert_lead_days: 30 }, async () => {
+      await q(db, 'SELECT contractors_daily_alerts()');
+      let seen = await mine(lead.user.id);
+      expect(seen.map((n) => n.title)).toEqual(['A team safety certificate expires soon']);
+      // the same day, and 6 days later: nothing more
+      await q(db, 'SELECT contractors_daily_alerts()');
+      await back(6);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      expect((await mine(lead.user.id))).toHaveLength(1);
+      // 7 days after: a reminder to the lead and to Procurement; the alert row counts it
+      await back(7);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      seen = await mine(lead.user.id);
+      expect(seen.map((n) => n.title)).toEqual(['A team safety certificate expires soon', 'Reminder: A team safety certificate expires soon']);
+      expect(seen[1]!.body).toMatch(/Weekly reminder 1.*until the expiry date is renewed/);
+      expect((await mine(proc.user.id))).toHaveLength(2);
+      expect((await q<{ times: number }>(db, `SELECT times FROM contractor_alerts_sent WHERE ref_id = $1 AND kind = 'safety_cert_due'`, [tm]))[0]!.times).toBe(2);
+      await back(7);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      expect((await mine(lead.user.id))).toHaveLength(3);
+      // the date passes: the "expired" stage is a new alert at once, and it repeats weekly too
+      await db.query(`UPDATE external_teams SET safety_cert_expiry = cal_today() - 1 WHERE id = $1`, [tm]);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      seen = await mine(lead.user.id);
+      expect(seen.at(-1)!.title).toBe('A team safety certificate has expired');
+      await back(7);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      expect((await mine(lead.user.id)).at(-1)!.title).toBe('Reminder: A team safety certificate has expired');
+      // renewed beyond the lead time: it stops, however long it has been
+      const n = (await mine(lead.user.id)).length;
+      await db.query(`UPDATE external_teams SET safety_cert_expiry = cal_today() + 200 WHERE id = $1`, [tm]);
+      await back(30);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      expect((await mine(lead.user.id))).toHaveLength(n);
+      // a later expiry date inside the lead time starts again as a new alert (not a reminder)
+      await db.query(`UPDATE external_teams SET safety_cert_expiry = cal_today() + 20 WHERE id = $1`, [tm]);
+      await q(db, 'SELECT contractors_daily_alerts()');
+      seen = await mine(lead.user.id);
+      expect(seen).toHaveLength(n + 1);
+      expect(seen.at(-1)!.title).toBe('A team safety certificate expires soon');
+    });
+  });
 });
 
 function await_d(iso: string, days: number): string {

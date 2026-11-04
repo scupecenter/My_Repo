@@ -71,6 +71,7 @@ const convertSchema = z
   })
   .strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
+const cancelSnagSchema = z.object({ reason: z.string().trim().min(3).max(1000) }).strict();
 
 interface RecordRow {
   id: string;
@@ -580,6 +581,9 @@ export class RegistersService {
       }
       if (active && (await can(module, 'delete', r.region_id))) actions.push('void');
       if (r.state === 'approved' && r.is_current && !r.has_open && r.entry_holder && (await can(module, 'edit', r.region_id))) actions.push('new_version');
+      // Q267: a System Admin cancels an approved Quality snag record entered by mistake (its QC snag is cancelled with it; a closed QC snag is history)
+      if (auth.state.isAdmin && r.register_key === 'quality' && r.record_type === 'snag' && r.state === 'approved' && r.is_current && !r.has_open
+        && qcSnags.get(r.entity_id)?.status !== 'closed') actions.push('cancel_snag');
       dto.allowed_actions = actions;
       out.push(dto);
     }
@@ -764,6 +768,21 @@ export class RegistersService {
     await this.stepUp.require(auth);
     await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_void_record(${id}::uuid, ${version}::int, ${body.reason}::text)) v`);
     return this.get(auth, key, id);
+  }
+
+  /**
+   * Q267: a System Admin cancels an approved Quality register record of type snag that was entered by mistake. A reason and step-up are required; the
+   * record is voided, its QC snag is cancelled with it, and the database audits it (register_record_cancel_snag). The database decides again.
+   */
+  async cancelSnagRecord(auth: AuthContext, id: string, ifMatch: string | undefined, rawBody: unknown): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const body = parse(cancelSnagSchema, rawBody ?? {});
+    await this.rowFor(auth, 'quality', id);
+    if (!auth.state.isAdmin) throw problems.forbidden('action_forbidden', 'Only a System Admin cancels an approved Quality snag record.');
+    await this.stepUp.require(auth);
+    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    await this.call(auth, Prisma.sql`SELECT qc_cancel_snag_record(${id}::uuid, ${version}::int, ${body.reason}::text, ${stepOk}::boolean) AS r`);
+    return this.get(auth, 'quality', id);
   }
 
   // ------------------------------------------------------------------ Q111: the explicit conversion of the old free text of a meeting

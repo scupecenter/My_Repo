@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useSession } from '@/api/hooks';
-import { useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
+import { useCancelSnagRecord, useCreateRecord, useNewVersion, useRecordClaim, useRecordHistory, useRecordOp, useRecordTransfer, useRegisterRecord, useUpdateRecord, type RecordOp } from '@/api/registers';
 import { useMatrix } from '@/api/sites';
 import { useAddRegisterComment, useRegisterComments } from '@/api/x';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
@@ -85,7 +85,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const lang = i18n.language;
   const session = useSession().data;
   const matrix = useMatrix().data;
-  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
+  const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
   const hist = useRecordHistory(key, record?.id ?? null);
   const comments = useRegisterComments(key, record?.id ?? '', !!record?.region_id);
   const addComment = useAddRegisterComment(key, record?.id ?? '');
@@ -102,6 +102,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const [server, setServer] = useState<Record<string, FieldIssue>>({});
   const [rejecting, setRejecting] = useState(false);
   const [voiding, setVoiding] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [tab, setTab] = useState('data');
   useReportDirty(dirty);
 
@@ -157,7 +158,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
     } else if (dirty) update.mutate({ record, patch: { data: patchData(def, record.data, data) } }, { onSuccess: (r) => { setDirty(false); run('submit', r); }, onError: fail });
     else run('submit', record);
   };
-  const busy = create.isPending || update.isPending || op.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
+  const busy = create.isPending || update.isPending || op.isPending || cancelSnag.isPending || claim.isPending || newVersion.isPending || transfer.isPending;
   const claimedBy = record?.ball_in_court?.claimed_by;
   const mine = claimedBy?.id === session?.user?.id;
   const canClaim = !!record && (act('review') || act('approve')) && !claimedBy && (record.ball_in_court?.holders.length ?? 0) > 1;
@@ -287,6 +288,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
           {record && act('new_version') && <button className="btn" data-testid="reg-new-version" disabled={busy} onClick={() => newVersion.mutate(record, { onSuccess: (r) => { toast(t('registers.version_created')); onCreated(r.id); }, onError: fail })}><FilePlus2 size={16} />{t('registers.new_version')}</button>}
           {record && act('transfer') && <button className="btn" data-testid="reg-transfer" disabled={busy} onClick={() => transfer.mutate({ record }, { onSuccess: () => toast(t('registers.transferred')), onError: fail })}><ArrowRightLeft size={16} />{t('registers.transfer')}</button>}
           {record && act('void') && <button className="btn" data-testid="reg-void" disabled={busy} onClick={() => setVoiding(true)}><Ban size={16} />{t('registers.void')}</button>}
+          {record && act('cancel_snag') && <button className="btn btn-danger" data-testid="reg-cancel-snag" disabled={busy} onClick={() => setCancelling(true)}><Ban size={16} />{t('registers.cancel_snag')}</button>}
           {record && canClaim && <button className="btn" data-testid="reg-claim" disabled={busy} onClick={() => claim.mutate({ record, op: 'claim' }, { onError: fail })}><HandMetal size={16} />{t('drawer.claim')}</button>}
           {record && mine && <button className="btn" data-testid="reg-release" disabled={busy} onClick={() => claim.mutate({ record, op: 'release' }, { onError: fail })}><UserMinus size={16} />{t('drawer.release')}</button>}
           {record && act('reject') && <button className="btn btn-danger" data-testid="reg-reject" disabled={busy} onClick={() => setRejecting(true)}><Undo2 size={16} />{t('approvals.reject')}</button>}
@@ -298,6 +300,8 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
       </footer>
       {record && <RejectDialog open={rejecting} title={t('approvals.reject_title', { site: record.site_code ?? name })} onClose={() => setRejecting(false)} onSend={(note) => run('reject', record, note)} />}
       {record && <RejectDialog open={voiding} title={t('registers.void_title')} onClose={() => setVoiding(false)} onSend={(note) => run('void', record, note)} />}
+      {record && <RejectDialog open={cancelling} title={t('registers.cancel_snag_title')} onClose={() => setCancelling(false)}
+        onSend={(reason) => cancelSnag.mutate({ record, reason }, { onSuccess: () => { toast(t('registers.cancel_snag_done')); setCancelling(false); }, onError: (e) => { setCancelling(false); fail(e); } })} />}
     </div>
   );
 }

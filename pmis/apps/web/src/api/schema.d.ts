@@ -4580,6 +4580,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/quality/records/{record_id}/cancel-snag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel an approved Quality snag record that was entered by mistake (System Admin, 0.13.2, Q267)
+         * @description 0.13.2 (Q267). A System Admin cancels the approved version in force of a Quality register record of type `snag` that was entered by mistake. A `reason`
+         *     (at least 3 characters) and step-up are required; `If-Match` is the record's version. The record becomes `voided` (never deleted) and its linked QC snag
+         *     is cancelled with it (`Snag.state` `cancelled`, `cancel_reason` = the reason); the QC snag then no longer blocks the PAC or FAC of its stream.
+         *     Audited with before and after (`register_record_cancel_snag`, with the id and status of the QC snag). Not allowed (409 `invalid_transition`):
+         *     a record that is not the approved version in force, one with a newer version still open (void it first), one whose QC snag is already closed (that
+         *     history stays), or one that is not a Quality record of type snag. A caller who is not a System Admin (a delegate included) is 403 `action_forbidden`;
+         *     a record outside the caller's regions is 404. `RegisterRecord.allowed_actions` lists `cancel_snag` for a System Admin when it applies.
+         */
+        post: operations["cancelQualitySnagRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/records/{record_id}/claim": {
         parameters: {
             query?: never;
@@ -5994,7 +6023,7 @@ export interface paths {
         put?: never;
         /**
          * Accept or reject a photo kept as pending evidence (L2)
-         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix. Reject: it leaves the set (kept on record).
+         * @description 0.12.4 (Q232). L2 of the snag (never its raiser, finder or fixer: 403 `self_approval_forbidden`), with a note. Accept: the photo counts as proof of the fix, and needs step-up (0.13.2, Q265: 401 `step_up_required` without it, like the closure of a snag). Reject: it leaves the set (kept on record) and needs no step-up.
          */
         post: operations["decideSnagEvidence"];
         delete?: never;
@@ -7965,6 +7994,8 @@ export interface components {
                 te_full?: components["schemas"]["ScopeFlag"];
                 te_ip_router_only?: components["schemas"]["ScopeFlag"];
             };
+            /** @description 0.13.2 (Q349). The pipeline style of the site page: the same setting as the dashboard (`dashboard.pipeline_variant`, A = rings, B = flat track). */
+            pipeline_variant?: components["schemas"]["PipelineVariant"];
             /** @description Information only ("6 of 9 sites at TE PAC"). */
             cluster_progress?: {
                 cluster_code?: string;
@@ -9754,6 +9785,8 @@ export interface components {
             scenarios?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[] | null;
             /** @enum {string|null} */
             projection?: "earliest" | "latest" | null;
+            /** @description 0.13.2 (Q296). The list catalogue a list field reads (for example `CompletionStatus`: Done, Pending, N/A); `options` are then its active codes and follow it. Null for a field with its own options. */
+            list_catalogue?: string | null;
         };
         TemplateMapping: {
             fields: components["schemas"]["TemplateTaskField"][];
@@ -10508,7 +10541,7 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer" | "cancel_snag")[];
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -13394,7 +13427,11 @@ export interface components {
             proposals_count?: number;
             /** @description 0.12.7 (Q184): approved contractor / external periods from before 0059 without their party; they do not count. */
             pending_party_count?: number;
-            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. */
+            /** @description 0.13.2 (Q393): approved-period days left out of `scorecard` because the task's SLA rule is marked `pending_confirmation`; they stay in the total delay and in `items`. */
+            scorecard_excluded_working_days?: number;
+            /** @description 0.13.2 (Q393): late tasks with such a rule that had approved-period days. */
+            scorecard_excluded_tasks?: number;
+            /** @description 0.12.7 (Q7): approved periods only, the input of a contractor scorecard. 0.13.2 (Q393): the days of a task whose SLA rule is `pending_confirmation` are not counted. */
             scorecard?: {
                 party: string;
                 period_party?: components["schemas"]["DelayParty"];
@@ -21716,6 +21753,46 @@ export interface operations {
         };
         responses: {
             /** @description Voided. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    cancelQualitySnagRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description The cancelled (voided) record. */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
