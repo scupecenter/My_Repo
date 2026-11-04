@@ -137,6 +137,12 @@ repo_block() {
     # pgBackRest runs as postgres and cannot create a folder under a root-owned parent (/var/backups): create the repository
     # folder here, owned by postgres and closed to others (parents stay root-owned).
     install -d -m 750 -o postgres -g postgres "$spec"
+    # A file left inside by a run as root (an older installer, a manual command) makes pgBackRest fail with "[13] Permission
+    # denied" on archive.info or backup.info. pgBackRest only ever runs as postgres, so the whole repository belongs to it.
+    if [[ -n $(find "$spec" \( ! -user postgres -o ! -group postgres \) -print -quit) ]]; then
+      echo "    repository $n: files not owned by postgres found in $spec; giving them to postgres" >&2
+      chown -R postgres:postgres "$spec"
+    fi
     printf 'repo%s-type=posix\nrepo%s-path=%s\n' "$n" "$n" "$spec"
   elif [[ $spec =~ $SFTP_RE ]]; then
     printf 'repo%s-type=sftp\nrepo%s-sftp-host=%s\nrepo%s-sftp-host-user=%s\nrepo%s-path=%s\n' \
