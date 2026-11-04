@@ -34,7 +34,8 @@ database, runs the cases and reports.
 | `cases/89_dashboard.sql` | Dashboard (migration 0039): a caller with no dashboard grant, the internal calculation functions, direct writes to the weight and snapshot tables, snapshots on demand, the admin weight functions for a non-admin. |
 | `cases/93_self_service.sql` | Self-service profile (migration 0044): `pmis_app` reading or writing email change requests, other people's profiles, its own email or name directly, or the enforced flag; admin-owned fields through the profile function; an email change without the password, to a used address, decided by a non-admin, by an admin on their own account, by a delegate for an admin or by a region-limited delegate, or cancelled by someone else; two-factor self enrolment and self disable on another account, without a fresh step-up, from another session, or while enforced; the enforced mark changed by a non-admin, a delegate without `users.administer` or an admin on themselves; the internal helpers. Two positive controls. |
 | `cases/90_documents.sql` | The document upload module (migration 0038): `pmis_app` writing slots, files, versions, drafts, zip jobs or the library directly; a non-admin saving or publishing a library document or attaching a blank form; the internal slot builder and spec writer; forged download audit rows (other actions, other regions); another person's zip job; attaching or withdrawing a file with no signed-in user or to a slot that does not exist. Includes two positive controls. |
-| `cases/90_rls_and_sessions.sql` | Region RLS (a Tripoli session and Benghazi data), and session rows. Includes KNOWN LIMIT cases (below). |
+| `cases/90_rls_and_sessions.sql` | Region RLS (a Tripoli session and Benghazi data), and session rows. RL-02 and RL-03 (a forged all-regions setting) pass since migration 0069. |
+| `cases/C3_session_context.sql` | The verified session context (migration 0069, P1-DB-03): a forged `app.region_ids`, `app.user_id` naming an admin, a forged step-up and forged audit labels; a tampered `app.ctx` or `app.ctx_mac`, a MAC copied from another transaction, a TEMP table of the same name; `app_begin` with a replayed signature, an expired or future `issued_at`, a wrong key, a disabled, deleted or unknown user, an extra field, a foreign delegation; the key table and the key functions closed to `pmis_app`. |
 
 ## How to run
 
@@ -84,13 +85,18 @@ What a run does, in order:
 -- @case LA-03
 -- @title The only admin suspends himself (self-change refused)
 -- @category last-admin
--- @actor ADMIN            -- fixture name; the runner sets app.user_id
--- @region *               -- the runner sets app.region_ids (omit to leave it unset)
+-- @actor ADMIN            -- fixture name; the runner starts a verified session context for that user (app_begin, signed with the test key)
+-- @region *               -- the regions the context must derive from the data (omit to take the actor's own)
 -- @expect error 42501 you cannot change your own status
 SELECT idm_set_user_status('{{ADMIN}}', 'suspended', 'Self suspend');
 -- @end
 ```
 
+- **Session context (migration 0069).** The database no longer trusts `app.user_id` or `app.region_ids`. For `@actor X` the runner begins the transaction, reads `txid_current()`, signs the context with the test key (`sign-context.mjs`, through a psql backtick) and calls `app_begin`, as the API does. The test key (`PMIS_SECSUITE_CONTEXT_KEY`, a fixed test value by default) is loaded into `pmis_context_keys` after the migrations.
+  - `@region N` means a session whose data-derived regions are exactly N. When the actor's assignments give something else, the runner (as the superuser, outside the case) ends them and adds a temporary assignment for N, takes the table digests, runs the case and restores the assignments afterwards.
+  - `@region *`: a System Admin gets `*` from the data; `DEL_ALL` and `DEL_RD` get a temporary all-regions assignment; for anyone else (Alice) `*` is a **forged** setting: the verified context keeps the data-derived regions and the plain `app.region_ids = '*'` is set on top, to show it has no effect.
+  - A line `\ctx NAME` in a case body switches the transaction to a verified context for the fixture user NAME (a second person acting in the same transaction, signed with the test key). It replaces the old `SET app.user_id = '...'` in the middle of a case, which the database now ignores.
+  - `@actor none` (or no `@actor`) starts no context at all; the plain settings of the case are set as written, to show the database ignores them. A case can also start its own context in its body with `{{SIGN}}` (the path of `sign-context.mjs`): see `cases/C3_session_context.sql`.
 - `@expect error <SQLSTATE>[|<SQLSTATE>] [message regex]`: the statement must fail with one of the SQLSTATEs and a message matching the regex (case-insensitive). Use the alternative form only where two layers may refuse the same attack.
 - `@expect output <value>` or `output>= <n>`: the last output line must equal (or be at least) the value. Used for reads that must return nothing.
 - `@expect ok`: the statements must succeed (positive control, committed).
@@ -110,8 +116,7 @@ blocked until then. Do not edit them to pass.
 
 | Case | What the database allows today | Fix |
 |---|---|---|
-| RL-02, RL-03 | A session that sets `app.region_ids = '*'` reads and writes region data outside its regions. The application sets this setting itself, so any SQL injection can set it. | P1-DB-03 (signed session context verified in the database, ADR 0003 section 6). |
-| SS-01 | The application role holds INSERT on `user_sessions`, so any SQL running as `pmis_app` can insert a live session for any user from a token it chooses. | P1-DB-03, and session creation through a guarded function. |
+| SS-01 | The application role holds INSERT on `user_sessions`, so any SQL running as `pmis_app` can insert a live session for any user from a token it chooses. | A guarded session-creation function (migration 0013 and the grants file). The case passes today. |
 
 ### REAL FINDINGS (FAIL, not yet in the known-limit list)
 
@@ -125,7 +130,7 @@ These are reported to tech-lead. The suite does not change the migrations.
 
 - The suite covers the database's own refusals. It does not test the API's authorisation, which is in `apps/api/test`.
 - It does not prove a forged app-level session cannot reach the database under an unknown SQL injection. It documents the known limits above.
-- The `app.user_id` setting can be forged to name an admin. ADR 0003 section 6 documents this as the residual limit that P1-DB-03 closes. It is not a case, because a case that always fails would hide the other results.
+- A compromised API process holds the context key and can sign any user. That is the residual limit of ADR 0003 section 6; the hash-chained audit log and the mails to the admins are the detection. The forged `app.user_id` that this section used to list as a residual limit is closed (cases CX-20 to CX-24).
 - The workflow engine tables and functions (P1-DB-05: submit, unlock, self-skip, claim, reject) are not in the migrations yet, so the suite has no cases for them.
 - Region RLS is enabled by migration 0003 on `sites`, `task_instances` and other site-bound tables. The suite has no case on those tables yet; `clusters` stands in for the region filter.
 

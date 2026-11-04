@@ -193,10 +193,9 @@ export class AuthService {
       throw problems.invalidCredentials();
     }
 
-    // One transaction: the lockout bookkeeping and, on success, the session. app.user_id is set so the audit rows know the user.
+    // One transaction: the lockout bookkeeping and, on success, the session. The signed context (app_begin) names the user so the audit rows know them.
     const created = await this.db.client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.user_id', ${row.user_id}, true)`;
-      await applyContext(tx, ctx);
+      await applyContext(tx, { ...ctx, userId: row.user_id });
       await tx.$executeRaw`SELECT auth_local_result(${row.user_id}::uuid, ${ok}::boolean)`;
       return this.db.runIn(tx, async () => {
         const tf = ok ? await this.twoFactor.state(row.user_id) : null;
@@ -276,11 +275,10 @@ export class AuthService {
     return this.sessionBody(next);
   }
 
-  /** Runs `fn` in one transaction for a user who is not signed in yet (pending sign-in): app.user_id set, ambient transaction on. */
+  /** Runs `fn` in one transaction for a user who is not signed in yet (pending sign-in): the signed context names the user, ambient transaction on. */
   private async asUser<T>(userId: string, fn: () => Promise<T>, ctx?: RequestContext): Promise<T> {
     return this.db.client.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true)`;
-      if (ctx) await applyContext(tx, ctx);
+      await applyContext(tx, { ...(ctx ?? { ip: null, userAgent: null, requestId: null }), userId });
       return this.db.runIn(tx, fn);
     });
   }

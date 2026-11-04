@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildFixture, ago, q, wdBetween } from './dash-fixture';
 import type { Fix } from './dash-fixture';
 import { JobsService } from '../src/jobs/jobs.service';
-import { makeUser, startApp, superDbDash } from './helpers';
+import { beginAs, makeUser, startApp, superDbDash } from './helpers';
 import { actor, plainAdmin } from './wf-helpers';
 import type { Actor } from './wf-helpers';
 
@@ -501,9 +501,14 @@ describe('the database', () => {
       // a session that is not a user gets nothing from the entry point
       await appDb.query("SELECT set_config('app.region_ids', '*', false)");
       await expect(appDb.query('SELECT dash_overview(NULL, NULL, NULL, NULL, NULL, true)')).rejects.toThrow(/sign in first/);
-      // a forged region setting does not widen a user's regions: the scope is derived from the user's own grants
+      // a forged user setting is not a session either (migration 0069): only a signed context is
       await appDb.query('SELECT set_config($1, $2, false)', ['app.user_id', tripoli.user.id]);
+      await expect(appDb.query('SELECT dash_overview(NULL, NULL, NULL, NULL, NULL, true)')).rejects.toThrow(/sign in first/);
+      // a forged region setting does not widen a user's regions: the scope is derived from the user's own grants
+      await appDb.query('BEGIN');
+      await beginAs(appDb, tripoli.user.id);
       const r = await appDb.query(`SELECT dash_overview(NULL, NULL, NULL, NULL, NULL, true) -> 'headline' ->> 'sites_total' AS n`);
+      await appDb.query('ROLLBACK');
       expect(r.rows[0].n).toBe('5');
     } finally {
       await appDb.end();

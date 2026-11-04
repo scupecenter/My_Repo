@@ -10,7 +10,7 @@ import { RateLimiter } from '../src/auth/rate-limiter';
 import { IntegrityService } from '../src/logs/integrity.service';
 import { JobRunsService } from '../src/logs/job-runs.service';
 import { LogsService } from '../src/logs/logs.service';
-import { API, Api, PASSWORD, adminApi, assign, delegate, grantProfile, loggedIn, makeRole, makeUser, startApp } from './helpers';
+import { API, Api, PASSWORD, adminApi, assign, beginAs, delegate, grantProfile, loggedIn, makeRole, makeUser, startApp } from './helpers';
 
 /**
  * Work package P9 (migration 0055, contract 0.12.3): owner answers Q165 (role capabilities), Q168 (severity, trusted networks, progressive limiting),
@@ -102,7 +102,7 @@ describe('Q165: role capabilities decide the full readers and the Team Leads', (
     await appDb.connect();
     try {
       await appDb.query('BEGIN');
-      await appDb.query(`SELECT set_config('app.user_id', $1, true)`, [d.id]);
+      await beginAs(appDb, d.id);
       await expect(appDb.query(`SELECT idm_role_set_capabilities($1, ARRAY['audit_full_reader'], 'try')`, [roleId])).rejects.toThrow(/System Admin only/);
       await appDb.query('ROLLBACK');
       await expect(appDb.query(`UPDATE roles SET capabilities = ARRAY['audit_full_reader'] WHERE id = $1`, [roleId])).rejects.toThrow(/permission denied|idm_\*/);

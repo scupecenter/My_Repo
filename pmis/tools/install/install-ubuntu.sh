@@ -180,7 +180,7 @@ command -v openssl >/dev/null || apt-get install -y -qq openssl
 # ---------------------------------------------------------------- previous answers
 # Saved answers first; for an installation made before install.conf existed, read nginx and pmis.env.
 PREV_SERVER_NAME='' PREV_HTTPS_PORT='' PREV_HTTP_PORT='' PREV_CERT_PATH='' PREV_KEY_PATH='' PREV_DB_NAME='' PREV_DB_PORT=''
-PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY='' PREV_FILE_ENC_KEY=''
+PREV_DB_PASSWORD='' PREV_API_PORT='' PREV_LOG_HMAC_KEY='' PREV_TOTP_ENC_KEY='' PREV_FILE_ENC_KEY='' PREV_PMIS_CONTEXT_KEY=''
 PREV_STORAGE_MODE='' PREV_STORAGE_DIR='' PREV_MINIO_PORT='' PREV_MINIO_DIR='' PREV_S3_ACCESS_KEY='' PREV_S3_SECRET_KEY='' PREV_MINIO_ROOT_PASSWORD=''
 PREV_TLS_MODE='' PREV_LE_NAME=''
 if [[ -r $CONF_DIR/install.conf ]]; then
@@ -210,6 +210,7 @@ p = u.urlsplit(sys.stdin.read().strip()); print(p.port or 5432, p.path.lstrip("/
   fi
   PREV_LOG_HMAC_KEY=$(sed -n 's/^LOG_HMAC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_TOTP_ENC_KEY=$(sed -n 's/^TOTP_ENC_KEY=//p' "$CONF_DIR/pmis.env")
+  PREV_PMIS_CONTEXT_KEY=$(sed -n 's/^PMIS_CONTEXT_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_FILE_ENC_KEY=$(sed -n 's/^FILE_ENC_KEY=//p' "$CONF_DIR/pmis.env")
   PREV_API_PORT=${PREV_API_PORT:-$(sed -n 's/^PORT=//p' "$CONF_DIR/pmis.env")}
   PREV_S3_ACCESS_KEY=$(sed -n 's/^S3_ACCESS_KEY=//p' "$CONF_DIR/pmis.env")
@@ -478,6 +479,14 @@ done
 (( APPLIED )) || echo "   Nothing new."
 psql_su -d "$DB_NAME" < "$PMIS_DIR/db/sql/app_grants.sql" >/dev/null
 echo "   Application role rights refreshed (db/sql/app_grants.sql)."
+
+# Session context key (migration 0069, ADR 0003 section 6): 32 random bytes. The API signs every transaction's context with it (PMIS_CONTEXT_KEY in pmis.env);
+# the database keeps the same key in pmis_context_keys (readable only by pmis_definer) and verifies. Created once; an update keeps it, and loads it again
+# (the call is idempotent, so a database restored from a backup gets it back). Never printed, never logged: it travels by stdin only.
+PMIS_CONTEXT_KEY=${PREV_PMIS_CONTEXT_KEY:-$(openssl rand -hex 32)}
+[[ $PMIS_CONTEXT_KEY =~ ^[0-9a-fA-F]{64}$ ]] || { echo "PMIS_CONTEXT_KEY in $CONF_DIR/pmis.env is not 64 hex characters; fix or remove it and run again." >&2; exit 1; }
+printf 'SELECT app_ctx_key_install(%s);\n' "$(sql_lit "$PMIS_CONTEXT_KEY")" | psql_su -d "$DB_NAME" >/dev/null
+echo "   Session context key loaded into the database (kept in $CONF_DIR/pmis.env)."
 # Deployment log (migration 0045, GET /admin/deployments): version, git commit, the migrations of this run, who and where. update.sh runs this script too.
 if [[ $(psql_su -d "$DB_NAME" -c "SELECT 1 FROM pg_proc WHERE proname = 'log_deployment'") == 1 ]]; then
   DEPLOY_VERSION=$(sed -n 's/^  version: *//p' "$PMIS_DIR/contracts/openapi.yaml" | head -1)
@@ -629,6 +638,7 @@ DATABASE_URL=postgresql://pmis_app:$DB_URL_PW@127.0.0.1:$DB_PORT/$DB_NAME
 LOG_HMAC_KEY=$LOG_HMAC_KEY
 TOTP_ENC_KEY=$TOTP_ENC_KEY
 FILE_ENC_KEY=$FILE_ENC_KEY
+PMIS_CONTEXT_KEY=$PMIS_CONTEXT_KEY
 $KEEP_LINES
 $S3_LINES
 # Mail: fill SMTP_HOST, SMTP_FROM (and SMTP_USER / SMTP_PASS when the relay needs them), then: sudo systemctl restart gsdn-pmis-api

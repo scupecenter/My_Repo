@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { DbService } from '../db/db.service';
 import { LogHmacService } from '../auth/log-hmac.service';
-import { RequestContext, secCtx } from './context';
+import { RequestContext, applyContext, secCtx } from './context';
 
 /** The events of the sign-in and security log (migration 0045, contract `SecurityEvent`). */
 export type SecurityEvent =
@@ -52,10 +52,7 @@ export class SecurityLogService {
   async sessionExpired(sessionId: string, ctx?: RequestContext): Promise<void> {
     try {
       await this.db.client.$transaction(async (tx) => {
-        if (ctx) {
-          await tx.$queryRaw(Prisma.sql`SELECT set_config('app.ip', ${ctx.ip ?? ''}, true), set_config('app.user_agent', ${ctx.userAgent ?? ''}, true),
-            set_config('app.request_id', ${ctx.requestId ?? ''}, true)`);
-        }
+        if (ctx) await applyContext(tx, ctx); // signed, user-less: only the request data for the row
         await tx.$executeRaw(Prisma.sql`SELECT sec_log_session_expired(${sessionId}::uuid)`);
       });
     } catch (e) {

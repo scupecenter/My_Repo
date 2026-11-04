@@ -67,7 +67,7 @@ SELECT idm_request_phone_change('+218910000003');
 -- @expect error P0001 new_phone: already used or requested by another account
 SELECT auth_local_result('{{BOB}}', true);
 SELECT idm_request_phone_change('+218910000077');
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT auth_local_result('{{ALICE}}', true);
 SELECT idm_request_phone_change('+218910000077');
 -- @end
@@ -111,7 +111,7 @@ SELECT idm_decide_phone_change(idm_request_phone_change('+218910000066'), true, 
 -- @expect error 42501 this user is an admin or a delegate
 SELECT auth_local_result('{{ADMIN}}', true);
 CREATE TEMP TABLE p811 AS SELECT idm_request_phone_change('+218910000065') AS id;
-SET app.user_id = '{{DEL_ALL}}';
+\ctx DEL_ALL
 SELECT idm_decide_phone_change((SELECT id FROM p811), true, 'For the admin');
 -- @end
 
@@ -123,7 +123,7 @@ SELECT idm_decide_phone_change((SELECT id FROM p811), true, 'For the admin');
 -- @expect error 42501 this change is global
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p812 AS SELECT idm_request_phone_change('+218910000064') AS id;
-SET app.user_id = '{{DEL_TRI}}';
+\ctx DEL_TRI
 SELECT idm_decide_phone_change((SELECT id FROM p812), true, 'Regional delegate');
 -- @end
 
@@ -135,7 +135,7 @@ SELECT idm_decide_phone_change((SELECT id FROM p812), true, 'Regional delegate')
 -- @expect error P0001 phone change request not found
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p813 AS SELECT idm_request_phone_change('+218910000063') AS id;
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT idm_cancel_phone_change((SELECT id FROM p813));
 -- @end
 
@@ -156,8 +156,7 @@ SELECT count(*) FROM idm_phone_change_list(NULL);
 -- @expect error P0001 email_not_verified
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p815 AS SELECT idm_request_email_change('bob.unverified@example.test') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM p815), true, 'Looks fine', NULL);
 -- @end
 
@@ -169,8 +168,7 @@ SELECT idm_decide_email_change((SELECT id FROM p815), true, 'Looks fine', NULL);
 -- @expect error P0001 email_not_verified
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p816 AS SELECT idm_request_email_change('bob.unverified2@example.test') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM p816), true, 'Looks fine');
 -- @end
 
@@ -182,7 +180,7 @@ SELECT idm_decide_email_change((SELECT id FROM p816), true, 'Looks fine');
 -- @expect error P0001 email change request not found
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p817 AS SELECT idm_request_email_change('bob.target@example.test') AS id;
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT idm_email_change_set_verification((SELECT id FROM p817), repeat('a', 64));
 -- @end
 
@@ -241,8 +239,7 @@ SELECT idm_request_phone_change('+218910000061');
 -- @expect output +218910000062
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p8ok1 AS SELECT idm_request_phone_change('+218910000062') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_phone_change((SELECT id FROM p8ok1), true, 'Confirmed in person');
 SELECT phone FROM users WHERE id = '{{BOB}}';
 -- @end
@@ -257,7 +254,6 @@ SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE p8ok2 AS SELECT idm_request_email_change('bob.verified@example.test') AS id;
 SELECT idm_email_change_set_verification((SELECT id FROM p8ok2), repeat('c', 64));
 SELECT idm_email_change_verify(repeat('c', 64));
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM p8ok2), true, 'Verified address', NULL);
 -- @end

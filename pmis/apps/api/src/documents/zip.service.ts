@@ -11,6 +11,7 @@ import { IdempotencyService } from '../common/idempotency.service';
 import { ProblemException, problems } from '../common/problem';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { applyContext } from '../logs/context';
 import { SyslogService } from '../auth/syslog.service';
 import { DocumentsService, SITE_DOCS } from './documents.service';
 import { attachmentHeader, displayName, safePart } from './naming';
@@ -149,8 +150,9 @@ export class ZipService implements OnApplicationBootstrap {
   private async inContext<T>(userId: string, admin: boolean, fn: () => Promise<T>): Promise<T> {
     return this.db.client.$transaction(
       async (tx) => {
-        await tx.$queryRaw`SELECT set_config('app.user_id', ${userId}, true)`;
-        await tx.$queryRaw`SELECT set_config('app.region_ids', CASE WHEN ${admin}::boolean THEN '*' ELSE app_resolve_region_ids(${userId}::uuid) END, true)`;
+        // The requester's rights are derived by the database (app_begin); `admin` is no longer sent.
+        void admin;
+        await applyContext(tx, { ip: null, userAgent: null, requestId: null, userId });
         return this.db.runIn(tx, fn);
       },
       { maxWait: 10_000, timeout: 600_000 },

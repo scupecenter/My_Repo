@@ -1,8 +1,8 @@
-import { Prisma } from '@prisma/client';
 import { isIP } from 'node:net';
 import type { Request } from 'express';
 import type { Tx } from '../db/db.service';
 import type { AuthContext } from '../auth/auth.types';
+import { beginContext } from '../db/session-context';
 
 /** What the database records about the device behind a request (migration 0045, `audit_log.device`, `security_log.device`). */
 export interface Device {
@@ -24,6 +24,12 @@ export interface RequestContext {
   /** manual (a person in the web app), api (a bearer client, later), job (a background job). bulk and batch are set by the services. */
   via?: 'manual' | 'api' | 'job' | 'bulk' | 'button' | 'drag';
   jobName?: string | null;
+  /** The user the transaction acts for (migration 0069: signed and verified by the database, which derives the rights from its data). Null/absent: a job with no person. */
+  userId?: string | null;
+  /** When the session's step-up ends. `stepup: true` without it means "valid for the next minute". */
+  stepupUntil?: Date | null;
+  /** A delegation id the user works under (checked by the database). */
+  onBehalf?: string | null;
 }
 
 export const UA_MAX = 400;
@@ -71,14 +77,18 @@ export function contextFromRequest(req: Request, auth?: AuthContext, stepup?: bo
   };
 }
 
-/** Sets the app.* settings of the transaction (set_config(..., true)). The database never trusts them for rights; it records them. */
+/**
+ * Starts the verified database context of the transaction (app_begin, migration 0069): the user, the request data for the audit rows, the step-up state.
+ * Rights (regions, admin status, delegation) are derived by the database from its own data. It must be the first call of the transaction.
+ */
 export async function applyContext(tx: Tx, c: RequestContext): Promise<void> {
   const device = parseDevice(c.userAgent);
-  await tx.$queryRaw(Prisma.sql`SELECT set_config('app.ip', ${c.ip ?? ''}, true), set_config('app.user_agent', ${(c.userAgent ?? '').slice(0, UA_MAX)}, true),
-    set_config('app.request_id', ${c.requestId ?? ''}, true), set_config('app.session_id', ${c.sessionId ?? ''}, true),
-    set_config('app.auth_method', ${c.authMethod ?? ''}, true), set_config('app.mfa', ${c.mfa === null || c.mfa === undefined ? '' : String(c.mfa)}, true),
-    set_config('app.stepup', ${c.stepup === null || c.stepup === undefined ? '' : String(c.stepup)}, true), set_config('app.via', ${c.via ?? ''}, true),
-    set_config('app.device', ${device ? JSON.stringify(device) : ''}, true), set_config('app.job_name', ${c.jobName ?? ''}, true)`);
+  const stepupUntil = c.stepupUntil ?? (c.stepup ? new Date(Date.now() + 60_000) : null);
+  await beginContext(tx, {
+    userId: c.userId ?? null, onBehalf: c.onBehalf ?? null, sessionId: c.sessionId ?? null, authMethod: c.authMethod ?? null, mfa: c.mfa ?? null,
+    stepupUntil, via: c.via ?? null, requestId: c.requestId ?? null, ip: c.ip ?? null, userAgent: c.userAgent ?? null,
+    device: device ? JSON.stringify(device) : null, jobName: c.jobName ?? null,
+  });
 }
 
 /** The context of a background job: no person, no device, `via = job`. */

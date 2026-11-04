@@ -16,6 +16,7 @@
 //   PMIS_SECSUITE_APP_USER        application role under test       (pmis_app)
 //   PMIS_SECSUITE_APP_PASSWORD    its password                      (testpass-123456)
 //   PMIS_SECSUITE_DB              scratch database name             (pmis_secsuite)
+//   PMIS_SECSUITE_CONTEXT_KEY     test session-context key, hex     (a fixed test key; loaded into pmis_context_keys, used by sign-context.mjs)
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -40,7 +41,11 @@ const cfg = {
   appUser: env('PMIS_SECSUITE_APP_USER', 'pmis_app'),
   appPassword: env('PMIS_SECSUITE_APP_PASSWORD', 'testpass-123456'),
   db: env('PMIS_SECSUITE_DB', 'pmis_secsuite'),
+  // Test key of the verified session context (migration 0069). Never a production key; the child processes (psql, sign-context.mjs) inherit it.
+  contextKey: env('PMIS_SECSUITE_CONTEXT_KEY', '5ec5a17e'.repeat(8)),
 };
+process.env.PMIS_SECSUITE_CONTEXT_KEY = cfg.contextKey;
+const signScript = join(here, 'sign-context.mjs');
 
 const args = process.argv.slice(2);
 const keepDb = args.includes('--keep-db');
@@ -128,18 +133,103 @@ function resolvePlaceholders(text, ids, id) {
   });
 }
 
-// Attack script: the session context, then the body, all inside one transaction that the runner always rolls back
-// (except for positive controls, which commit). Deferred checks (the last-admin triggers, the assignment scope checks)
-// are run at the end with SET CONSTRAINTS ALL IMMEDIATE, which is exactly what COMMIT would do, but without persisting
-// anything. So a refusal comes from the same place as in production: the function's own check first, the trigger at commit.
-function buildAttack(c, ids) {
-  const lines = ['\\set VERBOSITY verbose', 'BEGIN;'];
-  if (c.actor && c.actor !== 'none') {
-    if (!(c.actor in ids)) throw new Error(`case ${c.id}: unknown actor ${c.actor}`);
-    lines.push(`SET app.user_id = '${ids[c.actor]}';`);
+// Session context (migration 0069). A case with @actor runs in a verified context: the runner starts the transaction, reads txid_current(), signs the
+// context with the test key (sign-context.mjs, through a psql backtick) and calls app_begin, exactly as the API does. The database derives the regions, so
+// "@region 1" means a session whose data-derived regions are exactly region 1: when the actor's assignments do not give that, the runner changes them
+// (as the superuser, outside the case, restored afterwards) and the digest of the tables is taken after the change and before the restore.
+//   @region *   an actor who is a System Admin gets '*' from the data. DEL_ALL and DEL_RD get an all-regions assignment. For anyone else (ALICE), '*' is a
+//               FORGED setting: the verified context keeps the data-derived regions, and the plain setting app.region_ids = '*' is set in addition.
+//   no @actor   no context at all (like a request before sign-in); the plain settings are set as the case says, to prove the database ignores them.
+const ALL_REGION_ACTORS = new Set(['DEL_ALL', 'DEL_RD']);
+const TEMP_ASSIGNMENT = '00000000-0000-4000-8000-0000000000f1';
+const infoCache = new Map();
+function actorInfo(id) {
+  if (!infoCache.has(id)) {
+    const r = asSuper(`SELECT app_user_is_system_admin('${id}')::text || '|' || coalesce(app_resolve_region_ids('${id}'), '');`, cfg.db, { tuples: true });
+    if (r.status !== 0) throw new Error(`cannot read the regions of ${id}: ${firstLine(r.stderr)}`);
+    const [admin, regions] = lastNonEmpty(r.stdout).split('|');
+    infoCache.set(id, { admin: admin === 'true', regions: regions ?? '' });
   }
-  if (c.region) lines.push(`SET app.region_ids = '${c.region}';`);
-  lines.push(resolvePlaceholders(c.body.join('\n'), ids, c.id));
+  return infoCache.get(id);
+}
+
+function planContext(c, ids) {
+  if (!c.actor || c.actor === 'none') return { begin: false, userId: null, forge: c.region ?? null, prep: null };
+  if (!(c.actor in ids)) throw new Error(`case ${c.id}: unknown actor ${c.actor}`);
+  const userId = ids[c.actor];
+  const info = actorInfo(userId);
+  const plan = { begin: true, userId, forge: null, prep: null };
+  if (!c.region) return plan;
+  if (c.region === '*') {
+    if (info.admin || info.regions === '*') return plan;
+    if (ALL_REGION_ACTORS.has(c.actor)) plan.prep = { all: true, regions: [] };
+    else plan.forge = '*';
+    return plan;
+  }
+  const want = c.region.split(',').map((x) => Number(x.trim())).sort((x, y) => x - y);
+  const have = info.regions === '*' ? ['*'] : info.regions.split(',').filter(Boolean).map(Number).sort((x, y) => x - y);
+  if (want.join(',') !== have.join(',')) plan.prep = { all: false, regions: want };
+  return plan;
+}
+
+// Changes the actor's assignments so that the derived regions are the wanted ones. Returns what restore() needs.
+function prepareRegions(plan, ids) {
+  const u = plan.userId;
+  const saved = asSuper(`SELECT id || '|' || coalesce(valid_to::text, '') FROM user_role_assignments WHERE user_id = '${u}' AND id <> '${TEMP_ASSIGNMENT}' ORDER BY id;`, cfg.db, { tuples: true });
+  if (saved.status !== 0) throw new Error(`cannot read the assignments of ${u}: ${firstLine(saved.stderr)}`);
+  const rows = saved.stdout.split('\n').filter(Boolean).map((l) => l.split('|'));
+  const sql = [
+    'SET session_replication_role = replica;',
+    `UPDATE user_role_assignments SET valid_to = valid_from + interval '1 millisecond' WHERE user_id = '${u}';`,
+    `INSERT INTO user_role_assignments (id, user_id, role_id, permission_level, team, valid_from, all_regions, all_modules, is_primary)
+       VALUES ('${TEMP_ASSIGNMENT}', '${u}', '${ids.ROLE_TE}', 'entry', 'te', now() - interval '1 hour', ${plan.prep.all}, true, false);`,
+    ...plan.prep.regions.map((r) => `INSERT INTO user_role_assignment_regions (assignment_id, region_id) VALUES ('${TEMP_ASSIGNMENT}', ${r});`),
+  ].join('\n');
+  const r = asSuper(sql);
+  if (r.status !== 0) throw new Error(`cannot set the regions of ${u}: ${firstLine(r.stderr)}`);
+  infoCache.delete(u);
+  return rows;
+}
+
+function restoreRegions(plan, rows) {
+  const u = plan.userId;
+  const sql = [
+    'SET session_replication_role = replica;',
+    `DELETE FROM user_role_assignment_regions WHERE assignment_id = '${TEMP_ASSIGNMENT}';`,
+    `DELETE FROM user_role_assignments WHERE id = '${TEMP_ASSIGNMENT}';`,
+    ...rows.map(([id, vt]) => `UPDATE user_role_assignments SET valid_to = ${vt ? `'${vt}'::timestamptz` : 'NULL'} WHERE id = '${id}';`),
+  ].join('\n');
+  const r = asSuper(sql);
+  if (r.status !== 0) throw new Error(`cannot restore the assignments of ${u}: ${firstLine(r.stderr)}`);
+  infoCache.delete(u);
+}
+
+// Attack script: the verified context, then the body, all inside one transaction that the runner always rolls back (except for positive controls, which
+// commit). Deferred checks (the last-admin triggers, the assignment scope checks) are run at the end with SET CONSTRAINTS ALL IMMEDIATE, which is exactly
+// what COMMIT would do, but without persisting anything. So a refusal comes from the same place as in production: the function's own check first, the
+// trigger at commit.
+function beginLines(userId) {
+  return [
+    'SELECT txid_current() AS txid \\gset',
+    `\\set wire \`node ${signScript} :txid ${userId} via=manual\``,
+    "SELECT app_begin(:'wire'::jsonb -> 'ctx', decode(:'wire'::jsonb ->> 'sig', 'hex')) AS began \\gset",
+  ];
+}
+
+// A line "\ctx NAME" in a case body switches the transaction to a verified context for that fixture user (the legitimate form of what used to be
+// SET app.user_id = '...' in the middle of a case: a second person acting in the same transaction, signed with the test key).
+function expandCtx(body, ids, id) {
+  return body.replace(/^\\ctx\s+(\w+)\s*$/gm, (_, name) => {
+    if (!(name in ids)) throw new Error(`case ${id}: unknown user ${name} in \\ctx`);
+    return beginLines(ids[name]).join('\n');
+  });
+}
+
+function buildAttack(c, ids, plan) {
+  const lines = ['\\set VERBOSITY verbose', 'BEGIN;'];
+  if (plan.begin) lines.push(...beginLines(plan.userId));
+  if (plan.forge) lines.push(`SET app.region_ids = '${plan.forge}';`);
+  lines.push(expandCtx(resolvePlaceholders(c.body.join('\n'), ids, c.id), ids, c.id));
   lines.push('SET CONSTRAINTS ALL IMMEDIATE;');
   lines.push(c.expect.kind === 'ok' ? 'COMMIT;' : 'ROLLBACK;');
   return lines.join('\n') + '\n';
@@ -218,6 +308,10 @@ function buildDatabase() {
   if (r.status !== 0) setupFail('app_grants.sql', r);
   console.log('  applied db/sql/app_grants.sql');
 
+  r = asSuper(`SELECT app_ctx_key_install('${cfg.contextKey}');`, cfg.db, { tuples: true });
+  if (r.status !== 0) setupFail('install the session context key', r);
+  console.log('  installed the test session context key');
+
   for (const f of ['00_harness.sql', '01_fixtures.sql']) {
     r = asSuper('', cfg.db, { file: join(sqlDir, f) });
     if (r.status !== 0) setupFail(`sql/${f}`, r);
@@ -231,6 +325,7 @@ function buildDatabase() {
     const [k, ...v] = line.split('\t');
     ids[k] = v.join('\t');
   }
+  ids.SIGN = signScript;
   return ids;
 }
 
@@ -297,10 +392,16 @@ for (const c of cases) {
   let before;
   let after;
   try {
-    const attack = buildAttack(c, ids);
-    before = snapshot();
-    res = asApp(attack, { tuples: true });
-    after = snapshot();
+    const plan = planContext(c, ids);
+    const saved = plan.prep ? prepareRegions(plan, ids) : null;
+    try {
+      const attack = buildAttack(c, ids, plan);
+      before = snapshot();
+      res = asApp(attack, { tuples: true });
+      after = snapshot();
+    } finally {
+      if (saved) restoreRegions(plan, saved);
+    }
     const v = evaluate(c, res, before, after);
     results.push({ id: c.id, category: c.category, title: c.title, verdict: v.verdict, evidence: v.evidence, ms: Date.now() - t0 });
   } catch (err) {

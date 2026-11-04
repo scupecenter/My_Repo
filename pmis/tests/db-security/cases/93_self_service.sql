@@ -140,7 +140,7 @@ SELECT idm_decide_email_change(idm_request_email_change('admin.new@example.test'
 -- @expect error 42501 this user is an admin or a delegate
 SELECT auth_local_result('{{ADMIN}}', true);
 CREATE TEMP TABLE sp15 AS SELECT idm_request_email_change('admin.other@example.test') AS id;
-SET app.user_id = '{{DEL_ALL}}';
+\ctx DEL_ALL
 SELECT idm_decide_email_change((SELECT id FROM sp15), true, 'For the admin');
 -- @end
 
@@ -152,7 +152,7 @@ SELECT idm_decide_email_change((SELECT id FROM sp15), true, 'For the admin');
 -- @expect error 42501 this change is global
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE sp16 AS SELECT idm_request_email_change('bob.new@example.test') AS id;
-SET app.user_id = '{{DEL_TRI}}';
+\ctx DEL_TRI
 SELECT idm_decide_email_change((SELECT id FROM sp16), true, 'Regional delegate');
 -- @end
 
@@ -164,7 +164,7 @@ SELECT idm_decide_email_change((SELECT id FROM sp16), true, 'Regional delegate')
 -- @expect error P0001 email change request not found
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE sp17 AS SELECT idm_request_email_change('bob.other@example.test') AS id;
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT idm_cancel_email_change((SELECT id FROM sp17));
 -- @end
 
@@ -238,7 +238,7 @@ SELECT auth_totp_self_disable('{{BOB}}', gen_random_uuid());
 -- @region *
 -- @expect error 42501 two_factor_enforced
 SELECT count(*) FROM idm_set_two_factor('{{ALICE}}', true, 'Policy', repeat('c', 64));
-SET app.user_id = '{{ALICE}}';
+\ctx ALICE
 SELECT auth_totp_self_disable('{{ALICE}}', gen_random_uuid());
 -- @end
 
@@ -304,7 +304,6 @@ SELECT idm_update_own_profile('{"display_name": "Alice Renamed", "locale": "ar"}
 -- @expect output approved
 SELECT auth_local_result('{{BOB}}', true);
 CREATE TEMP TABLE spok2 AS SELECT idm_request_email_change('bob.approved@example.test') AS id;
-SET app.user_id = '{{ADMIN}}';
-SET app.region_ids = '*';
+\ctx ADMIN
 SELECT idm_decide_email_change((SELECT id FROM spok2), true, 'Verified by phone', 'Called the user on the registered phone (0058)');
 -- @end

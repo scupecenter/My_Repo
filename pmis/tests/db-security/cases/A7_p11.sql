@@ -91,7 +91,7 @@ INSERT INTO register_steps (record_id, level, action, acted_by) SELECT r.id, 1, 
 -- @expect error P0001 stream_required
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-10');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - Dismantle", "status": "Applied"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -103,7 +103,7 @@ SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permi
 -- @expect error P0001 not_eligible_holder
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-11');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "PTW - Dismantle", "permit_stream": "TE", "status": "Applied"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -115,7 +115,7 @@ SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permi
 -- @expect error P0001 not_eligible_holder
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-12');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "City Council Permit", "status": "Applied"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -127,7 +127,7 @@ SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permi
 -- @expect error P0001 stream_fixed
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-13');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - CW", "permit_stream": "TE", "status": "Applied"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -139,7 +139,7 @@ SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permi
 -- @expect output true
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-14');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT (reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - Dismantle", "permit_stream": "CW", "status": "Applied"}'::jsonb, NULL, NULL, false) IS NOT NULL)::text;
 -- @end
 
@@ -153,10 +153,10 @@ SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW')
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-15');
 SELECT idm_assign('{{BOB}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_TE'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case P11-15');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 CREATE TEMP TABLE p11_rec ON COMMIT DROP AS
   SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - CW", "status": "Applied"}'::jsonb, NULL, NULL, false) AS id;
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT reg_permit_transfer((SELECT id FROM p11_rec), NULL, 'mine now');
 -- @end
 

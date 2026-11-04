@@ -83,6 +83,17 @@ CI checks the scripts with `bash -n` and `shellcheck --severity=error` ("Install
 
 The steps and the commands of the owner after an update are in `infra/RUNBOOK.md` (sections 2 to 6).
 
+## Session context key (migration 0069, ADR 0003 section 6, P1-DB-03)
+
+- `PMIS_CONTEXT_KEY` (32 random bytes as 64 hex characters) is generated on the first run, written to `/etc/gsdn-pmis/pmis.env` (readable by root and the
+  service user only) and **loaded into the database** (`pmis_context_keys`, readable only by `pmis_definer`) with `app_ctx_key_install`. The API signs the
+  context of every transaction with it; the database verifies the signature, so SQL that runs as `pmis_app` without the key cannot name another user,
+  widen its regions or claim a step-up.
+- **An update keeps the key** and loads it again (the call is idempotent, so a database restored from a backup gets it back). The installer never prints
+  it and never writes it to a log; it reaches `psql` on standard input only.
+- Without the key in `pmis.env` the API refuses to start. If the table is empty (a restore from a backup that predates the key), run the installer again.
+- Rotation is in `infra/RUNBOOK.md` section 9. Keep an offline copy of `pmis.env` like the other keys.
+
 ## Outbound mail and the integrity anchors (migration 0055, Q167, Q171)
 
 The PMIS mails the security alerts to every active System Admin (and, later, the notification kinds listed in the setting `mail.notification_kinds`).

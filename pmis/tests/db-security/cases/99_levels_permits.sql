@@ -55,7 +55,7 @@ SELECT c.id, 'user', '{{ALICE}}' FROM matrix_cells c WHERE c.register_key = 'per
 -- @expect error P0001 not_eligible_holder
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case LV-06');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - TE", "status": "Applied"}'::jsonb, NULL, NULL, false);
 -- @end
 
@@ -67,7 +67,7 @@ SELECT reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permi
 -- @expect output true
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_CW'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case LV-07');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT (reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - CW", "status": "Applied"}'::jsonb, NULL, NULL, false) IS NOT NULL)::text;
 -- @end
 
@@ -79,7 +79,7 @@ SELECT (reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"perm
 -- @expect output true
 SELECT idm_assign('{{CAROL}}', (SELECT id FROM roles WHERE code = 'SITE_ENG_TE'), 'entry', NULL, NULL, NULL, false, true, NULL, true, NULL,
   ARRAY[(SELECT id FROM permission_profiles WHERE code = 'data_entry')], 'Security case LV-08');
-SET app.user_id = '{{CAROL}}';
+\ctx CAROL
 SELECT (reg_save_record('permits_hse', NULL, NULL, '{{SITE_TRI}}', NULL, '{"permit_type": "Access - TE", "status": "Applied"}'::jsonb, NULL, NULL, false) IS NOT NULL
   AND EXISTS (SELECT 1 FROM matrix_cells c JOIN matrix_cell_assignees a ON a.cell_id = c.id JOIN roles r ON r.id = a.ref_id
               WHERE c.register_key = 'permits_hse_te' AND c.level = 3 AND r.code = 'TE_TL'))::text;

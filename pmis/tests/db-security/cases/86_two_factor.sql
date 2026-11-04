@@ -206,7 +206,7 @@ SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a
 -- @region *
 -- @expect error 42501 no recent successful sign-in with a code
 SELECT idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_local_result('{{BOB}}', true);
 SELECT auth_session_create('{{BOB}}', repeat('a', 64), 'local'::"AuthMethod", repeat('c', 43), NULL, 'guard test');
 -- @end
@@ -341,7 +341,7 @@ SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64):
 -- @region *
 -- @expect output bad
 SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('c', 64));
 -- @end
 
@@ -352,7 +352,7 @@ SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -- @region *
 -- @expect output ok
 SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
 -- @end
 
@@ -363,7 +363,7 @@ SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 -- @region *
 -- @expect output bad
 SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
 SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('c', 64));
 -- @end
@@ -375,7 +375,7 @@ SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64):
 -- @region *
 -- @expect output ok
 SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
 SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('a', 64));
 -- @end
@@ -387,7 +387,7 @@ SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64):
 -- @region *
 -- @expect error 42501 not waiting for enrolment
 SELECT r_state FROM idm_set_two_factor('{{BOB}}', true, 'Policy test', repeat('a', 64));
-SET app.user_id = '{{BOB}}';
+\ctx BOB
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
 SELECT auth_totp_confirm_enrol('{{BOB}}', 1, ARRAY(SELECT repeat(to_hex(g), 64)::text FROM generate_series(1, 10) g), repeat('b', 64), repeat('a', 64));
 SELECT auth_totp_begin_enrol('{{BOB}}', 'v1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', repeat('b', 64), repeat('a', 64));
