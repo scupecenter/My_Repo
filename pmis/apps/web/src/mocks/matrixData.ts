@@ -89,6 +89,15 @@ export function initialMatrix(): Matrix {
     kind: 'register', register_key: 'permits_hse_te', code: 'permits_hse_te', name_en: 'Permits & HSE - TE stream', name_ar: 'التصاريح والسلامة - مسار TE', approval_levels: 2,
     cells: [cell('permits_hse_te', 1, ['1306']), cell('permits_hse_te', 3, ['1305'])],
   });
+  // migration 0054 (Q220): the Acquisition / RF & Design stream row (City Council, Civil Aviation, surveys by purpose; L1 = 1103, L2 = 1102) and the O&M stream row
+  // (no default holder: the System Admin names them, B10)
+  stages.splice(pat + 1, 0, {
+    kind: 'register', register_key: 'permits_hse_acq', code: 'permits_hse_acq', name_en: 'Permits & HSE - Acquisition / RF & Design stream', name_ar: 'التصاريح والسلامة - مسار الاستحواذ / التصميم', approval_levels: 2,
+    cells: [cell('permits_hse_acq', 1, ['1103']), cell('permits_hse_acq', 3, ['1102'])],
+  }, {
+    kind: 'register', register_key: 'permits_hse_om', code: 'permits_hse_om', name_en: 'Permits & HSE - O&M stream', name_ar: 'التصاريح والسلامة - مسار التشغيل والصيانة', approval_levels: 2,
+    cells: [],
+  });
   // Zawia (region 4) has its own L1 for CW: a region override that the screen lists and an admin may delete (Q86)
   const cw = stages.find((r) => r.code === 'cw')!;
   cw.cells.push({ ...cell('cw', 1, ['1205']), region_id: 4 });

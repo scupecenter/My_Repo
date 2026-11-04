@@ -261,6 +261,7 @@ export function toDetail(t: MockTask): TaskDetail {
     lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [],
     missing_for_submit: slotsOf(t).filter((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected')).map((s) => s.name_en),
     planned_start: t.planned_date, actual_start: t.actual_start ?? t.actual_date,
+    values: (t as MockTask & { values?: Record<string, unknown> }).values ?? {},
   } as TaskDetail;
 }
 

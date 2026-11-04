@@ -108,6 +108,12 @@ export function mapWfError(message: string): ProblemException | null {
         errors: Array.isArray(extra.errors) ? (extra.errors as FieldError[]) : [],
         extra: { order_scope: typeof extra.scope === 'string' ? extra.scope : null, team_specialization: typeof extra.specialization === 'string' ? extra.specialization : null },
       });
+    case 'scope_scenario_conflict':
+      // Q3 (migration 0052): the scenario makes a task N/A while the scope flags say the work exists; review before the scope is applied
+      return new ProblemException(422, 'scope_scenario_conflict', {
+        detail: detail ?? 'The scenario and the scope flags disagree.',
+        extra: { conflicts: Array.isArray(extra.conflicts) ? extra.conflicts : [] },
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

@@ -64,6 +64,15 @@ export interface TaskSummaryDto {
     rule_set_version: number | null;
     /** Q82: an approved task whose actual date is before its SLA start (a negative duration): a data-quality flag for review. */
     negative: boolean;
+    /** 0052 (Q13, Q136): the end event of the rule; null = the actual date of the task. */
+    end_event: string | null;
+    /** 0052 (Q135): the rule keeps an inherited value waiting for the owner's confirmation ("Pending SLA Confirmation"). */
+    pending_confirmation: boolean;
+    /** 0052 (Q2): false when the scenario says this SLA is not measured on the site (D-1 for Hot / Cold Swap). */
+    measured: boolean;
+    /** 0052 (D4b): tentative holidays counted inside the SLA period; non-empty = the due date carries a "tentative date" badge. */
+    tentative_holidays: string[];
+    due_date_tentative: boolean;
   };
   slots_filled: number;
   slots_required: number;
@@ -111,6 +120,10 @@ export interface TaskRow {
   sla_start_date: string | null;
   sla_elapsed: number | null;
   sla_colour: 'green' | 'amber' | 'red' | 'none';
+  sla_end_ref: string | null;
+  sla_pending: boolean | null;
+  sla_measured: boolean;
+  sla_tentative: string[] | null;
   return_count: number;
   last_return_note: string | null;
   admin_override: boolean;
@@ -162,6 +175,9 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       t.approved_date::text AS approved_date, t.baseline_date::text AS baseline_date, t.values AS "values",
       t.sla_rule_id::text AS sla_rule_id, r.min_working_days AS sla_min, r.max_working_days AS sla_max, coalesce(r.start_ref, r.start_event) AS sla_start,
       r.code AS sla_code, rs.version AS sla_rule_set_version, t.sla_start_date::text AS sla_start_date, sl.elapsed AS sla_elapsed, sl.colour AS sla_colour,
+      r.end_ref AS sla_end_ref, r.pending_confirmation AS sla_pending, sla_task_measured(t.id) AS sla_measured,
+      CASE WHEN r.id IS NULL OR t.sla_start_date IS NULL THEN NULL
+           ELSE sla_tentative_holidays(r.calendar_id, t.sla_start_date, CASE WHEN t.state = 'approved' THEN t.sla_end_date ELSE t.due_date END)::text[] END AS sla_tentative,
       t.return_count, t.last_return_note, t.admin_override, t.is_na, t.na_reason, t.version,
       t.ball_in_court_user_id::text AS pinned_user, t.external_party_id::text AS external_party_id, wd.version AS workflow_version,
       k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder,
@@ -276,6 +292,11 @@ export class TaskViewService {
           rule_id: r.sla_rule_id,
           rule_set_version: r.sla_rule_set_version,
           negative: r.state === 'approved' && r.sla_elapsed !== null && r.sla_elapsed < 0,
+          end_event: r.sla_end_ref ?? null,
+          pending_confirmation: r.sla_pending === true,
+          measured: r.sla_measured !== false,
+          tentative_holidays: r.sla_tentative ?? [],
+          due_date_tentative: (r.sla_tentative ?? []).length > 0,
         },
         slots_filled: Number(r.slots_filled),
         slots_required: Number(r.slots_required),

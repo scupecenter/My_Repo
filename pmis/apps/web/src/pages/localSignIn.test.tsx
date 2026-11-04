@@ -293,6 +293,18 @@ describe('hybrid mode list', () => {
       'DELETE /registers/:key/records/:id/slots/:slotId/files/:fileId', 'GET /snag-types', 'POST /snag-types', 'PATCH /snag-types/:id', 'GET /sites/:id/snags', 'POST /sites/:id/snags',
       'GET /snags/:id', 'PATCH /snags/:id', 'POST /snags/:id/photos', 'DELETE /snags/:id/photos/:photoId', 'POST /snags/:id/submit', 'POST /snags/:id/review', 'POST /snags/:id/approve',
       'POST /snags/:id/reject',
+      // contract 0.12.0 (P1): scenario applicability, scope exceptions, gate history, scenario rules, SLA sheet columns
+      'GET /sites/:id/applicability', 'POST /sites/:id/applicability/apply', 'POST /sites/:id/scope-exceptions', 'POST /sites/:id/scope-exceptions/:exceptionId/revoke',
+      'GET /sites/:id/gate-events', 'GET /settings/scenario-rules', 'PUT /settings/scenario-rules', 'GET /settings/sla-master-columns',
+      // contract 0.12.1: P7 warehouse (TE dispatch, region WL vendors, missing configuration, numbering)
+      'GET /warehouse/dispatch-status',
+      'GET /warehouse/dispatch-status/:id',
+      'GET /warehouse/region-vendors',
+      'PUT /warehouse/region-vendors/:id',
+      'GET /warehouse/config-gaps',
+      'GET /number-sequences',
+      'POST /number-sequences',
+      'PATCH /number-sequences/:id',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

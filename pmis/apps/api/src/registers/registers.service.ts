@@ -56,6 +56,7 @@ const noteSchema = z
   })
   .strict();
 const commentSchema = z.object({ body: z.string().trim().min(1).max(4000), mention_user_ids: z.array(z.string().uuid()).max(20).optional() }).strict();
+const transferSchema = z.object({ note: z.string().trim().max(2000).optional() }).strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
 
 interface RecordRow {
@@ -97,6 +98,7 @@ interface RecordRow {
   votes_needed: bigint | null;
   votes_done: bigint | null;
   entry_holder: boolean;
+  pin_holds: boolean | null;
   has_open: boolean;
   warnings: unknown[] | null;
   total: bigint | null;
@@ -131,6 +133,14 @@ const FIELD_ENTITY: Record<string, string> = {
   procurement: 'procurement', gecol: 'gecol', hlc: 'hlc', permits_hse: 'permit',
   quality: 'quality', issues: 'issue', risks: 'risk', change_control: 'change_request', readiness_handover: 'readiness',
   as_built: 'as_built', meetings: 'meeting', rf_design: 'rf_design', acquisition: 'acquisition', contractors: 'external_party',
+};
+
+/** 0054 (Q220): the streams a permit is entered on, as the `permit_stream` list shows them. */
+const PERMIT_STREAMS: Record<string, { label_en: string; label_ar: string }> = {
+  CW: { label_en: 'Civil Works (CW)', label_ar: 'الأعمال المدنية (CW)' },
+  TE: { label_en: 'Installation (TE)', label_ar: 'التركيب (TE)' },
+  ACQ: { label_en: 'Acquisition / RF & Design', label_ar: 'الاستحواذ / التصميم' },
+  OM: { label_en: 'O&M', label_ar: 'التشغيل والصيانة' },
 };
 
 @Injectable()
@@ -182,9 +192,16 @@ export class RegistersService {
         fields,
         record_count: Number(cnt[0]?.n ?? 0),
         ...(scopes[0]?.s ? { entry_scopes: scopes[0].s } : {}),
+        // 0054 (Q222): the permit types the caller may enter, with the streams they may choose (D220b); the database decides again on every write
+        ...(d.register_key === 'permits_hse' ? { entry_permit_types: await this.entryPermitTypes() } : {}),
       });
     }
     return { items };
+  }
+
+  private async entryPermitTypes(): Promise<unknown[]> {
+    const rows = await this.db.tx.$queryRaw<{ r: unknown[] | null }[]>(Prisma.sql`SELECT reg_entry_permit_types() AS r`);
+    return rows[0]?.r ?? [];
   }
 
   private async fieldsOf(key: string): Promise<unknown[]> {
@@ -195,7 +212,10 @@ export class RegistersService {
     const out: unknown[] = [];
     for (const f of rows) {
       let options: { value: string; label_en: string }[] | undefined;
-      if (Array.isArray(f.options)) options = (f.options as string[]).map((v) => ({ value: v, label_en: v }));
+      if (Array.isArray(f.options)) {
+        const labels = key === 'permits_hse' && f.code === 'permit_stream' ? PERMIT_STREAMS : undefined;
+        options = (f.options as string[]).map((v) => (labels?.[v] ? { value: v, ...labels[v] } : { value: v, label_en: v }));
+      }
       else if (f.options && typeof f.options === 'object' && (f.options as { source?: string }).source === 'permit_types') {
         permitTypes ??= (await this.db.tx.$queryRaw<{ code: string }[]>(Prisma.sql`SELECT code FROM permit_types WHERE is_active ORDER BY sort_order`)).map((r) => r.code);
         options = permitTypes.map((v) => ({ value: v, label_en: v }));
@@ -234,6 +254,7 @@ export class RegistersService {
         r.approved_by::text AS approved_by, r.source, r.version,
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
         reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
+        CASE WHEN r.ball_in_court_user_id IS NOT NULL AND r.state = 'entry' THEN reg_is_eligible(r.id, 'entry', r.ball_in_court_user_id) END AS pin_holds,
         reg_warnings(r.id) AS warnings,
         EXISTS (SELECT 1 FROM register_records o WHERE o.entity_id = r.entity_id AND o.state IN ('entry', 'in_review', 'in_approval')) AS has_open,
         ${Prisma.raw(TS_TEXT('r.created_at'))} AS ts
@@ -331,10 +352,12 @@ export class RegistersService {
     const cursor = decodeCursor(oneParam(q, 'cursor'), 2);
     const after = cursor ? Prisma.sql`AND (w.created_at, w.id) > (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)` : Prisma.empty;
     const rows = await this.db.tx.$queryRaw<
-      { id: string; level: number; action: string; acted_by: string | null; note: string | null; before_state: string | null; after_state: string | null; self_approval: boolean; stepup_verified: boolean; batch_row_id: string | null; created_at: Date; ts: string }[]
+      { id: string; level: number; action: string; acted_by: string | null; note: string | null; before_state: string | null; after_state: string | null; self_approval: boolean; stepup_verified: boolean; batch_row_id: string | null; previous_path: boolean; created_at: Date; ts: string }[]
     >(Prisma.sql`
       SELECT w.id::text AS id, w.level, w.action, w.acted_by::text AS acted_by, w.note, w.before_state, w.after_state, w.self_approval, w.stepup_verified,
-        w.batch_row_id::text AS batch_row_id, w.created_at, ${Prisma.raw(TS_TEXT('w.created_at'))} AS ts
+        w.batch_row_id::text AS batch_row_id, w.created_at, ${Prisma.raw(TS_TEXT('w.created_at'))} AS ts,
+        EXISTS (SELECT 1 FROM levels_conversions c WHERE c.entity_type = 'register_record' AND c.entity_id = w.record_id AND c.levels_before = 3
+                AND w.level >= 2 AND w.created_at <= c.converted_at) AS previous_path
       FROM register_steps w WHERE w.record_id = ${row.id}::uuid ${after} ORDER BY w.created_at, w.id LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
     const refs = await this.view.userRefs([...new Set(page.map((r) => r.acted_by).filter((x): x is string => !!x))]);
@@ -349,6 +372,7 @@ export class RegistersService {
           self_approval: r.self_approval,
           stepup_verified: r.stepup_verified,
           batch_row_id: r.batch_row_id,
+          previous_path: r.previous_path,
           created_at: r.created_at,
         };
         if (r.acted_by && refs.get(r.acted_by)) item.acted_by = refs.get(r.acted_by);
@@ -460,6 +484,11 @@ export class RegistersService {
         if (r.pinned === null && r.rule !== 'all_members') actions.push('claim');
       }
       if (active && r.pinned === auth.user.id) actions.push('release');
+      // 0054 (Q221): a permit draft held by somebody who no longer holds L1 of its row is handed over (by that person) or taken over (by a qualified holder)
+      if (r.register_key === 'permits_hse' && r.state === 'entry' && r.kind === 'entry') {
+        const mine = (r.pinned ?? r.created_by) === auth.user.id;
+        if ((!r.is_holder && mine && !(auth.state.isAdmin && r.has_holder === false)) || (r.is_holder && r.pinned !== null && r.pinned !== auth.user.id && r.pin_holds === false)) actions.push('transfer');
+      }
       if (active && (await can(module, 'delete', r.region_id))) actions.push('void');
       if (r.state === 'approved' && r.is_current && !r.has_open && r.entry_holder && (await can(module, 'edit', r.region_id))) actions.push('new_version');
       dto.allowed_actions = actions;
@@ -559,6 +588,15 @@ export class RegistersService {
       auth,
       release ? Prisma.sql`SELECT reg_release_record(${id}::uuid, ${version}::int) AS r` : Prisma.sql`SELECT reg_claim_record(${id}::uuid, ${version}::int) AS r`,
     );
+    return this.get(auth, key, id, info);
+  }
+
+  /** 0054 (Q221): move a permit draft to a qualified entry holder (the database decides who may and to whom). */
+  async transfer(auth: AuthContext, key: string, id: string, ifMatch: string | undefined, rawBody: unknown): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const body = parse(transferSchema, rawBody ?? {});
+    await this.rowFor(auth, key, id);
+    const info = await this.call<TransitionInfo>(auth, Prisma.sql`SELECT reg_permit_transfer(${id}::uuid, ${version}::int, ${body.note ?? null}::text) AS r`);
     return this.get(auth, key, id, info);
   }
 

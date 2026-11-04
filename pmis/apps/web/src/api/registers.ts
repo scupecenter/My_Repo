@@ -111,6 +111,15 @@ export function useRecordClaim(key: string) {
     onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
   });
 }
+/** 0.12.2 (Q221): hand a permit draft to a qualified entry holder, or take over one held by somebody who lost the row. The server decides who and to whom. */
+export function useRecordTransfer(key: string) {
+  const qc = useQueryClient();
+  return useMutation<RegisterRecord, ApiError, { record: RegisterRecord; note?: string }>({
+    mutationFn: ({ record, note }) => api.post(`/registers/${key}/records/${record.id}/transfer`, { version: record.version, body: note ? { note } : {} }),
+    onSuccess: (r) => qc.setQueryData(['register-record', key, r.id], r),
+    onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
+  });
+}
 /** `GET .../history` (contract 0.4.5): the steps of this version, oldest first, auto-skips included. */
 export const useRecordHistory = (key: string, id: string | null) =>
   useQuery({ queryKey: ['register-history', key, id], enabled: !!id, retry: false, queryFn: () => api.get<Page<RegisterRecordStep>>(`/registers/${key}/records/${id}/history`) });

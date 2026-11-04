@@ -1682,6 +1682,8 @@ model SlaRule {
   end_ref          String?
   code             String?
   rule_set_id      String?           @db.Uuid
+  // migration 0052 (Q135): an inherited value waiting for the owner's SLA confirmation; left out of the scorecard and penalties
+  pending_confirmation Boolean       @default(false)
 
   task_def  TaskDefinition @relation(fields: [task_def_id], references: [id])
   region    Region?        @relation(fields: [region_id], references: [id])
@@ -1729,6 +1731,7 @@ model SlaRuleSetItem {
   calendar_id      String     @db.Uuid
   code             String?
   overrides        Json       @default("[]") @db.JsonB // [{scenario, region_id, min_working_days, max_working_days}]
+  pending_confirmation Boolean @default(false) // migration 0052 (Q135)
   set              SlaRuleSet @relation(fields: [set_id], references: [id], onDelete: Cascade)
 
   @@id([set_id, task_def_id])
@@ -1755,9 +1758,88 @@ model SiteGateState {
   gate_code String
   is_open   Boolean
   since     DateTime @default(now()) @db.Timestamptz(6)
+  status    String? // migration 0052 (Q9): the last gate_eval status and date seen
+  gate_date DateTime? @db.Date
 
   @@id([site_id, gate_code])
   @@map("site_gate_state")
+}
+
+// Migration 0052 (Q9): the history of every gate of a site (opened, closed, date_moved). Written only by calc_gate_watch; never rewritten.
+model SiteGateEvent {
+  id            BigInt   @id @default(autoincrement())
+  site_id       String   @db.Uuid
+  region_id     Int
+  gate_code     String
+  event         String // opened | closed | date_moved
+  status        String
+  gate_date     DateTime? @db.Date
+  previous_date DateTime? @db.Date
+  shifted       Boolean  @default(false)
+  cause         Json     @default("[]") @db.JsonB
+  at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([site_id, gate_code, id])
+  @@map("site_gate_events")
+}
+
+// Migration 0052 (Q15, Q3, Q2): scenario applicability of a task code per workflow version. rule: applies | na | sla_not_measured | flag.
+model ScenarioTaskRule {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workflow_id String            @db.Uuid
+  task_code   String
+  scenario    DeliveryScenario?
+  rule        String
+  flag_expr   String? // cw | tower | adaption_only | gecol | hlc | rfi | te
+  reason      String
+  version     Int               @default(1)
+  is_active   Boolean           @default(true)
+  created_by  String?           @db.Uuid
+  created_at  DateTime          @default(now()) @db.Timestamptz(6)
+  retired_by  String?           @db.Uuid
+  retired_at  DateTime?         @db.Timestamptz(6)
+
+  @@map("scenario_task_rules")
+}
+
+model ScenarioRuleState {
+  id      Boolean @id @default(true)
+  version Int     @default(1)
+
+  @@map("scenario_rule_state")
+}
+
+// Migration 0052 (Q15, Q3): an approved scope exception enables on one site a task that its scenario makes N/A. Revoked, never deleted.
+model SiteScopeException {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_id           String    @db.Uuid
+  region_id         Int
+  task_code         String
+  reason            String
+  change_request_id String?   @db.Uuid
+  approved_by       String    @db.Uuid
+  approved_at       DateTime  @default(now()) @db.Timestamptz(6)
+  revoked_by        String?   @db.Uuid
+  revoked_at        DateTime? @db.Timestamptz(6)
+  revoke_reason     String?
+
+  @@map("site_scope_exceptions")
+}
+
+// Migration 0052 (Q14): the 45 columns D:AV of the Master SLA sheet and the PMIS task that measures each.
+model SlaMasterColumn {
+  seq            Int     @id
+  master_column  String  @unique
+  sla_code       String  @unique
+  name_en        String
+  from_to        String
+  applies_when   String
+  task_code      String?
+  flag_condition String?
+  inherited      Boolean @default(false)
+  note           String?
+
+  @@map("sla_master_columns")
 }
 
 model BaselineVersion {

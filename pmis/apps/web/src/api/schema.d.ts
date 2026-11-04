@@ -1563,6 +1563,114 @@ export interface paths {
         patch: operations["updateSite"];
         trace?: never;
     };
+    "/sites/{site_id}/applicability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Which tasks of the site apply by scenario, flags and scope exceptions (Q15, Q3, Q2)
+         * @description 0.12.0. Needs `sites` view in the site's region (404 otherwise).
+         */
+        get: operations["getSiteApplicability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/applicability/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the site's tasks N/A or applicable again from the rules (step-up, reason, audited)
+         * @description 0.12.0. System Admin, or a delegation of `task_definitions` edit in the site region. Never an approved task or one in review or approval (listed in `kept`). Only tasks set N/A here come back when they apply again; they reopen through the normal unlock (predecessors, gate). 422 `scope_scenario_conflict` while the scenario and the flags disagree (Q3).
+         */
+        post: operations["applySiteApplicability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/scope-exceptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a scope exception that enables a task the scenario makes N/A (step-up, reason, audited)
+         * @description 0.12.0 (Q15, Q3). System Admin, or a delegation of `task_definitions` edit in the site region. `change_request_id` names an approved or applied Change Control record of the same site. Errors: `not_na_by_scenario`, `change_not_approved`, `duplicate`. Apply the applicability afterwards to reopen the task.
+         */
+        post: operations["approveScopeException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/scope-exceptions/{exception_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a scope exception (step-up, reason, audited; never deleted) */
+        post: operations["revokeScopeException"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/gate-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The history of the site's gates, newest first (Q9)
+         * @description 0.12.0. Needs `sites` view in the site's region. At most 500 rows.
+         */
+        get: operations["listSiteGateEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites/{site_id}/tasks": {
         parameters: {
             query?: never;
@@ -3273,6 +3381,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/scenario-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Scenario applicability rules (Q15, Q3, Q2)
+         * @description 0.12.0. The active list of the workflow version in force. Needs `admin.settings` view.
+         */
+        get: operations["listScenarioRules"];
+        /**
+         * Replace the scenario applicability rules (step-up, reason, If-Match, audited)
+         * @description 0.12.0. System Admin, or a delegation of `task_definitions` edit for all regions. Old rules are retired, never deleted. A new rule reaches the tasks of a site only when its applicability is applied (`POST /sites/{site_id}/applicability/apply`).
+         */
+        put: operations["setScenarioRules"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/sla-master-columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The 45 SLA sheet columns D:AV and the PMIS task of each (Q14)
+         * @description 0.12.0. Needs `admin.settings` view. B-10a and B-10b are both measured by B10 (flag `rt_or_gf`); B-6 is tagged `inherited` (Q13).
+         */
+        get: operations["listSlaMasterColumns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/team-scope-match": {
         parameters: {
             query?: never;
@@ -3887,6 +4039,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a permit draft to a qualified entry holder (Q221)
+         * @description 0.12.2, Permits & HSE only. A draft (state `entry`) held by somebody who is no longer an entry holder (L1) of the Matrix row of the permit's stream is handed over by that person, or taken over by a qualified L1 holder. The draft is pinned to the only qualified holder (or to the caller when a qualified holder takes it over; with several holders it is left to all of them); the qualified holders and the previous holder get a `permit_transferred` notice (the System Admins a `no_eligible_holder` alert when nobody qualifies). Nothing in the draft changes; a `transfer` step and an audit row are written. 403 `not_eligible_holder` for anyone else, 409 `invalid_transition` when there is nothing to transfer or the record is not a draft.
+         */
+        post: operations["transferRegisterRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/{register_key}/records/{record_id}/void": {
         parameters: {
             query?: never;
@@ -4448,6 +4625,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/warehouse/dispatch-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * TE dispatch of the sites (D6), the Q65 date and the need-based status
+         * @description TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`.
+         */
+        get: operations["listSiteDispatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/dispatch-status/{site_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /** TE dispatch of one site, line by line (shown on the site and in the Warehouse) */
+        get: operations["getSiteDispatch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/region-vendors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The WL vendor of each region (Setting tblRegionVendor, D58) */
+        get: operations["listRegionVendors"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/region-vendors/{region_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                region_id: components["schemas"]["RegionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set or clear the WL vendor of a region (System Admin or a delegate of warehouse.items.edit for all regions)
+         * @description `If-Match` is optional (the first setting of a region has no version); when it is sent, a stale version answers 412.
+         */
+        put: operations["putRegionVendor"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/warehouse/config-gaps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The owner data still missing (Q107, D58, Q32) */
+        get: operations["getWarehouseConfigGaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/number-sequences": {
         parameters: {
             query?: never;
@@ -4458,7 +4730,7 @@ export interface paths {
         /** Numbering sequences */
         get: operations["listNumberSequences"];
         put?: never;
-        /** Create a sequence */
+        /** Create a sequence (System Admin or a delegate of settings.edit for all regions) */
         post: operations["createNumberSequence"];
         delete?: never;
         options?: never;
@@ -4484,7 +4756,7 @@ export interface paths {
         head?: never;
         /**
          * Change pattern, reset rule or deactivate
-         * @description `next_value` can only go up (422 `validation_failed` otherwise): numbers are never reused.
+         * @description `next_value` can only go up (422 `validation_failed`, `only_up`): numbers are never reused.
          */
         patch: operations["updateNumberSequence"];
         trace?: never;
@@ -5650,9 +5922,11 @@ export interface components {
             order_scope?: string | null;
             /** @description 0.9.1. With `team_scope_mismatch`: the specialization of the team (null when the team has none). */
             team_specialization?: string | null;
+            /** @description 0.12.0. With `scope_scenario_conflict`: the tasks where the scenario and the scope flags disagree. */
+            conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -6592,6 +6866,16 @@ export interface components {
             rule_set_version?: number | null;
             /** @description 0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise. */
             negative?: boolean;
+            /** @description 0.12.0 (Q13, Q136). The end event of the rule; null = the actual date of the task. With `task.layout_submitted_date` and no Layout Submitted Date the closed task has no end and no duration (a data gap). */
+            end_event?: components["schemas"]["SlaEndEvent"] | null;
+            /** @description 0.12.0 (Q135). The rule keeps an inherited value waiting for the owner's confirmation ("Pending SLA Confirmation"); it is left out of the scorecard and penalties. */
+            pending_confirmation?: boolean;
+            /** @description 0.12.0 (Q2). False when the scenario rules say this SLA is not measured on the site (D-1 for Hot / Cold Swap): the task applies but has no clock. */
+            measured?: boolean;
+            /** @description 0.12.0 (D4b). Tentative (not yet confirmed) holidays inside the SLA period. They count as holidays now and are corrected when confirmed. */
+            tentative_holidays?: string[];
+            /** @description 0.12.0 (D4b). True when `tentative_holidays` is not empty: the due date shows a "tentative date" badge. */
+            due_date_tentative?: boolean;
         };
         TaskSummary: {
             /** Format: uuid */
@@ -6828,6 +7112,8 @@ export interface components {
             stepup_verified?: boolean;
             /** Format: uuid */
             batch_row_id?: string | null;
+            /** @description 0.12.2 (Q216): an act of the old 3-level path (level 2 or 3) recorded before the task was converted to two levels; shown as "previous path before conversion". */
+            previous_path?: boolean;
             /** Format: date-time */
             created_at: string;
         };
@@ -6973,10 +7259,10 @@ export interface components {
             in_flight: number;
         };
         /**
-         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW).
+         * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -7250,7 +7536,7 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
-        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
+        /** @description What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`), and, since 0.12.0, `A|B` (the first of the codes whose task is not N/A on the site; D-1 uses `MS4|MS1`, Q2; a missing date waits, it never starts today). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`. */
         SlaStartEvent: string;
         /** @description A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule). */
         SlaRuleOverride: {
@@ -7272,6 +7558,155 @@ export interface components {
             /** @description A calendar of `GET /settings/calendars` (weekend days and holidays). */
             calendar_code: string;
             overrides?: components["schemas"]["SlaRuleOverride"][];
+            /** @description 0.12.0 (Q13, Q136). Null = the actual date of the task. Omitted in a PATCH = kept as it is in the draft. An unknown value is 422 `unknown_end_event`. */
+            end_event?: components["schemas"]["SlaEndEvent"] | null;
+            /** @description 0.12.0 (Q135). An inherited value waiting for the owner's confirmation. Omitted in a PATCH = kept as it is in the draft. */
+            pending_confirmation?: boolean;
+        };
+        /**
+         * @description 0.12.0. Where the clock ends when it is not the actual date of the task: the GECOL installation finish (C-2) and the HLC installation date (C-4) keep the Master end events during the parallel run (Q54); `hlc.in_service_date` is the C-4 end after the parallel run (Q136); `task.layout_submitted_date` is the Layout Submitted Date of B6 (Q13), never filled from another date.
+         * @enum {string}
+         */
+        SlaEndEvent: "gecol.installation_finish" | "hlc.installation_date" | "hlc.in_service_date" | "task.layout_submitted_date";
+        /** @description 0.12.0 (Q14). One of the 45 step columns D:AV of the Master SLA sheet and the PMIS task that measures it. */
+        SlaMasterColumn: {
+            seq: number;
+            /** @description Column letter of the SLA sheet (D to AV). */
+            master_column: string;
+            /** @description For example B-10a. */
+            sla_code: string;
+            name_en: string;
+            from_to: string;
+            applies_when: string;
+            /** @description Null when the column has no task of its own (an end-to-end figure or a Change Control window). */
+            task_code: string | null;
+            /** @description An extra site condition, for example `rt_or_gf=RT` (B-10a and B-10b split B10 by the Master O value). */
+            flag_condition: string | null;
+            /** @description The Master value is kept for compatibility only and does not measure a real cycle (B-6, Q13). */
+            inherited: boolean;
+            note?: string | null;
+        };
+        ScenarioRule: {
+            /** Format: uuid */
+            id?: string;
+            task_code: string;
+            /** @description Null = every scenario. A rule for the site's scenario wins over the rule for every scenario. */
+            scenario: components["schemas"]["DeliveryScenario"] | null;
+            /**
+             * @description `na` makes the task N/A unless a scope exception enables it; `sla_not_measured` keeps the task but measures no SLA; `flag` follows a scope flag expression.
+             * @enum {string}
+             */
+            rule: "applies" | "na" | "sla_not_measured" | "flag";
+            /**
+             * @description Only with `flag` (Master AA:AF).
+             * @enum {string|null}
+             */
+            flag_expr: "cw" | "tower" | "adaption_only" | "gecol" | "hlc" | "rfi" | "te" | null;
+            reason: string;
+            version?: number;
+            /** Format: date-time */
+            created_at?: string;
+        };
+        ScenarioRuleList: {
+            version: number;
+            items: components["schemas"]["ScenarioRule"][];
+        };
+        ScenarioRulesInput: {
+            reason: components["schemas"]["Reason"];
+            /** @description The whole active list (id, version and created_at are ignored). Errors: `unknown_task_code`, `invalid`, `required`, `duplicate`. */
+            rules: components["schemas"]["ScenarioRule"][];
+        };
+        ScopeConflict: {
+            task_code: string;
+            scenario: components["schemas"]["DeliveryScenario"];
+            flag_expr: string;
+            message: string;
+        };
+        ScopeException: {
+            /** Format: uuid */
+            id: string;
+            task_code: string;
+            reason: string;
+            /** Format: uuid */
+            change_request_id?: string | null;
+            approved_by: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            approved_at: string;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            revoked_by?: components["schemas"]["UserRef"] | null;
+            revoke_reason?: string | null;
+        };
+        SiteApplicability: {
+            /** Format: uuid */
+            site_id: string;
+            delivery_scenario: components["schemas"]["DeliveryScenario"] | null;
+            rfi: {
+                /** @description Q3: the Site RFI applies (scenario rule first, then the flags). */
+                applies: boolean;
+                /** @description The Master formula (flags AA:AD only), for the comparison only; never used for gates. */
+                master_rfi: boolean;
+                differs: boolean;
+            };
+            conflicts: components["schemas"]["ScopeConflict"][];
+            tasks: {
+                /** Format: uuid */
+                task_id: string;
+                task_code: string;
+                state: components["schemas"]["TaskState"];
+                /** @description Null = no rule speaks about the task (it keeps its state). */
+                applies: boolean | null;
+                sla_measured: boolean;
+                /** @enum {string} */
+                source: "exception" | "scenario" | "flag" | "none";
+                reason?: string | null;
+                /** Format: uuid */
+                exception_id?: string | null;
+                /**
+                 * @description What applying the scope would do to this task now.
+                 * @enum {string|null}
+                 */
+                would_change?: "na" | "applies" | null;
+            }[];
+            exceptions: components["schemas"]["ScopeException"][];
+        };
+        ApplicabilityApplyResult: {
+            result: {
+                /** Format: uuid */
+                site_id: string;
+                changed: {
+                    task_code: string;
+                    from: string;
+                    to: string;
+                    source: string;
+                }[];
+                /** @description Tasks the rules make N/A that are approved or in review or approval: never changed. */
+                kept: {
+                    task_code: string;
+                    state: string;
+                    reason: string;
+                }[];
+            };
+            applicability: components["schemas"]["SiteApplicability"];
+        };
+        /** @description 0.12.0 (Q9). One change of a gate of the site, kept for ever: an earlier opening date stays in the history after the gate closes again. */
+        GateEvent: {
+            id: string;
+            gate_code: string;
+            /** @enum {string} */
+            event: "opened" | "closed" | "date_moved";
+            /** @enum {string} */
+            status: "open" | "blocked" | "pending" | "na";
+            /** Format: date */
+            gate_date: string | null;
+            /** Format: date */
+            previous_date: string | null;
+            /** @description A Change Control suspension moved the gate date. */
+            shifted: boolean;
+            /** @description With `closed`: why the gate closed. */
+            cause: components["schemas"]["LockReason"][];
+            /** Format: date-time */
+            at: string;
         };
         /** @description One version of the whole SLA rule set. Versions are numbered 1, 2, 3 and so on; the seed is version 1. */
         SlaRuleSetSummary: {
@@ -7443,6 +7878,10 @@ export interface components {
             open_task_count?: number;
             /** @description The SLA rule set version this row belongs to (0.2.6). */
             set_version?: number;
+            /** @description 0.12.0. Null = the actual date of the task. */
+            end_event?: components["schemas"]["SlaEndEvent"] | null;
+            /** @description 0.12.0 (Q135). Pending SLA Confirmation. */
+            pending_confirmation?: boolean;
         };
         WeightItem: {
             code: string;
@@ -8181,6 +8620,10 @@ export interface components {
             next_year: number;
             /** @description Drives the empty-table banner. */
             next_year_table_empty: boolean;
+            /** @description 0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. */
+            official_calendar_pending?: boolean;
+            /** @description 0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge. */
+            tentative_counted?: boolean;
         };
         WeekendDaysRequest: components["schemas"]["WithReason"] & {
             calendar_code?: string;
@@ -8286,6 +8729,21 @@ export interface components {
             record_count?: number;
             /** @description 0.9.0. Only for a register whose scopes have their own Matrix rows (Procurement: scope HLC is entered by the HLC Fiber Team). The values of the `scope` list the caller may enter (empty = none). The server decides again on every write. */
             entry_scopes?: string[];
+            /** @description 0.12.2 (Q222). Permits & HSE only: the permit types the caller may enter (by their Matrix L1 rows and regions), in the order of the type list; a type the caller may not enter is left out. The server decides again on every write. */
+            entry_permit_types?: components["schemas"]["PermitEntryType"][];
+        };
+        PermitEntryType: {
+            /** @description The permit type (the values of the `permit_type` list). */
+            code: string;
+            /**
+             * @description The fixed stream of the type; null for a type whose stream is chosen by purpose (D220b).
+             * @enum {string|null}
+             */
+            stream: "CW" | "TE" | "ACQ" | "OM" | null;
+            /** @description The person entering the permit chooses `permit_stream` (required). */
+            choose_stream: boolean;
+            /** @description The streams the caller may enter this type on (the fixed one, or the choices they hold). */
+            streams: ("CW" | "TE" | "ACQ" | "OM")[];
         };
         /** @enum {string} */
         RegisterRecordState: "entry" | "in_review" | "in_approval" | "approved" | "voided";
@@ -8310,7 +8768,7 @@ export interface components {
             external_party?: components["schemas"]["ExternalPartyRef"];
             return_count?: number;
             last_return_note?: string | null;
-            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version")[];
+            allowed_actions?: ("edit" | "submit" | "review" | "approve" | "reject" | "void" | "claim" | "release" | "new_version" | "transfer")[];
             /**
              * Format: uuid
              * @description The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.
@@ -8362,7 +8820,7 @@ export interface components {
             id: string;
             level: number;
             /** @enum {string} */
-            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void";
+            action: "create" | "edit" | "submit" | "review" | "approve" | "reject" | "auto_skip" | "claim" | "release" | "new_version" | "void" | "transfer";
             acted_by?: components["schemas"]["UserRef"];
             note?: string | null;
             before_state?: components["schemas"]["RegisterRecordState"];
@@ -8374,6 +8832,8 @@ export interface components {
              * @description Set when the version came from a template batch.
              */
             batch_row_id?: string | null;
+            /** @description 0.12.2 (Q216): an act of the old 3-level path (level 2 or 3) recorded before the record was converted to two levels; shown as "previous path before conversion". */
+            previous_path?: boolean;
             /** Format: date-time */
             created_at: string;
         };
@@ -8648,8 +9108,24 @@ export interface components {
         NumberSequence: {
             /** @example DN-CW-TR */
             key: string;
-            form_kind: components["schemas"]["FormKind"];
-            /** @example DN-CW-{REGION}-{YYYY}-{SEQ:4} */
+            form_kind?: components["schemas"]["FormKind"] | null;
+            /**
+             * @description The warehouse document type this sequence numbers (one active sequence per type and region).
+             * @enum {string|null}
+             */
+            record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj" | null;
+            /** @description null for PL, OPEN and ADJ. */
+            region_id?: number | null;
+            /** @description The {REGION} token (Q32: only TR is known). */
+            region_code?: string | null;
+            /** Format: date-time */
+            last_issued_at?: string | null;
+            /** Format: date-time */
+            updated_at?: string;
+            /**
+             * @description Tokens {REGION}, {YYYY}, {YY} and {SEQ:n} (once); characters A-Z 0-9 - / _ .
+             * @example DN-CW-{REGION}-{YYYY}-{SEQ:4}
+             */
             pattern: string;
             /** @enum {string} */
             reset: "never" | "yearly";
@@ -8661,6 +9137,7 @@ export interface components {
             version: number;
         };
         NumberSequenceFields: {
+            region_code?: string | null;
             pattern?: string;
             /** @enum {string} */
             reset?: "never" | "yearly";
@@ -8670,12 +9147,41 @@ export interface components {
         NeedRule: {
             /** Format: uuid */
             id?: string;
-            /** @description For example per site, per sector, per tower. */
+            /** @description The Master Need Unit (Cambium Sector, Intracom Sector, MW Half-link, LPU Kit, Router, Cabinet, Battery) or another unit. */
             need_unit: string;
+            /** @description Quantity per unit of the site. */
             quantity?: number | null;
-            quantity_rule?: components["schemas"]["ConditionRule"];
-            applies_when?: components["schemas"]["ConditionRule"];
+            /**
+             * @description Q107: confirmed = the owner gave this quantity; a pending need never counts toward "complete". A confirmed need has a quantity.
+             * @default pending_configuration
+             * @enum {string}
+             */
+            status: "confirmed" | "pending_configuration";
+            quantity_rule?: components["schemas"]["NeedQuantityRule"];
+            applies_when?: components["schemas"]["NeedAppliesWhen"];
         };
+        /** @description How the units of a site are counted (D58). Null = by the need unit name. */
+        NeedQuantityRule: {
+            /**
+             * @description te_site = 1 per TE site; rf_sector = the Sectors of the approved RF & Design record; mw_half_link = 1 when the MW Far-end of the site is set, plus the sites whose Far-end is this site.
+             * @enum {string}
+             */
+            per?: "te_site" | "rf_sector" | "mw_half_link";
+            /**
+             * @description rf_sector only: the WL vendor of the region must be this one (0 otherwise; unknown while the region has no vendor).
+             * @enum {string}
+             */
+            wl_vendor?: "Cambium" | "Intracom";
+            /** @description Items of one group are alternatives (for example the three router models); default the item code. */
+            group?: string;
+        } | null;
+        /** @description When the rule applies; a missing key does not restrict. Null = every TE site. */
+        NeedAppliesWhen: {
+            /** @description router_only = IP Router Only (AF Yes) without TE Full (Q6). */
+            scope?: ("te_full" | "router_only")[];
+            delivery_scenario?: ("new_build" | "expansion" | "hot_swap" | "cold_swap" | "relocation")[];
+            region_ids?: components["schemas"]["RegionId"][];
+        } | null;
         WarehouseItemFields: {
             name_en?: string;
             name_ar?: string | null;
@@ -8689,6 +9195,11 @@ export interface components {
             /** @description The Project Status item code the received quantity feeds (D65). */
             progress_item_code?: string | null;
             need_rules?: components["schemas"]["NeedRule"][];
+            /**
+             * @description Q107: master = the code of the Master WH sheet; internal_provisional = an internal code (CW-01..28, generated TE codes), not a confirmed manufacturer code.
+             * @enum {string}
+             */
+            code_source?: "master" | "internal_provisional";
             is_active?: boolean;
         };
         WarehouseItem: components["schemas"]["WarehouseItemFields"] & {
@@ -8721,6 +9232,97 @@ export interface components {
             pending_return: number;
             /** @description on_hand minus reserved. */
             available: number;
+            /** @description Q105: returned Faulty or Damaged, held outside on_hand and available. Always 0 for a site. */
+            quarantine?: number;
+        };
+        /**
+         * @description D6: the PMIS status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.
+         * @enum {string}
+         */
+        DispatchNeedStatus: "complete" | "short" | "pending_configuration" | "not_applicable";
+        SiteDispatchLine: {
+            need_unit: string;
+            /** @description Items of one group are alternatives (ROUTER); otherwise the item code. */
+            need_group: string;
+            /** @enum {string} */
+            rule_status: "confirmed" | "pending_configuration";
+            /** @enum {string} */
+            unit_source?: "te_site" | "rf_sector" | "mw_half_link";
+            /** @description Units of the site; null when they cannot be counted yet. */
+            units?: number | null;
+            /** @description Quantity per unit. */
+            quantity?: number | null;
+            /** @description quantity x units; null while pending. */
+            need?: number | null;
+            /** @description Posted TE DN minus posted TE RN. */
+            delivered: number;
+            short?: number | null;
+            /** @enum {string} */
+            line_status: "complete" | "short" | "pending_configuration";
+            /**
+             * @description What a pending line is waiting for.
+             * @enum {string|null}
+             */
+            missing?: "need_quantity" | "region_wl_vendor" | "rf_design_sectors" | "rf_design" | null;
+            items: {
+                /** Format: uuid */
+                item_id?: string;
+                item_code?: string;
+                item_name?: string;
+                delivered?: number;
+                /** @enum {string} */
+                rule_status?: "confirmed" | "pending_configuration";
+            }[];
+        };
+        SiteDispatch: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            region_id?: components["schemas"]["RegionId"];
+            te_applies: boolean;
+            /** @description IP Router Only without TE Full (Q6). */
+            router_only?: boolean;
+            /**
+             * Format: date
+             * @description Q65: the date of the latest posted TE DN of the site. Used for the Master comparison; it does not depend on need_status.
+             */
+            te_dispatch_complete_date?: string | null;
+            latest_te_dn_no?: string | null;
+            need_status: components["schemas"]["DispatchNeedStatus"];
+            short_lines?: number;
+            pending_lines?: number;
+            /** @description Only on GET /warehouse/dispatch-status/{site_id}. */
+            lines?: components["schemas"]["SiteDispatchLine"][];
+        };
+        RegionVendor: {
+            region_id: components["schemas"]["RegionId"];
+            region_name?: string;
+            /** @enum {string|null} */
+            wl_vendor: "Cambium" | "Intracom" | null;
+            /** @description 0 = never set. */
+            version: number;
+        };
+        WarehouseConfigGaps: {
+            pending_need_rules: {
+                /** Format: uuid */
+                item_id?: string;
+                item_code?: string;
+                item_name?: string;
+                need_unit?: string;
+                quantity?: number | null;
+            }[];
+            provisional_codes: {
+                /** Format: uuid */
+                item_id?: string;
+                item_code?: string;
+                item_name?: string;
+                category?: string | null;
+            }[];
+            regions_without_wl_vendor: components["schemas"]["RegionId"][];
+            regions_without_sequence: {
+                region_id?: components["schemas"]["RegionId"];
+                record_types?: string[];
+            }[];
         };
         StockMovementLine: {
             /** Format: uuid */
@@ -8748,6 +9350,12 @@ export interface components {
             /** @enum {string} */
             record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
             doc_no?: string | null;
+            /** @description Q106: true once posted; the Doc No. can no longer change. */
+            doc_no_locked?: boolean;
+            /** @description The numbering sequence that issued the Doc No.; null = typed by hand. */
+            sequence_key?: string | null;
+            /** Format: date */
+            doc_date?: string | null;
             /**
              * Format: uuid
              * @description The record of the Warehouse register: submit, review, approve and void go through /registers/warehouse/records/{id}.
@@ -8784,7 +9392,7 @@ export interface components {
             record_type: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
             /** Format: uuid */
             site_id?: string;
-            /** @description Unique (Duplicate Doc No. answers 409). */
+            /** @description Optional (Q106): without it the next number of the active sequence of the type and region is issued. A typed number must be unique and never issued by a sequence (409 otherwise). */
             doc_no?: string;
             /** Format: date */
             doc_date?: string;
@@ -9489,7 +10097,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -13140,6 +13748,158 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getSiteApplicability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The applicability. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteApplicability"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    applySiteApplicability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description What changed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicabilityApplyResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    approveScopeException: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    task_code: string;
+                    reason: components["schemas"]["Reason"];
+                    /** Format: uuid */
+                    change_request_id?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description The applicability after the change. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteApplicability"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeScopeException: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description The applicability after the change. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteApplicability"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listSiteGateEvents: {
+        parameters: {
+            query?: {
+                gate_code?: string;
+            };
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["GateEvent"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSiteTasks: {
         parameters: {
             query?: {
@@ -16370,6 +17130,86 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    listScenarioRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioRuleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setScenarioRules: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScenarioRulesInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScenarioRuleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSlaMasterColumns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The columns in Master order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["SlaMasterColumn"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     getTeamScopeMatch: {
         parameters: {
             query?: never;
@@ -17554,6 +18394,48 @@ export interface operations {
             409: components["responses"]["Conflict"];
         };
     };
+    transferRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Transferred. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     voidRegisterRecord: {
         parameters: {
             query?: never;
@@ -18622,6 +19504,147 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listSiteDispatch: {
+        parameters: {
+            query?: {
+                need_status?: components["schemas"]["DispatchNeedStatus"];
+                region_id?: components["schemas"]["RegionId"];
+                /** @description Part of the site code. */
+                q?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sites. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SiteDispatch"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteDispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dispatch. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDispatch"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listRegionVendors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The seven regions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["RegionVendor"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    putRegionVendor: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                region_id: components["schemas"]["RegionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & {
+                    /** @enum {string|null} */
+                    wl_vendor: "Cambium" | "Intracom" | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegionVendor"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getWarehouseConfigGaps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The gaps. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarehouseConfigGaps"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
     listNumberSequences: {
         parameters: {
             query?: never;
@@ -18657,7 +19680,13 @@ export interface operations {
             content: {
                 "application/json": components["schemas"]["NumberSequenceFields"] & components["schemas"]["WithReason"] & {
                     key: string;
-                    form_kind: components["schemas"]["FormKind"];
+                    form_kind?: components["schemas"]["FormKind"];
+                    /**
+                     * @description With form_kind, only dn + cw_dn or rn + cw_rn. A DN or RN type needs region_id; PL, OPEN and ADJ have none.
+                     * @enum {string}
+                     */
+                    record_type?: "te_dn" | "cw_dn" | "te_rn" | "cw_rn" | "pl" | "open" | "adj";
+                    region_id?: components["schemas"]["RegionId"];
                 };
             };
         };

@@ -58,6 +58,10 @@ const permits: RegisterDefinition = {
   register_key: 'permits_hse', name_en: 'Permits & HSE', name_ar: 'التصاريح والسلامة', module_key: 'permits_hse', site_scoped: true, multiple_per_site: true, approval_levels: 2,
   fields: [
     F('permit_type', 'Type', 'النوع', 'list', 'Permit', { required: true, in_list: true, options: PERMIT_TYPES }),
+    // migration 0054 (Q220, D220b): the stream of a purpose-based permit type, chosen by the person entering it
+    { ...F('permit_stream', 'Stream (by purpose)', 'المسار (حسب الغرض)', 'list', 'Permit', { in_list: true }), options: [
+      { value: 'CW', label_en: 'Civil Works (CW)', label_ar: 'الأعمال المدنية (CW)' }, { value: 'TE', label_en: 'Installation (TE)', label_ar: 'التركيب (TE)' },
+      { value: 'ACQ', label_en: 'Acquisition / RF & Design', label_ar: 'الاستحواذ / التصميم' }, { value: 'OM', label_en: 'O&M', label_ar: 'التشغيل والصيانة' }] },
     F('applied_date', 'Applied / Requested', 'تاريخ التقديم', 'date', 'Permit'),
     F('status', 'Status', 'الحالة', 'list', 'Permit', { required: true, in_list: true, options: ['Applied', 'Approved', 'Rejected', 'N/A'] }),
     F('has_expiry', 'Has expiry date', 'له تاريخ انتهاء', 'yes_no', 'Validity', { in_list: true }), F('valid_from', 'Valid From', 'ساري من', 'date', 'Validity', { in_list: true }), F('valid_to', 'Valid To', 'ساري حتى', 'date', 'Validity', { in_list: true }),
@@ -113,6 +117,8 @@ export type MockRecord = {
   entity_id: string; version_no: number; supersedes_id?: string | null;
   /** Q43: the task this record is the source of, set at the first submission (or by the seed for an approved one). */
   task?: { id: string; task_code: string } | null;
+  /** Q221 (0054): the draft was handed over to the entry holders of its stream row. */
+  transferred?: boolean;
   /** Entered through a template batch (contract 0.7.0): the import row the version came from. */
   source?: 'manual' | 'template'; batch_row_id?: string;
 };

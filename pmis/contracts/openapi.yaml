@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.11.5
+  version: 0.12.2
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,9 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.12.2 (2026-11-04): additive. Work package P11 of the owner answers of 2026-11-04 (Q215, Q216, Q217, Q220, Q221, Q222, decision D220b; migration 0054; CHANGELOG 87). (1) Q215: every task or register record converted to the two fixed levels (by 0050 or now) sends one in-app notice, `NotificationKind` `levels_converted`, to the old reviewer and to the entry person, saying what changed and who is asked now. (2) Q216: `WorkflowStep.previous_path` and `RegisterRecordStep.previous_path` are true for the review and approve acts of the old 3-level path recorded before the conversion; the screens label them "previous path before conversion". (3) Q217: open items frozen on a one-level snapshot are converted to L1 / L2 after an impact report; an item whose L2 has no holder is held: its submission answers 422 `empty_cell` until the Responsibility Matrix names an L2 holder (System Admins alerted with `no_eligible_holder`). (4) Q220 / D220b: a permit's stream follows the activity. New Matrix rows `permits_hse_acq` (Acquisition / RF & Design; default L1 Acquisition Team and RF Engineer, L2 RF & Design / Acquisition Team Lead) and `permits_hse_om` (O&M; no default holder) beside `permits_hse` (CW) and `permits_hse_te`. City Council and Civil Aviation are on Acquisition / RF & Design; the purpose-based types (Access / PTW - Dismantle, Access - Survey, Access - QC / Maintenance, Security Clearance, Other Permit) carry the new Permits & HSE field `permit_stream` (`CW`, `TE`, `ACQ`, `OM`), chosen by the person entering the permit and required for those types; it decides the Matrix row. Refusals (422 `validation_failed`, path `/data/permit_stream`): `stream_required`, `stream_not_allowed`, `stream_fixed`. (5) Q221: the entry check of a permit runs at every save and at submit (403 `not_eligible_holder`). New `POST /registers/{register_key}/records/{record_id}/transfer` (Permits & HSE drafts only; `If-Match`, optional `note`): the holder of a draft who no longer holds L1 of its row hands it over, or a qualified holder takes over a draft held by such a person; the draft is pinned to the only qualified holder (or left to all of them), and both sides get `NotificationKind` `permit_transferred`; `RegisterRecord.allowed_actions` gains `transfer` and `RegisterRecordStep.action` gains `transfer`. (6) Q222: `RegisterDefinition.entry_permit_types` (Permits & HSE only) lists the permit types the caller may enter and the streams they may choose (`PermitEntryType`); the form offers only those, the database decides again on every write.
+    - 0.12.1 (2026-11-04): work package P7, the Warehouse follow-up of the owner answers Q105, Q106, Q107 and decision D6 (migration 0053; CHANGELOG 83). Additive except where noted. (1) Q105: a Faulty or Damaged return goes to quarantine, never back to the available stock: `StockLevel.quarantine` is new and `on_hand` / `available` count only Good returns; the effective condition of each return line is written on the line when the RN posts; an RN with the reason "Faulty or Damaged" is refused on submit (422 `validation_failed`, `errors[].code` `condition_required` on `/lines/<n>/condition`) until every line or the document names a condition. (2) Q106: the numbering service is built: `GET /number-sequences`, `POST /number-sequences` and `PATCH /number-sequences/{sequence_key}` (System Admin or a delegate of `settings.edit` for all regions, a reason, audited; unknown keys 422; `next_value` only up, `only_up`; a pattern needs `{SEQ:n}` once and, for a yearly reset, the year: `sequence_token`, `year_required`). `NumberSequence` gains `record_type`, `region_id`, `region_code`, `last_issued_at` and `updated_at`; `form_kind` is now optional (a sequence numbers a form kind, a warehouse document type, or both). Seed: the Q32 CW sequences of Tripoli (`DN-CW-TR`, `RN-CW-TR`, `PAC-CW-TR`, `FAC-CW-TR`, `SL-CW-TR`) and, as assumptions, `DN-TE-TR`, `RN-TE-TR`, `PL-WH`, `OPEN-WH`, `ADJ-WH`. `POST /warehouse/movements` without `doc_no` takes the next number of the active sequence of its type and region (none = it stays empty and is typed before the submit); a typed number is still accepted when it is unique and was never issued by a sequence (409 otherwise). `StockMovement` gains `doc_no_locked`, `sequence_key` and `doc_date`: once posted, the Doc No. is locked, and an edit or a new version of its record that changes it answers 422 `validation_failed` with `doc_no_locked` on `/data/doc_no`. (3) Q107: `WarehouseItem.code_source` (`master`, `internal_provisional`); `NeedRule.status` (`confirmed`, `pending_configuration`, the default; a confirmed need has a quantity); `NeedRule.quantity_rule` and `applies_when` are now `NeedQuantityRule` and `NeedAppliesWhen` (documented shapes, unknown keys 422; they replace the generic `ConditionRule`, which no server ever read). (4) D6: `GET /warehouse/dispatch-status` (TE sites of the caller's regions, filters `need_status`, `region_id`, `q`) and `GET /warehouse/dispatch-status/{site_id}` (`SiteDispatch` with its lines): `te_dispatch_complete_date` is the date of the latest posted TE DN (Q65, for the Master comparison); `need_status` is the separate PMIS status `complete`, `short`, `pending_configuration` (a pending need, or a count that cannot be made yet: never complete) or `not_applicable`. (5) `GET /warehouse/region-vendors` and `PUT /warehouse/region-vendors/{region_id}` (Setting tblRegionVendor, D58; System Admin or a delegate of `warehouse.items.edit`; a reason; audited), and `GET /warehouse/config-gaps` (the owner data still missing).
+    - 0.12.0 (2026-11-04): additive. Work package P1 of the owner answers of 2026-11-04 (migration 0052; CHANGELOG 80). (1) Q15, Q3: scenario applicability. `GET /sites/{site_id}/applicability` (`SiteApplicability`): per task whether it applies (`applies`, `source` scenario / flag / exception / none), whether its SLA is measured, the Site RFI decision (`rfi.applies` by scenario then flags, `rfi.master_rfi` the Master flags-only value for the comparison only), the scope conflicts and the scope exceptions. `POST /sites/{site_id}/applicability/apply` (step-up, reason; System Admin or a delegate of `task_definitions` edit in the site region) sets tasks N/A or applicable again: never an approved task or one in review or approval (listed in `result.kept`); audited per task. A Hot / Cold Swap with any of AA:AD = Yes is a conflict: 422 `scope_scenario_conflict` (new error code, `conflicts[]`) until the flags are corrected or `POST /sites/{site_id}/scope-exceptions` approves an exception (step-up, reason, optional approved Change Control record of the site; 422 `not_na_by_scenario`, `change_not_approved`, `duplicate`); `POST /sites/{site_id}/scope-exceptions/{exception_id}/revoke` revokes it (409 when already revoked). `GET/PUT /settings/scenario-rules` lists and replaces the rule list (ETag / If-Match, step-up, reason, audited). (2) Q2: D-1 starts at `MS4|MS1` (new start event grammar `A|B`: the first event that is not N/A on the site) and is not measured for Hot / Cold Swap: `SlaInfo.measured` false, no clock. (3) Q135: `SlaRule.pending_confirmation`, `SlaTaskRule.pending_confirmation` and `SlaInfo.pending_confirmation` (C-3 is "Pending SLA Confirmation"). (4) Q13, Q136: `SlaTaskRule.end_event` (`SlaEndEvent`: `gecol.installation_finish`, `hlc.installation_date`, `hlc.in_service_date`, `task.layout_submitted_date`; omitted = kept; 422 `unknown_end_event`), also on `SlaRule` and `SlaInfo`. The B6 task value `layout_submitted_date` (Layout Submitted Date; 422 `invalid_date` or `future_date` at `/values/layout_submitted_date`). (5) Q14: `GET /settings/sla-master-columns` (`SlaMasterColumn`, the 45 SLA sheet columns D:AV). (6) Q9: `GET /sites/{site_id}/gate-events` (`GateEvent`: opened, closed, date_moved). (7) Q180: gate dates use the effective dates of suspension and resumption (fallback: the approval date), window [start, resume). (8) D4b: `SlaInfo.tentative_holidays` and `due_date_tentative` ("tentative date" badge); `HolidaySummary.official_calendar_pending` (setting `calendar.official_confirmed`, pending owner data) and `tentative_counted`.
     - 0.11.5 (2026-11-02): additive. The Site Register stream templates and the full Master template (Q73, owner decisions 2026-10-29 and 2026-10-31; migration 0051; CHANGELOG 78). No new path: the catalogue, the download, the upload, the batch review, the send and the decisions of 0.7.0 now serve four more templates and TPL-MASTER. (1) `TPL-SITE-DA`, `TPL-SITE-CW`, `TPL-SITE-TE` and `TPL-SITE-CL` (one per stream) and `TPL-MASTER` are listed by `GET /templates` for a caller who may view the Site Register; `Template` gains `template_kind` (`register`, `stream`, `master`) and `stream` is now filled. A stream template has one row per site and, per task of the stream, its fields in Master column order with the Master names where a Master column exists (the Master Setting lists as drop-downs): planned and actual date, the typed values (for example B4 AAT SE Name, B5 analysis, the CW and TE item status lists, the EIR and PAT results, snag flags) and, grey and locked, what is never read (the dates the workflow sets, milestone dates, the fields another register owns such as the As-Built dates, the vendor). TPL-MASTER is the Master sheet (187 columns, in the Master order) and one sheet per register the caller may view; its `_tpl` sheet adds `parts` and one `part:<sheet>` checksum per sheet. `GET /templates/{template_id}/download` pre-fills a stream or Master copy with the current task values of the caller's regions (`prefill`, `site_ids`, `region_id`, or `task_id` for the task's site; a task of another stream answers 422 `wrong_template`). Every download is audited. (2) `POST /import-batches` reads a stream file as one row per site: each cell is assigned to its task, validated with the rules of manual task entry (the database runs the task's own save on the real task inside a rolled-back savepoint: holder of L1, edit right and region, state, date limits, no actual date in the future), then with the checks of the submit (the actual date and the mandatory documents). A task locked by a closed gate (Q81) is refused (`gate_locked`); a task that waits for a predecessor or is already in review or approval is held `pending_previous_approval` (`hold_reason` `predecessor_open` or `open_submission`); an approved or N/A task is refused; a value in a grey column is never read (`calculated_column` warning when it differs); SLA warnings never block (`sla_negative`, `sla_late`, `date_order`). Each touched task is one batch row (`ImportRow.task_code`, `task_id`, `warnings`, `source_ref`). A file of another stream, an older version or a changed header is rejected as for registers. (3) A `TPL-MASTER` file is split by the database: the Master sheet into one stream batch per stream, each register sheet into the register's own batch; every part is a batch of its own flow, all sharing `group_id` (`ImportBatch.stream`, `group_id`, `part_sheet`, `source` = `master_template`). The upload answers the first batch plus `parts` (every batch) and `warnings` (`UploadWarning`: a column or a sheet the PMIS does not own is ignored, a value in a calculated column is ignored, a part the caller may not import is skipped with the reason). The header row of each sheet is matched by name, so a column added to the file does not break the upload; a sheet that lost an issued header is rejected. Every row keeps its source (`sheet`, `source_ref` `Sheet!row`) and its differences (`diff`), the input of the parallel-run comparison report. `GET /import-batches` gains `stream` and `group_id`. (4) The flow is the one of the task screen: `POST /import-batches/{batch_id}/submit` (the uploader) starts each pending task, saves the entry and submits it as L1; L2 Data Reviewer & Approver decides each row (`POST .../decisions`, row by row or all at once, a return with a note sends the task back to L1) with the same grants, holders, step-up, gates and successors as on the task; held rows are listed in `outcome.held` (`reason` gains `open_submission` and `predecessor_open`) and a second send releases them. The task history and the audit show "via batch" (`workflow_steps.batch_row_id`, audit `via` = `template`). Register-owned fields are never written through a template: enter them in their register.
     - 0.11.4 (2026-11-02): additive. Two owner decisions, migration 0050 (CHANGELOG 79). (1) Old 3-level paths are converted to the two fixed levels in the database: the old final approver becomes L2 and the old review level is dropped (no endpoint; an open item changes `levels_required` to 2, its `version` rises, so a screen holding the old version gets 412). (2) Permits & HSE per stream (Q90): CW permits are entered by the CW team and TE permits by the TE team; `MatrixRowKey` gains `permits_hse_te` (the Matrix row of the TE stream: L1 Site Engineers (TE), L2 TE Team Lead; the `permits_hse` row covers CW). A permit of a TE type (Access - TE, PTW - TE) entered by someone who does not hold L1 of that row is refused with `not_eligible_holder`. `used_levels` of every matrix row is always [1, 3].
     - 0.11.2 (2026-11-02): additive. Storage protection (migration 0048; CHANGELOG 77; owner answer Q134). (1) Uploads (`uploadSlotFile`, blank forms, the register and log files that go through the same store) are virus-scanned before they are stored when `MALWARE_SCAN=clamd`. A refused file answers 422 `file_rejected` with `reason` = `malware` (new reason; nothing is stored, a System Log row and a security alert `malware_upload` are written). When clamd is unreachable and `SCAN_FAILURE=fail_closed` (the default) the upload answers **503** `malware_scan_unavailable` (new error code; retry later). With `SCAN_FAILURE=fail_open` the file is stored and flagged for a nightly rescan; the answer is unchanged. (2) A file that a rescan found infected answers 404 `not_found` on download (quarantined). (3) An expired zip export answers 410 `export_expired` as before; its stored object is deleted by the nightly job, so the answer is the same whether or not the object is still there. Files are stored encrypted at rest; nothing changes in the API for that. `ErrorCode` gains `malware_scan_unavailable`.
@@ -2470,6 +2473,130 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /sites/{site_id}/applicability:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: getSiteApplicability
+      summary: Which tasks of the site apply by scenario, flags and scope exceptions (Q15, Q3, Q2)
+      description: '0.12.0. Needs `sites` view in the site''s region (404 otherwise).'
+      responses:
+        '200':
+          description: The applicability.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteApplicability' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /sites/{site_id}/applicability/apply:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    post:
+      tags: [sites]
+      operationId: applySiteApplicability
+      summary: Set the site's tasks N/A or applicable again from the rules (step-up, reason, audited)
+      description: '0.12.0. System Admin, or a delegation of `task_definitions` edit in the site region. Never an approved task or one in review or approval (listed in `kept`). Only tasks set N/A here come back when they apply again; they reopen through the normal unlock (predecessors, gate). 422 `scope_scenario_conflict` while the scenario and the flags disagree (Q3).'
+      x-step-up: true
+      x-db-path: admin_apply_applicability
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: What changed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApplicabilityApplyResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/scope-exceptions:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    post:
+      tags: [sites]
+      operationId: approveScopeException
+      summary: Approve a scope exception that enables a task the scenario makes N/A (step-up, reason, audited)
+      description: '0.12.0 (Q15, Q3). System Admin, or a delegation of `task_definitions` edit in the site region. `change_request_id` names an approved or applied Change Control record of the same site. Errors: `not_na_by_scenario`, `change_not_approved`, `duplicate`. Apply the applicability afterwards to reopen the task.'
+      x-step-up: true
+      x-db-path: admin_save_scope_exception
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [task_code, reason]
+              properties:
+                task_code: { type: string, maxLength: 40 }
+                reason: { $ref: '#/components/schemas/Reason' }
+                change_request_id: { type: [string, 'null'], format: uuid }
+      responses:
+        '201':
+          description: The applicability after the change.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteApplicability' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/scope-exceptions/{exception_id}/revoke:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+      - { name: exception_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [sites]
+      operationId: revokeScopeException
+      summary: Revoke a scope exception (step-up, reason, audited; never deleted)
+      x-step-up: true
+      x-db-path: admin_revoke_scope_exception
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WithReason' }
+      responses:
+        '200':
+          description: The applicability after the change.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteApplicability' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/gate-events:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: listSiteGateEvents
+      summary: The history of the site's gates, newest first (Q9)
+      description: '0.12.0. Needs `sites` view in the site''s region. At most 500 rows.'
+      parameters:
+        - { name: gate_code, in: query, schema: { type: string, pattern: '^G[0-9]{1,2}$' } }
+      responses:
+        '200':
+          description: The events.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/GateEvent' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /sites/{site_id}/tasks:
     parameters:
       - $ref: '#/components/parameters/SiteId'
@@ -5223,6 +5350,67 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/scenario-rules:
+    get:
+      tags: [settings]
+      operationId: listScenarioRules
+      summary: Scenario applicability rules (Q15, Q3, Q2)
+      description: '0.12.0. The active list of the workflow version in force. Needs `admin.settings` view.'
+      responses:
+        '200':
+          description: The rules.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScenarioRuleList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [settings]
+      operationId: setScenarioRules
+      summary: Replace the scenario applicability rules (step-up, reason, If-Match, audited)
+      description: '0.12.0. System Admin, or a delegation of `task_definitions` edit for all regions. Old rules are retired, never deleted. A new rule reaches the tasks of a site only when its applicability is applied (`POST /sites/{site_id}/applicability/apply`).'
+      x-step-up: true
+      x-db-path: admin_save_scenario_rules
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScenarioRulesInput' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScenarioRuleList' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /settings/sla-master-columns:
+    get:
+      tags: [settings]
+      operationId: listSlaMasterColumns
+      summary: The 45 SLA sheet columns D:AV and the PMIS task of each (Q14)
+      description: '0.12.0. Needs `admin.settings` view. B-10a and B-10b are both measured by B10 (flag `rt_or_gf`); B-6 is tagged `inherited` (Q13).'
+      responses:
+        '200':
+          description: The columns in Master order.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/SlaMasterColumn' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /settings/team-scope-match:
     get:
       tags: [settings]
@@ -6202,6 +6390,47 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
+  /registers/{register_key}/records/{record_id}/transfer:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: transferRegisterRecord
+      summary: Move a permit draft to a qualified entry holder (Q221)
+      description: >-
+        0.12.2, Permits & HSE only. A draft (state `entry`) held by somebody who is no longer an entry holder (L1) of the Matrix row of the permit's stream is
+        handed over by that person, or taken over by a qualified L1 holder. The draft is pinned to the only qualified holder (or to the caller when a qualified
+        holder takes it over; with several holders it is left to all of them); the qualified holders and the previous holder get a `permit_transferred`
+        notice (the System Admins a `no_eligible_holder` alert when nobody qualifies). Nothing in the draft changes; a `transfer` step and an audit row are
+        written. 403 `not_eligible_holder` for anyone else, 409 `invalid_transition` when there is nothing to transfer or the record is not a draft.
+      x-db-path: reg_permit_transfer
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 2000 }
+      responses:
+        '200':
+          description: Transferred.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /registers/{register_key}/records/{record_id}/void:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}
@@ -7095,6 +7324,132 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/dispatch-status:
+    get:
+      tags: [warehouse]
+      operationId: listSiteDispatch
+      summary: TE dispatch of the sites (D6), the Q65 date and the need-based status
+      description: TE sites (TE Full or IP Router Only) of the caller's Warehouse regions, by site code. Each item is a `SiteDispatch` without `lines`.
+      parameters:
+      - name: need_status
+        in: query
+        schema: {$ref: '#/components/schemas/DispatchNeedStatus'}
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: q
+        in: query
+        description: Part of the site code.
+        schema: {type: string}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Sites.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/SiteDispatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/dispatch-status/{site_id}:
+    parameters:
+    - {$ref: '#/components/parameters/SiteId'}
+    get:
+      tags: [warehouse]
+      operationId: getSiteDispatch
+      summary: TE dispatch of one site, line by line (shown on the site and in the Warehouse)
+      x-db-path: wh_site_dispatch
+      responses:
+        '200':
+          description: The dispatch.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteDispatch'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /warehouse/region-vendors:
+    get:
+      tags: [warehouse]
+      operationId: listRegionVendors
+      summary: The WL vendor of each region (Setting tblRegionVendor, D58)
+      responses:
+        '200':
+          description: The seven regions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: {$ref: '#/components/schemas/RegionVendor'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /warehouse/region-vendors/{region_id}:
+    parameters:
+    - name: region_id
+      in: path
+      required: true
+      schema: {$ref: '#/components/schemas/RegionId'}
+    put:
+      tags: [warehouse]
+      operationId: putRegionVendor
+      summary: Set or clear the WL vendor of a region (System Admin or a delegate of warehouse.items.edit for all regions)
+      description: '`If-Match` is optional (the first setting of a region has no version); when it is sent, a stale version answers 412.'
+      x-db-path: admin_save_region_vendor
+      parameters:
+      - name: If-Match
+        in: header
+        required: false
+        schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - type: object
+                required: [wl_vendor]
+                properties:
+                  wl_vendor: {type: [string, 'null'], enum: [Cambium, Intracom, null]}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegionVendor'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+  /warehouse/config-gaps:
+    get:
+      tags: [warehouse]
+      operationId: getWarehouseConfigGaps
+      summary: The owner data still missing (Q107, D58, Q32)
+      x-db-path: wh_config_gaps
+      responses:
+        '200':
+          description: The gaps.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/WarehouseConfigGaps'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /number-sequences:
     get:
       tags: [forms]
@@ -7117,8 +7472,8 @@ paths:
     post:
       tags: [forms]
       operationId: createNumberSequence
-      summary: Create a sequence
-      x-db-path: forms_save_sequence
+      summary: Create a sequence (System Admin or a delegate of settings.edit for all regions)
+      x-db-path: admin_save_doc_sequence
       requestBody:
         required: true
         content:
@@ -7128,10 +7483,12 @@ paths:
               - {$ref: '#/components/schemas/NumberSequenceFields'}
               - {$ref: '#/components/schemas/WithReason'}
               - type: object
-                required: [key, form_kind, pattern]
+                required: [key, pattern]
                 properties:
                   key: {type: string, pattern: '^[A-Z0-9][A-Z0-9-]{1,40}$'}
                   form_kind: {$ref: '#/components/schemas/FormKind'}
+                  record_type: {type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj], description: 'With form_kind, only dn + cw_dn or rn + cw_rn. A DN or RN type needs region_id; PL, OPEN and ADJ have none.'}
+                  region_id: {$ref: '#/components/schemas/RegionId'}
       responses:
         '201':
           description: Created.
@@ -7152,8 +7509,8 @@ paths:
       tags: [forms]
       operationId: updateNumberSequence
       summary: Change pattern, reset rule or deactivate
-      description: '`next_value` can only go up (422 `validation_failed` otherwise): numbers are never reused.'
-      x-db-path: forms_save_sequence
+      description: '`next_value` can only go up (422 `validation_failed`, `only_up`): numbers are never reused.'
+      x-db-path: admin_save_doc_sequence
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
@@ -9215,6 +9572,7 @@ components:
         existing_id: { type: string, format: uuid, description: '0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).' }
         order_scope: { type: [string, 'null'], description: '0.9.1. With `team_scope_mismatch`: the scope of the Procurement order.' }
         team_specialization: { type: [string, 'null'], description: '0.9.1. With `team_scope_mismatch`: the specialization of the team (null when the team has none).' }
+        conflicts: { type: array, items: { $ref: '#/components/schemas/ScopeConflict' }, description: '0.12.0. With `scope_scenario_conflict`: the tasks where the scenario and the scope flags disagree.' }
     ErrorCode:
       type: string
       enum:
@@ -9267,6 +9625,7 @@ components:
         - internal_error
         - team_scope_mismatch
         - two_factor_enforced
+        - scope_scenario_conflict
     PageEnvelope:
       type: object
       required: [items, page]
@@ -10239,6 +10598,11 @@ components:
         rule_id: { type: [string, 'null'], format: uuid }
         rule_set_version: { type: [integer, 'null'], minimum: 1, description: 'SLA rule set version the task opened with, kept unless an admin applied a newer one to open tasks (0.2.6).' }
         negative: { type: boolean, description: '0.4.4 (Q82). True when the task is approved and its clock closed at an actual date before the start (elapsed_wd < 0). A data-quality flag for review; the System Admins and the stage lead were alerted and an audit row of kind sla_negative_duration was written. False or absent otherwise.' }
+        end_event: { oneOf: [{ $ref: '#/components/schemas/SlaEndEvent' }, { type: 'null' }], description: '0.12.0 (Q13, Q136). The end event of the rule; null = the actual date of the task. With `task.layout_submitted_date` and no Layout Submitted Date the closed task has no end and no duration (a data gap).' }
+        pending_confirmation: { type: boolean, description: '0.12.0 (Q135). The rule keeps an inherited value waiting for the owner''s confirmation ("Pending SLA Confirmation"); it is left out of the scorecard and penalties.' }
+        measured: { type: boolean, description: '0.12.0 (Q2). False when the scenario rules say this SLA is not measured on the site (D-1 for Hot / Cold Swap): the task applies but has no clock.' }
+        tentative_holidays: { type: array, items: { type: string, format: date }, description: '0.12.0 (D4b). Tentative (not yet confirmed) holidays inside the SLA period. They count as holidays now and are corrected when confirmed.' }
+        due_date_tentative: { type: boolean, description: '0.12.0 (D4b). True when `tentative_holidays` is not empty: the due date shows a "tentative date" badge.' }
     TaskSummary:
       type: object
       required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
@@ -10429,6 +10793,7 @@ components:
         admin_override: { type: boolean }
         stepup_verified: { type: boolean }
         batch_row_id: { type: [string, 'null'], format: uuid }
+        previous_path: { type: boolean, description: '0.12.2 (Q216): an act of the old 3-level path (level 2 or 3) recorded before the task was converted to two levels; shown as "previous path before conversion".' }
         created_at: { type: string, format: date-time }
     Comment:
       type: object
@@ -10537,8 +10902,8 @@ components:
         in_flight: { type: integer, minimum: 0, description: 'Submitted at least once and not finished: they keep the level path frozen at their first submission.' }
     MatrixRowKey:
       type: string
-      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW).'
-      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
+      description: '0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220).'
+      enum: [procurement, procurement_hlc, contractors, rf_design, acquisition, gecol, hlc, permits_hse, permits_hse_te, permits_hse_acq, permits_hse_om, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, deliverables, dismantle]
     Matrix:
       type: object
       required: [workflow_version, stages, version]
@@ -10820,7 +11185,7 @@ components:
       type: string
       minLength: 1
       maxLength: 60
-      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
+      description: 'What the SLA is measured from, as a code of the workflow version in force: a task code, a milestone code or a gate code (D-1 TE Access uses the Site RFI milestone), or one of the reserved values `PRED` (latest date of the predecessors), `OPEN` (the day the task opens) and `DLP:<task code>:<setting key>` (the date of the task plus the DLP months of the setting `dlp.months.cw` or `dlp.months.te`) and, since 0.4.4, `DLPD:<task code>:<setting key>` (the date of the task plus the calendar days of the setting `sla.dlp_days.cw`, default 90), and, since 0.9.0, `PR:<scope>` (the earliest PR date of the approved Procurement records of that scope on the site; C-3 uses `PR:HLC`), and, since 0.12.0, `A|B` (the first of the codes whose task is not N/A on the site; D-1 uses `MS4|MS1`, Q2; a missing date waits, it never starts today). The contract has no separate catalogue; an unknown code is 422 `validation_failed` with `errors[].code` = `unknown_start_event`.'
     SlaRuleOverride:
       type: object
       description: 'A different minimum and maximum for one delivery scenario, one region, or one scenario in one region. The most specific override wins (scenario and region, then region, then scenario, then the base rule).'
@@ -10846,6 +11211,129 @@ components:
         start_event: { $ref: '#/components/schemas/SlaStartEvent' }
         calendar_code: { type: string, description: 'A calendar of `GET /settings/calendars` (weekend days and holidays).' }
         overrides: { type: array, maxItems: 47, items: { $ref: '#/components/schemas/SlaRuleOverride' } }
+        end_event: { oneOf: [{ $ref: '#/components/schemas/SlaEndEvent' }, { type: 'null' }], description: '0.12.0 (Q13, Q136). Null = the actual date of the task. Omitted in a PATCH = kept as it is in the draft. An unknown value is 422 `unknown_end_event`.' }
+        pending_confirmation: { type: boolean, description: '0.12.0 (Q135). An inherited value waiting for the owner''s confirmation. Omitted in a PATCH = kept as it is in the draft.' }
+    SlaEndEvent:
+      type: string
+      enum: [gecol.installation_finish, hlc.installation_date, hlc.in_service_date, task.layout_submitted_date]
+      description: '0.12.0. Where the clock ends when it is not the actual date of the task: the GECOL installation finish (C-2) and the HLC installation date (C-4) keep the Master end events during the parallel run (Q54); `hlc.in_service_date` is the C-4 end after the parallel run (Q136); `task.layout_submitted_date` is the Layout Submitted Date of B6 (Q13), never filled from another date.'
+    SlaMasterColumn:
+      type: object
+      required: [seq, master_column, sla_code, name_en, from_to, applies_when, task_code, flag_condition, inherited]
+      description: '0.12.0 (Q14). One of the 45 step columns D:AV of the Master SLA sheet and the PMIS task that measures it.'
+      properties:
+        seq: { type: integer, minimum: 1, maximum: 45 }
+        master_column: { type: string, description: 'Column letter of the SLA sheet (D to AV).' }
+        sla_code: { type: string, description: 'For example B-10a.' }
+        name_en: { type: string }
+        from_to: { type: string }
+        applies_when: { type: string }
+        task_code: { type: [string, 'null'], description: 'Null when the column has no task of its own (an end-to-end figure or a Change Control window).' }
+        flag_condition: { type: [string, 'null'], description: 'An extra site condition, for example `rt_or_gf=RT` (B-10a and B-10b split B10 by the Master O value).' }
+        inherited: { type: boolean, description: 'The Master value is kept for compatibility only and does not measure a real cycle (B-6, Q13).' }
+        note: { type: [string, 'null'] }
+    ScenarioRule:
+      type: object
+      required: [task_code, scenario, rule, flag_expr, reason]
+      properties:
+        id: { type: string, format: uuid }
+        task_code: { type: string, maxLength: 40 }
+        scenario: { oneOf: [{ $ref: '#/components/schemas/DeliveryScenario' }, { type: 'null' }], description: 'Null = every scenario. A rule for the site''s scenario wins over the rule for every scenario.' }
+        rule: { type: string, enum: [applies, na, sla_not_measured, flag], description: '`na` makes the task N/A unless a scope exception enables it; `sla_not_measured` keeps the task but measures no SLA; `flag` follows a scope flag expression.' }
+        flag_expr: { type: [string, 'null'], enum: [cw, tower, adaption_only, gecol, hlc, rfi, te, null], description: 'Only with `flag` (Master AA:AF).' }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+        version: { type: integer }
+        created_at: { type: string, format: date-time }
+    ScenarioRuleList:
+      type: object
+      required: [version, items]
+      properties:
+        version: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/ScenarioRule' } }
+    ScenarioRulesInput:
+      type: object
+      additionalProperties: false
+      required: [reason, rules]
+      properties:
+        reason: { $ref: '#/components/schemas/Reason' }
+        rules: { type: array, maxItems: 500, items: { $ref: '#/components/schemas/ScenarioRule' }, description: 'The whole active list (id, version and created_at are ignored). Errors: `unknown_task_code`, `invalid`, `required`, `duplicate`.' }
+    ScopeConflict:
+      type: object
+      required: [task_code, scenario, flag_expr, message]
+      properties:
+        task_code: { type: string }
+        scenario: { $ref: '#/components/schemas/DeliveryScenario' }
+        flag_expr: { type: string }
+        message: { type: string }
+    ScopeException:
+      type: object
+      required: [id, task_code, reason, approved_by, approved_at]
+      properties:
+        id: { type: string, format: uuid }
+        task_code: { type: string }
+        reason: { type: string }
+        change_request_id: { type: [string, 'null'], format: uuid }
+        approved_by: { $ref: '#/components/schemas/UserRef' }
+        approved_at: { type: string, format: date-time }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        revoked_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        revoke_reason: { type: [string, 'null'] }
+    SiteApplicability:
+      type: object
+      required: [site_id, delivery_scenario, rfi, conflicts, tasks, exceptions]
+      properties:
+        site_id: { type: string, format: uuid }
+        delivery_scenario: { oneOf: [{ $ref: '#/components/schemas/DeliveryScenario' }, { type: 'null' }] }
+        rfi:
+          type: object
+          required: [applies, master_rfi, differs]
+          properties:
+            applies: { type: boolean, description: 'Q3: the Site RFI applies (scenario rule first, then the flags).' }
+            master_rfi: { type: boolean, description: 'The Master formula (flags AA:AD only), for the comparison only; never used for gates.' }
+            differs: { type: boolean }
+        conflicts: { type: array, items: { $ref: '#/components/schemas/ScopeConflict' } }
+        tasks:
+          type: array
+          items:
+            type: object
+            required: [task_id, task_code, state, applies, sla_measured, source]
+            properties:
+              task_id: { type: string, format: uuid }
+              task_code: { type: string }
+              state: { $ref: '#/components/schemas/TaskState' }
+              applies: { type: [boolean, 'null'], description: 'Null = no rule speaks about the task (it keeps its state).' }
+              sla_measured: { type: boolean }
+              source: { type: string, enum: [exception, scenario, flag, none] }
+              reason: { type: [string, 'null'] }
+              exception_id: { type: [string, 'null'], format: uuid }
+              would_change: { type: [string, 'null'], enum: [na, applies, null], description: 'What applying the scope would do to this task now.' }
+        exceptions: { type: array, items: { $ref: '#/components/schemas/ScopeException' } }
+    ApplicabilityApplyResult:
+      type: object
+      required: [result, applicability]
+      properties:
+        result:
+          type: object
+          required: [site_id, changed, kept]
+          properties:
+            site_id: { type: string, format: uuid }
+            changed: { type: array, items: { type: object, required: [task_code, from, to, source], properties: { task_code: { type: string }, from: { type: string }, to: { type: string }, source: { type: string } } } }
+            kept: { type: array, items: { type: object, required: [task_code, state, reason], properties: { task_code: { type: string }, state: { type: string }, reason: { type: string } } }, description: 'Tasks the rules make N/A that are approved or in review or approval: never changed.' }
+        applicability: { $ref: '#/components/schemas/SiteApplicability' }
+    GateEvent:
+      type: object
+      required: [id, gate_code, event, status, gate_date, previous_date, shifted, cause, at]
+      description: '0.12.0 (Q9). One change of a gate of the site, kept for ever: an earlier opening date stays in the history after the gate closes again.'
+      properties:
+        id: { type: string }
+        gate_code: { type: string }
+        event: { type: string, enum: [opened, closed, date_moved] }
+        status: { type: string, enum: [open, blocked, pending, na] }
+        gate_date: { type: [string, 'null'], format: date }
+        previous_date: { type: [string, 'null'], format: date }
+        shifted: { type: boolean, description: 'A Change Control suspension moved the gate date.' }
+        cause: { type: array, items: { $ref: '#/components/schemas/LockReason' }, description: 'With `closed`: why the gate closed.' }
+        at: { type: string, format: date-time }
     SlaRuleSetSummary:
       type: object
       description: 'One version of the whole SLA rule set. Versions are numbered 1, 2, 3 and so on; the seed is version 1.'
@@ -11017,6 +11505,8 @@ components:
         changed_at: { type: string, format: date-time }
         open_task_count: { type: integer }
         set_version: { type: integer, minimum: 1, description: 'The SLA rule set version this row belongs to (0.2.6).' }
+        end_event: { oneOf: [{ $ref: '#/components/schemas/SlaEndEvent' }, { type: 'null' }], description: '0.12.0. Null = the actual date of the task.' }
+        pending_confirmation: { type: boolean, description: '0.12.0 (Q135). Pending SLA Confirmation.' }
     WeightItem:
       type: object
       required: [code, name_en, weight]
@@ -11714,6 +12204,8 @@ components:
         tentative_reminder_due: { type: boolean, description: 'A tentative date falls within 14 days.' }
         next_year: { type: integer }
         next_year_table_empty: { type: boolean, description: 'Drives the empty-table banner.' }
+        official_calendar_pending: { type: boolean, description: '0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner.' }
+        tentative_counted: { type: boolean, description: '0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge.' }
     WeekendDaysRequest:
       allOf:
         - $ref: '#/components/schemas/WithReason'
@@ -11822,6 +12314,18 @@ components:
           type: array
           items: { type: string }
           description: '0.9.0. Only for a register whose scopes have their own Matrix rows (Procurement: scope HLC is entered by the HLC Fiber Team). The values of the `scope` list the caller may enter (empty = none). The server decides again on every write.'
+        entry_permit_types:
+          type: array
+          items: { $ref: '#/components/schemas/PermitEntryType' }
+          description: '0.12.2 (Q222). Permits & HSE only: the permit types the caller may enter (by their Matrix L1 rows and regions), in the order of the type list; a type the caller may not enter is left out. The server decides again on every write.'
+    PermitEntryType:
+      type: object
+      required: [code, stream, choose_stream, streams]
+      properties:
+        code: { type: string, description: 'The permit type (the values of the `permit_type` list).' }
+        stream: { type: [string, 'null'], enum: [CW, TE, ACQ, OM, null], description: 'The fixed stream of the type; null for a type whose stream is chosen by purpose (D220b).' }
+        choose_stream: { type: boolean, description: 'The person entering the permit chooses `permit_stream` (required).' }
+        streams: { type: array, items: { type: string, enum: [CW, TE, ACQ, OM] }, description: 'The streams the caller may enter this type on (the fixed one, or the choices they hold).' }
     RegisterRecordState:
       type: string
       enum: [entry, in_review, in_approval, approved, voided]
@@ -11844,7 +12348,7 @@ components:
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
-        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version] } }
+        allowed_actions: { type: array, items: { type: string, enum: [edit, submit, review, approve, reject, void, claim, release, new_version, transfer] } }
         entity_id: { type: string, format: uuid, description: 'The logical record; every version of it shares this id. The approved values are projected into the register table with the same id.' }
         version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
         supersedes_id: { type: [string, 'null'], format: uuid }
@@ -11889,7 +12393,7 @@ components:
       properties:
         id: { type: string, format: uuid }
         level: { type: integer }
-        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void] }
+        action: { type: string, enum: [create, edit, submit, review, approve, reject, auto_skip, claim, release, new_version, void, transfer] }
         acted_by: { $ref: '#/components/schemas/UserRef' }
         note: { type: [string, 'null'] }
         before_state: { $ref: '#/components/schemas/RegisterRecordState' }
@@ -11897,6 +12401,7 @@ components:
         self_approval: { type: boolean }
         stepup_verified: { type: boolean }
         batch_row_id: { type: [string, 'null'], format: uuid, description: 'Set when the version came from a template batch.' }
+        previous_path: { type: boolean, description: '0.12.2 (Q216): an act of the old 3-level path (level 2 or 3) recorded before the record was converted to two levels; shown as "previous path before conversion".' }
         created_at: { type: string, format: date-time }
     RegisterRecordInput:
       type: object
@@ -12154,11 +12659,16 @@ components:
               file_id: { type: string, format: uuid }
     NumberSequence:
       type: object
-      required: [key, form_kind, pattern, reset, next_value, version]
+      required: [key, pattern, reset, next_value, version]
       properties:
         key: { type: string, examples: [DN-CW-TR] }
-        form_kind: { $ref: '#/components/schemas/FormKind' }
-        pattern: { type: string, examples: ['DN-CW-{REGION}-{YYYY}-{SEQ:4}'] }
+        form_kind: { oneOf: [{ $ref: '#/components/schemas/FormKind' }, { type: 'null' }] }
+        record_type: { type: [string, 'null'], enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj, null], description: 'The warehouse document type this sequence numbers (one active sequence per type and region).' }
+        region_id: { type: [integer, 'null'], description: 'null for PL, OPEN and ADJ.' }
+        region_code: { type: [string, 'null'], pattern: '^[A-Z]{1,6}$', description: 'The {REGION} token (Q32: only TR is known).' }
+        last_issued_at: { type: [string, 'null'], format: date-time }
+        updated_at: { type: string, format: date-time }
+        pattern: { type: string, examples: ['DN-CW-{REGION}-{YYYY}-{SEQ:4}'], description: 'Tokens {REGION}, {YYYY}, {YY} and {SEQ:n} (once); characters A-Z 0-9 - / _ .' }
         reset: { type: string, enum: [never, yearly] }
         next_value: { type: integer, minimum: 1, description: 'Never decreases. Numbers are never reused or deleted.' }
         last_issued: { type: [string, 'null'] }
@@ -12168,7 +12678,8 @@ components:
     NumberSequenceFields:
       type: object
       properties:
-        pattern: { type: string }
+        region_code: { type: [string, 'null'], pattern: '^[A-Z]{1,6}$' }
+        pattern: { type: string, minLength: 6, maxLength: 80 }
         reset: { type: string, enum: [never, yearly] }
         next_value: { type: integer, minimum: 1 }
         is_active: { type: boolean }
@@ -12178,10 +12689,27 @@ components:
       required: [need_unit]
       properties:
         id: { type: string, format: uuid }
-        need_unit: { type: string, description: 'For example per site, per sector, per tower.' }
-        quantity: { type: [number, 'null'] }
-        quantity_rule: { $ref: '#/components/schemas/ConditionRule' }
-        applies_when: { $ref: '#/components/schemas/ConditionRule' }
+        need_unit: { type: string, description: 'The Master Need Unit (Cambium Sector, Intracom Sector, MW Half-link, LPU Kit, Router, Cabinet, Battery) or another unit.' }
+        quantity: { type: [number, 'null'], description: 'Quantity per unit of the site.' }
+        status: { type: string, enum: [confirmed, pending_configuration], default: pending_configuration, description: 'Q107: confirmed = the owner gave this quantity; a pending need never counts toward "complete". A confirmed need has a quantity.' }
+        quantity_rule: { $ref: '#/components/schemas/NeedQuantityRule' }
+        applies_when: { $ref: '#/components/schemas/NeedAppliesWhen' }
+    NeedQuantityRule:
+      type: [object, 'null']
+      additionalProperties: false
+      description: 'How the units of a site are counted (D58). Null = by the need unit name.'
+      properties:
+        per: { type: string, enum: [te_site, rf_sector, mw_half_link], description: 'te_site = 1 per TE site; rf_sector = the Sectors of the approved RF & Design record; mw_half_link = 1 when the MW Far-end of the site is set, plus the sites whose Far-end is this site.' }
+        wl_vendor: { type: string, enum: [Cambium, Intracom], description: 'rf_sector only: the WL vendor of the region must be this one (0 otherwise; unknown while the region has no vendor).' }
+        group: { type: string, pattern: '^[A-Z0-9][A-Z0-9_-]{0,39}$', description: 'Items of one group are alternatives (for example the three router models); default the item code.' }
+    NeedAppliesWhen:
+      type: [object, 'null']
+      additionalProperties: false
+      description: 'When the rule applies; a missing key does not restrict. Null = every TE site.'
+      properties:
+        scope: { type: array, items: { type: string, enum: [te_full, router_only] }, description: 'router_only = IP Router Only (AF Yes) without TE Full (Q6).' }
+        delivery_scenario: { type: array, items: { type: string, enum: [new_build, expansion, hot_swap, cold_swap, relocation] } }
+        region_ids: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
     WarehouseItemFields:
       type: object
       properties:
@@ -12195,6 +12723,7 @@ components:
         planned_delivery_date: { type: [string, 'null'], format: date }
         progress_item_code: { type: [string, 'null'], description: 'The Project Status item code the received quantity feeds (D65).' }
         need_rules: { type: array, items: { $ref: '#/components/schemas/NeedRule' } }
+        code_source: { type: string, enum: [master, internal_provisional], description: 'Q107: master = the code of the Master WH sheet; internal_provisional = an internal code (CW-01..28, generated TE codes), not a confirmed manufacturer code.' }
         is_active: { type: boolean }
     WarehouseItem:
       allOf:
@@ -12234,6 +12763,90 @@ components:
         pending_issue: { type: number }
         pending_return: { type: number }
         available: { type: number, description: 'on_hand minus reserved.' }
+        quarantine: { type: number, description: 'Q105: returned Faulty or Damaged, held outside on_hand and available. Always 0 for a site.' }
+    DispatchNeedStatus:
+      type: string
+      enum: [complete, short, pending_configuration, not_applicable]
+      description: 'D6: the PMIS status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.'
+    SiteDispatchLine:
+      type: object
+      required: [need_unit, need_group, rule_status, line_status, delivered, items]
+      properties:
+        need_unit: { type: string }
+        need_group: { type: string, description: 'Items of one group are alternatives (ROUTER); otherwise the item code.' }
+        rule_status: { type: string, enum: [confirmed, pending_configuration] }
+        unit_source: { type: string, enum: [te_site, rf_sector, mw_half_link] }
+        units: { type: [number, 'null'], description: 'Units of the site; null when they cannot be counted yet.' }
+        quantity: { type: [number, 'null'], description: 'Quantity per unit.' }
+        need: { type: [number, 'null'], description: 'quantity x units; null while pending.' }
+        delivered: { type: number, description: 'Posted TE DN minus posted TE RN.' }
+        short: { type: [number, 'null'] }
+        line_status: { type: string, enum: [complete, short, pending_configuration] }
+        missing: { type: [string, 'null'], enum: [need_quantity, region_wl_vendor, rf_design_sectors, rf_design, null], description: 'What a pending line is waiting for.' }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              item_id: { type: string, format: uuid }
+              item_code: { type: string }
+              item_name: { type: string }
+              delivered: { type: number }
+              rule_status: { type: string, enum: [confirmed, pending_configuration] }
+    SiteDispatch:
+      type: object
+      required: [site_id, site_code, te_applies, need_status]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        te_applies: { type: boolean }
+        router_only: { type: boolean, description: 'IP Router Only without TE Full (Q6).' }
+        te_dispatch_complete_date: { type: [string, 'null'], format: date, description: 'Q65: the date of the latest posted TE DN of the site. Used for the Master comparison; it does not depend on need_status.' }
+        latest_te_dn_no: { type: [string, 'null'] }
+        need_status: { $ref: '#/components/schemas/DispatchNeedStatus' }
+        short_lines: { type: integer }
+        pending_lines: { type: integer }
+        lines: { type: array, items: { $ref: '#/components/schemas/SiteDispatchLine' }, description: 'Only on GET /warehouse/dispatch-status/{site_id}.' }
+    RegionVendor:
+      type: object
+      required: [region_id, wl_vendor, version]
+      properties:
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        region_name: { type: string }
+        wl_vendor: { type: [string, 'null'], enum: [Cambium, Intracom, null] }
+        version: { type: integer, description: '0 = never set.' }
+    WarehouseConfigGaps:
+      type: object
+      required: [pending_need_rules, provisional_codes, regions_without_wl_vendor, regions_without_sequence]
+      properties:
+        pending_need_rules:
+          type: array
+          items:
+            type: object
+            properties:
+              item_id: { type: string, format: uuid }
+              item_code: { type: string }
+              item_name: { type: string }
+              need_unit: { type: string }
+              quantity: { type: [number, 'null'] }
+        provisional_codes:
+          type: array
+          items:
+            type: object
+            properties:
+              item_id: { type: string, format: uuid }
+              item_code: { type: string }
+              item_name: { type: string }
+              category: { type: [string, 'null'] }
+        regions_without_wl_vendor: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        regions_without_sequence:
+          type: array
+          items:
+            type: object
+            properties:
+              region_id: { $ref: '#/components/schemas/RegionId' }
+              record_types: { type: array, items: { type: string } }
     StockMovementLine:
       type: object
       required: [item_id, qty]
@@ -12254,6 +12867,9 @@ components:
         kind: { type: string, enum: [issue, return, receipt, adjustment] }
         record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj] }
         doc_no: { type: [string, 'null'] }
+        doc_no_locked: { type: boolean, description: 'Q106: true once posted; the Doc No. can no longer change.' }
+        sequence_key: { type: [string, 'null'], description: 'The numbering sequence that issued the Doc No.; null = typed by hand.' }
+        doc_date: { type: [string, 'null'], format: date }
         register_record_id: { type: [string, 'null'], format: uuid, description: 'The record of the Warehouse register: submit, review, approve and void go through /registers/warehouse/records/{id}.' }
         status: { type: string, enum: [pending, posted, cancelled], description: 'pending = shown as "pending issue" or "pending return"; posted when the DN or RN is approved.' }
         site_id: { type: [string, 'null'], format: uuid, description: 'null for PL, OPEN and ADJ.' }
@@ -12272,7 +12888,7 @@ components:
       properties:
         record_type: { type: string, enum: [te_dn, cw_dn, te_rn, cw_rn, pl, open, adj], description: 'DN and RN need a site; PL, OPEN and ADJ have none.' }
         site_id: { type: string, format: uuid }
-        doc_no: { type: string, description: 'Unique (Duplicate Doc No. answers 409).' }
+        doc_no: { type: string, description: 'Optional (Q106): without it the next number of the active sequence of the type and region is issued. A typed number must be unique and never issued by a sequence (409 otherwise).' }
         doc_date: { type: string, format: date }
         txn_status: { type: string, enum: [Approved, Dispatched, Received, Cancelled] }
         condition: { type: string, enum: [Good, Faulty, Damaged] }
@@ -12881,7 +13497,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]

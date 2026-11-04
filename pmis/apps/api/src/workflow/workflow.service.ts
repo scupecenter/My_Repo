@@ -205,12 +205,14 @@ export class WorkflowService {
     const rows = await this.db.tx.$queryRaw<
       {
         id: string; level: number; action: string; acted_by: string | null; on_behalf_of: string | null; note: string | null; before_state: string | null; after_state: string | null;
-        self_approval: boolean; admin_override: boolean; stepup_verified: boolean; batch_row_id: string | null; created_at: Date; ts: string;
+        self_approval: boolean; admin_override: boolean; stepup_verified: boolean; batch_row_id: string | null; previous_path: boolean; created_at: Date; ts: string;
       }[]
     >(Prisma.sql`
       SELECT w.id::text AS id, w.level, w.action::text AS action, w.acted_by::text AS acted_by, w.on_behalf_of::text AS on_behalf_of, w.note,
         w.before_state::text AS before_state, w.after_state::text AS after_state, w.self_approval, w.admin_override, w.stepup_verified,
-        w.batch_row_id::text AS batch_row_id, w.created_at, ${Prisma.raw(TS_TEXT('w.created_at'))} AS ts
+        w.batch_row_id::text AS batch_row_id, w.created_at, ${Prisma.raw(TS_TEXT('w.created_at'))} AS ts,
+        EXISTS (SELECT 1 FROM levels_conversions c WHERE c.entity_type = 'task' AND c.entity_id = w.task_id AND c.levels_before = 3
+                AND w.level >= 2 AND w.created_at <= c.converted_at) AS previous_path
       FROM workflow_steps w WHERE w.task_id = ${taskId}::uuid ${after} ORDER BY w.created_at, w.id LIMIT ${limit + 1}`);
     const page = rows.slice(0, limit);
     const refs = await this.view.userRefs([...new Set(page.flatMap((r) => [r.acted_by, r.on_behalf_of]).filter((x): x is string => !!x))]);
@@ -226,6 +228,7 @@ export class WorkflowService {
           admin_override: r.admin_override,
           stepup_verified: r.stepup_verified,
           batch_row_id: r.batch_row_id,
+          previous_path: r.previous_path,
           created_at: r.created_at,
         };
         if (r.acted_by && refs.get(r.acted_by)) item.acted_by = refs.get(r.acted_by);

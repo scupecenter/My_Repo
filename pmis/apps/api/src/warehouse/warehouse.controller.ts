@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Res,
 } from "@nestjs/common";
@@ -15,12 +16,49 @@ import type { AuthContext } from "../auth/auth.types";
 import { Auth } from "../auth/decorators";
 import { etagHeader } from "../common/etag";
 import { AsBuiltItemsService } from "./as-built-items.service";
+import { WarehouseConfigService } from "./warehouse-config.service";
 import { WarehouseService } from "./warehouse.service";
 
 /** Warehouse (contract tag `warehouse`): item master, stock, movements. */
 @Controller("warehouse")
 export class WarehouseController {
-  constructor(private readonly wh: WarehouseService) {}
+  constructor(
+    private readonly wh: WarehouseService,
+    private readonly cfg: WarehouseConfigService,
+  ) {}
+
+  // Migration 0053 (P7): the TE dispatch of each site (D6), the region WL vendors (D58) and the owner data still missing (Q107).
+  @Get("dispatch-status")
+  dispatch(@Query() q: Record<string, unknown>) {
+    return this.cfg.dispatchList(q);
+  }
+
+  @Get("dispatch-status/:siteId")
+  dispatchSite(@Param("siteId") siteId: string) {
+    return this.cfg.dispatchSite(siteId);
+  }
+
+  @Get("region-vendors")
+  regionVendors(@Auth() auth: AuthContext) {
+    return this.cfg.listRegionVendors(auth);
+  }
+
+  @Put("region-vendors/:regionId")
+  async putRegionVendor(
+    @Param("regionId") regionId: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.cfg.putRegionVendor(regionId, ifMatch, body);
+    res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
+  @Get("config-gaps")
+  configGaps(@Auth() auth: AuthContext) {
+    return this.cfg.configGaps(auth);
+  }
 
   @Get("items")
   items(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
@@ -153,6 +191,40 @@ export class AsBuiltItemsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const r = await this.items.updateItem(auth, id, ifMatch, body);
+    res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+}
+
+/** Numbering sequences (contract tag `forms`, Q106): the numbering service, separate from the PDF; the warehouse documents use it today. */
+@Controller("number-sequences")
+export class NumberSequencesController {
+  constructor(private readonly cfg: WarehouseConfigService) {}
+
+  @Get()
+  list(@Auth() auth: AuthContext) {
+    return this.cfg.listSequences(auth);
+  }
+
+  @Post()
+  @HttpCode(201)
+  async create(
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.cfg.createSequence(body);
+    res.setHeader("ETag", etagHeader(r.version));
+    return r;
+  }
+
+  @Patch(":key")
+  async update(
+    @Param("key") key: string,
+    @Headers("if-match") ifMatch: string | undefined,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const r = await this.cfg.updateSequence(key, ifMatch, body);
     res.setHeader("ETag", etagHeader(r.version));
     return r;
   }

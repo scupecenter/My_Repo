@@ -38,12 +38,13 @@ interface Cell { id: string; level: number; level_kind: string; used: boolean; r
 interface Row { kind: string; code: string; register_key: string | null; approval_levels: number; used_levels: number[]; region_ids_with_cells: number[]; cells: Cell[]; task_counts?: { not_submitted: number; in_flight: number }; preview: { single_level: boolean; skips: { user: { id: string }; from_level_kind: string; skipped_level_kinds: string[]; self_approval: boolean; region_ids: number[]; task_code: string | null }[] } }
 interface MatrixBody { workflow_version: number; version: number; stages: Row[] }
 
-const REGISTER_CODES = ['procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'warehouse', 'quality', 'issues', 'risks', 'change_control',
+const REGISTER_CODES = ['procurement', 'procurement_hlc', 'contractors', 'rf_design', 'acquisition', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om', 'warehouse', 'quality', 'issues', 'risks', 'change_control',
   'readiness_handover', 'as_built', 'meetings', 'deliverables'];
 /** Built in migration 0019: the registers suite owns their level count and region cells (it changes them while this suite runs). Migration 0035 (Q90) gives them their L2 holders.
  *  permits_hse_te: the Matrix row of the TE stream of Permits & HSE (migration 0050, Q90), L1 Site Engineers (TE), L2 TE Team Lead.
+ *  permits_hse_acq, permits_hse_om: the Acquisition / RF & Design and O&M stream rows of Permits & HSE (migration 0054, Q220); O&M has no default holder.
  *  procurement_hlc: the Matrix row of the Procurement scope HLC (migration 0042, owner decision 2026-11-02), seeded on two levels from the start. */
-const BUILT = ['procurement', 'procurement_hlc', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te'];
+const BUILT = ['procurement', 'procurement_hlc', 'gecol', 'hlc', 'permits_hse', 'permits_hse_te', 'permits_hse_acq', 'permits_hse_om'];
 const NOT_BUILT = [...REGISTER_CODES.filter((c) => !BUILT.includes(c)), 'dismantle'];
 
 const getMatrix = (api: Api, qs = '') => api.call('get', `/matrix${qs}`);
@@ -865,7 +866,7 @@ describe('the seed of the register rows', () => {
       await calc.query(seed);
 
       const rows = await calc.query(`SELECT count(*)::int AS n FROM register_definitions WHERE register_key = ANY($1::text[])`, [[...REGISTER_CODES, 'dismantle']]);
-      expect(rows.rows[0].n).toBe(19);
+      expect(rows.rows[0].n).toBe(21);
       const back = await calc.query(`SELECT count(*)::int AS n FROM matrix_cells c JOIN matrix_cell_assignees a ON a.cell_id = c.id WHERE c.register_key = 'deliverables'`);
       expect(back.rows[0].n).toBeGreaterThanOrEqual(3);
       const kept = await calc.query(`SELECT (SELECT count(*)::int FROM matrix_cell_assignees a JOIN matrix_cells c ON c.id = a.cell_id WHERE c.register_key = 'warehouse' AND c.level = 1) AS emptied,
@@ -879,7 +880,7 @@ describe('the seed of the register rows', () => {
       const n1 = (await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n;
       await calc.query(seed);
       expect((await calc.query('SELECT count(*)::int AS n FROM matrix_cells')).rows[0].n).toBe(n1);
-      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(19);
+      expect((await calc.query('SELECT count(*)::int AS n FROM register_definitions')).rows[0].n).toBe(21);
     } finally {
       await calc.end();
     }

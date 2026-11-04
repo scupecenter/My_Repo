@@ -730,6 +730,9 @@ describe('Permits & HSE: expiry choice, N/A, stop work, approver from the approv
 
   it('applies the expiry choice, N/A reason, PTW-only fields and date order', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
+    // 0054 (Q220): Civil Aviation permits are entered on the Acquisition / RF & Design stream row
+    await regCell(db, 'permits_hse_acq', R, 'entry', { user: [t.entry.user.id] });
+    await regCell(db, 'permits_hse_acq', R, 'approve', { user: [t.approve.user.id] });
     expect(await submitCodes(t, { permit_type: 'Access - CW', status: 'Approved', valid_from: '2025-12-01' })).toEqual(['required']);       // the type expires: Valid To needed
     expect(await submitCodes(t, { permit_type: 'Civil Aviation Authority Permit', status: 'Approved', valid_from: '2025-12-01', valid_to: '2030-01-01' })).toEqual(['permanent']);
     expect(await submitCodes(t, { permit_type: 'Access - CW', status: 'Approved', has_expiry: false, valid_from: '2025-12-01', valid_to: '2030-01-01' })).toEqual(['permanent']);
@@ -747,10 +750,10 @@ describe('Permits & HSE: expiry choice, N/A, stop work, approver from the approv
 
   it('fills the N/A approver from the final approval, never from the form', async () => {
     const t = await team(app, db, 'permits_hse', 'permits_hse', R);
-    const typed = await t.entry.api.call('post', recPath('permits_hse'), { site_id: t.site.id, data: { permit_type: 'Access - Survey', status: 'N/A', na_reason: 'no survey needed', na_approved_by: 'Me' } });
+    const typed = await t.entry.api.call('post', recPath('permits_hse'), { site_id: t.site.id, data: { permit_type: 'Access - Survey', permit_stream: 'CW', status: 'N/A', na_reason: 'no survey needed', na_approved_by: 'Me' } });
     expect(typed.status).toBe(422);
     expect(typed.body.errors[0].code).toBe('field_read_only');
-    const rec = await createRec(t, { permit_type: 'Access - Survey', status: 'N/A', na_reason: 'no survey needed' });
+    const rec = await createRec(t, { permit_type: 'Access - Survey', permit_stream: 'CW', status: 'N/A', na_reason: 'no survey needed' });   // 0054: the stream of a survey is chosen (D220b)
     const res = await approveAll(t, rec.id, rec.version);
     expect(res.data.na_approved_by).toBe(t.approve.user.name);
     const row = await q<{ na_approved_by: string; status: string }>(db, 'SELECT na_approved_by, status FROM permit_records WHERE id = $1', [rec.entity_id]);

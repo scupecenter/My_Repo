@@ -206,6 +206,8 @@ function PublishDialog({
   );
 }
 
+const SLA_END_EVENTS = ["gecol.installation_finish", "hlc.installation_date", "hlc.in_service_date", "task.layout_submitted_date"] as const;
+
 function Editor({ id, pin }: { id: string; pin: () => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -318,7 +320,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
         <table className="w-full text-sm">
           <thead className="text-mute">
             <tr>
-              {["task", "min", "max", "start", "calendar"].map((k) => (
+              {["task", "min", "max", "start", "calendar", "end", "pending"].map((k) => (
                 <th key={k} className="p-2 text-start">
                   {t(`slaSet.col_${k}`)}
                 </th>
@@ -428,6 +430,34 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                       <option value="LY">LY</option>
                     </select>
                   </td>
+                  {/* 0.12.0 (Q13, Q136): the end event; Q135: Pending SLA Confirmation */}
+                  <td className="p-2">
+                    <select
+                      className="input w-44"
+                      aria-label={`${r.task_code} ${t("slaSet.col_end")}`}
+                      data-testid={`sla-end-${r.task_code}`}
+                      disabled={!draft}
+                      value={r.end_event ?? ""}
+                      onChange={(e) => upd(r, { end_event: (e.target.value || null) as SlaTaskRule["end_event"] })}
+                    >
+                      <option value="">{t("slaSet.end_actual")}</option>
+                      {SLA_END_EVENTS.map((x) => (
+                        <option key={x} value={x}>{t(`slaSet.end_${x.replace(/\./g, "_")}`)}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td className="p-2">
+                    <label className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        data-testid={`sla-pending-${r.task_code}`}
+                        disabled={!draft}
+                        checked={!!r.pending_confirmation}
+                        onChange={(e) => upd(r, { pending_confirmation: e.target.checked })}
+                      />
+                      {r.pending_confirmation && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-pending-badge-${r.task_code}`}>{t("sla.pending_confirmation")}</span>}
+                    </label>
+                  </td>
                 </tr>,
                 (draft || (r.overrides ?? []).length > 0) && (
                   <tr
@@ -435,7 +465,7 @@ function Editor({ id, pin }: { id: string; pin: () => void }) {
                     data-testid={`sla-ovr-${r.task_code}`}
                   >
                     <td />
-                    <td colSpan={4} className="pb-2 ps-2">
+                    <td colSpan={6} className="pb-2 ps-2">
                       <ul className="space-y-1">
                         {(r.overrides ?? []).map((o, j) => {
                           const oBad =

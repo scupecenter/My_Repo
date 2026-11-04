@@ -245,13 +245,14 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
     expect(v1.status).toBe(200);
     expect(v1.body.rules).toHaveLength(46);
     expect(v1.body.rules.find((r: { task_code: string }) => r.task_code === 'D1')).toEqual({
-      task_code: 'D1', min_working_days: 3, max_working_days: 5, start_event: 'MS4', calendar_code: 'std', overrides: [],
+      // 0052 (Q2): D-1 starts at MS4, or MS1 when the Site RFI is N/A; the item carries its end event and the Q135 pending flag
+      task_code: 'D1', min_working_days: 3, max_working_days: 5, start_event: 'MS4|MS1', calendar_code: 'std', overrides: [], end_event: null, pending_confirmation: false,
     });
     expect(v1.body.rules.find((r: { task_code: string }) => r.task_code === 'B10')).toMatchObject({ min_working_days: 14, max_working_days: 21 });   // D5: one rule for B-10a and B-10b
     const list = await admin.api.call('get', '/settings/sla-rules?task_code=D1');
     expect(list.status).toBe(200);
     expect(list.body.items).toHaveLength(1);
-    expect(list.body.items[0]).toMatchObject({ task_code: 'D1', min_working_days: 3, max_working_days: 5, start_event: 'MS4', calendar_code: 'std', set_version: 1 });
+    expect(list.body.items[0]).toMatchObject({ task_code: 'D1', min_working_days: 3, max_working_days: 5, start_event: 'MS4|MS1', calendar_code: 'std', set_version: 1 });
   });
 
   it('creates one draft (a copy of the version in force), 409 for a second', async () => {
@@ -313,7 +314,7 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
       min_working_days: 4, max_working_days: 6, overrides: [{ region_id: 1, min_working_days: 2, max_working_days: 3 }],
     });
     const audit = await q<{ before: { rules: unknown[] }; after: { rules: unknown[] } }>(db, `SELECT before, after FROM audit_log WHERE action = 'sla_rule_set_update' AND entity_id = $1`, [draftId]);
-    expect(audit[0]!.before.rules).toEqual([{ task_code: 'D1', min: 3, max: 5, start: 'MS4' }]);
+    expect(audit[0]!.before.rules).toEqual([{ task_code: 'D1', min: 3, max: 5, start: 'MS4|MS1', end: null, pending_confirmation: false }]);   // 0052: end event and pending flag audited too
     const before = await taskRow(db, openBefore.site, 'D1');
     const pv = await admin.api.call('post', `/settings/sla-rule-sets/${draftId}/preview`, { effective_date: await dbDate(db, 'cal_today()') });
     expect(pv.status).toBe(200);

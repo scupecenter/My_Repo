@@ -137,8 +137,9 @@ export class CalendarService {
       WHERE true ${year ? Prisma.sql`AND extract(year FROM h.date) = ${year}` : Prisma.empty}
       ${code ? Prisma.sql`AND c.code = ${code}` : Prisma.empty} ${tentative ? Prisma.sql`AND h.tentative = ${tentative === 'true'}` : Prisma.empty}
       ORDER BY h.date, h.id`);
-    const s = await this.db.tx.$queryRaw<{ tentative_count: bigint; next_tentative_date: string | null; reminder: boolean; next_year: number; next_n: bigint }[]>(Prisma.sql`
+    const s = await this.db.tx.$queryRaw<{ tentative_count: bigint; next_tentative_date: string | null; reminder: boolean; next_year: number; next_n: bigint; confirmed: boolean }[]>(Prisma.sql`
       SELECT (SELECT count(*) FROM holidays WHERE tentative) AS tentative_count,
+             coalesce((calc_setting('calendar.official_confirmed', 'false'::jsonb) #>> '{}')::boolean, false) AS confirmed,
              (SELECT min(date)::text FROM holidays WHERE tentative AND date >= cal_today()) AS next_tentative_date,
              EXISTS (SELECT 1 FROM holidays WHERE tentative AND date BETWEEN cal_today() AND cal_today() + 14) AS reminder,
              (extract(year FROM cal_today()) + 1)::int AS next_year,
@@ -152,6 +153,9 @@ export class CalendarService {
         tentative_reminder_due: r?.reminder === true,
         next_year: r?.next_year ?? new Date().getUTCFullYear() + 1,
         next_year_table_empty: Number(r?.next_n ?? 0) === 0,
+        // 0052 (Q4, D4b): the official calendar is pending owner data until the setting calendar.official_confirmed is true; tentative dates count now
+        official_calendar_pending: r?.confirmed !== true,
+        tentative_counted: true,
       },
     };
   }
