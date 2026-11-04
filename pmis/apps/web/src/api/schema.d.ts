@@ -1686,6 +1686,8 @@ export interface paths {
          * @description Needs `sites` edit in the site's region; each field follows its field-level rule (hidden, read, edit). A value is checked like every custom field
          *     (type, list, validation); `null` clears it. Audited with before and after. Conditional documents whose rule reads a site field (A3 civil aviation
          *     permit: `site.custom.near_airport`) follow on the next read of the task's slots.
+         *     **Q225 (0.12.10):** a field with `requires_approval` (seed `near_airport`) is refused with the field code `approval_required` (an invalid value is still `invalid`);
+         *     propose it with `POST /sites/{site_id}/change-proposals`.
          */
         patch: operations["updateSite"];
         trace?: never;
@@ -1792,6 +1794,33 @@ export interface paths {
         get: operations["listSiteGateEvents"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/change-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose a change to site fields that require approval (Q225)
+         * @description One Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, the site's value now as Old Value, the proposed one as New Value, the
+         *     reason, today as Request Date), entered by the caller as L1: the caller needs `sites` view in the site's region, edit access to the field, the `create` right
+         *     of Change Control in the region and to be an L1 holder of the Change Control row (403 / 422 `not_eligible_holder` otherwise). The site keeps its approved value
+         *     until L2 approves the record; the approval applies it (audited `site_change_applied`), recalculates the site and re-judges its conditional documents. A stale
+         *     Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
+         *     `required`, `unchanged`; `/reason` `required`.
+         */
+        post: operations["proposeSiteChange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11056,6 +11085,27 @@ export interface components {
             section?: string | null;
             required?: boolean;
             can_edit: boolean;
+            /** @description Q225 (0.12.10): the field changes permits or scope, so it is changed by a proposal (`POST /sites/{site_id}/change-proposals`) and its L2 approval, never by `PATCH /sites/{site_id}`. */
+            requires_approval?: boolean;
+        };
+        SiteChangeProposal: {
+            /** @description Field code -> proposed value; null clears. */
+            custom: components["schemas"]["CustomValues"];
+            reason: string;
+        };
+        SiteChangeProposalResult: {
+            items: {
+                field: string;
+                /**
+                 * Format: uuid
+                 * @description The Change Control draft (register `change_control`), in entry.
+                 */
+                record_id: string;
+                change_id: string;
+                /** @description The site's value now as text ('(none)' when empty). */
+                old_value: string;
+                new_value: string;
+            }[];
         };
         RegisterRecordSlots: {
             items: components["schemas"]["DocumentSlot"][];
@@ -15932,6 +15982,36 @@ export interface operations {
                     "application/json": {
                         items: components["schemas"]["GateEvent"][];
                     };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    proposeSiteChange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteChangeProposal"];
+            };
+        };
+        responses: {
+            /** @description The drafts. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteChangeProposalResult"];
                 };
             };
             401: components["responses"]["Unauthorized"];
