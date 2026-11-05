@@ -398,6 +398,20 @@ export const registerHandlers = [
     const key = REGISTER_TEMPLATES[tpl];
     const reject = (reason: string, title: string) => problem(422, 'template_rejected', title, { reason, detail: title } as never);
     const stream = STREAM_TEMPLATES[tpl];
+    if (tpl === 'TPL-SITE-NEW') {
+      // contract 0.14.0 (Q460): a New sites file is one batch of site rows; the task_id of a task upload is refused
+      if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'action_forbidden', 'You need create on sites and import on templates to import new sites.');
+      if (fd.get('task_id')) return reject('wrong_template', 'The New sites template is not used from a task.');
+      if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'validation_failed', 'The file is empty', { errors: [{ path: '/file', code: 'required' }] });
+      if (f.name !== 'blob' && !f.name.toLowerCase().endsWith('.xlsx')) return reject(f.name.toLowerCase().endsWith('.xlsm') ? 'macros_not_allowed' : 'not_xlsx', 'Only plain .xlsx workbooks are accepted.');
+      const text = await f.text();
+      if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
+      if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
+      if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
+      const b = makeSiteBatch(f.name);
+      R().batches.unshift(b); save();
+      return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
+    }
     if ((stream || tpl === 'TPL-MASTER') && !fd.get('task_id')) {
       // contract 0.11.5: a stream file is one batch of task rows; a TPL-MASTER file is split into one batch per part, with warnings
       if (!f || typeof f === 'string' || f.size === 0) return problem(422, 'validation_failed', 'The file is empty', { errors: [{ path: '/file', code: 'required' }] });
@@ -460,6 +474,15 @@ export const registerHandlers = [
     if (b.uploaded_by !== (v.employee_id ?? '9999')) return problem(403, 'not_eligible_holder', 'Only the person who uploaded the file can send it into the flow.');
     if (!['validated', 'sent'].includes(b.status) || ['discarded'].includes(statusOf(b))) return problem(409, 'invalid_transition', 'The batch is not waiting to be sent');
     if (!b.rows.some((r) => r.action === 'create' || r.action === 'update')) return problem(422, 'validation_failed', 'No valid rows', { errors: [{ path: '/rows', code: 'no_valid_rows' }] });
+    if (b.entity === 'site') {
+      // each valid row becomes a site draft waiting for L2; a person who holds both levels (the PM) approves at once, with step-up (B5)
+      const self = viewer()?.key === 'pm';
+      if (self && !stepUpValid()) return stepUp();
+      const sent = b.rows.filter((r) => r.action === 'create' && r.decision === 'pending');
+      for (const r of sent) if (self) { r.decision = 'approved'; r.site_id = siteMeta(20).id; }
+      b.status = 'sent'; b.version += 1; save();
+      return HttpResponse.json({ ...toBatch(b), outcome: { submitted: sent.length, held: [], failed: [] } }, { headers: { ETag: `"${b.version}"` } });
+    }
     if (b.stream) {
       // each task row starts the task, saves the entry and submits it as L1; a row that waits for a predecessor or a review stays held
       const out: Outcome = { submitted: 0, held: [], failed: [] };
@@ -501,6 +524,25 @@ export const registerHandlers = [
     }
     if (b.status !== 'sent') return problem(409, 'invalid_transition', b.status === 'validated' ? 'The batch has not been sent into the flow yet.' : `The batch is ${statusOf(b)}.`);
     if (body.action === 'reject' && body.scope === 'all' && !body.note?.trim()) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] });
+    if (b.entity === 'site') {
+      // L2 approves a row (a site is created; step-up) or returns it with a note
+      if (!['pm', 'reviewer'].includes(viewer()?.key ?? '')) return problem(403, 'not_eligible_holder', 'You are not a Review and Approve holder (L2) of the Site creation row.');
+      const rows = b.rows.filter((r) => r.action === 'create' && r.decision === 'pending' && (body.scope === 'all' || (body.rows ?? []).some((x) => x.row_id === r.id)));
+      if (body.scope === 'rows' && !rows.length) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: '/rows', code: 'invalid_row' }] });
+      const wantsApprove = rows.some((r) => body.action === 'approve' && (body.scope === 'all' || body.rows!.find((x) => x.row_id === r.id)?.decision !== 'rejected'));
+      if (wantsApprove && !stepUpValid()) return stepUp();
+      const res: Outcome = { decided: 0, approved: 0, rejected: 0, held: [], failed: [] };
+      for (const r of rows) {
+        const one = body.scope === 'rows' ? body.rows!.find((x) => x.row_id === r.id)! : null;
+        const act = body.action === 'reject' || one?.decision === 'rejected' ? 'reject' : 'approve', note = (one?.note ?? body.note ?? '').trim();
+        if (act === 'reject') {
+          if (!note) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] });
+          r.decision = 'rejected'; r.note = note; res.rejected! += 1; res.decided! += 1;
+        } else { r.decision = 'approved'; r.site_id = siteMeta(20).id; res.approved! += 1; res.decided! += 1; }
+      }
+      b.version += 1; if (body.action === 'reject' && body.note) b.note = body.note.trim(); save();
+      return HttpResponse.json({ ...toBatch(b), outcome: res }, { headers: { ETag: `"${b.version}"` } });
+    }
     if (b.stream) {
       // the same transitions as on the task: L2 decides each row (a final approval needs the step-up), a return sends the task back to L1 with the note
       if (!(viewer()?.key === 'pm' || viewer()?.key === 'reviewer')) return problem(403, 'not_eligible_holder', 'You do not hold this level');
@@ -612,11 +654,28 @@ function makeBatch(key: MockRecord['register_key'], template_id: string, file_na
   rows.push({ id: crypto.randomUUID(), row_no: 8, key: siteMeta(14).code, action: 'error', decision: 'pending', payload: {}, site_index: 14, errors: [{ column: dateField?.label_en ?? 'Date', field: dateField?.code ?? 'date', code: 'invalid_date', message: 'The date must be between 2020-01-01 and 2035-12-31.' }], diff: {} });
   return { id: crypto.randomUUID(), register_key: key, template_id, file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
 }
+/** A New sites batch (contract 0.14.0): two valid rows (one Cancelled, with a cluster that will be created), a Site ID that exists already and an unknown region. */
+function makeSiteBatch(file_name: string): MockBatch {
+  const row = (n: number, key: string, data: Record<string, unknown>, extra: Partial<MockBatchRow> = {}): MockBatchRow => ({
+    id: crypto.randomUUID(), row_no: n, key, action: 'create', decision: 'pending', payload: data, site_index: null, errors: [], ...extra,
+    diff: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, { old: null, new: v }])),
+  });
+  const rows: MockBatchRow[] = [
+    row(2, 'NEW-001', { site_code: 'NEW-001', region_id: 1, name: 'New site one', name_ar: 'الموقع الجديد الأول', delivery_scenario: 'new_build', scope_tower_erection: 'yes' }),
+    row(3, 'NEW-002', { site_code: 'NEW-002', region_id: 5, name: 'New site two', delivery_scenario: 'expansion', cluster_code: 'BN-NEW', overall_status: 'cancelled' },
+      { warnings: [{ column: 'Cluster', field: 'cluster_code', code: 'cluster_will_be_created', message: 'This cluster does not exist yet: it is created in the region of the site when L2 approves.' }] }),
+    { id: crypto.randomUUID(), row_no: 4, key: siteMeta(10).code, action: 'error', decision: 'pending', payload: {}, site_index: null, diff: {},
+      errors: [{ column: 'Site ID', field: 'site_code', code: 'duplicate', message: 'This Site ID exists already. A Site ID is never reused, also when the site is cancelled or voided.' }] },
+    { id: crypto.randomUUID(), row_no: 5, key: 'NEW-004', action: 'error', decision: 'pending', payload: {}, site_index: null, diff: {},
+      errors: [{ column: 'Region', field: 'region', code: 'unknown_region', message: 'Unknown region. Use a region name, its code or a known alias (Settings, region aliases).' }] },
+  ];
+  return { id: crypto.randomUUID(), register_key: null, entity: 'site', template_id: 'TPL-SITE-NEW', file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
+}
 function toRow(r: MockBatchRow): ImportRow {
   const m = r.site_index !== null ? siteMeta(r.site_index) : null, rec = r.record_id ? R().records.find((x) => x.id === r.record_id) : undefined;
   return {
     id: r.id, sheet: r.sheet ?? 'Data', row_no: r.row_no, key: r.key, site_code: m?.code ?? r.key, record_type: rec?.record_type ?? null, record_id: r.record_id ?? null, action: r.action, diff: r.diff, errors: r.errors,
-    decision: decisionOf(r), ...(r.hold_reason ? { hold_reason: r.hold_reason } : {}), note: r.note ?? null,
+    decision: decisionOf(r), ...(r.hold_reason ? { hold_reason: r.hold_reason } : {}), note: r.note ?? null, ...(r.site_id ? { site_id: r.site_id } : {}), ...(r.warnings && !r.task_code ? { warnings: r.warnings } : {}),
     ...(r.task_code ? { task_code: r.task_code, task_id: taskIdOf(r.site_index, r.task_code), site_id: m?.id ?? null, warnings: r.warnings ?? [], source_ref: r.source_ref ?? `${r.sheet ?? 'Data'}!${r.row_no}` } : {}),
   };
 }
@@ -651,7 +710,7 @@ function toBatch(b: MockBatch): ImportBatch {
   const status = statusOf(b);
   return {
     id: b.id, template_id: b.template_id, template_version: 1, source: b.group_id ? 'master_template' : 'template', file_name: b.file_name, status, current_level: b.status === 'validated' ? 1 : 2, levels_required: 2, register_key: b.register_key, note: b.note ?? null,
-    ...(b.stream ? { stream: b.stream } : {}), ...(b.group_id ? { group_id: b.group_id, part_sheet: b.part_sheet ?? null } : {}),
+    ...(b.stream ? { stream: b.stream } : {}), ...(b.entity ? { entity: b.entity } : {}), ...(b.group_id ? { group_id: b.group_id, part_sheet: b.part_sheet ?? null } : {}),
     counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval') },
     job_id: null, task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
   };

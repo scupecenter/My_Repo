@@ -18,7 +18,7 @@ const TONE: Record<string, string> = { validated: 'bg-waitBg text-waitInk', in_a
 
 const dateOf = (iso?: string) => (iso ? iso.slice(0, 10) : '—');
 /** The kind of a template: the whole Master, a Site Register stream template (Q73), or the template of a register (a file from before 0.11.5 has no `template_kind`). */
-const kindOf = (x: Template): 'master' | 'stream' | 'register' => x.template_kind ?? (x.stream ? 'stream' : x.register_key ? 'register' : 'master');
+const kindOf = (x: Template): 'master' | 'stream' | 'register' | 'sites' => x.template_kind ?? (x.stream ? 'stream' : x.register_key ? 'register' : 'master');
 
 /**
  * The Templates page (CLAUDE.md "Approved templates only"): the approved templates to download (blank or pre-filled) and upload, and the batches of the uploads.
@@ -63,7 +63,7 @@ export function TemplatesPage() {
                   <tr key={x.template_id} className="border-t border-line" data-testid={`tpl-row-${x.template_id}`} data-register={x.register_key ?? ''} data-kind={kind} data-stream={x.stream ?? ''}>
                     <td className="p-2 font-semibold">
                       {nameOf(x)}
-                      {kind !== 'register' && <span className="chip ms-2 bg-card2 text-mute" data-testid={`tpl-kind-${x.template_id}`}>{kind === 'master' ? t('tpl.kind_master') : t('tpl.kind_stream')}</span>}
+                      {kind !== 'register' && <span className="chip ms-2 bg-card2 text-mute" data-testid={`tpl-kind-${x.template_id}`}>{kind === 'master' ? t('tpl.kind_master') : kind === 'sites' ? t('tpl.kind_sites') : t('tpl.kind_stream')}</span>}
                     </td>
                     <td className="mono p-2">{x.template_id}</td>
                     <td className="p-2"><span className="chip bg-accentSoft text-accentText" data-testid={`tpl-version-${x.template_id}`}>v{x.current_version}</span></td>

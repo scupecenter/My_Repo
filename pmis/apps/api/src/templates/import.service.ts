@@ -49,6 +49,7 @@ interface BatchRow {
   task_id: string | null;
   site_id: string | null;
   register_key: string | null;
+  entity: string | null;
   stream_code: string | null;
   group_id: string | null;
   part_sheet: string | null;
@@ -478,7 +479,7 @@ export class ImportService {
   private batchSelect(where: Prisma.Sql, tail: Prisma.Sql = Prisma.empty): Prisma.Sql {
     return Prisma.sql`
       SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
-        b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL THEN 'sites' END) AS module_key,
+        b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
         b.mode, b.file_template_version, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
@@ -521,6 +522,7 @@ export class ImportService {
         task_id: r.task_id,
         site_id: r.site_id,
         register_key: r.register_key,
+        entity: r.entity,
         stream: r.stream_code,
         group_id: r.group_id,
         part_sheet: r.part_sheet,
@@ -538,7 +540,7 @@ export class ImportService {
     const keys = await this.viewableRegisters();
     const siteRegs = await this.access.regions('sites', 'view');
     const sites = siteRegs === null || siteRegs.length > 0;
-    return Prisma.sql`(b.uploaded_by = ${auth.user.id}::uuid OR b.register_key = ANY(${keys}::text[]) ${sites ? Prisma.sql`OR b.stream_code IS NOT NULL` : Prisma.empty})`;
+    return Prisma.sql`(b.uploaded_by = ${auth.user.id}::uuid OR b.register_key = ANY(${keys}::text[]) ${sites ? Prisma.sql`OR b.stream_code IS NOT NULL OR b.entity = 'site'` : Prisma.empty})`;
   }
 
   async getBatch(auth: AuthContext, id: string): Promise<Record<string, unknown>> {
@@ -684,7 +686,7 @@ export class ImportService {
     // the level action needs the grid right on the register's module: approve for L2 (the database checks the level holders again for every row)
     const key = String(batch.register_key ?? '');
     const mod = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = ${key}`);
-    const module = batch.stream ? 'sites' : mod[0]?.module_key;
+    const module = (batch.stream || batch.entity) ? 'sites' : mod[0]?.module_key;
     if (module && (body.action === 'approve' || body.action === 'review')) {
       const regs = await this.access.regions(module, body.action === 'approve' ? 'approve' : 'view');
       if (regs !== null && regs.length === 0) throw problems.forbidden('action_forbidden', `You need ${body.action === 'approve' ? 'approve' : 'view'} on ${module}.`);

@@ -31,6 +31,9 @@ export type Page<T> = { items: T[]; page: S['PageInfo'] };
 export type Region = S['Region'];
 export type SiteListItem = S['SiteListItem'];
 export type SiteDetail = S['SiteDetail'];
+export type SiteDraft = S['SiteDraft'];
+export type SiteDraftInput = S['SiteDraftInput'];
+export type SiteDraftStatus = S['SiteDraftStatus'];
 export type PipelineNode = S['PipelineNode'];
 export type DocumentSlot = S['DocumentSlot'];
 export type DocumentFile = S['DocumentFile'];
@@ -198,8 +201,8 @@ export type UploadWarning = S['UploadWarning'];
 /** The answer of an upload: a TPL-MASTER file answers the first batch plus every batch of the file (`parts`) and what the PMIS ignored or skipped (`warnings`). */
 export type UploadedBatch = ImportBatch & { parts?: ImportBatch[]; warnings?: UploadWarning[] };
 /** The path of the review screen of a batch: a stream batch has no register. */
-export const batchPath = (b: Pick<ImportBatch, 'id' | 'register_key' | 'stream'>, fallbackKey?: string | null): string =>
-  b.stream ? `/templates/batches/${b.id}` : `/registers/${b.register_key ?? fallbackKey ?? ''}/batches/${b.id}`;
+export const batchPath = (b: Pick<ImportBatch, 'id' | 'register_key' | 'stream'> & { entity?: ImportBatch['entity'] }, fallbackKey?: string | null): string =>
+  b.stream || b.entity === 'site' ? `/templates/batches/${b.id}` : `/registers/${b.register_key ?? fallbackKey ?? ''}/batches/${b.id}`;
 export type WarehouseItem = S['WarehouseItem'];
 export type StockLevel = S['StockLevel'];
 export type StockMovement = S['StockMovement'];

@@ -1660,7 +1660,14 @@ export interface paths {
          */
         get: operations["listSites"];
         put?: never;
-        post?: never;
+        /**
+         * Propose a new site (a site draft, 0.14.0, Q460)
+         * @description Creates a **site draft**, not a site: the site exists only when L2 approves (`POST /site-drafts/{draft_id}/decide`). The caller must hold `create` on `sites`
+         *     in the region and the Entry level (L1) of the Matrix row `site_creation` there (403 `action_forbidden`, `not_eligible_holder`). The database validates the proposal
+         *     (422 `validation_failed`, `errors[].path` such as `/site_code`, `/region`, `/delivery_scenario`): the Site ID is unique for ever (also a cancelled one) and
+         *     the region may be given by `region_id` or by `region` (a name, code or alias). Landlord, phone and e-mail fields are not accepted (Q469). Audited.
+         */
+        post: operations["createSite"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1692,6 +1699,100 @@ export interface paths {
          *     propose it with `POST /sites/{site_id}/change-proposals`.
          */
         patch: operations["updateSite"];
+        trace?: never;
+    };
+    "/site-drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Site drafts of the caller's regions (0.14.0)
+         * @description Drafts (manual entries and the rows of New sites files that were sent) inside the caller's regions for the `sites` module. `mine` keeps the drafts the caller entered; `status` filters; `waiting_for_me` keeps the drafts in `in_approval` that the caller may decide.
+         */
+        get: operations["listSiteDrafts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        /** One site draft (0.14.0) */
+        get: operations["getSiteDraft"];
+        put?: never;
+        post?: never;
+        /**
+         * Discard a draft in entry (0.14.0)
+         * @description The person who entered it (or a System Admin) discards a draft that has not been sent. The draft is kept, in state `discarded`; its Site ID is free again. Audited.
+         */
+        delete: operations["discardSiteDraft"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft in entry (L1, 0.14.0)
+         * @description The whole proposal is sent again (`SiteDraftInput`) and validated like a new one. Only a draft in `entry` that does not come from an uploaded file; the caller must hold L1 of the Matrix row `site_creation` and `create` on `sites` in the region. Audited with before and after.
+         */
+        patch: operations["updateSiteDraft"];
+        trace?: never;
+    };
+    "/site-drafts/{draft_id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a draft to L2 (L1, 0.14.0)
+         * @description L1 sends the draft for approval; the L2 holders of the row in the region are notified. The proposal is validated again. **B5:** a person who holds both levels
+         *     approves their own submission at once: that needs step-up (401 `step_up_required`), creates the site and flags the draft `self_approval`.
+         */
+        post: operations["submitSiteDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/site-drafts/{draft_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * L2 approves or returns a draft (0.14.0)
+         * @description L2 (holder of the Approve level of the Matrix row `site_creation` with `approve` on `sites` in the region). `approve` creates the site on the workflow version in
+         *     force with all its tasks, runs the scenario applicability and recalculates (needs step-up); `reject` returns the draft to L1 with a mandatory `note`
+         *     (422 `note_required`). A draft that came from an uploaded file is decided in its batch (409 `invalid_transition`).
+         */
+        post: operations["decideSiteDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/sites/{site_id}/applicability": {
@@ -7941,6 +8042,8 @@ export interface components {
             id: string;
             site_code: string;
             name: string;
+            /** @description 0.14.0 (G9): the Arabic site name; the English name stays in `name`. */
+            name_ar?: string | null;
             region_id: components["schemas"]["RegionId"];
             cluster_code?: string | null;
             delivery_scenario?: components["schemas"]["DeliveryScenario"];
@@ -8512,7 +8615,7 @@ export interface components {
          * @description 0.4.6. Code of a matrix row that is not a stage: the register keys, plus `rf_design`, `acquisition` (Q44) and `deliverables` (Q71). 0.9.0: `procurement_hlc`, the row of the Procurement scope HLC (its L1 enters the HLC purchase requests). 0.11.4: `permits_hse_te`, the row of the TE stream of Permits & HSE (its L1 enters the TE permits; `permits_hse` covers CW). 0.12.2: `permits_hse_acq` (Acquisition / RF & Design stream) and `permits_hse_om` (O&M stream) of Permits & HSE (Q220). 0.12.4: `quality_te`, the row of the TE stream of QC snags (Q230; a TE snag uses its region cell, else the Quality region cell, else its global cell, else the Quality global cell).
          * @enum {string}
          */
-        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle" | "quality_te";
+        MatrixRowKey: "procurement" | "procurement_hlc" | "contractors" | "rf_design" | "acquisition" | "gecol" | "hlc" | "permits_hse" | "permits_hse_te" | "permits_hse_acq" | "permits_hse_om" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "deliverables" | "dismantle" | "quality_te" | "site_creation";
         Matrix: {
             workflow_version: number;
             /** @description Matrix revision (ETag). Rises with every saved change, in any workflow version. */
@@ -9458,10 +9561,10 @@ export interface components {
             kind: "data_import" | "assignment_import" | "config_import" | "master";
             module_key?: components["schemas"]["ModuleKey"];
             /**
-             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`) or the whole Master (`TPL-MASTER`).
+             * @description A register template (one per register), a Site Register stream template (`TPL-SITE-DA`, `-CW`, `-TE`, `-CL`), the whole Master (`TPL-MASTER`) or, since 0.14.0, the New sites template (`TPL-SITE-NEW`, kind `sites`: one row per new site, entered through batch and L2).
              * @enum {string}
              */
-            template_kind?: "register" | "stream" | "master";
+            template_kind?: "register" | "stream" | "master" | "sites";
             /** @description The register the template enters (`gecol` for TPL-GECOL). Null for a Site Register stream template or TPL-MASTER. */
             register_key?: string | null;
             /** @description The stream of a Site Register stream template (Q73): DESIGN_ACQ, CW, TE or CLOSURE. */
@@ -9554,6 +9657,11 @@ export interface components {
             /** @description Always 2. */
             levels_required?: number;
             register_key?: string | null;
+            /**
+             * @description 0.14.0: `site` for a New sites batch (the rows become site drafts when it is sent and sites when L2 approves them). Null otherwise.
+             * @enum {string|null}
+             */
+            entity?: "site" | null;
             /** @description A stream batch (0.11.5): the rows are tasks of this stream, DESIGN_ACQ, CW, TE or CLOSURE. Null for a register batch. */
             stream?: string | null;
             /**
@@ -11580,6 +11688,107 @@ export interface components {
                 photo_id: string;
                 reason: string;
             }[];
+        };
+        /**
+         * @description `entry`: being prepared by L1 (also after L2 returned it). `in_approval`: waiting for L2. `approved`: the site was created. `rejected`: a row of an uploaded file that L2 returned (the file is corrected and uploaded again). `discarded`: dropped by L1.
+         * @enum {string}
+         */
+        SiteDraftStatus: "entry" | "in_approval" | "approved" | "rejected" | "discarded";
+        /** @description The identity and scope of a site (Master B, C:S, X:AG). The region is `region_id` or `region` (a name, code or alias). Blank values are left out. No landlord, contact, phone or e-mail field exists (Q469). */
+        SiteDraftInput: {
+            /** @description Latin letters, digits, space, dot, dash, underscore or slash. Stored upper-case. */
+            site_code: string;
+            region_id?: components["schemas"]["RegionId"];
+            /** @description A region name, code or alias (for example `Tripoli Area`); the same resolution as the Master import. */
+            region?: string;
+            /** @description English site name. */
+            name: string;
+            /** @description Arabic site name (G9). */
+            name_ar?: string | null;
+            owner_site_id?: string | null;
+            /** @description An existing cluster of the region (or a global one), or a new code that is created when L2 approves. */
+            cluster_code?: string | null;
+            /** @description A code (`new_build`) or a label (`New Build`) of the DeliveryScenario list. */
+            delivery_scenario: string;
+            /** @description Indoor or Outdoor (list SiteScenario). */
+            site_scenario?: string | null;
+            /** @description A value of the list SiteType. */
+            site_type?: string | null;
+            project_phase?: string | null;
+            delivery_batch?: string | null;
+            cw_delivery_model?: string | null;
+            /** @description Yes, No (N/A) or blank; true and false are accepted. */
+            scope_tower_erection?: string | boolean | null;
+            scope_site_adaption?: string | boolean | null;
+            scope_gecol_power?: string | boolean | null;
+            scope_hlc_fiber?: string | boolean | null;
+            scope_te_full?: string | boolean | null;
+            scope_te_ip_router_only?: string | boolean | null;
+            /** @description A new site is Not Started (`not_started`); `cancelled` (or `Cancelled`) creates the site and then cancels it (Q466). */
+            overall_status?: string | null;
+            sub_region?: string | null;
+            /** @description With longitude, in range (-90 to 90). */
+            latitude?: number | string | null;
+            /** @description With latitude, in range (-180 to 180). */
+            longitude?: number | string | null;
+            address?: string | null;
+            /**
+             * Format: date
+             * @description Not in the future.
+             */
+            rf_survey_date?: string | null;
+        };
+        SiteDraft: {
+            /** Format: uuid */
+            id: string;
+            site_code: string;
+            region_id: components["schemas"]["RegionId"];
+            status: components["schemas"]["SiteDraftStatus"];
+            /** @description The validated values (`SiteDraftInput` fields in their stored form: the region as `region_id`, the scenario as its code, flags as `yes` / `na`). */
+            data: {
+                [key: string]: unknown;
+            };
+            warnings?: components["schemas"]["SiteDraftWarning"][];
+            /** @description The `If-Match` version. */
+            version: number;
+            created_by: components["schemas"]["UserRef"];
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            submitted_at?: string | null;
+            decided_by?: components["schemas"]["UserRef"] | null;
+            /** Format: date-time */
+            decided_at?: string | null;
+            decision_note?: string | null;
+            return_count?: number;
+            /** @description The note of the last return to L1. */
+            last_return_note?: string | null;
+            /** @description B5: the same person held L1 and L2. */
+            self_approval?: boolean;
+            /**
+             * Format: uuid
+             * @description The site, once approved.
+             */
+            site_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Set when the draft is a row of an uploaded New sites file (decide it in the batch).
+             */
+            batch_id?: string | null;
+            /** @description What the caller may do now. */
+            allowed_actions: ("edit" | "submit" | "discard" | "approve" | "reject")[];
+        };
+        SiteDraftWarning: {
+            field: string;
+            /** @enum {string} */
+            code: "cluster_will_be_created" | "outside_libya" | "list_other";
+            message: string;
+        };
+        SiteDraftDecision: {
+            /** @enum {string} */
+            action: "approve" | "reject";
+            /** @description Required for `reject`. */
+            note?: string;
         };
         SitePatch: {
             /** @description Field code -> value; null clears. */
@@ -13659,6 +13868,7 @@ export interface components {
         /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
         ViewCode: string;
         SiteId: string;
+        SiteDraftId: string;
         TaskId: string;
         WorkflowVersionNo: number;
         /** @description Stable milestone or gate code (for example MS4, G5). */
@@ -16413,6 +16623,34 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
+    createSite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteDraftInput"];
+            };
+        };
+        responses: {
+            /** @description The draft, in `entry`. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getSite: {
         parameters: {
             query?: never;
@@ -16470,6 +16708,205 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSiteDrafts: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["SiteDraftStatus"];
+                mine?: boolean;
+                waiting_for_me?: boolean;
+                /** @description Site ID or name. */
+                q?: string;
+                region_id?: components["schemas"]["RegionId"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Drafts, newest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SiteDraft"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getSiteDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    discardSiteDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft, `discarded`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    updateSiteDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteDraftInput"];
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    submitSiteDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft, `in_approval` (or `approved` on a self-approval). */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    decideSiteDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                draft_id: components["parameters"]["SiteDraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteDraftDecision"];
+            };
+        };
+        responses: {
+            /** @description The draft; `site_id` is set once approved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDraft"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

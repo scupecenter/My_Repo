@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
 export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string };
 
@@ -141,5 +141,34 @@ export function usePublishMatrix() {
     onError: (_e, _v, ctx) => qc.setQueryData(['matrix'], ctx?.before),
     onSuccess: (m) => qc.setQueryData(['matrix'], m),
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['matrix'] }); void qc.invalidateQueries({ queryKey: ['site-tasks'] }); },
+  });
+}
+
+// ---- Site creation (contract 0.14.0, Q460): a draft by L1, sent to L2, who approves (step-up) or returns it with a note. A site exists only after L2 approves.
+export type SiteDraftFilters = { status?: string; mine?: boolean; waiting_for_me?: boolean; q?: string };
+export const useSiteDrafts = (f: SiteDraftFilters = {}) =>
+  useQuery({ queryKey: ['site-drafts', f], queryFn: () => api.get<Page<SiteDraft>>('/site-drafts', { query: { ...f, limit: 100 } }) });
+const settleDrafts = (qc: QueryClient) => { void qc.invalidateQueries({ queryKey: ['site-drafts'] }); void qc.invalidateQueries({ queryKey: ['sites'] }); };
+export function useCreateSiteDraft() {
+  const qc = useQueryClient();
+  return useMutation<SiteDraft, ApiError, SiteDraftInput>({ mutationFn: (body) => api.post<SiteDraft>('/sites', { body }), onSettled: () => settleDrafts(qc) });
+}
+export function useUpdateSiteDraft() {
+  const qc = useQueryClient();
+  return useMutation<SiteDraft, ApiError, { draft: SiteDraft; body: SiteDraftInput }>({ mutationFn: ({ draft, body }) => api.patch<SiteDraft>(`/site-drafts/${draft.id}`, { version: draft.version, body }), onSettled: () => settleDrafts(qc) });
+}
+export function useSubmitSiteDraft() {
+  const qc = useQueryClient();
+  return useMutation<SiteDraft, ApiError, SiteDraft>({ mutationFn: (d) => api.post<SiteDraft>(`/site-drafts/${d.id}/submit`, { version: d.version }), onSettled: () => settleDrafts(qc) });
+}
+export function useDiscardSiteDraft() {
+  const qc = useQueryClient();
+  return useMutation<SiteDraft, ApiError, SiteDraft>({ mutationFn: (d) => api.del<SiteDraft>(`/site-drafts/${d.id}`, { version: d.version }), onSettled: () => settleDrafts(qc) });
+}
+export function useDecideSiteDraft() {
+  const qc = useQueryClient();
+  return useMutation<SiteDraft, ApiError, { draft: SiteDraft; action: 'approve' | 'reject'; note?: string }>({
+    mutationFn: ({ draft, action, note }) => api.post<SiteDraft>(`/site-drafts/${draft.id}/decide`, { version: draft.version, body: { action, ...(note ? { note } : {}) } }),
+    onSettled: () => settleDrafts(qc),
   });
 }

@@ -167,11 +167,15 @@ export type MockBatchRow = {
   base_id?: string; hold_reason?: 'open_version' | 'open_submission' | 'predecessor_open'; hold_record_id?: string; record_id?: string; note?: string | null;
   /** A stream batch row (contract 0.11.5): one per touched task; the file row is `row_no`. */
   task_code?: string; warnings?: { column?: string; field?: string; code: string; message?: string }[]; sheet?: string; source_ref?: string;
+  /** A New sites batch row (contract 0.14.0): the site it created once L2 approved it. */
+  site_id?: string | null;
 };
 /** `status`: validated (staged), sent (in the flow; the shown status follows the rows) or discarded. */
 export type MockBatch = {
   /** A stream batch has no register; `group_id` ties the batches of one TPL-MASTER file. */
   stream?: 'DESIGN_ACQ' | 'CW' | 'TE' | 'CLOSURE'; group_id?: string; part_sheet?: string;
+  /** `site` = a New sites batch (contract 0.14.0): its rows become site drafts, and sites when L2 approves them. */
+  entity?: 'site';
   id: string; register_key: RegisterKey | null; template_id: string; file_name: string; status: 'validated' | 'sent' | 'discarded'; version: number; created: number;
   uploaded_by: string; uploaded_at: string; note?: string | null; rows: MockBatchRow[];
 };

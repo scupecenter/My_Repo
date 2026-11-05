@@ -77,6 +77,11 @@ export function initialMatrix(): Matrix {
     kind: key === 'dismantle' ? 'dismantle' : 'register', register_key: key as Row['register_key'], code: key, name_en: en, name_ar: ar, approval_levels: 2,
     cells: [cell(key, 1, [['1509', '1204', '1407', '1408', '1508'][i % 5]]), cell(key, 2, ['1102']), cell(key, 3, ['1102'])], // L2 is cell 3; the middle cell is a leftover
   }));
+  // migration 0070 (contract 0.14.0, Q460): the Matrix row of site creation, the first register row. L1 and L2 are seeded to the System Admins (here the PM, 1001).
+  stages.splice(10, 0, {
+    kind: 'register', register_key: 'site_creation', code: 'site_creation', name_en: 'Site creation', name_ar: 'إنشاء المواقع', approval_levels: 2,
+    cells: [cell('site_creation', 1, ['1001']), cell('site_creation', 3, ['1001'])],
+  });
   // migration 0042: the Matrix row of the Procurement scope HLC, right after Procurement. L1 = the HLC Fiber Team (Nadia Hamed, 1207), L2 = the CW Team Lead (Q90).
   const at = stages.findIndex((r) => r.code === 'procurement') + 1;
   stages.splice(at, 0, {

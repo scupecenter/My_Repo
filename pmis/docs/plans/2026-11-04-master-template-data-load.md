@@ -1,6 +1,8 @@
 # Plan: loading the owner's "Site Master Template" file into the PMIS (2026-11-04)
 
-**Status:** analysis only. No code changed, nothing committed. The uploaded file is real project data. It stays outside the repository; this plan holds counts and cell addresses only (no names, phones, e-mails, Site IDs, company names or other record values).
+**Update 2026-11-05:** gaps G1 (site creation, manual and bulk), G2 (header alias for CL3), G8 (the Site Scenario list) and G9 (the Arabic site name) are built (migration 0070, contract 0.14.0, CHANGELOG 98; owner questions Q470 to Q475). Step 1 of the load order (3.2) now has its path: the template `TPL-SITE-NEW`, one batch, L2 of the Matrix row `site_creation`. The rest of this plan is unchanged.
+
+**Status (as written on 2026-11-04):** analysis only. No code changed, nothing committed. The uploaded file is real project data. It stays outside the repository; this plan holds counts and cell addresses only (no names, phones, e-mails, Site IDs, company names or other record values).
 
 **Input:** `GSDN_Site_Master_Template.xlsx`, uploaded by the product owner on 2026-11-04 with the request "study the file and determine how the data will be loaded into the system". The file was read read-only with openpyxl (`python3 -I`, scripts kept outside the upload folder); no macro or formula was run.
 

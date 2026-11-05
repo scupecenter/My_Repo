@@ -3,12 +3,22 @@ import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
+import { SiteDraftsService } from './site-drafts.service';
 import { SitesService } from './sites.service';
 
 /** The Site Register (سجل المواقع): site list with streams, site detail, task grid. */
 @Controller('sites')
 export class SitesController {
-  constructor(private readonly sites: SitesService) {}
+  constructor(private readonly sites: SitesService, private readonly drafts: SiteDraftsService) {}
+
+  /** Contract 0.14.0 (Q460): propose a new site. This creates a draft; the site exists only when L2 approves it. */
+  @Post()
+  @HttpCode(201)
+  async create(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Record<string, unknown>> {
+    const draft = await this.drafts.create(auth, body);
+    res.setHeader('ETag', etagHeader(draft.version as number));
+    return draft;
+  }
 
   @Get()
   list(@Auth() auth: AuthContext, @Query() query: Record<string, unknown>) {

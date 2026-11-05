@@ -211,7 +211,9 @@ export const siteHandlers = [
       ['TPL-SITE-TE', 'Site Register: Installation (TE)', 'سجل المواقع: التركيبات', 'stream', 'TE', 5],
       ['TPL-SITE-CL', 'Site Register: Handover & Closure', 'سجل المواقع: التسليم والإغلاق', 'stream', 'CLOSURE', 6],
     ].map(([id, en, ar, tk, stream]) => ({ template_id: id, name_en: en, name_ar: ar, kind: 'data_import', template_kind: tk, module_key: 'sites', register_key: null, stream, current_version: 1, issued_at: issued, is_active: true, versions })) : [];
-    return HttpResponse.json({ items: [...site, ...registers, ...legacy] } as never);
+    // contract 0.14.0 (Q460): the New sites template, for those who may create sites and use the Templates page (the engineer creates by hand only)
+    const newSites = v.nav.includes('sites') && v.nav.includes('templates') && ['pm', 'reviewer'].includes(v.key) ? [{ template_id: 'TPL-SITE-NEW', name_en: 'New sites', name_ar: 'مواقع جديدة', kind: 'data_import', template_kind: 'sites', module_key: 'sites', register_key: null, stream: null, current_version: 1, issued_at: issued, is_active: true, versions }] : [];
+    return HttpResponse.json({ items: [...newSites, ...site, ...registers, ...legacy] } as never);
   }),
   http.get(`${B}/templates/:id/download`, ({ params, request }) => {
     const g = guard(); if (g) return g;

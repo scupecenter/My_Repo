@@ -15,7 +15,7 @@ import { registerErrorMessage } from '@/lib/registerErrors';
  * (columns and sheets the PMIS does not own are ignored), then the caller opens the first batch.
  */
 export function TemplateUploadDialog({ open, onClose, templateId, templateName, taskId, kind = 'register', onDone }: {
-  open: boolean; onClose: () => void; templateId: string; templateName: string; taskId?: string; kind?: 'register' | 'stream' | 'master'; onDone: (b: ImportBatch) => void;
+  open: boolean; onClose: () => void; templateId: string; templateName: string; taskId?: string; kind?: 'register' | 'stream' | 'master' | 'sites'; onDone: (b: ImportBatch) => void;
 }) {
   const { t } = useTranslation();
   const upload = useUploadBatch();
@@ -29,7 +29,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
   const send = () => {
     if (!file) return;
     setError(null);
-    upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' ? 'submit' : mode }, {
+    upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' || kind === 'sites' ? 'submit' : mode }, {
       onSuccess: (b) => { if (b.parts?.length || b.warnings?.length) setResult(b); else { reset(); onDone(b); } },
       onError: (e) => setError({
         text: registerErrorMessage(t, e),
@@ -53,10 +53,11 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
                 <li>{t('tpl.rule_version')}</li>
                 <li>{t('tpl.rule_xlsx')}</li>
                 <li>{t('tpl.rule_flow')}</li>
-                {kind !== 'register' && <li data-testid="template-upload-rule-tasks">{t('tpl.rule_tasks')}</li>}
+                {kind !== 'register' && kind !== 'sites' && <li data-testid="template-upload-rule-tasks">{t('tpl.rule_tasks')}</li>}
+                {kind === 'sites' && <li data-testid="template-upload-rule-sites">{t('tpl.rule_sites')}</li>}
                 {kind === 'master' && <li data-testid="template-upload-rule-master">{t('tpl.rule_master')}</li>}
               </ul>
-              {kind !== 'register' && (
+              {kind !== 'register' && kind !== 'sites' && (
                 <fieldset className="space-y-1 text-sm" data-testid="template-upload-mode">
                   <legend className="font-semibold">{t('tpl.mode')}</legend>
                   {(['submit', 'draft'] as const).map((m) => (

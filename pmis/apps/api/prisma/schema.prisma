@@ -676,6 +676,7 @@ model Site {
   site_code               String            @unique // Master B Site ID
   owner_site_id           String? // Master C
   name                    String
+  name_ar                 String? // 0070 (G9): the Arabic site name; name stays the English one
   region_id               Int
   workflow_version_id     String            @db.Uuid // the workflow version this site runs on; changed only by migration
   sub_region              String?
@@ -1465,6 +1466,7 @@ model ImportBatch {
   submitted_by        String?   @db.Uuid
   closed_at           DateTime? @db.Timestamptz(6)
   stream_code         String? // a stream batch: the rows are tasks of this stream (0051)
+  entity              String? // 0070: site = a New sites batch (its rows become site drafts, then sites when L2 approves)
   group_id            String?   @db.Uuid // the batches of one TPL-MASTER file
   part_sheet          String? // the sheet of the file this batch came from
   mode                  String    @default("submit") // submit or draft (Save Draft / Planning, Q206; 0060)
@@ -1510,6 +1512,7 @@ model ImportBatchRow {
   ord                Int       @default(0) // the order of the rows in the preview (several task rows share one file row)
   source_ref         String? // Sheet!row of the file (the comparison report of the parallel run)
   task_submitted_at  DateTime? @db.Timestamptz(6)
+  site_draft_id      String?   @db.Uuid // 0070: the site draft this row created when the batch was sent
 
   batch ImportBatch @relation(fields: [batch_id], references: [id], onDelete: Cascade)
 
@@ -3134,4 +3137,32 @@ model StatusUpdate {
 
   @@index([week_start(sort: Desc), region_id, team])
   @@map("status_updates")
+}
+
+/// 0070 (G1, Q460): a proposed site (manual entry, or one row of a New sites file). It becomes a site only when L2 approves (site_create_apply).
+/// Written only by the site_draft_* and imp_*_site_batch functions; pmis_app reads it through row level security.
+model SiteDraft {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  site_code        String
+  region_id        Int
+  data             Json
+  status           String    @default("entry") // entry, in_approval, approved, rejected, discarded
+  version          Int       @default(1)
+  created_by       String    @db.Uuid
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  submitted_by     String?   @db.Uuid
+  submitted_at     DateTime? @db.Timestamptz(6)
+  decided_by       String?   @db.Uuid
+  decided_at       DateTime? @db.Timestamptz(6)
+  decision_note    String?
+  return_count     Int       @default(0)
+  last_return_note String?
+  self_approval    Boolean   @default(false)
+  site_id          String?   @db.Uuid
+  batch_id         String?   @db.Uuid
+  batch_row_id     String?   @db.Uuid
+
+  @@index([status, region_id, created_at(sort: Desc)], map: "site_drafts_status_region_idx")
+  @@map("site_drafts")
 }

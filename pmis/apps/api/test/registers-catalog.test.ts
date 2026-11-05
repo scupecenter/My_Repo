@@ -263,7 +263,7 @@ const SPECS: Spec[] = [
     data: () => ({
       latitude: 32.8,
       longitude: 13.2,
-      site_scenario: "New Build",
+      site_scenario: "Indoor", // 0070 (G8): the list of this field is Indoor / Outdoor
       tssr_submitted: "2026-01-05",
       tssr_approved: "2026-01-07",
     }),

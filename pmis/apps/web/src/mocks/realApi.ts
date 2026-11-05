@@ -326,6 +326,15 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/me/drafts/:key'],
   // Contract 0.13.2 (follow-up group C, migration 0068): a System Admin cancels an approved Quality snag record entered by mistake (Q267).
   ['post', '/registers/quality/records/:id/cancel-snag'],
+  // Contract 0.14.0 (site creation, migration 0070, Q460; apps/api: sites): POST /sites creates a site draft, /site-drafts/* is its life. The template download, the
+  // upload and the batch review use the paths of 0.7.0 above (no endpoint was added for them).
+  ['post', '/sites'],
+  ['get', '/site-drafts'],
+  ['get', '/site-drafts/:id'],
+  ['patch', '/site-drafts/:id'],
+  ['delete', '/site-drafts/:id'],
+  ['post', '/site-drafts/:id/submit'],
+  ['post', '/site-drafts/:id/decide'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

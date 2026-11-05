@@ -42,7 +42,7 @@ type Cell = string | number | Date | { formula: string; result: unknown };
 const day = (iso: string): Date => new Date(`${iso}T00:00:00.000Z`);
 
 /** A Master workbook as the owner keeps it: three header rows, a SUBTOTAL row, data rows from row 5, the Setting sheet with Project Staff. No _tpl. */
-async function masterFile(rows: Record<string, Cell>[], o: { staff?: [string, string, string][]; dropHeader?: string; sheets?: string[]; noMaster?: boolean; tpl?: boolean } = {}): Promise<Buffer> {
+async function masterFile(rows: Record<string, Cell>[], o: { staff?: [string, string, string][]; dropHeader?: string; rename?: Record<string, string>; sheets?: string[]; noMaster?: boolean; tpl?: boolean } = {}): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   wb.addWorksheet('Guide').getCell('A1').value = 'Guide';
   if (!o.noMaster) {
@@ -51,7 +51,7 @@ async function masterFile(rows: Record<string, Cell>[], o: { staff?: [string, st
       if (c.letter === o.dropHeader) continue;
       ws.getCell(`${c.letter}1`).value = c.group_top ?? null;
       ws.getCell(`${c.letter}2`).value = c.group_mid ?? null;
-      ws.getCell(`${c.letter}3`).value = c.name ?? null;
+      ws.getCell(`${c.letter}3`).value = o.rename?.[c.letter] ?? c.name ?? null;
       ws.getCell(`${c.letter}4`).value = { formula: `SUBTOTAL(3,${c.letter}5:${c.letter}504)`, result: 0 };
     }
     rows.forEach((r, i) => {
@@ -272,6 +272,28 @@ describe('legacy Master import: refusals', () => {
     expect(broken.body.detail).toContain('CW Survey & Analysis Report / Actual Date');
     // the database refuses the staging to anyone else whatever the API did
     expect(await q(db, `SELECT count(*)::int AS n FROM master_reconciliation_runs WHERE created_by = $1`, [importer.user.id])).toEqual([{ n: 0 }]);
+  });
+});
+
+describe('legacy Master import: a known header alias (G2, migration 0070)', () => {
+  it('accepts CL3 "IP Router" for "Indoor IP Router" and reports it, and still refuses any other renamed header', async () => {
+    const admin = await plainAdmin(app, db);
+    // the header of the owner file: the name part of CL3 is "IP Router"
+    const aliased = await uploadMaster(admin.api, await masterFile([{ A: 1, B: 'X-ALIAS-1' }], { rename: { CL: 'IP Router' } }));
+    expect(aliased.status).toBe(201);
+    expect(aliased.body.structure).toMatchObject({ identified: true, columns_found: 187, aliased: [{ letter: 'CL', header: 'TE Installation Items / Indoor IP Router', in_file: 'TE Installation Items / IP Router' }], missing_typed: [] });
+    expect(aliased.body.structure.extra).not.toContain('TE Installation Items / IP Router');
+    // another renamed typed column is not an alias: the check stays exact
+    const renamed = await uploadMaster(admin.api, await masterFile([{ A: 1, B: 'X-ALIAS-2' }], { rename: { AO: 'Real Date' } }));
+    expect(renamed.status).toBe(422);
+    expect(renamed.body).toMatchObject({ code: 'template_rejected', reason: 'structure_mismatch' });
+    expect(renamed.body.detail).toContain('CW Survey & Analysis Report / Actual Date');
+    // an alias of another column does not rescue it: CL3 may be "IP Router", not "Indoor Rack"
+    const other = await uploadMaster(admin.api, await masterFile([{ A: 1, B: 'X-ALIAS-3' }], { rename: { CL: 'Indoor Rack' } }));
+    expect(other.status).toBe(422);
+    expect(other.body).toMatchObject({ code: 'template_rejected', reason: 'structure_mismatch' });
+    // the alias list is data: the application role reads it and cannot write it
+    expect(await q(db, `SELECT letter, alias FROM master_header_aliases WHERE is_active`)).toEqual([{ letter: 'CL', alias: 'IP Router' }]);
   });
 });
 

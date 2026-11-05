@@ -32,6 +32,7 @@ interface SiteRow {
   id: string;
   site_code: string;
   name: string;
+  name_ar: string | null;
   region_id: number;
   cluster_code: string | null;
   delivery_scenario: string | null;
@@ -259,7 +260,7 @@ export class SitesService {
           bool_and(is_done OR is_na) AS all_done, bool_or(NOT is_na) AS has_work
         FROM flags GROUP BY site_id
       )
-      SELECT vis.id::text AS id, vis.site_code, vis.name, vis.region_id, vis.cluster_code_v AS cluster_code, vis.delivery_scenario::text AS delivery_scenario,
+      SELECT vis.id::text AS id, vis.site_code, vis.name, vis.name_ar, vis.region_id, vis.cluster_code_v AS cluster_code, vis.delivery_scenario::text AS delivery_scenario,
         vis.overall_status::text AS overall_status, vis.current_milestone AS current_milestone_col, vis.next_milestone AS next_milestone_col,
         vis.wf_version AS workflow_version, vis.workflow_version_id::text AS workflow_id, count(*) OVER () AS total
       FROM vis LEFT JOIN ss ON ss.site_id = vis.id
@@ -336,6 +337,7 @@ export class SitesService {
       id: site.id,
       site_code: site.site_code,
       name: site.name,
+      name_ar: site.name_ar,
       region_id: site.region_id,
       cluster_code: site.cluster_code,
       ...(site.delivery_scenario ? { delivery_scenario: site.delivery_scenario } : {}),
@@ -372,7 +374,7 @@ export class SitesService {
   private async siteRow(regions: number[] | null, id: string): Promise<(SiteRow & Record<string, unknown>) | undefined> {
     if (!uuidSchema.safeParse(id).success) return undefined;
     const rows = await this.db.tx.$queryRaw<(SiteRow & Record<string, unknown>)[]>(Prisma.sql`
-      SELECT s.id::text AS id, s.site_code, s.name, s.region_id, c.cluster_code, s.cluster_id::text AS cluster_id, s.delivery_scenario::text AS delivery_scenario,
+      SELECT s.id::text AS id, s.site_code, s.name, s.name_ar, s.region_id, c.cluster_code, s.cluster_id::text AS cluster_id, s.delivery_scenario::text AS delivery_scenario,
         s.overall_status::text AS overall_status, s.current_milestone AS current_milestone_col, s.next_milestone AS next_milestone_col,
         wd.version AS workflow_version, s.workflow_version_id::text AS workflow_id, s.owner_site_id, s.sub_region, s.latitude::float8 AS latitude,
         s.longitude::float8 AS longitude, s.address, s.site_type, s.project_phase, s.delivery_batch, s.cw_delivery_model,
