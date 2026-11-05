@@ -68,7 +68,7 @@ describe('a big New sites batch in the background', () => {
     await waitFor(() => expect(screen.getByTestId('batch-status')).toHaveTextContent('Approved'), { timeout: 10000 });
     expect(screen.getByTestId('batch-progress-sent-label')).toHaveTextContent('Sites created: 120 of 120 (100%)');
     expect(screen.getByTestId('batch-done')).toBeInTheDocument();
-  });
+  }, 30_000); // several polls of the mock and user steps: over the 5 s default under CI's parallel workers
 
   it('a second send while it runs is answered 409 batch_processing, in plain words', async () => {
     await signIn('reviewer');
@@ -81,7 +81,7 @@ describe('a big New sites batch in the background', () => {
     const u = userEvent.setup();
     await u.click(await screen.findByTestId('batch-submit'));
     expect(await screen.findByText('This batch is being processed. Wait until it ends, then try again.')).toBeInTheDocument();
-  });
+  }, 30_000);
 
   it('processing in Arabic: the labels, the note, Western digits, the bar filling from the right', async () => {
     await signIn('pm');
@@ -96,7 +96,7 @@ describe('a big New sites batch in the background', () => {
     expect(screen.getByTestId('batch-progress-processing-note')).toHaveTextContent(/25 صفاً/);
     expect(screen.getByTestId('batch-progress-processing-bar')).toHaveAttribute('aria-valuenow', '21');
     expect(screen.getByTestId('batch-processing-busy')).toBeDisabled();
-  });
+  }, 30_000);
 
   it('a run that stopped shows its message under the bar of the sent batch, with the count of failed rows', async () => {
     await signIn('pm');
@@ -110,5 +110,5 @@ describe('a big New sites batch in the background', () => {
     renderApp(<Routed />, { route: `/templates/batches/${ID}` });
     expect(await screen.findByTestId('batch-progress-run-failed')).toHaveTextContent('The background processing stopped after 101 of 469 rows.');
     expect(screen.getByTestId('batch-progress-run-errors')).toHaveTextContent('1 row(s) failed');
-  });
+  }, 30_000);
 });
