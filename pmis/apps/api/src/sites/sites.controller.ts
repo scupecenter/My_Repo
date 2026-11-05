@@ -42,7 +42,10 @@ export class SitesController {
     return site;
   }
 
-  /** Q225: propose a change to a site field that requires approval (one Change Control draft per field). */
+  /**
+   * Q225: propose a change to a site field that requires approval (one Change Control draft per field). Contract 0.14.1 (Q473): the same path changes the identity of
+   * the site (names, coordinates, and for a System Admin region and cluster); the Site ID never changes. There is no direct edit of the identity (PATCH writes custom values).
+   */
   @Post(':id/change-proposals')
   @HttpCode(201)
   propose(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {

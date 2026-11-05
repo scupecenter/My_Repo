@@ -7,6 +7,7 @@ import { useRegions, useSite, useSiteTasks } from '@/api/sites';
 import { FollowButton } from '@/components/FollowButton';
 import { SiteDocuments } from '@/components/SiteDocuments';
 import { SiteFields } from '@/components/SiteFields';
+import { SiteIdentity } from '@/components/SiteIdentity';
 import { SiteSnags } from '@/components/SiteSnags';
 import { SiteApplicability } from '@/components/SiteApplicability';
 import { SiteDispatchPanel } from '@/components/SiteDispatch';
@@ -70,6 +71,7 @@ export function Site() {
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>
+          <SiteIdentity site={s} />
           <SiteFields site={s} />
           {cp && <div className="my-3 flex items-center gap-2 rounded-lg bg-openBg p-3 text-openInk" data-testid="cluster-progress"><Layers size={16} />{t('site.cluster', { code: cp.cluster_code, at: cp.sites_at_te_pac, total: cp.sites_total })}</div>}
           <div role="tablist" aria-label={t('site.sections')} className="mt-3 flex gap-1" data-testid="site-section-tabs">
