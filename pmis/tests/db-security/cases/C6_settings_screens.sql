@@ -53,6 +53,15 @@ DELETE FROM settings WHERE key = 'calendar.official_confirmed';
 INSERT INTO settings (key, value, updated_at) VALUES ('mail.notification_kinds', '["mention"]'::jsonb, now()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
 -- @end
 
+-- @case SCR-05R
+-- @title The System Admin renames the mail notification kinds row away (the default then applies with no reason, step-up or audit row): the update trigger looks at the old key too
+-- @category settings-screens
+-- @actor ADMIN
+-- @region *
+-- @expect error 42501 permission denied
+UPDATE settings SET key = 'mail.notification_kinds_old' WHERE key = 'mail.notification_kinds';
+-- @end
+
 -- @case SCR-06
 -- @title Alice inserts a settings row
 -- @category settings-screens

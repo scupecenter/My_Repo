@@ -379,8 +379,12 @@ BEGIN
   END IF;
   RETURN coalesce(NEW, OLD);
 END $$;
-CREATE TRIGGER b_settings_guarded_keys BEFORE INSERT OR UPDATE ON settings FOR EACH ROW
+CREATE TRIGGER b_settings_guarded_keys BEFORE INSERT ON settings FOR EACH ROW
   WHEN (NEW.key IN ('calendar.official_confirmed', 'mail.notification_kinds')) EXECUTE FUNCTION settings_guarded_keys();
+-- an UPDATE is guarded when either the old or the new key is guarded, so a guarded row cannot be renamed away (security review 2026-11-05)
+CREATE TRIGGER b_settings_guarded_keys_update BEFORE UPDATE ON settings FOR EACH ROW
+  WHEN (OLD.key IN ('calendar.official_confirmed', 'mail.notification_kinds') OR NEW.key IN ('calendar.official_confirmed', 'mail.notification_kinds'))
+  EXECUTE FUNCTION settings_guarded_keys();
 CREATE TRIGGER b_settings_guarded_keys_delete BEFORE DELETE ON settings FOR EACH ROW
   WHEN (OLD.key IN ('calendar.official_confirmed', 'mail.notification_kinds')) EXECUTE FUNCTION settings_guarded_keys();
 
