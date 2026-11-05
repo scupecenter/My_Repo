@@ -1736,7 +1736,8 @@
     "in_house_no_order": "In-house work has no Procurement order.",
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
     "outsourced_no_internal_team": "Outsourced work takes its contractor from the Procurement order.",
-    "execution_mode_required": "Choose the execution mode (Outsourced or In-House) first."
+    "execution_mode_required": "Choose the execution mode (Outsourced or In-House) first.",
+    "batch_processing": "This batch is being processed. Wait until it ends, then try again."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -1810,7 +1811,9 @@
     "decision_saved": "Saved (draft)",
     "hold_gate_locked": "Held: the gate is not open yet",
     "site_name": "New sites",
-    "open_site": "Open site"
+    "open_site": "Open site",
+    "processing_started": "The batch is being processed in the background. The bar shows the progress.",
+    "processing_busy": "Processing…"
   },
   "batchProgress": {
     "title": "Import progress",
@@ -1831,7 +1834,12 @@
     "failed": "The check of the file failed. Nothing was saved. Upload the file again.",
     "discarded": "This batch was discarded before it was sent.",
     "loading_rows": "Loading {{loaded}} of {{total}} rows…",
-    "rows_incomplete": "Not all rows are loaded yet: the filters show the loaded rows only."
+    "rows_incomplete": "Not all rows are loaded yet: the filters show the loaded rows only.",
+    "processing": "Processing in the background: {{done}} of {{total}} rows ({{pct}}%)",
+    "processing_sites": "Sites created {{done}} of {{total}} ({{pct}}%)",
+    "processing_note": "This batch is processed in the background in parts of 25 rows. You can leave this page; Send and Approve are available again when it ends.",
+    "processing_failed": "The background processing stopped after {{done}} of {{total}} rows. The rows done are kept; the others are still waiting.",
+    "processing_errors": "{{count}} row(s) failed: see the rows marked with an error."
   },
   "batchStatus": {
     "parsing": "Checking",
@@ -1844,7 +1852,8 @@
     "applied": "Applied",
     "undone": "Undone",
     "failed": "Failed",
-    "discarded": "Discarded"
+    "discarded": "Discarded",
+    "processing": "Processing"
   },
   "matrixMore": {
     "rule": "Rule",

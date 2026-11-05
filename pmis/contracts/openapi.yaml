@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.14.3
+  version: 0.14.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
     - 0.14.3 (2026-11-05): the one-time historical-load document waiver (decision on owner question Q462, `docs/spec/technical-decisions-2026-11-04.md`; migration 0073; CHANGELOG 102). Additive. (1) `GET /settings/historical-waiver` (`getHistoricalWaiver`, any signed-in user: open or closed, cutoff date, expiry, whether the caller may manage it) and `PUT /settings/historical-waiver` (`setHistoricalWaiver`: a System Admin only, never a delegate, 403 `action_forbidden`; step-up; a reason; opening needs a cutoff date that is not in the future, 422 `validation_failed`; it closes itself after 30 days or by hand; every change is audited with the admin-override flag; the setting `load.historical_waiver` is written by no other path). (2) While it is open, a System Admin may mark a batch "historical load: accept without documents": `POST /import-batches` (a Site Register stream template) takes the form field `historical_load_reason`, and `POST /master-import/runs/{run_id}/apply` takes `historical_load: {reason}`; both need a step-up (401 `step_up_required`) and the open waiver (409 `invalid_transition`). For the rows of that batch the mandatory-document check is skipped only when the task's actual date is on or before the cutoff date; every other check runs; rows after the cutoff and every other batch are unchanged (the preview row carries the warning `historical_no_documents`). `ImportBatch.historical_load` shows the mark. (3) A task submitted that way has `TaskSummary.historical_no_documents` = true (the "Admin override" badge in the task and in the task grid; `TaskDetail.historical_load` has the batch, the cutoff and the missing document codes) and an audit row `task_historical_no_documents` (before and after values, the batch reference, `is_admin_override`). (4) Reversible: uploading the missing documents later is allowed on a flagged task even after its approval (`POST /tasks/{task_id}/slots/{slot_id}/files`) and, when no mandatory slot is missing any more, clears the flag by itself (audited `task_historical_no_documents_cleared`); a task that goes back to Data Entry loses the flag too. (5) KPIs: a flagged task is treated like an admin override. It is left out of the SLA and on-time figures when `exclude_overrides` is on (the default), counted otherwise; `KpiMeta.override_flagged_count` includes it and the new `KpiMeta.historical_flagged_count` counts only these; the health index leaves it out of documentation completeness and first-time approval; Project Status progress is unchanged.
     - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
     - 0.14.1 (2026-11-05): technical decision Q473 (`docs/spec/technical-decisions-2026-11-04.md`, "Site creation"; migration 0071; CHANGELOG 100). Additive: no new path. The identity of a site changes only through a Change Control proposal (L1 proposes, L2 approves, audited with before and after values), never by a direct edit. `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`) gains the optional `identity` object (`SiteIdentityProposal`: `name`, `name_ar`, `latitude` with `longitude` as one pair, `region_id`, `cluster_code`, and `site_code`, which is always refused); `custom` becomes optional (send `custom`, `identity` or both; a reason is still required). One Change Control draft (Data Correction, Field) is opened per item (`field_item` `site.name`, `site.name_ar`, `site.coordinates`, `site.region` with the cluster, `site.cluster`); the result items carry `field` `name`, `name_ar`, `coordinates`, `region` or `cluster`. Field codes: `/identity/site_code` `immutable` (the Site ID never changes; also at submit of a hand-made Change Control record that names `site.site_code`), `unknown_field`, `required`, `too_long`, `invalid` (ranges of the site creation: latitude -90..90, longitude -180..180), `pair_required`, `unchanged`, `unknown_region`, `unknown_cluster`, `cluster_other_region` (a cluster must belong to the target region or be global; a region change names a cluster of the new region or none when the site's cluster would not fit). Region and cluster change who can see the site, so only a System Admin proposes or approves them: a Team Lead or a delegate gets 403 `action_forbidden` at the proposal, at submit and at the approval. On approval the site moves (its tasks and records follow), it is recalculated and the change is audited (`site_change_applied`, plus `site_region_moved_out` for the old region). Direct writes are closed: `pmis_app` can no longer update `sites.site_code`, `name`, `name_ar`, `region_id`, `cluster_id`, `latitude` or `longitude`, and the function `admin_transfer_site_region` is dropped. `PATCH /sites/{site_id}` writes custom values only (unchanged). `SiteDetail` and `GET /sites/{site_id}` are unchanged.
@@ -8051,6 +8052,7 @@ paths:
       description: |
         Only the uploader (403 `not_eligible_holder` for anyone else, an admin too: the records are entered as L1 in the uploader's name only). Each valid row (`create` or `update`) becomes a register record, and is submitted as the uploader through the same functions as manual entry (`reg_save_record`, `reg_new_version`, `reg_transition_record`, with the import row so that the audit and the history show "via batch"), so it follows the Matrix row of its register: L2 Data Reviewer & Approver decides next. An update is a new version of the record in force; the version in force stays until the new one is approved (R9).
         **Stream batches (0.11.5):** each valid task row starts the task when it is pending (the start date is the actual start of the row, else today), saves its entry and submits it as the uploader through the same functions as the task screen (`wf_start`, `wf_save_entry`, `wf_submit`, with the import row so that the task history and the audit show "via batch"); the task then waits for L2 Data Reviewer & Approver of its Matrix cell. The conditional documents that apply are judged first, as on the task screen. A row whose task is in review or approval, or waits for a predecessor, is held `pending_previous_approval` and listed in `outcome.held` (`open_submission`, `predecessor_open`); a row whose task a closed gate locks becomes an `error` row (`gate_locked`, in `outcome.failed`). When the caller also holds L2 of a task, the submission is a self-approval and needs a step-up.
+        **Big New sites batches (0.14.4):** with more rows to send than the setting `imports.async_rows` (default 50) the answer is 202: the checks above are made first (the uploader, If-Match, the state, the L1 and the L2 holders, the step-up of a self-approval: 401 and nothing queued), then the batch is `processing` and the rows are sent in chunks of 25 in the background, each chunk committed on its own; `progress` and the counts move while the page polls. A second send while it runs answers 409 `batch_processing`.
         A row whose logical record has an open version is held `pending_previous_approval` and listed in `outcome.held`; send the batch again after that version is decided and the row is released. A row that the register refuses at submit becomes an `error` row (listed in `outcome.failed`) and nothing of it is kept. When the caller also holds L2, the submission is a self-approval and needs a step-up (401 `step_up_required`, nothing is created).
       x-db-path: imp_submit_batch
       parameters:
@@ -8068,6 +8070,13 @@ paths:
                 - type: object
                   properties:
                     outcome: {$ref: '#/components/schemas/ImportBatchOutcome'}
+        '202':
+          description: '0.14.4: a New sites batch with more rows to send than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are sent in the background (poll `GET /import-batches/{batch_id}` until the status changes).'
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -8086,6 +8095,7 @@ paths:
         A row is decided by the same transition a person makes on the record it created (`reg_transition_record`), with the same grid right (`approve` on the register's module for L2), the same holders of the Matrix row and the same step-up for a final approval (401 `step_up_required`); nothing here is a shortcut.
         **Stream batches (0.11.5):** a row is decided by the function a person calls on the task (`wf_review`, `wf_approve`, `wf_reject`) with the grid right `approve` on `sites`, the holders of the task's L2 cell, the step-up of a final approval and the gates and successors of the engine; a return sends the task back to L1 with the note (a rejection comment on the task). A held row is returned by the uploader or an L2 holder of its task.
         `approve` (or `review`, for a record still at a legacy middle level) with `scope=all` decides every open row; with `scope=rows` the rows listed. `reject` returns the rows to the uploader with a note (mandatory, 422 `note_required`): the record goes back to L1 Data Entry, the row is `rejected`. `discard` (uploader or System Admin) closes a batch that was not sent; nothing was created.
+        **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return is always answered at once.
         Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
       x-step-up: when an approval is final (L2 approve) or a self-approval (B5); not for a return or a discard
       x-db-path: imp_decide_batch
@@ -8110,6 +8120,13 @@ paths:
                 - type: object
                   properties:
                     outcome: {$ref: '#/components/schemas/ImportBatchOutcome'}
+        '202':
+          description: '0.14.4: the approval of a New sites batch with more rows than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are approved (the sites created) in the background.'
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ImportBatch'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -11724,6 +11741,7 @@ components:
         - file_pending_scan
         - list_not_configured
         - email_not_verified
+        - batch_processing
     PageEnvelope:
       type: object
       required: [items, page]
@@ -14112,6 +14130,25 @@ components:
               key: { type: [string, 'null'] }
               code: { type: string }
               message: { type: string }
+    ImportBatchProgress:
+      type: object
+      description: '0.14.4: the background run of a big New sites batch. It is done in chunks of 25 rows, each committed on its own, so `rows_done` and the counts of the batch move while it runs.'
+      required: [job_id, kind, state, rows_total, rows_done, percent]
+      properties:
+        job_id: { type: string, format: uuid }
+        kind: { type: string, enum: [submit, decide], description: '`submit`: the send of the uploader (a self-approval creates the sites); `decide`: an L2 approval.' }
+        state: { type: string, enum: [running, done, failed], description: '`failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.' }
+        rows_total: { type: integer }
+        rows_done: { type: integer }
+        percent: { type: integer, minimum: 0, maximum: 100 }
+        submitted: { type: integer, description: Rows sent (a send). }
+        approved: { type: integer, description: 'Rows approved, that is sites created.' }
+        rejected: { type: integer }
+        failed: { type: integer, description: 'Rows that failed; each carries its error in `GET /import-batches/{batch_id}/rows`.' }
+        started_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        error: { type: [string, 'null'] }
     ImportBatch:
       type: object
       required: [id, template_id, template_version, status, counts, version]
@@ -14123,8 +14160,9 @@ components:
         file_name: { type: string }
         status:
           type: string
-          enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed, discarded]
+          enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed, discarded, processing]
           description: |
+            `processing` (0.14.4): a big New sites batch is being sent or approved in the background (see `progress`); a send, a decision or a discard answers 409 `batch_processing` until it ends, then the batch shows its usual status.
             `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
             The status follows the rows and the records they created, so an approval made in the register screen counts too. `in_review`, `applied` and `undone` are not used for registers (two fixed levels; undo is not built).
         current_level: { type: integer, description: '1 while the batch waits for the uploader (L1 Data Entry), 2 once it is sent (L2 Data Reviewer & Approver).' }
@@ -14151,6 +14189,7 @@ components:
             held: { type: integer, description: Rows held `pending_previous_approval`. }
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
         job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
+        progress: { oneOf: [ { $ref: '#/components/schemas/ImportBatchProgress' }, { type: 'null' } ], description: '0.14.4: the latest background run of a big New sites batch (send or approval); null when the batch never had one.' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
         uploaded_by: { $ref: '#/components/schemas/UserRef' }

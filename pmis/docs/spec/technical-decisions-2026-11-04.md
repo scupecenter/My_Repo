@@ -270,6 +270,22 @@ The owner delegated Q480 and Q485 to Q489 to the technical lead. All six keep th
 | Q488 | No mail or in-app notice at 7 days left or on closing. The waiver is opened on purpose by a System Admin for a planned load, the Settings screen shows its state and end date, and the self-closing is audited. A notice can be added later as a notification kind if the load runs late. | Confirmed as built |
 | Q489 | The cutoff date of an open waiver cannot change. To change it the System Admin closes the waiver and opens it again, which starts a new 30-day window and a new audit trail; a batch marked earlier is accepted only while the waiver it was marked under is open with the same cutoff. | Confirmed as built |
 
+## Big New sites batches in the background, decided 2026-11-05 (4)
+
+The owner sent a New sites batch of 469 rows while holding L1 and L2 of the Matrix row `site_creation`, so the send created every site in the same request. It took about 0.31 s per site (about 145 s): nginx answered 504 after 120 s, and the API rolled the request back anyway, because **every request runs in one database transaction that Prisma ends after 30 s** (`TxInterceptor`, `timeout: 30_000`). Nothing was kept. Raising the nginx limit alone could never help. Built in migration 0074, contract 0.14.4.
+
+| Topic | Decision |
+|---|---|
+| Speed | Site creation is about 4 times faster with the same final data (measured on 40 synthetic sites, a self-approved send through `pmis_app` with a signed context: 12.9 s before, 3.0 s after on a fresh database; 10.4 s before, 3.5 s after on a database with 100 sites and fresh statistics). On a brand-new site the applicability decides every task first, writes the N/A tasks in one statement with one audit row each, and opens the successors once at the end; the calculation runs once per site; `custom_validate` returns at once for a new row without custom values when no custom field has a default or is required; `audit_log_fill` reads the verified context once per row instead of ten times. Every other site (an approved scope change, the admin path) keeps the step-by-step way. |
+| Visible difference | A task that becomes N/A in the same pass is no longer opened first and closed right after. So there is no transient `task_unlock` audit row, no "task ready" or "no holder" notice, and no document slot for it; its `version` ends one lower and its `current_level` stays 0. For 40 New Build sites this means 52 unlocks instead of 384 and 52 "no holder" alerts instead of 384. Task states, lock reasons, gates and SLA fields are identical; every N/A still has its audit row. |
+| Background | A send, or an L2 "approve", of a New sites batch with **more rows than the setting `imports.async_rows` (default 50)** answers **202** with the batch in the status `processing` and its `progress`. Smaller batches, returns and the other templates answer 200 as before. |
+| Request checks | Every check runs in the request, before the 202: visibility, If-Match, the uploader, the state, the note of a return, L1 / L2 of the Matrix row with the grid right, and the **step-up**, read from the verified context, for a self-approval or a final approval (401 and nothing queued). The run (table `import_batch_jobs`, no right for `pmis_app`) stores who asked and whether the step-up was verified. |
+| Chunks | The API does the rows in chunks of 25, each in its own transaction (about 2 s; an explicit 120 s limit for a chunk), never in the request transaction. Each chunk runs under a **newly signed context of the same person**: the database checks the person is still active and derives their regions and rights again. Every row is checked again by the same functions as the 200 path. Only that person can continue the run (`app_actor()` must match). The step-up counted is the one stored at the request; the API cannot claim a new one, and `pmis_app` can neither write the table nor pass the step-up as a parameter. A row that fails gets its error and the others go on. At the end the batch gets its usual status (`approved`, `partially_approved`, `in_approval`) and the same single audit row and notices as a 200 answer. |
+| Guard | While a run is active, a second send, any decision and a discard answer 409 `batch_processing`. The If-Match moves when the run is asked. |
+| Restart | A run left in `processing` (an API restart) is resumed by the API: once at start-up and every 2 minutes (`job_runs` name `import_batch_resume`, only when `JOBS_ENABLED`). A run whose person can no longer act is stopped: the rows done stay, the others wait, and an audit row records it. A chunk that fails three times in a row stops the run the same way. |
+| nginx | The installer sets `proxy_read_timeout 300s`; `update.sh` raises a lower value in an existing site (only that directive, `nginx -t` before the reload, the file is put back if the test fails). |
+| Open | The other templates (registers, Site Register streams) still send and decide in the request. A register or stream batch of several hundred rows could reach the 30 s limit; the same background run can be extended to them if that is seen. `imports.async_rows` has no field on the Settings screens yet (it is a stored setting, default 50). |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |
@@ -286,6 +302,7 @@ The owner delegated Q480 and Q485 to Q489 to the technical lead. All six keep th
 | Site creation | Change Control proposals also change the site names (EN/AR) and coordinates; region and cluster changes for a System Admin | Q473 |
 | Settings screens | Confirm the official calendar; the mail notification kinds; the RF feed fills empty coordinates only; the leads of the new region are told of a region move | Q440, Q441, Q476, Q477 |
 | Data load | The historical-load document waiver (migration 0073, contract 0.14.3) | Q462 |
+| Data load | Big New sites batches in the background, faster site creation (migration 0074, contract 0.14.4) | 2026-11-05 (4) |
 
 ## Owner data still needed
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile } from './client';
 import type { ImportBatch, Job, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
@@ -162,18 +162,31 @@ export const downloadTemplate = (templateId: string, o: TemplateDownload = {}): 
   });
 
 /** How often the batch page polls (ms). A test may lower them. */
-export const BATCH_POLL = { parsing: 2000, job: 1500, pending: 4000 };
+export const BATCH_POLL = { parsing: 2000, job: 1500, pending: 4000, processing: 3000 };
 /** Rows are waiting for L2 (or for a predecessor): the page keeps the batch fresh so the bar moves as L2 decides. */
 const SENT_STATUSES = ['in_approval', 'partially_approved', 'in_review'];
 export const batchPending = (b: Pick<ImportBatch, 'status' | 'counts'> | undefined): boolean =>
-  !!b && (b.status === 'parsing' || (SENT_STATUSES.includes(b.status) && (b.counts.pending ?? 0) > 0));
+  !!b && (b.status === 'parsing' || b.status === 'processing' || (SENT_STATUSES.includes(b.status) && (b.counts.pending ?? 0) > 0));
 
-/** The batch of an upload; its status follows the rows and the records they created. It polls while it is parsing and while rows wait for L2, and stops when nothing is pending. */
-export const useBatch = (id: string) =>
-  useQuery({
+/**
+ * The batch of an upload; its status follows the rows and the records they created. It polls while it is parsing, while a big batch is processed in the
+ * background (0.14.4, `processing`) and while rows wait for L2, and stops when nothing is pending. While it is processing the rows are refreshed too, so
+ * the table follows the chunks; when the processing ends the rows and the lists are refreshed once more.
+ */
+export function useBatch(id: string) {
+  const qc = useQueryClient();
+  const q = useQuery({
     queryKey: ['import-batch', id], queryFn: () => api.get<ImportBatch>(`/import-batches/${id}`),
-    refetchInterval: (q) => { const b = q.state.data; return !b || !batchPending(b) ? false : b.status === 'parsing' ? BATCH_POLL.parsing : BATCH_POLL.pending; },
+    refetchInterval: (x) => { const b = x.state.data; return !b || !batchPending(b) ? false : b.status === 'parsing' ? BATCH_POLL.parsing : b.status === 'processing' ? BATCH_POLL.processing : BATCH_POLL.pending; },
   });
+  const status = q.data?.status, done = q.data?.progress?.rows_done;
+  const was = useRef(status);
+  useEffect(() => {
+    if (status === 'processing' || was.current === 'processing') settleBatch(qc, id);
+    was.current = status;
+  }, [status, done, id, qc]);
+  return q;
+}
 
 /** `GET /jobs/{id}` of the parse job while the batch is `parsing`; the batch is refreshed when the job ends. */
 export function useParseJob(batch: ImportBatch | undefined) {

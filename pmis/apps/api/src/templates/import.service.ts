@@ -16,6 +16,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { TaskViewService, UserRefDto } from '../workflow/task-view.service';
 import { DocumentsService } from '../documents/documents.service';
+import { ImportJobsService } from './import-jobs.service';
 import { DATA_SHEET, LISTS_SHEET, MASTER_INFO_PREFILLED, STREAM_INFO_PREFILLED, TPL_SHEET, TemplatesService, TplColumn, TplPart } from './templates.service';
 import { UploadedFile, importMaxRows } from './upload.interceptor';
 import { guardXlsx } from './xlsx-guard';
@@ -24,7 +25,7 @@ export type RejectReason =
   | 'size_or_rows_exceeded' | 'tpl_missing' | 'template_unknown_or_inactive' | 'outdated_version' | 'wrong_template' | 'checksum_mismatch' | 'import_not_allowed'
   | 'not_xlsx' | 'macros_not_allowed' | 'tpl_invalid';
 
-const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded'];
+const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded', 'processing'];
 
 const uploadBody = z.object({
   template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional(), mode: z.enum(['submit', 'draft']).optional(),
@@ -67,7 +68,14 @@ interface BatchRow {
   historical_marked_by: string | null;
   historical_marked_at: Date | null;
   c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint;
+  progress: Record<string, unknown> | null;
   ts: string;
+}
+
+/** The answer of imp_async_start (migration 0074): queued = the batch is processed in the background (202, status processing). */
+interface AsyncStart {
+  queued: boolean;
+  job?: { job_id: string } & Record<string, unknown>;
 }
 
 interface Outcome {
@@ -129,6 +137,7 @@ export class ImportService {
     private readonly templates: TemplatesService,
     private readonly view: TaskViewService,
     private readonly documents: DocumentsService,
+    private readonly jobs: ImportJobsService,
   ) {}
 
   // ------------------------------------------------------------------ upload
@@ -504,6 +513,7 @@ export class ImportService {
         b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
         b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
         b.historical_marked_at, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
+        imp_batch_job_json(b.id) AS progress,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
       JOIN template_versions v ON v.id = b.template_version_id
@@ -545,6 +555,8 @@ export class ImportService {
           ? { cutoff_date: r.historical_cutoff, reason: r.historical_reason, marked_by: r.historical_marked_by ? (refs.get(r.historical_marked_by) ?? { id: r.historical_marked_by }) : null, marked_at: r.historical_marked_at }
           : null,
         job_id: null,
+        // 0074: the background run of a big New sites batch (null when the batch never had one); status is `processing` while it runs
+        progress: r.progress ?? null,
         task_id: r.task_id,
         site_id: r.site_id,
         register_key: r.register_key,
@@ -696,9 +708,24 @@ export class ImportService {
         WHERE r.batch_id = ${id}::uuid AND r.task_instance_id IS NOT NULL AND r.action = 'update' AND r.task_submitted_at IS NULL AND r.decision IN ('pending', 'pending_previous_approval')`);
       for (const t of tasks) await this.documents.syncTaskById(t.id);
     }
-    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    const until = await this.stepUp.validUntil(auth);
+    const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'submit', NULL, NULL, NULL, NULL, ${until}::timestamptz) AS r`);
+    if (queued) return queued;
+    const stepOk = Boolean(until);
     const outcome = await this.call<Outcome>(auth, Prisma.sql`SELECT imp_submit_batch(${id}::uuid, ${version}::int, ${stepOk}::boolean) AS r`);
     return { ...(await this.getBatch(auth, id)), outcome };
+  }
+
+  /**
+   * 0074: a New sites batch with more rows than `imports.async_rows` (default 50) is sent or approved in the background. The database checks everything now
+   * (rights, state, If-Match, note, step-up) and records the run; the answer is the batch in status `processing` with `accepted: true` (the controller
+   * answers 202). Null: the request runs as before.
+   */
+  private async queue(auth: AuthContext, id: string, sql: Prisma.Sql): Promise<Record<string, unknown> | null> {
+    const r = await this.call<AsyncStart>(auth, sql);
+    if (!r.queued || !r.job?.job_id) return null;
+    this.jobs.kick(r.job.job_id);
+    return { ...(await this.getBatch(auth, id)), accepted: true };
   }
 
   async decide(auth: AuthContext, id: string, ifMatch: string | undefined, rawBody: unknown): Promise<Record<string, unknown>> {
@@ -717,7 +744,13 @@ export class ImportService {
       const regs = await this.access.regions(module, body.action === 'approve' ? 'approve' : 'view');
       if (regs !== null && regs.length === 0) throw problems.forbidden('action_forbidden', `You need ${body.action === 'approve' ? 'approve' : 'view'} on ${module}.`);
     }
-    const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    const until = await this.stepUp.validUntil(auth);
+    if (body.action === 'approve') {
+      const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'decide', ${body.action}::text, ${body.scope}::text,
+        ${body.rows ? JSON.stringify(body.rows) : null}::jsonb, ${body.note ?? null}::text, ${until}::timestamptz) AS r`);
+      if (queued) return queued;
+    }
+    const stepOk = Boolean(until);
     const outcome = await this.call<Outcome>(
       auth,
       Prisma.sql`SELECT imp_decide_batch(${id}::uuid, ${version}::int, ${body.action}::text, ${body.scope}::text, ${body.rows ? JSON.stringify(body.rows) : null}::jsonb,

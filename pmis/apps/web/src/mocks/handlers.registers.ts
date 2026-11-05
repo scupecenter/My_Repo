@@ -10,7 +10,7 @@ import { db, save, stepUpValid, viewer, accountStatus } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { uid } from './ids';
 import { holdersOf, rowOf } from './matrixData';
-import { REGISTER_DEFS, REGISTER_TEMPLATES, STREAM_TEMPLATES, recId, type MockBatch, type MockBatchRow, type MockRecord } from './registersData';
+import { REGISTER_DEFS, REGISTER_TEMPLATES, STREAM_TEMPLATES, recId, type MockBatch, type MockBatchRow, type MockRecord, type MockRun } from './registersData';
 import { SITE_COUNT, siteIdOf, siteIndex, siteMeta, TODAY } from './sites';
 import { isSystemAdmin, waiver } from './waiverData';
 import { deriveDismantle, gecolCfg, hlcPrView, p4cWarnings } from './p4cData';
@@ -471,6 +471,7 @@ export const registerHandlers = [
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
+    if (b.run?.state === 'running') { advanceRun(b); save(); }   // 0.14.4: the background run moves by one chunk per read
     return HttpResponse.json(toBatch(b), { headers: { ETag: `"${b.version}"` } });
   }),
   http.get(`${B}/import-batches/:id/rows`, ({ params, request }) => {
@@ -487,6 +488,7 @@ export const registerHandlers = [
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
+    if (b.run?.state === 'running') return processing(b);
     const bad = batchMatch(request, b); if (bad) return bad;
     const v = viewer()!;
     if (b.uploaded_by !== (v.employee_id ?? '9999')) return problem(403, 'not_eligible_holder', 'Only the person who uploaded the file can send it into the flow.');
@@ -497,6 +499,7 @@ export const registerHandlers = [
       const self = viewer()?.key === 'pm';
       if (self && !stepUpValid()) return stepUp();
       const sent = b.rows.filter((r) => r.action === 'create' && r.decision === 'pending');
+      if (sent.length > ASYNC_ROWS) return startRun(b, 'submit', sent, self);   // 0.14.4: 202, processing in the background
       for (const r of sent) if (self) { r.decision = 'approved'; r.site_id = siteMeta(20).id; }
       b.status = 'sent'; b.version += 1; save();
       return HttpResponse.json({ ...toBatch(b), outcome: { submitted: sent.length, held: [], failed: [] } }, { headers: { ETag: `"${b.version}"` } });
@@ -530,6 +533,7 @@ export const registerHandlers = [
     const g = guard(); if (g) return g;
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
+    if (b.run?.state === 'running') return processing(b);
     const bad = batchMatch(request, b); if (bad) return bad;
     const body = (await request.json()) as { action: 'review' | 'approve' | 'reject' | 'discard'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
     const v = viewer()!, me = v.employee_id ?? '9999';
@@ -549,6 +553,9 @@ export const registerHandlers = [
       if (body.scope === 'rows' && !rows.length) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: '/rows', code: 'invalid_row' }] });
       const wantsApprove = rows.some((r) => body.action === 'approve' && (body.scope === 'all' || body.rows!.find((x) => x.row_id === r.id)?.decision !== 'rejected'));
       if (wantsApprove && !stepUpValid()) return stepUp();
+      if (body.action === 'approve' && rows.length > ASYNC_ROWS && rows.every((r) => body.scope === 'all' || body.rows!.find((x) => x.row_id === r.id)?.decision !== 'rejected')) {
+        return startRun(b, 'decide', rows, true);   // 0.14.4: 202, the sites are created in the background
+      }
       const res: Outcome = { decided: 0, approved: 0, rejected: 0, held: [], failed: [] };
       for (const r of rows) {
         const one = body.scope === 'rows' ? body.rows!.find((x) => x.row_id === r.id)! : null;
@@ -612,6 +619,31 @@ export const registerHandlers = [
 ];
 
 // ---- batch helpers
+/** Contract 0.14.4: a New sites batch with more rows than imports.async_rows (50) is sent or approved in the background, 25 rows per chunk. */
+export const ASYNC_ROWS = 50;
+const CHUNK = 25;
+function startRun(b: MockBatch, kind: MockRun['kind'], rows: MockBatchRow[], self: boolean) {
+  const now = new Date().toISOString();
+  b.run = { id: crypto.randomUUID(), kind, state: 'running', rows: rows.map((r) => r.id), done: 0, self, submitted: 0, approved: 0, failed: 0, started_at: now, updated_at: now, finished_at: null };
+  b.version += 1; save();
+  return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
+}
+function advanceRun(b: MockBatch) {
+  const run = b.run!;
+  for (const id of run.rows.slice(run.done, run.done + CHUNK)) {
+    const r = b.rows.find((x) => x.id === id)!;
+    if (run.kind === 'submit') { run.submitted += 1; if (run.self) { r.decision = 'approved'; r.site_id = siteMeta(20).id; run.approved += 1; } }
+    else { r.decision = 'approved'; r.site_id = siteMeta(20).id; run.approved += 1; }
+  }
+  run.done = Math.min(run.rows.length, run.done + CHUNK);
+  run.updated_at = new Date().toISOString();
+  if (run.done >= run.rows.length) { run.state = 'done'; run.finished_at = run.updated_at; b.status = 'sent'; b.version += 1; }
+}
+const processing = (b: MockBatch) => problem(409, 'batch_processing', 'The batch is being processed', { detail: `The batch is being processed (${b.run!.done} of ${b.run!.rows.length} rows). Wait until it ends.` } as never);
+const progressOf = (run: MockRun | undefined): ImportBatch['progress'] => run ? {
+  job_id: run.id, kind: run.kind, state: run.state, rows_total: run.rows.length, rows_done: run.done, percent: run.rows.length ? Math.floor((100 * run.done) / run.rows.length) : 100,
+  submitted: run.submitted, approved: run.approved, rejected: 0, failed: run.failed, started_at: run.started_at, updated_at: run.updated_at, finished_at: run.finished_at, error: null,
+} : null;
 type Outcome = { submitted?: number; decided?: number; approved?: number; rejected?: number; held: { row_id: string; row_no: number; key: string | null; reason: 'open_version' | 'open_submission' | 'predecessor_open'; record_id?: string | null }[]; failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[] };
 const batchMatch = (req: Request, b: MockBatch) => {
   const h = req.headers.get('If-Match');
@@ -625,6 +657,7 @@ function decisionOf(r: MockBatchRow): MockBatchRow['decision'] {
   return r.decision;
 }
 function statusOf(b: MockBatch): ImportBatch['status'] {
+  if (b.run?.state === 'running') return 'processing';
   if (b.status !== 'sent') return b.status;
   const valid = b.rows.filter((r) => r.action === 'create' || r.action === 'update'), d = (x: string) => valid.filter((r) => decisionOf(r) === x).length;
   const open = d('pending') + d('pending_previous_approval');
@@ -735,7 +768,7 @@ function toBatch(b: MockBatch): ImportBatch {
     id: b.id, template_id: b.template_id, template_version: 1, source: b.group_id ? 'master_template' : 'template', file_name: b.file_name, status, current_level: b.status === 'validated' ? 1 : 2, levels_required: 2, register_key: b.register_key, note: b.note ?? null,
     ...(b.stream ? { stream: b.stream } : {}), ...(b.entity ? { entity: b.entity } : {}), ...(b.group_id ? { group_id: b.group_id, part_sheet: b.part_sheet ?? null } : {}),
     counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval') },
-    job_id: null, task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
+    job_id: null, progress: progressOf(b.run), task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
     historical_load: b.historical ? { cutoff_date: b.historical.cutoff_date, reason: b.historical.reason, marked_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, marked_at: b.historical.marked_at } : null,
   };
 }

@@ -807,7 +807,7 @@ server {
     proxy_set_header Host \$host;
     proxy_set_header X-Forwarded-For \$remote_addr;
     proxy_set_header X-Forwarded-Proto https;
-    proxy_read_timeout 120s;
+    proxy_read_timeout 300s;   # 0074: long requests are not needed (big batches run in the background); the API ends a request transaction after 30 s
     client_max_body_size 25m;
   }
   location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; try_files \$uri =404; }

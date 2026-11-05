@@ -69,6 +69,12 @@ export function mapWfError(message: string): ProblemException | null {
       return new ProblemException(409, 'already_claimed', { detail: 'Another holder has claimed this level.', extra: { claimed_by: { id: extra.claimed_by } } });
     case 'invalid_transition':
       return new ProblemException(409, 'invalid_transition', { detail: detail ?? 'This is not possible in the current state.' });
+    case 'batch_processing':
+      // 0074: a big New sites batch is being sent or approved in the background; a second send, a decision or a discard waits for its end
+      return new ProblemException(409, 'batch_processing', {
+        detail: detail ?? 'The batch is being processed. Wait until it ends.',
+        extra: { rows_done: typeof extra.rows_done === 'number' ? extra.rows_done : null, rows_total: typeof extra.rows_total === 'number' ? extra.rows_total : null },
+      });
     case 'note_required':
       return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     case 'mandatory_slots_missing':
