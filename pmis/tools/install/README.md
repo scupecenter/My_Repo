@@ -148,7 +148,10 @@ an approval waiting for them, and an item returned to them with a note. These ar
 
 Everything else stays in-app (`no_eligible_holder`, `mention`, `followed_change`, `levels_converted`, `permit_transferred`, `snag_raised`, `snag_closed`,
 and so on). `task_returned` and `approval_due` are in the contract's list of kinds but nothing writes them yet; add them only when a later release does.
-There is no settings screen for this yet, so it is a deployment step, written in the deployment record. On the server, as the database owner:
+**Set it in the screen (since contract 0.14.2, migration 0072, Q441):** a System Admin opens Settings, Mail kinds, presses "Add the six recommended kinds", saves with a reason
+and a fresh password check. The change is audited (`mail_notification_kinds_update`). The list offers only the kinds the system writes, and refuses the kinds reserved for
+security (`security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`). A direct update of the setting is refused by the database for everybody but the
+database owner, so the SQL below is the fallback for a server whose application is not yet running:
 
 ```bash
 sudo -u postgres psql pmis -c "UPDATE settings SET value = '[\"task_assigned\", \"register_assigned\", \"snag_review\", \"task_rejected\", \"register_rejected\", \"snag_rejected\"]'::jsonb, updated_at = now() WHERE key = 'mail.notification_kinds';"

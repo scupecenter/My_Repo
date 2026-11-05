@@ -224,6 +224,10 @@
     "already_assigned": "Already assigned.",
     "role_in_use": "The role is still assigned to people.",
     "duplicate": "This already exists.",
+    "no_holidays": "The calendar has no holiday for the current or the next year.",
+    "tentative_remaining": "A holiday of the current or the next year is still tentative.",
+    "unknown_kind": "The system writes no notification of this kind.",
+    "reserved_kind": "This kind is reserved for security and is mailed by its own rule.",
     "validation_failed": "Check the highlighted fields and try again.",
     "action_forbidden": "You are not allowed to do this.",
     "step_up_required": "Re-authentication was not completed.",
@@ -895,7 +899,8 @@
     "tab_team-scope": "Team / scope match",
     "tab_lists": "Lists",
     "tab_contractor-rules": "Contractor rules",
-    "tab_gecol-order": "GECOL order warnings"
+    "tab_gecol-order": "GECOL order warnings",
+    "tab_mail-kinds": "Mail kinds"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -927,6 +932,10 @@
     "below_minimum": "Below the minimum.",
     "min_length": "Too short.",
     "duplicate": "Already exists.",
+    "no_holidays": "The calendar has no holiday for the current or the next year.",
+    "tentative_remaining": "A holiday of the current or the next year is still tentative.",
+    "unknown_kind": "The system writes no notification of this kind.",
+    "reserved_kind": "This kind is reserved for security and is mailed by its own rule.",
     "invalid": "Not valid.",
     "before_from_seq": "Must not be before the start.",
     "not_eligible_recipient": "This recipient is not eligible for the type.",
@@ -979,7 +988,19 @@
     "recalc_note": "Open tasks get their SLA due dates recalculated. Closed tasks keep their values.",
     "recalculated": "{{count}} open task(s) recalculated.",
     "empty": "No holidays for this year.",
-    "banner_official": "The official holiday calendar is not confirmed yet. Tentative dates count as holidays and the affected due dates show a \"tentative date\" badge until they are confirmed."
+    "banner_official": "The official holiday calendar is not confirmed yet. Tentative dates count as holidays and the affected due dates show a \"tentative date\" badge until they are confirmed.",
+    "official_title": "Official calendar of the year",
+    "official_not_confirmed": "The official calendar is not confirmed.",
+    "official_confirmed_by": "Confirmed by {{name}} ({{id}}) on {{when}}.",
+    "official_confirmed_db": "Confirmed on {{when}} (set in the database).",
+    "official_confirm": "Confirm the official calendar",
+    "official_unconfirm": "Withdraw the confirmation",
+    "official_confirm_title": "Confirm the official calendar",
+    "official_unconfirm_title": "Withdraw the confirmation of the official calendar",
+    "official_confirm_note": "Confirm only after the official announcement. The banner goes, the due dates stop showing the tentative badge, and the change is audited. The confirmation resets on 1 January.",
+    "official_unconfirm_note": "The banner \"calendar not confirmed\" returns until the calendar is confirmed again.",
+    "blocker_no_holidays": "The table has no holiday for {{year}}: add or import the dates first.",
+    "blocker_tentative_remaining": "{{count}} holiday(s) of {{year}} are still tentative: confirm them on the official announcement first."
   },
   "rules": {
     "col_version": "Version",
@@ -2193,6 +2214,7 @@
     "kind_register_rejected": "Record rejected",
     "kind_gate_closed_again": "Gate closed again",
     "kind_sla_negative_duration": "SLA data alert",
+    "kind_site_region_moved": "Site moved to your region",
     "kind_system": "System"
   },
   "tis": {
@@ -3469,6 +3491,46 @@
       "party_inactive": "Check the company in the Contractors register, or move the order to another contractor.",
       "no_active_contract": "Register the contract for this scope in the Contractors register, or move the order to a contractor with one.",
       "stop_work": "Follow the safety rules: the work waits until the Stop Work is lifted in Permits & HSE."
+    }
+  },
+  "mailKinds": {
+    "title": "Mail notification kinds",
+    "note": "Notifications are in-app only. Tick the kinds that are also sent by mail to the person. The six recommended kinds are the ones that ask a person to act: a task, a record or a snag fix waits for them, or came back with a note. Security alerts are mailed by their own rule and are not listed. Only a System Admin changes this list; saving needs a reason and a fresh password check.",
+    "forbidden": "Only a System Admin sets the mail notification kinds.",
+    "unknown": "The setting holds kinds the system does not write: {{kinds}}. Saving drops them.",
+    "select_recommended": "Add the six recommended kinds",
+    "select_none": "Clear all",
+    "recommended": "Recommended",
+    "confirm_note": "{{count}} kind(s) will be mailed.",
+    "kind": {
+      "task_assigned": "A task waits for you or is ready to start",
+      "register_assigned": "A register record waits for you",
+      "snag_review": "Photos of a snag fix wait for your approval",
+      "task_rejected": "A task was returned to you with a note",
+      "register_rejected": "A register record was returned to you with a note",
+      "snag_rejected": "A snag fix was returned to you",
+      "email_change_decided": "Decision on an email change",
+      "email_change_requested": "An email change waits for approval",
+      "followed_change": "A change in something you follow",
+      "gate_closed_again": "A phase gate closed again",
+      "holiday_tentative": "A tentative holiday to confirm",
+      "import_batch": "Rows of your upload were decided",
+      "levels_converted": "Approval levels were converted",
+      "mention": "You were mentioned",
+      "no_eligible_holder": "No eligible holder for a level",
+      "order_team_mismatch": "A running order no longer matches its team",
+      "party_type_review": "Review the type of a contractor",
+      "permit_transferred": "A permit was transferred",
+      "phone_change_decided": "Decision on a phone change",
+      "phone_change_requested": "A phone change waits for approval",
+      "site_draft_approved": "A new site was approved",
+      "site_draft_assigned": "A new site waits for approval",
+      "site_draft_returned": "A new site was returned to you",
+      "site_region_moved": "A site moved to your region",
+      "sla_negative_duration": "SLA data alert (negative duration)",
+      "snag_closed": "A snag was closed",
+      "snag_raised": "A snag was raised",
+      "team_safety_cert": "A team safety certificate expires"
     }
   },
   "gecolOrder": {

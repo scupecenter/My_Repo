@@ -10,18 +10,21 @@ import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
 import { TeamScopeMatch } from './TeamScopeMatch';
 import { GecolOrderWarnings } from './GecolOrderWarnings';
+import { MailKinds } from './MailKinds';
+import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds'] as const;
 
 function Layout() {
   const { t } = useTranslation();
+  const me = useMe(true);
   return (
     <div data-testid="page-settings">
       <h1 className="text-2xl font-bold">{t('nav.admin.settings')}</h1>
       <nav className="my-3 flex flex-wrap gap-1" aria-label={t('nav.admin.settings')}>
-        {SETTINGS_TABS.map((k) => <NavLink key={k} to={`/admin/settings/${k}`} data-testid={`settings-tab-${k}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.tab_${k}`)}</NavLink>)}
+        {SETTINGS_TABS.filter((k) => k !== 'mail-kinds' || me.data?.is_system_admin).map((k) => <NavLink key={k} to={`/admin/settings/${k}`} data-testid={`settings-tab-${k}`} className={({ isActive }) => `btn ${isActive ? 'btn-accent' : ''}`}>{t(`settings.tab_${k}`)}</NavLink>)}
       </nav>
       <Outlet />
     </div>
@@ -48,6 +51,7 @@ export function SettingsRoutes() {
         <Route path="lists" element={<Lists />} />
         <Route path="contractor-rules" element={<ContractorRules />} />
         <Route path="gecol-order" element={<GecolOrderWarnings />} />
+        <Route path="mail-kinds" element={<MailKinds />} />
       </Route>
     </Routes>
   );

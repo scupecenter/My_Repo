@@ -137,6 +137,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const fbDb = await buildDatabase(adminUrl, fb, appPassword);
   process.env.TEST_DATABASE_URL_FB = fbDb.appUrl;
   process.env.TEST_SUPER_URL_FB = fbDb.superUrl;
+  // The settings-screens database (migration 0072): the suite confirms the calendar, sets the mail kinds and moves sites between regions (it counts notifications).
+  const ss = `${dbName}_ss`;
+  const ssDb = await buildDatabase(adminUrl, ss, appPassword);
+  process.env.TEST_DATABASE_URL_SS = ssDb.appUrl;
+  process.env.TEST_SUPER_URL_SS = ssDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -171,6 +176,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${logs} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p1} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${fb} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${ss} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);

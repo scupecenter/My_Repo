@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.14.1
+  version: 0.14.2
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
     - 0.14.1 (2026-11-05): technical decision Q473 (`docs/spec/technical-decisions-2026-11-04.md`, "Site creation"; migration 0071; CHANGELOG 100). Additive: no new path. The identity of a site changes only through a Change Control proposal (L1 proposes, L2 approves, audited with before and after values), never by a direct edit. `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`) gains the optional `identity` object (`SiteIdentityProposal`: `name`, `name_ar`, `latitude` with `longitude` as one pair, `region_id`, `cluster_code`, and `site_code`, which is always refused); `custom` becomes optional (send `custom`, `identity` or both; a reason is still required). One Change Control draft (Data Correction, Field) is opened per item (`field_item` `site.name`, `site.name_ar`, `site.coordinates`, `site.region` with the cluster, `site.cluster`); the result items carry `field` `name`, `name_ar`, `coordinates`, `region` or `cluster`. Field codes: `/identity/site_code` `immutable` (the Site ID never changes; also at submit of a hand-made Change Control record that names `site.site_code`), `unknown_field`, `required`, `too_long`, `invalid` (ranges of the site creation: latitude -90..90, longitude -180..180), `pair_required`, `unchanged`, `unknown_region`, `unknown_cluster`, `cluster_other_region` (a cluster must belong to the target region or be global; a region change names a cluster of the new region or none when the site's cluster would not fit). Region and cluster change who can see the site, so only a System Admin proposes or approves them: a Team Lead or a delegate gets 403 `action_forbidden` at the proposal, at submit and at the approval. On approval the site moves (its tasks and records follow), it is recalculated and the change is audited (`site_change_applied`, plus `site_region_moved_out` for the old region). Direct writes are closed: `pmis_app` can no longer update `sites.site_code`, `name`, `name_ar`, `region_id`, `cluster_id`, `latitude` or `longitude`, and the function `admin_transfer_site_region` is dropped. `PATCH /sites/{site_id}` writes custom values only (unchanged). `SiteDetail` and `GET /sites/{site_id}` are unchanged.
     - 0.14.0 (2026-11-05): site creation, bulk and manual (gap G1 of `docs/plans/2026-11-04-master-template-data-load.md`, owner question Q460 answered by the technical decisions; migration 0070; CHANGELOG 98), plus the load fixes G8 and G9 (G2 is API-only). Additive. (1) Two entry ways, both ending at L2; a site exists only when L2 approves. Manual: `POST /sites` (`createSite`) creates a site draft (`SiteDraft`, state `entry`) from `SiteDraftInput` (Site ID, region by id or by name, code or alias, English and Arabic name, cluster, delivery scenario, the six scope flags, Overall Status `Not Started` or `Cancelled`, coordinates, dates; unknown fields such as landlord, phone or e-mail are refused: those data are not loaded, Q469); `GET /site-drafts`, `GET/PATCH/DELETE /site-drafts/{draft_id}` (edit and discard while in `entry`), `POST /site-drafts/{draft_id}/submit` (L1 sends it to L2) and `POST /site-drafts/{draft_id}/decide` (L2: `approve` creates the site and needs step-up, `reject` returns it to L1 with a note). Bulk: the approved template `TPL-SITE-NEW` ("New sites", `template_kind` `sites`, issued with a hidden `_tpl` sheet) through the existing `GET /templates/{template_id}/download`, `POST /import-batches`, `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (L2 approves row by row or all at once; a return needs a note); `ImportBatch.entity` is `site` and an approved row carries the new site in `ImportRow.site_id`. A batch of this template is not a task batch (`task_id` on upload is refused with 422 `wrong_template`). (2) Who: the Responsibility Matrix gets the row `site_creation` (`MatrixRowKey`; L1 and L2 seeded to the System Admins, editable like any row, decision B11); creating needs `create` on `sites` in the region and L1 of that row, approving needs `approve` on `sites` in the region and L2 of that row (403 `action_forbidden` or `not_eligible_holder`). A person who holds both levels approves their own submission at once (B5: step-up, `SiteDraft.self_approval`, flagged in the audit row). (3) Validation (422 `validation_failed`, `errors[]` with `path` `/site_code`, `/region`, `/delivery_scenario` and so on): the Site ID is unique and never reused (a cancelled or voided site keeps it; a draft waiting for approval holds it too: `duplicate`), the region is resolved through the region aliases (`unknown_region`), the delivery scenario is one of the DeliveryScenario list, Site Scenario and Site Type are values of their lists, scope flags are Yes, No (N/A) or blank, dates are `yyyy-mm-dd` and not in the future, coordinates are in range and come in pairs; a Hot or Cold Swap with a scope flag Yes is refused at entry (`scope_scenario_conflict`). A cluster that does not exist yet is created in the site's region when L2 approves (`SiteDraft.warnings` `cluster_will_be_created`); a cluster of another region is refused (`cluster_other_region`). (4) On approval the site is created on the workflow version in force with all its task instances, the first tasks are opened, the scenario applicability of P1 runs, the site is recalculated and the creation is audited (`site_create`, with the draft, batch and batch row; `self_approval`); a row with Overall Status `Cancelled` creates the site and then sets it cancelled (Q466, audited `site_cancelled`). (5) G9 (Q469): `SiteListItem.name_ar` and `SiteDetail.name_ar`, the Arabic site name. (6) G8: the RF & Design field `site_scenario` reads its own list `SiteScenario` (Indoor, Outdoor; pending the owner's confirmation), no longer `DeliveryScenario`; saved values that are unambiguously Indoor or Outdoor were mapped, every other saved value stays as an inactive value of the list. (7) G2: the legacy Master import (`POST /master-import/runs`) accepts a known header alias for a typed column (CL3 `IP Router` for `Indoor IP Router`); any other renamed header is still refused (`structure_mismatch`).
     - 0.13.2 (2026-11-04): follow-up group C of the technical decisions of 2026-11-04 (`docs/spec/technical-decisions-2026-11-04.md`; migration 0068; CHANGELOG 96). Additive except the step-up of Q265. (1) Q260: the Quality register's Severity field (list catalogue `Severity`) reads the snag severity codes `CRITICAL`, `MAJOR` and `MINOR`; the catalogue mirrors `snag_severities` (`GET /snag-severities`, `PUT /snag-severities`), so changing the snag severities changes the register list, and a direct write to a `Severity` value (`POST /list-catalogues/Severity/values`, `PATCH /list-catalogues/Severity/values/{value_id}`) is refused with 422 `mirrored_list`. Records saved with the old text (Critical, Major, Minor) are rewritten to the codes; any other old text stays as an inactive value. (2) Q265: `POST /snags/{snag_id}/photos/{photo_id}/evidence` with `decision` `accept` needs step-up (401 `step_up_required`), like the closure of a snag; `reject` does not. (3) Q267: `POST /registers/quality/records/{record_id}/cancel-snag` (`cancelQualitySnagRecord`): a System Admin cancels an approved Quality record of type snag that was entered by mistake; `reason` and step-up are required, `If-Match` is the record's version; the record becomes `voided` and its QC snag is cancelled with it; audited (`register_record_cancel_snag`). A closed QC snag, a record that is not the approved version in force, or one with an open newer version is 409 `invalid_transition`; a caller who is not a System Admin is 403 `action_forbidden`. `RegisterRecord.allowed_actions` gains `cancel_snag`. (4) Q291: the Meetings register gains the optional text field `external_attendees` (up to 2000 characters, section "Attendees and sites") for vendors, GECOL, HLC and landlords who are not users; `attendee_users` still holds Aljeel users only. (5) Q296: `TemplateTaskField.list_catalogue` (`GET /template-mapping`): a task field of a stream template whose options were Done / Pending / N/A reads the catalogue `CompletionStatus`; its `options` are the catalogue's active codes and follow it, and `options` sent with `POST /template-mapping` for such a field are ignored. (6) Q349: `SiteDetail.pipeline_variant` (`A` or `B`): the site page pipeline follows the same setting `dashboard.pipeline_variant` as the dashboard. (7) Q393: a late task whose SLA rule is marked `pending_confirmation` stays out of `DashboardDelay.scorecard` (its days stay in the total delay and in `items`); `DashboardDelay.scorecard_excluded_working_days` and `scorecard_excluded_tasks` say how much was left out. The task still shows its colour. (8) Q330: the safety certificate alert (`team_safety_cert` notifications) repeats every 7 days until the expiry date is renewed; a renewed date starts again as a new alert.
@@ -6620,6 +6621,54 @@ paths:
         '404': {$ref: '#/components/responses/NotFound'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /settings/calendar-confirmation:
+    get:
+      tags: [calendar]
+      operationId: getCalendarConfirmation
+      summary: Is the official calendar confirmed, by whom and when (Q440)
+      description: |
+        0.14.2. Every signed-in user may read it (the banner "calendar not confirmed" is shown to all). `can_edit` is true for a System Admin or a delegate of `settings`
+        edit for all regions. `blockers` lists what stops a confirmation now: `no_holidays` (the current or the next year has no holiday) and `tentative_remaining`
+        (a holiday of those two years is still tentative).
+      responses:
+        '200':
+          description: The state.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CalendarConfirmation'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [calendar]
+      operationId: setCalendarConfirmation
+      summary: Confirm or unconfirm the official calendar (reason, If-Match, audited)
+      description: |
+        0.14.2 (Q440). A System Admin, or a delegate of `settings` edit for all regions. Needs a reason and If-Match. Audited as `calendar_official_confirmed` or
+        `calendar_official_unconfirmed` with the state before and after. Confirming while a blocker stands is 422 `validation_failed` (path `/confirmed`, code
+        `no_holidays` or `tentative_remaining`); repeating the state that already holds is 409 `invalid_transition`. The setting resets itself every 1 January (Q245).
+      x-db-path: admin_set_calendar_confirmation
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CalendarConfirmationInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CalendarConfirmation'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
   /settings/structural-freeze:
     get:
       tags: [settings]
@@ -6876,6 +6925,55 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/mail-notification-kinds:
+    get:
+      tags: [settings]
+      operationId: getMailNotificationKinds
+      summary: The notification kinds that are also sent by mail (Q441)
+      description: |
+        0.14.2. System Admin only (403 `action_forbidden` otherwise). `kinds` is the setting `mail.notification_kinds`; `catalogue` lists the kinds the code writes today,
+        the six go-live kinds of `tools/install/README.md` marked `recommended`. Security alerts and the integrity hash are mailed by their own rules and are not in the
+        catalogue. `unknown_kinds` holds values of the setting that are not in the catalogue (set in the database); the next save drops them.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailNotificationKinds'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setMailNotificationKinds
+      summary: Save the mail notification kinds (System Admin, step-up, reason, If-Match, audited)
+      description: |
+        0.14.2 (Q441). Replaces the list. Field errors (422 `validation_failed`, path `/kinds/<index>`): `unknown_kind` (not a kind the code writes), `reserved_kind`
+        (kinds reserved for security: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`), `duplicate`, `invalid`; `/kinds`: `too_many`.
+        Audited as `mail_notification_kinds_update` with the list before and after.
+      x-step-up: true
+      x-db-path: admin_save_mail_kinds
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MailNotificationKindsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MailNotificationKinds'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -14545,6 +14643,8 @@ components:
         next_year_table_empty: { type: boolean, description: 'Drives the empty-table banner.' }
         official_calendar_pending: { type: boolean, description: '0.12.0 (Q4). True until the official Libyan calendar is entered and confirmed (setting `calendar.official_confirmed`, pending owner data). Drives the "calendar not confirmed" banner. 0.13.1 (Q245): the setting resets to false on 1 January (Africa/Tripoli), so this is true again until the new year is confirmed.' }
         tentative_counted: { type: boolean, description: '0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge.' }
+        official_confirmed_at: { type: [string, 'null'], format: date-time, description: '0.14.2 (Q440). When the official calendar was confirmed; null while it is not confirmed (or when the setting was set in the database).' }
+        official_confirmed_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: '0.14.2 (Q440). Who confirmed it; null while it is not confirmed.' }
     WeekendDaysRequest:
       allOf:
         - $ref: '#/components/schemas/WithReason'
@@ -15022,6 +15122,63 @@ components:
         po_wo_date: { type: string, format: date }
         order_status: { type: string }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    CalendarConfirmationInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [confirmed]
+          properties:
+            confirmed: { type: boolean, description: 'true confirms the official calendar, false withdraws the confirmation.' }
+    CalendarConfirmation:
+      type: object
+      description: '0.14.2 (Q440). The setting `calendar.official_confirmed` with who set it and when.'
+      required: [confirmed, version, can_edit, blockers]
+      properties:
+        confirmed: { type: boolean }
+        confirmed_at: { type: [string, 'null'], format: date-time }
+        confirmed_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, minimum: 0, description: 'The ETag; it changes with every change of the setting, also the yearly reset and a change made in the database.' }
+        can_edit: { type: boolean }
+        blockers:
+          type: array
+          description: 'What stops a confirmation now (empty when it can be confirmed).'
+          items:
+            type: object
+            required: [code, year, count]
+            properties:
+              code: { type: string, enum: [no_holidays, tentative_remaining] }
+              year: { type: integer }
+              count: { type: integer, minimum: 0, description: 'The number of holidays of that year still tentative (0 for no_holidays).' }
+    MailNotificationKindsInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [kinds]
+          properties:
+            kinds:
+              type: array
+              maxItems: 100
+              uniqueItems: true
+              items: { type: string, minLength: 2, maxLength: 60, pattern: '^[a-z][a-z0-9_]*$' }
+              description: 'Notification kinds that are also mailed to the person. An empty list keeps every notification in-app.'
+    MailNotificationKinds:
+      type: object
+      description: '0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name.'
+      required: [kinds, unknown_kinds, catalogue, version]
+      properties:
+        kinds: { type: array, items: { type: string } }
+        unknown_kinds: { type: array, items: { type: string }, description: 'Values of the setting that are not in the catalogue; a save drops them.' }
+        catalogue:
+          type: array
+          items:
+            type: object
+            required: [kind, recommended]
+            properties:
+              kind: { type: string }
+              recommended: { type: boolean, description: 'One of the six go-live kinds: a task, a record or a snag fix waits for the person, or came back with a note.' }
+        version: { type: integer, minimum: 0 }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
     GecolOrderWarningsInput:
       type: object
       required: [enabled, chains, billing_after]
@@ -16510,7 +16667,7 @@ components:
     # ---------------------------------------------------------- notifications and logs
     NotificationKind:
       type: string
-      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice]
+      enum: [task_assigned, task_returned, task_approved, approval_due, reassigned, absence_alert, idle_task_alert, no_holder, holiday_tentative, delegation, mfa_exemption, template_updated, import_batch, system, mention, followed_change, task_rejected, no_eligible_holder, register_assigned, register_rejected, gate_closed_again, sla_negative_duration, email_change_requested, email_change_decided, security_alert, snag_raised, snag_review, snag_rejected, snag_closed, levels_converted, permit_transferred, phone_change_requested, phone_change_decided, security_notice, site_region_moved]
     Notification:
       type: object
       required: [id, kind, title, created_at, read_at]

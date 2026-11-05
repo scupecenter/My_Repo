@@ -1,7 +1,7 @@
-import { AlertTriangle, CalendarCheck, Pencil, Plus, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, CalendarCheck, CheckCircle2, Pencil, Plus, Trash2, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCalendar, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetWeekend } from '@/api/settings';
+import { useCalendar, useCalendarConfirmation, useCreateHoliday, useDeleteHoliday, useHolidayChange, useHolidays, useImportHolidays, useSetCalendarConfirmation, useSetWeekend } from '@/api/settings';
 import type { Holiday } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -41,6 +41,46 @@ function HolidayDialog({ h, onClose }: { h: Holiday | null; onClose: () => void 
   );
 }
 
+/**
+ * Settings, Work calendar: the official calendar of the year (Q440, contract 0.14.2). A System Admin, or a delegate of settings edit for all regions, confirms it (or
+ * withdraws the confirmation) with a reason; everybody sees who confirmed it and when. The banner "not confirmed" shows until it is.
+ */
+function Confirmation() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  const q = useCalendarConfirmation(), set = useSetCalendarConfirmation();
+  const [open, setOpen] = useState(false);
+  const c = q.data;
+  if (!c) return null;
+  const when = c.confirmed_at ? new Date(c.confirmed_at).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en-GB', { timeZone: 'Africa/Tripoli', dateStyle: 'medium', timeStyle: 'short' }) : null;
+  const next = !c.confirmed;
+  return (
+    <section className="card space-y-2 p-4" data-testid="cal-confirmation">
+      <h2 className="font-bold">{t('cal.official_title')}</h2>
+      {c.confirmed ? (
+        <p className="flex items-center gap-2 text-sm" data-testid="cal-confirmed-info"><CheckCircle2 size={16} className="text-doneInk" />
+          {c.confirmed_by ? t('cal.official_confirmed_by', { name: c.confirmed_by.display_name, id: c.confirmed_by.employee_id ?? '', when }) : t('cal.official_confirmed_db', { when })}</p>
+      ) : <p className="text-sm text-mute" data-testid="cal-not-confirmed">{t('cal.official_not_confirmed')}</p>}
+      {next && c.blockers.length > 0 && (
+        <ul className="list-disc ps-5 text-sm text-waitInk" data-testid="cal-blockers">
+          {c.blockers.map((b) => <li key={`${b.code}-${b.year}`} data-testid={`cal-blocker-${b.code}-${b.year}`}>{t(`cal.blocker_${b.code}`, { year: b.year, count: b.count })}</li>)}
+        </ul>
+      )}
+      {c.can_edit && (
+        <button className={`btn ${next ? 'btn-accent' : ''}`} data-testid={next ? 'cal-confirm-official' : 'cal-unconfirm-official'} disabled={next && c.blockers.length > 0} onClick={() => setOpen(true)}>
+          <CalendarCheck size={14} />{t(next ? 'cal.official_confirm' : 'cal.official_unconfirm')}
+        </button>
+      )}
+      {open && (
+        <FormDialog open onClose={() => setOpen(false)} testid="cal-official-dialog" title={t(next ? 'cal.official_confirm_title' : 'cal.official_unconfirm_title')} busy={set.isPending} error={set.isError ? errText(set.error, t) : null}
+          onSubmit={(reason) => set.mutate({ version: c.version, confirmed: next, reason }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); } })}>
+          <p className="text-sm text-mute">{t(next ? 'cal.official_confirm_note' : 'cal.official_unconfirm_note')}</p>
+        </FormDialog>
+      )}
+    </section>
+  );
+}
+
 export function Calendar() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
@@ -62,6 +102,7 @@ export function Calendar() {
       {sum?.next_year_table_empty && <div role="status" className="flex gap-2 rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="cal-banner-empty"><AlertTriangle size={16} />{t('cal.banner_empty', { year: sum.next_year })}</div>}
       {/* 0.12.0 (Q4, D4b): the official calendar is pending owner data; tentative dates count now and mark the due dates */}
       {sum?.official_calendar_pending && <div role="status" className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="cal-banner-official"><AlertTriangle size={16} />{t('cal.banner_official')}</div>}
+      <Confirmation />
       <section className="card p-4" data-testid="cal-weekend">
         <h2 className="mb-2 font-bold">{t('cal.weekend')}</h2>
         <div className="flex flex-wrap gap-3 text-sm">

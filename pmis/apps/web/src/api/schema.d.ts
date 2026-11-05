@@ -4220,6 +4220,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/calendar-confirmation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Is the official calendar confirmed, by whom and when (Q440)
+         * @description 0.14.2. Every signed-in user may read it (the banner "calendar not confirmed" is shown to all). `can_edit` is true for a System Admin or a delegate of `settings`
+         *     edit for all regions. `blockers` lists what stops a confirmation now: `no_holidays` (the current or the next year has no holiday) and `tentative_remaining`
+         *     (a holiday of those two years is still tentative).
+         */
+        get: operations["getCalendarConfirmation"];
+        /**
+         * Confirm or unconfirm the official calendar (reason, If-Match, audited)
+         * @description 0.14.2 (Q440). A System Admin, or a delegate of `settings` edit for all regions. Needs a reason and If-Match. Audited as `calendar_official_confirmed` or
+         *     `calendar_official_unconfirmed` with the state before and after. Confirming while a blocker stands is 422 `validation_failed` (path `/confirmed`, code
+         *     `no_holidays` or `tentative_remaining`); repeating the state that already holds is 409 `invalid_transition`. The setting resets itself every 1 January (Q245).
+         */
+        put: operations["setCalendarConfirmation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/structural-freeze": {
         parameters: {
             query?: never;
@@ -4388,6 +4416,34 @@ export interface paths {
          *     field; `billing_after` cannot be the billing conversion itself), `duplicate`, `invalid`, `too_many`.
          */
         put: operations["setGecolOrderWarnings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/mail-notification-kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The notification kinds that are also sent by mail (Q441)
+         * @description 0.14.2. System Admin only (403 `action_forbidden` otherwise). `kinds` is the setting `mail.notification_kinds`; `catalogue` lists the kinds the code writes today,
+         *     the six go-live kinds of `tools/install/README.md` marked `recommended`. Security alerts and the integrity hash are mailed by their own rules and are not in the
+         *     catalogue. `unknown_kinds` holds values of the setting that are not in the catalogue (set in the database); the next save drops them.
+         */
+        get: operations["getMailNotificationKinds"];
+        /**
+         * Save the mail notification kinds (System Admin, step-up, reason, If-Match, audited)
+         * @description 0.14.2 (Q441). Replaces the list. Field errors (422 `validation_failed`, path `/kinds/<index>`): `unknown_kind` (not a kind the code writes), `reserved_kind`
+         *     (kinds reserved for security: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`), `duplicate`, `invalid`; `/kinds`: `too_many`.
+         *     Audited as `mail_notification_kinds_update` with the list before and after.
+         */
+        put: operations["setMailNotificationKinds"];
         post?: never;
         delete?: never;
         options?: never;
@@ -10340,6 +10396,13 @@ export interface components {
             official_calendar_pending?: boolean;
             /** @description 0.12.0 (D4b). Tentative dates count as holidays now; the affected due dates carry a "tentative date" badge. */
             tentative_counted?: boolean;
+            /**
+             * Format: date-time
+             * @description 0.14.2 (Q440). When the official calendar was confirmed; null while it is not confirmed (or when the setting was set in the database).
+             */
+            official_confirmed_at?: string | null;
+            /** @description 0.14.2 (Q440). Who confirmed it; null while it is not confirmed. */
+            official_confirmed_by?: components["schemas"]["UserRef"] | null;
         };
         WeekendDaysRequest: components["schemas"]["WithReason"] & {
             calendar_code?: string;
@@ -10812,6 +10875,47 @@ export interface components {
             po_wo_date?: string;
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        CalendarConfirmationInput: components["schemas"]["WithReason"] & {
+            /** @description true confirms the official calendar, false withdraws the confirmation. */
+            confirmed: boolean;
+        };
+        /** @description 0.14.2 (Q440). The setting `calendar.official_confirmed` with who set it and when. */
+        CalendarConfirmation: {
+            confirmed: boolean;
+            /** Format: date-time */
+            confirmed_at?: string | null;
+            confirmed_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag; it changes with every change of the setting, also the yearly reset and a change made in the database. */
+            version: number;
+            can_edit: boolean;
+            /** @description What stops a confirmation now (empty when it can be confirmed). */
+            blockers: {
+                /** @enum {string} */
+                code: "no_holidays" | "tentative_remaining";
+                year: number;
+                /** @description The number of holidays of that year still tentative (0 for no_holidays). */
+                count: number;
+            }[];
+        };
+        MailNotificationKindsInput: components["schemas"]["WithReason"] & {
+            /** @description Notification kinds that are also mailed to the person. An empty list keeps every notification in-app. */
+            kinds: string[];
+        };
+        /** @description 0.14.2 (Q441). The setting `mail.notification_kinds` and the kinds it may name. */
+        MailNotificationKinds: {
+            kinds: string[];
+            /** @description Values of the setting that are not in the catalogue; a save drops them. */
+            unknown_kinds: string[];
+            catalogue: {
+                kind: string;
+                /** @description One of the six go-live kinds: a task, a record or a snag fix waits for the person, or came back with a note. */
+                recommended: boolean;
+            }[];
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
         };
         GecolOrderWarningsInput: {
             enabled: boolean;
@@ -12567,7 +12671,7 @@ export interface components {
             revoked_count: number;
         };
         /** @enum {string} */
-        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice";
+        NotificationKind: "task_assigned" | "task_returned" | "task_approved" | "approval_due" | "reassigned" | "absence_alert" | "idle_task_alert" | "no_holder" | "holiday_tentative" | "delegation" | "mfa_exemption" | "template_updated" | "import_batch" | "system" | "mention" | "followed_change" | "task_rejected" | "no_eligible_holder" | "register_assigned" | "register_rejected" | "gate_closed_again" | "sla_negative_duration" | "email_change_requested" | "email_change_decided" | "security_alert" | "snag_raised" | "snag_review" | "snag_rejected" | "snag_closed" | "levels_converted" | "permit_transferred" | "phone_change_requested" | "phone_change_decided" | "security_notice" | "site_region_moved";
         Notification: {
             /** Format: uuid */
             id: string;
@@ -21398,6 +21502,62 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    getCalendarConfirmation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarConfirmation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setCalendarConfirmation: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarConfirmationInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarConfirmation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getStructuralFreeze: {
         parameters: {
             query?: never;
@@ -21690,6 +21850,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getMailNotificationKinds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailNotificationKinds"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setMailNotificationKinds: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MailNotificationKindsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MailNotificationKinds"];
                 };
             };
             401: components["responses"]["Unauthorized"];
