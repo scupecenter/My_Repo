@@ -149,14 +149,17 @@ export const qcHandlers = [
     return HttpResponse.json(qcSiteDetail(detail(siteIndex(id))), { headers: { ETag: `"${next.version}"` } });
   }),
 
-  // ---- Q225 (contract 0.12.10): one Change Control draft per field; the site keeps its value until L2 approves
+  // ---- Q225 (contract 0.12.10): one Change Control draft per field; the site keeps its value until L2 approves.
+  // ---- Q473 (contract 0.14.1): the identity of the site (names, coordinates, region, cluster) is proposed the same way; region and cluster are for a System Admin.
   http.post(`${B}/sites/:id/change-proposals`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
     const id = params.id as string;
     if (siteIndex(id) < 0) return problem(404, 'not_found', 'Site not found');
     if (viewer()!.key === 'viewer') return problem(403, 'action_forbidden', 'You need the Change Control create right in this region');
     const cur = siteCustom.get(id) ?? { custom: {}, version: 1 };
-    const b = (await request.json().catch(() => ({}))) as { custom?: Record<string, unknown>; reason?: string };
+    const b = (await request.json().catch(() => ({}))) as { custom?: Record<string, unknown>; identity?: Record<string, unknown>; reason?: string };
+    // Q473: region and cluster change who can see the site: a System Admin only, before any other check
+    if (b.identity && ('region_id' in b.identity || 'cluster_code' in b.identity) && !isPm()) return problem(403, 'action_forbidden', 'Only a System Admin proposes or approves a change of the region or the cluster.');
     const errs: { path: string; code: string }[] = [];
     if (!b.reason?.trim()) errs.push({ path: '/reason', code: 'required' });
     for (const [k, v] of Object.entries(b.custom ?? {})) {
@@ -165,10 +168,57 @@ export const qcHandlers = [
       else if (!f.requires_approval) errs.push({ path: `/custom/${k}`, code: 'no_approval_needed' });
       else if ((cur.custom[k] ?? null) === v) errs.push({ path: `/custom/${k}`, code: 'unchanged' });
     }
-    if (errs.length || !b.custom || !Object.keys(b.custom).length) return fields(...(errs.length ? errs : [{ path: '/custom', code: 'required' }]));
-    const items = Object.entries(b.custom).map(([k, v], i) => {
-      const it = { field: k, record_id: `cc000000-0000-4000-8000-${String(siteProposals.length + i + 1).padStart(12, '0')}`, change_id: `SFC-${k.toUpperCase()}-${siteProposals.length + i + 1}`,
-        old_value: asText(cur.custom[k]), new_value: asText(v) };
+    const drafts: { field: string; old_value: string; new_value: string }[] = [];
+    if (b.identity) {
+      const idn = b.identity, site = detail(siteIndex(id)), m = siteMeta(siteIndex(id));
+      const bad = (path: string, code: string) => errs.push({ path: `/identity/${path}`, code });
+      for (const k of Object.keys(idn)) if (!['name', 'name_ar', 'latitude', 'longitude', 'region_id', 'cluster_code', 'site_code'].includes(k)) bad(k, 'unknown_field');
+      if ('site_code' in idn) bad('site_code', 'immutable');                                 // the Site ID never changes
+      if ('name' in idn) {
+        const v = String(idn.name ?? '').trim();
+        if (!v) bad('name', 'required'); else if (v.length > 200) bad('name', 'too_long'); else if (v === site.name) bad('name', 'unchanged');
+        else drafts.push({ field: 'name', old_value: site.name, new_value: v });
+      }
+      if ('name_ar' in idn) {
+        const v = idn.name_ar === null ? '' : String(idn.name_ar).trim(), was = site.name_ar ?? '';
+        if (v.length > 200) bad('name_ar', 'too_long'); else if (v === was) bad('name_ar', 'unchanged');
+        else drafts.push({ field: 'name_ar', old_value: was || '(none)', new_value: v || '(none)' });
+      }
+      if ('latitude' in idn || 'longitude' in idn) {
+        const lat = idn.latitude, lon = idn.longitude;
+        const none = (v: unknown) => v === undefined || v === null || v === '';
+        if (none(lat) || none(lon)) bad(none(lat) ? 'latitude' : 'longitude', 'pair_required');
+        else if (typeof lat !== 'number' || typeof lon !== 'number') bad(typeof lat === 'number' ? 'longitude' : 'latitude', 'invalid');
+        else if (Math.abs(lat) > 90) bad('latitude', 'invalid');
+        else if (Math.abs(lon) > 180) bad('longitude', 'invalid');
+        else drafts.push({ field: 'coordinates', old_value: site.latitude == null ? '(none)' : `${site.latitude.toFixed(6)}, ${(site.longitude ?? 0).toFixed(6)}`, new_value: `${lat.toFixed(6)}, ${lon.toFixed(6)}` });
+      }
+      if ('region_id' in idn || 'cluster_code' in idn) {
+        const REG = ['TR', 'MI', 'WM', 'ZW', 'BG', 'GM', 'SB'];
+        const target = 'region_id' in idn ? Number(idn.region_id) : site.region_id;
+        const code = 'cluster_code' in idn ? (idn.cluster_code === null || idn.cluster_code === '' ? null : String(idn.cluster_code)) : undefined;
+        const fits = (c: string) => c.startsWith('GLOBAL') || c === `CL-${REG[target - 1]}-${c.slice(-1)}`;
+        if ('region_id' in idn && !(Number.isInteger(target) && target >= 1 && target <= 7)) bad('region_id', 'unknown_region');
+        else if ('region_id' in idn && target === site.region_id && code === undefined) bad('region_id', 'unchanged');
+        else if (code && !/^(CL-[A-Z]{2}-\d|GLOBAL.*)$/.test(code)) bad('cluster_code', 'unknown_cluster');
+        else if (code && !fits(code)) bad('cluster_code', 'cluster_other_region');
+        else if ('region_id' in idn && target !== site.region_id) {
+          const keep = code === undefined ? (m.cluster as string) : code;
+          if (keep && !fits(keep)) bad('cluster_code', 'cluster_other_region');
+          else drafts.push({ field: 'region', old_value: `${REG[site.region_id - 1]} / ${m.cluster}`, new_value: `${REG[target - 1]} / ${keep || '(none)'}` });
+        } else if (code !== undefined) {
+          if ((code ?? '(none)') === m.cluster) bad('cluster_code', 'unchanged'); else drafts.push({ field: 'cluster', old_value: m.cluster as string, new_value: code ?? '(none)' });
+        }
+      }
+      if (Object.keys(idn).length === 0) errs.push({ path: '/identity', code: 'required' });
+    }
+    if (!b.custom && !b.identity) errs.push({ path: '/custom', code: 'required' });
+    if (errs.length) return fields(...errs);
+    const items = [
+      ...drafts.map((d) => ({ ...d })),
+      ...Object.entries(b.custom ?? {}).map(([k, v]) => ({ field: k, old_value: asText(cur.custom[k]), new_value: asText(v) })),
+    ].map((d, i) => {
+      const it = { ...d, record_id: `cc000000-0000-4000-8000-${String(siteProposals.length + i + 1).padStart(12, '0')}`, change_id: `SFC-${d.field.toUpperCase()}-${siteProposals.length + i + 1}` };
       siteProposals.push({ ...it, site_id: id, reason: b.reason!.trim() });
       return it;
     });

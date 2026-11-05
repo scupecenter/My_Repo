@@ -1915,13 +1915,24 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Propose a change to site fields that require approval (Q225)
+         * Propose a change to site fields that require approval (Q225) and to the identity of the site (Q473)
          * @description One Change Control draft per field (Scope Change, `field_item` `site.custom.<code>`, the site's value now as Old Value, the proposed one as New Value, the
          *     reason, today as Request Date), entered by the caller as L1: the caller needs `sites` view in the site's region, edit access to the field, the `create` right
          *     of Change Control in the region and to be an L1 holder of the Change Control row (403 / 422 `not_eligible_holder` otherwise). The site keeps its approved value
          *     until L2 approves the record; the approval applies it (audited `site_change_applied`), recalculates the site and re-judges its conditional documents. A stale
          *     Old Value is refused at submit (`old_value_changed`). Field codes: `unknown_field`, `no_approval_needed` (edit it with PATCH), `field_read_only`, `invalid`,
          *     `required`, `unchanged`; `/reason` `required`.
+         *
+         *     **The identity of the site (0.14.1, Q473).** `identity` proposes the English name (`name`), the Arabic name (`name_ar`, null clears it), the coordinates (`latitude`
+         *     and `longitude` together, six decimals; a pair is replaced, never cleared), the region (`region_id`) and the cluster (`cluster_code`, null clears it). One Change Control
+         *     draft (Data Correction, scope Field) per item, entered by the caller as L1 like the drafts above; the site keeps its values until L2 approves, and nothing is
+         *     proposed when one field is refused. A region change carries the cluster in the same draft (the cluster named in `cluster_code`, else the site's cluster when it is
+         *     global or belongs to the new region, else 422 `cluster_other_region` on `/identity/cluster_code`). The Site ID never changes: `site_code` is refused with
+         *     `/identity/site_code` `immutable`. **Region and cluster are for a System Admin only** (they change who can see the site): a Team Lead or a delegate gets 403
+         *     `action_forbidden`, before any other check. The same rules apply when a Change Control record names `site.region` or `site.cluster` (submit and approval) and
+         *     `site.site_code` (`immutable` at submit). On approval the site changes (a region change moves its tasks and records), is recalculated and the change is audited
+         *     (`site_change_applied` with before and after values; a move also writes `site_region_moved_out` in the old region). There is no direct edit of the identity:
+         *     `PATCH /sites/{site_id}` writes custom values only.
          */
         post: operations["proposeSiteChange"];
         delete?: never;
@@ -11807,13 +11818,32 @@ export interface components {
             /** @description Q225 (0.12.10): the field changes permits or scope, so it is changed by a proposal (`POST /sites/{site_id}/change-proposals`) and its L2 approval, never by `PATCH /sites/{site_id}`. */
             requires_approval?: boolean;
         };
+        /** @description Send `custom`, `identity` or both (422 when neither); a reason is required. */
         SiteChangeProposal: {
             /** @description Field code -> proposed value; null clears. */
-            custom: components["schemas"]["CustomValues"];
+            custom?: components["schemas"]["CustomValues"];
+            identity?: components["schemas"]["SiteIdentityProposal"];
             reason: string;
+        };
+        /** @description 0.14.1 (Q473). The identity of the site, proposed as Change Control drafts. At least one field. `region_id` and `cluster_code` are for a System Admin only (403 `action_forbidden`). `site_code` is accepted only to be refused (`immutable`). */
+        SiteIdentityProposal: {
+            /** @description The English site name (the column `name`). */
+            name?: string;
+            /** @description The Arabic site name; null or empty clears it. */
+            name_ar?: string | null;
+            /** @description With `longitude`: the pair is replaced as a whole (six decimals). */
+            latitude?: number;
+            longitude?: number;
+            /** @description System Admin only. The site moves to this region on approval; its tasks and records follow. */
+            region_id?: number;
+            /** @description System Admin only. An existing cluster of the target region, or a global one; null clears the cluster. A cluster is never created by a change (Q471). */
+            cluster_code?: string | null;
+            /** @description Always refused: 422 `/identity/site_code` `immutable`. The Site ID never changes. */
+            site_code?: string;
         };
         SiteChangeProposalResult: {
             items: {
+                /** @description A custom field code, or (0.14.1) `name`, `name_ar`, `coordinates`, `region` or `cluster`. */
                 field: string;
                 /**
                  * Format: uuid

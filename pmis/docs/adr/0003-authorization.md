@@ -102,3 +102,8 @@
 - The interim period, before item 6 merges, is acceptable only with synthetic data.
 - Module-aware region sets remove over-exposure across modules, at the cost of one resolver call per transaction, cached in the context table.
 - Every guard needs a negative test that connects as `pmis_app`, including forged `set_config` attempts.
+
+## Amendment 2026-11-05 (Q473, migration 0071): the region of a site
+- `admin_transfer_site_region` is dropped. The region (and the cluster) of a site changes only through an approved Change Control proposal (`site.region`, `site.cluster`), proposed and approved by a **System Admin** (`app_actor_is_system_admin()`, not a delegate): they decide who can see the site. The trigger `sites_region_immutable` still refuses any other change; `pmis_app` has no update right on `sites.region_id`, `cluster_id`, `site_code`, `name`, `name_ar`, `latitude` or `longitude`.
+- Lines above that name `admin_transfer_site_region` describe the state before this amendment.
+

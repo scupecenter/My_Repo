@@ -25,11 +25,13 @@ export function useUpdateSite(siteId: string) {
   });
 }
 
-// ------------------------------------------------------------------------------------------------- Q225 (contract 0.12.10): a rule-affecting site field is proposed
+// ------------------------------------------------------------------------------------------------- Q225 (contract 0.12.10): a rule-affecting site field is proposed; Q473 (0.14.1): so is the identity
 export type SiteChangeProposalResult = S['SiteChangeProposalResult'];
+/** Contract 0.14.1 (Q473): the identity of the site, proposed as Change Control drafts (region and cluster for a System Admin only; the Site ID is never changed). */
+export type SiteIdentityProposal = S['SiteIdentityProposal'];
 export function useProposeSiteChange(siteId: string) {
   const qc = useQueryClient();
-  return useMutation<SiteChangeProposalResult, ApiError, { custom: Record<string, unknown>; reason: string }>({
+  return useMutation<SiteChangeProposalResult, ApiError, { custom?: Record<string, unknown>; identity?: SiteIdentityProposal; reason: string }>({
     mutationFn: (body) => api.post(`/sites/${siteId}/change-proposals`, { body }),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['site', siteId] });

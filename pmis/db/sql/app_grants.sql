@@ -66,3 +66,16 @@ REVOKE ALL ON pmis_context_keys FROM pmis_app;
 -- drafts that hold the proposals (site_draft_*, imp_*_site_batch), or the accepted Master header aliases (G2).
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON site_drafts, master_header_aliases FROM pmis_app;
 REVOKE INSERT, DELETE, TRUNCATE ON sites FROM pmis_app;
+
+-- 0071 (Q473): the identity of a site changes only through an approved Change Control proposal (p4a_apply_site_change, owner pmis_definer) and is set at creation by
+-- site_create_apply. pmis_app keeps the update right on the other columns of sites (the column list is built from the table, so a column added later is not granted by
+-- accident), and loses it on the identity: site_code, name, name_ar, region_id, cluster_id, latitude, longitude.
+DO $$
+DECLARE cols text;
+BEGIN
+  REVOKE UPDATE ON sites FROM pmis_app;
+  SELECT string_agg(format('%I', a.attname), ', ' ORDER BY a.attnum) INTO cols
+  FROM pg_attribute a WHERE a.attrelid = 'public.sites'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+    AND a.attname NOT IN ('id', 'site_code', 'name', 'name_ar', 'region_id', 'cluster_id', 'latitude', 'longitude');
+  EXECUTE format('GRANT UPDATE (%s) ON sites TO pmis_app', cols);
+END $$;

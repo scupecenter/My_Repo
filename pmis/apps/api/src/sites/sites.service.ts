@@ -25,8 +25,16 @@ const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocatio
 const siteVersion = (v: unknown): number => contentVersion([v instanceof Date ? v.toISOString() : String(v)]);
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const patchSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().max(2000).optional() }).strict();
-/** Q225 (migration 0062): a change to a site field that requires approval, proposed as Change Control drafts. */
-const proposalSchema = z.object({ custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field'), reason: z.string().trim().min(1).max(2000) }).strict();
+/**
+ * Q225 (migration 0062): a change to a site field that requires approval, proposed as Change Control drafts. Q473 (migration 0071): the identity of the site
+ * (name, name_ar, latitude with longitude, region_id, cluster_code; site_code is refused by the database with the field error `immutable`) goes the same way.
+ * The values are checked by the database, which answers the field errors; here only the shape is.
+ */
+const proposalSchema = z.object({
+  custom: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
+  identity: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
+  reason: z.string().trim().min(1).max(2000),
+}).strict().refine((b) => b.custom !== undefined || b.identity !== undefined, { message: 'send custom or identity', path: ['custom'] });
 
 interface SiteRow {
   id: string;
@@ -472,7 +480,10 @@ export class SitesService {
   }
 
   // ------------------------------------------------------------------ POST /sites/{id}/change-proposals (Q225, site_propose_change)
-  /** A rule-affecting site field (near_airport) is changed by a Change Control draft per field, entered by the caller as L1; it applies after L2 approval. */
+  /**
+   * A rule-affecting site field (near_airport) and, since Q473, the identity of the site (names, coordinates, region, cluster) are changed by a Change Control draft per
+   * field, entered by the caller as L1; it applies after L2 approval. Region and cluster are for a System Admin (403 for anybody else).
+   */
   async propose(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
     const regions = await this.access.requireRegions('sites', 'view');
     const body = parse(proposalSchema, raw);
@@ -480,10 +491,19 @@ export class SitesService {
     if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
     await this.db.tx.$executeRaw`SAVEPOINT site_propose`;
     try {
-      const rows = await this.db.tx.$queryRaw<{ r: { items: Record<string, unknown>[] } }[]>(Prisma.sql`
-        SELECT site_propose_change(${id}::uuid, ${JSON.stringify(body.custom)}::jsonb, ${body.reason}::text) AS r`);
+      const items: Record<string, unknown>[] = [];
+      if (body.identity) {
+        const rows = await this.db.tx.$queryRaw<{ r: { items: Record<string, unknown>[] } }[]>(Prisma.sql`
+          SELECT site_propose_identity(${id}::uuid, ${JSON.stringify(body.identity)}::jsonb, ${body.reason}::text) AS r`);
+        items.push(...(rows[0]?.r.items ?? []));
+      }
+      if (body.custom) {
+        const rows = await this.db.tx.$queryRaw<{ r: { items: Record<string, unknown>[] } }[]>(Prisma.sql`
+          SELECT site_propose_change(${id}::uuid, ${JSON.stringify(body.custom)}::jsonb, ${body.reason}::text) AS r`);
+        items.push(...(rows[0]?.r.items ?? []));
+      }
       await this.db.tx.$executeRaw`RELEASE SAVEPOINT site_propose`;
-      return { items: rows[0]?.r.items ?? [] };
+      return { items };
     } catch (e) {
       const p = mapDbError(e);
       if (!p) throw e;
