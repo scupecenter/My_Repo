@@ -178,6 +178,8 @@ export type MockBatch = {
   entity?: 'site';
   id: string; register_key: RegisterKey | null; template_id: string; file_name: string; status: 'validated' | 'sent' | 'discarded'; version: number; created: number;
   uploaded_by: string; uploaded_at: string; note?: string | null; rows: MockBatchRow[];
+  /** Q462 (contract 0.14.3): marked "historical load: accept without documents" by a System Admin under the open waiver. */
+  historical?: { cutoff_date: string; reason: string; marked_at: string };
 };
 
 const pad = (n: number) => String(n).padStart(12, '0');

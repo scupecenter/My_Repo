@@ -92,6 +92,7 @@ export class ProjectStatusService {
         as_of: new Date().toISOString(),
         workflow_versions: meta.workflow_versions ?? [],
         override_flagged_count: flagged,
+        historical_flagged_count: Number(meta.historical_flagged_count ?? 0),
         overrides_excluded: exclude,
         weight_set: weightSet,
       },

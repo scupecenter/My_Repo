@@ -26,7 +26,11 @@ export type RejectReason =
 
 const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded'];
 
-const uploadBody = z.object({ template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional(), mode: z.enum(['submit', 'draft']).optional() }).passthrough();
+const uploadBody = z.object({
+  template_id: z.string().max(60).optional(), task_id: z.string().uuid().optional(), mode: z.enum(['submit', 'draft']).optional(),
+  // Q462 (0073): "historical load: accept without documents", a System Admin under the open waiver
+  historical_load_reason: z.string().trim().min(3).max(2000).optional(),
+}).passthrough();
 const decisionBody = z
   .object({
     action: z.enum(['review', 'approve', 'reject', 'discard']),
@@ -57,6 +61,11 @@ interface BatchRow {
   module_key: string | null;
   mode: string;
   file_template_version: number | null;
+  historical_load: boolean;
+  historical_cutoff: string | null;
+  historical_reason: string | null;
+  historical_marked_by: string | null;
+  historical_marked_at: Date | null;
   c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint;
   ts: string;
 }
@@ -134,6 +143,7 @@ export class ImportService {
       throw problems.forbidden('action_forbidden', 'You need to import on templates.');
     }
     const body = parse(uploadBody, rawBody ?? {});
+    if (body.historical_load_reason !== undefined) await this.requireHistoricalAdmin(auth);
     if (!file || file.size === 0) throw problems.validation([{ path: '/file', code: 'required', message: 'Send the filled template as the form field "file".' }]);
     const ctx: Record<string, unknown> = { file_name: file.originalname.slice(0, 200), size: file.size, sha256: sha256(file.buffer) };
 
@@ -184,6 +194,9 @@ export class ImportService {
     }
     if (current.kind === 'master') {
       if (body.task_id) return this.reject(auth, requestId, 'wrong_template', 'TPL-MASTER has no per-task upload: upload the stream template of the task.', ctx);
+      if (body.historical_load_reason !== undefined) {
+        throw problems.validation([{ path: '/historical_load_reason', code: 'invalid', message: 'Accepting without documents is for the Site Register stream templates and the Master import of the System Admin, not for a TPL-MASTER file.' }]);
+      }
       return this.uploadMaster(auth, requestId, ctx, wb, kv, issued as unknown as { columns: unknown; header_checksum: string }, templateId, version, file.originalname, body.mode ?? 'submit');
     }
     // 4. the header row
@@ -216,8 +229,15 @@ export class ImportService {
 
     // 6. staging in the database, which decides every row again
     const payload = JSON.stringify(rows);
-    const id = await this.stage(auth, requestId, ctx, templateId, version, issued.header_checksum, file.originalname, String(ctx.sha256), body.task_id ?? null, payload, body.mode ?? 'submit');
+    const id = await this.stage(auth, requestId, ctx, templateId, version, issued.header_checksum, file.originalname, String(ctx.sha256), body.task_id ?? null, payload, body.mode ?? 'submit', body.historical_load_reason ?? null);
     return this.getBatch(auth, id);
+  }
+
+  /** Q462: marking a batch is for a System Admin (never a delegate) with a fresh step-up; the database checks both again at the write. */
+  private async requireHistoricalAdmin(auth: AuthContext): Promise<void> {
+    const a = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT coalesce(app_actor_is_system_admin(), false) AS ok`;
+    if (!a[0]?.ok) throw problems.forbidden('action_forbidden', 'Only a System Admin can accept a batch without documents (historical load).');
+    await this.stepUp.require(auth);
   }
 
   /** Savepoint around a staging call: a refusal of the database (version, headers, rights) is logged and answered as template_rejected. */
@@ -240,10 +260,12 @@ export class ImportService {
     }
   }
 
-  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string, mode: string): Promise<string> {
+  private async stage(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, templateId: string, version: number, checksum: string, fileName: string, sha: string, taskId: string | null, payload: string, mode: string, historicalReason: string | null = null): Promise<string> {
     const id = await this.guarded(auth, requestId, ctx, async () => {
-      const r = await this.db.tx.$queryRaw<{ id: string | null }[]>(Prisma.sql`
-        SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb, ${mode}::text)::text AS id`);
+      const r = await this.db.tx.$queryRaw<{ id: string | null }[]>(historicalReason === null
+        ? Prisma.sql`SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb, ${mode}::text)::text AS id`
+        : Prisma.sql`SELECT imp_stage_batch(${templateId}::text, ${version}::int, ${checksum}::text, ${fileName}::text, ${sha}::text, ${taskId}::uuid, ${payload}::jsonb, ${mode}::text,
+            ${JSON.stringify({ reason: historicalReason })}::jsonb)::text AS id`);
       if (!r[0]) throw new ProblemException(500, 'internal_error', {});
       return r[0].id;
     });
@@ -480,7 +502,8 @@ export class ImportService {
     return Prisma.sql`
       SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
         b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
-        b.mode, b.file_template_version, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
+        b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
+        b.historical_marked_at, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
       JOIN template_versions v ON v.id = b.template_version_id
@@ -500,7 +523,7 @@ export class ImportService {
   }
 
   private async dtos(rows: BatchRow[]): Promise<Record<string, unknown>[]> {
-    const refs = await this.view.userRefs([...new Set(rows.map((r) => r.uploaded_by))]);
+    const refs = await this.view.userRefs([...new Set([...rows.map((r) => r.uploaded_by), ...rows.flatMap((r) => (r.historical_marked_by ? [r.historical_marked_by] : []))])]);
     return rows.map((r) => {
       const status = r.status;
       const dto: Record<string, unknown> = {
@@ -518,6 +541,9 @@ export class ImportService {
         },
         mode: r.mode,
         file_template_version: r.file_template_version,
+        historical_load: r.historical_load
+          ? { cutoff_date: r.historical_cutoff, reason: r.historical_reason, marked_by: r.historical_marked_by ? (refs.get(r.historical_marked_by) ?? { id: r.historical_marked_by }) : null, marked_at: r.historical_marked_at }
+          : null,
         job_id: null,
         task_id: r.task_id,
         site_id: r.site_id,

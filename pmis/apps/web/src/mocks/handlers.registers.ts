@@ -12,6 +12,7 @@ import { uid } from './ids';
 import { holdersOf, rowOf } from './matrixData';
 import { REGISTER_DEFS, REGISTER_TEMPLATES, STREAM_TEMPLATES, recId, type MockBatch, type MockBatchRow, type MockRecord } from './registersData';
 import { SITE_COUNT, siteIdOf, siteIndex, siteMeta, TODAY } from './sites';
+import { isSystemAdmin, waiver } from './waiverData';
 import { deriveDismantle, gecolCfg, hlcPrView, p4cWarnings } from './p4cData';
 
 const B = API_BASE;
@@ -424,6 +425,19 @@ export const registerHandlers = [
       if (text.includes('otherstream')) return reject('wrong_template', `This file is the template ${tpl === 'TPL-SITE-CW' ? 'TPL-SITE-TE' : 'TPL-SITE-CW'}, but ${tpl} was selected.`);
       if (stream) {
         const b = makeStreamBatch(stream, tpl, f.name);
+        const hl = fd.get('historical_load_reason');
+        if (hl !== null) {
+          // Q462 (0.14.3): a System Admin only, with a step-up, while the waiver is open, in submit mode; the rows before the cutoff are not refused for missing documents
+          const w = waiver();
+          if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin can accept a batch without documents (historical load).' });
+          if (!stepUpValid()) return stepUp();
+          if (String(hl).trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load_reason', code: 'required', message: 'A reason is required.' }] });
+          if (fd.get('mode') === 'draft') return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/mode', code: 'invalid', message: 'The historical load is for Submit for Review.' }] });
+          if (!w.open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The historical-load waiver is closed: a batch cannot be accepted without documents.' });
+          b.historical = { cutoff_date: w.cutoff_date!, reason: String(hl).trim(), marked_at: new Date().toISOString() };
+          const first = b.rows.find((r) => r.action === 'update');
+          if (first) first.warnings = [...(first.warnings ?? []), { column: `${first.task_code} Actual Date`, code: 'historical_no_documents', message: 'Missing document(s). Accepted without documents under the historical-load waiver; the task will be flagged.' }];
+        }
         R().batches.unshift(b); save();
         return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
       }
@@ -722,5 +736,6 @@ function toBatch(b: MockBatch): ImportBatch {
     ...(b.stream ? { stream: b.stream } : {}), ...(b.entity ? { entity: b.entity } : {}), ...(b.group_id ? { group_id: b.group_id, part_sheet: b.part_sheet ?? null } : {}),
     counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval') },
     job_id: null, task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
+    historical_load: b.historical ? { cutoff_date: b.historical.cutoff_date, reason: b.historical.reason, marked_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, marked_at: b.historical.marked_at } : null,
   };
 }

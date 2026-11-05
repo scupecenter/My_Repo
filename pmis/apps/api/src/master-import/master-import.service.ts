@@ -34,7 +34,11 @@ const DIFF_KINDS = ['diff', 'missing_in_pmis', 'missing_in_master', 'exception']
 const RESOLUTIONS = ['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored'];
 const MAX_ROWS = 5000;
 
-const applyBody = z.object({ mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000) }).strict();
+const applyBody = z.object({
+  mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
+  // Q462 (0073): mark the batches "historical load: accept without documents" (a System Admin under the open waiver)
+  historical_load: z.object({ reason: z.string().trim().min(3).max(2000) }).strict().optional(),
+}).strict();
 const resolveBody = z.object({ resolution: z.enum(['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored']), note: z.string().max(1000).optional() }).strict();
 
 interface RunRow {
@@ -266,9 +270,16 @@ export class MasterImportService {
     const version = parseIfMatch(ifMatch);
     const body = parse(applyBody, raw);
     await this.getRun(auth, id);
+    if (body.historical_load) {
+      // Q462: a System Admin (never a delegate), then a step-up; the database checks both again, and the open waiver
+      const a = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT coalesce(app_actor_is_system_admin(), false) AS ok`;
+      if (!a[0]?.ok) throw problems.forbidden('action_forbidden', 'Only a System Admin can accept a batch without documents (historical load).');
+      await this.stepUp.require(auth);
+    }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
-    const outcome = await this.call<Record<string, unknown>>(auth,
-      Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
+    const outcome = await this.call<Record<string, unknown>>(auth, body.historical_load
+      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify({ reason: body.historical_load.reason })}::jsonb) AS r`
+      : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
     return { ...(await this.getRun(auth, id)), outcome };
   }
 

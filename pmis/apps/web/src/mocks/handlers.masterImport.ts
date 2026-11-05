@@ -7,6 +7,7 @@ import type { ImportAlias, MasterImportDiff, MasterImportRun, TemplateMappingCha
 import { db, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { uid } from './ids';
+import { isSystemAdmin, waiver, waiverToday, waiverView } from './waiverData';
 
 const B = API_BASE;
 
@@ -100,14 +101,44 @@ export const masterImportHandlers = [
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (!r) return problem(404, 'not_found', 'Not found');
-    const body = await request.json() as { mode?: string; reason?: string };
+    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string } };
     if (!body.reason || body.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required', message: 'A reason is required.' }] });
     if (r.status === 'applied') return problem(409, 'invalid_transition', 'Not possible now', { detail: 'This run was already applied.' });
     if (!stepUpValid()) return stepUp();
+    if (body.historical_load) {
+      // Q462 (0.14.3): a System Admin, the submit mode, a reason, the waiver open
+      if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin can accept a batch without documents (historical load).' });
+      if (body.mode === 'draft') return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/mode', code: 'invalid', message: 'The historical load is for the submit mode.' }] });
+      if ((body.historical_load.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load/reason', code: 'required', message: 'A reason is required.' }] });
+      if (!waiver().open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The historical-load waiver is closed: a batch cannot be accepted without documents.' });
+    }
     const outcome = { group_id: uid('group'), mode: body.mode === 'draft' ? 'draft' as const : 'submit' as const, batches: [{ id: uid('batch'), ref: 'CW', template_id: 'TPL-SITE-CW', submitted: body.mode === 'draft' ? 0 : 1, saved: body.mode === 'draft' ? 1 : 0, held: 0, failed: 0, errors: 0 }], skipped: [] };
     Object.assign(r, { status: 'applied', applied_at: now(), apply_reason: body.reason, apply_mode: outcome.mode, group_id: outcome.group_id, outcome, version: r.version + 1,
       applied_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' } });
     return HttpResponse.json({ ...r, outcome }, { headers: { ETag: `"${r.version}"` } });
+  }),
+  // Q462 (contract 0.14.3): the one-time historical-load document waiver. Any signed-in user reads it; only a System Admin opens or closes it, with a step-up.
+  http.get(`${B}/settings/historical-waiver`, () => { const g = guard(); if (g) return g; return HttpResponse.json(waiverView()); }),
+  http.put(`${B}/settings/historical-waiver`, async ({ request }) => {
+    const g = guard(); if (g) return g;
+    if (!isSystemAdmin()) return problem(403, 'action_forbidden', 'Action not allowed', { detail: 'Only a System Admin can open or close the historical-load waiver.' });
+    if (!stepUpValid()) return stepUp();
+    const b = await request.json() as { open?: unknown; cutoff_date?: string; reason?: string } & Record<string, unknown>;
+    const errs: { path: string; code: string }[] = [];
+    for (const k of Object.keys(b)) if (!['open', 'cutoff_date', 'reason'].includes(k)) errs.push({ path: `/${k}`, code: 'unknown_field' });
+    if (typeof b.open !== 'boolean') errs.push({ path: '/open', code: 'required' });
+    if ((b.reason ?? '').trim().length < 3) errs.push({ path: '/reason', code: 'required' });
+    if (b.open === true) {
+      if (!b.cutoff_date) errs.push({ path: '/cutoff_date', code: 'required' });
+      else if (b.cutoff_date > waiverToday()) errs.push({ path: '/cutoff_date', code: 'in_the_future' });
+    }
+    if (errs.length) return problem(422, 'validation_failed', 'Validation failed', { errors: errs as never });
+    const w = waiver();
+    if (b.open && w.open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The waiver is already open. Close it first to open it again with another cutoff date.' });
+    if (!b.open && !w.open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The waiver is not open.' });
+    if (b.open) Object.assign(w, { open: true, cutoff_date: b.cutoff_date!, opened_at: now(), expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(), reason: b.reason!.trim(), opened_by: uid(viewer()?.employee_id ?? '1001'), closed_at: null, closed_how: null });
+    else Object.assign(w, { open: false, cutoff_date: null, closed_at: now(), closed_how: 'manual' });
+    return HttpResponse.json(waiverView());
   }),
   http.patch(`${B}/master-import/diffs/:id`, async ({ params, request }) => {
     const g = adminOnly(); if (g) return g;

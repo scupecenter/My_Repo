@@ -153,6 +153,7 @@ export function RegisterBatch() {
             <span className="chip bg-card2" data-testid="batch-count-diff">{t('batch.diff', { create: b.counts.create ?? 0, update: b.counts.update ?? 0, unchanged: b.counts.unchanged ?? 0 })}</span>
             {!!heldN && <span className="chip bg-lockBg text-lockInk" data-testid="batch-count-held">{t('batch.held_count', { count: heldN })}</span>}
             {rows.loadingMore && <span className="chip bg-card2 text-mute" role="status" data-testid="batch-loading-rows">{t('batchProgress.loading_rows', { loaded: all.length, total: totalRows })}</span>}
+            {b.historical_load && <span className="chip bg-waitBg text-waitInk" data-testid="batch-historical" title={b.historical_load.reason}>{t('hw.batch_chip', { cutoff: b.historical_load.cutoff_date })}</span>}
             <div role="tablist" className="ms-auto flex gap-1">
               {(['all', 'valid', 'invalid', ...(heldN ? ['held'] : [])] as const).map((s) => <button key={s} role="tab" aria-selected={show === s} data-testid={`batch-show-${s}`} className={`btn px-3 py-1 text-xs ${show === s ? 'btn-primary' : ''}`} onClick={() => setShow(s as typeof show)}>{t(`batch.show_${s}`)}</button>)}
             </div>

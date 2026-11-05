@@ -74,6 +74,13 @@ export async function superDbDocs(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the historical-waiver database (migration 0073; the Document Library is active there; see global-setup). */
+export async function superDbHw(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HW });
+  await c.connect();
+  return c;
+}
+
 let seq = 0;
 const uniq = (): string => `${process.pid}${Date.now().toString(36)}${(seq++).toString(36)}${randomBytes(2).toString('hex')}`;
 

@@ -23,9 +23,11 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
     if (!this.config.jobsEnabled) return;
     const a = setInterval(() => void this.evaluateAlerts(), ALERT_EVERY_MS);
     const p = setInterval(() => void this.purge(), PURGE_EVERY_MS);
+    const w = setInterval(() => void this.expireHistoricalWaiver(), ALERT_EVERY_MS);
     a.unref();
     p.unref();
-    this.timers.push(a, p);
+    w.unref();
+    this.timers.push(a, p, w);
     setTimeout(() => void this.purge(), 60_000).unref();
   }
 
@@ -77,6 +79,11 @@ export class JobRunsService implements OnApplicationBootstrap, OnModuleDestroy {
 
   evaluateAlerts(): Promise<number | null> {
     return this.run('security_alerts', async (tx) => Number((await tx.$queryRaw<{ n: number }[]>`SELECT sec_alerts_evaluate() AS n`)[0]?.n ?? 0));
+  }
+
+  /** Q462 (migration 0073): the historical-load waiver closes itself 30 days after it was opened (audited). The effective state never waits for this job. */
+  expireHistoricalWaiver(): Promise<number | null> {
+    return this.run('historical_waiver_expire', async (tx) => ((await tx.$queryRaw<{ c: boolean }[]>`SELECT hw_waiver_expire() AS c`)[0]?.c ? 1 : 0));
   }
 
   purge(): Promise<number | null> {

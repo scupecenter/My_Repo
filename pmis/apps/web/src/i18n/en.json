@@ -900,7 +900,8 @@
     "tab_lists": "Lists",
     "tab_contractor-rules": "Contractor rules",
     "tab_gecol-order": "GECOL order warnings",
-    "tab_mail-kinds": "Mail kinds"
+    "tab_mail-kinds": "Mail kinds",
+    "tab_historical-waiver": "Historical load"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -958,7 +959,8 @@
     "not_a_column": "Add the specialization to the table first.",
     "unknown_scope": "Not an order scope of the table.",
     "unknown_role": "Not a role code.",
-    "unknown_field": "Not a field that can be used here."
+    "unknown_field": "Not a field that can be used here.",
+    "in_the_future": "The cutoff date cannot be in the future."
   },
   "cal": {
     "banner_tentative": "A tentative holiday falls within 14 days ({{date}}). Confirm it on the official announcement.",
@@ -1296,6 +1298,43 @@
     "note": "The user gets a new temporary password, is signed out everywhere, and must change it at the next sign-in. Your password is asked once.",
     "done_title": "Password reset",
     "self": "Use Change password for your own account."
+  },
+  "hw": {
+    "title": "Historical load: accept without documents",
+    "note": "A one-time, time-boxed override for loading the history of the project. The tasks that the owner's Master records as done have no documents, and a task cannot be submitted without its mandatory documents. While this is open, a System Admin may mark a batch \"historical load\".",
+    "rule_scope": "Only a System Admin can open, close or use it. It cannot be delegated.",
+    "rule_checks": "It skips the mandatory-document check only for tasks whose actual date is on or before the cutoff date. Every other check still runs: dates, gates, predecessors, the L1 and L2 holders, the two levels.",
+    "rule_flag": "Each task accepted this way is flagged \"Admin override\", audited with before and after values, and left out of the SLA and on-time figures like any admin override.",
+    "rule_reverse": "It is reversible: when the documents are uploaded later, the flag clears by itself.",
+    "rule_time": "It closes itself after 30 days, or by hand. Opening it needs a reason, a step-up and a cutoff date that is not in the future.",
+    "state_open": "Open",
+    "state_closed": "Closed",
+    "cutoff": "Cutoff date",
+    "opened_at": "Opened",
+    "expires_at": "Closes itself",
+    "days_left": "{{count}} day(s) left",
+    "closed_manual": "Closed by hand on {{when}}.",
+    "closed_expired": "Closed itself after 30 days, on {{when}}.",
+    "admin_only": "Only a System Admin can open or close it.",
+    "open": "Open the historical load",
+    "close": "Close the historical load",
+    "open_title": "Open the historical load",
+    "close_title": "Close the historical load",
+    "open_hint": "Rows whose actual date is on or before the cutoff date may skip the mandatory documents. It closes itself in 30 days.",
+    "close_hint": "Batches already marked can no longer skip the documents; tasks already flagged keep the flag until their documents are uploaded.",
+    "cutoff_label": "Cutoff date (not in the future)",
+    "opened_toast": "The historical load is open.",
+    "closed_toast": "The historical load is closed.",
+    "option_title": "Historical load",
+    "option_label": "Historical load: accept without documents",
+    "option_hint": "Tasks whose actual date is on or before {{cutoff}} are accepted without their mandatory documents and flagged \"Admin override\". Every other check still runs. Needs a reason and a step-up.",
+    "option_reason": "Reason for accepting without documents",
+    "batch_chip": "Historical load up to {{cutoff}}"
+  },
+  "override": {
+    "badge": "Admin override",
+    "historical_title": "Accepted without its mandatory documents under the historical load. The flag clears by itself when the documents are uploaded.",
+    "historical_note": "This task was accepted without its mandatory documents ({{docs}}) under the historical load (cutoff date {{cutoff}}). The flag clears when the documents are uploaded."
   },
   "badges": {
     "local": "Local sign-in",
@@ -3124,7 +3163,8 @@
     "held_open_submission": "The task is in review: the row waits until that is decided.",
     "cluster_will_be_created": "This cluster does not exist yet: it is created in the region of the site when L2 approves.",
     "outside_libya": "These coordinates are outside Libya. Check them.",
-    "list_other": "This value is not in the list; the list allows another value."
+    "list_other": "This value is not in the list; the list allows another value.",
+    "historical_no_documents": "Missing documents: the task will be accepted without them under the historical load (its actual date is on or before the cutoff date) and flagged \"Admin override\"."
   },
   "scope": {
     "tab": "Scope",

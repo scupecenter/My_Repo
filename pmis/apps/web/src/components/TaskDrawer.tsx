@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Check, Clock, ExternalLink, HandMetal, Play, Save, Undo2, UserMinus, UserX, X } from 'lucide-react';
+import { Check, Clock, ExternalLink, HandMetal, Play, Save, ShieldAlert, Undo2, UserMinus, UserX, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +15,7 @@ import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
 import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
+import { OverrideBadge } from './OverrideBadge';
 import { TaskRegisterFields } from './TaskRegisterFields';
 import { FieldHistory } from './logs/FieldHistory';
 import { RejectDialog } from './RejectDialog';
@@ -78,7 +79,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
       <header className="flex items-start gap-2 border-b border-line p-4">
         <div className="flex-1">
           <Dialog.Title className="font-bold"><span className="mono">{task.site_code}</span> · {task.task_code} {name}</Dialog.Title>
-          <Dialog.Description className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute"><span className="chip bg-card2" data-testid="drawer-state">{t(`taskState.${task.state}`)}</span>{t('drawer.level', { level: task.current_level ?? 1, total: task.levels_required ?? 3 })}</Dialog.Description>
+          <Dialog.Description className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute"><span className="chip bg-card2" data-testid="drawer-state">{t(`taskState.${task.state}`)}</span>{task.historical_no_documents && <OverrideBadge taskId={task.id} />}{t('drawer.level', { level: task.current_level ?? 1, total: task.levels_required ?? 3 })}</Dialog.Description>
         </div>
         <Link className="btn px-2 py-1 text-xs" data-testid="drawer-open-site" to={`/sites/${task.site_id}`}><ExternalLink size={12} />{t('drawer.open_site')}</Link>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="drawer-close"><X size={16} /></button></Dialog.Close>
@@ -88,6 +89,12 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         {task.lock_reasons?.length ? <div className="rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="drawer-locks">{task.lock_reasons.map((r, i) => <p key={i}>{r.message}</p>)}</div> : null}
         {task.lock_reasons?.length ? <BlockedByPanel taskId={task.id} siteId={task.site_id} /> : null}
         {task.last_return_note && task.state === 'entry' && <div className="rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="drawer-return-note">{t('approvals.returned_note', { note: task.last_return_note })}</div>}
+        {task.historical_no_documents && (
+          <div className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="drawer-historical">
+            <ShieldAlert size={16} className="shrink-0" />
+            <span>{t('override.historical_note', { docs: (task.historical_load?.missing_documents ?? []).join(', '), cutoff: task.historical_load?.cutoff_date ?? '' })}{task.historical_load?.reason ? ` — ${task.historical_load.reason}` : ''}</span>
+          </div>
+        )}
         {task.holder_absent && <div className="flex gap-2 rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="drawer-absent"><UserX size={16} />{t('drawer.absent')}</div>}
 
         <div {...panelProps('data', tab)} className="space-y-4">

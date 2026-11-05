@@ -80,6 +80,8 @@ export interface TaskSummaryDto {
   return_count: number;
   last_return_note: string | null;
   admin_override: boolean;
+  /** Q462 (migration 0073): submitted without the mandatory documents under the historical-load waiver (the "Admin override" badge). */
+  historical_no_documents: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
   lock_reasons: { kind: string; ref_code: string | null; message: string; count: number | null }[];
   /** Only in the Site Register task grid: register-owned fields shown read-through, editable through the source register (spec 2.7). */
@@ -127,6 +129,10 @@ export interface TaskRow {
   return_count: number;
   last_return_note: string | null;
   admin_override: boolean;
+  historical_no_documents: boolean;
+  historical_batch_id: string | null;
+  historical_flagged_at: Date | null;
+  historical_missing: string[] | null;
   is_na: boolean;
   na_reason: string | null;
   version: number;
@@ -178,7 +184,8 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       r.end_ref AS sla_end_ref, r.pending_confirmation AS sla_pending, sla_task_measured(t.id) AS sla_measured,
       CASE WHEN r.id IS NULL OR t.sla_start_date IS NULL THEN NULL
            ELSE sla_tentative_holidays(r.calendar_id, t.sla_start_date, CASE WHEN t.state = 'approved' THEN t.sla_end_date ELSE t.due_date END)::text[] END AS sla_tentative,
-      t.return_count, t.last_return_note, t.admin_override, t.is_na, t.na_reason, t.version,
+      t.return_count, t.last_return_note, t.admin_override, t.historical_no_documents, t.historical_batch_id::text AS historical_batch_id,
+      t.historical_flagged_at, t.historical_missing, t.is_na, t.na_reason, t.version,
       t.ball_in_court_user_id::text AS pinned_user, t.external_party_id::text AS external_party_id, wd.version AS workflow_version,
       k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder,
       k.votes_needed, k.votes_done,
@@ -304,6 +311,7 @@ export class TaskViewService {
         return_count: r.return_count,
         last_return_note: r.last_return_note,
         admin_override: r.admin_override,
+        historical_no_documents: r.historical_no_documents,
         lock_reasons: [],
         version: r.version,
       };

@@ -2194,6 +2194,7 @@ export interface paths {
          *     (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`); a file the virus scan refuses (422 `file_rejected`, `reason` = `malware`); the scanner unreachable under fail_closed (503 `malware_scan_unavailable`).
          *     Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
          *     The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
+         *     **Q462 (0.14.3):** a task flagged `historical_no_documents` (accepted without documents under the historical-load waiver) also takes a file for a slot that is still `missing` while it is submitted or approved. When the last mandatory slot is filled the flag clears by itself (audited `task_historical_no_documents_cleared`); nothing else changes.
          */
         post: operations["uploadSlotFile"];
         delete?: never;
@@ -4283,6 +4284,35 @@ export interface paths {
          * @description Needs a written reason and step-up. The lift is audited. Required typed confirmation (0.2.5, per CLAUDE.md), `confirm_text` must equal `structural-freeze`, else 422 `confirmation_mismatch`.
          */
         post: operations["liftStructuralFreeze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/historical-waiver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The one-time historical-load document waiver (Q462)
+         * @description Any signed-in user may read it: the batch screens show the "historical load" option only to a System Admin while it is open. `opened_by` and `reason` are given to a System Admin only.
+         *     The state is the effective one: a waiver older than 30 days is closed here even before the expiry job has written it.
+         */
+        get: operations["getHistoricalWaiver"];
+        /**
+         * Open or close the historical-load waiver (System Admin only)
+         * @description Only a System Admin, never a delegate (403 `action_forbidden`), with a step-up (401 `step_up_required`) and a reason. Opening needs `cutoff_date`, which cannot be in the future (422 `validation_failed`), and
+         *     starts a window of 30 days; opening an open waiver, or closing a closed one, is 409 `invalid_transition`. The waiver closes itself after 30 days (audited as `historical_waiver.expired`) or by hand (`open` false).
+         *     Every change is audited with before and after values and the admin-override flag. The setting `load.historical_waiver` is written by no other path (not by a settings grant either).
+         *     While it is open, a System Admin may mark a batch "accept without documents" (`POST /import-batches`, `POST /master-import/runs/{run_id}/apply`): for the rows of that batch the mandatory-document check is
+         *     skipped when the task's actual date is on or before the cutoff date, and the task is flagged (`historical_no_documents`). Every other check still runs.
+         */
+        put: operations["setHistoricalWaiver"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8305,6 +8335,8 @@ export interface components {
             return_count?: number;
             last_return_note?: string | null;
             admin_override?: boolean;
+            /** @description Q462 (0.14.3): the task was submitted without its mandatory documents under the historical-load waiver. Shown as the "Admin override" badge; cleared when the documents are uploaded. Treated like an admin override in the KPIs. */
+            historical_no_documents?: boolean;
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
             holder_account_status?: components["schemas"]["UserAccountStatus"];
@@ -8477,6 +8509,8 @@ export interface components {
             is_na?: boolean;
             na_reason?: string | null;
             workflow_version?: number;
+            /** @description Q462 (0.14.3): why the task carries `historical_no_documents`; null when it does not. */
+            historical_load?: components["schemas"]["TaskHistoricalLoad"] | null;
         };
         TaskEntryPatch: {
             /** Format: date */
@@ -9509,6 +9543,70 @@ export interface components {
             created_at: string;
             created_by: components["schemas"]["UserRef"];
         };
+        HistoricalWaiver: {
+            /** @description Effective state: false when the 30 days have passed, whether or not the expiry job has written it. */
+            open: boolean;
+            /**
+             * Format: date
+             * @description Rows whose actual date is on or before it may skip the document check. Null when closed.
+             */
+            cutoff_date: string | null;
+            /** Format: date-time */
+            opened_at?: string | null;
+            /**
+             * Format: date-time
+             * @description opened_at plus 30 days.
+             */
+            expires_at?: string | null;
+            days_left?: number | null;
+            /** @description Always 30. */
+            window_days: number;
+            /**
+             * Format: uuid
+             * @description System Admin callers only.
+             */
+            opened_by?: string | null;
+            /** @description System Admin callers only. */
+            reason?: string | null;
+            /** Format: date-time */
+            closed_at?: string | null;
+            /** @enum {string|null} */
+            closed_how?: "manual" | "expired" | null;
+            /** @description The caller is a System Admin: the only one who may open, close or use the waiver. */
+            can_manage: boolean;
+        };
+        HistoricalWaiverInput: {
+            open: boolean;
+            /**
+             * Format: date
+             * @description Required when opening; not in the future.
+             */
+            cutoff_date?: string;
+            reason: string;
+        };
+        HistoricalLoadMark: {
+            /** Format: date */
+            cutoff_date: string;
+            reason: string;
+            marked_by: {
+                /** Format: uuid */
+                id?: string;
+                display_name?: string;
+            } | null;
+            /** Format: date-time */
+            marked_at: string;
+        };
+        TaskHistoricalLoad: {
+            /** Format: uuid */
+            batch_id: string;
+            /** Format: date */
+            cutoff_date?: string | null;
+            /** Format: date-time */
+            flagged_at: string;
+            /** @description The document codes that were missing when the check was skipped. */
+            missing_documents: string[];
+            reason?: string | null;
+        };
         WithReason: {
             reason: components["schemas"]["Reason"];
         };
@@ -9747,6 +9845,8 @@ export interface components {
             mode?: "submit" | "draft";
             /** @description D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed. */
             file_template_version?: number | null;
+            /** @description Q462 (0.14.3): set when a System Admin marked the batch "accept without documents" under the open waiver. Null otherwise. */
+            historical_load?: components["schemas"]["HistoricalLoadMark"] | null;
             counts: {
                 create?: number;
                 update?: number;
@@ -9938,6 +10038,10 @@ export interface components {
             /** @enum {string} */
             mode: "submit" | "draft";
             reason: string;
+            /** @description Q462 (0.14.3): mark every batch of this apply "historical load: accept without documents". A System Admin only (403 `action_forbidden`), `mode` submit, a step-up, the waiver open (409 `invalid_transition`). For the rows whose actual date is on or before the cutoff date the mandatory-document check is skipped and the task is flagged; every other check runs. */
+            historical_load?: {
+                reason: string;
+            };
         };
         MasterImportDiffResolve: {
             /** @enum {string} */
@@ -13018,8 +13122,10 @@ export interface components {
             as_of: string;
             /** @description Active versions read (per site). */
             workflow_versions?: number[];
-            /** @description Admin overrides flagged in, or excluded from, this KPI. */
+            /** @description Admin overrides flagged in, or excluded from, this KPI. 0.14.3: includes the tasks flagged `historical_no_documents`. */
             override_flagged_count?: number;
+            /** @description Q462 (0.14.3): only the tasks flagged `historical_no_documents` (accepted without documents under the historical-load waiver). */
+            historical_flagged_count?: number;
             overrides_excluded?: boolean;
             weight_set?: components["schemas"]["WeightSetRef"];
         };
@@ -21652,6 +21758,55 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getHistoricalWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description State. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoricalWaiver"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setHistoricalWaiver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HistoricalWaiverInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HistoricalWaiver"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getDlpSettings: {
         parameters: {
             query?: never;
@@ -23049,6 +23204,8 @@ export interface operations {
                      * @enum {string}
                      */
                     mode?: "submit" | "draft";
+                    /** @description Q462 (0.14.3): marks the batch "historical load: accept without documents". A System Admin only, with a step-up, while `GET /settings/historical-waiver` is open; a Site Register stream template in submit mode only (422 `validation_failed` otherwise; 403 `action_forbidden` for anyone else; 409 `invalid_transition` when the waiver is closed). The rows whose task has an actual date on or before the cutoff date are not refused for missing documents (warning `historical_no_documents`); the batch is sent by the same System Admin (the uploader). */
+                    historical_load_reason?: string;
                 };
             };
         };

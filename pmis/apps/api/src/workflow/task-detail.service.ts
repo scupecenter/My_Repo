@@ -44,6 +44,8 @@ export type TaskDetailDto = TaskSummaryDto & {
   is_na: boolean;
   na_reason: string | null;
   workflow_version: number;
+  /** Q462 (0073): why the task carries `historical_no_documents`; null when it does not. */
+  historical_load: { batch_id: string; cutoff_date: string | null; flagged_at: Date | null; missing_documents: string[]; reason: string | null } | null;
 };
 
 @Injectable()
@@ -93,7 +95,15 @@ export class TaskDetailService {
       is_na: row.is_na,
       na_reason: row.na_reason,
       workflow_version: row.workflow_version,
+      historical_load: await this.historicalLoad(row),
     };
+  }
+
+  private async historicalLoad(row: TaskRow): Promise<TaskDetailDto['historical_load']> {
+    if (!row.historical_no_documents || !row.historical_batch_id) return null;
+    const b = await this.db.tx.$queryRaw<{ cutoff: string | null; reason: string | null }[]>(Prisma.sql`
+      SELECT historical_cutoff::text AS cutoff, historical_reason AS reason FROM import_batches WHERE id = ${row.historical_batch_id}::uuid`);
+    return { batch_id: row.historical_batch_id, cutoff_date: b[0]?.cutoff ?? null, flagged_at: row.historical_flagged_at, missing_documents: row.historical_missing ?? [], reason: b[0]?.reason ?? null };
   }
 
   /** Mandatory fields and document slots the task still lacks for submission. */

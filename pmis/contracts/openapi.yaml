@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.14.2
+  version: 0.14.3
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.14.3 (2026-11-05): the one-time historical-load document waiver (decision on owner question Q462, `docs/spec/technical-decisions-2026-11-04.md`; migration 0073; CHANGELOG 102). Additive. (1) `GET /settings/historical-waiver` (`getHistoricalWaiver`, any signed-in user: open or closed, cutoff date, expiry, whether the caller may manage it) and `PUT /settings/historical-waiver` (`setHistoricalWaiver`: a System Admin only, never a delegate, 403 `action_forbidden`; step-up; a reason; opening needs a cutoff date that is not in the future, 422 `validation_failed`; it closes itself after 30 days or by hand; every change is audited with the admin-override flag; the setting `load.historical_waiver` is written by no other path). (2) While it is open, a System Admin may mark a batch "historical load: accept without documents": `POST /import-batches` (a Site Register stream template) takes the form field `historical_load_reason`, and `POST /master-import/runs/{run_id}/apply` takes `historical_load: {reason}`; both need a step-up (401 `step_up_required`) and the open waiver (409 `invalid_transition`). For the rows of that batch the mandatory-document check is skipped only when the task's actual date is on or before the cutoff date; every other check runs; rows after the cutoff and every other batch are unchanged (the preview row carries the warning `historical_no_documents`). `ImportBatch.historical_load` shows the mark. (3) A task submitted that way has `TaskSummary.historical_no_documents` = true (the "Admin override" badge in the task and in the task grid; `TaskDetail.historical_load` has the batch, the cutoff and the missing document codes) and an audit row `task_historical_no_documents` (before and after values, the batch reference, `is_admin_override`). (4) Reversible: uploading the missing documents later is allowed on a flagged task even after its approval (`POST /tasks/{task_id}/slots/{slot_id}/files`) and, when no mandatory slot is missing any more, clears the flag by itself (audited `task_historical_no_documents_cleared`); a task that goes back to Data Entry loses the flag too. (5) KPIs: a flagged task is treated like an admin override. It is left out of the SLA and on-time figures when `exclude_overrides` is on (the default), counted otherwise; `KpiMeta.override_flagged_count` includes it and the new `KpiMeta.historical_flagged_count` counts only these; the health index leaves it out of documentation completeness and first-time approval; Project Status progress is unchanged.
     - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
     - 0.14.1 (2026-11-05): technical decision Q473 (`docs/spec/technical-decisions-2026-11-04.md`, "Site creation"; migration 0071; CHANGELOG 100). Additive: no new path. The identity of a site changes only through a Change Control proposal (L1 proposes, L2 approves, audited with before and after values), never by a direct edit. `POST /sites/{site_id}/change-proposals` (`SiteChangeProposal`) gains the optional `identity` object (`SiteIdentityProposal`: `name`, `name_ar`, `latitude` with `longitude` as one pair, `region_id`, `cluster_code`, and `site_code`, which is always refused); `custom` becomes optional (send `custom`, `identity` or both; a reason is still required). One Change Control draft (Data Correction, Field) is opened per item (`field_item` `site.name`, `site.name_ar`, `site.coordinates`, `site.region` with the cluster, `site.cluster`); the result items carry `field` `name`, `name_ar`, `coordinates`, `region` or `cluster`. Field codes: `/identity/site_code` `immutable` (the Site ID never changes; also at submit of a hand-made Change Control record that names `site.site_code`), `unknown_field`, `required`, `too_long`, `invalid` (ranges of the site creation: latitude -90..90, longitude -180..180), `pair_required`, `unchanged`, `unknown_region`, `unknown_cluster`, `cluster_other_region` (a cluster must belong to the target region or be global; a region change names a cluster of the new region or none when the site's cluster would not fit). Region and cluster change who can see the site, so only a System Admin proposes or approves them: a Team Lead or a delegate gets 403 `action_forbidden` at the proposal, at submit and at the approval. On approval the site moves (its tasks and records follow), it is recalculated and the change is audited (`site_change_applied`, plus `site_region_moved_out` for the old region). Direct writes are closed: `pmis_app` can no longer update `sites.site_code`, `name`, `name_ar`, `region_id`, `cluster_id`, `latitude` or `longitude`, and the function `admin_transfer_site_region` is dropped. `PATCH /sites/{site_id}` writes custom values only (unchanged). `SiteDetail` and `GET /sites/{site_id}` are unchanged.
     - 0.14.0 (2026-11-05): site creation, bulk and manual (gap G1 of `docs/plans/2026-11-04-master-template-data-load.md`, owner question Q460 answered by the technical decisions; migration 0070; CHANGELOG 98), plus the load fixes G8 and G9 (G2 is API-only). Additive. (1) Two entry ways, both ending at L2; a site exists only when L2 approves. Manual: `POST /sites` (`createSite`) creates a site draft (`SiteDraft`, state `entry`) from `SiteDraftInput` (Site ID, region by id or by name, code or alias, English and Arabic name, cluster, delivery scenario, the six scope flags, Overall Status `Not Started` or `Cancelled`, coordinates, dates; unknown fields such as landlord, phone or e-mail are refused: those data are not loaded, Q469); `GET /site-drafts`, `GET/PATCH/DELETE /site-drafts/{draft_id}` (edit and discard while in `entry`), `POST /site-drafts/{draft_id}/submit` (L1 sends it to L2) and `POST /site-drafts/{draft_id}/decide` (L2: `approve` creates the site and needs step-up, `reject` returns it to L1 with a note). Bulk: the approved template `TPL-SITE-NEW` ("New sites", `template_kind` `sites`, issued with a hidden `_tpl` sheet) through the existing `GET /templates/{template_id}/download`, `POST /import-batches`, `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (L2 approves row by row or all at once; a return needs a note); `ImportBatch.entity` is `site` and an approved row carries the new site in `ImportRow.site_id`. A batch of this template is not a task batch (`task_id` on upload is refused with 422 `wrong_template`). (2) Who: the Responsibility Matrix gets the row `site_creation` (`MatrixRowKey`; L1 and L2 seeded to the System Admins, editable like any row, decision B11); creating needs `create` on `sites` in the region and L1 of that row, approving needs `approve` on `sites` in the region and L2 of that row (403 `action_forbidden` or `not_eligible_holder`). A person who holds both levels approves their own submission at once (B5: step-up, `SiteDraft.self_approval`, flagged in the audit row). (3) Validation (422 `validation_failed`, `errors[]` with `path` `/site_code`, `/region`, `/delivery_scenario` and so on): the Site ID is unique and never reused (a cancelled or voided site keeps it; a draft waiting for approval holds it too: `duplicate`), the region is resolved through the region aliases (`unknown_region`), the delivery scenario is one of the DeliveryScenario list, Site Scenario and Site Type are values of their lists, scope flags are Yes, No (N/A) or blank, dates are `yyyy-mm-dd` and not in the future, coordinates are in range and come in pairs; a Hot or Cold Swap with a scope flag Yes is refused at entry (`scope_scenario_conflict`). A cluster that does not exist yet is created in the site's region when L2 approves (`SiteDraft.warnings` `cluster_will_be_created`); a cluster of another region is refused (`cluster_other_region`). (4) On approval the site is created on the workflow version in force with all its task instances, the first tasks are opened, the scenario applicability of P1 runs, the site is recalculated and the creation is audited (`site_create`, with the draft, batch and batch row; `self_approval`); a row with Overall Status `Cancelled` creates the site and then sets it cancelled (Q466, audited `site_cancelled`). (5) G9 (Q469): `SiteListItem.name_ar` and `SiteDetail.name_ar`, the Arabic site name. (6) G8: the RF & Design field `site_scenario` reads its own list `SiteScenario` (Indoor, Outdoor; pending the owner's confirmation), no longer `DeliveryScenario`; saved values that are unambiguously Indoor or Outdoor were mapped, every other saved value stays as an inactive value of the list. (7) G2: the legacy Master import (`POST /master-import/runs`) accepts a known header alias for a typed column (CL3 `IP Router` for `Indoor IP Router`); any other renamed header is still refused (`structure_mismatch`).
@@ -3400,6 +3401,7 @@ paths:
         (422 `file_rejected` with `reason` = `format_not_allowed`, `executable`, `archive`, `macro`, `script`, `html`, `empty`, `unknown_type`); the number of files (422 `file_rejected`, `reason` = `too_many_files`); a file the virus scan refuses (422 `file_rejected`, `reason` = `malware`); the scanner unreachable under fail_closed (503 `malware_scan_unavailable`).
         Files are kept under a random key; the name the user typed is metadata only. A photo's EXIF capture date is read (`capture_date`); a photo without one is accepted with `unknown_capture_date`.
         The slot becomes `uploaded` once it has `min_files` current files. With `replaces_file_group_id` the new file is the next version of that file and the old one stays downloadable.
+        **Q462 (0.14.3):** a task flagged `historical_no_documents` (accepted without documents under the historical-load waiver) also takes a file for a slot that is still `missing` while it is submitted or approved. When the last mandatory slot is filled the flag clears by itself (audited `task_historical_no_documents_cleared`); nothing else changes.
       parameters:
         - $ref: '#/components/parameters/TaskId'
         - name: slot_id
@@ -6748,6 +6750,49 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/historical-waiver:
+    get:
+      tags: [settings]
+      operationId: getHistoricalWaiver
+      summary: The one-time historical-load document waiver (Q462)
+      description: |
+        Any signed-in user may read it: the batch screens show the "historical load" option only to a System Admin while it is open. `opened_by` and `reason` are given to a System Admin only.
+        The state is the effective one: a waiver older than 30 days is closed here even before the expiry job has written it.
+      x-db-path: hw_waiver_state
+      responses:
+        '200':
+          description: State.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoricalWaiver'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setHistoricalWaiver
+      summary: Open or close the historical-load waiver (System Admin only)
+      description: |
+        Only a System Admin, never a delegate (403 `action_forbidden`), with a step-up (401 `step_up_required`) and a reason. Opening needs `cutoff_date`, which cannot be in the future (422 `validation_failed`), and
+        starts a window of 30 days; opening an open waiver, or closing a closed one, is 409 `invalid_transition`. The waiver closes itself after 30 days (audited as `historical_waiver.expired`) or by hand (`open` false).
+        Every change is audited with before and after values and the admin-override flag. The setting `load.historical_waiver` is written by no other path (not by a settings grant either).
+        While it is open, a System Admin may mark a batch "accept without documents" (`POST /import-batches`, `POST /master-import/runs/{run_id}/apply`): for the rows of that batch the mandatory-document check is
+        skipped when the task's actual date is on or before the cutoff date, and the task is flagged (`historical_no_documents`). Every other check still runs.
+      x-step-up: true
+      x-db-path: hw_waiver_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/HistoricalWaiverInput'}
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/HistoricalWaiver'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /settings/dlp:
     get:
       tags: [settings]
@@ -7929,6 +7974,7 @@ paths:
                 template_id: {type: string, description: The template the user selected.}
                 task_id: {type: string, format: uuid, description: 'Set when uploading from beside a task (per-task template). The batch response then carries `task_id` and its `site_id`; the template must be one the task uses, else 422.'}
                 mode: {type: string, enum: [submit, draft], default: submit, description: 'Q206 (0.12.8): `draft` = Save Draft / Planning (stream templates and the Master sheet only; a register file is always submitted, 422 otherwise).'}
+                historical_load_reason: {type: string, minLength: 3, maxLength: 2000, description: 'Q462 (0.14.3): marks the batch "historical load: accept without documents". A System Admin only, with a step-up, while `GET /settings/historical-waiver` is open; a Site Register stream template in submit mode only (422 `validation_failed` otherwise; 403 `action_forbidden` for anyone else; 409 `invalid_transition` when the waiver is closed). The rows whose task has an actual date on or before the cutoff date are not refused for missing documents (warning `historical_no_documents`); the batch is sent by the same System Admin (the uploader).'}
       responses:
         '202':
           description: Accepted. The file is parsed and staged in the request, so the batch is already `validated` (`job_id` stays null; `parsing` is kept for a future background parse).
@@ -12718,6 +12764,7 @@ components:
         return_count: { type: integer }
         last_return_note: { type: [string, 'null'] }
         admin_override: { type: boolean }
+        historical_no_documents: { type: boolean, description: 'Q462 (0.14.3): the task was submitted without its mandatory documents under the historical-load waiver. Shown as the "Admin override" badge; cleared when the documents are uploaded. Treated like an admin override in the KPIs.' }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
         holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
@@ -12842,6 +12889,7 @@ components:
             is_na: { type: boolean }
             na_reason: { type: [string, 'null'] }
             workflow_version: { type: integer }
+            historical_load: { oneOf: [ { $ref: '#/components/schemas/TaskHistoricalLoad' }, { type: 'null' } ], description: 'Q462 (0.14.3): why the task carries `historical_no_documents`; null when it does not.' }
     TaskEntryPatch:
       type: object
       minProperties: 1
@@ -13831,6 +13879,46 @@ components:
         body: { type: string }
         created_at: { type: string, format: date-time }
         created_by: { $ref: '#/components/schemas/UserRef' }
+    HistoricalWaiver:
+      type: object
+      required: [open, cutoff_date, window_days, can_manage]
+      properties:
+        open: { type: boolean, description: 'Effective state: false when the 30 days have passed, whether or not the expiry job has written it.' }
+        cutoff_date: { type: [string, 'null'], format: date, description: 'Rows whose actual date is on or before it may skip the document check. Null when closed.' }
+        opened_at: { type: [string, 'null'], format: date-time }
+        expires_at: { type: [string, 'null'], format: date-time, description: 'opened_at plus 30 days.' }
+        days_left: { type: [integer, 'null'] }
+        window_days: { type: integer, description: Always 30. }
+        opened_by: { type: [string, 'null'], format: uuid, description: System Admin callers only. }
+        reason: { type: [string, 'null'], description: System Admin callers only. }
+        closed_at: { type: [string, 'null'], format: date-time }
+        closed_how: { type: [string, 'null'], enum: [manual, expired, null] }
+        can_manage: { type: boolean, description: 'The caller is a System Admin: the only one who may open, close or use the waiver.' }
+    HistoricalWaiverInput:
+      type: object
+      required: [open, reason]
+      additionalProperties: false
+      properties:
+        open: { type: boolean }
+        cutoff_date: { type: string, format: date, description: 'Required when opening; not in the future.' }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    HistoricalLoadMark:
+      type: object
+      required: [cutoff_date, reason, marked_by, marked_at]
+      properties:
+        cutoff_date: { type: string, format: date }
+        reason: { type: string }
+        marked_by: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, display_name: { type: string } } }
+        marked_at: { type: string, format: date-time }
+    TaskHistoricalLoad:
+      type: object
+      required: [batch_id, flagged_at, missing_documents]
+      properties:
+        batch_id: { type: string, format: uuid }
+        cutoff_date: { type: [string, 'null'], format: date }
+        flagged_at: { type: string, format: date-time }
+        missing_documents: { type: array, items: { type: string }, description: The document codes that were missing when the check was skipped. }
+        reason: { type: [string, 'null'] }
     WithReason:
       type: object
       required: [reason]
@@ -14049,6 +14137,7 @@ components:
         note: { type: [string, 'null'], description: The last note of a return. }
         mode: { type: string, enum: [submit, draft], description: 'Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.' }
         file_template_version: { type: [integer, 'null'], description: 'D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed.' }
+        historical_load: { oneOf: [ { $ref: '#/components/schemas/HistoricalLoadMark' }, { type: 'null' } ], description: 'Q462 (0.14.3): set when a System Admin marked the batch "accept without documents" under the open waiver. Null otherwise.' }
         counts:
           type: object
           properties:
@@ -14193,6 +14282,13 @@ components:
       properties:
         mode: { type: string, enum: [submit, draft] }
         reason: { type: string, minLength: 3, maxLength: 2000 }
+        historical_load:
+          type: object
+          required: [reason]
+          additionalProperties: false
+          description: 'Q462 (0.14.3): mark every batch of this apply "historical load: accept without documents". A System Admin only (403 `action_forbidden`), `mode` submit, a step-up, the waiver open (409 `invalid_transition`). For the rows whose actual date is on or before the cutoff date the mandatory-document check is skipped and the task is flagged; every other check runs.'
+          properties:
+            reason: { type: string, minLength: 3, maxLength: 2000 }
     MasterImportDiffResolve:
       type: object
       required: [resolution]
@@ -16997,7 +17093,8 @@ components:
       properties:
         as_of: { type: string, format: date-time }
         workflow_versions: { type: array, items: { type: integer }, description: 'Active versions read (per site).' }
-        override_flagged_count: { type: integer, description: 'Admin overrides flagged in, or excluded from, this KPI.' }
+        override_flagged_count: { type: integer, description: 'Admin overrides flagged in, or excluded from, this KPI. 0.14.3: includes the tasks flagged `historical_no_documents`.' }
+        historical_flagged_count: { type: integer, description: 'Q462 (0.14.3): only the tasks flagged `historical_no_documents` (accepted without documents under the historical-load waiver).' }
         overrides_excluded: { type: boolean }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
     MilestonePipelineNode:

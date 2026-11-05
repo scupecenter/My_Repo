@@ -215,12 +215,13 @@ const settleBatch = (qc: QueryClient, id: string) => {
 
 export function useUploadBatch() {
   const qc = useQueryClient();
-  return useMutation<UploadedBatch, ApiError, { file: File; template_id: string; task_id?: string; mode?: 'submit' | 'draft' }>({
-    mutationFn: ({ file, template_id, task_id, mode }) => {
+  return useMutation<UploadedBatch, ApiError, { file: File; template_id: string; task_id?: string; mode?: 'submit' | 'draft'; historical_load_reason?: string }>({
+    mutationFn: ({ file, template_id, task_id, mode, historical_load_reason }) => {
       const fd = new FormData();
       fd.append('file', file); fd.append('template_id', template_id);
       if (task_id) fd.append('task_id', task_id);
       if (mode && mode !== 'submit') fd.append('mode', mode);
+      if (historical_load_reason) fd.append('historical_load_reason', historical_load_reason);   // Q462 (0.14.3): a System Admin under the open waiver
       return api.post('/import-batches', { body: fd, idempotencyKey: crypto.randomUUID() });
     },
     onSuccess: (b) => { qc.setQueryData(['import-batch', b.id], b); void qc.invalidateQueries({ queryKey: ['import-batches'] }); },

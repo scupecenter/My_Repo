@@ -4,9 +4,11 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import { useHistoricalOffer } from '@/api/historicalWaiver';
 import { useUploadBatch } from '@/api/registers';
 import { batchPath, type ImportBatch, type UploadedBatch } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
+import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from './HistoricalLoadOption';
 
 /**
  * Upload dialog (contract 0.7.0, 0.11.5): pick the filled template and send it. The server checks the hidden `_tpl` sheet, the version and the header row,
@@ -22,14 +24,17 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<'submit' | 'draft'>('submit');
+  // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open, on a stream file in submit mode
+  const offer = useHistoricalOffer(open && kind === 'stream' && mode === 'submit');
+  const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
   const [result, setResult] = useState<UploadedBatch | null>(null);
   const [error, setError] = useState<{ text: string; detail?: string; reason?: string } | null>(null);
-  const reset = () => { setFile(null); setError(null); setResult(null); upload.reset(); };
+  const reset = () => { setFile(null); setError(null); setResult(null); setHist(NO_HISTORICAL); upload.reset(); };
   const close = () => { reset(); onClose(); };
   const send = () => {
     if (!file) return;
     setError(null);
-    upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' || kind === 'sites' ? 'submit' : mode }, {
+    upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' || kind === 'sites' ? 'submit' : mode, ...(offer && hist.on ? { historical_load_reason: hist.reason.trim() } : {}) }, {
       onSuccess: (b) => { if (b.parts?.length || b.warnings?.length) setResult(b); else { reset(); onDone(b); } },
       onError: (e) => setError({
         text: registerErrorMessage(t, e),
@@ -68,6 +73,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
                   ))}
                 </fieldset>
               )}
+              {offer && <HistoricalLoadOption waiver={offer} value={hist} onChange={setHist} testid="hl" />}
               <div>
                 <label htmlFor="tpl-file" className="text-sm font-semibold">{t('tpl.file')}</label>
                 <input ref={input} id="tpl-file" type="file" accept=".xlsx" data-testid="template-upload-file" className="input mt-1" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }} />
@@ -81,7 +87,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
               )}
               <div className="flex justify-end gap-2">
                 <button className="btn" onClick={close}>{t('common.cancel')}</button>
-                <button className="btn btn-primary" data-testid="template-upload-submit" disabled={!file || upload.isPending} onClick={send}><FileUp size={16} />{t('tpl.upload')}</button>
+                <button className="btn btn-primary" data-testid="template-upload-submit" disabled={!file || upload.isPending || (!!offer && !historicalReady(hist))} onClick={send}><FileUp size={16} />{t('tpl.upload')}</button>
               </div>
             </>
           )}

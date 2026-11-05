@@ -8,6 +8,8 @@ import {
   downloadOriginal, exportDiffs, useApplyRun, useMasterDiffs, useMasterRun, useMasterRuns, useResolveDiff, useUploadLegacyMaster,
   type DiffFilters, type MasterImportDiff, type MasterImportRun,
 } from '@/api/masterImport';
+import { useHistoricalOffer } from '@/api/historicalWaiver';
+import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from '@/components/HistoricalLoadOption';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { useToast } from '@/components/Toast';
@@ -186,8 +188,11 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   const apply = useApplyRun();
   const [mode, setMode] = useState<'submit' | 'draft'>('submit');
   const [reason, setReason] = useState('');
+  // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open; a draft has no document check
+  const offer = useHistoricalOffer(mode === 'submit');
+  const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
   const [err, setErr] = useState<string | null>(null);
-  const go = () => apply.mutate({ run, mode, reason }, {
+  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim() } } : {}) }, {
     onSuccess: (r) => { toast(t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
     onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
   });
@@ -204,6 +209,7 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
               <label key={m} className="flex items-center gap-2"><input type="radio" name="mi-mode" value={m} data-testid={`mi-mode-${m}`} checked={mode === m} onChange={() => setMode(m)} />{t(`mi.mode_${m}`)}</label>
             ))}
           </fieldset>
+          {offer && <HistoricalLoadOption waiver={offer} value={hist} onChange={setHist} testid="hl" />}
           <div>
             <label htmlFor="mi-reason" className="text-sm font-semibold">{t('mi.reason')}</label>
             <textarea id="mi-reason" className="input mt-1 w-full" data-testid="mi-apply-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -211,7 +217,7 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
           {err && <p role="alert" className="text-sm text-lateInk" data-testid="mi-apply-error">{err}</p>}
           <div className="flex justify-end gap-2">
             <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-            <button className="btn btn-primary" data-testid="mi-apply-confirm" disabled={reason.trim().length < 3 || apply.isPending} onClick={go}>{t('mi.apply')}</button>
+            <button className="btn btn-primary" data-testid="mi-apply-confirm" disabled={reason.trim().length < 3 || apply.isPending || (!!offer && !historicalReady(hist))} onClick={go}>{t('mi.apply')}</button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
