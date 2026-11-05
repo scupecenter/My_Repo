@@ -5142,6 +5142,7 @@ export interface paths {
          * Send the validated batch into the normal flow (L1 Data Entry)
          * @description Only the uploader (403 `not_eligible_holder` for anyone else, an admin too: the records are entered as L1 in the uploader's name only). Each valid row (`create` or `update`) becomes a register record, and is submitted as the uploader through the same functions as manual entry (`reg_save_record`, `reg_new_version`, `reg_transition_record`, with the import row so that the audit and the history show "via batch"), so it follows the Matrix row of its register: L2 Data Reviewer & Approver decides next. An update is a new version of the record in force; the version in force stays until the new one is approved (R9).
          *     **Stream batches (0.11.5):** each valid task row starts the task when it is pending (the start date is the actual start of the row, else today), saves its entry and submits it as the uploader through the same functions as the task screen (`wf_start`, `wf_save_entry`, `wf_submit`, with the import row so that the task history and the audit show "via batch"); the task then waits for L2 Data Reviewer & Approver of its Matrix cell. The conditional documents that apply are judged first, as on the task screen. A row whose task is in review or approval, or waits for a predecessor, is held `pending_previous_approval` and listed in `outcome.held` (`open_submission`, `predecessor_open`); a row whose task a closed gate locks becomes an `error` row (`gate_locked`, in `outcome.failed`). When the caller also holds L2 of a task, the submission is a self-approval and needs a step-up.
+         *     **Big New sites batches (0.14.4):** with more rows to send than the setting `imports.async_rows` (default 50) the answer is 202: the checks above are made first (the uploader, If-Match, the state, the L1 and the L2 holders, the step-up of a self-approval: 401 and nothing queued), then the batch is `processing` and the rows are sent in chunks of 25 in the background, each chunk committed on its own; `progress` and the counts move while the page polls. A second send while it runs answers 409 `batch_processing`.
          *     A row whose logical record has an open version is held `pending_previous_approval` and listed in `outcome.held`; send the batch again after that version is decided and the row is released. A row that the register refuses at submit becomes an `error` row (listed in `outcome.failed`) and nothing of it is kept. When the caller also holds L2, the submission is a self-approval and needs a step-up (401 `step_up_required`, nothing is created).
          */
         post: operations["submitImportBatch"];
@@ -5168,6 +5169,7 @@ export interface paths {
          * @description A row is decided by the same transition a person makes on the record it created (`reg_transition_record`), with the same grid right (`approve` on the register's module for L2), the same holders of the Matrix row and the same step-up for a final approval (401 `step_up_required`); nothing here is a shortcut.
          *     **Stream batches (0.11.5):** a row is decided by the function a person calls on the task (`wf_review`, `wf_approve`, `wf_reject`) with the grid right `approve` on `sites`, the holders of the task's L2 cell, the step-up of a final approval and the gates and successors of the engine; a return sends the task back to L1 with the note (a rejection comment on the task). A held row is returned by the uploader or an L2 holder of its task.
          *     `approve` (or `review`, for a record still at a legacy middle level) with `scope=all` decides every open row; with `scope=rows` the rows listed. `reject` returns the rows to the uploader with a note (mandatory, 422 `note_required`): the record goes back to L1 Data Entry, the row is `rejected`. `discard` (uploader or System Admin) closes a batch that was not sent; nothing was created.
+         *     **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return is always answered at once.
          *     Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
          */
         post: operations["decideImportBatch"];
@@ -7305,7 +7307,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -9800,6 +9802,38 @@ export interface components {
                 message?: string;
             }[];
         };
+        /** @description 0.14.4: the background run of a big New sites batch. It is done in chunks of 25 rows, each committed on its own, so `rows_done` and the counts of the batch move while it runs. */
+        ImportBatchProgress: {
+            /** Format: uuid */
+            job_id: string;
+            /**
+             * @description `submit`: the send of the uploader (a self-approval creates the sites); `decide`: an L2 approval.
+             * @enum {string}
+             */
+            kind: "submit" | "decide";
+            /**
+             * @description `failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.
+             * @enum {string}
+             */
+            state: "running" | "done" | "failed";
+            rows_total: number;
+            rows_done: number;
+            percent: number;
+            /** @description Rows sent (a send). */
+            submitted?: number;
+            /** @description Rows approved, that is sites created. */
+            approved?: number;
+            rejected?: number;
+            /** @description Rows that failed; each carries its error in `GET /import-batches/{batch_id}/rows`. */
+            failed?: number;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            error?: string | null;
+        };
         ImportBatch: {
             /** Format: uuid */
             id: string;
@@ -9812,11 +9846,12 @@ export interface components {
             source?: "template" | "master_import" | "legacy_master" | "master_template";
             file_name?: string;
             /**
-             * @description `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
+             * @description `processing` (0.14.4): a big New sites batch is being sent or approved in the background (see `progress`); a send, a decision or a discard answers 409 `batch_processing` until it ends, then the batch shows its usual status.
+             *     `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
              *     The status follows the rows and the records they created, so an approval made in the register screen counts too. `in_review`, `applied` and `undone` are not used for registers (two fixed levels; undo is not built).
              * @enum {string}
              */
-            status: "parsing" | "validated" | "in_review" | "in_approval" | "partially_approved" | "approved" | "rejected" | "applied" | "undone" | "failed" | "discarded";
+            status: "parsing" | "validated" | "in_review" | "in_approval" | "partially_approved" | "approved" | "rejected" | "applied" | "undone" | "failed" | "discarded" | "processing";
             /** @description 1 while the batch waits for the uploader (L1 Data Entry), 2 once it is sent (L2 Data Reviewer & Approver). */
             current_level?: number;
             /** @description Always 2. */
@@ -9862,6 +9897,8 @@ export interface components {
             };
             /** @description Parse job (`GET /jobs/{job_id}`) while status is `parsing`. */
             job_id?: string | null;
+            /** @description 0.14.4: the latest background run of a big New sites batch (send or approval); null when the batch never had one. */
+            progress?: components["schemas"]["ImportBatchProgress"] | null;
             /**
              * Format: uuid
              * @description Set when the file was uploaded from beside a task.
@@ -23314,6 +23351,16 @@ export interface operations {
                     };
                 };
             };
+            /** @description 0.14.4: a New sites batch with more rows to send than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are sent in the background (poll `GET /import-batches/{batch_id}` until the status changes). */
+            202: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatch"];
+                };
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
@@ -23353,6 +23400,16 @@ export interface operations {
                     "application/json": components["schemas"]["ImportBatch"] & {
                         outcome?: components["schemas"]["ImportBatchOutcome"];
                     };
+                };
+            };
+            /** @description 0.14.4: the approval of a New sites batch with more rows than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are approved (the sites created) in the background. */
+            202: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportBatch"];
                 };
             };
             401: components["responses"]["Unauthorized"];

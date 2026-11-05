@@ -64,6 +64,25 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
     );
   }
 
+  if (b.status === 'processing') {
+    // 0.14.4: a big New sites batch is sent or approved in the background, 25 rows per chunk; the bar follows the committed chunks
+    const pr = b.progress, total = pr?.rows_total ?? c.sent, doneN = pr?.rows_done ?? 0, p = pr?.percent ?? pct(doneN, total);
+    const creating = !!site && (pr?.kind === 'decide' || (pr?.approved ?? 0) > 0);
+    const shown = creating ? (pr?.approved ?? c.approved) : doneN;
+    const label = creating ? t('batchProgress.processing_sites', { done: shown, total, pct: pct(shown, total) }) : t('batchProgress.processing', { done: doneN, total, pct: p });
+    const segs: Seg[] = [
+      { key: 'done', n: shown, tone: 'bg-done', label: creating ? t('batchProgress.approved') : t('batchStatus.processing') },
+      ...(pr?.failed ? [{ key: 'failed', n: pr.failed, tone: 'bg-late', label: t('batchProgress.invalid') }] : []),
+      { key: 'pending', n: Math.max(0, total - shown - (pr?.failed ?? 0)), tone: 'bg-wait', label: t('batchProgress.pending') },
+    ];
+    return (
+      <section className={wrap} data-testid="batch-progress" data-phase="processing" aria-label={t('batchProgress.title')} aria-busy="true">
+        <Bar segs={segs} total={total} now={creating ? pct(shown, total) : p} label={label} testid="batch-progress-processing" />
+        <p className="mt-2 text-xs text-mute" role="status" data-testid="batch-progress-processing-note">{t('batchProgress.processing_note')}</p>
+      </section>
+    );
+  }
+
   if (b.status === 'validated') {
     const segs: Seg[] = [{ key: 'valid', n: c.valid, tone: 'bg-done', label: t('batchProgress.valid') }, { key: 'invalid', n: c.error, tone: 'bg-late', label: t('batchProgress.invalid') }];
     const label = t('batchProgress.checked', { total: c.rows, valid: c.valid, validPct: pct(c.valid, c.rows), invalid: c.error, invalidPct: pct(c.error, c.rows) });
@@ -84,9 +103,12 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
     ];
     const total = c.sent, doneN = site ? c.approved : c.approved + c.rejected, p = pct(doneN, total);
     const label = site ? t('batchProgress.sites_created', { done: c.approved, total, pct: p }) : t('batchProgress.done', { pct: p, done: doneN, total });
+    const pr = b.progress;
     return (
       <section className={wrap} data-testid="batch-progress" data-phase="sent" aria-label={t('batchProgress.title')}>
         <Bar segs={segs} total={total} now={p} label={label} testid="batch-progress-sent" />
+        {pr?.state === 'failed' && <p className="mt-2 text-xs text-lateInk" role="status" data-testid="batch-progress-run-failed">{t('batchProgress.processing_failed', { done: pr.rows_done, total: pr.rows_total })}</p>}
+        {!!pr?.failed && <p className="mt-2 text-xs text-lateInk" data-testid="batch-progress-run-errors">{t('batchProgress.processing_errors', { count: pr.failed })}</p>}
       </section>
     );
   }

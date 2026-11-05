@@ -194,6 +194,8 @@ export type LegacyConversionProposal = S['LegacyConversionProposal'];
 export type LegacyConversionInput = S['LegacyConversionInput'];
 export type Template = S['Template'];
 export type ImportBatch = S['ImportBatch'];
+/** 0.14.4: the background run of a big New sites batch (status `processing`). */
+export type ImportBatchProgress = S['ImportBatchProgress'];
 export type ImportRow = S['ImportRow'];
 export type ImportDecisionRequest = S['ImportDecisionRequest'];
 export type ImportBatchOutcome = S['ImportBatchOutcome'];

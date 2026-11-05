@@ -180,6 +180,12 @@ export type MockBatch = {
   uploaded_by: string; uploaded_at: string; note?: string | null; rows: MockBatchRow[];
   /** Q462 (contract 0.14.3): marked "historical load: accept without documents" by a System Admin under the open waiver. */
   historical?: { cutoff_date: string; reason: string; marked_at: string };
+  /** Contract 0.14.4: the background run of a big New sites batch (status `processing` while it runs); each read of the batch moves it by one chunk. */
+  run?: MockRun;
+};
+export type MockRun = {
+  id: string; kind: 'submit' | 'decide'; state: 'running' | 'done' | 'failed'; rows: string[]; done: number; self: boolean;
+  submitted: number; approved: number; failed: number; started_at: string; updated_at: string; finished_at: string | null;
 };
 
 const pad = (n: number) => String(n).padStart(12, '0');

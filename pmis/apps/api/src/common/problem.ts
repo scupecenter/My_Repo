@@ -13,7 +13,8 @@ export type ErrorCode =
   | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
   | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
   | 'list_not_configured'
-  | 'email_not_verified';
+  | 'email_not_verified'
+  | 'batch_processing';
 
 export interface FieldError {
   path: string;
@@ -70,6 +71,7 @@ const TITLES: Record<string, string> = {
   integrity_too_large: 'The check is too large for one request',
   mail_not_configured: 'Mail is not configured',
   email_not_verified: 'The new email address is not confirmed',
+  batch_processing: 'The batch is being processed',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

@@ -14,6 +14,7 @@ export function registerErrorMessage(t: TFunction, e: unknown): string {
     if (e.code === 'insufficient_stock') return t('regErrors.insufficient_stock');
     if (e.code === 'item_in_use') return t('regErrors.item_in_use');
     if (e.code === 'freeze_active') return t('regErrors.freeze_active');
+    if (e.code === 'batch_processing') return t('regErrors.batch_processing');   // 0.14.4: a big batch is still processed in the background
   }
   return taskErrorMessage(t, e);
 }

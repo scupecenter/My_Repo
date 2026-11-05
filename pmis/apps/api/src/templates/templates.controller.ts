@@ -10,6 +10,14 @@ import { ImportService } from './import.service';
 import { TemplatesService, XLSX_MIME } from './templates.service';
 import { UploadInterceptor, type UploadedFile } from './upload.interceptor';
 
+/** 0074: a batch handed to the background run (status `processing`) answers 202 Accepted; every other send or decision answers 200. */
+function accepted(res: Response, dto: Record<string, unknown>): Record<string, unknown> {
+  const { accepted: queued, ...out } = dto;
+  if (queued) res.status(202);
+  res.setHeader('ETag', etagHeader(out.version as number));
+  return out;
+}
+
 /** Approved templates: the catalogue and the download of the current version (tag templates). */
 @Controller('templates')
 export class TemplatesController {
@@ -76,8 +84,7 @@ export class ImportBatchesController {
   @HttpCode(200)
   async submit(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Res({ passthrough: true }) res: Response) {
     const dto = await this.imports.submit(auth, id, ifMatch);
-    res.setHeader('ETag', etagHeader(dto.version as number));
-    return dto;
+    return accepted(res, dto);
   }
 
   @Post(':id/decisions')
@@ -87,7 +94,6 @@ export class ImportBatchesController {
     @Headers('idempotency-key') key: string | undefined, @Res({ passthrough: true }) res: Response,
   ) {
     const dto = await this.idem.run(auth.user.id, `decideImportBatch:${id}`, key, body, () => this.imports.decide(auth, id, ifMatch, body));
-    res.setHeader('ETag', etagHeader(dto.version as number));
-    return dto;
+    return accepted(res, dto);
   }
 }

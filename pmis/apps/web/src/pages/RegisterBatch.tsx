@@ -79,7 +79,7 @@ export function RowWarnings({ row }: { row: ImportRow }) {
   );
 }
 
-const STEP_OF: Record<string, number> = { validated: 1, in_approval: 2, partially_approved: 2, in_review: 2, approved: 3, rejected: 3, discarded: 3, applied: 3 };
+const STEP_OF: Record<string, number> = { validated: 1, processing: 2, in_approval: 2, partially_approved: 2, in_review: 2, approved: 3, rejected: 3, discarded: 3, applied: 3 };
 
 /** Batch review (RE-05, RE-06): the preview with the diff per cell and the reasons per cell, then send it into the flow, and L2 approves row by row or all at once. */
 export function RegisterBatch() {
@@ -117,9 +117,10 @@ export function RegisterBatch() {
   const back = <Link className="btn" data-testid="batch-back" to={siteBatch ? '/sites' : stream ? '/templates' : `/registers/${key}`}>{siteBatch ? t('newSite.back') : stream ? t('tpl.back') : t('registers.back')}</Link>;
   const name = siteBatch ? t('batch.site_name') : stream ? t(`tpl.stream_${stream}`, { defaultValue: stream }) : def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
   const ok = (r: ImportBatchOutcome | undefined) => { if (r) setOutcome({ ...r, held: r.held ?? [], failed: r.failed ?? [] }); };
-  const send = (x: ImportBatch) => submit.mutate(x, { onSuccess: (r) => { ok(r.outcome); toast(t('batch.sent')); }, onError: fail });
+  // 0.14.4: a big New sites batch answers 202 `processing`: the page polls and the bar follows the background run
+  const send = (x: ImportBatch) => submit.mutate(x, { onSuccess: (r) => { ok(r.outcome); toast(r.status === 'processing' ? t('batch.processing_started') : t('batch.sent')); }, onError: fail });
   const act = (x: ImportBatch, req: Parameters<typeof decide.mutate>[0]['req'], done?: string) =>
-    decide.mutate({ batch: x, req }, { onSuccess: (r) => { ok(r.outcome); if (done) toast(done); }, onError: fail });
+    decide.mutate({ batch: x, req }, { onSuccess: (r) => { ok(r.outcome); if (r.status === 'processing') toast(t('batch.processing_started')); else if (done) toast(done); }, onError: fail });
 
   if (batch.isError) return <div data-testid="page-register-batch"><p role="alert" className="text-lateInk">{t('regErrors.not_found')}</p>{back}</div>;
   const step = b ? (STEP_OF[b.status] ?? 1) : 1;
@@ -163,6 +164,13 @@ export function RegisterBatch() {
               <span className="flex-1">{decidableN ? t('batch.ready', { count: decidableN }) : t('batch.none_valid')}</span>
               <button className="btn" data-testid="batch-discard" disabled={decide.isPending} onClick={() => act(b, { action: 'discard', scope: 'all' }, t('batch.discarded_toast'))}><Trash2 size={16} />{t('batch.discard')}</button>
               <button className="btn btn-primary" data-testid="batch-submit" disabled={!decidableN || submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.send')}</button>
+            </div>
+          )}
+          {b.status === 'processing' && (
+            // 0.14.4: nothing can be sent or decided while the background run works; the buttons come back when it ends
+            <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-card2 p-3 text-sm" data-testid="batch-processing">
+              <span className="flex-1" role="status">{t('batchStatus.processing')}</span>
+              <button className="btn btn-primary" data-testid="batch-processing-busy" disabled aria-disabled="true"><Send size={16} />{t('batch.processing_busy')}</button>
             </div>
           )}
           {sent && (b.status === 'in_approval' || b.status === 'partially_approved') && (

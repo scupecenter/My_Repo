@@ -3139,6 +3139,44 @@ model StatusUpdate {
   @@map("status_updates")
 }
 
+/// 0074: the background run of the send or the approval of a big New sites batch (status processing, chunks of 25 rows). Written only by the
+/// imp_async_* functions (owner pmis_definer); pmis_app has no right on it and reads the progress through imp_batch_job_json.
+model ImportBatchJob {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  batch_id        String    @db.Uuid
+  kind            String // submit | decide
+  action          String?
+  scope           String?
+  items           Json?
+  note            String?
+  actor_id        String    @db.Uuid
+  stepup_verified Boolean
+  stepup_until    DateTime? @db.Timestamptz(6)
+  session_id      String?   @db.Uuid
+  auth_method     String?
+  mfa             Boolean?
+  request_id      String?
+  prev_status     String
+  state           String    @default("running") // running | done | failed
+  rows_total      Int
+  rows_done       Int       @default(0)
+  pos             Int       @default(0)
+  n_submitted     Int       @default(0)
+  n_decided       Int       @default(0)
+  n_approved      Int       @default(0)
+  n_rejected      Int       @default(0)
+  n_failed        Int       @default(0)
+  failed          Json      @default("[]")
+  chunks          Int       @default(0)
+  error           String?
+  created_at      DateTime  @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  heartbeat_at    DateTime  @default(dbgenerated("clock_timestamp()")) @db.Timestamptz(6)
+  finished_at     DateTime? @db.Timestamptz(6)
+
+  @@index([batch_id, created_at(sort: Desc)], map: "import_batch_jobs_batch")
+  @@map("import_batch_jobs")
+}
+
 /// 0070 (G1, Q460): a proposed site (manual entry, or one row of a New sites file). It becomes a site only when L2 approves (site_create_apply).
 /// Written only by the site_draft_* and imp_*_site_batch functions; pmis_app reads it through row level security.
 model SiteDraft {
