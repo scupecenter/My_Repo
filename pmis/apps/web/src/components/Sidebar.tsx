@@ -2,36 +2,48 @@ import { ChevronDown, ChevronRight, ChevronUp, Star, X } from 'lucide-react';
 import { useRef, useState, type ReactNode, type RefObject, type KeyboardEvent as KE, type PointerEvent as PE } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { useViews } from '@/api/sites';
+import { useStreams, useViews } from '@/api/sites';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
-import { DEFAULT_VIEWS, viewName } from '@/lib/streams';
-import type { NavItem } from './navItems';
+import { DEFAULT_STREAMS, DEFAULT_VIEWS, streamName, viewName, withDismantle } from '@/lib/streams';
+import { SITE_OM_VIEW, SITE_STREAM_SUBMENUS, type NavItem } from './navItems';
 
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 400;
 export const SIDEBAR_DEFAULT = 240;
-const GROUPS = ['work', 'registers', 'data', 'admin', 'logs'] as const;
+const GROUPS = ['work', 'site_register', 'registers', 'data', 'admin', 'logs'] as const;
 const K = { collapsed: 'pmis.nav.collapsed', sites: 'pmis.nav.sites_open', favs: 'pmis.nav.favs', recent: 'pmis.nav.recent' };
 const RECENT_MAX = 5;
 
 /** Stored list of strings, tolerant of anything else that may sit in localStorage. */
 const loadList = (key: string): string[] => { const v = loadPref<unknown>(key, []); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []; };
 
-function SiteViews({ activeView, onNavigate }: { activeView: string | null; onNavigate?: () => void }) {
+/** What the Site Register URL selects: a stream (`?stream=`), a work view (`?view=`) or everything. */
+export function siteSelection(pathname: string, search: string): { stream: string; view: string } {
+  if (!pathname.startsWith('/sites')) return { stream: '', view: '' };
+  const p = new URLSearchParams(search);
+  return { stream: p.get('stream') ?? '', view: p.get('view') ?? '' };
+}
+
+/** Sub-menus of the Site Register (owner request 2026-11-05): four streams, Dismantle (its own register), O&M (the OM view). */
+function SiteSubmenus({ onNavigate, dismantle }: { onNavigate?: () => void; dismantle: NavItem | undefined }) {
   const { t, i18n } = useTranslation();
-  const q = useViews();
+  const streamsQ = useStreams();
+  const viewsQ = useViews();
   const loc = useLocation();
-  const views = (q.data?.length ? [...q.data].sort((a, b) => a.sort_order - b.sort_order) : DEFAULT_VIEWS);
+  const sel = siteSelection(loc.pathname, loc.search);
+  const known = withDismantle(streamsQ.data);
+  const streams = SITE_STREAM_SUBMENUS.map((code) => known.find((x) => x.code === code) ?? DEFAULT_STREAMS.find((x) => x.code === code)!);
+  const om = (viewsQ.data?.length ? viewsQ.data : DEFAULT_VIEWS).find((v) => v.code === SITE_OM_VIEW) ?? DEFAULT_VIEWS.find((v) => v.code === SITE_OM_VIEW)!;
+  const item = (testid: string, to: string, on: boolean, text: string) => (
+    <Link key={testid} to={to} onClick={onNavigate} data-testid={testid} aria-current={on ? 'page' : undefined}
+      className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{text}</Link>
+  );
   return (
-    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('nav.views')} data-testid="nav-sites-views">
-      {views.map((v) => {
-        const on = loc.pathname.startsWith('/sites') && activeView === v.code;
-        return (
-          <Link key={v.code} to={`/sites?view=${v.code}`} onClick={onNavigate} data-testid={`nav-sites-view-${v.code}`} aria-current={on ? 'page' : undefined}
-            className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{viewName(i18n.language, v)}</Link>
-        );
-      })}
+    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('nav.site_submenus')} data-testid="nav-sites-views">
+      {streams.map((st) => item(`nav-sites-stream-${st.code}`, `/sites?stream=${st.code}`, sel.stream === st.code && !sel.view, streamName(t, i18n.language, st)))}
+      {dismantle && item('nav-dismantle', dismantle.to, loc.pathname.startsWith(dismantle.to), t('nav.dismantle'))}
+      {item(`nav-sites-view-${om.code}`, `/sites?view=${om.code}`, sel.view === om.code && !sel.stream, viewName(i18n.language, om))}
     </div>
   );
 }
@@ -45,9 +57,10 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const [favs, setFavs] = useState<string[]>(() => loadList(K.favs));
   const [recent, setRecent] = useState<string[]>(() => loadList(K.recent));
   const [q, setQ] = useState('');
-  const label = (n: NavItem) => t(`nav.${n.key}`);
+  const label = (n: NavItem) => t(n.key === 'sites' ? 'nav.sites_all' : `nav.${n.key}`);
   const byKey = (k: string) => items.find((i) => i.key === k);
-  const activeView = new URLSearchParams(loc.search).get('view');
+  const sel = siteSelection(loc.pathname, loc.search);
+  const subOn = SITE_STREAM_SUBMENUS.some((c) => c === sel.stream && !sel.view) || (sel.view === SITE_OM_VIEW && !sel.stream);
 
   // Recent items: adjust state while rendering when the active page changes (no effect needed).
   const [seen, setSeen] = useState<string | undefined>();
@@ -80,10 +93,14 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
       </>
     );
   };
-  const row = (n: NavItem, opts: { testid: string; extra?: ReactNode; active?: boolean }) => (
+  const row = (n: NavItem, opts: { testid: string; extra?: ReactNode; active?: boolean; plain?: boolean }) => (
     <div key={opts.testid} className="group flex items-center">
-      <NavLink to={n.to} onClick={onNavigate} data-testid={opts.testid} {...(compact ? { title: label(n), 'aria-label': label(n) } : {})}
-        className={({ isActive }) => linkCls(opts.active ?? (isActive || n.key === activeKey))}>{inner(n, opts.testid === `nav-${n.key}`)}</NavLink>
+      {opts.plain
+        ? <Link to={n.to} onClick={onNavigate} data-testid={opts.testid} aria-current={opts.active ? 'page' : undefined} className={linkCls(!!opts.active)}>{inner(n, true)}</Link>
+        : (
+          <NavLink to={n.to} onClick={onNavigate} data-testid={opts.testid} {...(compact ? { title: label(n), 'aria-label': label(n) } : {})}
+            className={({ isActive }) => linkCls(opts.active ?? (isActive || n.key === activeKey))}>{inner(n, opts.testid === `nav-${n.key}`)}</NavLink>
+        )}
       {opts.extra}
     </div>
   );
@@ -139,7 +156,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
               const list = items.filter((i) => i.group === g);
               if (!list.length) return null;
               const open = compact || !collapsed.includes(g);
-              const hasActive = list.some((i) => i.key === activeKey);
+              const hasActive = list.some((i) => i.key === activeKey) || (g === 'site_register' && loc.pathname.startsWith('/sites'));
               return (
                 <div key={g} className="mb-3" data-testid={`nav-group-${g}`} data-active={hasActive || undefined}>
                   {compact
@@ -151,11 +168,15 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
                       </button>
                     )}
                   {open && list.map((n) => {
+                    const hasSites = !compact && !!byKey('sites');
+                    if (n.key === 'dismantle' && hasSites) return null; // shown among the Site Register sub-menus
                     if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
+                    const dm = byKey('dismantle');
                     return (
                       <div key={n.key}>
                         {row(n, {
                           testid: `nav-${n.key}`,
+                          active: loc.pathname.startsWith('/sites') && !subOn, plain: true,
                           extra: (
                             <>
                               <button type="button" data-testid="nav-sites-toggle" aria-expanded={sitesOpen} aria-label={`${t(sitesOpen ? 'nav.collapse' : 'nav.expand')}: ${label(n)}`} onClick={toggleSites} className="rounded-md p-1 text-faint hover:bg-hover">
@@ -165,7 +186,7 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
                             </>
                           ),
                         })}
-                        {sitesOpen && <SiteViews activeView={activeView} onNavigate={onNavigate} />}
+                        {sitesOpen && <SiteSubmenus onNavigate={onNavigate} dismantle={dm} />}
                       </div>
                     );
                   })}

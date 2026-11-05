@@ -15,7 +15,15 @@ for (const c of CASES) {
     await expect(page.getByTestId('page-sites')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('dir', c.locale === 'ar' ? 'rtl' : 'ltr');
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(c.title);
-    await expect(page.getByTestId('nav-sites')).toContainText(c.title);
+    await expect(page.getByTestId('nav-group-toggle-site_register')).toContainText(c.title);
+
+    // sub-menu of the Site Register main menu: the Civil Works stream, titled and highlighted
+    await page.getByTestId('nav-sites-stream-CW').click();
+    await expect(page.getByTestId('stream-tab-CW')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(c.cw);
+    await expect(page.getByTestId('nav-sites-stream-CW')).toHaveAttribute('aria-current', 'page');
+    await page.getByTestId('nav-sites').click();
+    await expect(page.getByTestId('stream-tab-ALL')).toHaveAttribute('aria-selected', 'true');
 
     // tabs: All, four streams, Dismantle
     const tabs = page.getByTestId('stream-tabs').getByRole('tab');

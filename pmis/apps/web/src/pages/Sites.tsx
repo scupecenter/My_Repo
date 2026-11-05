@@ -14,7 +14,7 @@ import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
 import { useVirtual } from '@/components/useVirtual';
-import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
+import { DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName, withDismantle } from '@/lib/streams';
 
 const ROWS = { comfortable: 52, compact: 38 } as const;
 const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }];
@@ -63,6 +63,10 @@ export function Sites() {
   const viewsQ = useViews();
   const streamsQ = useStreams();
   const tabs = withDismantle(streamsQ.data);
+  // Name of the Site Register sub-menu that is open (sidebar request 2026-11-05): the view wins, else the stream; empty = all sites.
+  const viewRef = view ? (viewsQ.data ?? DEFAULT_VIEWS).find((x) => x.code === view) : undefined;
+  const streamRef = stream ? tabs.find((x) => x.code === stream) : undefined;
+  const subMenu = view ? (viewRef ? viewName(i18n.language, viewRef) : view) : streamRef ? streamName(t, i18n.language, streamRef) : '';
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
@@ -131,7 +135,7 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={t('sites.title')} subtitle={t('sites.subtitle')} />
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} />
       <div role="tablist" aria-label={t('sites.streams_label')} className="mb-3 flex flex-wrap gap-1 border-b border-line" data-testid="stream-tabs">
         {[{ code: '', label: t('sites.stream_all') }, ...tabs.map((s) => ({ code: s.code, label: streamName(t, i18n.language, s) }))].map((s) => (
           <button key={s.code || 'ALL'} role="tab" aria-selected={stream === s.code} data-testid={`stream-tab-${s.code || 'ALL'}`} onClick={() => setStream(s.code)}
