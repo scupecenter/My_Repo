@@ -205,6 +205,19 @@ The questions are in [`open-questions.md`](open-questions.md). This file gives o
 | Q420 to Q425, Q427 | Confirmed as built. Managing other people's views stays with the System Admin; the heir of an orphaned view is the owner's direct manager. |
 | Q426 | Confirmed: 30 days, 200 drafts per user, 64 KB each. No other forms for now. |
 
+## Site creation (Q470 to Q475), decided 2026-11-05
+
+The owner again asked the technical lead to decide these ("قرر في الأسئلة Q470–Q475 بنفسك").
+
+| # | Decision |
+|---|---|
+| Q470 | The Site Scenario list of RF & Design is **Indoor / Outdoor**, as the Master `tblScenario`. Old saved values that did not map stay inactive and readable; nothing is lost. The owner can add a value in Settings → Lists. The list stays "pending" (draft badge) until the owner confirms it there. |
+| Q471 | Confirmed as built: a cluster is created with its first site when L2 approves. The reviewer sees `cluster_will_be_created` before deciding. A cluster of another region is refused. |
+| Q472 | **Configuration before the real load (no code):** the System Admin sets the `site_creation` row in the Responsibility Matrix per region: **L1 = Project Support**, **L2 = Project Manager**. The seeded System Admins group stays as a fallback only. Two different people avoid a self-approval on every batch. |
+| Q473 | **Change:** a site's identity changes through a **Change Control proposal** (the Q225 path, `POST /sites/{id}/change-proposals`), never by a direct edit. The rule then needs no exceptions: L1 proposes, L2 approves, and the change is audited. The proposal path gains the English and Arabic names and the coordinates. The **Site ID never changes**. A change of **region or cluster** is a System Admin decision through the same path, because it changes who can see the site. |
+| Q474 | Confirmed as built: a Cancelled row creates and cancels the site in one approval, with two audit rows. Cancelling a site that already exists stays a Change Control Cancellation (Q382). |
+| Q475 | Confirmed as built: the Site ID is stored upper-case with single spaces, compared ignoring case and extra spaces, and never reused. The "duplicate" message names no region or site detail. Site IDs are project identifiers, not secrets, and must be unique across the whole project, so revealing that an ID is taken is accepted. |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |
@@ -218,6 +231,7 @@ The questions are in [`open-questions.md`](open-questions.md). This file gives o
 | P2 | The site page follows the pipeline style; pending SLA rules left out of the scorecard | Q349, Q393 |
 | P4b | Weekly certificate reminder until renewed | Q330 |
 | P4c | Execution mode required at submit after the parallel run | Q365 |
+| Site creation | Change Control proposals also change the site names (EN/AR) and coordinates; region and cluster changes for a System Admin | Q473 |
 
 ## Owner data still needed
 
