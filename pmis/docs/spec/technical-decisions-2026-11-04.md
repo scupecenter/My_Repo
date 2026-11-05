@@ -257,6 +257,19 @@ The plan of 2026-11-04 (blocker 5, gap G5) asked the owner how the historical ta
 
 Configuration for the real load (no code): the System Admin who runs the load is the L1 holder of the tasks of the load (or nobody holds L1 and the admin is the holder of last resort), and L2 is another person (Q472), so the rows are not flagged self-approvals. The load order of the plan does not change.
 
+## Decided 2026-11-05 (3)
+
+The owner delegated Q480 and Q485 to Q489 to the technical lead. All six keep the behaviour already built (migrations 0072 and 0073); no code change.
+
+| # | Decision | Kind |
+|---|---|---|
+| Q480 | When nobody holds the `reassign` grant in the new region, the region-move notice goes to the active System Admins, and the audit row records the fallback. B12b already lets a System Admin keep, reassign or act on behalf; the Project Manager is not added, because the notice is about reassignment, which is not their grant. Naming the leads per region removes the fallback. | Confirmed as built |
+| Q485 | Documents uploaded later on a flagged task are not sent to L2: the task is already approved (the unit of approval is the whole task) and reopening it for documents would create a second approval of history. The slot shows `uploaded`, the flag clears with an audit row (`task_historical_no_documents_cleared`), and the health index keeps counting the slot as incomplete until a reviewer approves it in the document view. | Confirmed as built |
+| Q486 | No marking after staging. The mark is chosen at upload (or when the Master run is applied) by the System Admin with a step-up; a batch staged without it is discarded and uploaded again. A later "accept without documents" action on a staged batch would be a second door to the same override and is not added. | Confirmed as built |
+| Q487 | History stays out of the SLA and on-time figures by default (the existing override rule, `dashboard.exclude_overrides` on), is always flagged, and still counts in Project Status progress, because the work was done. The figures then describe the work run in the PMIS. | Confirmed as built |
+| Q488 | No mail or in-app notice at 7 days left or on closing. The waiver is opened on purpose by a System Admin for a planned load, the Settings screen shows its state and end date, and the self-closing is audited. A notice can be added later as a notification kind if the load runs late. | Confirmed as built |
+| Q489 | The cutoff date of an open waiver cannot change. To change it the System Admin closes the waiver and opens it again, which starts a new 30-day window and a new audit trail; a batch marked earlier is accepted only while the waiver it was marked under is open with the same cutoff. | Confirmed as built |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |
