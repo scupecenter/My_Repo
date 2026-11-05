@@ -1,0 +1,16 @@
+template_header,master_header,master_column,transform,personal,notes
+Risk ID,Risk ID,A,site_id,,key (trimmed, upper case)
+Risk Statement,Risk Statement,B,,,
+Category,Category,C,,,
+Scope,Scope,D,,,
+Affected Sites,Affected Sites,E,,,
+Probability (1-5),Probability (1-5)|Probability,F,,,
+Impact (1-5),Impact (1-5)|Impact,G,,,
+Response,Response,J,,,
+Mitigation Action,Mitigation Action,K,,,
+Risk Owner,Risk Owner,L,,,
+Target Date,Target Date,N,,,
+Status,Status,O,,,
+Trend,Trend,P,,,
+Last Review Date,Last Review Date,Q,,,
+Next Review Date,Next Review Date,R,,,

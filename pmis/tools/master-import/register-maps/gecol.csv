@@ -1,0 +1,17 @@
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+GECOL PR No.,GECOL PR No.|PR No.,E,,,blank in the owner file (Q468)
+GECOL Request Date,,,,,missing in the owner file (Q468)
+GECOL Contractor,GECOL Contractor|Contractor,F,,,
+Survey Date,Survey Date,H,,,
+Layout Received,Layout Received,I,,,
+Layout Approved,Layout Approved,J,,,
+GECOL Notice Date,GECOL Notice Date,K,,,
+MOS Date,MOS Date,L,,,
+Installation Finish Date,Installation Finish Date,M,,,
+AAT Acceptance Date,AAT Acceptance Date,N,,,
+GECOL Docs Approval Date,GECOL Docs Approval Date,O,,,
+Meter No.,Meter No.,P,,,
+Power-On Date (Meter Charging),Power-On Date (Meter Charging)|Power-On Date,Q,,,
+Billing Conversion Date,Billing Conversion Date,R,,,
+Remark,Remark,T,,,

@@ -2,11 +2,14 @@ import { ArrowRight, Check, Send, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
-import { useBatch, useBatches, useBatchRows, useDecideBatch, useRegisterDefs, useSubmitBatch } from '@/api/registers';
+import { useBatch, useBatches, useBatchRows, useDecideBatch, useParseJob, useRegisterDefs, useSubmitBatch } from '@/api/registers';
 import { batchPath, type ImportBatch, type ImportBatchOutcome, type ImportRow, type RegisterDefinition } from '@/api/types';
+import { batchTotals, BatchProgress } from '@/components/BatchProgress';
+import { useBatchValueFormat, type ShowValue } from '@/components/batchFormat';
 import { RejectDialog } from '@/components/RejectDialog';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { useToast } from '@/components/Toast';
+import { useVirtual } from '@/components/useVirtual';
 import { registerErrorMessage } from '@/lib/registerErrors';
 
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
@@ -17,7 +20,7 @@ export const rowId = (r: Pick<ImportRow, 'row_no' | 'task_code'>): string => (r.
 const humanize = (code: string) => { const s = code.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
 /** The per-cell diff of one row: the field (by its label), what it was and what the file makes it. A new row lists the values it brings. */
-export function RowDiff({ row, def, site }: { row: ImportRow; def?: RegisterDefinition; site?: boolean }) {
+export function RowDiff({ row, def, site, fmt }: { row: ImportRow; def?: RegisterDefinition; site?: boolean; fmt?: ShowValue }) {
   const { t, i18n } = useTranslation();
   const entries = Object.entries(row.diff ?? {});
   if (!entries.length) return <span className="text-mute">—</span>;
@@ -25,17 +28,19 @@ export function RowDiff({ row, def, site }: { row: ImportRow; def?: RegisterDefi
     <ul className="space-y-0.5" data-testid={`batch-diff-${rowId(row)}`}>
       {entries.map(([code, v]) => {
         const f = def?.fields.find((x) => x.code === code);
-        const show = (x: unknown) => (f ? showValue(f, x, i18n.language, t) : x === null || x === undefined || x === '' ? '—' : String(x));
+        // the label in the current language (region name, Yes / No / N/A, scenario, list label); the code stays in the title
+        const show = (x: unknown) => { if (fmt) return fmt(code, x).text; return f ? showValue(f, x, i18n.language, t) : x === null || x === undefined || x === '' ? '—' : String(x); };
+        const tip = (x: unknown) => (fmt ? fmt(code, x).raw ?? undefined : undefined);
         // a task row: the three dates of the task, or a key of its values (the label of the field when the app has one)
         const label = f ? fieldLabel(f, i18n.language) : row.task_code ? t(`batch.task_field.${code}`, { defaultValue: humanize(code) }) : site ? t(`newSite.field.${code}`, { defaultValue: humanize(code) }) : code;
         return (
           <li key={code} className="flex flex-wrap items-baseline gap-1" data-testid={`batch-diff-${rowId(row)}-${code}`}>
             <span className="font-semibold">{label}</span>
-            {row.action === 'create' ? <span className="mono">{show(v.new)}</span> : (
+            {row.action === 'create' ? <span className="mono" title={tip(v.new)}>{show(v.new)}</span> : (
               <>
-                <span className="mono text-mute line-through" data-testid={`batch-diff-old-${rowId(row)}-${code}`}>{show(v.old)}</span>
+                <span className="mono text-mute line-through" title={tip(v.old)} data-testid={`batch-diff-old-${rowId(row)}-${code}`}>{show(v.old)}</span>
                 <ArrowRight size={12} className="rtl:rotate-180" aria-hidden />
-                <span className="mono" data-testid={`batch-diff-new-${rowId(row)}-${code}`}>{show(v.new)}</span>
+                <span className="mono" title={tip(v.new)} data-testid={`batch-diff-new-${rowId(row)}-${code}`}>{show(v.new)}</span>
               </>
             )}
           </li>
@@ -93,14 +98,21 @@ export function RegisterBatch() {
   const [outcome, setOutcome] = useState<(ImportBatchOutcome & { held: NonNullable<ImportBatchOutcome['held']>; failed: NonNullable<ImportBatchOutcome['failed']> }) | null>(null);
   const def = useRegisterDefs().data?.find((d) => d.register_key === key);
   const fail = (e: unknown) => { const m = registerErrorMessage(t, e); if (m) toast(m, 'err'); };
-  const all = rows.data?.items ?? [];
-  const valid = all.filter((r) => r.action !== 'error'), invalid = all.filter((r) => r.action === 'error');
-  const decidable = all.filter((r) => r.action === 'create' || r.action === 'update');
-  const held = decidable.filter((r) => r.decision === 'pending_previous_approval');
-  const shown = show === 'valid' ? valid : show === 'invalid' ? invalid : show === 'held' ? held : all;
+  const job = useParseJob(b);
+  const fmt = useBatchValueFormat(def);
+  const all = rows.items;
+  // every number on the page comes from the server counts of the batch, never from the rows that happen to be loaded (the filters below only filter the loaded rows)
+  const c = batchTotals(b?.counts ?? {});
+  const validN = c.valid, invalidN = c.error, heldN = c.held, decidableN = c.create + c.update, openN = c.pending;
+  const held = all.filter((r) => (r.action === 'create' || r.action === 'update') && r.decision === 'pending_previous_approval');
+  const shown = show === 'valid' ? all.filter((r) => r.action !== 'error') : show === 'invalid' ? all.filter((r) => r.action === 'error') : show === 'held' ? held : all;
   const sent = !!b && SENT.includes(b.status);
-  // a register row has a record once the batch was sent; a task row is in the flow when its decision is pending (a held row is pending_previous_approval)
-  const open = decidable.filter((r) => r.decision === 'pending' && (r.record_id || stream || siteBatch));
+  // a big batch (a New sites file of ~500 rows) is windowed: only the rows in view are drawn
+  const BIG = 300, ROW_H = 76, virtual = shown.length > BIG;
+  const viewport = typeof window === 'undefined' ? 640 : Math.max(360, window.innerHeight - 320);
+  const v = useVirtual(shown.length, ROW_H, viewport);
+  const visible = virtual ? shown.slice(v.start, v.end) : shown;
+  const totalRows = c.rows;
   const group = useBatches({ status: '', template_id: '', register_key: '', group_id: b?.group_id ?? '' }, !!b?.group_id);
   const back = <Link className="btn" data-testid="batch-back" to={siteBatch ? '/sites' : stream ? '/templates' : `/registers/${key}`}>{siteBatch ? t('newSite.back') : stream ? t('tpl.back') : t('registers.back')}</Link>;
   const name = siteBatch ? t('batch.site_name') : stream ? t(`tpl.stream_${stream}`, { defaultValue: stream }) : def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
@@ -133,34 +145,36 @@ export function RegisterBatch() {
               <li key={n} aria-current={step === n ? 'step' : undefined} data-step={n} className={`chip ${step === n ? 'bg-accentSoft text-accentText' : step > n ? 'bg-doneBg text-doneInk' : 'bg-card2 text-mute'}`}>{n}. {t(`batch.step_${n}`)}</li>
             ))}
           </ol>
+          <BatchProgress batch={b} job={job} site={siteBatch} />
           <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="batch-counts">
             <span className="chip bg-lockBg text-lockInk" data-testid="batch-status">{t(`batchStatus.${b.status}`, { defaultValue: b.status })}</span>
-            <span className="chip bg-doneBg text-doneInk" data-testid="batch-count-valid">{t('batch.valid', { count: valid.length })}</span>
-            <span className="chip bg-lateBg text-lateInk" data-testid="batch-count-invalid">{t('batch.invalid', { count: invalid.length })}</span>
+            <span className="chip bg-doneBg text-doneInk" data-testid="batch-count-valid">{t('batch.valid', { count: validN })}</span>
+            <span className="chip bg-lateBg text-lateInk" data-testid="batch-count-invalid">{t('batch.invalid', { count: invalidN })}</span>
             <span className="chip bg-card2" data-testid="batch-count-diff">{t('batch.diff', { create: b.counts.create ?? 0, update: b.counts.update ?? 0, unchanged: b.counts.unchanged ?? 0 })}</span>
-            {!!held.length && <span className="chip bg-lockBg text-lockInk" data-testid="batch-count-held">{t('batch.held_count', { count: held.length })}</span>}
+            {!!heldN && <span className="chip bg-lockBg text-lockInk" data-testid="batch-count-held">{t('batch.held_count', { count: heldN })}</span>}
+            {rows.loadingMore && <span className="chip bg-card2 text-mute" role="status" data-testid="batch-loading-rows">{t('batchProgress.loading_rows', { loaded: all.length, total: totalRows })}</span>}
             <div role="tablist" className="ms-auto flex gap-1">
-              {(['all', 'valid', 'invalid', ...(held.length ? ['held'] : [])] as const).map((s) => <button key={s} role="tab" aria-selected={show === s} data-testid={`batch-show-${s}`} className={`btn px-3 py-1 text-xs ${show === s ? 'btn-primary' : ''}`} onClick={() => setShow(s as typeof show)}>{t(`batch.show_${s}`)}</button>)}
+              {(['all', 'valid', 'invalid', ...(heldN ? ['held'] : [])] as const).map((s) => <button key={s} role="tab" aria-selected={show === s} data-testid={`batch-show-${s}`} className={`btn px-3 py-1 text-xs ${show === s ? 'btn-primary' : ''}`} onClick={() => setShow(s as typeof show)}>{t(`batch.show_${s}`)}</button>)}
             </div>
           </div>
           {b.status === 'validated' && (
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-card2 p-3 text-sm">
-              <span className="flex-1">{decidable.length ? t('batch.ready', { count: decidable.length }) : t('batch.none_valid')}</span>
+              <span className="flex-1">{decidableN ? t('batch.ready', { count: decidableN }) : t('batch.none_valid')}</span>
               <button className="btn" data-testid="batch-discard" disabled={decide.isPending} onClick={() => act(b, { action: 'discard', scope: 'all' }, t('batch.discarded_toast'))}><Trash2 size={16} />{t('batch.discard')}</button>
-              <button className="btn btn-primary" data-testid="batch-submit" disabled={!decidable.length || submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.send')}</button>
+              <button className="btn btn-primary" data-testid="batch-submit" disabled={!decidableN || submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.send')}</button>
             </div>
           )}
           {sent && (b.status === 'in_approval' || b.status === 'partially_approved') && (
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-card2 p-3 text-sm">
-              <span className="flex-1" data-testid="batch-approve-hint">{t('batch.approve_hint', { count: open.length })}</span>
-              {!!held.length && <button className="btn" data-testid="batch-resend" disabled={submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.resend')}</button>}
-              <button className="btn btn-danger" data-testid="batch-reject-all" disabled={decide.isPending || (!open.length && !held.length)} onClick={() => setReturning('all')}><Undo2 size={16} />{t('batch.reject_all')}</button>
-              <button className="btn btn-primary" data-testid="batch-approve-all" disabled={!open.length || decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'all' }, t('approvals.done'))}><Check size={16} />{t('batch.approve_all', { count: open.length })}</button>
+              <span className="flex-1" data-testid="batch-approve-hint">{t('batch.approve_hint', { count: openN })}</span>
+              {!!heldN && <button className="btn" data-testid="batch-resend" disabled={submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.resend')}</button>}
+              <button className="btn btn-danger" data-testid="batch-reject-all" disabled={decide.isPending || (!openN && !heldN)} onClick={() => setReturning('all')}><Undo2 size={16} />{t('batch.reject_all')}</button>
+              <button className="btn btn-primary" data-testid="batch-approve-all" disabled={!openN || decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'all' }, t('approvals.done'))}><Check size={16} />{t('batch.approve_all', { count: openN })}</button>
             </div>
           )}
-          {!!held.length && (
+          {!!heldN && (
             <div className="mb-3 rounded-md bg-lockBg p-3 text-sm text-lockInk" data-testid="batch-held">
-              <p className="font-semibold">{stream ? t('batch.held_title_task', { count: held.length }) : t('batch.held_title', { count: held.length })}</p>
+              <p className="font-semibold">{stream ? t('batch.held_title_task', { count: heldN }) : t('batch.held_title', { count: heldN })}</p>
               <p>{stream ? t('batch.held_body_task') : t('batch.held_body')}</p>
               <ul className="mt-1 list-disc ps-5">{held.map((r) => <li key={r.id} data-testid={`batch-held-${rowId(r)}`}><span className="mono">{r.key}</span> {t('batch.row_no', { n: r.row_no })}{r.hold_reason && r.hold_reason !== 'open_version' ? ` · ${t(`batch.hold_${r.hold_reason}`)}` : ''}</li>)}</ul>
             </div>
@@ -177,18 +191,19 @@ export function RegisterBatch() {
           {b.status === 'approved' && <p className="mb-3 rounded-md bg-doneBg p-3 text-doneInk" data-testid="batch-done">{t('batch.done')}</p>}
           {b.status === 'rejected' && <p className="mb-3 rounded-md bg-lateBg p-3 text-lateInk" data-testid="batch-rejected">{t('batch.rejected')}{b.note ? ` ${b.note}` : ''}</p>}
           {b.status === 'discarded' && <p className="mb-3 rounded-md bg-card2 p-3 text-mute" data-testid="batch-discarded">{t('batch.discarded')}</p>}
-          <div className="card overflow-x-auto">
+          <div className={`card overflow-x-auto ${virtual ? 'max-h-[70vh] overflow-y-auto' : ''}`} data-testid="batch-scroller" data-loaded={all.length} data-total={totalRows} onScroll={virtual ? v.onScroll : undefined}>
             <table className="w-full min-w-[820px] text-sm" data-testid="batch-table">
               <thead className="bg-card2 text-mute"><tr>{['row', 'key', 'result', 'changes', 'reason', 'decision', ''].map((c) => <th key={c} className="p-2 text-start">{c ? t(`batch.col_${c}`) : ''}</th>)}</tr></thead>
               <tbody>
-                {shown.map((r) => {
+                {virtual && v.start > 0 && <tr aria-hidden style={{ height: v.start * ROW_H }} />}
+                {visible.map((r) => {
                   const canDecide = sent && (b.status === 'in_approval' || b.status === 'partially_approved') && (r.action === 'create' || r.action === 'update');
                   return (
                     <tr key={r.id} className="border-t border-line align-top" data-testid={`batch-row-${rowId(r)}`} data-action={r.action} data-decision={r.decision} data-source={r.source_ref ?? ''}>
                       <td className="mono p-2">{r.source_ref && b.group_id ? r.source_ref : r.row_no}</td>
                       <td className="mono p-2 font-semibold">{r.key ?? '—'}</td>
                       <td className="p-2"><span className={`chip ${ACTION_TONE[r.action]}`}>{t(`batch.action_${r.action}`)}</span></td>
-                      <td className="p-2">{r.action === 'error' ? <span className="text-mute">—</span> : <RowDiff row={r} def={def} site={siteBatch} />}</td>
+                      <td className="p-2">{r.action === 'error' ? <span className="text-mute">—</span> : <RowDiff row={r} def={def} site={siteBatch} fmt={fmt} />}</td>
                       <td className="p-2 text-lateInk">
                         {r.action === 'error' ? <RowErrors row={r} site={siteBatch} /> : r.note ? <span className="text-mute" data-testid={`batch-note-${rowId(r)}`}>{r.note}</span> : !r.warnings?.length ? '—' : null}
                         <RowWarnings row={r} />
@@ -214,9 +229,10 @@ export function RegisterBatch() {
                     </tr>
                   );
                 })}
+                {virtual && v.end < shown.length && <tr aria-hidden style={{ height: (shown.length - v.end) * ROW_H }} />}
               </tbody>
             </table>
-            {rows.isSuccess && !shown.length && <p className="p-4 text-center text-mute">{t('registers.empty')}</p>}
+            {rows.complete && !shown.length && <p className="p-4 text-center text-mute">{t('registers.empty')}</p>}
           </div>
           <RejectDialog open={returning !== null} title={returning === 'all' ? t('batch.reject_all_title') : t('batch.return_row_title')} onClose={() => setReturning(null)}
             onSend={(note) => {

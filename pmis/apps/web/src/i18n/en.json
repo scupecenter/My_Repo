@@ -1752,6 +1752,27 @@
     "site_name": "New sites",
     "open_site": "Open site"
   },
+  "batchProgress": {
+    "title": "Import progress",
+    "legend": "Segments of the bar",
+    "parsing_wait": "Checking the file…",
+    "parsing": "Checking the file: {{pct}}%",
+    "parsing_rows": "Checking the file: {{pct}}% ({{done}} of {{total}} rows)",
+    "checked": "{{total}} rows · {{valid}} valid ({{validPct}}%) · {{invalid}} invalid ({{invalidPct}}%)",
+    "split": "By action: new {{create}} · changed {{update}} · unchanged {{unchanged}}",
+    "valid": "Valid",
+    "invalid": "Invalid",
+    "approved": "Approved",
+    "rejected": "Returned",
+    "held": "Held",
+    "pending": "Waiting",
+    "done": "Done {{pct}}% (approved + returned of sent): {{done}} of {{total}}",
+    "sites_created": "Sites created: {{done}} of {{total}} ({{pct}}%)",
+    "failed": "The check of the file failed. Nothing was saved. Upload the file again.",
+    "discarded": "This batch was discarded before it was sent.",
+    "loading_rows": "Loading {{loaded}} of {{total}} rows…",
+    "rows_incomplete": "Not all rows are loaded yet: the filters show the loaded rows only."
+  },
   "batchStatus": {
     "parsing": "Checking",
     "validated": "Checked",
