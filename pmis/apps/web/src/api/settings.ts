@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -60,6 +60,25 @@ export const useImportHolidays = () => {
 export const useSetWeekend = () => {
   const qc = useQueryClient();
   return useMutation<WeekendDaysResult, ApiError, { weekend_days: number[]; reason: string }>({ mutationFn: (body) => api.put('/settings/weekend-days', { body }), onSettled: () => refresh(qc, 'calendars') });
+};
+
+/** 0.14.2 (Q440): confirm or withdraw the official calendar. The ETag of the read is the If-Match of the write. */
+export const useCalendarConfirmation = () => useQuery({ queryKey: ['calendar-confirmation'], queryFn: () => api.get<CalendarConfirmation>('/settings/calendar-confirmation') });
+export const useSetCalendarConfirmation = () => {
+  const qc = useQueryClient();
+  return useMutation<CalendarConfirmation, ApiError, { version: number; confirmed: boolean; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/calendar-confirmation', { version, body }),
+    onSettled: () => refresh(qc, 'calendar-confirmation', 'holidays', 'calendars'),
+  });
+};
+
+/** 0.14.2 (Q441): the notification kinds that are also mailed (System Admin only; step-up on save). */
+export const useMailKinds = () => useQuery({ queryKey: ['mail-kinds'], retry: false, queryFn: () => api.get<MailNotificationKinds>('/settings/mail-notification-kinds') });
+export const useSetMailKinds = () => {
+  const qc = useQueryClient();
+  return useMutation<MailNotificationKinds, ApiError, { version: number; kinds: string[]; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/mail-notification-kinds', { version, body }), onSettled: () => refresh(qc, 'mail-kinds'),
+  });
 };
 
 // ---------------------------------------------------------------- rules

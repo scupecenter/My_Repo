@@ -335,6 +335,11 @@ export const REAL_API_AUTH_USERS = [
   ['delete', '/site-drafts/:id'],
   ['post', '/site-drafts/:id/submit'],
   ['post', '/site-drafts/:id/decide'],
+  // Contract 0.14.2 (settings screens, migration 0072; apps/api: calendar, settings): the official calendar confirmation (Q440) and the mail notification kinds (Q441).
+  ['get', '/settings/calendar-confirmation'],
+  ['put', '/settings/calendar-confirmation'],
+  ['get', '/settings/mail-notification-kinds'],
+  ['put', '/settings/mail-notification-kinds'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

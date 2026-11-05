@@ -230,6 +230,17 @@ The offline helper `tools/master-import/fill-templates.py` (gap G3). Questions i
 | Q493 | The first run on the owner's machine lists the Master headers it cannot find (names only). The owner sends the list and the mapping files are corrected in a small follow-up. | Confirmed process |
 | Q494 | Procurement **Record Type** is derived per row: `po` when the PO / WO No. is filled, otherwise `pr` (codes of the Procurement register's record types `pr`, `po`, `wo`, migration 0019; a `wo` row is corrected by the Procurement team). **Delivery** and **Team** are left blank; each copied row is listed as `needs_delivery_team` and the Procurement team completes them in the PMIS before submitting. | Change |
 
+## Decided 2026-11-05 (2)
+
+The owner decided the two questions that the identity work of the same day left open (Q476, Q477), and the technical lead built the two settings screens that Q440 and Q441 asked for. *Built 2026-11-05: migration 0072, contract 0.14.2, CHANGELOG 101.*
+
+| # | Decision |
+|---|---|
+| Q440 | **Change (built):** Settings, Work calendar gets a confirm / withdraw action for the official calendar (`calendar.official_confirmed`). A System Admin, or a delegate of `settings` edit for all regions; a reason and If-Match; audited (`calendar_official_confirmed` / `calendar_official_unconfirmed`). Confirming is refused while the current or the next year has no holiday or one of their holidays is still tentative (the check Q440 recommended); withdrawing is always allowed. The banner "calendar not confirmed" goes while it is confirmed, and the screen shows who confirmed it and when. The yearly reset (Q245) still returns it to "not confirmed" on 1 January. |
+| Q441 | **Change (built):** Settings gets a "Mail kinds" editor for `mail.notification_kinds`, System Admin only: a checklist of the kinds the code writes, the six go-live kinds marked recommended. A reason, step-up and If-Match; audited (`mail_notification_kinds_update`). Unknown kinds, kinds reserved for security (`security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and duplicates are refused. `task_assigned` still covers "a task is ready to start". The setting can no longer be changed by a direct update, not even by an administrator. |
+| Q476 | RF feed fills coordinates only when empty. The approved RF & Design feed writes `sites.latitude` and `sites.longitude` only while the site has no coordinates (a complete pair in range); once a site has them they change only through a Change Control proposal (Q473). The fill is audited (`site_coordinates_fed`); coordinates in a record that the site does not take are audited as not applied (`site_coordinates_kept`). Every other part of the feed is unchanged. |
+| Q477 | Manual reassignment plus an immediate notice to the new region's leads. When an approved region move takes a site to another region, its open tasks keep their holders and their SLA (B12b: nothing is reassigned or reset). The holders of the `reassign` grant of the new region who can see the site get an in-app notice (`site_region_moved`) at once; it lists the site and its open tasks with their holders, so they can use the B12b choices (keep, reassign, act on it themselves). When nobody holds the grant there, the System Admins get it (Q480). |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |
@@ -244,6 +255,7 @@ The offline helper `tools/master-import/fill-templates.py` (gap G3). Questions i
 | P4b | Weekly certificate reminder until renewed | Q330 |
 | P4c | Execution mode required at submit after the parallel run | Q365 |
 | Site creation | Change Control proposals also change the site names (EN/AR) and coordinates; region and cluster changes for a System Admin | Q473 |
+| Settings screens | Confirm the official calendar; the mail notification kinds; the RF feed fills empty coordinates only; the leads of the new region are told of a region move | Q440, Q441, Q476, Q477 |
 
 ## Owner data still needed
 

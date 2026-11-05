@@ -8,7 +8,7 @@ import { weightIssues } from '@/lib/weights';
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
-import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
+import { CALENDAR_CODES, CATALOGUE, COMPLETENESS, MAIL_KIND_CATALOGUE, MISMATCH, initCfg, GATES, MILESTONES, OPEN_TASKS, SCENARIOS, START_EVENT_CODES, TASK_DEFS, type SlaSetRec, type WeightRec } from './settingsData';
 
 const B = API_BASE;
 const TODAY = '2026-10-25';
@@ -209,11 +209,23 @@ const DONE: Record<string, number> = { a1: 100, a2: 90, a3: 70, a4: 55, a5: 40, 
 const contrib = (a?: { code: string; weight: number }) => (a ? Math.round(a.weight * (DONE[a.code] ?? 50)) / 100 : 0);
 const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.reduce((n, a) => n + contrib(a), 0) * 10) / 10;
 
+/** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
+const CC = () => (C().calConfirm ??= initCfg().calConfirm);
+const MK = () => (C().mailKinds ??= initCfg().mailKinds);
+const confirmation = () => {
+  const c = CC(), h = C().holidays, y = Number(TODAY.slice(0, 4));
+  const blockers = [y, y + 1].flatMap((yr): { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[] => {
+    const rows = h.filter((x) => x.date.startsWith(String(yr)));
+    return !rows.length ? [{ code: 'no_holidays', year: yr, count: 0 }] : rows.some((x) => x.tentative) ? [{ code: 'tentative_remaining', year: yr, count: rows.filter((x) => x.tentative).length }] : [];
+  });
+  return { confirmed: c.confirmed, confirmed_at: c.confirmed ? c.at : null, confirmed_by: c.confirmed && c.by ? ref(c.by) : null, version: c.version, can_edit: isAdmin(), blockers };
+};
 const summary = () => {
   const h = C().holidays, tent = h.filter((x) => x.tentative && x.date >= TODAY).sort((a, b) => a.date.localeCompare(b.date));
   return { tentative_count: h.filter((x) => x.tentative).length, next_tentative_date: tent[0]?.date ?? null, tentative_reminder_due: !!tent[0] && day(tent[0].date) - day(TODAY) <= 14 * 864e5, next_year: 2027, next_year_table_empty: !h.some((x) => x.date.startsWith('2027')),
     // contract 0.12.0 (Q4, D4b): the official calendar is pending owner data; tentative dates count now
-    official_calendar_pending: true, tentative_counted: true };
+    official_calendar_pending: !CC().confirmed, tentative_counted: true,
+    official_confirmed_at: CC().confirmed ? CC().at : null, official_confirmed_by: CC().confirmed && CC().by ? ref(CC().by!) : null };
 };
 const changed = (holiday: Holiday) => HttpResponse.json({ holiday, affected_open_tasks: 12, recalculation_job_id: null });
 
@@ -310,6 +322,26 @@ export const settingsHandlers = [
     Object.assign(h, { tentative: false, date: b.date ?? h.date, confirmed_at: new Date().toISOString(), confirmed_by: me(), version: h.version + 1 }); save();
     return changed(h);
   }),
+  // 0.14.2 (Q440): confirm or withdraw the official calendar
+  http.get(`${B}/settings/calendar-confirmation`, () => { const g = guard(); if (g) return g; const j = confirmation(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/calendar-confirmation`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, CC().version); if (p) return p;
+    const b = await body<{ confirmed?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['confirmed', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.confirmed !== 'boolean') errs.push({ path: '/confirmed', code: 'required' });
+    if (errs.length) return fields(...errs);
+    if (CC().confirmed === b.confirmed) return problem(409, 'invalid_transition', b.confirmed ? 'The official calendar is already confirmed.' : 'The official calendar is not confirmed.');
+    if (b.confirmed) {
+      const bl = confirmation().blockers;
+      if (bl.length) return fields(...bl.map((x) => ({ path: '/confirmed', code: x.code })));
+    }
+    Object.assign(CC(), { confirmed: b.confirmed as boolean, at: b.confirmed ? new Date().toISOString() : null, by: b.confirmed ? viewer()!.employee_id! : null, version: CC().version + 1 }); save();
+    const j = confirmation();
+    return HttpResponse.json(j, tag(j.version));
+  }),
   http.put(`${B}/settings/weekend-days`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!stepUpValid()) return stepUp();
@@ -319,6 +351,34 @@ export const settingsHandlers = [
     if (!d.length || d.length > 6 || new Set(d).size !== d.length || d.some((x) => !int(x, 0, 6))) return fields({ path: '/weekend_days', code: 'invalid' });
     C().weekend = { days: [...d].sort(), version: C().weekend.version + 1 }; save();
     return HttpResponse.json({ calendar_code: 'LY', weekend_days: C().weekend.days, affected_open_tasks: 12, version: C().weekend.version });
+  }),
+
+  // ------------------------------------------------------------------ 0.14.2 (Q441): the mail notification kinds (System Admin only)
+  http.get(`${B}/settings/mail-notification-kinds`, () => {
+    const g = needAdmin(); if (g) return g;
+    const m = MK();
+    return HttpResponse.json({ kinds: [...m.kinds, ...m.unknown], unknown_kinds: m.unknown, catalogue: MAIL_KIND_CATALOGUE, version: m.version, updated_at: m.updated_at, updated_by: m.updated_by ? ref(m.updated_by) : null }, tag(m.version));
+  }),
+  http.put(`${B}/settings/mail-notification-kinds`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!stepUpValid()) return stepUp();
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, MK().version); if (p) return p;
+    const b = await body<{ kinds?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['kinds', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (!Array.isArray(b.kinds)) errs.push({ path: '/kinds', code: 'invalid' });
+    else if (b.kinds.length > 100) errs.push({ path: '/kinds', code: 'too_many' });
+    else (b.kinds as unknown[]).forEach((k, i) => {
+      if (typeof k !== 'string' || !/^[a-z][a-z0-9_]{1,59}$/.test(k)) errs.push({ path: `/kinds/${i}`, code: 'invalid' });
+      else if (/^(security_|integrity_|audit_integrity|break_glass|retention_)/.test(k)) errs.push({ path: `/kinds/${i}`, code: 'reserved_kind' });
+      else if (!MAIL_KIND_CATALOGUE.some((c) => c.kind === k)) errs.push({ path: `/kinds/${i}`, code: 'unknown_kind' });
+      else if ((b.kinds as unknown[]).indexOf(k) !== i) errs.push({ path: `/kinds/${i}`, code: 'duplicate' });
+    });
+    if (errs.length) return fields(...errs);
+    Object.assign(MK(), { kinds: [...(b.kinds as string[])].sort(), unknown: [], version: MK().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const m = MK();
+    return HttpResponse.json({ kinds: m.kinds, unknown_kinds: [], catalogue: MAIL_KIND_CATALOGUE, version: m.version, updated_at: m.updated_at, updated_by: ref(m.updated_by!) }, tag(m.version));
   }),
 
   // ------------------------------------------------------------------ SLA rule sets (0.2.6)

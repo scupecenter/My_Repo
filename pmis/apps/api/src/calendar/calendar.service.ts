@@ -35,6 +35,17 @@ const patchSchema = z.object({
 
 const confirmSchema = z.object({ reason, date: isoDate.optional() }).strict();
 
+const confirmationSchema = z.object({ reason, confirmed: z.boolean() }).strict();
+
+interface ConfirmationJson {
+  confirmed: boolean;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  version: number;
+  can_edit: boolean;
+  blockers: { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[];
+}
+
 const weekendSchema = z.object({
   reason,
   calendar_code: z.string().min(1).max(60).optional(),
@@ -145,6 +156,8 @@ export class CalendarService {
              (extract(year FROM cal_today()) + 1)::int AS next_year,
              (SELECT count(*) FROM holidays WHERE extract(year FROM date) = extract(year FROM cal_today()) + 1) AS next_n`);
     const r = s[0];
+    // 0.14.2 (Q440): who confirmed the official calendar and when
+    const conf = await this.confirmation();
     return {
       items: rows.map(toDto),
       summary: {
@@ -156,8 +169,37 @@ export class CalendarService {
         // 0052 (Q4, D4b): the official calendar is pending owner data until the setting calendar.official_confirmed is true; tentative dates count now
         official_calendar_pending: r?.confirmed !== true,
         tentative_counted: true,
+        official_confirmed_at: conf.confirmed_at,
+        official_confirmed_by: conf.confirmed_by,
       },
     };
+  }
+
+  private async userRef(id: string | null): Promise<{ id: string; display_name: string; employee_id: string | null } | null> {
+    if (!id) return null;
+    const u = await this.db.tx.$queryRaw<{ display_name: string; employee_id: string | null }[]>(Prisma.sql`SELECT display_name, employee_id FROM users WHERE id = ${id}::uuid`);
+    return { id, display_name: u[0]?.display_name ?? '', employee_id: u[0]?.employee_id?.trim() ?? null };
+  }
+
+  private async confirmation() {
+    const r = await this.db.tx.$queryRaw<{ j: ConfirmationJson }[]>(Prisma.sql`SELECT cal_confirmation_json() AS j`);
+    const j = r[0]!.j;
+    return { confirmed: j.confirmed, confirmed_at: j.confirmed_at, confirmed_by: await this.userRef(j.confirmed_by), version: j.version, can_edit: j.can_edit, blockers: j.blockers };
+  }
+
+  /** GET /settings/calendar-confirmation (every signed-in user: the banner is shown to all) */
+  getConfirmation() {
+    return this.confirmation();
+  }
+
+  /** PUT /settings/calendar-confirmation (Q440): a System Admin, or a delegate of settings edit for all regions; reason and If-Match; audited by the database */
+  async setConfirmation(auth: AuthContext, ifMatch: string | undefined, raw: unknown) {
+    void auth;
+    await this.access.requireAdmin('calendars', 'edit');
+    const version = parseIfMatch(ifMatch);
+    const b = parse(confirmationSchema, raw);
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT admin_set_calendar_confirmation(${b.confirmed}::boolean, ${b.reason}::text, ${version}::int)`);
+    return this.confirmation();
   }
 
   private async one(id: string): Promise<HolidayRow | undefined> {

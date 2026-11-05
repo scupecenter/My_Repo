@@ -86,6 +86,7 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 - **Workflow columns** U:FW are the task dates and statuses of the 10 stages and of Dismantle. They are entered through the tasks (cat `master_columns`). Gates and milestones are calc (`rules.md` §2).
 - **Status** FX:FZ is calc (`rules.md` §2.4). **Issue** GA:GE is replaced by the Issue Log register (§3.12).
 - **Update 2026-11-05 (Q460, migration 0070):** the Site Register creates sites, by hand (`POST /sites`, a draft) or from the approved template `TPL-SITE-NEW`, both ending at L2 of the Matrix row `site_creation`; the identity comes from the Master sheet and RF & Design enriches the site later through its feed. The default below is superseded.
+- **Update 2026-11-05 (Q476, migration 0072):** the RF & Design feed fills the latitude and longitude of the site only while the site has none (a complete pair); once a site has coordinates they change only through a Change Control proposal (Q473). The fill is audited as `site_coordinates_fed`, a record that names other coordinates as `site_coordinates_kept` (not applied).
 - Where a new site is created (Site Register or RF & Design) is open (Q46). *Default:* the Site Register "New site" form has an Identity section whose fields are stored in the RF & Design record of the same site.
 
 ### 2.2 Streams (default seed, admin-configurable, versioned with the workflow)

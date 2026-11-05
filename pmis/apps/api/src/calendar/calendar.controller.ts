@@ -52,6 +52,20 @@ export class CalendarController {
     return r;
   }
 
+  @Get('calendar-confirmation')
+  async confirmation(@Res({ passthrough: true }) res: Response) {
+    const r = await this.calendar.getConfirmation();
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
+  @Put('calendar-confirmation')
+  async setConfirmation(@Auth() auth: AuthContext, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    const r = await this.calendar.setConfirmation(auth, ifMatch, body);
+    res.setHeader('ETag', etagHeader(r.version));
+    return r;
+  }
+
   @Put('weekend-days')
   async weekend(@Auth() auth: AuthContext, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const r = await this.calendar.setWeekend(auth, body);

@@ -333,6 +333,8 @@ describe('hybrid mode list', () => {
       'POST /registers/quality/records/:id/cancel-snag',
       // contract 0.14.0: site creation (Q460): the draft and its life
       'POST /sites', 'GET /site-drafts', 'GET /site-drafts/:id', 'PATCH /site-drafts/:id', 'DELETE /site-drafts/:id', 'POST /site-drafts/:id/submit', 'POST /site-drafts/:id/decide',
+      // contract 0.14.2: the official calendar confirmation (Q440) and the mail notification kinds (Q441)
+      'GET /settings/calendar-confirmation', 'PUT /settings/calendar-confirmation', 'GET /settings/mail-notification-kinds', 'PUT /settings/mail-notification-kinds',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

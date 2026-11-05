@@ -72,9 +72,21 @@ export const SEC_LOG: SecurityLogEntry[] = Array.from({ length: 36 }, (_, i) => 
   } as SecurityLogEntry;
 });
 
+/** 0.14.2 (Q441): the kinds the code writes (mail_kind_catalogue of migration 0072); the first six are the go-live kinds. */
+export const MAIL_KIND_CATALOGUE = [
+  'task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected',
+  'email_change_decided', 'email_change_requested', 'followed_change', 'gate_closed_again', 'holiday_tentative', 'import_batch', 'levels_converted', 'mention',
+  'no_eligible_holder', 'order_team_mismatch', 'party_type_review', 'permit_transferred', 'phone_change_decided', 'phone_change_requested', 'site_draft_approved',
+  'site_draft_assigned', 'site_draft_returned', 'site_region_moved', 'sla_negative_duration', 'snag_closed', 'snag_raised', 'team_safety_cert',
+].map((kind, i) => ({ kind, recommended: i < 6 }));
+
 export function initCfg() {
   return {
     holidays: HOLIDAYS.map((h) => ({ ...h })), weekend: { days: [5, 6], version: 1 },
+    // 0.14.2 (Q440): the official calendar confirmation (calendar.official_confirmed); not confirmed at the start
+    calConfirm: { confirmed: false, at: null as string | null, by: null as string | null, version: 1 },
+    // 0.14.2 (Q441): mail.notification_kinds (empty during development) and a value the code does not write, to show the warning
+    mailKinds: { kinds: [] as string[], unknown: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as string | null },
     freeze: { active: true, starts_on: '2026-11-01', ends_on: '2027-01-31', lifted: false, lifted_at: null, lifted_by: null, lift_reason: null, blocked_operations: ['publishWorkflowVersion'], version: 1 },
     dlp: { current: { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' }, history: [
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },

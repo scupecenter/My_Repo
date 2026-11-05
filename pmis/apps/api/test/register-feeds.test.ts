@@ -224,6 +224,11 @@ describe('the other register feeds (Q103)', () => {
     expect((await q<Record<string, unknown>>(db, `SELECT owner_site_id, latitude::float AS lat, site_scenario, delivery_scenario::text AS ds, tower_height_m::float AS th FROM sites WHERE id = $1`, [t.site.id]))[0])
       .toMatchObject({ owner_site_id: `OWN-${U}`, lat: 32.5, site_scenario: 'Indoor', ds: 'new_build', th: 30 });   // 0070 (G8): the RF Site Scenario is Indoor / Outdoor, it no longer moves the Delivery Scenario
     expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'site_identity_fed' AND entity_id = $1`, [t.site.id])).length).toBe(1);
+    // Q476 (0072): the site had no coordinates, so the feed filled them, and the audit says so
+    const fed = await q<{ before: any; after: any; reason: string; region_id: number }>(db, `SELECT before, after, reason, region_id FROM audit_log WHERE action = 'site_coordinates_fed' AND entity_id = $1`, [t.site.id]);
+    expect(fed).toHaveLength(1);
+    expect(fed[0]).toMatchObject({ before: { latitude: null, longitude: null }, after: { latitude: 32.5, longitude: 13.1, record_id: rf.id }, region_id: R });
+    expect(fed[0]!.reason).toMatch(/Q476/);
 
     const a = await team(app, db, 'acquisition', 'acquisition', R);
     const signed = await daysAgo(3);
@@ -311,5 +316,57 @@ describe('Q113 / Q108: the As-Built CW and TE parts', () => {
     const f = (await q<{ options: string[] | null }>(db, `SELECT options FROM register_fields WHERE register_key = 'as_built' AND code = 'router_type'`))[0]!;
     expect(f.options).toEqual(expect.arrayContaining(['S9500', 'S9501', 'S9700']));
     expect((await q<{ rt: string[] }>(db, `SELECT record_types AS rt FROM register_definitions WHERE register_key = 'as_built'`))[0]!.rt).toEqual(['cw_part', 'te_part']);
+  });
+});
+
+describe('Q476 (migration 0072): the RF & Design feed fills the coordinates only while the site has none', () => {
+  const coords = async (siteId: string) => (await q<{ lat: number | null; lon: number | null }>(db, 'SELECT latitude::float8 AS lat, longitude::float8 AS lon FROM sites WHERE id = $1', [siteId]))[0]!;
+  const audit = (action: string, siteId: string) => q<{ before: any; after: any; reason: string; region_id: number }>(
+    db, 'SELECT before, after, reason, region_id FROM audit_log WHERE action = $1 AND entity_id = $2 ORDER BY id', [action, siteId]);
+
+  it('fills an empty site once, audits it, and a later version with other coordinates changes nothing about them (the other fields still follow)', async () => {
+    const t = await team(app, db, 'rf_design', 'rf_design', R);
+    expect(await coords(t.site.id)).toEqual({ lat: null, lon: null });
+    const v1 = await create(t, 'rf_design', { site_owner_id: `OWN-${U}-1`, latitude: 32.5, longitude: 13.1, tower_height: 30 });
+    const v1done = await approveFlex(t, v1.id, v1.version);
+    expect(await coords(t.site.id)).toEqual({ lat: 32.5, lon: 13.1 });
+    expect(await audit('site_coordinates_fed', t.site.id)).toHaveLength(1);
+    expect(await audit('site_coordinates_kept', t.site.id)).toHaveLength(0);
+
+    const v2 = await newVersion(t, 'rf_design', v1done, { site_owner_id: `OWN-${U}-2`, latitude: 33.9, longitude: 14.2, tower_height: 36 });
+    await approveFlex(t, v2.id, v2.version);
+    expect(await coords(t.site.id)).toEqual({ lat: 32.5, lon: 13.1 });                          // not overwritten
+    expect((await q<Record<string, unknown>>(db, 'SELECT owner_site_id, tower_height_m::float AS th FROM sites WHERE id = $1', [t.site.id]))[0])
+      .toMatchObject({ owner_site_id: `OWN-${U}-2`, th: 36 });                                  // everything else is as before 0072
+    expect(await audit('site_coordinates_fed', t.site.id)).toHaveLength(1);                     // no second "fed"
+    const kept = await audit('site_coordinates_kept', t.site.id);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toMatchObject({ before: { latitude: 32.5, longitude: 13.1 }, after: { latitude: 33.9, longitude: 14.2, applied: false }, region_id: R });
+    expect(kept[0]!.reason).toMatch(/Change Control proposal/);
+  });
+
+  it('a site that already has coordinates keeps them when its first RF & Design record is approved', async () => {
+    const t = await team(app, db, 'rf_design', 'rf_design', R);
+    await db.query('UPDATE sites SET latitude = 30.25, longitude = 11.5 WHERE id = $1', [t.site.id]);
+    const rf = await create(t, 'rf_design', { site_owner_id: `OWN-${U}-3`, latitude: 32.5, longitude: 13.1 });
+    const rfDone = await approveFlex(t, rf.id, rf.version);
+    expect(await coords(t.site.id)).toEqual({ lat: 30.25, lon: 11.5 });
+    expect(await audit('site_coordinates_fed', t.site.id)).toHaveLength(0);
+    expect(await audit('site_coordinates_kept', t.site.id)).toHaveLength(1);
+    // the same coordinates are not reported as a difference
+    const same = await newVersion(t, 'rf_design', rfDone, { latitude: 30.25, longitude: 11.5 });
+    await approveFlex(t, same.id, same.version);
+    expect(await audit('site_coordinates_kept', t.site.id)).toHaveLength(1);
+  });
+
+  it('a record with only one of the pair, or with no coordinates, fills nothing', async () => {
+    const t = await team(app, db, 'rf_design', 'rf_design', R);
+    const half = await create(t, 'rf_design', { site_owner_id: `OWN-${U}-4`, latitude: 32.5 });
+    const halfDone = await approveFlex(t, half.id, half.version);
+    expect(await coords(t.site.id)).toEqual({ lat: null, lon: null });
+    const none = await newVersion(t, 'rf_design', halfDone, { site_owner_id: `OWN-${U}-5` });
+    await approveFlex(t, none.id, none.version);
+    expect(await coords(t.site.id)).toEqual({ lat: null, lon: null });
+    expect(await audit('site_coordinates_fed', t.site.id)).toHaveLength(0);
   });
 });
