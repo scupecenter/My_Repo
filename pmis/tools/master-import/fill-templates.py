@@ -442,7 +442,7 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
             if ev == 'derived':
                 rep.counts['derived'] += 1
             elif ev in ('date_day_first_assumed', 'date_month_first_assumed'):
-                rep.add(ev, addr, src_addr, col['header'], short(old), short(new), note)
+                rep.add(ev, addr, src_addr, col['header'], '' if p['personal'] else short(old), '' if p['personal'] else short(new), note)
             elif ev == 'outside_list':
                 rep.add('outside_list', addr, src_addr, col['header'], '' if p['personal'] else short(old), '', note)
             elif ev == 'not_normalised':
@@ -459,6 +459,11 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
                 continue
             cell = tpl.ws.cell(out_row, col['idx'])
             cell.value = new
+            if isinstance(new, str) and new[:1] in FORMULA_LEAD:
+                # untrusted text that would read as a formula is kept as literal text, never a live formula (security review 2026-11-05)
+                cell.data_type = 's'
+                cell.quotePrefix = True
+                rep.add('formula_text_kept', addr, src_addr, col['header'], '', '', 'starts with = + - @ or a control character: written as text')
             if col['kind'] == 'date' and isinstance(new, (dt.date, dt.datetime)):
                 cell.number_format = 'yyyy-mm-dd'
         for h in (reg.get('needs_headers') or '').split('|'):
@@ -473,18 +478,28 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
 # ---------------------------------------------------------------------------------------------------------------------
 # Reports
 # ---------------------------------------------------------------------------------------------------------------------
+FORMULA_LEAD = ('=', '+', '-', '@', '\t', '\r')
+
+
+def csv_safe(v):
+    """A report cell that a spreadsheet would read as a formula is prefixed with ' (CSV injection)."""
+    if isinstance(v, str) and v[:1] in FORMULA_LEAD:
+        return "'" + v
+    return v
+
+
 def write_reports(out_dir: Path, base: str, tpl: Template, reg: dict, rep: Report, include_personal: bool, master_facts: dict):
     csv_path = out_dir / f'{base}_report.csv'
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
         w.writerow(['event', 'template_cell', 'master_cell', 'header', 'old', 'new', 'note'])
         for e in rep.events:
-            w.writerow([e['event'], e['cell'], e['source_cell'], e['header'], e['old'], e['new'], e['note']])
+            w.writerow([csv_safe(x) for x in (e['event'], e['cell'], e['source_cell'], e['header'], e['old'], e['new'], e['note'])])
         for row, why in rep.skipped_rows:
-            w.writerow(['row_skipped', '', f"row {row}", '', '', '', why])
+            w.writerow([csv_safe(x) for x in ('row_skipped', '', f"row {row}", '', '', '', why)])
         for h, c in rep.per_column.items():
             for what, n in c.items():
-                w.writerow([f'column_{what}', '', '', h, '', '', f'{n} cells'])
+                w.writerow([csv_safe(x) for x in (f'column_{what}', '', '', h, '', '', f'{n} cells')])
     md = out_dir / f'{base}_summary.md'
     skip_counts = Counter(w for _, w in rep.skipped_rows)
     lines = [

@@ -255,6 +255,25 @@ class FillTests(unittest.TestCase):
         self.assertEqual(self.run_tool(), 0)
         self.assertIsNone(self.filled()['Data']['B2'].value)
 
+    def test_formula_like_text_written_as_literal(self):
+        make_master(self.master, self.rows())
+        wb = openpyxl.load_workbook(self.master)
+        c = wb['Acquisition']['C3']
+        c.value = '=HYPERLINK("http://example.invalid","x")'
+        c.data_type = 's'  # literal text in the Master, as a user could type it with a leading quote
+        wb.save(self.master)
+        self.assertEqual(self.run_tool(), 0)
+        cell = self.filled()['Data']['B2']
+        self.assertEqual(cell.value, '=HYPERLINK("http://example.invalid","x")')
+        self.assertEqual(cell.data_type, 's')  # never a live formula
+        with open(self.out / 'TPL-ACQ_v3_report.csv', encoding='utf-8') as f:
+            rows = list(csv.DictReader(f))
+        kept = [r for r in rows if r['event'] == 'formula_text_kept']
+        self.assertEqual(len(kept), 1)
+        for r in rows:
+            for v in r.values():
+                self.assertFalse(isinstance(v, str) and v[:1] in ('=', '+', '-', '@'), v)  # CSV-safe
+
     def test_shipped_maps_are_consistent(self):
         reg = ft.load_registers(HERE.parent / 'register-maps')
         self.assertEqual(set(reg), {'TPL-RF', 'TPL-ACQ', 'TPL-PRM', 'TPL-PO', 'TPL-GECOL', 'TPL-HLC', 'TPL-ASB', 'TPL-RSK'})
