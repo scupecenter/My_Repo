@@ -109,19 +109,22 @@ describe('Sidebar tree (N1-N12)', () => {
   it('opens each Site Register sub-menu on the right stream or view, titles the page and highlights the entry', async () => {
     const u = userEvent.setup();
     app();
+    // [link, href, data-stream of the card, page title]
     const cases: [string, string, string, string][] = [
-      ['nav-sites-stream-DESIGN_ACQ', '/sites?stream=DESIGN_ACQ', 'stream-tab-DESIGN_ACQ', 'Design & Acquisition'],
-      ['nav-sites-stream-CW', '/sites?stream=CW', 'stream-tab-CW', 'Civil Works'],
-      ['nav-sites-stream-TE', '/sites?stream=TE', 'stream-tab-TE', 'Installation (TE)'],
-      ['nav-sites-stream-CLOSURE', '/sites?stream=CLOSURE', 'stream-tab-CLOSURE', 'Handover & Closure'],
-      ['nav-sites-view-OM', '/sites?view=OM', 'view-tabs-OM', 'O&M'],
+      ['nav-sites-stream-DESIGN_ACQ', '/sites?stream=DESIGN_ACQ', 'DESIGN_ACQ', 'Design & Acquisition'],
+      ['nav-sites-stream-CW', '/sites?stream=CW', 'CW', 'Civil Works'],
+      ['nav-sites-stream-TE', '/sites?stream=TE', 'TE', 'Installation (TE)'],
+      ['nav-sites-stream-CLOSURE', '/sites?stream=CLOSURE', 'CLOSURE', 'Handover & Closure'],
+      ['nav-sites-view-OM', '/sites?view=OM', 'ALL', 'O&M'],
     ];
     for (const [id, href, tab, title] of cases) {
       const link = await screen.findByTestId(id);
       expect(link).toHaveAttribute('href', href);
       await u.click(link);
       expect(await screen.findByTestId('page-sites')).toBeInTheDocument();
-      expect(screen.getByTestId(tab)).toHaveAttribute('aria-selected', 'true');
+      await waitFor(() => expect(document.querySelector(`[data-stream="${tab}"]`)).not.toBeNull()); // the card carries the stream; the O&M view lists all streams
+      expect(screen.queryByTestId('stream-tabs')).toBeNull();
+      expect(screen.queryByTestId('view-tabs')).toBeNull();
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`Site Register: ${title}`);
       expect(screen.getByTestId(id)).toHaveAttribute('aria-current', 'page');
       expect(screen.getByTestId('nav-sites')).not.toHaveAttribute('aria-current');
@@ -130,7 +133,7 @@ describe('Sidebar tree (N1-N12)', () => {
     await u.click(screen.getByTestId('nav-sites'));
     await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(/^Site Register$/));
     expect(screen.getByTestId('nav-sites')).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByTestId('stream-tab-ALL')).toHaveAttribute('aria-selected', 'true');
+    expect(document.querySelector('[data-stream="ALL"]')).not.toBeNull();
   });
 
   it('points the Dismantle sub-menu at the Dismantle register', async () => {
@@ -142,7 +145,7 @@ describe('Sidebar tree (N1-N12)', () => {
     app('/sites?view=CW');
     expect(await screen.findByTestId('page-sites')).toBeInTheDocument();
     await screen.findByTestId('nav-sites');
-    expect(screen.getByTestId('view-tabs-CW')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByTestId('view-tabs')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Site Register: CW Register');
     expect(screen.getByTestId('nav-sites')).toHaveAttribute('aria-current', 'page');
     expect(screen.getByTestId('nav-group-site_register')).toHaveAttribute('data-active', 'true');

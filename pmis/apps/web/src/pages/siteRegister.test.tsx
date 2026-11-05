@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
@@ -19,20 +19,34 @@ const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /><
 const A1 = taskIdOf(0, 0);
 
 describe('Site Register: streams', () => {
-  it('names the module Site Register and offers All, the four API streams and Dismantle, in EN and AR', async () => {
+  it('names the module Site Register, has no tab bars (the sidebar switches) and titles the open stream with the API name', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites' });
     expect(screen.getByRole('heading', { name: 'Site Register' })).toBeInTheDocument();
-    for (const c of ['ALL', 'DESIGN_ACQ', 'CW', 'TE', 'CLOSURE', 'DISMANTLE']) expect(await screen.findByTestId(`stream-tab-${c}`)).toBeInTheDocument();
-    expect(screen.getByTestId('stream-tab-DESIGN_ACQ')).toHaveTextContent('Design & Acquisition');
+    expect(await screen.findByTestId('site-row-TR101')).toBeInTheDocument();
+    expect(document.querySelector('[data-stream="ALL"]')).not.toBeNull();
+    expect(screen.queryByTestId('stream-tabs')).toBeNull();
+    expect(screen.queryByTestId('view-tabs')).toBeNull();
+    cleanup();
+    for (const [code, name] of [['DESIGN_ACQ', 'Design & Acquisition'], ['CW', 'Civil Works'], ['TE', 'Installation (TE)'], ['CLOSURE', 'Handover & Closure']]) {
+      renderApp(<Sites />, { route: `/sites?stream=${code}` });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`Site Register: ${name}`);
+      await waitFor(() => expect(document.querySelector(`[data-stream="${code}"]`)).not.toBeNull());
+      cleanup();
+    }
   });
 
-  it('shows the agreed Arabic names', async () => {
+  it('shows the agreed Arabic names in the title of each stream', async () => {
     await signIn('pm');
+    const names = { DESIGN_ACQ: 'التصميم والاستحواذ', CW: 'الأعمال المدنية', TE: 'التركيبات', CLOSURE: 'التسليم والإغلاق' };
     renderApp(<Sites />, { route: '/sites', locale: 'ar' });
-    const names = ['الكل', 'التصميم والاستحواذ', 'الأعمال المدنية', 'التركيبات', 'التسليم والإغلاق', 'الفك'];
-    await waitFor(() => expect(within(screen.getByTestId('stream-tabs')).getAllByRole('tab').map((x) => x.textContent)).toEqual(names));
     expect(screen.getByRole('heading', { name: 'سجل المواقع' })).toBeInTheDocument();
+    cleanup();
+    for (const [code, name] of Object.entries(names)) {
+      renderApp(<Sites />, { route: `/sites?stream=${code}`, locale: 'ar' });
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`سجل المواقع: ${name}`);
+      cleanup();
+    }
   });
 
   it('calls GET /sites?stream=CW and shows stage, done/total, late and milestone per site; N/A sites sit behind a toggle', async () => {
@@ -53,12 +67,12 @@ describe('Site Register: streams', () => {
     await waitFor(() => expect(Number(screen.getByTestId('sites-count').textContent?.match(/\d+/)?.[0])).toBe(before + na));
   });
 
-  it('Dismantle has no API stream yet: it explains that and fetches nothing', async () => {
+  it('an old ?stream=DISMANTLE link lands on the Dismantle register and fetches no site list for it', async () => {
     await signIn('pm');
     const seen: (string | null)[] = [];
     server.events.on('request:start', ({ request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/sites')) seen.push(u.searchParams.get('stream')); });
-    renderApp(<Sites />, { route: '/sites?stream=DISMANTLE' });
-    expect(await screen.findByTestId('stream-dismantle-todo')).toBeInTheDocument();
+    renderApp(<Routes><Route path="/sites" element={<Sites />} /><Route path="/registers/dismantle" element={<div data-testid="at-dismantle" />} /></Routes>, { route: '/sites?stream=DISMANTLE' });
+    expect(await screen.findByTestId('at-dismantle')).toBeInTheDocument();
     expect(seen).not.toContain('DISMANTLE');
   });
 
@@ -96,35 +110,39 @@ describe('Site Register: streams', () => {
 });
 
 describe('Site Register: views (contract 0.4.7)', () => {
-  it('offers All work, CW, TE and O&M as tabs named by the API, in EN and AR, and keeps the streams', async () => {
+  it('titles the open view with the name from the API, in EN and AR, and shows no tab bars', async () => {
     await signIn('pm');
-    renderApp(<Sites />, { route: '/sites' });
-    await waitFor(() => expect(within(screen.getByTestId('view-tabs')).getAllByRole('tab').map((x) => x.textContent)).toEqual(['All work', 'CW Register', 'TE Register', 'O&M']));
-    expect(screen.getByTestId('view-tabs')).toHaveAttribute('role', 'tablist');
-    expect(screen.getByTestId('stream-tabs')).toBeInTheDocument();
+    for (const [view, en, ar] of [['CW', 'CW Register', 'سجل الأعمال المدنية'], ['TE', 'TE Register', 'سجل التركيبات'], ['OM', 'O&M', 'التشغيل والصيانة']]) {
+      renderApp(<Sites />, { route: `/sites?view=${view}` });
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`Site Register: ${en}`));
+      expect(screen.queryByTestId('view-tabs')).toBeNull();
+      expect(screen.queryByTestId('stream-tabs')).toBeNull();
+      cleanup();
+      renderApp(<Sites />, { route: `/sites?view=${view}`, locale: 'ar' });
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`سجل المواقع: ${ar}`));
+      cleanup();
+    }
   });
 
-  it('shows the Arabic names', async () => {
-    await signIn('pm');
-    renderApp(<Sites />, { route: '/sites', locale: 'ar' });
-    await waitFor(() => expect(within(screen.getByTestId('view-tabs')).getAllByRole('tab').map((x) => x.textContent)).toEqual(['كل الأعمال', 'سجل الأعمال المدنية', 'سجل التركيبات', 'التشغيل والصيانة']));
-  });
-
-  it('passes view to GET /sites, combines it with the stream, and moves between tabs with the arrow keys', async () => {
+  it('passes view to GET /sites from the URL (an old ?view=CW link) and combines it with the stream', async () => {
     await signIn('pm');
     const seen: string[] = [];
     server.events.on('request:start', ({ request }) => { const u = new URL(request.url); if (u.pathname.endsWith('/sites') && u.searchParams.get('view')) seen.push(u.search); });
-    renderApp(<Sites />, { route: '/sites?stream=CW' });
-    const tab = await screen.findByTestId('view-tabs-CW');
-    await userEvent.click(tab);
+    renderApp(<Sites />, { route: '/sites?stream=CW&view=CW' });
     await waitFor(() => expect(seen.some((q) => q.includes('view=CW') && q.includes('stream=CW'))).toBe(true));
-    expect(tab).toHaveAttribute('aria-selected', 'true');
-    tab.focus();
-    await userEvent.keyboard('{ArrowRight}');
-    expect(screen.getByTestId('view-tabs-TE')).toHaveAttribute('aria-selected', 'true');
-    expect(await screen.findByTestId('sites-empty')).toBeInTheDocument(); // stream CW and view TE share no task
-    await userEvent.click(screen.getByTestId('view-tabs-CW'));
     expect(await screen.findByTestId('site-row-TR101')).toHaveAttribute('href', expect.stringMatching(/stream=CW&view=CW/));
+    cleanup();
+    renderApp(<Sites />, { route: '/sites?stream=CW&view=TE' });
+    expect(await screen.findByTestId('sites-empty')).toBeInTheDocument(); // stream CW and view TE share no task
+  });
+
+  it('on the site page the view tabs still move with the arrow keys (mirrored in RTL)', async () => {
+    await signIn('pm');
+    renderApp(<SiteAt />, { route: `/sites/${siteIdOf(0)}` });
+    const all = await screen.findByTestId('site-view-tabs-ALL');
+    all.focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(screen.getByTestId('site-view-tabs-CW')).toHaveAttribute('aria-selected', 'true');
   });
 
   it('the real 0.4.7 shapes: B15 in CW, D18 in TE, B14 in OM (O&M not assigned); stage 1 and Z1 only in All work', async () => {

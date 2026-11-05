@@ -288,7 +288,6 @@
     "pipeline": "Pipeline",
     "late": "Late",
     "empty": "No site matches these filters.",
-    "streams_label": "Streams",
     "stream_all": "All",
     "views_label": "Views",
     "view_all": "All work",
@@ -298,7 +297,6 @@
     "current_stage": "Current stage",
     "progress": "Done / total",
     "milestone": "Milestone",
-    "dismantle_todo": "Dismantle (owner decision Q41) is a fifth sub-section outside the stage mapping. The API has no DISMANTLE stream yet, so there is nothing to list. It will fill in once the stream exists.",
     "new_site": "New site",
     "download_template": "Download template",
     "upload_template": "Upload"
