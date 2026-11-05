@@ -904,7 +904,8 @@
     "tab_contractor-rules": "Contractor rules",
     "tab_gecol-order": "GECOL order warnings",
     "tab_mail-kinds": "Mail kinds",
-    "tab_historical-waiver": "Historical load"
+    "tab_historical-waiver": "Historical load",
+    "tab_imports": "Imports"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -1840,7 +1841,11 @@
     "rows_incomplete": "Not all rows are loaded yet: the filters show the loaded rows only.",
     "processing": "Processing in the background: {{done}} of {{total}} rows ({{pct}}%)",
     "processing_sites": "Sites created {{done}} of {{total}} ({{pct}}%)",
-    "processing_note": "This batch is processed in the background in parts of 25 rows. You can leave this page; Send and Approve are available again when it ends.",
+    "processing_note": "This batch is processed in the background, part by part. You can leave this page; Send and Approve are available again when it ends.",
+    "processing_records": "Records approved {{done}} of {{total}} ({{pct}}%)",
+    "processing_records_decided": "Records decided {{done}} of {{total}} ({{pct}}%)",
+    "processing_tasks": "Tasks submitted {{done}} of {{total}} ({{pct}}%)",
+    "processing_tasks_decided": "Tasks decided {{done}} of {{total}} ({{pct}}%)",
     "processing_failed": "The background processing stopped after {{done}} of {{total}} rows. The rows done are kept; the others are still waiting.",
     "processing_errors": "{{count}} row(s) failed: see the rows marked with an error."
   },
@@ -3423,6 +3428,10 @@
     "staff": "Project Staff: {{mapped}} of {{rows}} roles mapped (a mapping never grants a right).",
     "applied": "Applied ({{mode}}): {{reason}}",
     "applied_toast": "Applied: {{count}} batch(es) sent into the normal flow.",
+    "applied_processing": "Applied: the big batches are sent in the background. The bar shows the progress.",
+    "progress_batches": "Batches still being sent: {{running}} of {{total}}",
+    "progress_done": "Background sending finished: {{submitted}} task(s) submitted, {{saved}} saved, {{failed}} failed, of {{total}} rows.",
+    "progress_failed": "The background sending stopped after {{done}} of {{total}} rows. The rows done are kept; send the remaining batches again from the Templates page.",
     "all_kinds": "All kinds",
     "all_resolutions": "All resolutions",
     "kind_diff": "Difference",
@@ -3851,5 +3860,18 @@
       "gharyan": "Gharyan",
       "ghadames": "Ghadames"
     }
+  },
+  "importsSettings": {
+    "title": "Imports / Background processing",
+    "note": "A send or an approval of a batch with more rows than this number runs in the background, in parts, so that a big file is never cut off. Smaller batches are done at once.",
+    "field": "Process in the background from N rows",
+    "rows": "rows",
+    "hint": "A whole number from {{min}} to {{max}}. The default is {{def}}.",
+    "range": "Type a whole number from {{min}} to {{max}}.",
+    "current": "In force: batches with more than {{n}} rows run in the background (default {{def}}).",
+    "updated": "Last changed by {{name}} ({{id}}) on {{when}}.",
+    "never": "Not changed since installation.",
+    "readonly": "Only a System Admin, or a delegate of Settings edit for all regions, can change this value.",
+    "confirm": "Change the threshold from {{from}} to {{to}} rows. The next send or decision uses the new value."
   }
 }

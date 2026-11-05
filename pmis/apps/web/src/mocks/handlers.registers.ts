@@ -505,6 +505,13 @@ export const registerHandlers = [
       return HttpResponse.json({ ...toBatch(b), outcome: { submitted: sent.length, held: [], failed: [] } }, { headers: { ETag: `"${b.version}"` } });
     }
     if (b.stream) {
+      // 0.14.6: a big stream batch is sent in the background (the PM holds both levels in the mock: a self-approval, with step-up)
+      const toSend = b.rows.filter((r) => r.action === 'update' && r.decision === 'pending');
+      if (toSend.length > ASYNC_ROWS) {
+        const self = viewer()?.key === 'pm';
+        if (self && !stepUpValid()) return stepUp();
+        return startRun(b, 'submit', toSend, self, 'stream');
+      }
       // each task row starts the task, saves the entry and submits it as L1; a row that waits for a predecessor or a review stays held
       const out: Outcome = { submitted: 0, held: [], failed: [] };
       for (const row of b.rows) {
@@ -517,6 +524,9 @@ export const registerHandlers = [
     }
     const key = b.register_key as RegisterKey, selfApproval = userHolds(key, 1, v.employee_id, 2) && userHolds(key, 2, v.employee_id, 2);
     if (selfApproval && !stepUpValid() && b.rows.some((r) => (r.action === 'create' || r.action === 'update') && r.decision === 'pending' && !r.record_id && !openVersionOf(r))) return stepUp();
+    // 0.14.6: a big register batch is sent in the background (the step-up of a self-approval is asked now, above)
+    const toSend = b.rows.filter((r) => (r.action === 'create' || r.action === 'update') && !r.record_id && r.decision !== 'approved' && r.decision !== 'rejected');
+    if (toSend.length > ASYNC_ROWS) return startRun(b, 'submit', toSend, selfApproval, 'register');
     const outcome: Outcome = { submitted: 0, held: [], failed: [] };
     for (const row of b.rows) {
       if ((row.action !== 'create' && row.action !== 'update') || row.record_id || row.decision === 'approved' || row.decision === 'rejected') continue;
@@ -574,6 +584,7 @@ export const registerHandlers = [
       const rows = b.rows.filter((r) => r.action === 'update' && ['pending', 'pending_previous_approval'].includes(r.decision) && (body.scope === 'all' || (body.rows ?? []).some((x) => x.row_id === r.id)));
       if (body.scope === 'rows' && !rows.length) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: '/rows', code: 'invalid_row' }] });
       if (body.action === 'approve' && rows.some((r) => r.decision === 'pending') && !stepUpValid()) return stepUp();
+      if (rows.length > ASYNC_ROWS) { const bad = notesMissing(body, rows); if (bad) return bad; return startRun(b, 'decide', rows, false, 'stream', body); }   // 0.14.6
       const res: Outcome = { decided: 0, approved: 0, rejected: 0, held: [], failed: [] };
       for (const r of rows) {
         const one = body.scope === 'rows' ? body.rows!.find((x) => x.row_id === r.id)! : null;
@@ -592,6 +603,7 @@ export const registerHandlers = [
       && (body.scope === 'all' || (body.rows ?? []).some((x) => x.row_id === r.id)));
     if (body.scope === 'rows' && !targets.length) return problem(422, 'validation_failed', 'Unknown or decided row', { errors: [{ path: '/rows', code: 'invalid_row' }] });
     if (body.action === 'approve' && targets.some((r) => r.record_id) && !stepUpValid()) return stepUp();
+    if (targets.length > ASYNC_ROWS) { const bad = notesMissing(body, targets); if (bad) return bad; return startRun(b, 'decide', targets, false, 'register', body); }   // 0.14.6
     const out: Outcome = { decided: 0, approved: 0, rejected: 0, held: [], failed: [] };
     for (const r of targets) {
       const one = body.scope === 'rows' ? body.rows!.find((x) => x.row_id === r.id)! : null;
@@ -619,30 +631,72 @@ export const registerHandlers = [
 ];
 
 // ---- batch helpers
-/** Contract 0.14.4: a New sites batch with more rows than imports.async_rows (50) is sent or approved in the background, 25 rows per chunk. */
+/**
+ * Contract 0.14.4: a New sites batch with more rows than imports.async_rows (50) is sent or approved in the background, 25 rows per chunk. Contract 0.14.6: register
+ * batches (50 rows per chunk) and stream batches (25) too, for a send and for an approve, review or return.
+ */
 export const ASYNC_ROWS = 50;
 const CHUNK = 25;
-function startRun(b: MockBatch, kind: MockRun['kind'], rows: MockBatchRow[], self: boolean) {
+const CHUNK_OF: Record<string, number> = { site: 25, register: 50, stream: 25 };
+type DecideBody = { action: 'review' | 'approve' | 'reject' | 'discard'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
+/** A return needs a note on every row it returns (as the request of the API, which refuses it all before anything is queued). */
+const notesMissing = (body: DecideBody, rows: MockBatchRow[]) => rows.some((r) => {
+  const one = body.scope === 'rows' ? body.rows?.find((x) => x.row_id === r.id) : undefined;
+  return (body.action === 'reject' || one?.decision === 'rejected') && !(one?.note ?? body.note ?? '').trim();
+}) ? problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] }) : null;
+function startRun(b: MockBatch, kind: MockRun['kind'], rows: MockBatchRow[], self: boolean, batchKind: 'site' | 'register' | 'stream' = 'site', body?: DecideBody) {
   const now = new Date().toISOString();
-  b.run = { id: crypto.randomUUID(), kind, state: 'running', rows: rows.map((r) => r.id), done: 0, self, submitted: 0, approved: 0, failed: 0, started_at: now, updated_at: now, finished_at: null };
+  const choices = body?.scope === 'rows' ? Object.fromEntries((body.rows ?? []).map((x) => [x.row_id, { decision: x.decision, note: x.note }])) : undefined;
+  b.run = { id: crypto.randomUUID(), kind, state: 'running', rows: rows.map((r) => r.id), done: 0, self, submitted: 0, approved: 0, failed: 0, started_at: now, updated_at: now, finished_at: null,
+    batchKind, action: kind === 'decide' ? (body?.action === 'discard' ? null : body?.action ?? 'approve') : null, note: body?.note ?? null, choices, decided: 0, rejected: 0, held: 0 };
   b.version += 1; save();
   return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
 }
+/** One row of a register or a stream run (0.14.6), by the same rules as the synchronous mock paths. */
+function runRow(b: MockBatch, run: MockRun, r: MockBatchRow) {
+  if (run.kind === 'submit') {
+    if (run.batchKind === 'register') {
+      const open = openVersionOf(r);
+      if (open) { r.decision = 'pending_previous_approval'; r.hold_reason = 'open_version'; r.hold_record_id = open.id; run.held = (run.held ?? 0) + 1; return; }
+      const rec = createRecordFor(b, r, run.self);
+      r.record_id = rec.id; r.decision = rec.state === 'approved' ? 'approved' : 'pending';
+    } else if (run.self) r.decision = 'approved';
+    run.submitted += 1;
+    if (r.decision === 'approved') run.approved += 1;
+    return;
+  }
+  const one = run.choices?.[r.id];
+  const act = run.action === 'reject' || one?.decision === 'rejected' ? 'reject' : run.action === 'review' ? 'review' : 'approve';
+  const note = (one?.note ?? run.note ?? '').trim();
+  const rec = r.record_id ? R().records.find((x) => x.id === r.record_id) : undefined;
+  if (run.batchKind === 'register' && !rec && act !== 'reject') { run.held = (run.held ?? 0) + 1; return; }
+  if (act === 'reject') {
+    if (rec) { step(rec, 'reject', 2, note, false, r.id); rec.state = 'entry'; rec.current_level = 1; rec.return_count += 1; rec.last_return_note = note; touch(rec); }
+    r.decision = 'rejected'; r.note = note; r.hold_reason = undefined; run.rejected = (run.rejected ?? 0) + 1;
+  } else if (act === 'approve') {
+    if (rec) { step(rec, 'approve', 2, undefined, false, r.id); rec.state = 'approved'; rec.current_level = 2; touch(rec); }
+    r.decision = 'approved'; run.approved += 1;
+  }
+  run.decided = (run.decided ?? 0) + 1;
+}
 function advanceRun(b: MockBatch) {
   const run = b.run!;
-  for (const id of run.rows.slice(run.done, run.done + CHUNK)) {
+  const size = CHUNK_OF[run.batchKind ?? 'site'] ?? CHUNK;
+  for (const id of run.rows.slice(run.done, run.done + size)) {
     const r = b.rows.find((x) => x.id === id)!;
+    if (run.batchKind && run.batchKind !== 'site') { runRow(b, run, r); continue; }
     if (run.kind === 'submit') { run.submitted += 1; if (run.self) { r.decision = 'approved'; r.site_id = siteMeta(20).id; run.approved += 1; } }
     else { r.decision = 'approved'; r.site_id = siteMeta(20).id; run.approved += 1; }
   }
-  run.done = Math.min(run.rows.length, run.done + CHUNK);
+  run.done = Math.min(run.rows.length, run.done + size);
   run.updated_at = new Date().toISOString();
   if (run.done >= run.rows.length) { run.state = 'done'; run.finished_at = run.updated_at; b.status = 'sent'; b.version += 1; }
 }
 const processing = (b: MockBatch) => problem(409, 'batch_processing', 'The batch is being processed', { detail: `The batch is being processed (${b.run!.done} of ${b.run!.rows.length} rows). Wait until it ends.` } as never);
 const progressOf = (run: MockRun | undefined): ImportBatch['progress'] => run ? {
-  job_id: run.id, kind: run.kind, state: run.state, rows_total: run.rows.length, rows_done: run.done, percent: run.rows.length ? Math.floor((100 * run.done) / run.rows.length) : 100,
-  submitted: run.submitted, approved: run.approved, rejected: 0, failed: run.failed, started_at: run.started_at, updated_at: run.updated_at, finished_at: run.finished_at, error: null,
+  job_id: run.id, kind: run.kind, action: run.action ?? null, batch_kind: run.batchKind ?? 'site', state: run.state, rows_total: run.rows.length, rows_done: run.done,
+  percent: run.rows.length ? Math.floor((100 * run.done) / run.rows.length) : 100, submitted: run.submitted, approved: run.approved, rejected: run.rejected ?? 0,
+  decided: run.decided ?? 0, held: run.held ?? 0, saved: 0, failed: run.failed, started_at: run.started_at, updated_at: run.updated_at, finished_at: run.finished_at, error: null,
 } : null;
 type Outcome = { submitted?: number; decided?: number; approved?: number; rejected?: number; held: { row_id: string; row_no: number; key: string | null; reason: 'open_version' | 'open_submission' | 'predecessor_open'; record_id?: string | null }[]; failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[] };
 const batchMatch = (req: Request, b: MockBatch) => {

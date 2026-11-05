@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { api, ApiError, downloadFile } from './client';
 import type { components } from './schema';
 
@@ -18,8 +19,27 @@ export type DiffFilters = { kind: string; reason: string; resolution: string; si
 
 /** Q1 / Q211 (contract 0.12.8): the legacy Master import runs (System Admin or a delegate of templates administer). */
 export const useMasterRuns = () => useQuery({ queryKey: ['master-runs'], retry: false, queryFn: () => api.get<Page<MasterImportRun>>('/master-import/runs', { query: { limit: 50 } }) });
-export const useMasterRun = (id: string | undefined) =>
-  useQuery({ queryKey: ['master-run', id], enabled: !!id, retry: false, queryFn: () => api.get<MasterImportRun>(`/master-import/runs/${id}`) });
+export type MasterImportRunProgress = S['MasterImportRunProgress'];
+/** 0.14.6: how often an applied run whose batches are sent in the background is read again. */
+export const RUN_POLL = { ms: 3000 };
+/** The run; while its batches are sent in the background (`progress.state` running) it is read again every 3 s, and the batch lists once more when it ends. */
+export function useMasterRun(id: string | undefined) {
+  const qc = useQueryClient();
+  const q = useQuery({
+    queryKey: ['master-run', id], enabled: !!id, retry: false, queryFn: () => api.get<MasterImportRun>(`/master-import/runs/${id}`),
+    refetchInterval: (x) => (x.state.data?.progress?.state === 'running' ? RUN_POLL.ms : false),
+  });
+  const was = useRef<string | undefined>(undefined);
+  const st = q.data?.progress?.state;
+  useEffect(() => {
+    if (was.current === 'running' && st && st !== 'running') {
+      void qc.invalidateQueries({ queryKey: ['import-batches'] });
+      void qc.invalidateQueries({ queryKey: ['master-runs'] });
+    }
+    was.current = st;
+  }, [st, qc]);
+  return q;
+}
 export const useMasterDiffs = (id: string | undefined, f: DiffFilters) =>
   useQuery({
     queryKey: ['master-diffs', id, f], enabled: !!id, placeholderData: keepPreviousData,

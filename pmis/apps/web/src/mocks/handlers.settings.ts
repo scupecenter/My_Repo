@@ -212,6 +212,12 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 /** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
+/** 0.14.6: imports.async_rows (a store saved before 0.14.6 starts from the seed). */
+const IM = () => (C().imports ??= initCfg().imports);
+const importsView = () => {
+  const c = IM();
+  return { async_rows: c.async_rows, default_async_rows: 50, min: 10, max: 500, updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
+};
 const confirmation = () => {
   const c = CC(), h = C().holidays, y = Number(TODAY.slice(0, 4));
   const blockers = [y, y + 1].flatMap((yr): { code: 'no_holidays' | 'tentative_remaining'; year: number; count: number }[] => {
@@ -351,6 +357,23 @@ export const settingsHandlers = [
     if (!d.length || d.length > 6 || new Set(d).size !== d.length || d.some((x) => !int(x, 0, 6))) return fields({ path: '/weekend_days', code: 'invalid' });
     C().weekend = { days: [...d].sort(), version: C().weekend.version + 1 }; save();
     return HttpResponse.json({ calendar_code: 'LY', weekend_days: C().weekend.days, affected_open_tasks: 12, version: C().weekend.version });
+  }),
+
+  // ------------------------------------------------------------------ 0.14.6: the background threshold of batches (Settings, Imports)
+  http.get(`${B}/settings/imports`, () => { const g = guard(); if (g) return g; const j = importsView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/imports`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, IM().version); if (p) return p;
+    const b = await body<{ async_rows?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['async_rows', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (typeof b.async_rows !== 'number' || !Number.isInteger(b.async_rows) || b.async_rows < 10 || b.async_rows > 500) errs.push({ path: '/async_rows', code: 'out_of_range' });
+    if (errs.length) return fields(...errs);
+    if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
+    Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
   }),
 
   // ------------------------------------------------------------------ 0.14.2 (Q441): the mail notification kinds (System Admin only)

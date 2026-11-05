@@ -70,6 +70,8 @@ import { TeamScopeMatchController } from './settings/team-scope-match.controller
 import { TeamScopeMatchService } from './settings/team-scope-match.service';
 import { GecolOrderWarningsController } from './settings/gecol-order-warnings.controller';
 import { GecolOrderWarningsService } from './settings/gecol-order-warnings.service';
+import { ImportsSettingsController } from './settings/imports-settings.controller';
+import { ImportsSettingsService } from './settings/imports-settings.service';
 import { MailKindsController } from './settings/mail-kinds.controller';
 import { MailKindsService } from './settings/mail-kinds.service';
 import { HistoricalWaiverController } from './settings/historical-waiver.controller';
@@ -131,7 +133,7 @@ export function appModuleFor(config: AppConfig) {
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, SiteDraftsController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
-      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, HistoricalWaiverController, P4cController, AuditLogController, SecurityLogController, LogsAdminController,
+      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, HistoricalWaiverController, P4cController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
@@ -146,7 +148,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, HistoricalWaiverService, P4cService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
+      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, HistoricalWaiverService, P4cService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox

@@ -4290,6 +4290,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The background threshold of batches (imports.async_rows)
+         * @description 0.14.6. Every signed-in user may read it. A send or a decision of a batch (New sites, register, stream, and each staged batch of a Master import apply) with more
+         *     rows than `async_rows` runs in the background (202, status `processing`). `can_edit` is true for a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getImportsSettings"];
+        /**
+         * Change the background threshold (reason, If-Match, audited)
+         * @description 0.14.6. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A whole number
+         *     from 10 to 500 (422 `validation_failed`, path `/async_rows`), a reason and If-Match; an unknown key is refused (422 `unknown_field`). Saving the value in force is
+         *     409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
+         */
+        put: operations["setImportsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -5143,6 +5170,7 @@ export interface paths {
          * @description Only the uploader (403 `not_eligible_holder` for anyone else, an admin too: the records are entered as L1 in the uploader's name only). Each valid row (`create` or `update`) becomes a register record, and is submitted as the uploader through the same functions as manual entry (`reg_save_record`, `reg_new_version`, `reg_transition_record`, with the import row so that the audit and the history show "via batch"), so it follows the Matrix row of its register: L2 Data Reviewer & Approver decides next. An update is a new version of the record in force; the version in force stays until the new one is approved (R9).
          *     **Stream batches (0.11.5):** each valid task row starts the task when it is pending (the start date is the actual start of the row, else today), saves its entry and submits it as the uploader through the same functions as the task screen (`wf_start`, `wf_save_entry`, `wf_submit`, with the import row so that the task history and the audit show "via batch"); the task then waits for L2 Data Reviewer & Approver of its Matrix cell. The conditional documents that apply are judged first, as on the task screen. A row whose task is in review or approval, or waits for a predecessor, is held `pending_previous_approval` and listed in `outcome.held` (`open_submission`, `predecessor_open`); a row whose task a closed gate locks becomes an `error` row (`gate_locked`, in `outcome.failed`). When the caller also holds L2 of a task, the submission is a self-approval and needs a step-up.
          *     **Big New sites batches (0.14.4):** with more rows to send than the setting `imports.async_rows` (default 50) the answer is 202: the checks above are made first (the uploader, If-Match, the state, the L1 and the L2 holders, the step-up of a self-approval: 401 and nothing queued), then the batch is `processing` and the rows are sent in chunks of 25 in the background, each chunk committed on its own; `progress` and the counts move while the page polls. A second send while it runs answers 409 `batch_processing`.
+         *     **Big register and stream batches (0.14.6):** the same for a register batch (chunks of 50 rows) and a stream batch (chunks of 25 rows). The step-up is asked at the request when the sender holds L2 of the register row or of a task of the rows (a self-approval, B5). Each row is checked again in its chunk by the same functions; a stream send synchronises the conditional documents of the chunk's tasks inside that chunk (never all of them in the request). `progress.submitted`, `progress.approved` (the self-approvals), `progress.held` and `progress.failed` count the rows; the held and the failed rows are listed by `GET /import-batches/{batch_id}/rows`.
          *     A row whose logical record has an open version is held `pending_previous_approval` and listed in `outcome.held`; send the batch again after that version is decided and the row is released. A row that the register refuses at submit becomes an `error` row (listed in `outcome.failed`) and nothing of it is kept. When the caller also holds L2, the submission is a self-approval and needs a step-up (401 `step_up_required`, nothing is created).
          */
         post: operations["submitImportBatch"];
@@ -5169,7 +5197,8 @@ export interface paths {
          * @description A row is decided by the same transition a person makes on the record it created (`reg_transition_record`), with the same grid right (`approve` on the register's module for L2), the same holders of the Matrix row and the same step-up for a final approval (401 `step_up_required`); nothing here is a shortcut.
          *     **Stream batches (0.11.5):** a row is decided by the function a person calls on the task (`wf_review`, `wf_approve`, `wf_reject`) with the grid right `approve` on `sites`, the holders of the task's L2 cell, the step-up of a final approval and the gates and successors of the engine; a return sends the task back to L1 with the note (a rejection comment on the task). A held row is returned by the uploader or an L2 holder of its task.
          *     `approve` (or `review`, for a record still at a legacy middle level) with `scope=all` decides every open row; with `scope=rows` the rows listed. `reject` returns the rows to the uploader with a note (mandatory, 422 `note_required`): the record goes back to L1 Data Entry, the row is `rejected`. `discard` (uploader or System Admin) closes a batch that was not sent; nothing was created.
-         *     **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return is always answered at once.
+         *     **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return of a New sites batch is always answered at once.
+         *     **Big register and stream batches (0.14.6):** an `approve`, a `review` or a `reject` of more rows than the threshold answers 202 after the checks (the grid right, the authority of the person on at least one row: 403 `not_eligible_holder`, the notes of a return: 422, the step-up of an approval: 401; nothing queued); the rows are decided in chunks (register 50, stream 25) with the same transitions, audit rows and notice as the 200 answer, and the rights are derived again for every chunk (a row the person may no longer decide is counted in `progress.failed`). A `discard` is always answered at once.
          *     Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
          */
         post: operations["decideImportBatch"];
@@ -5322,6 +5351,7 @@ export interface paths {
         /**
          * Enter the typed task columns of a run through the normal batch flow
          * @description The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
+         *     **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -9841,15 +9871,31 @@ export interface components {
                 message?: string;
             }[];
         };
-        /** @description 0.14.4: the background run of a big New sites batch. It is done in chunks of 25 rows, each committed on its own, so `rows_done` and the counts of the batch move while it runs. */
+        /** @description 0.14.4: the background run of a big New sites batch; 0.14.6: also of a register or a stream batch. It is done in chunks (New sites 25 rows, register 50, stream 25), each committed on its own, so `rows_done` and the counts of the batch move while it runs. */
         ImportBatchProgress: {
             /** Format: uuid */
             job_id: string;
             /**
-             * @description `submit`: the send of the uploader (a self-approval creates the sites); `decide`: an L2 approval.
+             * @description `submit`: the send of the uploader (a self-approval creates the sites or approves the records and tasks); `decide`: an L2 decision.
              * @enum {string}
              */
             kind: "submit" | "decide";
+            /**
+             * @description 0.14.6: the decision of a `decide` run; null for a send.
+             * @enum {string|null}
+             */
+            action?: "approve" | "review" | "reject" | null;
+            /**
+             * @description 0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).
+             * @enum {string}
+             */
+            batch_kind?: "site" | "register" | "stream";
+            /** @description 0.14.6: rows decided (a review that passed a level counts too). */
+            decided?: number;
+            /** @description 0.14.6: rows held `pending_previous_approval` (a send) or left by an approve-all because they have no record or task submission yet. */
+            held?: number;
+            /** @description 0.14.6: rows saved by a Save Draft / Planning send (Q206). */
+            saved?: number;
             /**
              * @description `failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.
              * @enum {string}
@@ -9860,7 +9906,7 @@ export interface components {
             percent: number;
             /** @description Rows sent (a send). */
             submitted?: number;
-            /** @description Rows approved, that is sites created. */
+            /** @description Rows approved: sites created, records or tasks approved (a self-approved send counts here too). */
             approved?: number;
             rejected?: number;
             /** @description Rows that failed; each carries its error in `GET /import-batches/{batch_id}/rows`. */
@@ -9885,7 +9931,7 @@ export interface components {
             source?: "template" | "master_import" | "legacy_master" | "master_template";
             file_name?: string;
             /**
-             * @description `processing` (0.14.4): a big New sites batch is being sent or approved in the background (see `progress`); a send, a decision or a discard answers 409 `batch_processing` until it ends, then the batch shows its usual status.
+             * @description `processing` (0.14.4, 0.14.6): a big batch (New sites, register, stream) is being sent or decided in the background (see `progress`); a send, a decision or a discard answers 409 `batch_processing` until it ends, then the batch shows its usual status.
              *     `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
              *     The status follows the rows and the records they created, so an approval made in the register screen counts too. `in_review`, `applied` and `undone` are not used for registers (two fixed levels; undo is not built).
              * @enum {string}
@@ -9936,7 +9982,7 @@ export interface components {
             };
             /** @description Parse job (`GET /jobs/{job_id}`) while status is `parsing`. */
             job_id?: string | null;
-            /** @description 0.14.4: the latest background run of a big New sites batch (send or approval); null when the batch never had one. */
+            /** @description 0.14.4 / 0.14.6: the latest background run of a big batch (send or decision); null when the batch never had one. */
             progress?: components["schemas"]["ImportBatchProgress"] | null;
             /**
              * Format: uuid
@@ -10054,7 +10100,34 @@ export interface components {
             outcome?: components["schemas"]["MasterImportOutcome"] | null;
             /** @description The original file is stored. */
             has_file?: boolean;
+            /** @description 0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied). */
+            progress?: components["schemas"]["MasterImportRunProgress"] | null;
             version: number;
+        };
+        /** @description 0.14.6: the background sends of the batches of an applied Master import run, summed over its batches (each batch also has its own `ImportBatch.progress`). */
+        MasterImportRunProgress: {
+            /**
+             * @description `running` while a batch is still being sent; `failed` when a run was stopped (the rows done so far stay).
+             * @enum {string}
+             */
+            state: "running" | "done" | "failed";
+            /** @description Batches sent in the background. */
+            batches: number;
+            batches_running?: number;
+            rows_total: number;
+            rows_done: number;
+            percent: number;
+            submitted?: number;
+            saved?: number;
+            approved?: number;
+            held?: number;
+            failed?: number;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            /** Format: date-time */
+            finished_at?: string | null;
         };
         MasterImportOutcome: {
             /** Format: uuid */
@@ -10073,10 +10146,21 @@ export interface components {
                 failed?: number;
                 /** @description Rows the staging refused. */
                 errors?: number;
+                /** @description 0.14.6: the batch is sent in the background (its counts are in its `ImportBatch.progress`). */
+                queued?: boolean;
+                /**
+                 * Format: uuid
+                 * @description 0.14.6: the background run of a queued batch.
+                 */
+                job_id?: string;
+                /** @description 0.14.6: the rows to send of a queued batch. */
+                rows?: number;
             }[];
             skipped?: {
                 [key: string]: unknown;
             }[];
+            /** @description 0.14.6: how many batches are sent in the background. */
+            queued?: number;
         };
         MasterImportDiff: {
             /** Format: uuid */
@@ -11055,6 +11139,26 @@ export interface components {
             po_wo_date?: string;
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
+        };
+        /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
+        ImportsSettings: {
+            async_rows: number;
+            /** @description The default (50). */
+            default_async_rows: number;
+            /** @description 10 */
+            min: number;
+            /** @description 500 */
+            max: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** @description Who changed it last (null: the value of the installation). */
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        ImportsSettingsInput: components["schemas"]["WithReason"] & {
+            async_rows: number;
         };
         CalendarConfirmationInput: components["schemas"]["WithReason"] & {
             /** @description true confirms the official calendar, false withdraws the confirmation. */
@@ -21901,6 +22005,62 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getImportsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setImportsSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportsSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     getHistoricalWaiver: {
         parameters: {
             query?: never;
@@ -23457,7 +23617,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description 0.14.4: a New sites batch with more rows to send than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are sent in the background (poll `GET /import-batches/{batch_id}` until the status changes). */
+            /** @description 0.14.4 (New sites), 0.14.6 (register and stream batches): a batch with more rows to send than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are sent in the background (poll `GET /import-batches/{batch_id}` until the status changes; `progress` says how far it is). */
             202: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -23508,7 +23668,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description 0.14.4: the approval of a New sites batch with more rows than `imports.async_rows` (default 50): every check is done, the batch is `processing` and the rows are approved (the sites created) in the background. */
+            /** @description 0.14.4: the approval of a New sites batch with more rows than `imports.async_rows` (default 50); 0.14.6: an approve, review or return of a register or a stream batch with more rows than the threshold. Every check is done, the batch is `processing` and the rows are decided in the background. */
             202: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -23761,6 +23921,18 @@ export interface operations {
         responses: {
             /** @description Applied. */
             200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MasterImportRun"] & {
+                        outcome?: components["schemas"]["MasterImportOutcome"];
+                    };
+                };
+            };
+            /** @description 0.14.6: applied; one or more staged batches are sent in the background (see `progress` and `outcome.batches[].queued`). Poll `GET /master-import/runs/{run_id}` until `progress.state` is `done`. */
+            202: {
                 headers: {
                     ETag: components["headers"]["ETag"];
                     [name: string]: unknown;
