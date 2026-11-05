@@ -1,0 +1,25 @@
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+Candidate,Candidate,E,,,blank in the owner file (Q468)
+Latitude,Latitude,F,,,
+Longitude,Longitude,G,,,
+Address,Address,H,,,
+Candidate Submitted Date (SAR),,,,,missing in the owner file
+MW LOS Check,,,,,missing in the owner file
+Test Pit Result,,,,,missing in the owner file
+TSS Date,TSS Date,K,,,
+Selected,Selected,L,,,
+Selection Date,,,,,missing in the owner file (Q468)
+Owner / Landlord,Owner / Landlord,N,,yes,personal (Q469)
+Ownership Type,Ownership Type,O,,,
+Contact Person,Contact Person,P,,yes,personal (Q469)
+Phone,Phone,Q,,yes,personal (Q469)
+E-mail,E-mail|Email,R,,yes,personal (Q469)
+Negotiation Start Date,Negotiation Start Date,S,,,
+Contract No.,Contract No.,T,,,looks like month-year in 388 cells; copied as found
+Contract Sign-off Date,Contract Sign-off Date,U,,,
+Lease Expiry Date,Lease Expiry Date,V,,,
+Title Verified,Title Verified,W,,,owner file uses Yes/No/N/A
+Lease Termination Notice Date,,,,,missing in the owner file
+Site Handback Date (Restored),,,,,missing in the owner file
+Remark,Remark,AB,,,

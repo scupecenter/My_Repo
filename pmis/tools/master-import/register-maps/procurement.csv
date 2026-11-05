@@ -1,0 +1,12 @@
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+Record Type,PO No.|PO / WO No.,H,record_type_po_pr,,derived: po when the PO / WO number is filled (the po code of the Procurement register's record types pr / po / wo), else pr
+Scope,Scope,E,,,values outside ProcScope are reported and not changed
+Delivery,,,,,missing in the owner file; the Procurement team completes it in the PMIS (Q494)
+PR No.,PR No.,F,,,
+PR Date,PR Date,G,,,
+PO / WO No.,PO No.|PO / WO No.,H,,,renamed in the owner file
+PO / WO Date,PO Date|PO / WO Date,I,,,renamed in the owner file
+Order Status,Status|Order Status,K,,,renamed in the owner file
+Remark,Remark,L,,,
+Team,,,,,missing in the owner file; the Procurement team completes it in the PMIS (Q494)

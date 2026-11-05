@@ -1,0 +1,10 @@
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+Type,Type,D,,,
+Applied / Requested,Applied / Requested,G,,,
+Status,Status,H,,,
+Has expiry date,Validity,L,open_ended_no,,Open-ended becomes No; any other value is copied as found
+Valid From,Valid From|Approved / Valid From,I,,,
+Valid To,Valid To|Expiry Date,J,,,
+N/A Reason,,,,,missing in the owner file
+Remark,,,,,missing in the owner file

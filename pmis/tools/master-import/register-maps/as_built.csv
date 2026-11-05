@@ -1,0 +1,28 @@
+# Only the TE configuration columns the plan (section 2.2) lists for TPL-ASB. The CW quantity columns (q_*) are empty in the owner file and carry
+# item-specific headers issued by the PMIS: add rows here when they are filled. Patch Cord 1 and 2 are missing in the owner file.
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+Configuration (WL/MW/IP/PWR),Configuration (WL/MW/IP/PWR)|Configuration,AJ,,,
+WL Vendor,WL Vendor,AK,,,
+WL Antenna Type,WL Antenna Type,,,,
+RF Height (m),RF Height (m)|RF Height,AN,,,99 numbers typed as text
+Azimuth,Azimuth,,,,
+M-Tilt,M-Tilt,AP,,,
+MW Vendor,MW Vendor,,,,
+MW Antenna Type,MW Antenna Type,,,,
+MW Antenna Height (m),MW Antenna Height (m)|MW Antenna Height,AT,,,
+MW Azimuth,MW Azimuth,,,,
+RSL (dBm),RSL (dBm)|RSL,AV,,,
+IP Vendor,IP Vendor,,,,
+Router Type,Router Type,,,,
+Rectifier Status,Rectifier Status,,,,
+Power Vendor,Power Vendor,,,,
+Rated Rectifier (kW),Rated Rectifier (kW),,,,
+No. Charger (Existing),No. Charger (Existing),,,,
+Max Charger (W),Max Charger (W),,,,
+MDB Type,MDB Type,,,,
+Battery Type,Battery Type,,,,
+Battery Model,Battery Model,,,,
+Battery Capacity (AH),Battery Capacity (AH),,,,
+Backup Time (h),Backup Time (h),,,,
+D.G,D.G,,,,

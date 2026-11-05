@@ -1,0 +1,13 @@
+# One row per register. template_id is read from the _tpl sheet of the template the PMIS issued.
+# header_row / first_data_row are Excel row numbers in the Master sheet. key_headers = the template's natural key (template_definitions.match_keys).
+# needs_headers = template columns the owner's file cannot fill; every copied row with one still blank is listed as needs_delivery_team.
+# site_scoped = no: the key column is not a Site ID (Risk Register), so it is not checked against the Master sheet.
+register,template_id,master_sheet,header_row,first_data_row,site_header,key_headers,key_any_of,site_scoped,needs_headers
+rf_design,TPL-RF,RF & Design,1,3,Site ID,Site ID,,yes,
+acquisition,TPL-ACQ,Acquisition,1,3,Site ID,Site ID|Candidate,,yes,
+permits_hse,TPL-PRM,Permission Log,1,3,Site ID,Site ID|Type|Valid From,,yes,
+procurement,TPL-PO,PR-PO,1,3,Site ID,Site ID|Scope|PR No.|PO / WO No.,PR No.|PO / WO No.,yes,Delivery|Team
+gecol,TPL-GECOL,GECOL,1,3,Site ID,Site ID,,yes,
+hlc,TPL-HLC,HLC,1,3,Site ID,Site ID,,yes,
+as_built,TPL-ASB,As-Built,3,5,Site ID,Site ID,,yes,
+risks,TPL-RSK,Risk Register,1,2,Risk ID,Risk ID,,no,

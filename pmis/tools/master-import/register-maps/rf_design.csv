@@ -1,0 +1,48 @@
+# template_header = header issued by the PMIS (register_fields.label_en). master_header = header in the Master sheet; "a|b" lists alternatives (first found wins).
+# master_column is documentation only (letter in the owner's file, plan section 2.2). Columns with no Master source have an empty master_header.
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+Site Owner ID,Site Owner ID,C,,,
+Sub Region,Sub Region,F,,,
+Latitude,Latitude,G,,,
+Longitude,Longitude,H,,,
+Site Type,Site Type,I,,,list SiteType
+Site Scenario,Site Scenario,J,,,list; re-linked in migration 0070
+Tower Owner,Tower Owner,L,,,
+Existing or New,Existing or New|Existing / New,M,,,
+RT or GF,RT or GF|RT / GF,N,,,
+Tower Type,Tower Type,O,,,
+Tower Height (m),Tower Height (m)|Tower Height,P,,,number typed as text in 11 cells
+Nominal Plan Issue Date,Nominal Plan Issue Date (RFNP)|Nominal Plan Issue Date,Q,,,renamed in the owner file
+Nominal Latitude,Nominal Latitude,R,,,
+Nominal Longitude,Nominal Longitude,S,,,
+Search Ring Radius (m),Search Ring Radius (m)|Search Ring Radius,T,,,
+Search Ring Received Date,Search Ring Received Date|Search Ring Received,U,,,
+Cluster ID,Cluster ID,X,,,
+Antenna Height,Antenna Height,Y,,,
+Sectors,Sectors,Z,,,
+Azimuths,Azimuths,AA,,,
+M-Tilt / E-Tilt,M-Tilt / E-Tilt,AB,,,
+RF Survey Actual Date,RF Survey Actual Date|RF Survey Actual,AD,,,
+TSS Plan,TSS Plan,AI,,,
+TSS Actual,TSS Actual,AJ,,,
+TSSR Submitted,TSSR Submitted,AK,,,
+TSSR Approved,TSSR Approved Date (RFTS)|TSSR Approved,AL,,,renamed in the owner file
+TSSR Status,TSSR Status,AM,,,
+TSSR Rev No.,,,,,missing in the owner file
+RF Data Sheet Issued,RF Data Sheet Issued,AN,,,
+MW LOS Survey Date,MW LOS Survey Date,AO,,,
+MW Far-end Site,MW Far-end Site,AQ,,,
+Link Budget Date,Link Budget Date,AR,,,
+Frequency License Date,,,,,missing in the owner file
+Frequency License Ref,,,,,missing in the owner file
+Building Height,Building Height,AS,,,number typed as text in 260 cells
+Cabinet Foundation (Existing / New),Cabinet Foundation (Existing / New)|Cabinet Foundation,AU,,,
+Cabinet Foundation Dimensions,Cabinet Foundation Dimensions,AV,,,
+Backup Site,Backup Site,AW,,,
+Belong to FN,Belong to FN,AX,,,
+Primary MFN,Primary MFN,AY,,,free text
+Secondary MFN,Secondary MFN,AZ,,,free text
+HLD Ref #,HLD Ref #|HLD Ref,BA,,,
+LLD Approved Date,LLD Approved Date|LLD Approved,BB,,,
+Remark,Remark,BC,,,

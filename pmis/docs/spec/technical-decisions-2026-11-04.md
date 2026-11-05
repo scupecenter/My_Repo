@@ -218,6 +218,18 @@ The owner again asked the technical lead to decide these ("قرر في الأس�
 | Q474 | Confirmed as built: a Cancelled row creates and cancels the site in one approval, with two audit rows. Cancelling a site that already exists stays a Change Control Cancellation (Q382). |
 | Q475 | Confirmed as built: the Site ID is stored upper-case with single spaces, compared ignoring case and extra spaces, and never reused. The "duplicate" message names no region or site detail. Site IDs are project identifiers, not secrets, and must be unique across the whole project, so revealing that an ID is taken is accepted. |
 
+## Data-load helper (Q490 to Q494), decided 2026-11-05
+
+The offline helper `tools/master-import/fill-templates.py` (gap G3). Questions in [`open-questions.md`](open-questions.md).
+
+| Q | Decision | Kind |
+|---|---|---|
+| Q490 | Non-numeric text in a number cell (and any text in a date cell that is not a date) is copied as found and listed in the report, so the PMIS refuses it visibly. Only "N/A", "Pending" and "Cancelled" are blanked. | Confirmed as built |
+| Q491 | Text dates with day and month both 12 or less are read **day first** (dd/mm/yyyy, the Libyan convention). Each such cell is listed in the report as `date_day_first_assumed` with its address and old and new value, for the L2 reviewer. The flag `--month-first` switches the assumption (event `date_month_first_assumed`). Unambiguous dates are unchanged. | Change |
+| Q492 | `--include-personal` stays off. Landlord, contact, phone and e-mail data are not loaded until the owner decides Q469 in writing. Then only a System Admin runs the tool with the flag, on the server or an Aljeel machine, never a personal device. The tool prints a one-line warning when the flag is used. | Confirmed, with the warning added |
+| Q493 | The first run on the owner's machine lists the Master headers it cannot find (names only). The owner sends the list and the mapping files are corrected in a small follow-up. | Confirmed process |
+| Q494 | Procurement **Record Type** is derived per row: `po` when the PO / WO No. is filled, otherwise `pr` (codes of the Procurement register's record types `pr`, `po`, `wo`, migration 0019; a `wo` row is corrected by the Procurement team). **Delivery** and **Team** are left blank; each copied row is listed as `needs_delivery_team` and the Procurement team completes them in the PMIS before submitting. | Change |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |

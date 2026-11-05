@@ -1752,6 +1752,27 @@
     "site_name": "مواقع جديدة",
     "open_site": "فتح الموقع"
   },
+  "batchProgress": {
+    "title": "تقدّم الاستيراد",
+    "legend": "أجزاء الشريط",
+    "parsing_wait": "جارٍ فحص الملف…",
+    "parsing": "فحص الملف: {{pct}}%",
+    "parsing_rows": "فحص الملف: {{pct}}% ({{done}} من {{total}} صف)",
+    "checked": "{{total}} صف · {{valid}} صالح ({{validPct}}%) · {{invalid}} غير صالح ({{invalidPct}}%)",
+    "split": "حسب الإجراء: جديد {{create}} · متغيّر {{update}} · مطابق {{unchanged}}",
+    "valid": "صالح",
+    "invalid": "غير صالح",
+    "approved": "معتمد",
+    "rejected": "مُعاد",
+    "held": "معلّق",
+    "pending": "بالانتظار",
+    "done": "تم {{pct}}% (المعتمد + المُعاد من المُرسَل): {{done}} من {{total}}",
+    "sites_created": "المواقع المُنشأة: {{done}} من {{total}} ({{pct}}%)",
+    "failed": "فشل فحص الملف. لم يُحفظ شيء. ارفع الملف من جديد.",
+    "discarded": "أُلغيت هذه الدفعة قبل إرسالها.",
+    "loading_rows": "جارٍ تحميل {{loaded}} من {{total}} صف…",
+    "rows_incomplete": "لم تُحمَّل كل الصفوف بعد: تعرض المرشّحات الصفوف المحمّلة فقط."
+  },
   "batchStatus": {
     "parsing": "قيد الفحص",
     "validated": "تم الفحص",

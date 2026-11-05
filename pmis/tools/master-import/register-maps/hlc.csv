@@ -1,0 +1,10 @@
+template_header,master_header,master_column,transform,personal,notes
+Site ID,Site ID,B,site_id,,key
+HLC Request No.,HLC Request No.|Request No.,E,,,blank in the owner file (Q468)
+Request Date,Request Date,F,,,
+Fiber Uplink (Exchange / Post),Termination Point|Fiber Uplink,G,,,renamed in the owner file
+Fiber Status,Fiber Status,I,,,
+Internal Fiber Team,,,,,missing in the owner file
+Installation Date,Installation Date,J,,,
+TX Link Tested Date,TX Link Tested Date,K,,,
+Remark,Remark,L,,,

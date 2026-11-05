@@ -408,7 +408,8 @@ export const registerHandlers = [
       if (text.includes('notpl')) return reject('tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing.');
       if (text.includes('retired')) return reject('outdated_version', `This file was made from version 1 of ${tpl}; the current version is 2. Download the template again.`);
       if (text.includes('tampered')) return reject('checksum_mismatch', 'The header row of the file was changed.');
-      const b = makeSiteBatch(f.name);
+      const big = /bigsites(\d+)/.exec(text); // a test file of many new sites: `bigsites469`
+      const b = makeSiteBatch(f.name, big ? Number(big[1]) : undefined);
       R().batches.unshift(b); save();
       return HttpResponse.json(toBatch(b), { status: 202, headers: { ETag: `"${b.version}"` } });
     }
@@ -463,7 +464,10 @@ export const registerHandlers = [
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
     const u = new URL(request.url).searchParams, action = u.get('action'), decision = u.get('decision');
-    return page(b.rows.filter((r) => (!action || r.action === action) && (!decision || (r.action !== 'error' && r.action !== 'unchanged' && decisionOf(r) === decision))).map(toRow));
+    const all = b.rows.filter((r) => (!action || r.action === action) && (!decision || (r.action !== 'error' && r.action !== 'unchanged' && decisionOf(r) === decision)));
+    // keyset paging like the API: `limit` (default 200, at most 200) and an opaque `next_cursor` (here the offset), null on the last page
+    const limit = Math.min(Math.max(Number(u.get('limit')) || 200, 1), 200), start = Math.max(Number(u.get('cursor')) || 0, 0);
+    return HttpResponse.json({ items: all.slice(start, start + limit).map(toRow), page: { limit, next_cursor: start + limit < all.length ? String(start + limit) : null, total: all.length } });
   }),
   http.post(`${B}/import-batches/:id/submit`, ({ params, request }) => {
     const g = guard(); if (g) return g;
@@ -655,7 +659,7 @@ function makeBatch(key: MockRecord['register_key'], template_id: string, file_na
   return { id: crypto.randomUUID(), register_key: key, template_id, file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
 }
 /** A New sites batch (contract 0.14.0): two valid rows (one Cancelled, with a cluster that will be created), a Site ID that exists already and an unknown region. */
-function makeSiteBatch(file_name: string): MockBatch {
+function makeSiteBatch(file_name: string, many?: number): MockBatch {
   const row = (n: number, key: string, data: Record<string, unknown>, extra: Partial<MockBatchRow> = {}): MockBatchRow => ({
     id: crypto.randomUUID(), row_no: n, key, action: 'create', decision: 'pending', payload: data, site_index: null, errors: [], ...extra,
     diff: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, { old: null, new: v }])),
@@ -669,6 +673,11 @@ function makeSiteBatch(file_name: string): MockBatch {
     { id: crypto.randomUUID(), row_no: 5, key: 'NEW-004', action: 'error', decision: 'pending', payload: {}, site_index: null, diff: {},
       errors: [{ column: 'Region', field: 'region', code: 'unknown_region', message: 'Unknown region. Use a region name, its code or a known alias (Settings, region aliases).' }] },
   ];
+  if (many) { // a big file: `many` valid rows (regions in turn, flags yes / no / na), no invalid one
+    rows.length = 0;
+    const SC = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'], FL = ['yes', 'no', 'na'];
+    for (let i = 1; i <= many; i += 1) rows.push(row(i + 1, `BIG-${String(i).padStart(4, '0')}`, { site_code: `BIG-${String(i).padStart(4, '0')}`, region_id: (i % 7) + 1, name: `Big site ${i}`, delivery_scenario: SC[i % SC.length], scope_tower_erection: FL[i % 3] }));
+  }
   return { id: crypto.randomUUID(), register_key: null, entity: 'site', template_id: 'TPL-SITE-NEW', file_name, status: 'validated', version: 1, created: Date.now(), uploaded_by: viewer()!.employee_id ?? '9999', uploaded_at: new Date().toISOString(), rows };
 }
 function toRow(r: MockBatchRow): ImportRow {

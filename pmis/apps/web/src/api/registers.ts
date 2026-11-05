@@ -1,6 +1,7 @@
+import { useEffect, useMemo } from 'react';
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile } from './client';
-import type { ImportBatch, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
+import type { ImportBatch, Job, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
 
 export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
@@ -160,11 +161,46 @@ export const downloadTemplate = (templateId: string, o: TemplateDownload = {}): 
     ...(o.prefill ? { prefill: 'true' } : {}), ...(o.taskId ? { task_id: o.taskId } : {}), ...(o.siteIds?.length ? { site_ids: o.siteIds.join(',') } : {}), ...(o.regionId ? { region_id: o.regionId } : {}),
   });
 
-/** The batch of an upload; its status follows the rows and the records they created. */
+/** How often the batch page polls (ms). A test may lower them. */
+export const BATCH_POLL = { parsing: 2000, job: 1500, pending: 4000 };
+/** Rows are waiting for L2 (or for a predecessor): the page keeps the batch fresh so the bar moves as L2 decides. */
+const SENT_STATUSES = ['in_approval', 'partially_approved', 'in_review'];
+export const batchPending = (b: Pick<ImportBatch, 'status' | 'counts'> | undefined): boolean =>
+  !!b && (b.status === 'parsing' || (SENT_STATUSES.includes(b.status) && (b.counts.pending ?? 0) > 0));
+
+/** The batch of an upload; its status follows the rows and the records they created. It polls while it is parsing and while rows wait for L2, and stops when nothing is pending. */
 export const useBatch = (id: string) =>
-  useQuery({ queryKey: ['import-batch', id], queryFn: () => api.get<ImportBatch>(`/import-batches/${id}`) });
-export const useBatchRows = (id: string, enabled: boolean) =>
-  useQuery({ queryKey: ['import-batch-rows', id], enabled, queryFn: () => api.get<Page<ImportRow>>(`/import-batches/${id}/rows`, { query: { limit: 200 } }) });
+  useQuery({
+    queryKey: ['import-batch', id], queryFn: () => api.get<ImportBatch>(`/import-batches/${id}`),
+    refetchInterval: (q) => { const b = q.state.data; return !b || !batchPending(b) ? false : b.status === 'parsing' ? BATCH_POLL.parsing : BATCH_POLL.pending; },
+  });
+
+/** `GET /jobs/{id}` of the parse job while the batch is `parsing`; the batch is refreshed when the job ends. */
+export function useParseJob(batch: ImportBatch | undefined) {
+  const qc = useQueryClient();
+  const jobId = batch?.status === 'parsing' ? batch.job_id : null;
+  const q = useQuery({
+    queryKey: ['job', jobId], enabled: !!jobId, queryFn: () => api.get<Job>(`/jobs/${jobId}`),
+    refetchInterval: (x) => { const j = x.state.data; return j && (j.status === 'done' || j.status === 'failed') ? false : BATCH_POLL.job; },
+  });
+  const ended = q.data?.status === 'done' || q.data?.status === 'failed';
+  useEffect(() => { if (ended && batch) void qc.invalidateQueries({ queryKey: ['import-batch', batch.id] }); }, [ended, batch?.id, qc]); // eslint-disable-line react-hooks/exhaustive-deps
+  return q.data;
+}
+
+/** Every row of the batch: the pages (`next_cursor`) are followed until the last one. The server counts (`b.counts`) are the totals; `items.length` is only what has arrived. */
+export function useBatchRows(id: string, enabled: boolean) {
+  const q = useInfiniteQuery({
+    queryKey: ['import-batch-rows', id], enabled, initialPageParam: '' as string,
+    queryFn: ({ pageParam }) => api.get<Page<ImportRow>>(`/import-batches/${id}/rows`, { query: { limit: 200, ...(pageParam ? { cursor: pageParam } : {}) } }),
+    getNextPageParam: (last) => last.page.next_cursor ?? undefined,
+  });
+  const { hasNextPage, isFetching, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = q;
+  const pages = q.data?.pages.length ?? 0;
+  useEffect(() => { if (hasNextPage && !isFetching && !isFetchNextPageError) void fetchNextPage(); }, [hasNextPage, isFetching, isFetchNextPageError, fetchNextPage, pages]);
+  const items = useMemo(() => q.data?.pages.flatMap((p) => p.items) ?? [], [q.data]);
+  return { items, isSuccess: q.isSuccess, isError: q.isError, loadingMore: q.isSuccess && (hasNextPage || isFetchingNextPage) && !isFetchNextPageError, complete: q.isSuccess && !hasNextPage };
+}
 
 export type BatchFilters = { status: string; template_id: string; register_key: string; stream?: string; group_id?: string };
 /** `GET /import-batches`: the batches the caller uploaded, or may see through the register's module. */
