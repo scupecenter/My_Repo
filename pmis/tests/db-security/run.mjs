@@ -208,20 +208,21 @@ function restoreRegions(plan, rows) {
 // commit). Deferred checks (the last-admin triggers, the assignment scope checks) are run at the end with SET CONSTRAINTS ALL IMMEDIATE, which is exactly
 // what COMMIT would do, but without persisting anything. So a refusal comes from the same place as in production: the function's own check first, the
 // trigger at commit.
-function beginLines(userId) {
+function beginLines(userId, opts = '') {
   return [
     'SELECT txid_current() AS txid \\gset',
-    `\\set wire \`node ${signScript} :txid ${userId} via=manual\``,
+    `\\set wire \`node ${signScript} :txid ${userId} via=manual${opts ? ` ${opts}` : ''}\``,
     "SELECT app_begin(:'wire'::jsonb -> 'ctx', decode(:'wire'::jsonb ->> 'sig', 'hex')) AS began \\gset",
   ];
 }
 
 // A line "\ctx NAME" in a case body switches the transaction to a verified context for that fixture user (the legitimate form of what used to be
 // SET app.user_id = '...' in the middle of a case: a second person acting in the same transaction, signed with the test key).
+// Options of sign-context.mjs may follow the name (migration 0073: "\ctx ADMIN stepup=300" is a System Admin whose step-up is valid for 300 seconds).
 function expandCtx(body, ids, id) {
-  return body.replace(/^\\ctx\s+(\w+)\s*$/gm, (_, name) => {
+  return body.replace(/^\\ctx\s+(\w+)((?:\s+[a-z_]+=[\w.:-]+)*)\s*$/gm, (_, name, opts) => {
     if (!(name in ids)) throw new Error(`case ${id}: unknown user ${name} in \\ctx`);
-    return beginLines(ids[name]).join('\n');
+    return beginLines(ids[name], (opts || '').trim()).join('\n');
   });
 }
 

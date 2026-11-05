@@ -142,6 +142,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const ssDb = await buildDatabase(adminUrl, ss, appPassword);
   process.env.TEST_DATABASE_URL_SS = ssDb.appUrl;
   process.env.TEST_SUPER_URL_SS = ssDb.superUrl;
+  // The historical-waiver database (migration 0073, Q462): the seeded Document Library stays active (the waiver skips mandatory documents), and the suite opens the
+  // waiver setting, flags tasks and reads the dashboard counts, which no other suite may meet.
+  const hw = `${dbName}_hw`;
+  const hwDb = await buildDatabase(adminUrl, hw, appPassword, true);
+  process.env.TEST_DATABASE_URL_HW = hwDb.appUrl;
+  process.env.TEST_SUPER_URL_HW = hwDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -180,6 +186,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${p9} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${hw} WITH (FORCE)`);
     await a.end();
   };
 }

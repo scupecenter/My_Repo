@@ -11,6 +11,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import type { ColDef } from '@/lib/tablePrefs';
 import { Holders } from './HolderChip';
+import { OverrideBadge } from './OverrideBadge';
 import { MoreMenu } from './PageHeader';
 import { EmptyState, NoResults } from './States';
 import { ActiveChips, BulkBar, ColumnMenu, Empty, HEADER_H, HeaderRow, NotApplicable, pin, QuickFilter, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from './TableKit';
@@ -193,7 +194,7 @@ export function TaskGrid({ siteId, stages, onOpen, selected, onVisible }: { site
           {/* 0.12.0 (D4b): a tentative holiday inside the period; Q135: Pending SLA Confirmation */}
           {task.sla.due_date_tentative && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-tentative-${task.id}`} title={t('sla.tentative_title', { dates: (task.sla.tentative_holidays ?? []).join(', ') })}>{t('sla.tentative_date')}</span>}
           {task.sla.pending_confirmation && <span className="chip bg-waitBg text-waitInk" data-testid={`sla-pending-${task.id}`}>{t('sla.pending_confirmation')}</span>}</span> : <Empty />;
-      case 'status': return <span className="flex items-center gap-1"><span className={`chip ${STATE_TONE[task.state]}`}>{t(`taskState.${task.state}`)}</span>{task.state === 'locked' && <WhyLocked task={task} />}</span>;
+      case 'status': return <span className="flex flex-wrap items-center gap-1"><span className={`chip ${STATE_TONE[task.state]}`}>{t(`taskState.${task.state}`)}</span>{task.state === 'locked' && <WhyLocked task={task} />}{task.historical_no_documents && <OverrideBadge taskId={task.id} />}</span>;
       case 'docs': return <span className={`chip ${task.slots_required && task.slots_filled === task.slots_required ? 'bg-doneBg text-doneInk' : 'bg-lockBg text-lockInk'}`} data-testid={`slots-${task.id}`}><FileText size={12} className="me-1" />{task.slots_filled ?? 0}/{task.slots_required ?? 0}</span>;
       default: return <TemplateButtons task={task} />;
     }

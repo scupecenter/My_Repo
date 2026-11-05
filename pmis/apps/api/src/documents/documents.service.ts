@@ -76,6 +76,8 @@ interface TaskCtx {
   site_id: string;
   region_id: number;
   state: string;
+  /** Q462 (0073): accepted without documents under the historical-load waiver; its missing slots take a file after the submit or the approval. */
+  historical_no_documents?: boolean;
   task_code: string;
   site_code: string;
   values: unknown;
@@ -197,8 +199,8 @@ export class DocumentsService {
   async taskCtx(taskId: string): Promise<TaskCtx> {
     const regions = await this.access.requireRegions('sites', 'view');
     if (!uuidSchema.safeParse(taskId).success) throw problems.notFound();
-    const rows = await this.db.tx.$queryRaw<{ id: string; site_id: string; region_id: number; state: string; task_code: string; site_code: string; values: unknown; custom: unknown; site: Record<string, unknown> }[]>(Prisma.sql`
-      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
+    const rows = await this.db.tx.$queryRaw<{ id: string; site_id: string; region_id: number; state: string; historical_no_documents: boolean; task_code: string; site_code: string; values: unknown; custom: unknown; site: Record<string, unknown> }[]>(Prisma.sql`
+      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, t.historical_no_documents, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
       FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id JOIN sites s ON s.id = t.site_id
       WHERE t.id = ${taskId}::uuid ${regions === null ? Prisma.empty : Prisma.sql`AND t.region_id = ANY(${regions}::int[])`}`);
     const r = rows[0];
@@ -246,8 +248,13 @@ export class DocumentsService {
     };
   }
 
+  /** Pending or ongoing; or, Q462 (0073), submitted or approved without its documents under the historical-load waiver (the database lets only a missing slot take a file). */
+  private takesFiles(task: TaskCtx): boolean {
+    return task.state === 'open' || task.state === 'entry' || (task.historical_no_documents === true && ['in_review', 'in_approval', 'approved'].includes(task.state));
+  }
+
   private async canUpload(auth: AuthContext, task: TaskCtx): Promise<boolean> {
-    if (task.state !== 'open' && task.state !== 'entry') return false;
+    if (!this.takesFiles(task)) return false;
     if (!(await this.access.hasGrant(auth, 'sites', 'edit'))) return false;
     const regions = await this.access.regions('sites', 'edit');
     if (regions !== null && !regions.includes(task.region_id)) return false;
@@ -265,8 +272,8 @@ export class DocumentsService {
 
   /** Same as slotsOf for a task row the caller has already been allowed to see. */
   async slotsForVisibleTask(auth: AuthContext, taskId: string): Promise<DocumentSlotDto[]> {
-    const rows = await this.db.tx.$queryRaw<{ id: string; site_id: string; region_id: number; state: string; task_code: string; site_code: string; values: unknown; custom: unknown; site: Record<string, unknown> }[]>(Prisma.sql`
-      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
+    const rows = await this.db.tx.$queryRaw<{ id: string; site_id: string; region_id: number; state: string; historical_no_documents: boolean; task_code: string; site_code: string; values: unknown; custom: unknown; site: Record<string, unknown> }[]>(Prisma.sql`
+      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, t.historical_no_documents, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
       FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id JOIN sites s ON s.id = t.site_id WHERE t.id = ${taskId}::uuid`);
     const r = rows[0];
     return r ? this.buildSlots(auth, r) : [];
@@ -275,7 +282,7 @@ export class DocumentsService {
   /** Judges the conditional documents of a task before it is submitted (the engine reads the slots). A task the caller cannot see is ignored. */
   async syncTaskById(taskId: string): Promise<void> {
     const rows = await this.db.tx.$queryRaw<TaskCtx[]>(Prisma.sql`
-      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
+      SELECT t.id::text AS id, t.site_id::text AS site_id, t.region_id, t.state::text AS state, t.historical_no_documents, td.code AS task_code, s.site_code, t."values" AS "values", t.custom AS custom, to_jsonb(s) AS site
       FROM task_instances t JOIN task_definitions td ON td.id = t.task_def_id JOIN sites s ON s.id = t.site_id WHERE t.id = ${taskId}::uuid`);
     if (rows[0]) await this.syncSlots(rows[0]);
   }
@@ -541,7 +548,7 @@ export class DocumentsService {
     auth: AuthContext, taskId: string, slotId: string, file: { buffer: Buffer; originalname: string } | undefined, body: Record<string, unknown> | undefined,
   ): Promise<DocumentFileDto> {
     const { task, slot } = await this.slotOf(auth, taskId, slotId);
-    const closed = task.state !== 'open' && task.state !== 'entry' ? `Documents can be uploaded only while the task is pending or ongoing (it is ${task.state}).` : null;
+    const closed = !this.takesFiles(task) ? `Documents can be uploaded only while the task is pending or ongoing (it is ${task.state}).` : null;
     const owner: SlotOwner = { kind: 'task', key: task.id, site_code: task.site_code, name_code: task.task_code, can_upload: slot.can_upload, closed_detail: closed };
     return this.uploadInto(owner, slot, file, body, () => this.buildSlots(auth, task));
   }

@@ -340,6 +340,10 @@ export const REAL_API_AUTH_USERS = [
   ['put', '/settings/calendar-confirmation'],
   ['get', '/settings/mail-notification-kinds'],
   ['put', '/settings/mail-notification-kinds'],
+  // Contract 0.14.3 (Q462, migration 0073; apps/api: settings): the one-time historical-load document waiver. The "historical load" option of the batch screens uses the
+  // paths of 0.7.0 and 0.12.8 above (no endpoint was added for it); the badge reads the task fields.
+  ['get', '/settings/historical-waiver'],
+  ['put', '/settings/historical-waiver'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

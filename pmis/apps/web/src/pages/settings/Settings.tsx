@@ -14,8 +14,9 @@ import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
+import { HistoricalWaiver } from './HistoricalWaiver';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -52,6 +53,7 @@ export function SettingsRoutes() {
         <Route path="contractor-rules" element={<ContractorRules />} />
         <Route path="gecol-order" element={<GecolOrderWarnings />} />
         <Route path="mail-kinds" element={<MailKinds />} />
+        <Route path="historical-waiver" element={<HistoricalWaiver />} />
       </Route>
     </Routes>
   );
