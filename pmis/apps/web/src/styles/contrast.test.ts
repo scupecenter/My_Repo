@@ -40,6 +40,11 @@ describe.each([['light', light], ['dark', dark]] as const)('WCAG AA contrast, %s
   it.each(TEXT)('%s on %s is at least 4.5:1', (fg, bg) => {
     expect(ratio(vars, fg, bg)).toBeGreaterThanOrEqual(4.5);
   });
+  it('the site map lights and the tower stand out from the land (3:1, non-text contrast)', () => {
+    const marks = ['--map-tower', '--map-idle', '--map-hold', '--stream-design', '--stream-cw', '--stream-te', '--stream-closure', ...Array.from({ length: 10 }, (_, i) => `--ms-${i + 1}`)];
+    for (const m of marks) expect(ratio(vars, m, '--map-land'), m).toBeGreaterThanOrEqual(3);
+    expect(ratio(vars, '--map-land', '--map-sea'), 'land on sea').toBeGreaterThanOrEqual(1.05);
+  });
   it('state borders differ from the card (1.3:1)', () => {
     for (const s of ['done', 'progress', 'late', 'locked', 'planned']) expect(ratio(vars, `--state-${s}-border`, '--card'), s).toBeGreaterThanOrEqual(1.3);
   });

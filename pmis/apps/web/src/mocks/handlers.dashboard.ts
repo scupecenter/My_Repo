@@ -5,6 +5,7 @@ import { tripoliToday } from '@/lib/today';
 import { guard, problem } from './handlers';
 import { buildDashboard, CENTRAL_ITEMS } from './dashboardData';
 import { db, viewer, type Db } from './db';
+import { MAP_MILESTONES, mapItem, SITE_COUNT, STREAMS as SITE_STREAMS } from './sites';
 
 const B = API_BASE;
 
@@ -88,6 +89,18 @@ export const dashboardHandlers = [
     if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
     const q = new URL(request.url).searchParams;
     return bad(q) ?? HttpResponse.json(buildDashboard(q, null, (code, on) => manualInForce(code, on), { variant: S().variant, plan: (code, on) => { const pl = planOf(code); return pl ? planPct(pl.points, on) : undefined; } }));
+  }),
+  // 0.14.5 (OV-12): the site map, built from the synthetic mock sites with synthetic coordinates spread over Libya. The mock accounts see every region.
+  http.get(`${B}/dashboard/site-map`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const items = Array.from({ length: SITE_COUNT }, (_, i) => mapItem(i));
+    const live = items.filter((x) => x.overall_status !== 'cancelled');
+    return HttpResponse.json({
+      as_of: new Date().toISOString(), scope_regions: null,
+      counts: { total: items.length, cancelled: items.length - live.length, with_coordinates: live.filter((x) => x.has_coordinates).length, without_coordinates: live.filter((x) => !x.has_coordinates).length },
+      streams: SITE_STREAMS, milestones: MAP_MILESTONES, items,
+    });
   }),
   // Q116: the pipeline style; in the mock the System Admin is the `pm` account
   http.put(`${B}/dashboard/pipeline-variant`, async ({ request }) => {

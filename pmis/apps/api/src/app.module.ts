@@ -60,6 +60,7 @@ import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { SiteMapService } from './dashboard/site-map.service';
 import { DelayPeriodsController } from './dashboard/delay-periods.controller';
 import { DelayPeriodsService } from './dashboard/delay-periods.service';
 import { ProjectStatusService } from './dashboard/project-status.service';
@@ -145,7 +146,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, HistoricalWaiverService, P4cService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
+      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, HistoricalWaiverService, P4cService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox

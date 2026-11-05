@@ -344,6 +344,9 @@ export const REAL_API_AUTH_USERS = [
   // paths of 0.7.0 and 0.12.8 above (no endpoint was added for it); the badge reads the task fields.
   ['get', '/settings/historical-waiver'],
   ['put', '/settings/historical-waiver'],
+  // Contract 0.14.5 (apps/api: dashboard, site-map.service): the site map of the dashboard (OV-12, SC-10). `GET /sites?coordinates=` and the tower fields of the site use
+  // the paths above.
+  ['get', '/dashboard/site-map'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

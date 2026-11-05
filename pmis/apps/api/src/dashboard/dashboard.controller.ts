@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { DashboardService } from './dashboard.service';
 import { ProjectStatusService } from './project-status.service';
+import { SiteMapService } from './site-map.service';
 
 /** The main dashboard and Project Status (contract tags `dashboard` and `project-status`, 0.7.2; 0.11.0 for the owner answers Q118 to Q127; 0.12.7 for P2 of the answers of 2026-11-04). */
 @Controller()
@@ -11,11 +12,19 @@ export class DashboardController {
   constructor(
     private readonly dash: DashboardService,
     private readonly ps: ProjectStatusService,
+    private readonly map: SiteMapService,
   ) {}
 
   @Get('dashboard')
   get(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.dash.get(auth, q);
+  }
+
+  /** OV-12 / SC-10 (contract 0.14.5): the sites of the dashboard map, limited to dashboard.view ∩ sites.view regions. */
+  @Get('dashboard/site-map')
+  @Header('Cache-Control', 'no-store')
+  siteMap() {
+    return this.map.get();
   }
 
   @Get('dashboard/export')

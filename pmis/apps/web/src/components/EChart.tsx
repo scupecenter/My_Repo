@@ -30,10 +30,18 @@ function useEnvKey(): string {
  * An ECharts chart (loaded on demand). `build` makes the option from the palette; it should be memoised on the data. The chart is decorative for
  * assistive technology: `label` is its text alternative, and every number it shows is also on the page as text.
  */
-export function EChart({ build, height = 220, label, testid }: { build: (p: Palette, rtl: boolean) => unknown; height?: number; label: string; testid?: string }) {
+export function EChart({ build, height = 220, label, testid, renderer = 'svg', onClick }: {
+  build: (p: Palette, rtl: boolean) => unknown; height?: number | string; label: string; testid?: string;
+  /** canvas for the site map (many animated marks); svg elsewhere */
+  renderer?: 'svg' | 'canvas';
+  /** a click on a mark: ECharts' event parameters (the site map opens the site card from `data`) */
+  onClick?: (params: { data?: unknown; seriesId?: string }) => void;
+}) {
   const el = useRef<HTMLDivElement>(null);
   const chart = useRef<ChartHandle | null>(null);
   const latest = useRef(build);
+  const click = useRef(onClick);
+  useEffect(() => { click.current = onClick; });
   const env = useEnvKey();
   useEffect(() => { latest.current = build; });
 
@@ -44,7 +52,8 @@ export function EChart({ build, height = 220, label, testid }: { build: (p: Pale
     const fonts = typeof document !== 'undefined' && document.fonts?.ready ? document.fonts.ready.catch(() => undefined) : Promise.resolve();
     void Promise.all([import('@/lib/echarts'), fonts]).then(([{ init }]) => {
       if (dead || !el.current) return;
-      const c = init(el.current);
+      const c = init(el.current, renderer);
+      c.on('click', (p) => click.current?.(p as { data?: unknown; seriesId?: string }));
       chart.current = c;
       c.setOption(latest.current(readPalette(), document.documentElement.dir === 'rtl'), true);
       if (typeof ResizeObserver !== 'undefined') {
@@ -53,6 +62,7 @@ export function EChart({ build, height = 220, label, testid }: { build: (p: Pale
       }
     }).catch(() => undefined);
     return () => { dead = true; ro?.disconnect(); chart.current?.dispose(); chart.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the renderer is fixed for the life of the chart
   }, []);
 
   useEffect(() => {

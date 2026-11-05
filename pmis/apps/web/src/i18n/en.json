@@ -303,7 +303,10 @@
     "milestone": "Milestone",
     "new_site": "New site",
     "download_template": "Download template",
-    "upload_template": "Upload"
+    "upload_template": "Upload",
+    "coords_missing": "Without valid coordinates",
+    "map": "Map",
+    "table": "Table"
   },
   "scenario": {
     "new_build": "New Build",
@@ -2038,7 +2041,8 @@
     "filter_stage": "Stage: {{v}}",
     "filter_state": "State: {{v}}",
     "filter_type": "Type: {{v}}",
-    "filter_bucket": "Quick: {{v}}"
+    "filter_bucket": "Quick: {{v}}",
+    "filter_coords": "Coordinates: missing"
   },
   "twoFactor": {
     "badge_label": "2FA",
@@ -3775,6 +3779,77 @@
       "longitude": "Longitude",
       "address": "Address",
       "rf_survey_date": "RF survey date"
+    }
+  },
+  "siteMap": {
+    "title": "Sites on the map",
+    "forbidden": "The map needs the view right on the Site Register.",
+    "count": "{{shown}} drawn of {{total}} sites",
+    "colour_by": "Colour by",
+    "by_stream": "Stream",
+    "by_milestone": "Milestone",
+    "as_list": "List",
+    "as_map": "Map",
+    "reset_view": "Reset view",
+    "full": "Full screen",
+    "exit_full": "Exit full screen",
+    "filters": "Map filters",
+    "search": "Site ID or name",
+    "no_options": "No values",
+    "late_only": "Late only",
+    "outer_note": "The dashboard filters above (region, cluster, scenario, stream) also apply to the map.",
+    "legend": "Legend",
+    "late_ring": "Red ring: late tasks or behind baseline",
+    "late_tip": "Late: {{n}} task(s) past due",
+    "behind": "behind baseline",
+    "light_col": "Light",
+    "chart_label": "Map of Libya with {{n}} site towers. {{list}}. Use the List button for a readable list.",
+    "list_limit": "The first {{n}} of {{total}} sites are listed; narrow the filters to see the others.",
+    "empty": "No site matches the filters.",
+    "no_coords_one": "{{count}} site without valid coordinates is not drawn: open the list",
+    "no_coords_other": "{{count}} sites without valid coordinates are not drawn: open the list",
+    "all_coords": "Every site shown has valid coordinates.",
+    "offline_note": "Map drawn from a built-in outline; no map service is used.",
+    "none": "None",
+    "gone": "This site is not in the map list any more.",
+    "coords": "Coordinates",
+    "tower": "Tower type and height",
+    "owner_site_id": "Owner site ID",
+    "current_task": "Current task and holder",
+    "late_tasks": "Late tasks",
+    "task_progress": "Tasks approved",
+    "reached": "Milestones reached",
+    "open_site": "Open the site page",
+    "f": {
+      "status": "Status",
+      "region": "Region",
+      "sub": "Sub-region",
+      "owner": "Site owner / Tower owner",
+      "scenario": "Delivery scenario",
+      "stream": "Stream",
+      "ms": "Current milestone",
+      "cluster": "Cluster"
+    },
+    "light": {
+      "progress": "In progress",
+      "on_air": "On-Air",
+      "hold": "On Hold",
+      "idle": "Not started",
+      "cancelled": "Cancelled"
+    },
+    "city": {
+      "tripoli": "Tripoli",
+      "misrata": "Misrata",
+      "zawia": "Zawia",
+      "benghazi": "Benghazi",
+      "sebha": "Sebha",
+      "sirte": "Sirte",
+      "tobruk": "Tobruk",
+      "ghat": "Ghat",
+      "kufra": "Kufra",
+      "bayda": "Al Bayda",
+      "gharyan": "Gharyan",
+      "ghadames": "Ghadames"
     }
   }
 }

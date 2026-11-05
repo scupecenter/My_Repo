@@ -12,7 +12,7 @@ import { pipelineVariant } from './handlers.dashboard';
 import { accountStatus } from './db';
 import { GROUPS, recomputeSkip, ROLES, rowOf } from './matrixData';
 import { REGISTER_DEFS, TEMPLATE_OF_REGISTER } from './registersData';
-import { detail, gridOf, listItem, scopedTasks, siteIndex, SITE_COUNT, siteMeta, STREAMS, TODAY, VIEWS } from './sites';
+import { detail, gridOf, hasValidCoords, listItem, scopedTasks, siteIndex, SITE_COUNT, siteMeta, STREAMS, TODAY, VIEWS } from './sites';
 
 const B = API_BASE;
 const REGIONS = [['Tripoli', 'طرابلس'], ['Middle', 'الوسطى'], ['WM', 'الجبل الغربي'], ['Zawia', 'الزاوية'], ['Benghazi', 'بنغازي'], ['GM', 'الجبل الأخضر'], ['Sebha', 'سبها']];
@@ -50,10 +50,11 @@ export const siteHandlers = [
     const q = (u.get('q') ?? '').toLowerCase(), regions = u.getAll('region_id').map(Number), limit = Math.min(Number(u.get('limit') ?? 50), 200), start = Number(u.get('cursor') ?? 0);
     const sc = u.get('scenario'), st = u.get('overall_status'), stage = u.get('stage_code'), stream = u.get('stream');
     if (stream && !STREAMS.some((x) => x.code === stream)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/stream', code: 'unknown_stream' }] });
-    const view = u.get('view'), bucket = u.get('bucket');
+    const view = u.get('view'), bucket = u.get('bucket'), coords = u.get('coordinates');
     if (view && !VIEWS.some((x) => x.code === view)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/view', code: 'unknown_view' }] });
     const all = Array.from({ length: SITE_COUNT }, (_, i) => siteMeta(i)).filter((m) =>
-      (!q || `${m.code} ${m.name}`.toLowerCase().includes(q)) && (!regions.length || regions.includes(m.region_id)) && (!sc || m.scenario === sc) && (!st || m.status === st));
+      (!q || `${m.code} ${m.name}`.toLowerCase().includes(q)) && (!regions.length || regions.includes(m.region_id)) && (!sc || m.scenario === sc) && (!st || m.status === st)
+      && (coords !== 'missing' || (!hasValidCoords(m.i) && m.status !== 'cancelled')) && (coords !== 'valid' || hasValidCoords(m.i)));
     // with a stream: rail and counts cover that stream only, and sites where it does not apply are left out (contract 0.4.1)
     const items = all.map((m) => listItem(m.i, stream ?? undefined, view ?? undefined))
       .filter((x) => !view || scopedTasks(siteIndex(x.id), stream ?? undefined, view).some((t) => t.state !== 'na')) // sites with no task in the view are left out

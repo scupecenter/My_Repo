@@ -43,6 +43,13 @@ export const useDashboard = (q: DashboardQuery) =>
 /** Downloads exactly the view on screen (`GET /dashboard/export`, needs the export right; the server audits it). Excel by default (Q127), CSV as an option. */
 export const downloadDashboard = (q: DashboardQuery, format: ExportFormat = 'xlsx') => downloadFile('/dashboard/export', { ...clean(q), format });
 
+// ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
+export type SiteMap = S['SiteMap'];
+export type SiteMapItem = S['SiteMapItem'];
+/** The sites of the map: the caller's dashboard.view regions that are also sites.view regions. Filters are applied in the browser (lib/siteMap). */
+export const useSiteMap = (enabled = true) =>
+  useQuery({ queryKey: ['dashboard-site-map'], staleTime: 60_000, enabled, queryFn: () => api.get<SiteMap>('/dashboard/site-map') });
+
 // ---------------------------------------------------------------- Q118: manual percentage of the central Project Status items
 export const useManualItems = () =>
   useQuery({ queryKey: ['manual-items'], queryFn: () => api.get<ManualItemList>('/project-status/manual-items') });

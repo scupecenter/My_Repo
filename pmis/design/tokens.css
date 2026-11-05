@@ -339,6 +339,29 @@
   --text-5xl:26px;
   --lh-text:1.5;--lh-ar:1.7;
   --type-1:12px;--type-2:13px;--type-3:14px;--type-4:16px;--type-5:18px;--type-6:22px;--type-7:28px;
+  /* Site map (OV-12, 2026-11-05): land, sea, the tower and the light colours. The surface scale flips in the dark theme, so the same steps keep at least 3:1
+     against the land in both themes (contrast.test.ts). Streams and milestones avoid green (On-Air, --done), red (late ring, --late) and the on-hold amber. */
+  --map-sea:var(--card);
+  --map-land:var(--surface-gray-2);
+  --map-line:var(--outline-gray-4);
+  --map-tower:var(--surface-gray-8);
+  --map-idle:var(--surface-gray-7);
+  --map-hold:var(--surface-amber-8);
+  --map-cancel:var(--surface-gray-9);
+  --stream-design:var(--surface-violet-8);
+  --stream-cw:var(--surface-orange-7);
+  --stream-te:var(--surface-blue-8);
+  --stream-closure:var(--surface-teal-8);
+  --ms-1:var(--surface-violet-8);
+  --ms-2:var(--surface-orange-7);
+  --ms-3:var(--surface-orange-8);
+  --ms-4:var(--surface-orange-10);
+  --ms-5:var(--surface-blue-7);
+  --ms-6:var(--surface-blue-9);
+  --ms-7:var(--surface-teal-7);
+  --ms-8:var(--surface-teal-9);
+  --ms-9:var(--surface-violet-9);
+  --ms-10:var(--surface-violet-10);
   color-scheme:light;
 }
 [data-theme=dark]{
@@ -635,5 +658,6 @@
   --state-planned-bg:var(--surface-violet-2);
   --state-planned-border:var(--outline-violet-4);
   --focus:3px solid #464646cc;
+  --map-cancel:var(--surface-gray-6);
   color-scheme:dark;
 }

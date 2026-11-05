@@ -10,6 +10,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { problems } from '../common/problem';
 import { oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
+import { HAS_COORDINATES } from '../dashboard/site-map.service';
 import { RegistersService } from '../registers/registers.service';
 import { TaskSummaryDto, TaskViewService, taskSelect } from '../workflow/task-view.service';
 
@@ -202,6 +203,7 @@ export class SitesService {
     const cluster = oneParam(q, 'cluster_code');
     const batch = oneParam(q, 'delivery_batch');
     const wfv = oneParam(q, 'workflow_version');
+    const coords = oneParam(q, 'coordinates');
     const stream = oneParam(q, 'stream');
     const view = oneParam(q, 'view');
     const sort = oneParam(q, 'sort') ?? 'site_code';
@@ -210,6 +212,7 @@ export class SitesService {
     if (status !== undefined && !STATUSES.includes(status)) throw problems.validation([{ path: '/overall_status', code: 'invalid', message: 'Unknown overall status.' }]);
     if (!(BUCKETS as readonly string[]).includes(bucket)) throw problems.validation([{ path: '/bucket', code: 'invalid', message: 'Unknown bucket.' }]);
     if (!(SORTS as readonly string[]).includes(sort)) throw problems.validation([{ path: '/sort', code: 'invalid', message: 'Unknown sort.' }]);
+    if (coords !== undefined && coords !== 'missing' && coords !== 'valid') throw problems.validation([{ path: '/coordinates', code: 'invalid', message: 'coordinates is missing or valid.' }]);
     if (wfv !== undefined && !/^[0-9]{1,6}$/.test(wfv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
     if (stream !== undefined) await this.requireGroup('stream', stream);
     if (view !== undefined) await this.requireGroup('view', view);
@@ -223,6 +226,9 @@ export class SitesService {
     if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);
     if (batch) where.push(Prisma.sql`s.delivery_batch = ${batch}`);
     if (wfv) where.push(Prisma.sql`wd.version = ${Number(wfv)}`);
+    // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
+    if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
+    else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);
     for (const pair of this.customPairs(q)) {
       where.push(Prisma.sql`EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.code = ${pair[0]} AND fd.is_active AND fd.in_list_filters
         AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') <> 'hidden') AND s.custom ->> ${pair[0]} = ${pair[1]}`);
@@ -385,7 +391,7 @@ export class SitesService {
       SELECT s.id::text AS id, s.site_code, s.name, s.name_ar, s.region_id, c.cluster_code, s.cluster_id::text AS cluster_id, s.delivery_scenario::text AS delivery_scenario,
         s.overall_status::text AS overall_status, s.current_milestone AS current_milestone_col, s.next_milestone AS next_milestone_col,
         wd.version AS workflow_version, s.workflow_version_id::text AS workflow_id, s.owner_site_id, s.sub_region, s.latitude::float8 AS latitude,
-        s.longitude::float8 AS longitude, s.address, s.site_type, s.project_phase, s.delivery_batch, s.cw_delivery_model,
+        s.longitude::float8 AS longitude, s.address, s.site_type, s.project_phase, s.tower_owner, s.tower_type, s.tower_height_m::float8 AS tower_height_m, s.delivery_batch, s.cw_delivery_model,
         s.scope_tower_erection::text AS scope_tower_erection, s.scope_site_adaption::text AS scope_site_adaption, s.scope_gecol_power::text AS scope_gecol_power,
         s.scope_hlc_fiber::text AS scope_hlc_fiber, s.scope_te_full::text AS scope_te_full, s.scope_te_ip_router_only::text AS scope_te_ip_router_only,
         s.updated_at, s.custom, 1::bigint AS total
@@ -421,6 +427,9 @@ export class SitesService {
       project_phase: site.project_phase,
       delivery_batch: site.delivery_batch,
       cw_delivery_model: site.cw_delivery_model,
+      tower_owner: site.tower_owner ?? null,
+      tower_type: site.tower_type ?? null,
+      tower_height_m: site.tower_height_m ?? null,
       scope_flags: {
         tower_erection: flag(site.scope_tower_erection),
         site_adaption: flag(site.scope_site_adaption),
