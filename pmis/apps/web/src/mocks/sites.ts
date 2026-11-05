@@ -170,6 +170,8 @@ export function detail(i: number): SiteDetail {
   const m = siteMeta(i), pipe = pipelineOf(i);
   return {
     ...listItem(i), pipeline: pipe, version: 1, address: `${NAMES[i % NAMES.length]} road`, site_type: 'Macro', project_phase: 'Phase 2',
+    // the map has synthetic coordinates (mapGeo); the site page keeps none, so the identity proposals start empty
+    tower_owner: mapGeo(i).tower_owner, sub_region: NAMES[i % NAMES.length], owner_site_id: `OWN-${1000 + i}`, tower_type: i % 3 === 0 ? 'Monopole' : 'Lattice', tower_height_m: 24 + (i % 4) * 6,
     cluster_progress: { cluster_code: m.cluster, sites_total: 9, sites_at_te_pac: 1 + (i % 6), kpi_acceptance_date: null },
     counts: { open_snags: i % 4, open_issues: i % 3, documents_missing: siteTasks(i).reduce((a, t) => a + (t.slots_required ?? 0) - (t.slots_filled ?? 0), 0) },
   } as SiteDetail;
@@ -184,3 +186,37 @@ export function gridOf(i: number, stream?: string, view?: string): SiteTasks {
       .filter((st) => (!stream || st.stream_code === stream) && (!view || st.tasks.length)),
   };
 }
+
+// ---------------------------------------------------------------- 0.14.5: the site map (synthetic coordinates spread over Libya, fictional tower owners)
+/** Synthetic centres per region (around the main city of each region) and a fixed scatter, so the map looks like a real spread without any real site. */
+const CENTRE: [number, number][] = [[32.82, 13.15], [31.55, 15.6], [31.95, 11.4], [32.68, 12.45], [32.0, 20.25], [32.6, 21.7], [26.9, 14.4]];
+const SPREAD: [number, number][] = [[0.35, 0.6], [0.9, 1.6], [0.5, 1.0], [0.25, 0.5], [0.45, 0.9], [0.35, 0.9], [1.4, 1.8]];
+const OWNERS = ['TowerCo Alpha (synthetic)', 'TowerCo Beta (synthetic)', 'Own tower'];
+const jit = (i: number, k: number) => (((i * 9301 + k * 49297) % 233280) / 233280) * 2 - 1;
+/** Every 17th site has no coordinates and every 29th a point outside Libya: both are counted as "without valid coordinates". */
+export function mapGeo(i: number): { latitude: number | null; longitude: number | null; tower_owner: string | null } {
+  const r = siteMeta(i).region_id - 1;
+  const owner = i % 5 === 4 ? null : OWNERS[i % OWNERS.length]!;
+  if (i % 17 === 16) return { latitude: null, longitude: null, tower_owner: owner };
+  if (i % 29 === 28) return { latitude: 41.2, longitude: 12.1, tower_owner: owner };
+  const [la, lo] = CENTRE[r]!, [sla, slo] = SPREAD[r]!;
+  return { latitude: Math.round((la + jit(i, 1) * sla) * 1e5) / 1e5, longitude: Math.round((lo + jit(i, 2) * slo) * 1e5) / 1e5, tower_owner: owner };
+}
+const validGeo = (la: number | null, lo: number | null) => la !== null && lo !== null && la > 18 && la < 34.5 && lo > 8 && lo < 26;
+export const hasValidCoords = (i: number) => { const g = mapGeo(i); return validGeo(g.latitude, g.longitude); };
+
+/** One row of GET /dashboard/site-map from the mock site: the current milestone is the first stage neither done nor N/A, On-Air is the on_air stage done. */
+export function mapItem(i: number) {
+  const m = siteMeta(i), pipe = pipelineOf(i), li = listItem(i), g = mapGeo(i), tasks = siteTasks(i).filter((t) => t.state !== 'na');
+  const cur = pipe.find((n) => n.state !== 'done' && n.state !== 'na');
+  const last = [...pipe].reverse().find((n) => n.state === 'done');
+  const late = li.late_task_count ?? 0, behind = !!cur && i % 9 === 0;
+  return {
+    id: m.id, site_code: m.code, name: m.name, name_ar: li.name_ar ?? null, region_id: m.region_id as SiteListItem['region_id'], sub_region: NAMES[i % NAMES.length]!, cluster_code: m.cluster,
+    latitude: g.latitude, longitude: g.longitude, has_coordinates: validGeo(g.latitude, g.longitude), overall_status: m.status, delivery_scenario: m.scenario, tower_owner: g.tower_owner,
+    stream_code: cur ? streamOfStage(cur.code) : null, milestone_code: cur?.code ?? null, last_milestone_code: last?.code ?? null,
+    on_air_reached: pipe.find((n) => n.code === 'on_air')?.state === 'done', late_task_count: late, behind_baseline: behind, late: late > 0 || behind,
+    task_progress_pct: tasks.length ? Math.round((tasks.filter((t) => t.state === 'approved').length * 1000) / tasks.length) / 10 : null,
+  };
+}
+export const MAP_MILESTONES = STAGE_CODES.map((code, s) => ({ code, name_en: STAGE_EN[s]!, name_ar: STAGE_AR[s]!, sort_order: s + 1, stream_code: STREAM_OF[s]! }));

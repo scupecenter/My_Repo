@@ -6822,6 +6822,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/site-map": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sites of the dashboard map (OV-12, SC-10; 0.14.5)
+         * @description One compact row per active site the caller may see, for the map of the dashboard and of the Site Register (owner request 2026-11-05). The map is drawn in the browser
+         *     from a bundled outline of Libya; nothing is fetched from outside the internal server (no map tiles).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise) and `sites.view` (403 `module_forbidden` when the caller has it in no region). The sites
+         *     are those in the regions where the caller holds both; the database row-level filter applies as for `GET /sites`. Cancelled sites are listed with `overall_status`
+         *     `cancelled` (the map hides them unless the status filter asks for them). No custom field, no landlord or contact data is returned. Not audited (a read, like `GET /dashboard`).
+         *     **Current stream and milestone.** Read from the site's own workflow version: the current milestone is the first milestone (stage) in workflow order that is neither
+         *     reached (its milestone task approved, or every counting task approved when the stage has no milestone task) nor N/A; the current stream is that stage's stream.
+         *     Both are null when every milestone is reached or N/A. `on_air_reached` is true when the On-Air milestone (stable code MS6) is reached.
+         *     **Late.** `late_task_count` counts the site's open tasks past their due date (today, Africa/Tripoli); `behind_baseline` is true when a milestone that is not reached
+         *     has an approved baseline date before today; `late` is either of them.
+         *     **Coordinates.** `has_coordinates` is true when latitude is between 18 and 34.5 and longitude between 8 and 26 (as OV-12); `counts.without_coordinates` counts the
+         *     other active, not cancelled sites (`GET /sites?coordinates=missing` lists them).
+         *     The list is not paged: 1000 sites answer in well under 2 s (CLAUDE.md). The filters of the map (status, region, sub-region, site owner, scenario, stream, milestone,
+         *     cluster, late only, search) are applied in the browser.
+         */
+        get: operations["getDashboardSiteMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/export": {
         parameters: {
             query?: never;
@@ -8190,6 +8223,12 @@ export interface components {
             project_phase?: string | null;
             delivery_batch?: string | null;
             cw_delivery_model?: string | null;
+            /** @description 0.14.5: the site owner / tower owner (Master column M, owned by RF & Design). */
+            tower_owner?: string | null;
+            /** @description 0.14.5. */
+            tower_type?: string | null;
+            /** @description 0.14.5: metres. */
+            tower_height_m?: number | null;
             scope_flags?: {
                 tower_erection?: components["schemas"]["ScopeFlag"];
                 site_adaption?: components["schemas"]["ScopeFlag"];
@@ -13994,6 +14033,71 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** @description 0.14.5: one site of the dashboard map (OV-12). */
+        SiteMapItem: {
+            /** Format: uuid */
+            id: string;
+            site_code: string;
+            name: string;
+            name_ar: string | null;
+            region_id: components["schemas"]["RegionId"];
+            sub_region: string | null;
+            cluster_code: string | null;
+            latitude: number | null;
+            longitude: number | null;
+            /** @description Latitude 18 to 34.5 and longitude 8 to 26 (exclusive), as OV-12. */
+            has_coordinates: boolean;
+            overall_status: components["schemas"]["OverallStatus"];
+            delivery_scenario: components["schemas"]["DeliveryScenario"] | null;
+            /** @description Site owner / tower owner (Master column M). */
+            tower_owner: string | null;
+            /** @description The stream of the current milestone; null when every milestone is reached or N/A. */
+            stream_code: string | null;
+            /** @description The current milestone (stable stage code, ADR 0010): the first one in workflow order that is neither reached nor N/A. */
+            milestone_code: string | null;
+            /** @description The last milestone reached, in workflow order. */
+            last_milestone_code: string | null;
+            /** @description The On-Air milestone (MS6) is reached. */
+            on_air_reached: boolean;
+            /** @description Open tasks past their due date. */
+            late_task_count: number;
+            /** @description A milestone not reached has an approved baseline date before today. */
+            behind_baseline: boolean;
+            /** @description `late_task_count` > 0 or `behind_baseline`. */
+            late: boolean;
+            /** @description Share of the counting tasks approved, in %, one decimal (not the weighted Project Status); null when the site has no counting task. */
+            task_progress_pct: number | null;
+        };
+        SiteMapGroup: {
+            code: string;
+            name_en: string;
+            name_ar: string | null;
+            /** @description Workflow order (the stage sequence for a milestone). */
+            sort_order: number;
+            /** @description For a milestone: its stream. */
+            stream_code?: string | null;
+        };
+        /** @description 0.14.5: the dashboard map (OV-12, SC-10). */
+        SiteMap: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions of the list (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            counts: {
+                /** @description Active sites listed, cancelled included. */
+                total: number;
+                cancelled: number;
+                /** @description Not cancelled, with valid coordinates. */
+                with_coordinates: number;
+                /** @description Not cancelled, without valid coordinates. */
+                without_coordinates: number;
+            };
+            /** @description The streams of the workflow versions of the listed sites, in order. */
+            streams: components["schemas"]["SiteMapGroup"][];
+            /** @description The milestones (stages) of those versions, in workflow order (one per stable code). */
+            milestones: components["schemas"]["SiteMapGroup"][];
+            items: components["schemas"]["SiteMapItem"][];
+        };
         Dashboard: {
             meta: components["schemas"]["DashboardMeta"];
             basis: components["schemas"]["DashboardBasis"];
@@ -16872,6 +16976,8 @@ export interface operations {
                 cluster_code?: string;
                 delivery_batch?: string;
                 workflow_version?: number;
+                /** @description 0.14.5: `missing` keeps the sites that are not cancelled and have no valid coordinates (no latitude or longitude, or outside lat 18 to 34.5 and lon 8 to 26): the `counts.without_coordinates` of `GET /dashboard/site-map`; `valid` keeps the sites with valid coordinates. */
+                coordinates?: "missing" | "valid";
                 /** @description Filter on custom fields shown in filters, as `code:value` pairs (repeatable). */
                 custom?: string[];
                 sort?: "site_code" | "-site_code" | "region" | "-region" | "stage" | "-stage" | "due_date" | "-due_date";
@@ -26509,6 +26615,28 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDashboardSiteMap: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sites of the map. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteMap"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     exportDashboard: {

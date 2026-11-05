@@ -1,5 +1,5 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
-import { Download, FileDown, FilePlus2, FileUp, RotateCcw } from 'lucide-react';
+import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { useToast } from '@/components/Toast';
 import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
 import { MiniRail } from '@/components/Pipeline';
+import { SiteMap } from '@/components/SiteMap';
 import { useVirtual } from '@/components/useVirtual';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
@@ -54,11 +55,14 @@ export function Sites() {
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
   const f = { q: sp.get('q') ?? '', region_id: sp.get('region_id') ?? '', scenario: sp.get('scenario') ?? '', overall_status: sp.get('overall_status') ?? '', stage_code: sp.get('stage_code') ?? '' };
   const bucket = sp.get('bucket') ?? '';
+  // 0.14.5: the sites the map cannot draw (the link of the dashboard map), and the map layout of the register (SC-10)
+  const coordinates = sp.get('coordinates') === 'missing' ? 'missing' : '';
+  const asMap = sp.get('layout') === 'map';
   const sel = sp.get('sel') ?? '';
-  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0);
+  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
-  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
@@ -77,9 +81,9 @@ export function Sites() {
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
-  const q = useSites({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle);
+  const q = useSites({ ...f, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, stage_code: '', ...(bucket ? { bucket } : {}), ...(view ? { view } : {}) }, real);
+  const allQ = useSites({ ...f, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -117,6 +121,7 @@ export function Sites() {
     ...(f.scenario ? [{ key: 'scenario', label: t('table.filter_scenario', { v: t(`scenario.${f.scenario}`) }), onRemove: () => set('scenario')('') }] : []),
     ...(f.overall_status ? [{ key: 'overall_status', label: t('table.filter_status', { v: t(`status.${f.overall_status}`) }), onRemove: () => set('overall_status')('') }] : []),
     ...(f.stage_code ? [{ key: 'stage_code', label: t('table.filter_stage', { v: stageName(f.stage_code) }), onRemove: () => set('stage_code')('') }] : []),
+    ...(coordinates ? [{ key: 'coordinates', label: t('table.filter_coords'), onRemove: () => setParams({ coordinates: '' }) }] : []),
     ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
   ];
 
@@ -169,6 +174,9 @@ export function Sites() {
         </>}
         count={<span className="text-sm text-mute" data-testid="sites-count">{t('sites.count', { count: total })}</span>}
         tools={<>
+        <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
+          {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
+        </button>
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
         <MoreMenu items={[
@@ -179,6 +187,9 @@ export function Sites() {
       <ActiveChips chips={chips} onClear={clearAll} />
       {dismantle ? (
         <Navigate to="/registers/dismantle" replace />
+      ) : asMap ? (
+        // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
+        <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
       ) : (
         <div className="card overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>

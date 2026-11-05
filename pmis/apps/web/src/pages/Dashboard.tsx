@@ -9,6 +9,7 @@ import type { PipelineNode } from '@/api/types';
 import { EChart, type Palette } from '@/components/EChart';
 import { errText } from '@/components/FormDialog';
 import { Pipeline } from '@/components/Pipeline';
+import { SiteMap } from '@/components/SiteMap';
 import { EmptyState } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { streamName } from '@/lib/streams';
@@ -402,6 +403,9 @@ export function Dashboard() {
               </ul>
             </Card>
           </div>
+
+          {/* OV-12: the sites on the map (contract 0.14.5); the dashboard filters above narrow it too */}
+          <SiteMap testid="dash-site-map" height={520} outer={{ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, stream: q.stream === 'DISMANTLE' ? '' : q.stream }} />
 
           {/* streams */}
           <Card title={t('dash.streams.title')} testid="dash-streams" aside={<span className="text-sm text-mute">{t('dash.streams.hint')}</span>}>

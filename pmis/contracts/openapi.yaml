@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN PMIS API
-  version: 0.14.4
+  version: 0.14.5
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
     - 0.14.4 (2026-11-05): big New sites batches run in the background (technical decision of 2026-11-05, `docs/spec/technical-decisions-2026-11-04.md`; migration 0074; CHANGELOG 106). Additive. (1) `POST /import-batches/{batch_id}/submit` and `POST /import-batches/{batch_id}/decisions` (action `approve`) of a New sites batch (`entity` = `site`) with more rows to send or to approve than the setting `imports.async_rows` (default 50) answer **202** with the batch in the new status `processing` and its `progress` (`ImportBatchProgress`: rows done of rows total, percent, sites created); every check of the request is made before the 202 (uploader, If-Match, state, note, L1 / L2 of the Matrix row with the grid right, the step-up of a final approval or a self-approval: 401 `step_up_required`, nothing is queued). The rows are then done in chunks of 25, each committed on its own under the same person (the step-up verified at the request counts; nobody else can continue the run), so the counts and the rows move while the page polls; a row that fails gets its error and the others go on; at the end the batch has its usual status (`approved`, `partially_approved`, `in_approval`) and its usual audit row and notices. A run left behind by a restart is resumed by the API. While `processing`, a second send, a decision or a discard answers 409 `batch_processing` (new `ErrorCode`). Smaller batches, returns and the other templates answer 200 as before. (2) `ImportBatch.status` adds `processing`; `ImportBatch.progress` (null when the batch never ran in the background). (3) No request changes; a client that only reads 200 keeps working for small batches and sees 202 + `processing` for big ones.
     - 0.14.3 (2026-11-05): the one-time historical-load document waiver (decision on owner question Q462, `docs/spec/technical-decisions-2026-11-04.md`; migration 0073; CHANGELOG 102). Additive. (1) `GET /settings/historical-waiver` (`getHistoricalWaiver`, any signed-in user: open or closed, cutoff date, expiry, whether the caller may manage it) and `PUT /settings/historical-waiver` (`setHistoricalWaiver`: a System Admin only, never a delegate, 403 `action_forbidden`; step-up; a reason; opening needs a cutoff date that is not in the future, 422 `validation_failed`; it closes itself after 30 days or by hand; every change is audited with the admin-override flag; the setting `load.historical_waiver` is written by no other path). (2) While it is open, a System Admin may mark a batch "historical load: accept without documents": `POST /import-batches` (a Site Register stream template) takes the form field `historical_load_reason`, and `POST /master-import/runs/{run_id}/apply` takes `historical_load: {reason}`; both need a step-up (401 `step_up_required`) and the open waiver (409 `invalid_transition`). For the rows of that batch the mandatory-document check is skipped only when the task's actual date is on or before the cutoff date; every other check runs; rows after the cutoff and every other batch are unchanged (the preview row carries the warning `historical_no_documents`). `ImportBatch.historical_load` shows the mark. (3) A task submitted that way has `TaskSummary.historical_no_documents` = true (the "Admin override" badge in the task and in the task grid; `TaskDetail.historical_load` has the batch, the cutoff and the missing document codes) and an audit row `task_historical_no_documents` (before and after values, the batch reference, `is_admin_override`). (4) Reversible: uploading the missing documents later is allowed on a flagged task even after its approval (`POST /tasks/{task_id}/slots/{slot_id}/files`) and, when no mandatory slot is missing any more, clears the flag by itself (audited `task_historical_no_documents_cleared`); a task that goes back to Data Entry loses the flag too. (5) KPIs: a flagged task is treated like an admin override. It is left out of the SLA and on-time figures when `exclude_overrides` is on (the default), counted otherwise; `KpiMeta.override_flagged_count` includes it and the new `KpiMeta.historical_flagged_count` counts only these; the health index leaves it out of documentation completeness and first-time approval; Project Status progress is unchanged.
     - 0.14.2 (2026-11-05): the settings screens of Q440 and Q441 and the decisions Q476 and Q477 (`docs/spec/technical-decisions-2026-11-04.md`, "Decided 2026-11-05 (2)"; migration 0072; CHANGELOG 101). Additive. (1) Q440: the official calendar is confirmed in Settings, Work calendar. `GET /settings/calendar-confirmation` and `PUT /settings/calendar-confirmation` (`CalendarConfirmation`, `CalendarConfirmationInput`: `confirmed` true or false and a `reason`; If-Match; audited as `calendar_official_confirmed` or `calendar_official_unconfirmed`; a System Admin, or a delegate of `settings` edit for all regions). Confirming is refused (422 `validation_failed`, path `/confirmed`) while the current or the next year has no holiday (`no_holidays`) or a holiday of those years is still tentative (`tentative_remaining`); the same blockers are in `CalendarConfirmation.blockers`. Unconfirming is always allowed. `HolidaySummary` gains `official_confirmed_at` and `official_confirmed_by` (who and when); `official_calendar_pending` is false while the setting is true, so the banner disappears. (2) Q441: the mail notification kinds are set in Settings. `GET /settings/mail-notification-kinds` and `PUT /settings/mail-notification-kinds` (`MailNotificationKinds`, `MailNotificationKindsInput`: `kinds` and a `reason`; If-Match; step-up; audited as `mail_notification_kinds_update`; System Admin only, a delegate gets 403 `action_forbidden`). The catalogue lists the kinds the code writes, with the six go-live kinds marked `recommended`; an unknown kind is refused (`unknown_kind`), and so is a kind reserved for security (`reserved_kind`: `security_*`, `integrity_*`, `audit_integrity_*`, `break_glass_*`, `retention_*`) and a duplicate (`duplicate`). (3) Q476: no HTTP change. The approved RF & Design feed fills `latitude` and `longitude` of the site only while the site has no coordinates (audited as `site_coordinates_fed`); afterwards they change only through a Change Control proposal (0.14.1). (4) Q477: no HTTP change. When an approved region move takes a site to another region, its open tasks keep their holders and SLA (B12b) and the holders of the `reassign` grant of the new region get an in-app notice of the new kind `site_region_moved` that lists the site and its open tasks; `NotificationKind` gains `site_region_moved`.
@@ -2600,6 +2601,7 @@ paths:
         - { name: cluster_code, in: query, schema: { type: string } }
         - { name: delivery_batch, in: query, schema: { type: string } }
         - { name: workflow_version, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: coordinates, in: query, description: '0.14.5: `missing` keeps the sites that are not cancelled and have no valid coordinates (no latitude or longitude, or outside lat 18 to 34.5 and lon 8 to 26): the `counts.without_coordinates` of `GET /dashboard/site-map`; `valid` keeps the sites with valid coordinates.', schema: { type: string, enum: [missing, valid] } }
         - name: custom
           in: query
           description: Filter on custom fields shown in filters, as `code:value` pairs (repeatable).
@@ -10674,6 +10676,34 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /dashboard/site-map:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardSiteMap
+      summary: The sites of the dashboard map (OV-12, SC-10; 0.14.5)
+      description: |
+        One compact row per active site the caller may see, for the map of the dashboard and of the Site Register (owner request 2026-11-05). The map is drawn in the browser
+        from a bundled outline of Libya; nothing is fetched from outside the internal server (no map tiles).
+        **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise) and `sites.view` (403 `module_forbidden` when the caller has it in no region). The sites
+        are those in the regions where the caller holds both; the database row-level filter applies as for `GET /sites`. Cancelled sites are listed with `overall_status`
+        `cancelled` (the map hides them unless the status filter asks for them). No custom field, no landlord or contact data is returned. Not audited (a read, like `GET /dashboard`).
+        **Current stream and milestone.** Read from the site's own workflow version: the current milestone is the first milestone (stage) in workflow order that is neither
+        reached (its milestone task approved, or every counting task approved when the stage has no milestone task) nor N/A; the current stream is that stage's stream.
+        Both are null when every milestone is reached or N/A. `on_air_reached` is true when the On-Air milestone (stable code MS6) is reached.
+        **Late.** `late_task_count` counts the site's open tasks past their due date (today, Africa/Tripoli); `behind_baseline` is true when a milestone that is not reached
+        has an approved baseline date before today; `late` is either of them.
+        **Coordinates.** `has_coordinates` is true when latitude is between 18 and 34.5 and longitude between 8 and 26 (as OV-12); `counts.without_coordinates` counts the
+        other active, not cancelled sites (`GET /sites?coordinates=missing` lists them).
+        The list is not paged: 1000 sites answer in well under 2 s (CLAUDE.md). The filters of the map (status, region, sub-region, site owner, scenario, stream, milestone,
+        cluster, late only, search) are applied in the browser.
+      responses:
+        '200':
+          description: The sites of the map.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/SiteMap'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
   /dashboard/export:
     get:
       tags: [dashboard]
@@ -12652,6 +12682,9 @@ components:
             project_phase: { type: [string, 'null'] }
             delivery_batch: { type: [string, 'null'] }
             cw_delivery_model: { type: [string, 'null'] }
+            tower_owner: { type: [string, 'null'], description: '0.14.5: the site owner / tower owner (Master column M, owned by RF & Design).' }
+            tower_type: { type: [string, 'null'], description: '0.14.5.' }
+            tower_height_m: { type: [number, 'null'], description: '0.14.5: metres.' }
             scope_flags:
               type: object
               properties:
@@ -17976,6 +18009,64 @@ components:
         progress_pct: {type: number}
         health_score: {type: [number, 'null']}
         by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
+    SiteMapItem:
+      type: object
+      description: '0.14.5: one site of the dashboard map (OV-12).'
+      required: [id, site_code, name, name_ar, region_id, sub_region, cluster_code, latitude, longitude, has_coordinates, overall_status, delivery_scenario, tower_owner,
+        stream_code, milestone_code, last_milestone_code, on_air_reached, late_task_count, behind_baseline, late, task_progress_pct]
+      properties:
+        id: {type: string, format: uuid}
+        site_code: {type: string}
+        name: {type: string}
+        name_ar: {type: [string, 'null']}
+        region_id: {$ref: '#/components/schemas/RegionId'}
+        sub_region: {type: [string, 'null']}
+        cluster_code: {type: [string, 'null']}
+        latitude: {type: [number, 'null']}
+        longitude: {type: [number, 'null']}
+        has_coordinates: {type: boolean, description: 'Latitude 18 to 34.5 and longitude 8 to 26 (exclusive), as OV-12.'}
+        overall_status: {$ref: '#/components/schemas/OverallStatus'}
+        delivery_scenario: {oneOf: [{$ref: '#/components/schemas/DeliveryScenario'}, {type: 'null'}]}
+        tower_owner: {type: [string, 'null'], description: 'Site owner / tower owner (Master column M).'}
+        stream_code: {type: [string, 'null'], description: 'The stream of the current milestone; null when every milestone is reached or N/A.'}
+        milestone_code: {type: [string, 'null'], description: 'The current milestone (stable stage code, ADR 0010): the first one in workflow order that is neither reached nor N/A.'}
+        last_milestone_code: {type: [string, 'null'], description: 'The last milestone reached, in workflow order.'}
+        on_air_reached: {type: boolean, description: 'The On-Air milestone (MS6) is reached.'}
+        late_task_count: {type: integer, minimum: 0, description: 'Open tasks past their due date.'}
+        behind_baseline: {type: boolean, description: 'A milestone not reached has an approved baseline date before today.'}
+        late: {type: boolean, description: '`late_task_count` > 0 or `behind_baseline`.'}
+        task_progress_pct: {type: [number, 'null'], description: 'Share of the counting tasks approved, in %, one decimal (not the weighted Project Status); null when the site has no counting task.'}
+    SiteMapGroup:
+      type: object
+      required: [code, name_en, name_ar, sort_order]
+      properties:
+        code: {type: string}
+        name_en: {type: string}
+        name_ar: {type: [string, 'null']}
+        sort_order: {type: integer, description: 'Workflow order (the stage sequence for a milestone).'}
+        stream_code: {type: [string, 'null'], description: 'For a milestone: its stream.'}
+    SiteMap:
+      type: object
+      description: '0.14.5: the dashboard map (OV-12, SC-10).'
+      required: [as_of, scope_regions, counts, streams, milestones, items]
+      properties:
+        as_of: {type: string, format: date-time}
+        scope_regions:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/RegionId'}
+          description: The regions of the list (null = every region).
+        counts:
+          type: object
+          required: [total, cancelled, with_coordinates, without_coordinates]
+          properties:
+            total: {type: integer, description: 'Active sites listed, cancelled included.'}
+            cancelled: {type: integer}
+            with_coordinates: {type: integer, description: 'Not cancelled, with valid coordinates.'}
+            without_coordinates: {type: integer, description: 'Not cancelled, without valid coordinates.'}
+        streams: {type: array, items: {$ref: '#/components/schemas/SiteMapGroup'}, description: 'The streams of the workflow versions of the listed sites, in order.'}
+        milestones: {type: array, items: {$ref: '#/components/schemas/SiteMapGroup'}, description: 'The milestones (stages) of those versions, in workflow order (one per stable code).'}
+        items: {type: array, items: {$ref: '#/components/schemas/SiteMapItem'}}
+
     Dashboard:
       type: object
       required: [meta, basis, filters, headline, pipeline, streams, sla, gates, issues, health, delay, regions]

@@ -337,6 +337,8 @@ describe('hybrid mode list', () => {
       'GET /settings/calendar-confirmation', 'PUT /settings/calendar-confirmation', 'GET /settings/mail-notification-kinds', 'PUT /settings/mail-notification-kinds',
       // contract 0.14.3: the one-time historical-load document waiver (Q462)
       'GET /settings/historical-waiver', 'PUT /settings/historical-waiver',
+      // contract 0.14.5: the site map of the dashboard (OV-12)
+      'GET /dashboard/site-map',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

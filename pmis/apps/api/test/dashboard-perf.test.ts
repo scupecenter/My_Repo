@@ -23,7 +23,7 @@ beforeAll(async () => {
   await db.query("SELECT dash_seed_sites(1000, 'PF')");
   await db.query('ANALYZE');
   admin = await plainAdmin(app, db, true);
-  regional = await actor(app, db, { regions: [1, 2], grants: [['dashboard', 'view'], ['issues', 'view']] });
+  regional = await actor(app, db, { regions: [1, 2], grants: [['dashboard', 'view'], ['issues', 'view'], ['sites', 'view']] });
 }, 120_000);
 afterAll(async () => {
   await db.end();
@@ -78,4 +78,13 @@ describe('1000 sites', () => {
     expect(read.body.basis.source).toBe('snapshot');
     expect(read.ms).toBeLessThan(2000);
   }, 180_000);
+  it('the site map (OV-12, 0.14.5) of 1000 sites answers in under 2 seconds, for all regions and for two regions', async () => {
+    const all = await slowest(admin, '/dashboard/site-map');
+    expect(all.body.items).toHaveLength(1000);
+    expect(all.body.counts.cancelled).toBe(27);
+    expect(all.ms).toBeLessThan(2000);
+    const two = await slowest(regional, '/dashboard/site-map');
+    expect(two.body.items.every((x: { region_id: number }) => x.region_id === 1 || x.region_id === 2)).toBe(true);
+    expect(two.ms).toBeLessThan(2000);
+  }, 120_000);
 });

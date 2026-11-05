@@ -4,8 +4,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildFixture, ago, q, wdBetween } from './dash-fixture';
 import type { Fix } from './dash-fixture';
 import { JobsService } from '../src/jobs/jobs.service';
-import { beginAs, makeUser, startApp, superDbDash } from './helpers';
-import { actor, plainAdmin } from './wf-helpers';
+import { beginAs, loggedIn, makeUser, startApp, superDbDash } from './helpers';
+import { actor, addAssignment, plainAdmin } from './wf-helpers';
 import type { Actor } from './wf-helpers';
 
 /**
@@ -513,5 +513,94 @@ describe('the database', () => {
     } finally {
       await appDb.end();
     }
+  });
+});
+
+/**
+ * The site map (OV-12, SC-10; contract 0.14.5): one row per visible site with the current stream and milestone of its own workflow version, On-Air reached,
+ * late tasks and the baseline signal. Coordinates are set here (synthetic points): T1 in Tripoli, B1 in Benghazi, T2 outside Libya, the others empty.
+ */
+describe('site map (OV-12, 0.14.5)', () => {
+  const MAP = '/dashboard/site-map';
+  let tripoliSites: Actor;
+  let crossed: Actor;
+  beforeAll(async () => {
+    await db.query('SET session_replication_role = replica');
+    await db.query(`UPDATE sites SET latitude = 32.887, longitude = 13.191, tower_owner = 'Synthetic TowerCo', tower_type = 'Monopole', tower_height_m = 30, sub_region = 'Souq Al Juma',
+      custom = custom || '{"near_airport": "yes"}'::jsonb WHERE id = $1`, [fx.site.T1!.id]);
+    await db.query(`UPDATE sites SET latitude = 32.116, longitude = 20.067 WHERE id = $1`, [fx.site.B1!.id]);
+    await db.query(`UPDATE sites SET latitude = 40.1, longitude = 13.2 WHERE id = $1`, [fx.site.T2!.id]);
+    await db.query('SET session_replication_role = origin');
+    tripoliSites = await actor(app, db, { regions: [1], grants: [['dashboard', 'view'], ['sites', 'view']] });
+    // dashboard in every region, sites in Benghazi only: the map is the intersection (B3)
+    const u = await makeUser(db, { status: 'active' });
+    await addAssignment(db, u.id, { regions: null, grants: [['dashboard', 'view']] });
+    await addAssignment(db, u.id, { regions: [5], grants: [['sites', 'view']] });
+    crossed = { user: u, api: await loggedIn(app, u), roleId: '' };
+  });
+  const map = async (a: Actor): Promise<J> => {
+    const res = await a.api.call('get', MAP);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    return res.body as J;
+  };
+  const item = (m: J, code: string): J => m.items.find((x: J) => x.site_code === `DASH-${code}`);
+
+  it('lists every active site of the admin with the current stream and milestone, On-Air reached, late tasks and the baseline signal', async () => {
+    const m = await map(admin);
+    expect(m.scope_regions).toBeNull();
+    expect(m.items.map((x: J) => x.site_code).sort()).toEqual(['B1', 'B2', 'B3', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6'].map((c) => `DASH-${c}`));
+    expect(m.counts).toEqual({ total: 9, cancelled: 1, with_coordinates: 2, without_coordinates: 6 });
+    // T1: MS1..MS4 reached, MS5 (TE) open; B8 is open and 30 days past its due date; MS5's baseline was 10 days ago
+    expect(item(m, 'T1')).toMatchObject({ stream_code: 'TE', milestone_code: 'MS5', last_milestone_code: 'MS4', on_air_reached: false, late_task_count: 1, behind_baseline: true, late: true,
+      has_coordinates: true, latitude: 32.887, longitude: 13.191, tower_owner: 'Synthetic TowerCo', sub_region: 'Souq Al Juma', overall_status: 'in_progress', region_id: 1, cluster_code: 'DASH-CL1' });
+    expect(item(m, 'T2')).toMatchObject({ stream_code: 'CW', milestone_code: 'MS2', on_air_reached: false, late_task_count: 0, behind_baseline: true, has_coordinates: false, delivery_scenario: 'expansion' });
+    expect(item(m, 'T3')).toMatchObject({ stream_code: 'DESIGN_ACQ', milestone_code: 'MS1', last_milestone_code: null, overall_status: 'not_started', behind_baseline: true });
+    expect(item(m, 'T4')).toMatchObject({ stream_code: null, milestone_code: null, last_milestone_code: 'MS10', on_air_reached: true, overall_status: 'completed', late: false });
+    expect(item(m, 'T6')).toMatchObject({ stream_code: 'CLOSURE', milestone_code: 'MS10', on_air_reached: true });
+    expect(item(m, 'B1')).toMatchObject({ stream_code: 'TE', milestone_code: 'MS7', last_milestone_code: 'MS6', on_air_reached: true, late_task_count: 1, late: true, has_coordinates: true });
+    expect(item(m, 'B2')).toMatchObject({ overall_status: 'on_hold', milestone_code: 'MS2', on_air_reached: false });
+    expect(item(m, 'T5')).toMatchObject({ overall_status: 'cancelled' });
+    expect(item(m, 'B3')).toMatchObject({ milestone_code: 'MS1', behind_baseline: false, late: false });
+    expect(typeof item(m, 'T1').task_progress_pct).toBe('number');
+    // the names of the groups of the legend
+    expect(m.streams.map((s: J) => s.code)).toEqual(['DESIGN_ACQ', 'CW', 'TE', 'CLOSURE']);
+    expect(m.milestones.map((s: J) => s.code)).toEqual(['MS1', 'MS2', 'MS3', 'MS4', 'MS5', 'MS6', 'MS7', 'MS8', 'MS9', 'MS10']);
+    expect(m.milestones.find((s: J) => s.code === 'MS6')).toMatchObject({ stream_code: 'TE' });
+  });
+
+  it('returns only the compact map fields: no custom field, no address, no landlord or contact data', async () => {
+    const t1 = item(await map(admin), 'T1');
+    expect(Object.keys(t1).sort()).toEqual(['behind_baseline', 'cluster_code', 'delivery_scenario', 'has_coordinates', 'id', 'last_milestone_code', 'late', 'late_task_count', 'latitude',
+      'longitude', 'milestone_code', 'name', 'name_ar', 'on_air_reached', 'overall_status', 'region_id', 'site_code', 'stream_code', 'sub_region', 'task_progress_pct', 'tower_owner']);
+  });
+
+  it('a user limited to Tripoli sees only the Tripoli sites and counts', async () => {
+    const m = await map(tripoliSites);
+    expect(m.scope_regions).toEqual([1]);
+    expect(m.items.every((x: J) => x.region_id === 1)).toBe(true);
+    expect(m.items).toHaveLength(6);
+    expect(m.counts).toEqual({ total: 6, cancelled: 1, with_coordinates: 1, without_coordinates: 4 });
+  });
+
+  it('the regions are those of dashboard.view that are also regions of sites.view (B3); without sites.view or dashboard.view the answer is 403', async () => {
+    const m = await map(crossed);
+    expect(m.scope_regions).toEqual([5]);
+    expect(m.items.map((x: J) => x.site_code).sort()).toEqual(['DASH-B1', 'DASH-B2', 'DASH-B3']);
+    const noSites = await tripoli.api.call('get', MAP);
+    expect(noSites.status).toBe(403);
+    expect(noSites.body.code).toBe('module_forbidden');
+    const noDash = await nobody.api.call('get', MAP);
+    expect(noDash.status).toBe(403);
+  });
+
+  it('GET /sites?coordinates=missing lists the sites the map cannot draw, and the site card has the tower fields', async () => {
+    const res = await tripoliSites.api.call('get', '/sites?coordinates=missing');
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((x: J) => x.site_code).sort()).toEqual(['DASH-T2', 'DASH-T3', 'DASH-T4', 'DASH-T6']);
+    const valid = await tripoliSites.api.call('get', '/sites?coordinates=valid');
+    expect(valid.body.items.map((x: J) => x.site_code)).toEqual(['DASH-T1']);
+    expect((await tripoliSites.api.call('get', '/sites?coordinates=nowhere')).status).toBe(422);
+    const d = await tripoliSites.api.call('get', `/sites/${fx.site.T1!.id}`);
+    expect(d.body).toMatchObject({ tower_owner: 'Synthetic TowerCo', tower_type: 'Monopole', tower_height_m: 30, latitude: 32.887 });
   });
 });
