@@ -25,6 +25,14 @@ const seedFields = (): TemplateTaskField[] => [
 const alias = (kind: 'region' | 'role', label: string, target: string | null, target_name: string | null, status: 'mapped' | 'ambiguous' | 'unmapped', note: string | null = null): ImportAlias =>
   ({ kind, alias: label.toLowerCase(), label, target, target_name, status, is_active: true, note, updated_at: '2026-11-04T08:00:00Z' });
 
+/** 0.14.6: one chunk of the background sends of an applied run (25 rows). */
+function advance(r: MasterImportRun) {
+  const p = r.progress!;
+  const done = Math.min(p.rows_total, p.rows_done + 25), draft = r.apply_mode === 'draft', t = now();
+  Object.assign(p, { rows_done: done, percent: p.rows_total ? Math.floor((100 * done) / p.rows_total) : 100, submitted: draft ? 0 : done, saved: draft ? done : 0, updated_at: t });
+  if (done >= p.rows_total) Object.assign(p, { state: 'done', batches_running: 0, finished_at: t });
+}
+
 function st(): State {
   const key = db() as unknown as object;
   let s = states.get(key);
@@ -84,6 +92,7 @@ export const masterImportHandlers = [
   http.get(`${B}/master-import/runs/:id`, ({ params }) => {
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
+    if (r?.progress?.state === 'running') advance(r);   // 0.14.6: each read moves the background sends by one chunk of 25 rows
     return r ? HttpResponse.json(r, { headers: { ETag: `"${r.version}"` } }) : problem(404, 'not_found', 'Not found');
   }),
   http.get(`${B}/master-import/runs/:id/diffs`, ({ params, request }) => {
@@ -112,10 +121,17 @@ export const masterImportHandlers = [
       if ((body.historical_load.reason ?? '').trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/historical_load/reason', code: 'required', message: 'A reason is required.' }] });
       if (!waiver().open) return problem(409, 'invalid_transition', 'Not possible now', { detail: 'The historical-load waiver is closed: a batch cannot be accepted without documents.' });
     }
-    const outcome = { group_id: uid('group'), mode: body.mode === 'draft' ? 'draft' as const : 'submit' as const, batches: [{ id: uid('batch'), ref: 'CW', template_id: 'TPL-SITE-CW', submitted: body.mode === 'draft' ? 0 : 1, saved: body.mode === 'draft' ? 1 : 0, held: 0, failed: 0, errors: 0 }], skipped: [] };
-    Object.assign(r, { status: 'applied', applied_at: now(), apply_reason: body.reason, apply_mode: outcome.mode, group_id: outcome.group_id, outcome, version: r.version + 1,
-      applied_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' } });
-    return HttpResponse.json({ ...r, outcome }, { headers: { ETag: `"${r.version}"` } });
+    // 0.14.6: a staged batch with more rows than imports.async_rows (50) is sent in the background: 202 with the run's progress
+    const rowsToSend = Number((r.summary as Record<string, unknown>).applicable ?? 0), big = rowsToSend > 50, draft = body.mode === 'draft';
+    const outcome = { group_id: uid('group'), mode: draft ? 'draft' as const : 'submit' as const, queued: big ? 1 : 0,
+      batches: [{ id: uid('batch'), ref: 'CW', template_id: 'TPL-SITE-CW', submitted: big || draft ? 0 : 1, saved: draft && !big ? 1 : 0, held: 0, failed: 0, errors: 0,
+        ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }], skipped: [] };
+    const t0 = now();
+    Object.assign(r, { status: 'applied', applied_at: t0, apply_reason: body.reason, apply_mode: outcome.mode, group_id: outcome.group_id, outcome, version: r.version + 1,
+      applied_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' },
+      progress: big ? { state: 'running', batches: 1, batches_running: 1, rows_total: rowsToSend, rows_done: 0, percent: 0, submitted: 0, saved: 0, approved: 0, held: 0, failed: 0,
+        started_at: t0, updated_at: t0, finished_at: null } : null });
+    return HttpResponse.json({ ...r, outcome }, { status: big ? 202 : 200, headers: { ETag: `"${r.version}"` } });
   }),
   // Q462 (contract 0.14.3): the one-time historical-load document waiver. Any signed-in user reads it; only a System Admin opens or closes it, with a step-up.
   http.get(`${B}/settings/historical-waiver`, () => { const g = guard(); if (g) return g; return HttpResponse.json(waiverView()); }),

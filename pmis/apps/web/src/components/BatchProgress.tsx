@@ -75,9 +75,16 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
       ...(pr?.failed ? [{ key: 'failed', n: pr.failed, tone: 'bg-late', label: t('batchProgress.invalid') }] : []),
       { key: 'pending', n: Math.max(0, total - shown - (pr?.failed ?? 0)), tone: 'bg-wait', label: t('batchProgress.pending') },
     ];
+    // 0.14.6: a register or a stream batch says what its rows became so far (records approved, tasks submitted); rounded down like the server's percent
+    const kind = pr?.batch_kind ?? (b.stream ? 'stream' : b.entity === 'site' ? 'site' : 'register');
+    const what = !pr || kind === 'site' ? null
+      : kind === 'register'
+        ? (pr.kind === 'decide' && pr.action !== 'approve' ? { key: 'batchProgress.processing_records_decided', n: pr.decided ?? 0 } : { key: 'batchProgress.processing_records', n: pr.approved ?? 0 })
+        : (pr.kind === 'decide' ? { key: 'batchProgress.processing_tasks_decided', n: pr.decided ?? 0 } : { key: 'batchProgress.processing_tasks', n: pr.submitted ?? 0 });
     return (
       <section className={wrap} data-testid="batch-progress" data-phase="processing" aria-label={t('batchProgress.title')} aria-busy="true">
         <Bar segs={segs} total={total} now={creating ? pct(shown, total) : p} label={label} testid="batch-progress-processing" />
+        {what && <p className="mt-2 text-sm" data-testid="batch-progress-processing-kind" data-kind={kind}>{t(what.key, { done: what.n, total, pct: total > 0 ? Math.floor((what.n * 100) / total) : 0 })}</p>}
         <p className="mt-2 text-xs text-mute" role="status" data-testid="batch-progress-processing-note">{t('batchProgress.processing_note')}</p>
       </section>
     );

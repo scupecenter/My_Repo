@@ -339,6 +339,8 @@ describe('hybrid mode list', () => {
       'GET /settings/historical-waiver', 'PUT /settings/historical-waiver',
       // contract 0.14.5: the site map of the dashboard (OV-12)
       'GET /dashboard/site-map',
+      // contract 0.14.6: the background threshold of batches (Settings, Imports)
+      'GET /settings/imports', 'PUT /settings/imports',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

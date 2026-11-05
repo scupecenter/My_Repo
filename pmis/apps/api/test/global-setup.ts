@@ -148,6 +148,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const hwDb = await buildDatabase(adminUrl, hw, appPassword, true);
   process.env.TEST_DATABASE_URL_HW = hwDb.appUrl;
   process.env.TEST_SUPER_URL_HW = hwDb.superUrl;
+  // The async database (migration 0075): the register and stream batches sent in the background, and the Settings field of imports.async_rows, which the suite
+  // changes (every other suite reads the threshold). The seeded Document Library stays active (the historical-load waiver and the per-chunk document sync).
+  const asy = `${dbName}_async`;
+  const asyDb = await buildDatabase(adminUrl, asy, appPassword, true);
+  process.env.TEST_DATABASE_URL_ASYNC = asyDb.appUrl;
+  process.env.TEST_SUPER_URL_ASYNC = asyDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -187,6 +193,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${p9m} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hw} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
     await a.end();
   };
 }

@@ -347,6 +347,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.5 (apps/api: dashboard, site-map.service): the site map of the dashboard (OV-12, SC-10). `GET /sites?coordinates=` and the tower fields of the site use
   // the paths above.
   ['get', '/dashboard/site-map'],
+  // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
+  ['get', '/settings/imports'],
+  ['put', '/settings/imports'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

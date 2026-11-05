@@ -16,6 +16,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { TaskViewService } from '../workflow/task-view.service';
+import { ImportJobsService } from '../templates/import-jobs.service';
 import { TPL_SHEET } from '../templates/templates.service';
 import type { UploadedFile } from '../templates/upload.interceptor';
 import { guardXlsx } from '../templates/xlsx-guard';
@@ -44,7 +45,7 @@ const resolveBody = z.object({ resolution: z.enum(['open', 'pmis_correct', 'mast
 interface RunRow {
   id: string; file_name: string; file_sha256: string; file_size: bigint; status: string; structure: Record<string, unknown>; summary: Record<string, unknown>;
   created_by: string; created_at: Date; applied_by: string | null; applied_at: Date | null; apply_reason: string | null; apply_mode: string | null; group_id: string | null;
-  outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string;
+  outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string; progress: Record<string, unknown> | null;
 }
 
 interface DiffRow {
@@ -64,6 +65,7 @@ export class MasterImportService {
     private readonly syslog: SyslogService,
     private readonly storage: StorageService,
     private readonly view: TaskViewService,
+    private readonly jobs: ImportJobsService,
   ) {}
 
   private async canUse(): Promise<boolean> {
@@ -168,6 +170,7 @@ export class MasterImportService {
     return Prisma.sql`
       SELECT r.id::text AS id, r.file_name, r.file_sha256, r.file_size, r.status, r.structure, r.summary, r.created_by::text AS created_by, r.created_at,
         r.applied_by::text AS applied_by, r.applied_at, r.apply_reason, r.apply_mode, r.group_id::text AS group_id, r.outcome, r.version, r.storage_key IS NOT NULL AS has_file,
+        mi_run_progress_json(r.id) AS progress,
         to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM master_reconciliation_runs r WHERE ${where} ${tail}`;
   }
@@ -179,6 +182,8 @@ export class MasterImportService {
       created_by: refs.get(r.created_by) ?? { id: r.created_by }, created_at: r.created_at,
       applied_by: r.applied_by ? refs.get(r.applied_by) ?? { id: r.applied_by } : null, applied_at: r.applied_at, apply_reason: r.apply_reason, apply_mode: r.apply_mode,
       group_id: r.group_id, outcome: r.outcome, has_file: r.has_file, version: r.version,
+      // 0075: the background sends of the batches of an applied run (null when every batch was sent in the request)
+      progress: r.progress ?? null,
     }));
   }
 
@@ -277,10 +282,13 @@ export class MasterImportService {
       await this.stepUp.require(auth);
     }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
     const outcome = await this.call<Record<string, unknown>>(auth, body.historical_load
       ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify({ reason: body.historical_load.reason })}::jsonb) AS r`
       : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
-    return { ...(await this.getRun(auth, id)), outcome };
+    const queued = ((outcome.batches ?? []) as { queued?: boolean; job_id?: string }[]).filter((b) => b.queued && b.job_id);
+    this.jobs.kickInOrder(queued.map((b) => b.job_id as string));
+    return { ...(await this.getRun(auth, id)), outcome, ...(queued.length > 0 ? { accepted: true } : {}) };
   }
 
   async resolve(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {

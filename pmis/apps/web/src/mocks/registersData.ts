@@ -186,6 +186,9 @@ export type MockBatch = {
 export type MockRun = {
   id: string; kind: 'submit' | 'decide'; state: 'running' | 'done' | 'failed'; rows: string[]; done: number; self: boolean;
   submitted: number; approved: number; failed: number; started_at: string; updated_at: string; finished_at: string | null;
+  /** Contract 0.14.6: a register or a stream batch runs in the background too; the decision and the per-row choices of a `decide` run. */
+  batchKind?: 'site' | 'register' | 'stream'; action?: 'approve' | 'review' | 'reject' | null; note?: string | null;
+  choices?: Record<string, { decision: 'approved' | 'rejected'; note?: string }>; decided?: number; rejected?: number; held?: number;
 };
 
 const pad = (n: number) => String(n).padStart(12, '0');

@@ -48,7 +48,7 @@ describe('a big New sites batch in the background', () => {
     expect(screen.getByTestId('batch-progress')).toHaveAttribute('data-phase', 'processing');
     expect(screen.getByTestId('batch-progress-processing-label')).toHaveTextContent(/Processing in the background: \d+ of 120 rows \(\d+%\)/);
     expect(screen.getByTestId('batch-progress-processing-bar')).toHaveAttribute('role', 'progressbar');
-    expect(screen.getByTestId('batch-progress-processing-note')).toHaveTextContent(/parts of 25 rows/);
+    expect(screen.getByTestId('batch-progress-processing-note')).toHaveTextContent(/part by part/);
     expect(screen.queryByTestId('batch-submit')).not.toBeInTheDocument();
     expect(screen.queryByTestId('batch-discard')).not.toBeInTheDocument();
     expect(screen.getByTestId('batch-processing-busy')).toBeDisabled();
@@ -93,7 +93,7 @@ describe('a big New sites batch in the background', () => {
     expect(await screen.findByTestId('batch-progress-processing-label')).toHaveTextContent('المواقع المُنشأة 100 من 469 (21%)');
     expect(document.documentElement.dir).toBe('rtl');
     expect(screen.getByTestId('batch-status')).toHaveTextContent('قيد المعالجة');
-    expect(screen.getByTestId('batch-progress-processing-note')).toHaveTextContent(/25 صفاً/);
+    expect(screen.getByTestId('batch-progress-processing-note')).toHaveTextContent(/جزءاً بعد جزء/);
     expect(screen.getByTestId('batch-progress-processing-bar')).toHaveAttribute('aria-valuenow', '21');
     expect(screen.getByTestId('batch-processing-busy')).toBeDisabled();
   }, 30_000);

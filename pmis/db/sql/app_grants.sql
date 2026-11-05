@@ -79,4 +79,4 @@ BEGIN
     AND a.attname NOT IN ('id', 'site_code', 'name', 'name_ar', 'region_id', 'cluster_id', 'latitude', 'longitude');
   EXECUTE format('GRANT UPDATE (%s) ON sites TO pmis_app', cols);
 END $$;
-REVOKE ALL ON import_batch_jobs FROM pmis_app;  -- 0074: the background runs of a big New sites batch only through imp_async_start, imp_async_step, imp_async_pending, imp_async_abandon and imp_batch_job_json (owner pmis_definer)
+REVOKE ALL ON import_batch_jobs FROM pmis_app;  -- 0074 / 0075: the background runs of a big batch (New sites, register, stream, Master apply) only through imp_async_start, imp_async_step, imp_async_chunk_tasks, imp_async_pending, imp_async_abandon and imp_batch_job_json (owner pmis_definer)

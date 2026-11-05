@@ -3145,7 +3145,7 @@ model ImportBatchJob {
   id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   batch_id        String    @db.Uuid
   kind            String // submit | decide
-  action          String?
+  action          String? // approve (0074); approve | review | reject (0076)
   scope           String?
   items           Json?
   note            String?
@@ -3166,6 +3166,8 @@ model ImportBatchJob {
   n_approved      Int       @default(0)
   n_rejected      Int       @default(0)
   n_failed        Int       @default(0)
+  n_held          Int       @default(0) // 0076: rows held at a send or left by an approve-all
+  n_saved         Int       @default(0) // 0076: rows saved by a Save Draft send
   failed          Json      @default("[]")
   chunks          Int       @default(0)
   error           String?

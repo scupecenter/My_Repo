@@ -4,11 +4,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError } from '@/api/client';
+import type { ImportBatch } from '@/api/types';
 import {
   downloadOriginal, exportDiffs, useApplyRun, useMasterDiffs, useMasterRun, useMasterRuns, useResolveDiff, useUploadLegacyMaster,
-  type DiffFilters, type MasterImportDiff, type MasterImportRun,
+  type DiffFilters, type MasterImportDiff, type MasterImportRun, type MasterImportRunProgress,
 } from '@/api/masterImport';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
+import { BatchProgress } from '@/components/BatchProgress';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from '@/components/HistoricalLoadOption';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
@@ -105,6 +107,32 @@ export function ReconciliationPage() {
   );
 }
 
+/**
+ * 0.14.6: the staged batches of a big apply are sent in the background. While they run, the same bar as a batch page (BatchProgress, phase processing) shows the
+ * rows done and the tasks submitted; the page reads the run again every 3 s. When they end, one line says what was sent and what failed.
+ */
+function RunProgress({ p }: { p: MasterImportRunProgress }) {
+  const { t } = useTranslation();
+  if (p.state === 'running') {
+    const batch = {
+      id: 'mi-run', template_id: 'TPL-MASTER', template_version: 0, version: 0, status: 'processing', stream: 'master', counts: {},
+      progress: { job_id: 'mi-run', kind: 'submit', batch_kind: 'stream', action: null, state: 'running', rows_total: p.rows_total, rows_done: p.rows_done, percent: p.percent,
+        submitted: p.submitted ?? 0, approved: p.approved ?? 0, failed: p.failed ?? 0 },
+    } as unknown as ImportBatch;
+    return (
+      <div data-testid="mi-run-progress" data-state={p.state}>
+        <BatchProgress batch={batch} />
+        <p className="text-xs text-mute" data-testid="mi-run-progress-batches">{t('mi.progress_batches', { running: p.batches_running ?? 0, total: p.batches })}</p>
+      </div>
+    );
+  }
+  return (
+    <p className={`card p-3 text-sm ${p.state === 'failed' || (p.failed ?? 0) > 0 ? 'text-lateInk' : ''}`} role="status" data-testid="mi-run-progress" data-state={p.state}>
+      {p.state === 'failed' ? t('mi.progress_failed', { done: p.rows_done, total: p.rows_total }) : t('mi.progress_done', { submitted: p.submitted ?? 0, saved: p.saved ?? 0, failed: p.failed ?? 0, total: p.rows_total })}
+    </p>
+  );
+}
+
 function RunDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -141,6 +169,7 @@ function RunDetail({ id }: { id: string }) {
         <p className="text-mute">{t('mi.staff', { mapped: num(r.summary, 'staff_mapped'), rows: num(r.summary, 'staff_rows') })}</p>
         {r.status === 'applied' && <p data-testid="mi-applied" className="font-semibold">{t('mi.applied', { mode: t(`mi.mode_${r.apply_mode}`), reason: r.apply_reason ?? '' })}</p>}
       </div>
+      {r.progress && <RunProgress p={r.progress} />}
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2">
         <select className="input w-auto" aria-label={t('mi.col_kind')} data-testid="mi-filter-kind" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
@@ -193,7 +222,7 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
   const [err, setErr] = useState<string | null>(null);
   const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim() } } : {}) }, {
-    onSuccess: (r) => { toast(t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
+    onSuccess: (r) => { toast(r.progress?.state === 'running' ? t('mi.applied_processing') : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
     onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
   });
   return (

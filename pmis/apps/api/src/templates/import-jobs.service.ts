@@ -2,10 +2,14 @@ import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } f
 import { Prisma } from '@prisma/client';
 import { APP_CONFIG, AppConfig } from '../config/config';
 import { DbService } from '../db/db.service';
+import { DocumentsService } from '../documents/documents.service';
 import { applyContext, jobContext } from '../logs/context';
 import { JobRunsService } from '../logs/job-runs.service';
 
-/** Rows per chunk: each chunk is one transaction, about 2 s for 25 New Build sites (migration 0074), far below the 30 s request limit. */
+/**
+ * Rows per chunk of a New sites batch: each chunk is one transaction, about 2 s for 25 New Build sites (migration 0074), far below the 30 s request limit.
+ * Since 0075 the database chooses the size by the kind of batch when the API passes none (imp_async_chunk_size: New sites 25, register rows 50, stream rows 25).
+ */
 export const IMPORT_CHUNK_ROWS = 25;
 /** The limit of one chunk transaction (a chunk normally takes a few seconds). */
 export const IMPORT_CHUNK_TIMEOUT_MS = 120_000;
@@ -36,7 +40,7 @@ export interface JobProgress {
 }
 
 /**
- * The background run of a big New sites batch (migration 0074, technical decision of 2026-11-05).
+ * The background run of a big batch: New sites (migration 0074), register and stream batches (0075; technical decisions of 2026-11-05).
  *
  * The request (POST submit / decisions) checks everything and records the run in the request transaction (imp_async_start), then answers 202. This service
  * does the rows: chunk after chunk, each in its own transaction (never the request transaction, which Prisma ends after 30 s), under a newly signed
@@ -58,6 +62,7 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     private readonly db: DbService,
     private readonly runs: JobRunsService,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
+    private readonly documents: DocumentsService,
   ) {}
 
   onApplicationBootstrap(): void {
@@ -82,6 +87,34 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     if (!this.autoStart || this.stopped) return;
     const t = setTimeout(() => void this.runWhenVisible(jobId, 0), 50);
     t.unref();
+  }
+
+  /**
+   * 0075: several runs asked by one request (the batches of a Master import apply) are done one after the other, never at the same time, so that two chunks
+   * never update the same sites concurrently.
+   */
+  kickInOrder(jobIds: string[]): void {
+    if (!this.autoStart || this.stopped || jobIds.length === 0) return;
+    const run = async (): Promise<void> => {
+      for (const id of jobIds) {
+        if (this.stopped) return;
+        await this.runWhenVisibleAwait(id);
+      }
+    };
+    const t = setTimeout(() => void run(), 50);
+    t.unref();
+  }
+
+  /** As runWhenVisible, but resolves when the run ended (or never became visible). */
+  private async runWhenVisibleAwait(jobId: string): Promise<void> {
+    for (let attempt = 0; attempt < 40 && !this.stopped; attempt++) {
+      const job = (await this.pending(0)).find((j) => j.job_id === jobId);
+      if (job) {
+        await this.process(job);
+        return;
+      }
+      await new Promise((r) => setTimeout(r, 250).unref());
+    }
   }
 
   /** Resolves when no run of this process is active (tests). */
@@ -143,11 +176,23 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     return p;
   }
 
-  /** One chunk, in its own transaction under the person's signed context. Exposed for the tests (a run interrupted after one chunk). */
-  async step(job: PendingJob, chunk: number = IMPORT_CHUNK_ROWS): Promise<JobProgress> {
+  /**
+   * One chunk, in its own transaction under the person's signed context. Exposed for the tests (a run interrupted after one chunk). `chunk` overrides the size
+   * the database chooses for the kind of batch. For a stream send, the document slots of the chunk's tasks are synchronised first, in the same transaction
+   * (the conditional documents that apply now are slots before the engine counts the missing ones, as the synchronous send does for all its tasks).
+   */
+  async step(job: PendingJob, chunk?: number): Promise<JobProgress> {
+    const size = chunk ?? null;
+    const ctx = this.contextOf(job);
     return this.db.client.$transaction(async (tx) => {
-      await applyContext(tx, this.contextOf(job));
-      const r = await tx.$queryRaw<{ r: JobProgress }[]>(Prisma.sql`SELECT imp_async_step(${job.job_id}::uuid, ${chunk}::int) AS r`);
+      await applyContext(tx, ctx);
+      const tasks = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`SELECT t::text AS id FROM imp_async_chunk_tasks(${job.job_id}::uuid, ${size}::int) AS t`);
+      if (tasks.length > 0) {
+        await this.db.runIn(tx, async () => {
+          for (const t of tasks) await this.documents.syncTaskById(t.id);
+        }, ctx);
+      }
+      const r = await tx.$queryRaw<{ r: JobProgress }[]>(Prisma.sql`SELECT imp_async_step(${job.job_id}::uuid, ${size}::int) AS r`);
       return r[0]?.r ?? { state: 'failed' };
     }, { maxWait: 10_000, timeout: IMPORT_CHUNK_TIMEOUT_MS });
   }

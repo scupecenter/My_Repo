@@ -89,6 +89,7 @@ export type HolidayChangeResult = S['HolidayChangeResult'];
 export type HolidaySummary = S['HolidaySummary'];
 export type CalendarConfirmation = S['CalendarConfirmation'];
 export type MailNotificationKinds = S['MailNotificationKinds'];
+export type ImportsSettings = S['ImportsSettings'];
 export type Calendar = S['Calendar'];
 export type WeekendDaysResult = S['WeekendDaysResult'];
 export type SlaRule = S['SlaRule'];

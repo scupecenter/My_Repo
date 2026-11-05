@@ -555,7 +555,7 @@ export class ImportService {
           ? { cutoff_date: r.historical_cutoff, reason: r.historical_reason, marked_by: r.historical_marked_by ? (refs.get(r.historical_marked_by) ?? { id: r.historical_marked_by }) : null, marked_at: r.historical_marked_at }
           : null,
         job_id: null,
-        // 0074: the background run of a big New sites batch (null when the batch never had one); status is `processing` while it runs
+        // 0074 / 0075: the background run of a big batch (null when the batch never had one); status is `processing` while it runs
         progress: r.progress ?? null,
         task_id: r.task_id,
         site_id: r.site_id,
@@ -701,6 +701,10 @@ export class ImportService {
   async submit(auth: AuthContext, id: string, ifMatch: string | undefined): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
     const batch = await this.getBatch(auth, id);
+    const until = await this.stepUp.validUntil(auth);
+    // 0074 / 0075: a big batch (New sites, register, stream) is sent in the background; a stream send then synchronises the documents of each chunk's tasks in that chunk
+    const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'submit', NULL, NULL, NULL, NULL, ${until}::timestamptz) AS r`);
+    if (queued) return queued;
     if (batch.stream) {
       // as on the task screen: the conditional documents that apply now are slots before the engine counts the missing ones
       const tasks = await this.db.tx.$queryRaw<{ id: string }[]>(Prisma.sql`
@@ -708,16 +712,13 @@ export class ImportService {
         WHERE r.batch_id = ${id}::uuid AND r.task_instance_id IS NOT NULL AND r.action = 'update' AND r.task_submitted_at IS NULL AND r.decision IN ('pending', 'pending_previous_approval')`);
       for (const t of tasks) await this.documents.syncTaskById(t.id);
     }
-    const until = await this.stepUp.validUntil(auth);
-    const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'submit', NULL, NULL, NULL, NULL, ${until}::timestamptz) AS r`);
-    if (queued) return queued;
     const stepOk = Boolean(until);
     const outcome = await this.call<Outcome>(auth, Prisma.sql`SELECT imp_submit_batch(${id}::uuid, ${version}::int, ${stepOk}::boolean) AS r`);
     return { ...(await this.getBatch(auth, id)), outcome };
   }
 
   /**
-   * 0074: a New sites batch with more rows than `imports.async_rows` (default 50) is sent or approved in the background. The database checks everything now
+   * 0074 / 0075: a batch (New sites, register, stream) with more rows than `imports.async_rows` (default 50) is sent or decided in the background. The database checks everything now
    * (rights, state, If-Match, note, step-up) and records the run; the answer is the batch in status `processing` with `accepted: true` (the controller
    * answers 202). Null: the request runs as before.
    */
@@ -745,7 +746,8 @@ export class ImportService {
       if (regs !== null && regs.length === 0) throw problems.forbidden('action_forbidden', `You need ${body.action === 'approve' ? 'approve' : 'view'} on ${module}.`);
     }
     const until = await this.stepUp.validUntil(auth);
-    if (body.action === 'approve') {
+    // 0074: a New sites approval; 0075: an approval, a review or a return of a register or a stream batch (a discard is one statement and stays in the request)
+    if (body.action !== 'discard') {
       const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'decide', ${body.action}::text, ${body.scope}::text,
         ${body.rows ? JSON.stringify(body.rows) : null}::jsonb, ${body.note ?? null}::text, ${until}::timestamptz) AS r`);
       if (queued) return queued;
