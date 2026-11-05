@@ -158,7 +158,7 @@ export function listItem(i: number, stream?: string, view?: string): SiteListIte
   const pipe = pipelineOf(i).filter((n) => (!stream || streamOfStage(n.code) === stream) && (!view || tasks.some((t) => t.stage_code === n.code)));
   const cur = pipe.find((n) => n.state === 'current' || n.state === 'late');
   return {
-    id: m.id, site_code: m.code, name: m.name, region_id: m.region_id as SiteListItem['region_id'], cluster_code: m.cluster, delivery_scenario: m.scenario, overall_status: m.status,
+    id: m.id, site_code: m.code, name: m.name, name_ar: i % 2 === 0 ? `موقع ${m.name}` : null, region_id: m.region_id as SiteListItem['region_id'], cluster_code: m.cluster, delivery_scenario: m.scenario, overall_status: m.status,
     current_milestone: cur?.code ?? null, next_milestone: pipe.find((n) => n.state === 'planned')?.code ?? null, workflow_version: 1,
     late_task_count: tasks.filter((t) => t.sla?.colour === 'red' && t.state !== 'approved').length,
     waiting_approval_count: tasks.filter((t) => t.state === 'in_review' || t.state === 'in_approval').length, rail: bad(pipe) as SiteListItem['rail'],

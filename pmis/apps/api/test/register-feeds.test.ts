@@ -216,13 +216,13 @@ describe('Q225: a site field that changes rules goes through Change Control', ()
 describe('the other register feeds (Q103)', () => {
   it('RF & Design fills rf_design_records and the site identity; Acquisition fills its candidates and Master T', async () => {
     const t = await team(app, db, 'rf_design', 'rf_design', R);
-    const rf = await create(t, 'rf_design', { site_owner_id: `OWN-${U}`, latitude: 32.5, longitude: 13.1, site_scenario: 'Expansion', tower_height: 30, antenna_height: 28, sectors: 3 });
+    const rf = await create(t, 'rf_design', { site_owner_id: `OWN-${U}`, latitude: 32.5, longitude: 13.1, site_scenario: 'Indoor', tower_height: 30, antenna_height: 28, sectors: 3 });
     expect((await q(db, 'SELECT 1 FROM rf_design_records WHERE id = $1', [rf.entity_id])).length).toBe(0);
     await approveFlex(t, rf.id, rf.version);
     expect((await q<Record<string, unknown>>(db, 'SELECT antenna_height_m::float AS a, sectors, record_version FROM rf_design_records WHERE id = $1', [rf.entity_id]))[0])
       .toMatchObject({ a: 28, sectors: 3, record_version: 1 });
     expect((await q<Record<string, unknown>>(db, `SELECT owner_site_id, latitude::float AS lat, site_scenario, delivery_scenario::text AS ds, tower_height_m::float AS th FROM sites WHERE id = $1`, [t.site.id]))[0])
-      .toMatchObject({ owner_site_id: `OWN-${U}`, lat: 32.5, site_scenario: 'Expansion', ds: 'expansion', th: 30 });
+      .toMatchObject({ owner_site_id: `OWN-${U}`, lat: 32.5, site_scenario: 'Indoor', ds: 'new_build', th: 30 });   // 0070 (G8): the RF Site Scenario is Indoor / Outdoor, it no longer moves the Delivery Scenario
     expect((await q(db, `SELECT 1 FROM audit_log WHERE action = 'site_identity_fed' AND entity_id = $1`, [t.site.id])).length).toBe(1);
 
     const a = await team(app, db, 'acquisition', 'acquisition', R);

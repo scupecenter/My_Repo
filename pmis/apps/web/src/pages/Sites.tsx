@@ -1,9 +1,15 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
-import { Download, RotateCcw } from 'lucide-react';
+import { Download, FileDown, FilePlus2, FileUp, RotateCcw } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useMe } from '@/api/hooks';
+import { downloadTemplate, useTemplates } from '@/api/registers';
 import { useRegions, useSites, useStreams, useViews } from '@/api/sites';
+import { batchPath } from '@/api/types';
+import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
+import { isAdmin } from '@/lib/perm';
+import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { ViewTabs } from '@/components/ViewTabs';
 import { SavedViews } from '@/components/SavedViews';
@@ -56,6 +62,11 @@ export function Sites() {
   const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
+  // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
+  const me = useMe(true).data;
+  const newTpl = useTemplates().data?.find((x) => x.template_id === 'TPL-SITE-NEW');
+  const canCreate = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'sites' && (g.action as string) === 'create');
+  const [upSites, setUpSites] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
@@ -117,7 +128,7 @@ export function Sites() {
     const st = statusOf(s.streams, stream);
     switch (id) {
       case 'code': return <b className="mono">{s.site_code}</b>;
-      case 'name': return <Trunc text={s.name} />;
+      case 'name': return <span className="flex min-w-0 items-baseline gap-2"><Trunc text={s.name} />{s.name_ar && <span dir="rtl" lang="ar" className="truncate text-xs text-mute" data-testid={`site-name-ar-${s.site_code}`}>{s.name_ar}</span>}</span>;
       case 'region': return <Trunc text={rname(s.region_id)} />;
       case 'stream_status': return <span className={`chip ${STREAM_TONE[st?.state ?? 'na']}`} data-testid={`stream-state-${s.site_code}`}>{t(`streamState.${st?.state ?? 'na'}`)}</span>;
       case 'stage': return <span data-testid={`stream-stage-${s.site_code}`}><Trunc text={stageName(st?.current_stage)} /></span>;
@@ -135,7 +146,13 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} />
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={(canCreate || newTpl) && (
+        <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
+          {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
+          {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
+            onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
+          <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
+        </span>)} />
       <div role="tablist" aria-label={t('sites.streams_label')} className="mb-3 flex flex-wrap gap-1 border-b border-line" data-testid="stream-tabs">
         {[{ code: '', label: t('sites.stream_all') }, ...tabs.map((s) => ({ code: s.code, label: streamName(t, i18n.language, s) }))].map((s) => (
           <button key={s.code || 'ALL'} role="tab" aria-selected={stream === s.code} data-testid={`stream-tab-${s.code || 'ALL'}`} onClick={() => setStream(s.code)}
@@ -201,6 +218,8 @@ export function Sites() {
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
+      {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
+        kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}
     </div>
   );
 }

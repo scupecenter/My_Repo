@@ -64,6 +64,7 @@ export function Site() {
           <div className="flex flex-wrap items-start gap-3">
             <div className="flex-1">
               <h1 className="text-2xl font-bold" data-testid="site-title"><span className="mono">{s.site_code}</span> {s.name}</h1>
+              {s.name_ar && <p dir="rtl" lang="ar" className="text-lg text-mute" data-testid="site-name-ar">{s.name_ar}</p>}
               <p className="text-mute" data-testid="site-meta">{(i18n.language === 'ar' && region?.name_ar) || region?.name_en} · {s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : ''}{s.cluster_code ? ` · ${s.cluster_code}` : ''}</p>
             </div>
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />

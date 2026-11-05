@@ -61,3 +61,8 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON saved_views, saved_view_targets, save
 
 -- 0069 (P1-DB-03): the session context keys are readable by pmis_definer only; pmis_app only calls app_begin (the signed session context)
 REVOKE ALL ON pmis_context_keys FROM pmis_app;
+
+-- 0070 (G1, Q460): a site is created only by site_create_apply when L2 approves (owner pmis_definer). pmis_app can no longer insert, delete or truncate sites, or write the
+-- drafts that hold the proposals (site_draft_*, imp_*_site_batch), or the accepted Master header aliases (G2).
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON site_drafts, master_header_aliases FROM pmis_app;
+REVOKE INSERT, DELETE, TRUNCATE ON sites FROM pmis_app;

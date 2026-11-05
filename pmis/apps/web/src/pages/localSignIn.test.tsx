@@ -331,6 +331,8 @@ describe('hybrid mode list', () => {
       'DELETE /me/drafts/:key',
       // contract 0.13.2: follow-up group C (Q267 cancel of a mistaken Quality snag record)
       'POST /registers/quality/records/:id/cancel-snag',
+      // contract 0.14.0: site creation (Q460): the draft and its life
+      'POST /sites', 'GET /site-drafts', 'GET /site-drafts/:id', 'PATCH /site-drafts/:id', 'DELETE /site-drafts/:id', 'POST /site-drafts/:id/submit', 'POST /site-drafts/:id/decide',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

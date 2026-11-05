@@ -1,4 +1,4 @@
-import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Session, TaskDetail, TaskSummary, UserRef, WorkflowStep } from '@/api/types';
+import type { ApprovalItem, BallInCourt, Comment, DocumentSlot, Matrix, Me, Session, SiteDraft, TaskDetail, TaskSummary, UserRef, WorkflowStep } from '@/api/types';
 import { initAdmin } from './adminData';
 import { initCfg } from './settingsData';
 import { initOrg } from './orgData';
@@ -88,6 +88,8 @@ const fresh = () => ({
   reg: initRegisters(),
   wh: initWarehouse(),
   notifications: seedNotifications(),
+  /** 0.14.0 (Q460): the site drafts (manual entry of new sites); a site exists only when L2 approves. */
+  siteDrafts: [] as (SiteDraft & { by: string })[],
   /** Phase 4b: follows, weekly status updates and the comment threads of register records. */
   x: initX(),
   admin: initAdmin(),
@@ -168,7 +170,7 @@ export function meBody(): Me {
   return {
     user: { id: uid(v.employee_id ?? '9999'), display_name: db().profiles?.[v.key]?.display_name ?? v.name, employee_id: v.employee_id, email: db().profiles?.[v.key]?.email ?? v.email, status: v.status, locale: db().profiles?.[v.key]?.locale ?? 'en', theme: db().profiles?.[v.key]?.theme ?? 'light' },
     assignments: [], is_system_admin: v.key === 'pm',
-    effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav },
+    effective: { grants: [...v.nav.map((m) => ({ module_key: m, action: 'view' as const, region_ids: 'all' as const })), ...(v.key === 'engineer' ? [{ module_key: 'sites', action: 'create' as const, region_ids: 'all' as const }] : []), ...(v.key === 'auditor' ? [{ module_key: 'admin.security_log', action: 'view_security_log' as const, region_ids: 'all' as const }, { module_key: 'audit', action: 'view_audit' as const, region_ids: 'all' as const }] : [])], nav: v.nav },
   };
 }
 

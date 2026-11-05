@@ -17,7 +17,7 @@ export const rowId = (r: Pick<ImportRow, 'row_no' | 'task_code'>): string => (r.
 const humanize = (code: string) => { const s = code.replace(/_/g, ' '); return s.charAt(0).toUpperCase() + s.slice(1); };
 
 /** The per-cell diff of one row: the field (by its label), what it was and what the file makes it. A new row lists the values it brings. */
-export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition }) {
+export function RowDiff({ row, def, site }: { row: ImportRow; def?: RegisterDefinition; site?: boolean }) {
   const { t, i18n } = useTranslation();
   const entries = Object.entries(row.diff ?? {});
   if (!entries.length) return <span className="text-mute">—</span>;
@@ -27,7 +27,7 @@ export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition
         const f = def?.fields.find((x) => x.code === code);
         const show = (x: unknown) => (f ? showValue(f, x, i18n.language, t) : x === null || x === undefined || x === '' ? '—' : String(x));
         // a task row: the three dates of the task, or a key of its values (the label of the field when the app has one)
-        const label = f ? fieldLabel(f, i18n.language) : row.task_code ? t(`batch.task_field.${code}`, { defaultValue: humanize(code) }) : code;
+        const label = f ? fieldLabel(f, i18n.language) : row.task_code ? t(`batch.task_field.${code}`, { defaultValue: humanize(code) }) : site ? t(`newSite.field.${code}`, { defaultValue: humanize(code) }) : code;
         return (
           <li key={code} className="flex flex-wrap items-baseline gap-1" data-testid={`batch-diff-${rowId(row)}-${code}`}>
             <span className="font-semibold">{label}</span>
@@ -46,13 +46,13 @@ export function RowDiff({ row, def }: { row: ImportRow; def?: RegisterDefinition
 }
 
 /** The reasons per cell of an invalid row: the header of the column, then the plain sentence (the server's own words when the app has none). */
-export function RowErrors({ row }: { row: ImportRow }) {
+export function RowErrors({ row, site }: { row: ImportRow; site?: boolean }) {
   const { t } = useTranslation();
   return (
     <ul className="space-y-0.5" data-testid={`batch-reason-${rowId(row)}`}>
       {(row.errors ?? []).map((e, i) => (
         <li key={`${e.code}-${i}`} data-testid={`batch-cell-error-${rowId(row)}-${e.field ?? e.code}`}>
-          {e.column && <b>{e.column}: </b>}{t(`regErrors.${e.code}`, { field: e.column ?? '', defaultValue: e.message ?? e.code })}
+          {e.column && <b>{e.column}: </b>}{site ? t(`newSite.err.${e.code}`, { defaultValue: e.message ?? e.code }) : t(`regErrors.${e.code}`, { field: e.column ?? '', defaultValue: e.message ?? e.code })}
         </li>
       ))}
     </ul>
@@ -85,6 +85,7 @@ export function RegisterBatch() {
   const b = batch.data;
   const key = keyParam || b?.register_key || '';
   const stream = b?.stream ?? null;
+  const siteBatch = b?.entity === 'site'; // a New sites batch (contract 0.14.0): its rows are site drafts, and a site is created when L2 approves a row
   const rows = useBatchRows(batchId, !!b);
   const submit = useSubmitBatch(), decide = useDecideBatch();
   const [show, setShow] = useState<'all' | 'valid' | 'invalid' | 'held'>('all');
@@ -99,10 +100,10 @@ export function RegisterBatch() {
   const shown = show === 'valid' ? valid : show === 'invalid' ? invalid : show === 'held' ? held : all;
   const sent = !!b && SENT.includes(b.status);
   // a register row has a record once the batch was sent; a task row is in the flow when its decision is pending (a held row is pending_previous_approval)
-  const open = decidable.filter((r) => r.decision === 'pending' && (r.record_id || stream));
+  const open = decidable.filter((r) => r.decision === 'pending' && (r.record_id || stream || siteBatch));
   const group = useBatches({ status: '', template_id: '', register_key: '', group_id: b?.group_id ?? '' }, !!b?.group_id);
-  const back = <Link className="btn" data-testid="batch-back" to={stream ? '/templates' : `/registers/${key}`}>{stream ? t('tpl.back') : t('registers.back')}</Link>;
-  const name = stream ? t(`tpl.stream_${stream}`, { defaultValue: stream }) : def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
+  const back = <Link className="btn" data-testid="batch-back" to={siteBatch ? '/sites' : stream ? '/templates' : `/registers/${key}`}>{siteBatch ? t('newSite.back') : stream ? t('tpl.back') : t('registers.back')}</Link>;
+  const name = siteBatch ? t('batch.site_name') : stream ? t(`tpl.stream_${stream}`, { defaultValue: stream }) : def ? ((i18n.language === 'ar' && def.name_ar) || def.name_en) : key;
   const ok = (r: ImportBatchOutcome | undefined) => { if (r) setOutcome({ ...r, held: r.held ?? [], failed: r.failed ?? [] }); };
   const send = (x: ImportBatch) => submit.mutate(x, { onSuccess: (r) => { ok(r.outcome); toast(t('batch.sent')); }, onError: fail });
   const act = (x: ImportBatch, req: Parameters<typeof decide.mutate>[0]['req'], done?: string) =>
@@ -187,9 +188,9 @@ export function RegisterBatch() {
                       <td className="mono p-2">{r.source_ref && b.group_id ? r.source_ref : r.row_no}</td>
                       <td className="mono p-2 font-semibold">{r.key ?? '—'}</td>
                       <td className="p-2"><span className={`chip ${ACTION_TONE[r.action]}`}>{t(`batch.action_${r.action}`)}</span></td>
-                      <td className="p-2">{r.action === 'error' ? <span className="text-mute">—</span> : <RowDiff row={r} def={def} />}</td>
+                      <td className="p-2">{r.action === 'error' ? <span className="text-mute">—</span> : <RowDiff row={r} def={def} site={siteBatch} />}</td>
                       <td className="p-2 text-lateInk">
-                        {r.action === 'error' ? <RowErrors row={r} /> : r.note ? <span className="text-mute" data-testid={`batch-note-${rowId(r)}`}>{r.note}</span> : !r.warnings?.length ? '—' : null}
+                        {r.action === 'error' ? <RowErrors row={r} site={siteBatch} /> : r.note ? <span className="text-mute" data-testid={`batch-note-${rowId(r)}`}>{r.note}</span> : !r.warnings?.length ? '—' : null}
                         <RowWarnings row={r} />
                       </td>
                       <td className="p-2">{r.action === 'error' ? '—' : r.action === 'unchanged' ? <span className="text-mute">{t('batch.skipped')}</span>
@@ -197,8 +198,9 @@ export function RegisterBatch() {
                       <td className="p-2">
                         <span className="flex flex-wrap gap-1">
                           {r.record_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-record-${rowId(r)}`} to={`/registers/${key}?record=${r.record_id}`}>{t('batch.open_record')}</Link>}
+                          {siteBatch && r.site_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-site-${rowId(r)}`} to={`/sites/${r.site_id}`}>{t('batch.open_site')}</Link>}
                           {r.task_id && r.site_id && <Link className="btn px-2 py-0.5 text-xs" data-testid={`batch-open-task-${rowId(r)}`} to={`/sites/${r.site_id}?task=${r.task_id}`}>{t('batch.open_task')}</Link>}
-                          {canDecide && r.decision === 'pending' && (r.record_id || stream) && (
+                          {canDecide && r.decision === 'pending' && (r.record_id || stream || siteBatch) && (
                             <>
                               <button className="btn px-2 py-0.5 text-xs" data-testid={`batch-row-approve-${rowId(r)}`} disabled={decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'rows', rows: [{ row_id: r.id, decision: 'approved' }] }, t('approvals.done'))}><Check size={12} />{t('approvals.approve')}</button>
                               <button className="btn btn-danger px-2 py-0.5 text-xs" data-testid={`batch-row-reject-${rowId(r)}`} disabled={decide.isPending} onClick={() => setReturning(r.id)}><Undo2 size={12} />{t('batch.return')}</button>

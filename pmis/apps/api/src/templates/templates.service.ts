@@ -124,7 +124,7 @@ export class TemplatesService {
   }
 
   /** Does the caller have the right to use the template of this register (view on its module)? */
-  private async usable(t: TemplateRow): Promise<boolean> {
+  private async usable(t: TemplateRow, auth: AuthContext): Promise<boolean> {
     if (t.kind === 'register' && t.module_key) {
       const regs = await this.access.regions(t.module_key, 'view');
       return regs === null || regs.length > 0;
@@ -133,12 +133,17 @@ export class TemplatesService {
       const regs = await this.access.regions('sites', 'view');
       return regs === null || regs.length > 0;
     }
+    if (t.kind === 'sites') {
+      // the New sites template (0.14.0, Q460) is for those who may create sites and may download or import templates
+      const regs = await this.access.regions('sites', 'create');
+      if (regs !== null && regs.length === 0) return false;
+      return (await this.access.hasGrant(auth, 'templates', 'import')) || (await this.access.hasGrant(auth, 'templates', 'download_documents'));
+    }
     return false;
   }
 
   // ------------------------------------------------------------------ GET /templates
   async list(auth: AuthContext): Promise<{ items: unknown[] }> {
-    void auth;
     const rows = await this.db.tx.$queryRaw<TemplateRow[]>(Prisma.sql`
       SELECT d.id::text AS id, d.template_id, d.name, d.name_ar, d.kind, d.register_key, d.stream_code, d.module_key, d.current_version, d.is_active, d.updated_at,
         v.field_set_version, '[]'::jsonb AS columns, v.header_checksum, v.field_set_hash, d.custom_entity
@@ -148,7 +153,7 @@ export class TemplatesService {
       SELECT v.template_def_id::text AS def, v.version, v.published_at, v.reason FROM template_versions v ORDER BY v.version DESC`);
     const items: unknown[] = [];
     for (const t of rows) {
-      if (!(await this.usable(t))) continue;
+      if (!(await this.usable(t, auth))) continue;
       items.push({
         template_id: t.template_id,
         name_en: t.name,
@@ -173,6 +178,7 @@ export class TemplatesService {
     const t = await this.current(templateId);
     if (!t || !t.is_active) throw problems.notFound('This template does not exist.');
     if (t.kind === 'stream' || t.kind === 'master') return this.downloadSite(auth, t, q);
+    if (t.kind === 'sites') return this.downloadNewSites(auth, t);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
@@ -216,6 +222,21 @@ export class TemplatesService {
         ${JSON.stringify({ version: t.current_version, prefill, rows: rows.length, task_id: taskId ?? null, site_ids: site, region_id: region, register_key: t.register_key })}::jsonb, NULL)`);
     const name = `${t.template_id}_v${t.current_version}${prefill ? '_prefilled' : ''}_${issuedAt.toISOString().slice(0, 10)}.xlsx`;
     return { buffer, fileName: name };
+  }
+
+  /**
+   * TPL-SITE-NEW (0.14.0, Q460): one row per new site, empty (a new site has nothing to pre-fill). The columns are the identity and scope of a site; there is no landlord,
+   * contact, phone or e-mail column (Q469). The upload becomes a batch whose rows are site drafts for L2.
+   */
+  private async downloadNewSites(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
+    await this.access.requireRegions('sites', 'create');
+    if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const me = await this.db.tx.$queryRaw<{ employee_id: string | null }[]>(Prisma.sql`SELECT employee_id FROM users WHERE id = ${auth.user.id}::uuid`);
+    const issuedAt = new Date();
+    const buffer = await this.build(t, t.columns, [], { prefill: false, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
   private siteIds(q: Record<string, unknown>): string[] {
@@ -606,6 +627,21 @@ export class TemplatesService {
         'قالب معتمد من نظام GSDN PMIS. املأ الورقة وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
         'الأعمدة الرمادية محسوبة أو يحددها سير العمل أو يملكها سجل آخر: تظهر للعلم ولا تُقرأ. أدخل بيانات السجلات في سجلها. الخلية الفارغة لا تمسح قيمة موجودة.',
         'تُدخل كل مهمة تملؤها بصفة مُدخل البيانات (L1) وتُرسل، وتحتاج تاريخها الفعلي ومستنداتها الإلزامية كما في شاشة المهمة. المهمة المقفلة ببوابة مغلقة تُرفض، وتُعلَّق التي تنتظر سابقتها أو قيد المراجعة. لا يُعتمد شيء قبل قرار L2.',
+      ]
+      : t.kind === 'sites'
+      ? [
+        `GSDN PMIS approved template ${t.template_id}, version ${t.current_version} (New sites).`,
+        'Fill the sheet "Data" (one row per new site) and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
+        'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
+        'Required: Site ID, Region, Site Name (EN) and Delivery Scenario. The Site ID is unique for ever: a Site ID that exists, also one of a cancelled site, is refused. The region may be a region name, its code or a known alias (for example "Tripoli Area").',
+        'Scope columns take Yes, No or blank. A cluster that does not exist yet is created in the region of the site when L2 approves. Overall Status is Not Started (or blank) or Cancelled: a Cancelled row creates the site and then cancels it, so its history exists.',
+        'Landlord and contact details (names, phones, e-mails) are not loaded: the template has no such columns.',
+        'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas.',
+        'The upload becomes a batch. No site exists until the rows have gone through L1 (you send the batch) and L2 (Data Reviewer & Approver approves each row or all at once, with step-up).',
+        '',
+        'قالب معتمد من نظام GSDN PMIS لإنشاء مواقع جديدة. املأ الورقة Data (صف لكل موقع) وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
+        'المطلوب: رقم الموقع والمنطقة والاسم بالإنجليزية وسيناريو التسليم. رقم الموقع لا يتكرر أبدا حتى لموقع ملغى. لا تُحمَّل بيانات المالك وجهات الاتصال.',
+        'لا يُنشأ أي موقع قبل أن يعتمده مراجع البيانات (L2) بعد إرسال الدفعة منك (L1).',
       ]
       : [
         `GSDN PMIS approved template ${t.template_id}, version ${t.current_version}.`,

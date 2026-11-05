@@ -30,6 +30,7 @@ import { AsBuiltItems } from '@/pages/AsBuiltItems';
 import { Warehouse } from '@/pages/Warehouse';
 import { Site } from '@/pages/Site';
 import { Sites } from '@/pages/Sites';
+import { NewSite } from '@/pages/NewSite';
 import { Absence } from '@/pages/Absence';
 import { AnnouncementResults } from '@/pages/AnnouncementResults';
 import { Announcements } from '@/pages/Announcements';
@@ -88,6 +89,7 @@ function gated(session: Session) {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="dashboard/manual-items" element={<ManualItems />} />
         <Route path="sites" element={<Sites />} />
+        <Route path="sites/new" element={<NewSite />} />
         <Route path="sites/:siteId" element={<Site />} />
         <Route path="registers/:key" element={<RegisterPage />} />
         <Route path="warehouse" element={<Warehouse />} />
