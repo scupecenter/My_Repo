@@ -49,6 +49,7 @@ Read before any work:
 - **Site Register and streams (owner decision 2026-10-29).**
   - The Sites module is named **Site Register** (سجل المواقع).
   - It has a **stream filter** and one **sub-section per stream**. A sub-section shows and works on the sites' status in that stream only: its tasks, current step, late items and milestone.
+  - **Navigation (owner decision 2026-11-05).** Site Register is a main menu of its own: "All sites" (the whole site data) and six sub-menus, each limited to its boundaries: Design & Acquisition (stage 1), Civil Works (2–4), Installation TE (5–8), Handover & Closure (9–10), Dismantle (the Dismantle register, E1–E3) and O&M (after HOTO: TE DLP/FAC and Final Closure; it overlaps Handover & Closure on those, accepted). Every register (Procurement, GECOL, HLC, Permits & HSE, Warehouse, Quality, Issue Log, Risk Register, Change Control Log, Readiness & Handover, As-Built, Meetings, RF & Design, Acquisition, Contractors) sits under the main menu **Registers & Logs** (السجلات والقيود).
   - Default streams are seed data, admin-configurable and versioned with the workflow:
     - Design & Acquisition: stage 1;
     - Civil Works: stages 2–4;

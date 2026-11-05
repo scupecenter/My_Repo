@@ -1,21 +1,19 @@
 import type { Concept } from '@/lib/icons';
 
-export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'registers' | 'data' | 'admin' | 'logs' }[] = [
+export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'site_register' | 'registers' | 'data' | 'admin' | 'logs' }[] = [
   { key: 'my_work', to: '/my-work', icon: 'home', group: 'work' },
   { key: 'inbox', to: '/inbox', icon: 'inbox', group: 'work' },
   { key: 'approvals', to: '/approvals', icon: 'approval', group: 'work' },
-  { key: 'sites', to: '/sites', icon: 'site', group: 'work' },
   { key: 'workload', to: '/workload', icon: 'workload', group: 'work' },
   { key: 'status_updates', to: '/status-updates', icon: 'weekly', group: 'work' },
   { key: 'dashboard', to: '/dashboard', icon: 'dashboard', group: 'work' },
   { key: 'messages', to: '/messages', icon: 'message', group: 'work' },
+  { key: 'sites', to: '/sites', icon: 'site', group: 'site_register' },
+  { key: 'dismantle', to: '/registers/dismantle', icon: 'dismantle', group: 'site_register' },
   { key: 'procurement', to: '/registers/procurement', icon: 'procurement', group: 'registers' },
   { key: 'gecol', to: '/registers/gecol', icon: 'power', group: 'registers' },
   { key: 'hlc', to: '/registers/hlc', icon: 'fiber', group: 'registers' },
   { key: 'permits_hse', to: '/registers/permits_hse', icon: 'permit', group: 'registers' },
-  { key: 'dismantle', to: '/registers/dismantle', icon: 'dismantle', group: 'registers' },
-  { key: 'contractors', to: '/registers/contractors', icon: 'contractor', group: 'registers' },
-  { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'warehouse', to: '/warehouse', icon: 'warehouse', group: 'registers' },
   { key: 'quality', to: '/registers/quality', icon: 'quality', group: 'registers' },
   { key: 'issues', to: '/registers/issues', icon: 'issue', group: 'registers' },
@@ -26,6 +24,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'reg
   { key: 'meetings', to: '/registers/meetings', icon: 'meeting', group: 'registers' },
   { key: 'rf_design', to: '/registers/rf_design', icon: 'rf', group: 'registers' },
   { key: 'acquisition', to: '/registers/acquisition', icon: 'acquisition', group: 'registers' },
+  { key: 'contractors', to: '/registers/contractors', icon: 'contractor', group: 'registers' },
+  { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'templates', to: '/templates', icon: 'document', group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: 'people', group: 'admin' },
   { key: 'admin.roles', to: '/admin/roles', icon: 'role', group: 'admin' },
@@ -57,3 +57,11 @@ export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurem
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
 export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];
+
+/**
+ * Sub-menus of the Site Register main menu (owner request 2026-11-05). Streams 1-4 are the existing `?stream=` filter (codes as the API
+ * sends them in `workflow_streams`, names from `streams.ts`); O&M is the existing `?view=OM`; Dismantle is the NAV entry `dismantle`
+ * (own register route and own rights). They show when the caller may use the Site Register itself.
+ */
+export const SITE_STREAM_SUBMENUS = ['DESIGN_ACQ', 'CW', 'TE', 'CLOSURE'] as const;
+export const SITE_OM_VIEW = 'OM';
