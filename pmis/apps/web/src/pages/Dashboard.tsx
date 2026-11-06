@@ -283,6 +283,9 @@ export function Dashboard() {
 
       {!d ? <p className="text-mute" role="status" data-testid="dash-loading">{t('common.loading')}</p> : (
         <>
+          {/* OV-12 (first card, owner request 2026-11-06): the sites on the map (contract 0.14.5); the dashboard filters above narrow it too */}
+          <SiteMap testid="dash-site-map" height={520} outer={{ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, stream: q.stream === 'DISMANTLE' ? '' : q.stream }} />
+
           {/* headline */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <section className="card p-4 xl:col-span-2" data-testid="dash-kpi-progress" aria-label={t('dash.kpi.progress')}>
@@ -403,9 +406,6 @@ export function Dashboard() {
               </ul>
             </Card>
           </div>
-
-          {/* OV-12: the sites on the map (contract 0.14.5); the dashboard filters above narrow it too */}
-          <SiteMap testid="dash-site-map" height={520} outer={{ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, stream: q.stream === 'DISMANTLE' ? '' : q.stream }} />
 
           {/* streams */}
           <Card title={t('dash.streams.title')} testid="dash-streams" aside={<span className="text-sm text-mute">{t('dash.streams.hint')}</span>}>

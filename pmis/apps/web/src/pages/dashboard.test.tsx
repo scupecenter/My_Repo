@@ -18,6 +18,14 @@ const page = (route = '/dashboard', locale: 'en' | 'ar' = 'en') =>
   renderApp(<><Routes><Route path="/dashboard" element={<Dashboard />} /><Route path="*" element={<Where />} /></Routes></>, { route, locale });
 
 describe('Dashboard', () => {
+  it('puts the site map first, above the headline KPIs (owner request 2026-11-06)', async () => {
+    await signIn('pm');
+    page();
+    const kpi = await screen.findByTestId('dash-kpi-progress');
+    const map = await screen.findByTestId('dash-site-map');
+    expect(map.compareDocumentPosition(kpi) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  }, 30_000);
+
   it('shows the headline KPIs: weighted progress with plan and SPI "not available", sites by Overall Status, milestones, Final Closure', async () => {
     await signIn('pm');
     page();
