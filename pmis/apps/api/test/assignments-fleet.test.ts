@@ -1,9 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { allLocked, approve, q, taskRow, newSite, dbDate } from './calc-helpers';
 import { startApp, superDb } from './helpers';
 import { G, Team, approveFlex, patch, post, recPath, regCell, team } from './reg-helpers';
+import { PDF } from './doc-helpers';
 import { downloadTemplate, load } from './tpl-helpers';
 import { Actor, actor } from './wf-helpers';
 
@@ -45,6 +48,8 @@ interface Ctx { proc: Team; car: Team; fin: Team; viewerCar: Actor; viewerFin: A
 
 /** The three registers' holders in region 7, two members (m1 is also a Finance L2 holder: the custodian of the expense test) and two read-only users. */
 async function setup(): Promise<Ctx> {
+  // the shared test database switches the seeded Document Library off; the proof and receipt types of this feature are switched on for this suite
+  await db.query(`UPDATE document_types SET is_active = true WHERE code IN ('ADV_PROOF', 'ADV_RECEIPT')`);
   const proc = await team(app, db, 'procurement', 'procurement', R);
   const carEntry = await actor(app, db, { level: 'entry', grants: G('car_dispatcher', 'view', 'create', 'edit'), regions: [R], modules: null });
   const carApprove = await actor(app, db, { level: 'approve', grants: G('car_dispatcher', 'view', 'approve'), regions: [R], modules: null });
@@ -109,6 +114,16 @@ async function approveAdvance(c: Ctx, adv: Record<string, any>, amount: number):
   return approveFlex(c.fin, adv.id, p.body.version);
 }
 
+
+/** Attaches a file to the slot of a document code on a Financial Advances record (payment proof ADV_PROOF, receipt ADV_RECEIPT). */
+async function attach(c: Ctx, id: string, code: string): Promise<void> {
+  const slots = await c.fin.entry.api.call('get', recPath('financial_advances', id, '/slots'));
+  const slot = (slots.body.items as { id: string; doc_code: string }[]).find((x) => x.doc_code === code);
+  if (!slot) throw new Error(`no slot ${code}: ${JSON.stringify(slots.body)}`);
+  const up = await c.fin.entry.api.call('post', recPath('financial_advances', id, `/slots/${slot.id}/files`)).attach('file', PDF, { filename: 'proof.pdf', contentType: 'application/octet-stream' });
+  if (up.status !== 201) throw new Error(`upload failed: ${up.status} ${JSON.stringify(up.body)}`);
+}
+
 async function disburse(c: Ctx, adv: Record<string, any>, amount: number): Promise<Record<string, any>> {
   const nv = await c.fin.entry.api.call('post', recPath('financial_advances', adv.id, '/versions'), undefined, { 'If-Match': `"${adv.version}"` });
   expect(nv.status).toBe(201);
@@ -117,6 +132,7 @@ async function disburse(c: Ctx, adv: Record<string, any>, amount: number): Promi
     data: { advance_state: 'disbursed', disbursed_amount: amount, disbursed_date: today, payment_method: 'Cash', payment_ref: `PAY-${uniq()}` },
   });
   expect(p.status).toBe(200);
+  await attach(c, nv.body.id, 'ADV_PROOF');
   return approveFlex(c.fin, nv.body.id, p.body.version);
 }
 
@@ -278,6 +294,10 @@ describe('Financial Advances', () => {
     const dis = await disburse(c, await approveAdvance(c, a!, AMOUNT), AMOUNT);
     const today = await dbDate(db, 'cal_today()');
     const exp = await mk(c.fin, 'expense', { advance_id: dis.entity_id, expense_date: today, expense_kind: 'Fuel', amount: 50 });
+    const nore = await post(c.fin.entry.api, 'financial_advances', exp.id, 'submit', exp.version);
+    expect(nore.status).toBe(422);
+    expect(nore.body.errors.map((e: { code: string; path: string }) => `${e.path}:${e.code}`)).toContain('/data/receipt:required');
+    await attach(c, exp.id, 'ADV_RECEIPT');
     const sub = await post(c.fin.entry.api, 'financial_advances', exp.id, 'submit', exp.version);
     expect(sub.status).toBe(200);
     await c.cust.api.stepUp(c.cust.user.password);
@@ -290,6 +310,23 @@ describe('Financial Advances', () => {
     // the derived balance: disbursed - approved expenses - returned
     const adv = await c.fin.entry.api.call('get', recPath('financial_advances', dis.id));
     expect(adv.body.data.balance).toBe(AMOUNT - 50);
+  });
+
+  it('a disbursement needs its payment proof attached (Q508)', async () => {
+    const c = await setup();
+    const asg = await assignment(c, { vehicle_required: false, vehicle_not_required_reason: 'none', members: members(c.m1.user.id) });
+    const [a] = await children(c.fin, 'advance', asg);
+    const ap = await approveAdvance(c, a!, 100);
+    const nv = await c.fin.entry.api.call('post', recPath('financial_advances', ap.id, '/versions'), undefined, { 'If-Match': `"${ap.version}"` });
+    const today = await dbDate(db, 'cal_today()');
+    const p = await patch(c.fin.entry.api, 'financial_advances', nv.body.id, nv.body.version, {
+      data: { advance_state: 'disbursed', disbursed_amount: 100, disbursed_date: today, payment_method: 'Cash', payment_ref: 'PAY-X' },
+    });
+    const res = await post(c.fin.entry.api, 'financial_advances', nv.body.id, 'submit', p.body.version);
+    expect(res.status).toBe(422);
+    expect(res.body.errors.map((e: { code: string; path: string }) => `${e.path}:${e.code}`)).toContain('/data/payment_proof:required');
+    await attach(c, nv.body.id, 'ADV_PROOF');
+    expect((await post(c.fin.entry.api, 'financial_advances', nv.body.id, 'submit', p.body.version)).status).toBe(200);
   });
 
   it('refuses an expense on an advance of another site', async () => {
@@ -373,5 +410,13 @@ describe('milestones and gates do not change with the MOB tasks', () => {
     });
     expect(await snap(withMob)).toEqual(await snap(without));
     expect((await snap(withMob)).ms1!.state).toBe('approved');
+  });
+});
+
+describe('document rules judge the raw record, never the viewer-masked projection', () => {
+  it('documents.service reads r.data for the slot rules (the amounts mask is for what a user is shown)', () => {
+    const src = readFileSync(resolve(__dirname, '../src/documents/documents.service.ts'), 'utf8');
+    expect(src).not.toContain('reg_data_for');
+    expect(readFileSync(resolve(__dirname, '../src/registers/registers.service.ts'), 'utf8')).toContain('reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data');
   });
 });

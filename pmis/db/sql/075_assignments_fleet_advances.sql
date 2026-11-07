@@ -189,6 +189,36 @@ JOIN register_definitions r ON r.register_key = v.rk
 ON CONFLICT (template_id) DO NOTHING;
 SELECT tpl_sync_all();
 
+-- Document Library: the payment proof of a disbursement and the receipt of an expense (documents are data; the admin edits them). Not mandatory for the slot
+-- gate (an advance in its first versions has none); fa_rules requires one before a disbursed advance or an expense is submitted.
+DO $$
+DECLARE r record; did uuid; spec jsonb;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES
+    ('ADV_PROOF',   'Advance payment proof', 'إثبات صرف العهدة', 'advance'),
+    ('ADV_RECEIPT', 'Expense receipt',       'إيصال المصروف',    'expense')
+  ) AS v(code, name_en, name_ar, rtype) LOOP
+    CONTINUE WHEN EXISTS (SELECT 1 FROM document_types WHERE code = r.code);
+    spec := jsonb_build_object('kind', 'scanned_document', 'form_kind', NULL, 'name_en', r.name_en, 'name_ar', r.name_ar,
+      'placements', jsonb_build_array(jsonb_build_object('target', 'register', 'ref', 'financial_advances', 'record_type', r.rtype)), 'mandatory', false,
+      'condition_rule', NULL, 'formats', jsonb_build_array('pdf', 'jpg', 'jpeg', 'png'), 'max_size_mb', 20, 'min_files', 1, 'max_files', NULL, 'photo_rules', NULL,
+      'expiry_tracked', false, 'blank_form_file_id', NULL, 'is_active', true);
+    INSERT INTO document_types (code, name_en, kind, is_active, lib_managed, published_version, needs_review, updated_at)
+    VALUES (r.code, r.name_en, 'scanned_document', false, true, 0, false, now()) RETURNING id INTO did;
+    PERFORM doc_apply_spec(did, spec);
+    PERFORM doc_snapshot_version(did, 'new_only', DATE '2024-01-01', 'seed: migration 0076 (Q508 payment proof, Q512 receipts)', 0);
+  END LOOP;
+END $$;
+
+-- True when the record has a current file in the slot of this document code, or when the admin has switched the document type off (documents are
+-- configuration: a deactivated type asks for nothing).
+CREATE OR REPLACE FUNCTION fa_has_doc(p_entity uuid, p_code text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT NOT EXISTS (SELECT 1 FROM public.document_types dt WHERE dt.code = p_code AND dt.is_active)
+      OR EXISTS (SELECT 1 FROM public.document_files f JOIN public.document_slots sl ON sl.id = f.slot_id JOIN public.document_types dt ON dt.id = sl.doc_type_id
+                 WHERE sl.register_entity_id = p_entity AND dt.code = p_code AND f.is_current AND f.withdrawn_at IS NULL AND f.superseded_by IS NULL)
+$$;
+
 CREATE INDEX register_records_proc_idx ON register_records ((data ->> 'procurement_record_id')) WHERE register_key IN ('car_dispatcher', 'financial_advances');
 CREATE INDEX register_records_advance_idx ON register_records ((data ->> 'advance_id')) WHERE register_key = 'financial_advances';
 
@@ -557,8 +587,11 @@ BEGIN
       IF st = 'disbursed' THEN
         IF public.fa_blank(d, 'disbursed_amount') OR (d ->> 'disbursed_amount')::numeric <= 0 THEN errs := errs || public.reg_err_item('/data/disbursed_amount', 'invalid_amount', 'The disbursed amount (LYD) must be greater than zero.'); END IF;
         FOREACH ps IN ARRAY ARRAY['disbursed_date', 'payment_method', 'payment_ref'] LOOP
-          IF public.fa_blank(d, ps) THEN errs := errs || public.reg_err_item('/data/' || ps, 'required', 'A disbursement needs the date, method and payment reference (Q508); the proof file is attached to the record.'); END IF;
+          IF public.fa_blank(d, ps) THEN errs := errs || public.reg_err_item('/data/' || ps, 'required', 'A disbursement needs the date, method and payment reference (Q508).'); END IF;
         END LOOP;
+        IF public.fa_blank(d, 'payment_proof') AND NOT public.fa_has_doc(NEW.entity_id, 'ADV_PROOF') THEN
+          errs := errs || public.reg_err_item('/data/payment_proof', 'required', 'Attach the payment proof to the record (Q508).');
+        END IF;
       END IF;
       IF st = 'closed' AND public.fin_balance(NEW.entity_id) <> 0 AND public.fa_blank(d, 'exceptional_note') THEN
         errs := errs || public.reg_err_item('/data/exceptional_note', 'balance_not_zero', 'Closing needs a balance of zero, or the L2 note "exceptional handling".');
@@ -572,6 +605,7 @@ BEGIN
       IF typ = 'expense' THEN
         IF public.fa_blank(d, 'expense_date') OR public.fa_blank(d, 'expense_kind') THEN errs := errs || public.reg_err_item('/data/expense_date', 'required', 'The date and the kind of the expense are required.'); END IF;
         IF public.fa_blank(d, 'amount') OR (d ->> 'amount')::numeric <= 0 THEN errs := errs || public.reg_err_item('/data/amount', 'invalid_amount', 'The amount (LYD) must be greater than zero.'); END IF;
+        IF public.fa_blank(d, 'receipt') AND NOT public.fa_has_doc(NEW.entity_id, 'ADV_RECEIPT') THEN errs := errs || public.reg_err_item('/data/receipt', 'required', 'Attach the receipt to the record.'); END IF;
       ELSIF public.fa_blank(d, 'returned_amount') OR (d ->> 'returned_amount')::numeric < 0 THEN
         errs := errs || public.reg_err_item('/data/returned_amount', 'invalid_amount', 'The returned amount (LYD) is required and not negative.');
       END IF;
@@ -833,7 +867,7 @@ DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['fa_latest(text,text,text)', 'fa_field_work(jsonb)', 'fin_balance(uuid)', 'fleet_readiness_calc(uuid)', 'fleet_readiness(uuid)', 'fa_mob_complete(uuid)',
-      'fleet_sync(uuid)', 'fa_new_draft(text,text,uuid,integer,jsonb)', 'fa_open_drafts(uuid)', 'fa_proc_current(text)', 'fa_rules()', 'fa_after()', 'fin_amounts_visible(uuid,text,jsonb)',
+      'fleet_sync(uuid)', 'fa_new_draft(text,text,uuid,integer,jsonb)', 'fa_open_drafts(uuid)', 'fa_proc_current(text)', 'fa_rules()', 'fa_after()', 'fa_has_doc(uuid,text)', 'fin_amounts_visible(uuid,text,jsonb)',
       'reg_data_for(uuid,text,text,uuid,jsonb)', 'fleet_extend_booking(uuid,date)', 'fin_top_up(uuid,numeric,date)', 'fleet_availability(date,date,text,text,uuid)',
       'sla_resolve_start(uuid,text)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
