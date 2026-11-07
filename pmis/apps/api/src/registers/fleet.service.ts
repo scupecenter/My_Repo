@@ -23,6 +23,7 @@ export class FleetService {
   /** POST /registers/car_dispatcher/records/{id}/extend : a child booking (draft) that extends the booking after its end. */
   async extendBooking(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
     const body = parse(extendSchema, raw);
+    await this.access.requireRegions('car_dispatcher', 'create');
     await this.registers.get(auth, 'car_dispatcher', id);
     const nid = await this.registers.call<string>(auth, Prisma.sql`SELECT fleet_extend_booking(${id}::uuid, ${body.to_date}::date) AS r`);
     return this.registers.get(auth, 'car_dispatcher', nid);
@@ -31,6 +32,7 @@ export class FleetService {
   /** POST /registers/financial_advances/records/{id}/top-up : a child advance (draft), a top-up and/or an extension of the period. */
   async topUp(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {
     const body = parse(topUpSchema, raw);
+    await this.access.requireRegions('financial_advances', 'create');
     await this.registers.get(auth, 'financial_advances', id);
     const nid = await this.registers.call<string>(auth, Prisma.sql`SELECT fin_top_up(${id}::uuid, ${body.requested_amount ?? 0}::numeric, ${body.period_to ?? null}::date) AS r`);
     return this.registers.get(auth, 'financial_advances', nid);

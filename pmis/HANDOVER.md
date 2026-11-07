@@ -102,7 +102,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
 ## 7. Next
-**Current state (2026-11-07):** built up to migration 0075, contract 0.14.6, `CHANGELOG.md` entry 109; see the changelog for every item done since the list below. **Next to build:** field assignments inside Procurement, the Car Dispatcher and Financial Advances registers, and tasks MOB-1/2/5 (owner decisions Q495–Q512, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`, changelog 110; planned migration 0076 and contract 0.15.0; documents updated, code not started).
+**Current state (2026-11-07):** built up to migration 0076, contract 0.15.0, `CHANGELOG.md` entry 111 (field assignments in Procurement, Car Dispatcher, Financial Advances, tasks MOB-1/2/5: database and API done, web screens and end-to-end scenario still to build; MOB responsible party and documents are admin-configurable defaults); see the changelog for every item done since the list below.
 
 Earlier list (kept for history):
 From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):

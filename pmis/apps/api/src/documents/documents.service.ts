@@ -439,7 +439,7 @@ export class DocumentsService {
     if (!uuidSchema.safeParse(recordId).success) throw problems.notFound();
     const rows = await this.db.tx.$queryRaw<RecordCtx[]>(Prisma.sql`
       SELECT r.id::text AS id, r.entity_id::text AS entity_id, r.register_key, r.record_type, ${def.module_key}::text AS module_key, r.site_id::text AS site_id, r.region_id,
-        r.state, r.task_id::text AS task_id, s.site_code, r.data, r.custom, CASE WHEN s.id IS NULL THEN NULL ELSE to_jsonb(s) END AS site
+        r.state, r.task_id::text AS task_id, s.site_code, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data, r.custom, CASE WHEN s.id IS NULL THEN NULL ELSE to_jsonb(s) END AS site
       FROM register_records r LEFT JOIN sites s ON s.id = r.site_id
       WHERE r.id = ${recordId}::uuid AND r.register_key = ${key}
         ${regions === null ? Prisma.empty : Prisma.sql`AND (r.is_global OR r.region_id = ANY(${regions}::int[]))`}`);
@@ -470,7 +470,7 @@ export class DocumentsService {
   async syncRecordById(recordId: string): Promise<void> {
     const rows = await this.db.tx.$queryRaw<RecordCtx[]>(Prisma.sql`
       SELECT r.id::text AS id, r.entity_id::text AS entity_id, r.register_key, r.record_type, ''::text AS module_key, r.site_id::text AS site_id, r.region_id,
-        r.state, r.task_id::text AS task_id, s.site_code, r.data, r.custom, CASE WHEN s.id IS NULL THEN NULL ELSE to_jsonb(s) END AS site
+        r.state, r.task_id::text AS task_id, s.site_code, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data, r.custom, CASE WHEN s.id IS NULL THEN NULL ELSE to_jsonb(s) END AS site
       FROM register_records r LEFT JOIN sites s ON s.id = r.site_id WHERE r.id = ${recordId}::uuid`);
     if (rows[0]) await this.syncRecord(rows[0]);
   }

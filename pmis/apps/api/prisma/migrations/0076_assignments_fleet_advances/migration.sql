@@ -36,7 +36,12 @@ INSERT INTO list_catalogues (code, name_en, name_ar, critical, status, allow_oth
   ('BookingType',    'Required vehicle type',  'نوع السيارة المطلوبة', false, 'pending', false, 'Car Dispatcher booking.'),
   ('AdvanceKind',    'Advance kind',           'نوع العهدة',         false, 'pending', false, 'Financial Advances (plan code ADVANCE_KIND).'),
   ('ExpenseKind',    'Expense kind',           'نوع المصروف',        false, 'pending', false, 'Financial Advances expenses.'),
-  ('PaymentMethod',  'Payment method',         'طريقة الدفع',        false, 'pending', false, 'Financial Advances disbursement.')
+  ('PaymentMethod',  'Payment method',         'طريقة الدفع',        false, 'pending', false, 'Financial Advances disbursement.'),
+  ('HomeRegion',     'Vehicle home region',    'المنطقة الأم للسيارة', false, 'pending', false, 'Car Dispatcher: a booking outside it is allowed with a warning (Q510).'),
+  ('VehicleStatus',  'Vehicle status',         'حالة السيارة',       true,  'pending', false, 'Drives whether a vehicle is bookable (available).'),
+  ('BookingState',   'Booking state',          'حالة الحجز',         true,  'pending', false, 'Drives the reservation and the readiness of an assignment.'),
+  ('AdvanceScope',   'Advance scope',          'نوع العهدة',         true,  'pending', false, 'Individual or group (Q497).'),
+  ('AdvanceState',   'Advance state',          'حالة العهدة',        true,  'pending', false, 'Drives the readiness of an assignment and the balance.')
 ON CONFLICT (code) DO NOTHING;
 INSERT INTO list_values (catalogue_code, code, label_en, label_ar, sort_order)
 SELECT v.c, v.code, v.code, v.ar, v.ord FROM (VALUES
@@ -45,7 +50,15 @@ SELECT v.c, v.code, v.code, v.ar, v.ord FROM (VALUES
   ('BookingType', 'Any', 'أي نوع', 5), ('BookingType', 'Pickup 4x4', 'بيك أب دفع رباعي', 10), ('BookingType', 'Sedan', 'سيارة صالون', 20), ('BookingType', 'Van', 'فان', 30), ('BookingType', 'Truck', 'شاحنة', 40), ('BookingType', 'Minibus', 'حافلة صغيرة', 50),
   ('AdvanceKind', 'Daily allowance', 'بدل يومي', 10), ('AdvanceKind', 'Fuel', 'وقود', 20), ('AdvanceKind', 'Accommodation', 'إقامة', 30), ('AdvanceKind', 'Materials', 'مواد', 40), ('AdvanceKind', 'Other', 'أخرى', 90),
   ('ExpenseKind', 'Daily allowance', 'بدل يومي', 10), ('ExpenseKind', 'Fuel', 'وقود', 20), ('ExpenseKind', 'Accommodation', 'إقامة', 30), ('ExpenseKind', 'Meals', 'وجبات', 40), ('ExpenseKind', 'Materials', 'مواد', 50), ('ExpenseKind', 'Other', 'أخرى', 90),
-  ('PaymentMethod', 'Cash', 'نقداً', 10), ('PaymentMethod', 'Bank transfer', 'تحويل مصرفي', 20), ('PaymentMethod', 'Cheque', 'شيك', 30)
+  ('PaymentMethod', 'Cash', 'نقداً', 10), ('PaymentMethod', 'Bank transfer', 'تحويل مصرفي', 20), ('PaymentMethod', 'Cheque', 'شيك', 30),
+  ('HomeRegion', 'Tripoli', 'طرابلس', 10), ('HomeRegion', 'Middle', 'الوسطى', 20), ('HomeRegion', 'WM', 'الغربية', 30), ('HomeRegion', 'Zawia', 'الزاوية', 40),
+  ('HomeRegion', 'Benghazi', 'بنغازي', 50), ('HomeRegion', 'GM', 'الجبل الأخضر', 60), ('HomeRegion', 'Sebha', 'سبها', 70),
+  ('VehicleStatus', 'available', 'متاحة', 10), ('VehicleStatus', 'under_maintenance', 'تحت الصيانة', 20), ('VehicleStatus', 'out_of_service', 'خارج الخدمة', 30),
+  ('BookingState', 'requested', 'مطلوب', 10), ('BookingState', 'waiting_vehicle', 'بانتظار سيارة', 20), ('BookingState', 'reserved', 'محجوز', 30),
+  ('BookingState', 'on_trip', 'في رحلة', 40), ('BookingState', 'returned', 'عاد', 50), ('BookingState', 'cancelled', 'ملغى', 60),
+  ('AdvanceScope', 'individual', 'فردية', 10), ('AdvanceScope', 'group', 'جماعية', 20),
+  ('AdvanceState', 'requested', 'مطلوبة', 10), ('AdvanceState', 'approved_for_disbursement', 'معتمدة للصرف', 20), ('AdvanceState', 'disbursed', 'مصروفة', 30),
+  ('AdvanceState', 'settlement_in_progress', 'قيد التسوية', 40), ('AdvanceState', 'settled', 'مسوّاة', 50), ('AdvanceState', 'closed', 'مغلقة', 60), ('AdvanceState', 'cancelled', 'ملغاة', 70)
 ) AS v(c, code, ar, ord)
 ON CONFLICT (catalogue_code, code) DO NOTHING;
 SELECT list_refresh_fields('ProcScope');
@@ -79,13 +92,13 @@ INSERT INTO register_fields (register_key, code, label_en, label_ar, field_type,
   ('car_dispatcher', 'plate_no',          'Plate no.',         'رقم اللوحة',          'text',   false, false, false, NULL, true,  'Vehicle', 10, NULL),
   ('car_dispatcher', 'vehicle_type',      'Vehicle type',      'نوع السيارة',         'list_code', false, false, false, NULL, true, 'Vehicle', 20, 'VehicleType'),
   ('car_dispatcher', 'model',             'Model',             'الموديل',             'text',   false, false, false, NULL, false, 'Vehicle', 30, NULL),
-  ('car_dispatcher', 'home_region',       'Home region',       'المنطقة الأم',        'list',   false, false, false, '["Tripoli", "Middle", "WM", "Zawia", "Benghazi", "GM", "Sebha"]'::jsonb, true, 'Vehicle', 40, NULL),
+  ('car_dispatcher', 'home_region',       'Home region',       'المنطقة الأم',        'list_code',   false, false, false, NULL, true, 'Vehicle', 40, 'HomeRegion'),
   ('car_dispatcher', 'driver_user_id',    'Driver (staff)',    'السائق (موظف)',       'user',   false, false, false, NULL, false, 'Vehicle', 50, NULL),
   ('car_dispatcher', 'driver_name',       'Driver (name)',     'السائق (اسم)',        'text',   false, false, false, NULL, false, 'Vehicle', 60, NULL),
   ('car_dispatcher', 'permit_expiry',     'Permit expiry',     'انتهاء الترخيص',      'date',   false, false, false, NULL, true,  'Vehicle', 70, NULL),
   ('car_dispatcher', 'insurance_expiry',  'Insurance expiry',  'انتهاء التأمين',      'date',   false, false, false, NULL, false, 'Vehicle', 80, NULL),
   ('car_dispatcher', 'inspection_date',   'Inspection date',   'تاريخ الفحص',         'date',   false, false, false, NULL, false, 'Vehicle', 90, NULL),
-  ('car_dispatcher', 'vehicle_status',    'Vehicle status',    'حالة السيارة',        'list',   false, false, false, '["available", "under_maintenance", "out_of_service"]'::jsonb, true, 'Vehicle', 100, NULL),
+  ('car_dispatcher', 'vehicle_status',    'Vehicle status',    'حالة السيارة',        'list_code',   false, false, false, NULL, true, 'Vehicle', 100, 'VehicleStatus'),
   ('car_dispatcher', 'bookable',          'Bookable',          'قابلة للحجز',         'yes_no', false, false, true,  NULL, true,  'Vehicle', 110, NULL),
   -- Car Dispatcher: booking
   ('car_dispatcher', 'procurement_record_id', 'Assignment (Procurement record)', 'المهمة (سجل المشتريات)', 'text', false, false, false, NULL, false, 'Booking', 200, NULL),
@@ -95,13 +108,13 @@ INSERT INTO register_fields (register_key, code, label_en, label_ar, field_type,
   ('car_dispatcher', 'from_date',         'From',              'من',                  'date',   false, false, false, NULL, true,  'Booking', 230, NULL),
   ('car_dispatcher', 'to_date',           'To',                'إلى',                 'date',   false, false, false, NULL, true,  'Booking', 240, NULL),
   ('car_dispatcher', 'vehicle_id',        'Vehicle',           'السيارة',             'text',   false, false, false, NULL, true,  'Booking', 250, NULL),
-  ('car_dispatcher', 'booking_state',     'Booking state',     'حالة الحجز',          'list',   false, false, false, '["requested", "waiting_vehicle", "reserved", "on_trip", "returned", "cancelled"]'::jsonb, true, 'Booking', 260, NULL),
+  ('car_dispatcher', 'booking_state',     'Booking state',     'حالة الحجز',          'list_code',   false, false, false, NULL, true, 'Booking', 260, 'BookingState'),
   ('car_dispatcher', 'parent_booking_id', 'Extends booking',   'تمديد للحجز',         'text',   false, false, false, NULL, false, 'Booking', 270, NULL),
   ('car_dispatcher', 'waiting_reason',    'Waiting reason',    'سبب الانتظار',        'text',   false, false, false, NULL, false, 'Booking', 280, NULL),
   ('car_dispatcher', 'out_of_region',     'Outside the home region', 'خارج المنطقة الأم', 'yes_no', false, false, true, NULL, false, 'Booking', 290, NULL),
   -- Financial Advances: advance
   ('financial_advances', 'procurement_record_id', 'Assignment (Procurement record)', 'المهمة (سجل المشتريات)', 'text', false, false, false, NULL, false, 'Advance', 10, NULL),
-  ('financial_advances', 'advance_scope',     'Advance scope',     'نوع العهدة',          'list',   false, false, false, '["individual", "group"]'::jsonb, true, 'Advance', 20, NULL),
+  ('financial_advances', 'advance_scope',     'Advance scope',     'نوع العهدة',          'list_code',   false, false, false, NULL, true, 'Advance', 20, 'AdvanceScope'),
   ('financial_advances', 'custodian_user_id', 'Custodian',         'أمين العهدة',         'user',   false, false, false, NULL, true,  'Advance', 30, NULL),
   ('financial_advances', 'beneficiaries',     'Beneficiaries (group)', 'المستفيدون (جماعية)', 'multi_user', false, false, false, NULL, false, 'Advance', 40, NULL),
   ('financial_advances', 'advance_kind',      'Advance kind',      'نوع المصروف المتوقع', 'list_code', false, false, false, NULL, true, 'Advance', 50, 'AdvanceKind'),
@@ -115,7 +128,7 @@ INSERT INTO register_fields (register_key, code, label_en, label_ar, field_type,
   ('financial_advances', 'period_from',       'Period from',       'الفترة من',           'date',   false, false, false, NULL, false, 'Advance', 130, NULL),
   ('financial_advances', 'period_to',         'Period to',         'الفترة إلى',          'date',   false, false, false, NULL, false, 'Advance', 140, NULL),
   ('financial_advances', 'parent_advance_id', 'Top-up / extension of', 'تكملة / تمديد لـ', 'text',   false, false, false, NULL, false, 'Advance', 150, NULL),
-  ('financial_advances', 'advance_state',     'Advance state',     'حالة العهدة',         'list',   false, false, false, '["requested", "approved_for_disbursement", "disbursed", "settlement_in_progress", "settled", "closed", "cancelled"]'::jsonb, true, 'Advance', 160, NULL),
+  ('financial_advances', 'advance_state',     'Advance state',     'حالة العهدة',         'list_code',   false, false, false, NULL, true, 'Advance', 160, 'AdvanceState'),
   ('financial_advances', 'exceptional_note',  'Exceptional handling note', 'ملاحظة معالجة استثنائية', 'text', false, false, false, NULL, false, 'Advance', 170, NULL),
   ('financial_advances', 'balance',           'Balance (LYD)',     'الرصيد (دينار)',      'number', false, false, true,  NULL, false, 'Advance', 180, NULL),
   -- Financial Advances: expense, settlement
@@ -135,6 +148,38 @@ INSERT INTO register_task_sources (register_key, task_code, date_field, data_eq,
   ('procurement', 'MOB-2', 'ready_date', '{}'::jsonb, '{"scope": ["CW", "Tower Erection", "Site Adaption"]}'::jsonb, 120),
   ('procurement', 'MOB-5', 'ready_date', '{}'::jsonb, '{"scope": ["TE Installation"]}'::jsonb, 150)
 ON CONFLICT (register_key, task_code) DO NOTHING;
+
+-- Q512 / plan section 0: the two new registers and the Assignment fields of Procurement have no Master column. TPL-MASTER keeps its sheets and the 15 PR-PO columns.
+UPDATE register_definitions SET rules = rules || '{"master_export": false}'::jsonb WHERE register_key IN ('car_dispatcher', 'financial_advances');
+UPDATE register_definitions SET rules = rules || '{"master_exclude_fields": ["members", "planned_start", "planned_end", "actual_end", "vehicle_required", "vehicle_not_required_reason", "advance_required", "advance_not_required_reason", "readiness", "ready_date", "open_advances_after_close"]}'::jsonb
+WHERE register_key = 'procurement';
+CREATE OR REPLACE FUNCTION tpl_master_register_columns(p_key text) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT coalesce(jsonb_agg(c ORDER BY o), '[]'::jsonb)
+  FROM jsonb_array_elements(public.tpl_columns(p_key)) WITH ORDINALITY AS t(c, o)
+  WHERE NOT (c ->> 'code') IN (SELECT jsonb_array_elements_text(coalesce((SELECT d.rules -> 'master_exclude_fields' FROM public.register_definitions d WHERE d.register_key = p_key), '[]'::jsonb)))
+$$;
+CREATE OR REPLACE FUNCTION tpl_master_parts() RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE out jsonb;
+BEGIN
+  WITH p AS (
+    SELECT 0 AS ord, 'master'::text AS part, 'Master'::text AS sheet, 'master'::text AS kind, NULL::text AS ref, public.tpl_master_columns() AS cols
+    UNION ALL
+    SELECT 10 + d.sort_order, d.register_key, coalesce(tp.sheet_name, left(btrim(regexp_replace(d.name, '[\[\]:*?/\\]', '', 'g')), 31)), 'register', d.register_key,
+           public.tpl_master_register_columns(d.register_key)
+    FROM public.template_definitions d
+    JOIN public.register_definitions rd ON rd.register_key = d.register_key
+    LEFT JOIN public.template_parts tp ON tp.template_id = 'TPL-MASTER' AND tp.register_key = d.register_key
+    WHERE d.kind = 'register' AND d.is_active AND coalesce(rd.rules ->> 'master_export', 'true') <> 'false'
+  )
+  SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object('part', p.part, 'sheet', p.sheet, 'kind', p.kind, 'ref', p.ref, 'columns', p.cols,
+           'header_checksum', public.tpl_header_checksum(p.cols))) ORDER BY p.ord, p.part COLLATE "C"), '[]'::jsonb)
+  INTO out FROM p;
+  RETURN out;
+END $$;
+ALTER FUNCTION tpl_master_register_columns(text) OWNER TO pmis_definer;
+ALTER FUNCTION tpl_master_parts() OWNER TO pmis_definer;
 
 -- Templates (two entry ways); the first versions are issued by tpl_sync_all(), which also bumps the Procurement template (new fields).
 INSERT INTO template_definitions (template_id, name, name_ar, target_entity, kind, register_key, module_key, custom_entity, match_keys, sort_order)
@@ -453,7 +498,13 @@ BEGIN
     -- ------------------------------------------------------------------ booking
     ELSIF NEW.register_key = 'car_dispatcher' AND typ = 'booking' THEN
       pr := public.fa_proc_current(d ->> 'procurement_record_id');
-      IF pr.id IS NULL THEN errs := errs || public.reg_err_item('/data/procurement_record_id', 'unknown_assignment', 'Choose an approved Procurement record (the assignment).'); END IF;
+      IF pr.id IS NULL OR NOT public.app_region_check(pr.region_id) THEN errs := errs || public.reg_err_item('/data/procurement_record_id', 'unknown_assignment', 'Choose an approved Procurement record (the assignment).');
+      ELSIF NOT public.fa_blank(d, 'site_id') AND d ->> 'site_id' <> pr.site_id::text THEN errs := errs || public.reg_err_item('/data/site_id', 'site_mismatch', 'The site is not the site of the assignment.');
+      END IF;
+      IF NOT public.fa_blank(d, 'parent_booking_id') AND NOT EXISTS (SELECT 1 FROM public.fa_latest('car_dispatcher') pb WHERE pb.record_type = 'booking' AND pb.entity_id::text = d ->> 'parent_booking_id'
+           AND pb.data ->> 'procurement_record_id' = d ->> 'procurement_record_id') THEN
+        errs := errs || public.reg_err_item('/data/parent_booking_id', 'unknown_booking', 'The booking to extend is not an approved booking of the same assignment.');
+      END IF;
       IF public.fa_blank(d, 'from_date') THEN errs := errs || public.reg_err_item('/data/from_date', 'required', 'Required.'); END IF;
       IF public.fa_blank(d, 'to_date') THEN errs := errs || public.reg_err_item('/data/to_date', 'required', 'Required.'); END IF;
       IF NOT public.fa_blank(d, 'from_date') AND NOT public.fa_blank(d, 'to_date') THEN
@@ -475,7 +526,9 @@ BEGIN
     -- ------------------------------------------------------------------ advance
     ELSIF NEW.register_key = 'financial_advances' AND typ = 'advance' THEN
       pr := public.fa_proc_current(d ->> 'procurement_record_id');
-      IF pr.id IS NULL THEN errs := errs || public.reg_err_item('/data/procurement_record_id', 'unknown_assignment', 'Choose an approved Procurement record (the assignment).'); END IF;
+      IF pr.id IS NULL OR NOT public.app_region_check(pr.region_id) THEN errs := errs || public.reg_err_item('/data/procurement_record_id', 'unknown_assignment', 'Choose an approved Procurement record (the assignment).');
+      ELSIF pr.site_id IS DISTINCT FROM NEW.site_id THEN errs := errs || public.reg_err_item('/data/procurement_record_id', 'site_mismatch', 'The assignment belongs to another site.');
+      END IF;
       IF public.fa_blank(d, 'advance_scope') THEN errs := errs || public.reg_err_item('/data/advance_scope', 'required', 'Required.'); END IF;
       IF public.fa_blank(d, 'custodian_user_id') THEN errs := errs || public.reg_err_item('/data/custodian_user_id', 'required', 'A named custodian is required (Q497).'); END IF;
       IF d ->> 'advance_scope' = 'group' AND coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(d -> 'beneficiaries') = 'array' THEN d -> 'beneficiaries' END), 0) = 0 THEN
@@ -488,7 +541,8 @@ BEGIN
       IF nullif(d ->> 'period_from', '') IS NOT NULL AND nullif(d ->> 'period_to', '') IS NOT NULL AND (d ->> 'period_to')::date < (d ->> 'period_from')::date THEN
         errs := errs || public.reg_err_item('/data/period_to', 'end_before_start', 'The period ends before it starts.');
       END IF;
-      IF NOT public.fa_blank(d, 'parent_advance_id') AND NOT EXISTS (SELECT 1 FROM public.fa_latest('financial_advances') a WHERE a.record_type = 'advance' AND a.entity_id::text = d ->> 'parent_advance_id') THEN
+      IF NOT public.fa_blank(d, 'parent_advance_id') AND NOT EXISTS (SELECT 1 FROM public.fa_latest('financial_advances') a WHERE a.record_type = 'advance' AND a.entity_id::text = d ->> 'parent_advance_id' AND a.site_id = NEW.site_id
+                     AND a.data ->> 'procurement_record_id' = d ->> 'procurement_record_id') THEN
         errs := errs || public.reg_err_item('/data/parent_advance_id', 'unknown_advance', 'The advance to top up is not an approved advance.');
       END IF;
       SELECT p.data ->> 'advance_state' INTO ps FROM public.register_records p WHERE p.entity_id = NEW.entity_id AND p.id <> NEW.id AND p.state = 'approved' ORDER BY p.version_no DESC LIMIT 1;
@@ -502,8 +556,8 @@ BEGIN
       END IF;
       IF st = 'disbursed' THEN
         IF public.fa_blank(d, 'disbursed_amount') OR (d ->> 'disbursed_amount')::numeric <= 0 THEN errs := errs || public.reg_err_item('/data/disbursed_amount', 'invalid_amount', 'The disbursed amount (LYD) must be greater than zero.'); END IF;
-        FOREACH ps IN ARRAY ARRAY['disbursed_date', 'payment_method', 'payment_ref', 'payment_proof'] LOOP
-          IF public.fa_blank(d, ps) THEN errs := errs || public.reg_err_item('/data/' || ps, 'required', 'A disbursement needs the date, method, reference and the payment proof (Q508).'); END IF;
+        FOREACH ps IN ARRAY ARRAY['disbursed_date', 'payment_method', 'payment_ref'] LOOP
+          IF public.fa_blank(d, ps) THEN errs := errs || public.reg_err_item('/data/' || ps, 'required', 'A disbursement needs the date, method and payment reference (Q508); the proof file is attached to the record.'); END IF;
         END LOOP;
       END IF;
       IF st = 'closed' AND public.fin_balance(NEW.entity_id) <> 0 AND public.fa_blank(d, 'exceptional_note') THEN
@@ -512,13 +566,12 @@ BEGIN
     -- ------------------------------------------------------------------ expense, settlement
     ELSIF NEW.register_key = 'financial_advances' AND typ IN ('expense', 'settlement') THEN
       SELECT * INTO adv FROM public.fa_latest('financial_advances') a WHERE a.record_type = 'advance' AND a.entity_id::text = d ->> 'advance_id';
-      IF NOT FOUND OR adv.data ->> 'advance_state' NOT IN ('disbursed', 'settlement_in_progress') THEN
+      IF NOT FOUND OR adv.data ->> 'advance_state' NOT IN ('disbursed', 'settlement_in_progress') OR adv.site_id IS DISTINCT FROM NEW.site_id OR adv.region_id IS DISTINCT FROM NEW.region_id THEN
         errs := errs || public.reg_err_item('/data/advance_id', 'advance_not_disbursed', 'Choose a disbursed advance.');
       END IF;
       IF typ = 'expense' THEN
         IF public.fa_blank(d, 'expense_date') OR public.fa_blank(d, 'expense_kind') THEN errs := errs || public.reg_err_item('/data/expense_date', 'required', 'The date and the kind of the expense are required.'); END IF;
         IF public.fa_blank(d, 'amount') OR (d ->> 'amount')::numeric <= 0 THEN errs := errs || public.reg_err_item('/data/amount', 'invalid_amount', 'The amount (LYD) must be greater than zero.'); END IF;
-        IF public.fa_blank(d, 'receipt') THEN errs := errs || public.reg_err_item('/data/receipt', 'required', 'The receipt is required.'); END IF;
       ELSIF public.fa_blank(d, 'returned_amount') OR (d ->> 'returned_amount')::numeric < 0 THEN
         errs := errs || public.reg_err_item('/data/returned_amount', 'invalid_amount', 'The returned amount (LYD) is required and not negative.');
       END IF;
@@ -632,6 +685,11 @@ DECLARE r public.register_records%ROWTYPE; cur public.register_records%ROWTYPE;
 BEGIN
   SELECT * INTO r FROM public.register_records WHERE id = p_record AND register_key = 'car_dispatcher' AND record_type = 'booking';
   IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The booking does not exist.')); END IF;
+  PERFORM public.reg_require_grant('car_dispatcher', NULL, 'create');
+  IF NOT (EXISTS (SELECT 1 FROM public.reg_entry_holders('car_dispatcher', NULL) h WHERE h.user_id = public.app_actor())
+          OR (public.app_user_is_system_admin(public.app_actor()) AND NOT EXISTS (SELECT 1 FROM public.reg_entry_holders('car_dispatcher', NULL)))) THEN
+    PERFORM public.wf_err('not_eligible_holder', jsonb_build_object('detail', 'You are not an entry holder (L1) of the Car Dispatcher row of the Matrix.'));
+  END IF;
   SELECT * INTO cur FROM public.fa_latest('car_dispatcher') x WHERE x.entity_id = r.entity_id;
   IF NOT FOUND THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Only an approved booking can be extended.')); END IF;
   IF coalesce(cur.data ->> 'booking_state', '') NOT IN ('reserved', 'on_trip') THEN
@@ -652,6 +710,11 @@ DECLARE r public.register_records%ROWTYPE; cur public.register_records%ROWTYPE;
 BEGIN
   SELECT * INTO r FROM public.register_records WHERE id = p_record AND register_key = 'financial_advances' AND record_type = 'advance';
   IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The advance does not exist.')); END IF;
+  PERFORM public.reg_require_grant('financial_advances', r.region_id, 'create');
+  IF NOT (EXISTS (SELECT 1 FROM public.reg_entry_holders('financial_advances', r.region_id) h WHERE h.user_id = public.app_actor())
+          OR (public.app_user_is_system_admin(public.app_actor()) AND NOT EXISTS (SELECT 1 FROM public.reg_entry_holders('financial_advances', r.region_id)))) THEN
+    PERFORM public.wf_err('not_eligible_holder', jsonb_build_object('detail', 'You are not an entry holder (L1) of the Financial Advances row of the Matrix.'));
+  END IF;
   SELECT * INTO cur FROM public.fa_latest('financial_advances') x WHERE x.entity_id = r.entity_id;
   IF NOT FOUND OR cur.data ->> 'advance_state' NOT IN ('disbursed', 'settlement_in_progress') THEN
     PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Only a disbursed advance can be topped up or extended.'));

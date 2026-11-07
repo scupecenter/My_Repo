@@ -250,7 +250,7 @@ export class TemplatesService {
   /** The records in force (approved, else the open draft), inside the caller's regions. Row level security applies as well. */
   private async prefillRows(key: string, regs: number[] | null, sites: string[], region: number | null, cols: TplColumn[]): Promise<Record<string, unknown>[]> {
     const rows = await this.db.tx.$queryRaw<{ entity_id: string; site_code: string | null; record_type: string | null; data: Record<string, unknown>; custom: Record<string, unknown> }[]>(Prisma.sql`
-      SELECT DISTINCT ON (r.entity_id) r.entity_id::text AS entity_id, s.site_code, r.record_type, r.data, r.custom
+      SELECT DISTINCT ON (r.entity_id) r.entity_id::text AS entity_id, s.site_code, r.record_type, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data, r.custom
       FROM register_records r LEFT JOIN sites s ON s.id = r.site_id
       WHERE r.register_key = ${key} AND r.state IN ('approved', 'entry', 'in_review', 'in_approval')
         AND (r.is_current OR NOT EXISTS (SELECT 1 FROM register_records c WHERE c.entity_id = r.entity_id AND c.is_current))
@@ -428,7 +428,7 @@ export class TemplatesService {
       const allowed = await this.access.regions(def[0].module_key, 'view');
       if (allowed !== null && allowed.length === 0) continue;
       const rec = await this.db.tx.$queryRaw<{ site_id: string; data: Record<string, unknown> }[]>(Prisma.sql`
-        SELECT DISTINCT ON (r.site_id) r.site_id::text AS site_id, r.data FROM register_records r
+        SELECT DISTINCT ON (r.site_id) r.site_id::text AS site_id, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data FROM register_records r
         WHERE r.register_key = ${key} AND r.site_id = ANY(${ids}::uuid[]) AND r.state = 'approved' AND r.is_current
           ${allowed === null ? Prisma.empty : Prisma.sql`AND r.region_id = ANY(${allowed}::int[])`}
         ORDER BY r.site_id, r.version_no DESC`);

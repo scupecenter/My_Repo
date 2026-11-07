@@ -393,7 +393,7 @@ export class RegistersService {
       conds.push(Prisma.sql`r.entity_id = ${entity}::uuid`);
     }
     const text = oneParam(q, 'q');
-    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR r.data::text ILIKE ${likePattern(text)})`);
+    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data)::text ILIKE ${likePattern(text)})`);
     if (oneParam(q, 'all_versions') !== 'true' && entity === undefined) {
       conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`);
     }
