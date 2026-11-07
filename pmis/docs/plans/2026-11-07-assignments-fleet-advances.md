@@ -1,6 +1,6 @@
 # Field assignments in Procurement, Car Dispatcher and Financial Advances (plan, 2026-11-07)
 
-Status: **approved by the product owner on 2026-11-07** (decisions Q495 to Q512). Documents updated; implementation not started yet. Planned: migration 0076, contract 0.15.0.
+Status: **approved by the product owner on 2026-11-07** (decisions Q495 to Q516). Documents updated; implementation not started yet. Planned: migration 0076, contract 0.15.0.
 
 ## 0. Hard limits (owner instruction)
 - **No change** to the 10 milestones, the 9 phase gates, their conditions, stage order, Project Status weights, the SLA of existing tasks, or the Master-format export (the PR-PO sheet keeps its 15 columns).
@@ -41,6 +41,10 @@ Status: **approved by the product owner on 2026-11-07** (decisions Q495 to Q512)
 | Q510 | Each vehicle has a home region; booking outside it is allowed with a warning. The driver is a staff-registry employee when there is one, else free text. |
 | Q511 | Currency: LYD only. |
 | Q512 | Amounts are visible to Finance, the Project Manager, the custodian and the custodian's Team Lead only (field-level rules). Expenses are approved by the Finance L2; a custodian never approves their own expenses. The two new registers are not part of the Master-format export; each has its own Export button. |
+| Q513 | MOB SLA: minimum 2, maximum 3 working days, from L2 approval of the Procurement record to ready_date. |
+| Q514 | MOB holders: L1 Project Procurement Team; L2 the stage Team Lead (RF & Design / Acquisition for MOB-1, CW for MOB-2, TE for MOB-5). |
+| Q515 | MOB tasks have no mandatory document; the evidence is in the linked PO/WO, payment proof and booking. |
+| Q516 | MOB applicability follows the stage: MOB-1 as stage 1, MOB-2 as B2 (CW flag), MOB-5 all scenarios; N/A automatically otherwise. |
 
 ## 3. Procurement register extension (no new register)
 - **Scope list (`ProcScope`)**: new values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (data in the list catalogue). For these scopes delivery is In-House and there is no PR; the existing "In-House with PR" rule already refuses a PR.
