@@ -133,3 +133,113 @@ Each register is a separate module with its own menu (CLAUDE.md). Every create o
 - **Given** an action item that is overdue
   **When** the dashboard loads
   **Then** it is counted under Exceptions & Alerts. (ASSUMPTION)
+
+## RG-ASG Field assignments in Procurement (Q495–Q506; plan 2026-11-07-assignments-fleet-advances.md §3)
+- **Given** a Procurement record for field work
+  **When** L1 fills the "Assignment" section (members, planned_start, planned_end, vehicle_required, advance_required)
+  **Then** the record needs at least one member, each `supervisor` or `executor`, and every member is an active user (Q496).
+  **And** these fields have no Master column and the PR-PO export keeps its 15 columns.
+- **Given** `vehicle_required` = no
+  **When** `vehicle_not_required_reason` is empty
+  **Then** the save is refused; with a reason it is accepted (Q499).
+- **Given** `advance_required` = no
+  **When** `advance_not_required_reason` is empty
+  **Then** the save is refused; with a reason it is accepted (Q500).
+- **Given** a Procurement record with scope Survey, Acquisition Visit, Inspection, Maintenance or Emergency
+  **When** it is saved with delivery In-House and no PR
+  **Then** it is accepted (Q505).
+  **And** the same record with a PR number is refused by the existing "In-House with a PR" rule.
+- **Given** a Procurement record with a PO/WO (Outsourced or TE Vendor) or an internal work order (In-House)
+  **When** the B2 document is uploaded
+  **Then** it is the proof of the assignment (Q503); there is no separate assignments register (Q504).
+- **Given** the Project Manager or a Team Lead is added to the Procurement matrix row
+  **When** they enter or approve an assignment
+  **Then** they act as L1 and/or L2 of that row (Q495).
+- **Given** an old version of TPL-PO
+  **When** it is uploaded after the fields changed
+  **Then** it is refused with the usual old-version message.
+
+## RG-CAR Car Dispatcher: booking a vehicle (Q498–Q501, Q507, Q510)
+- **Given** a Procurement record with `vehicle_required` = yes
+  **When** it is approved at L2
+  **Then** one draft booking opens in the Car Dispatcher L1 inbox (Q507).
+  **And** approving it again opens no second booking (idempotent).
+- **Given** a vehicle already reserved from 10 to 14 of the month
+  **When** a booking for the same vehicle from 12 to 16 is approved at L2
+  **Then** the reservation is refused with 409 `vehicle_already_reserved`.
+- **Given** a vehicle whose status is under_maintenance, or whose permit or insurance has expired (`bookable` = false)
+  **When** the dispatcher selects it for a booking
+  **Then** it is refused.
+- **Given** a booking with no suitable vehicle
+  **When** the dispatcher cannot assign one
+  **Then** it is set to `waiting_vehicle` with a `waiting_reason`; nothing is rejected automatically.
+- **Given** a vehicle whose home region differs from the site's region
+  **When** it is booked
+  **Then** the booking is allowed and shows the `out_of_region` warning (Q510).
+- **Given** work running past its end date
+  **When** the dispatcher uses "extend" on a booking
+  **Then** a child booking (`parent_booking_id`) goes through L1/L2 and the parent keeps its history (Q501).
+  **And** a new request instead of an extension is also allowed.
+- **Given** a Procurement record needing several vehicles
+  **When** the dispatcher adds more bookings
+  **Then** each is linked to the same `procurement_record_id` (Q498).
+- **Given** the Car Dispatcher register
+  **When** a user exports
+  **Then** it uses its own Export button; it is not a part of the Master-format export (Q512).
+
+## RG-ADV Financial Advances (Q497, Q500–Q502, Q508, Q509, Q511, Q512)
+- **Given** a Procurement record with `advance_required` = yes and three members
+  **When** it is approved at L2
+  **Then** three draft individual advances open in the Finance L1 inbox, one per member, in the same transaction as the booking (plan §5).
+  **And** approving it again opens none more.
+- **Given** a group advance
+  **When** it is saved
+  **Then** it needs one named `custodian_user_id` who receives and settles it, plus `beneficiaries` (Q497).
+- **Given** an advance in `approved_for_disbursement`
+  **When** the Finance L1 holder records the disbursement with the payment proof and the Finance L2 holder approves it
+  **Then** the state becomes `disbursed` (Q508).
+  **And** there is no third approval level.
+- **Given** an expense recorded by the custodian
+  **When** the custodian tries to approve it
+  **Then** it is refused; only the Finance L2 approves expenses (Q512).
+- **Given** an advance with disbursed 1000, approved expenses 700 and returned 100
+  **When** the panel is read
+  **Then** `balance` = 200 (disbursed − approved expenses − returned), shown in LYD only (Q511).
+- **Given** an advance with balance 0
+  **When** it is closed
+  **Then** it becomes `closed`.
+- **Given** an advance with a balance other than 0
+  **When** it is closed without an L2 note "exceptional handling"
+  **Then** the closure is refused; with the note it is accepted.
+- **Given** the assignment's work is closed while an advance is not settled
+  **When** the assignment closes
+  **Then** it is allowed and the advance shows "open after the work closed"; `open_advances_after_close` counts it (Q502).
+- **Given** a user who is not Finance, the Project Manager, the custodian or the custodian's Team Lead
+  **When** they open an advance
+  **Then** the amount fields are hidden (field-level rules, Q512).
+- **Given** a top-up or extension
+  **When** it is created
+  **Then** it is a child record (`parent_advance_id`) through L1/L2 (Q501).
+- **Given** the Financial Advances register
+  **When** a user exports
+  **Then** it uses its own Export button; it is not a part of the Master-format export (Q512).
+
+## RG-RDY Readiness to mobilize and the MOB tasks (Q506; plan §5 rule 4 and §6)
+- **Given** a Procurement record approved with a vehicle `reserved` and an advance only `approved_for_disbursement`
+  **When** readiness is derived
+  **Then** it is `awaiting_advance`; approval without disbursement does not count.
+- **Given** the same record when the advance becomes `disbursed`
+  **When** readiness is derived
+  **Then** it is `ready_to_mobilize` and `ready_date` is that date.
+- **Given** `vehicle_required` = no with a reason and `advance_required` = no with a reason
+  **When** the record is approved
+  **Then** it is `ready_to_mobilize` at approval.
+- **Given** a vehicle still `waiting_vehicle` and no advance disbursed
+  **When** readiness is derived
+  **Then** it is `awaiting_both`.
+- **Given** MOB-1, MOB-2 and MOB-5
+  **When** the linked record becomes ready
+  **Then** the task follows its `ready_date`; it counts toward no milestone and sits in no gate condition (`counts_toward_milestone` = false).
+- **Regression: Given** a site with the MOB tasks added in stages 1, 2 and 5
+  **When** milestone and gate dates are computed with and without the MOB tasks done or open
+  **Then** all 10 milestone dates and all 9 gate dates are identical, and the existing SLA and Project Status weights are unchanged.
