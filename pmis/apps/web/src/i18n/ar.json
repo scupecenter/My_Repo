@@ -36,6 +36,8 @@
     "sites_all": "كل المواقع",
     "site_submenus": "القوائم الفرعية لسجل المواقع",
     "contractors": "المقاولون",
+    "car_dispatcher": "توزيع السيارات",
+    "financial_advances": "العهد المالية",
     "warehouse": "المخزن",
     "quality": "الجودة",
     "issues": "سجل المشاكل",
@@ -1586,6 +1588,10 @@
     "in_service": "دخول الخدمة",
     "execution": "التنفيذ"
   },
+  "procAssign": { "title": "التكليف", "role": "الدور", "supervisor": "مشرف", "executor": "منفّذ", "lead": "رئيس الفريق", "none": "لا يوجد أعضاء بعد.", "readiness": "الجاهزية",
+    "ready": { "not_ready": "غير جاهز", "awaiting_vehicle": "بانتظار سيارة", "awaiting_advance": "بانتظار العهدة", "awaiting_both": "بانتظار السيارة والعهدة", "ready_to_mobilize": "جاهز للتحرك" } },
+  "fleet": { "pick_dates": "حدّد تاريخي البداية والنهاية أولاً", "none_free": "لا توجد سيارة متاحة في هذه التواريخ.", "already_reserved": "هذه السيارة محجوزة بالفعل في تواريخ متداخلة. اختر سيارة أخرى أو تواريخ أخرى.",
+    "extend": "تمديد", "extend_to": "التمديد حتى", "extended": "تم إنشاء مسودة التمديد", "top_up": "إضافة مبلغ", "top_up_amount": "المبلغ الإضافي (د.ل)", "period_to": "تمديد الفترة حتى", "topped_up": "تم إنشاء مسودة الإضافة", "balance": "الرصيد", "hidden": "مخفي" },
   "registers": {
     "new": "سجل جديد",
     "new_hint": "مسودة جديدة. املأ الأقسام ثم احفظها ثم أرسلها للمراجعة.",
