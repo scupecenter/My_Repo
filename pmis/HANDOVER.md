@@ -102,7 +102,14 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
 ## 7. Next
-**Current state (2026-11-07):** built up to migration 0076, contract 0.15.0, `CHANGELOG.md` entry 111 (field assignments in Procurement, Car Dispatcher, Financial Advances, tasks MOB-1/2/5: database and API done, web screens and end-to-end scenario still to build; MOB responsible party and documents are admin-configurable defaults); see the changelog for every item done since the list below.
+**Current state (2026-11-07):** built up to migration 0076, contract 0.15.0, `CHANGELOG.md` entry 111: field assignments in Procurement, Car Dispatcher, Financial Advances and tasks MOB-1/2/5 (decisions Q495–Q516), database, API and web screens done (PR #101).
+
+**Open follow-ups from PR #101:**
+1. A real test for a conditional document-slot rule evaluated on the raw record data (today only a source guard checks that `documents.service.ts` does not use `reg_data_for`).
+2. A custodian alone cannot request a top-up of their own advance (only a Finance entry holder can).
+3. The Procurement `members` list cannot be entered through the approved template, only by hand.
+4. MOB tasks on sites that existed before 0076 stay locked until the admin opens them.
+5. Web: no MSW mock handlers for the new endpoints (tests use `server.use`); a local `rk` cast covers the new register keys.
 
 Earlier list (kept for history):
 From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):
