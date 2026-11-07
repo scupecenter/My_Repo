@@ -32,9 +32,9 @@ afterAll(async () => {
 const REASON = 'official announcement of the Ministry';
 
 /** A D1 task that is open since `startOffset` working days ago (MS4 approved on that day). */
-async function openD1(startOffset: number, region = 5): Promise<{ site: Site; start: string }> {
+async function openD1(startOffset: number, region = 5, from = 'cal_today()'): Promise<{ site: Site; start: string }> {
   const site = await newSite(db, region);
-  const start = await wd(db, startOffset);
+  const start = await wd(db, startOffset, from);
   await makeTask(db, site, 'MS4', 'approved', { actualDate: start });
   const d1 = await makeTask(db, site, 'D1', 'locked');
   await db.query(`UPDATE task_instances SET state = 'open' WHERE id = $1`, [d1]);
@@ -201,7 +201,8 @@ describe('a holiday change recalculates the due dates of open tasks only', () =>
   });
 
   it('weekend days: step-up, audit, and the due dates of open tasks follow (Friday only as weekend)', async () => {
-    const t = await openD1(0);
+    // Start on this week's Monday so the 5-working-day window always spans a Saturday (a Saturday start never did).
+    const t = await openD1(0, 5, "date_trunc('week', cal_today())::date");
     const before = await taskRow(db, t.site, 'D1');
     const body = { reason: REASON, weekend_days: [5] };
     expect((await noStep.api.call('put', '/settings/weekend-days', body)).status).toBe(401);
