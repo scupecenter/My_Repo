@@ -25,6 +25,8 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'sit
   { key: 'rf_design', to: '/registers/rf_design', icon: 'rf', group: 'registers' },
   { key: 'acquisition', to: '/registers/acquisition', icon: 'acquisition', group: 'registers' },
   { key: 'contractors', to: '/registers/contractors', icon: 'contractor', group: 'registers' },
+  { key: 'car_dispatcher', to: '/registers/car_dispatcher', icon: 'dismantle', group: 'registers' },
+  { key: 'financial_advances', to: '/registers/financial_advances', icon: 'procurement', group: 'registers' },
   { key: 'contractor_reports', to: '/reports/contractors', icon: 'report', group: 'registers' },
   { key: 'templates', to: '/templates', icon: 'document', group: 'data' },
   { key: 'admin.users', to: '/admin/users', icon: 'people', group: 'admin' },

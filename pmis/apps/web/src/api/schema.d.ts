@@ -4453,6 +4453,96 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/car_dispatcher/records/{record_id}/extend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Extend a reserved booking with a child booking (Q501)
+         * @description 0.15.0. Creates a draft `booking` (state `entry`) that continues the booking after its end, up to `to_date`, for the same vehicle, assignment and engineer, with
+         *     `parent_booking_id` set; it goes through L1 / L2 like any booking and its approval writes its own reservation (409 `vehicle_already_reserved` when the vehicle
+         *     is taken). The parent keeps its history. Only a `reserved` or `on_trip` approved booking can be extended (409 `invalid_transition`). Needs `create` on
+         *     `car_dispatcher` and L1 of its Matrix row (403 otherwise).
+         */
+        post: operations["extendCarBooking"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/financial_advances/records/{record_id}/top-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Top up or extend a disbursed advance with a child advance (Q501)
+         * @description 0.15.0. Creates a draft `advance` (state `entry`, `advance_state` `requested`) linked to the original by `parent_advance_id`, with the same custodian, scope
+         *     and kind. `requested_amount` is the extra money (LYD); `period_to` extends the period (at least one of the two). Only a `disbursed` or
+         *     `settlement_in_progress` advance can be topped up (409 `invalid_transition`). The original keeps its history; the child has its own L1 / L2 and disbursement.
+         *     Needs `create` on `financial_advances` in the region and L1 of its Matrix row (403 otherwise). Amounts are hidden from users outside Finance (Q512).
+         */
+        post: operations["topUpAdvance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/fleet/availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bookable vehicles that are free in a date range
+         * @description 0.15.0. The approved vehicles of the Car Dispatcher whose status is `available`, whose permit and insurance do not expire before `to`, and that have no
+         *     reservation overlapping `from` to `to` (both days included). A booking that is being changed may pass `exclude_booking_id` so its own reservation does not
+         *     count. Needs the Car Dispatcher module. The home region is a warning only (Q510): vehicles of other regions are listed unless `home_region` filters them.
+         */
+        get: operations["listFleetAvailability"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/procurement/records/{record_id}/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The readiness of a Procurement assignment (Ready to mobilize)
+         * @description 0.15.0. `ready_to_mobilize` when the record is approved AND (vehicle not required with its reason, or every booking is `reserved`, `on_trip` or `returned`) AND
+         *     (advance not required with its reason, or every individual advance is at least `disbursed`). Approval without disbursement does not count. `ready_date` is when
+         *     the last condition became true (only while ready). `readiness` is null for a record without field work. Needs the Procurement module in the record's region.
+         */
+        get: operations["getAssignmentReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/gecol-order-warnings": {
         parameters: {
             query?: never;
@@ -7370,7 +7460,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -11119,6 +11209,50 @@ export interface components {
                 procurement_record_id?: string;
                 /** @description The legacy date was not a valid past date and was not copied. */
                 date_dropped?: boolean;
+            }[];
+        };
+        FleetVehicleAvailable: {
+            /**
+             * Format: uuid
+             * @description The logical record id (`entity_id`) of the vehicle: the value of `booking.data.vehicle_id`.
+             */
+            vehicle_id: string;
+            plate_no: string;
+            vehicle_type?: string | null;
+            model?: string | null;
+            home_region?: string | null;
+            /** Format: uuid */
+            driver_user_id?: string | null;
+            driver_name?: string | null;
+        };
+        AssignmentReadiness: {
+            /** Format: uuid */
+            entity_id: string;
+            /** @enum {string|null} */
+            readiness: "awaiting_vehicle" | "awaiting_advance" | "awaiting_both" | "ready_to_mobilize" | null;
+            approved: boolean;
+            /** Format: date */
+            ready_date?: string | null;
+            open_advances_after_close: boolean;
+            vehicle: {
+                required?: boolean | null;
+                ok?: boolean;
+            };
+            advance: {
+                required?: boolean | null;
+                ok?: boolean;
+            };
+            bookings: {
+                /** Format: uuid */
+                entity_id?: string;
+                booking_state?: string | null;
+            }[];
+            advances: {
+                /** Format: uuid */
+                entity_id?: string;
+                /** Format: uuid */
+                custodian_user_id?: string | null;
+                advance_state?: string | null;
             }[];
         };
         /** @description 0.12.11 (Q114). An approved, active Procurement order of a Dismantle part. */
@@ -22259,6 +22393,131 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    extendCarBooking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: date */
+                    to_date: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The child booking. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    topUpAdvance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requested_amount?: number;
+                    /** Format: date */
+                    period_to?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The child advance. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listFleetAvailability: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                home_region?: "Tripoli" | "Middle" | "WM" | "Zawia" | "Benghazi" | "GM" | "Sebha";
+                vehicle_type?: string;
+                exclude_booking_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The free vehicles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items: components["schemas"]["FleetVehicleAvailable"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getAssignmentReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                record_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The readiness. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentReadiness"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getGecolOrderWarnings: {

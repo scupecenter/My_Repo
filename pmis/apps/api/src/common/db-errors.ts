@@ -75,6 +75,9 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'The batch is being processed. Wait until it ends.',
         extra: { rows_done: typeof extra.rows_done === 'number' ? extra.rows_done : null, rows_total: typeof extra.rows_total === 'number' ? extra.rows_total : null },
       });
+    case 'vehicle_already_reserved':
+      // 0076: the btree_gist exclusion of vehicle_reservations (or the check before it) refused an overlapping reservation
+      return new ProblemException(409, 'vehicle_already_reserved', { detail: detail ?? 'The vehicle is already reserved for overlapping dates.' });
     case 'note_required':
       return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     case 'mandatory_slots_missing':

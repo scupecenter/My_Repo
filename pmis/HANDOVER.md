@@ -102,6 +102,9 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
 ## 7. Next
+**Current state (2026-11-07):** built up to migration 0076, contract 0.15.0, `CHANGELOG.md` entry 111 (field assignments in Procurement, Car Dispatcher, Financial Advances, tasks MOB-1/2/5: database and API done, web screens and end-to-end scenario still to build; MOB responsible party and documents are admin-configurable defaults); see the changelog for every item done since the list below.
+
+Earlier list (kept for history):
 From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):
 1. Update `docs/spec/registers-and-streams.md` to match the plan (stream and stage boundary, O&M view, Dismantle flow, document section, write-through editing). Done (changelog 43). Q37, Q40, Q41 and Q73 in `open-questions.md` already carry the owner updates.
 2. Add `CHANGELOG.md` entry (43) for these documentation updates and the owner decisions. Done (changelog 43).

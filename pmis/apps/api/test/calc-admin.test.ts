@@ -32,9 +32,9 @@ afterAll(async () => {
 const REASON = 'official announcement of the Ministry';
 
 /** A D1 task that is open since `startOffset` working days ago (MS4 approved on that day). */
-async function openD1(startOffset: number, region = 5): Promise<{ site: Site; start: string }> {
+async function openD1(startOffset: number, region = 5, from = 'cal_today()'): Promise<{ site: Site; start: string }> {
   const site = await newSite(db, region);
-  const start = await wd(db, startOffset);
+  const start = await wd(db, startOffset, from);
   await makeTask(db, site, 'MS4', 'approved', { actualDate: start });
   const d1 = await makeTask(db, site, 'D1', 'locked');
   await db.query(`UPDATE task_instances SET state = 'open' WHERE id = $1`, [d1]);
@@ -201,7 +201,8 @@ describe('a holiday change recalculates the due dates of open tasks only', () =>
   });
 
   it('weekend days: step-up, audit, and the due dates of open tasks follow (Friday only as weekend)', async () => {
-    const t = await openD1(0);
+    // Start on this week's Monday so the 5-working-day window always spans a Saturday (a Saturday start never did).
+    const t = await openD1(0, 5, "date_trunc('week', cal_today())::date");
     const before = await taskRow(db, t.site, 'D1');
     const body = { reason: REASON, weekend_days: [5] };
     expect((await noStep.api.call('put', '/settings/weekend-days', body)).status).toBe(401);
@@ -240,10 +241,10 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
     const res = await admin.api.call('get', '/settings/sla-rule-sets');
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(1);
-    expect(res.body.items[0]).toMatchObject({ version: 1, status: 'published', is_active: true, effective_from: '2024-01-01', rule_count: 46 });
+    expect(res.body.items[0]).toMatchObject({ version: 1, status: 'published', is_active: true, effective_from: '2024-01-01', rule_count: 49 });
     const v1 = await admin.api.call('get', `/settings/sla-rule-sets/${res.body.items[0].id}`);
     expect(v1.status).toBe(200);
-    expect(v1.body.rules).toHaveLength(46);
+    expect(v1.body.rules).toHaveLength(49);
     expect(v1.body.rules.find((r: { task_code: string }) => r.task_code === 'D1')).toEqual({
       // 0052 (Q2): D-1 starts at MS4, or MS1 when the Site RFI is N/A; the item carries its end event and the Q135 pending flag
       task_code: 'D1', min_working_days: 3, max_working_days: 5, start_event: 'MS4|MS1', calendar_code: 'std', overrides: [], end_event: null, pending_confirmation: false,
@@ -262,7 +263,7 @@ describe('SLA rule sets: versions, publishing and applying to open tasks', () =>
     await db.query(`UPDATE task_instances SET state = 'approved', actual_date = cal_today(), approved_date = cal_today() WHERE site_id = $1 AND sla_rule_id IS NOT NULL AND state = 'open'`, [closedBefore.site.id]);
     const res = await admin.api.call('post', '/settings/sla-rule-sets', { reason: 'review of D-1 after the pilot' });
     expect(res.status).toBe(201);
-    expect(res.body).toMatchObject({ version: 2, status: 'draft', base_version: 1, is_active: false, effective_from: null, apply_to_open_tasks: null, rule_count: 46 });
+    expect(res.body).toMatchObject({ version: 2, status: 'draft', base_version: 1, is_active: false, effective_from: null, apply_to_open_tasks: null, rule_count: 49 });
     expect(res.headers.etag).toBe('"1"');
     draftId = res.body.id;
     draftTag = res.headers.etag as string;

@@ -73,7 +73,7 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 
 ### 1.3 Visibility
 - Records with a Site ID inherit the site's region. B3 scoping (region × module) applies (CLAUDE.md "Visibility", B3).
-- Records without a site key (Risk Register, Contractors and Teams, WH item master, PL / OPEN / ADJ movements, Deliverables Log, Meetings) have no region. See Q69. *Default (ASSUMPTION):* anyone holding the module sees them.
+- Records without a site key (Risk Register, Contractors and Teams, WH item master, PL / OPEN / ADJ movements, Deliverables Log, Meetings, Car Dispatcher vehicles) have no region. See Q69. *Default (ASSUMPTION):* anyone holding the module sees them.
 
 ---
 
@@ -436,6 +436,16 @@ Template IDs follow the existing `TPL-*` codes (`rules.md` §10). New codes are 
   - In-House with a PR; Outsourced PO without a PR; PO before PR.
   - Unknown contractor; unknown team; team of another contractor; team specialization against ScopeMatch (D37: CW scopes and GECOL need CW; TE Installation needs TE; TE Dismantle accepts TE or CW).
   - ProcScope "TE Installation" has PR / PO / WO = No (Setting CG10): the PR and PO fields stay empty for it (ASSUMPTION from the list column).
+- **Field assignments (owner decisions 2026-11-07, Q495–Q512, Q504: no separate assignments register; plan `docs/plans/2026-11-07-assignments-fleet-advances.md` §3).** The Procurement record is the assignment, for companies (PO/WO) and for internal teams (internal work order, B2 slot, Q503).
+  - **New `ProcScope` values** (data in the list catalogue): `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (Q505). For these scopes delivery is In-House and there is no PR; the existing "In-House with a PR" rule already refuses a PR.
+  - **New fields in the "Assignment" section.** They have **no Master column**; the PR-PO export keeps its 15 columns and is unchanged.
+    - `members`: list of `{user_id, member_role: supervisor | executor, is_lead}` (Q496); at least one member when the record is used for field work; members are active users.
+    - `planned_start`, `planned_end`, `actual_end` (dates of the field work).
+    - `vehicle_required` yes/no + `vehicle_not_required_reason` (required when no, Q499).
+    - `advance_required` yes/no + `advance_not_required_reason` (required when no, Q500).
+    - Derived, read-only (never read on upload): `readiness` (`not_ready`, `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close` (Q502). Rules in §3.20 and §3.21.
+  - **Template:** `TPL-PO` gets a new version when the fields change (normal behaviour); old versions are refused on upload with the usual message.
+  - Entry: Procurement, the Project Manager and the Team Leads, as L1 and/or L2 of the Procurement matrix row (Q495).
 
 ### 3.4 Contractors (`contractors`) — sheet PR-PO, `tblContractors` and `tblTeams` (D26, D22)
 - **Key:** Contractor (company name) for companies, Team for teams. **No site key** (§1.3).
@@ -698,6 +708,8 @@ Owner decision 2026-10-31 (plan §1), amends the earlier one-row layout. Dismant
 | As-Built | 1 | Master R, CZ; B13 (BU), D15 (EF) |
 | Meetings | 0 (multi-site) | none |
 | Dismantle | up to 2 (CW part, TE part) | E1, E2, E3 |
+| Car Dispatcher | 0 (vehicles); N bookings per Procurement record | MOB-1, MOB-2, MOB-5 readiness only (no gate, no milestone) |
+| Financial Advances | N advances per Procurement record | MOB-1, MOB-2, MOB-5 readiness only (no gate, no milestone) |
 
 ### 3.19 Document section (owner decision 2026-10-31)
 Source: plan §3; CLAUDE.md "Document Library"; `stories-document-library-and-uploads.md`; ADR 0008.
@@ -705,6 +717,29 @@ Source: plan §3; CLAUDE.md "Document Library"; `stories-document-library-and-up
 - An admin can: add, edit or retire a **document type**; set **where each type appears** (register, stage, task, field); set the **file naming rule** per type (for example site code, type, date); set the **allowed formats** per type (PDF, images, e-mail: `.eml`, `.msg`, `.html` / `.htm`, `.mht` / `.mhtml`, others).
 - Allowed formats per type are **decided later** with the owner. Keep the options open (Q100).
 - ADR 0008 checks formats by magic bytes. Its allow-list needs entries for the e-mail formats. The spec exists; the build is not verified (plan §3).
+
+### 3.20 Car Dispatcher (`car_dispatcher`): حجز وتوزيع السيارات (owner decisions 2026-11-07, Q498–Q501, Q507, Q510)
+Source: plan `docs/plans/2026-11-07-assignments-fleet-advances.md` §4.1 and §5. No Master sheet and no Master column; **not in the Master-format export** (Q512): it has its own Export button, and the export dialog does not list it as a Master part. It has nothing to do with the Warehouse DN/RN dispatch.
+- **Menu:** Registers & Logs, two entry ways (manual and approved template), L1/L2, own matrix row `car_dispatcher` (holders empty in seed; plain role "Fleet Dispatcher" seeded), custom fields, Export. Not site-scoped.
+- **Record type `vehicle` (fleet master):** `plate_no` (unique) · `vehicle_type` · `model` · `home_region` (Q510) · `driver_user_id` or `driver_name` (staff-registry employee when there is one, else free text, Q510) · `permit_expiry` · `insurance_expiry` · `inspection_date` · `vehicle_status` (`available`, `under_maintenance`, `out_of_service`). Derived `bookable` = active status and permit and insurance not expired.
+- **Record type `booking`:** `procurement_record_id` (required) · `site_id` · `engineer_user_id` · `required_type` · `from_date` · `to_date` · `vehicle_id` (set by the dispatcher) · `booking_state` (`requested`, `waiting_vehicle`, `reserved`, `on_trip`, `returned`, `cancelled`) · `parent_booking_id` (extension, Q501) · `waiting_reason` · `out_of_region` (derived warning; booking outside the home region is allowed, Q510).
+- **Database guarantee:** table `vehicle_reservations` with a btree_gist EXCLUDE constraint: one vehicle is never reserved for overlapping dates (409 `vehicle_already_reserved`).
+- **Link rules** (plan §5):
+  1. When a Procurement record with field work is approved at L2 and `vehicle_required` is yes, one draft `booking` opens in the Car Dispatcher L1 inbox (Q507), in the same transaction as the advance requests, idempotent on re-approval. The dispatcher adds more bookings when needed (Q498).
+  2. A booking accepts only a `bookable` vehicle; L2 approval writes the reservation. With no vehicle the booking is `waiting_vehicle` with a reason; nothing is rejected automatically.
+  3. Extension (Q501): an "extend" action creates a child booking through L1/L2; the parent keeps its history. A new request is the other choice.
+- **Validation:** an unbookable vehicle is refused; overlapping reservation of a vehicle is refused (409 `vehicle_already_reserved`); `plate_no` unique.
+
+### 3.21 Financial Advances (`financial_advances`): العهد المالية (owner decisions 2026-11-07, Q497, Q500–Q502, Q508, Q509, Q511, Q512)
+Source: plan §4.2 and §5. No Master sheet and no Master column; **not in the Master-format export** (Q512); own Export button. Advances are field-work custody only, not project accounting.
+- **Menu:** Registers & Logs, two entry ways, L1/L2, own matrix row `financial_advances` (holders empty in seed; plain role "Finance Officer" seeded), custom fields, Export. Site-scoped through the Procurement record. Currency LYD only (Q511).
+- **Record type `advance`:** `procurement_record_id` (required) · `advance_scope` (`individual` | `group`, Q497) · `custodian_user_id` · `beneficiaries` (group only) · `advance_kind` (catalogue `ADVANCE_KIND`) · `requested_amount` · `approved_amount` · `disbursed_amount` · `disbursed_date` · `payment_method` · `payment_ref` · payment-proof document slot · `period_from` · `period_to` · `parent_advance_id` (top-up or extension, Q501) · `advance_state` (`requested`, `approved_for_disbursement`, `disbursed`, `settlement_in_progress`, `settled`, `closed`, `cancelled`). The daily allowance is typed by hand (Q509).
+- **Record type `expense`:** `advance_id` · `expense_date` · `expense_kind` · `description` · `amount` · receipt slot. Approved by the Finance L2; never by the custodian (Q512).
+- **Record type `settlement`:** `advance_id` · `returned_amount` · `settlement_note`. Derived `balance = disbursed − approved expenses − returned`. Closing needs balance 0 or an L2 note "exceptional handling".
+- **Disbursement (Q508):** the Finance L1 holder records it with the payment proof; the Finance L2 holder approves it. Operational states are record data, not extra approval levels (two levels only).
+- **Visibility (Q512):** amounts are visible to Finance, the Project Manager, the custodian and the custodian's Team Lead only (field-level rules).
+- **Link rules** (plan §5): when a Procurement record with field work is approved at L2 and `advance_required` is yes, one draft individual `advance` opens per member in the Finance L1 inbox, in the same transaction as the booking, idempotent on re-approval. An advance may stay open after the work closes (Q502) and is flagged "open after the work closed".
+- **Readiness** (Procurement `readiness`, plan §5 rule 4): `ready_to_mobilize` when the record is approved AND (vehicle not required with reason OR every booking `reserved` or `on_trip`) AND (advance not required with reason OR every individual advance at least `disbursed`). Approval without disbursement does not count. `ready_date` is when the last condition became true; it feeds the tasks MOB-1, MOB-2 and MOB-5 (Q506), which count toward no milestone and sit in no gate condition.
 
 ---
 

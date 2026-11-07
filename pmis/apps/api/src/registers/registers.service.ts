@@ -323,7 +323,7 @@ export class RegistersService {
     return Prisma.sql`
       SELECT r.id::text AS id, r.entity_id::text AS entity_id, r.version_no, r.supersedes_id::text AS supersedes_id, r.is_current, r.register_key, r.record_type,
         r.site_id::text AS site_id, s.site_code, r.region_id, r.state, r.current_level, r.levels_required, reg_levels(r.id) AS n_levels,
-        r.ball_in_court_user_id::text AS pinned, r.data, r.custom, r.external_party_id::text AS external_party_id, r.return_count, r.last_return_note,
+        r.ball_in_court_user_id::text AS pinned, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data, r.custom, r.external_party_id::text AS external_party_id, r.return_count, r.last_return_note,
         r.self_approval, r.task_id::text AS task_id, td.code AS task_code, r.created_by::text AS created_by, r.created_at, r.updated_at, r.approved_at,
         r.approved_by::text AS approved_by, r.source, r.version,
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
@@ -393,7 +393,7 @@ export class RegistersService {
       conds.push(Prisma.sql`r.entity_id = ${entity}::uuid`);
     }
     const text = oneParam(q, 'q');
-    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR r.data::text ILIKE ${likePattern(text)})`);
+    if (text) conds.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data)::text ILIKE ${likePattern(text)})`);
     if (oneParam(q, 'all_versions') !== 'true' && entity === undefined) {
       conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`);
     }

@@ -22,6 +22,7 @@ import { RecordDocuments } from './RecordDocuments';
 import { DismantleOrderSelect, HlcPurchaseRequests } from './P4cPanels';
 import { useRecordSlots } from '@/api/documents';
 import { Holders } from './HolderChip';
+import { Balance, ExtendBooking, MembersEditor, ReadinessBadge, reservedMessage, TopUp, VehiclePicker } from './AssignmentPanels';
 import { LegacyConversion } from './LegacyConversion';
 import { RejectDialog } from './RejectDialog';
 import { useToast } from './Toast';
@@ -83,6 +84,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const toast = useToast();
   const key = rawDef.register_key;
   const lang = i18n.language;
+  const rk: string = key; // 0.15.0 keys (car_dispatcher, financial_advances) are not in the generated RegisterKey union yet
   const session = useSession().data;
   const matrix = useMatrix().data;
   const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
@@ -118,7 +120,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const labelOf = (code: string) => { const f = def.fields.find((x) => x.code === code); return f ? fieldLabel(f, lang) : code; };
   const sections = sectionsFor(def, data);
   const set = (code: string, v: unknown) => { setData((d) => ({ ...d, [code]: v })); setDirty(true); setServer((s) => { const n = { ...s }; delete n[code]; return n; }); };
-  const fail = (e: unknown) => { setServer(serverFieldIssues(e)); const m = registerErrorMessage(t, e); if (m) toast(m, 'err'); };
+  const fail = (e: unknown) => { setServer(serverFieldIssues(e)); const m = reservedMessage(t, e) ?? registerErrorMessage(t, e); if (m) toast(m, 'err'); };
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
   // B5 / B6 preview from the Matrix row: who holds the next levels as well.
@@ -231,7 +233,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             <section key={s.id} aria-labelledby={`rs-${s.id}`} data-testid={`reg-section-${s.id}`} className="space-y-2">
               <h3 id={`rs-${s.id}`} className="font-semibold">{t(`regSections.${s.id}`, { defaultValue: s.title })}</h3>
               <div className="grid grid-cols-2 gap-3">
-                {s.fields.map((f) => {
+                {s.fields.filter((f) => !(rk === 'procurement' && f.code === 'members') && !(rk === 'financial_advances' && f.code === 'balance')).map((f) => {
                   const iss = issues[f.code];
                   const show = iss && (tried || server[f.code] || dirty);
                   return (
@@ -239,7 +241,9 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
                       <div className="flex items-center gap-1"><label htmlFor={`reg-field-${f.code}`} className="text-sm text-mute">{fieldLabel(f, lang)}{f.required ? ' *' : ''}</label>
                         {f.list?.status === 'pending' && <span className="chip bg-waitBg text-[10px] text-waitInk" data-testid={`reg-list-pending-${f.code}`} title={t('lists.pending_hint')}>{t('lists.pending')}</span>}
                         {record && <FieldHistory entityType="register_record" entityId={record.entity_id} field={f.code} label={fieldLabel(f, lang)} />}</div>
-                      {key === 'dismantle' && f.code === 'procurement_order_id'
+                      {rk === 'car_dispatcher' && f.code === 'vehicle_id'
+                        ? <VehiclePicker value={data.vehicle_id} onChange={(v) => set('vehicle_id', v)} from={data.from_date as string} to={data.to_date as string} vehicleType={data.required_type as string} bookingId={record?.id} disabled={!editable} invalid={!!show} />
+                        : key === 'dismantle' && f.code === 'procurement_order_id'
                         ? <DismantleOrderSelect siteId={site?.id} part={rtype} value={data[f.code]} onChange={(v) => set(f.code, v)} editable={editable} invalid={!!show} />
                         : editable ? <FieldInput field={f} value={data[f.code]} onChange={(v) => set(f.code, v)} invalid={!!show} ctx={ctx} />
                         : f.type === 'child_list' ? <FieldInput field={f} value={data[f.code]} onChange={() => undefined} disabled ctx={ctx} />
@@ -253,6 +257,16 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
             </section>
           ))}
         </form>
+        {rk === 'procurement' && (
+          <section aria-labelledby="rs-assignment" data-testid="reg-section-assignment" className="space-y-2">
+            <h3 id="rs-assignment" className="font-semibold">{t('procAssign.title')}</h3>
+            {record && <ReadinessBadge recordId={record.id} />}
+            <MembersEditor value={data.members} onChange={(v) => set('members', v)} disabled={!editable} names={Object.fromEntries(Object.entries(record?.refs?.users ?? {}).map(([id, u]) => [id, (u as { display_name: string }).display_name]))} />
+          </section>
+        )}
+        {record && rk === 'financial_advances' && <Balance record={record} />}
+        {record && rk === 'financial_advances' && record.record_type === 'advance' && record.state === 'approved' && <TopUp record={record} onDone={onCreated} />}
+        {record && rk === 'car_dispatcher' && record.record_type === 'booking' && record.state === 'approved' && <ExtendBooking record={record} onDone={onCreated} />}
         </div>
 
         {record && (
