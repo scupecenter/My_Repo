@@ -3206,3 +3206,34 @@ model SiteDraft {
   @@index([status, region_id, created_at(sort: Desc)], map: "site_drafts_status_region_idx")
   @@map("site_drafts")
 }
+
+// Migration 0076 (Car Dispatcher): one vehicle is never reserved for overlapping dates. The EXCLUDE constraint
+// vehicle_reservations_no_overlap (btree_gist: vehicle_entity_id WITH =, period WITH &&, WHERE state = 'reserved') is in the migration; written only by the
+// definer functions (trigger fa_rules) when a booking is approved.
+model VehicleReservation {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  vehicle_entity_id String    @db.Uuid // register_records.entity_id of the vehicle
+  booking_entity_id String    @db.Uuid // register_records.entity_id of the booking
+  booking_record_id String    @db.Uuid // the approved booking version that wrote it
+  period            Unsupported("daterange") // [from, to] inclusive, stored [from, to + 1)
+  state             String    @default("reserved") // reserved | released
+  created_by        String?   @db.Uuid
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  released_at       DateTime? @db.Timestamptz(6)
+
+  @@index([booking_entity_id], map: "vehicle_reservations_booking_idx")
+  @@index([vehicle_entity_id, state], map: "vehicle_reservations_vehicle_idx")
+  @@map("vehicle_reservations")
+}
+
+// Migration 0076: the stored readiness of a Procurement assignment (fleet_sync); ready_date = when the last condition became true.
+model AssignmentReadiness {
+  procurement_entity_id     String   @id @db.Uuid
+  readiness                 String
+  ready_date                DateTime? @db.Date
+  open_advances_after_close Boolean  @default(false)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([readiness], map: "assignment_readiness_state_idx")
+  @@map("assignment_readiness")
+}

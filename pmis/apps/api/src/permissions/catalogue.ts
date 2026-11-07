@@ -41,6 +41,8 @@ export const MODULES: ModuleDef[] = [
   { key: 'as_built', name_en: 'As-Built', actions: OPERATIONAL },
   { key: 'meetings', name_en: 'Meetings', actions: OPERATIONAL },
   { key: 'dismantle', name_en: 'Dismantle', actions: OPERATIONAL },
+  { key: 'car_dispatcher', name_en: 'Car Dispatcher', actions: OPERATIONAL },
+  { key: 'financial_advances', name_en: 'Financial Advances', actions: OPERATIONAL },
   { key: 'absence', name_en: 'Absence', actions: ['view', 'create', 'edit', 'delete'] },
   { key: 'messages', name_en: 'Messages', actions: ['view', 'create'] },
   { key: 'announcements', name_en: 'Announcements', actions: ['view', 'create'] },
