@@ -84,7 +84,7 @@ function Body({ def: rawDef, record, onCreated }: { def: RegisterDefinition; rec
   const toast = useToast();
   const key = rawDef.register_key;
   const lang = i18n.language;
-  const rk: string = key; // 0.15.0 keys (car_dispatcher, financial_advances) are not in the generated RegisterKey union yet
+  const rk = key;
   const session = useSession().data;
   const matrix = useMatrix().data;
   const create = useCreateRecord(key), update = useUpdateRecord(key), op = useRecordOp(key), cancelSnag = useCancelSnagRecord(), claim = useRecordClaim(key), newVersion = useNewVersion(key), transfer = useRecordTransfer(key);
