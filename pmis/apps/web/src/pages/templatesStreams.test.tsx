@@ -11,7 +11,7 @@ import { RegisterBatch } from './RegisterBatch';
 import { RegisterPage } from './Register';
 import { TemplatesPage } from './Templates';
 
-/** Contract 0.11.5: the Site Register stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
+/** Contract 0.11.5: the SITE 360 stream templates and TPL-MASTER on the Templates page, the upload dialog and the review of a batch of task rows. */
 const Routed = () => (
   <Routes>
     <Route path="/templates" element={<TemplatesPage />} />
@@ -40,7 +40,7 @@ describe('Templates page: Site Register templates', () => {
     for (const id of ['TPL-MASTER', 'TPL-SITE-DA', 'TPL-SITE-CW', 'TPL-SITE-TE', 'TPL-SITE-CL', 'TPL-PO', 'TPL-GECOL']) expect(await screen.findByTestId(`tpl-row-${id}`)).toBeInTheDocument();
     expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-kind', 'stream');
     expect(screen.getByTestId('tpl-row-TPL-SITE-CW')).toHaveAttribute('data-stream', 'CW');
-    expect(screen.getByTestId('tpl-kind-TPL-SITE-CW')).toHaveTextContent('Site Register stream');
+    expect(screen.getByTestId('tpl-kind-TPL-SITE-CW')).toHaveTextContent('SITE 360 stream');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('Whole Master');
     expect(screen.queryByTestId('tpl-kind-TPL-GECOL')).not.toBeInTheDocument();
     expect(screen.getByTestId('tpl-version-TPL-SITE-CW')).toHaveTextContent('v1');
@@ -205,7 +205,7 @@ describe('Arabic', () => {
     renderApp(<Routed />, { route: '/templates', locale: 'ar' });
     const u = userEvent.setup();
     expect(document.documentElement.dir).toBe('rtl');
-    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toHaveTextContent('سجل المواقع: الأعمال المدنية');
+    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toHaveTextContent('SITE 360: الأعمال المدنية');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('الماستر كاملًا');
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent('الأعمدة الرمادية');
     await u.click(screen.getByTestId('tpl-upload-TPL-MASTER'));

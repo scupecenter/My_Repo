@@ -38,8 +38,8 @@ export const isRealStream = (code: string, streams: Stream[] | undefined) => cod
 
 /** Seed views (migration 0023), only until the API answers. */
 export const DEFAULT_VIEWS: ViewRef[] = [
-  { code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', sort_order: 1 },
-  { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', sort_order: 2 },
+  { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sort_order: 1 },
+  { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sort_order: 2 },
   { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sort_order: 3 },
 ];
 /** View name from the API (EN/AR), as the admin configured it. */

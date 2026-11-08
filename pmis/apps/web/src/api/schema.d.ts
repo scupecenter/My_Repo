@@ -237,7 +237,7 @@ export interface paths {
          *     code past its end is 401 `enrol_code_expired`; both count toward the same lock as wrong TOTP codes (5 in a row lock the account for 15
          *     minutes and end every pending sign-in). The code is not used up here (the QR code may be redrawn); it is used up at the confirm step.
          *     With the right code it makes a new secret, stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and
-         *     returns it once: the `otpauth_uri` (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the
+         *     returns it once: the `otpauth_uri` (issuer "GSDN Workspace") for the QR code and the `secret` as the manual key. Calling it again replaces the
          *     pending secret. The answer is never cached. A user who is already enrolled cannot start again; an admin reset is needed.
          */
         post: operations["startTwoFactorEnrolment"];
@@ -7734,7 +7734,7 @@ export interface components {
             /** @description otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code. */
             otpauth_uri: string;
             /** @constant */
-            issuer: "GSDN PMIS";
+            issuer: "GSDN Workspace";
             /** @description The user's email. */
             account: string;
             /** @constant */

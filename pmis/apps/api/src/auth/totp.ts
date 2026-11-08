@@ -7,7 +7,7 @@ import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes, ra
 export const TOTP_PERIOD_S = 30;
 export const TOTP_DIGITS = 6;
 export const TOTP_WINDOW = 1;
-export const TOTP_ISSUER = 'GSDN PMIS';
+export const TOTP_ISSUER = 'GSDN Workspace';
 export const RECOVERY_CODE_COUNT = 10;
 
 const B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';

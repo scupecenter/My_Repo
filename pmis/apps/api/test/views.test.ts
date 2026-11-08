@@ -51,8 +51,8 @@ describe('view definitions: seed data versioned with the workflow', () => {
     expect(res.status).toBe(200);
     expect(res.body.views.map((v: { code: string }) => v.code)).toEqual(['CW', 'TE', 'OM']);
     const by = Object.fromEntries(res.body.views.map((v: { code: string }) => [v.code, v]));
-    expect(by.CW).toMatchObject({ name_en: 'CW Register', sort_order: 1, stage_codes: ['MS2', 'MS3', 'MS4'], task_codes: ['B14', 'B15'] });
-    expect(by.TE).toMatchObject({ name_en: 'TE Register', stage_codes: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'], task_codes: [] }); // TE FAC (D18) is not TE work any more (Q102 final)
+    expect(by.CW).toMatchObject({ name_en: 'Civil Works', sort_order: 1, stage_codes: ['MS2', 'MS3', 'MS4'], task_codes: ['B14', 'B15'] });
+    expect(by.TE).toMatchObject({ name_en: 'Installation (TE)', stage_codes: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'], task_codes: [] }); // TE FAC (D18) is not TE work any more (Q102 final)
     expect(by.OM).toMatchObject({ name_en: 'O&M', stage_codes: [], task_codes: ['Z1', 'D18'] }); // O&M always lists everything after HOTO, whatever the switch says
     expect(by.CW.name_ar).toBeTruthy();
     // stage 1 and Final Closure (stage 10) are in no view as stages: Z1 is an O&M task member
@@ -62,7 +62,7 @@ describe('view definitions: seed data versioned with the workflow', () => {
 
     const list = await admin.api.call('get', `/sites?q=${s.code}`);
     expect(list.body.items[0].views).toEqual([
-      expect.objectContaining({ code: 'CW', name_en: 'CW Register' }), expect.objectContaining({ code: 'TE' }), expect.objectContaining({ code: 'OM', name_en: 'O&M' }),
+      expect.objectContaining({ code: 'CW', name_en: 'Civil Works' }), expect.objectContaining({ code: 'TE' }), expect.objectContaining({ code: 'OM', name_en: 'O&M' }),
     ]);
     expect(list.body.items[0].views[0].stage_codes).toBeUndefined();
     const detail = await admin.api.call('get', `/sites/${s.id}`);

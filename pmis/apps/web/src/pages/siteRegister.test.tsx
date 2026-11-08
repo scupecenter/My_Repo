@@ -18,11 +18,11 @@ import { Sites } from './Sites';
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
 const A1 = taskIdOf(0, 0);
 
-describe('Site Register: streams', () => {
+describe('SITE 360: streams', () => {
   it('names the module Site Register, has no tab bars (the sidebar switches) and titles the open stream with the API name', async () => {
     await signIn('pm');
     renderApp(<Sites />, { route: '/sites' });
-    expect(screen.getByRole('heading', { name: 'Site Register' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'SITE 360' })).toBeInTheDocument();
     expect(await screen.findByTestId('site-row-TR101')).toBeInTheDocument();
     expect(document.querySelector('[data-stream="ALL"]')).not.toBeNull();
     expect(screen.queryByTestId('stream-tabs')).toBeNull();
@@ -30,7 +30,7 @@ describe('Site Register: streams', () => {
     cleanup();
     for (const [code, name] of [['DESIGN_ACQ', 'Design & Acquisition'], ['CW', 'Civil Works'], ['TE', 'Installation (TE)'], ['CLOSURE', 'Handover & Closure']]) {
       renderApp(<Sites />, { route: `/sites?stream=${code}` });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`Site Register: ${name}`);
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${name}`);
       await waitFor(() => expect(document.querySelector(`[data-stream="${code}"]`)).not.toBeNull());
       cleanup();
     }
@@ -40,11 +40,11 @@ describe('Site Register: streams', () => {
     await signIn('pm');
     const names = { DESIGN_ACQ: 'التصميم والاستحواذ', CW: 'الأعمال المدنية', TE: 'التركيبات', CLOSURE: 'التسليم والإغلاق' };
     renderApp(<Sites />, { route: '/sites', locale: 'ar' });
-    expect(screen.getByRole('heading', { name: 'سجل المواقع' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'SITE 360' })).toBeInTheDocument();
     cleanup();
     for (const [code, name] of Object.entries(names)) {
       renderApp(<Sites />, { route: `/sites?stream=${code}`, locale: 'ar' });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`سجل المواقع: ${name}`);
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${name}`);
       cleanup();
     }
   });
@@ -109,17 +109,17 @@ describe('Site Register: streams', () => {
   });
 });
 
-describe('Site Register: views (contract 0.4.7)', () => {
+describe('SITE 360: views (contract 0.4.7)', () => {
   it('titles the open view with the name from the API, in EN and AR, and shows no tab bars', async () => {
     await signIn('pm');
-    for (const [view, en, ar] of [['CW', 'CW Register', 'سجل الأعمال المدنية'], ['TE', 'TE Register', 'سجل التركيبات'], ['OM', 'O&M', 'التشغيل والصيانة']]) {
+    for (const [view, en, ar] of [['CW', 'Civil Works', 'الأعمال المدنية'], ['TE', 'Installation (TE)', 'التركيبات'], ['OM', 'O&M', 'التشغيل والصيانة']]) {
       renderApp(<Sites />, { route: `/sites?view=${view}` });
-      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`Site Register: ${en}`));
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${en}`));
       expect(screen.queryByTestId('view-tabs')).toBeNull();
       expect(screen.queryByTestId('stream-tabs')).toBeNull();
       cleanup();
       renderApp(<Sites />, { route: `/sites?view=${view}`, locale: 'ar' });
-      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`سجل المواقع: ${ar}`));
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${ar}`));
       cleanup();
     }
   });

@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: GSDN PMIS API
+  title: GSDN Workspace API
   version: 0.15.0
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
@@ -112,7 +112,7 @@ info:
     name: Proprietary, Aljeel internal use
     url: https://pmis.aljeel.internal/license
   contact:
-    name: GSDN PMIS tech-lead
+    name: GSDN Workspace tech-lead
 servers:
   - url: https://pmis.aljeel.internal/api/v1
     description: Internal server (TLS from the internal CA)
@@ -470,7 +470,7 @@ paths:
         code past its end is 401 `enrol_code_expired`; both count toward the same lock as wrong TOTP codes (5 in a row lock the account for 15
         minutes and end every pending sign-in). The code is not used up here (the QR code may be redrawn); it is used up at the confirm step.
         With the right code it makes a new secret, stores it encrypted (AES-256-GCM, key from the server environment) as the pending secret and
-        returns it once: the `otpauth_uri` (issuer "GSDN PMIS") for the QR code and the `secret` as the manual key. Calling it again replaces the
+        returns it once: the `otpauth_uri` (issuer "GSDN Workspace") for the QR code and the `secret` as the manual key. Calling it again replaces the
         pending secret. The answer is never cached. A user who is already enrolled cannot start again; an admin reset is needed.
       x-db-path: auth_totp_begin_enrol
       security: []
@@ -12202,7 +12202,7 @@ components:
       properties:
         secret: { type: string, description: 'Base32 manual key. Shown only in this answer.' }
         otpauth_uri: { type: string, description: 'otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code.' }
-        issuer: { type: string, const: GSDN PMIS }
+        issuer: { type: string, const: GSDN Workspace }
         account: { type: string, description: The user's email. }
         algorithm: { type: string, const: SHA1 }
         digits: { type: integer, const: 6 }

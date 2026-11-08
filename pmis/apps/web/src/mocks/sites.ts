@@ -41,8 +41,8 @@ export const STREAMS = [
 const STREAM_OF = ['DESIGN_ACQ', 'CW', 'CW', 'CW', 'TE', 'TE', 'TE', 'TE', 'CLOSURE', 'CLOSURE'];
 /** The views of contract 0.4.7 with the seed membership (migration 0023) while `views.om_team_assigned` is false: B15 in CW, D18 in TE, B14 in OM. Stage 1 and Z1 are in no view. */
 export const VIEWS: View[] = [
-  { code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', sort_order: 1, stage_codes: [STAGE_CODES[1], STAGE_CODES[2], STAGE_CODES[3]], task_codes: ['B15'] },
-  { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', sort_order: 2, stage_codes: STAGE_CODES.slice(4, 9), task_codes: ['D18'] },
+  { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sort_order: 1, stage_codes: [STAGE_CODES[1], STAGE_CODES[2], STAGE_CODES[3]], task_codes: ['B15'] },
+  { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sort_order: 2, stage_codes: STAGE_CODES.slice(4, 9), task_codes: ['D18'] },
   { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sort_order: 3, stage_codes: [], task_codes: ['B14'] },
 ];
 export const VIEW_REFS = VIEWS.map(({ code, name_en, name_ar, sort_order }) => ({ code, name_en, name_ar, sort_order }));

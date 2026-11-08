@@ -128,44 +128,44 @@ const EMAIL_COLS = Prisma.sql`id::text AS id, old_email, new_email, status, requ
 export const PROFILE_MAIL = {
   verify: (code: string, until: string): Omit<MailMessage, 'to'> => ({
     category: 'email_change_verification',
-    subject: 'GSDN PMIS: confirm your new email address',
-    text: `You asked to use this address for your GSDN PMIS account. Open My profile in the PMIS and enter this code: ${code}\n`
+    subject: 'GSDN Workspace: confirm your new email address',
+    text: `You asked to use this address for your GSDN Workspace account. Open My profile in GSDN Workspace and enter this code: ${code}\n`
       + `It works once and expires at ${until}. If you did not ask for this, ignore this message.\n\n`
-      + `طلبت استخدام هذا البريد لحسابك في نظام GSDN PMIS. افتح "ملفي الشخصي" وأدخل الرمز: ${code}\nإن لم تطلب ذلك فتجاهل هذه الرسالة.`,
+      + `طلبت استخدام هذا البريد لحسابك في نظام GSDN Workspace. افتح "ملفي الشخصي" وأدخل الرمز: ${code}\nإن لم تطلب ذلك فتجاهل هذه الرسالة.`,
   }),
   emailRequestedOld: (): Omit<MailMessage, 'to'> => ({
     category: 'security_notice',
-    subject: 'GSDN PMIS: a change of your sign-in email was requested',
-    text: 'Someone signed in to your GSDN PMIS account asked to change its sign-in email. An administrator must approve it. '
+    subject: 'GSDN Workspace: a change of your sign-in email was requested',
+    text: 'Someone signed in to your GSDN Workspace account asked to change its sign-in email. An administrator must approve it. '
       + 'If this was not you, change your password and tell an administrator.\n\n'
-      + 'طُلب تغيير بريد الدخول لحسابك في نظام GSDN PMIS، ويجب أن يوافق عليه مسؤول. إن لم تكن أنت فغيّر كلمة المرور وأبلغ المسؤول.',
+      + 'طُلب تغيير بريد الدخول لحسابك في نظام GSDN Workspace، ويجب أن يوافق عليه مسؤول. إن لم تكن أنت فغيّر كلمة المرور وأبلغ المسؤول.',
   }),
   emailDecided: (approved: boolean): Omit<MailMessage, 'to'> => ({
     category: 'email_change_decided',
-    subject: approved ? 'GSDN PMIS: your sign-in email was changed' : 'GSDN PMIS: your email change was rejected',
+    subject: approved ? 'GSDN Workspace: your sign-in email was changed' : 'GSDN Workspace: your email change was rejected',
     text: (approved
-      ? 'The sign-in email of your GSDN PMIS account was changed after an administrator approved the request. Your sessions were signed out: sign in again with the new address. '
-      : 'An administrator rejected the request to change the sign-in email of your GSDN PMIS account; it stays as it was. ')
+      ? 'The sign-in email of your GSDN Workspace account was changed after an administrator approved the request. Your sessions were signed out: sign in again with the new address. '
+      : 'An administrator rejected the request to change the sign-in email of your GSDN Workspace account; it stays as it was. ')
       + 'See My profile for the details. If you did not ask for this, tell an administrator.\n\n'
       + (approved ? 'تم تغيير بريد الدخول لحسابك بعد موافقة المسؤول وتم إنهاء جلساتك، فسجّل الدخول من جديد بالعنوان الجديد.' : 'رفض المسؤول طلب تغيير بريد الدخول، ويبقى كما هو.'),
   }),
   phone: (what: 'requested' | 'approved' | 'rejected'): Omit<MailMessage, 'to'> => ({
     category: 'phone_change',
-    subject: what === 'requested' ? 'GSDN PMIS: a change of your sign-in phone was requested'
-      : what === 'approved' ? 'GSDN PMIS: your sign-in phone was changed' : 'GSDN PMIS: your phone change was rejected',
-    text: (what === 'requested' ? 'A change of the sign-in phone of your GSDN PMIS account was requested and waits for an administrator. '
-      : what === 'approved' ? 'The sign-in phone of your GSDN PMIS account was changed after an administrator approved the request. '
-        : 'An administrator rejected the request to change the sign-in phone of your GSDN PMIS account; it stays as it was. ')
+    subject: what === 'requested' ? 'GSDN Workspace: a change of your sign-in phone was requested'
+      : what === 'approved' ? 'GSDN Workspace: your sign-in phone was changed' : 'GSDN Workspace: your phone change was rejected',
+    text: (what === 'requested' ? 'A change of the sign-in phone of your GSDN Workspace account was requested and waits for an administrator. '
+      : what === 'approved' ? 'The sign-in phone of your GSDN Workspace account was changed after an administrator approved the request. '
+        : 'An administrator rejected the request to change the sign-in phone of your GSDN Workspace account; it stays as it was. ')
       + 'See My profile for the details. If you did not ask for this, change your password and tell an administrator.\n\n'
-      + 'تغيّرت حالة طلب تغيير هاتف الدخول لحسابك في نظام GSDN PMIS. راجع "ملفي الشخصي". إن لم تطلب ذلك فأبلغ المسؤول.',
+      + 'تغيّرت حالة طلب تغيير هاتف الدخول لحسابك في نظام GSDN Workspace. راجع "ملفي الشخصي". إن لم تطلب ذلك فأبلغ المسؤول.',
   }),
   twoFactorOff: (byAdmin: boolean): Omit<MailMessage, 'to'> => ({
     category: 'security_notice',
-    subject: 'GSDN PMIS: two-factor sign-in was turned off',
-    text: (byAdmin ? 'An administrator turned two-factor sign-in off for your GSDN PMIS account. Your sessions were signed out. '
-      : 'Two-factor sign-in was turned off on your GSDN PMIS account from My profile. Your other sessions were signed out. ')
+    subject: 'GSDN Workspace: two-factor sign-in was turned off',
+    text: (byAdmin ? 'An administrator turned two-factor sign-in off for your GSDN Workspace account. Your sessions were signed out. '
+      : 'Two-factor sign-in was turned off on your GSDN Workspace account from My profile. Your other sessions were signed out. ')
       + 'Your recovery codes no longer work. If you did not expect this, change your password and tell an administrator.\n\n'
-      + 'تم إيقاف التحقق بخطوتين لحسابك في نظام GSDN PMIS وإنهاء الجلسات الأخرى. إن لم تتوقع ذلك فغيّر كلمة المرور وأبلغ المسؤول.',
+      + 'تم إيقاف التحقق بخطوتين لحسابك في نظام GSDN Workspace وإنهاء الجلسات الأخرى. إن لم تتوقع ذلك فغيّر كلمة المرور وأبلغ المسؤول.',
   }),
 };
 
