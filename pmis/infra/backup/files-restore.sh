@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: restore the stored files from the restic repository (owner answer Q134). Part of the restore drill (infra/RUNBOOK.md, section
+# GSDN Workspace: restore the stored files from the restic repository (owner answer Q134). Part of the restore drill (infra/RUNBOOK.md, section
 # "Restore drill"); the drill record is in infra/restore-drill.md.
 #
 # Usage:   files-restore.sh <snapshot-id|latest> <empty-target-directory>

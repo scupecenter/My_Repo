@@ -478,7 +478,7 @@ BEGIN
       IF t.state = 'open' AND (NOT draft OR flds ? 'actual_start' OR flds ? 'actual_date') THEN
         start_d := public.imp_start_date(r.task_code, flds, t);
         IF start_d IS NULL THEN
-          RAISE EXCEPTION 'wf:actual_start_required:{"detail": "The task is pending: type its Actual Start. The PMIS never uses today as the start of an earlier piece of work (Q209)."}';
+          RAISE EXCEPTION 'wf:actual_start_required:{"detail": "The task is pending: type its Actual Start. GSDN Workspace never uses today as the start of an earlier piece of work (Q209)."}';
         END IF;
         PERFORM public.wf_start(t.id, NULL, start_d);
       END IF;
@@ -1085,7 +1085,7 @@ BEGIN
     v_rows := v_rows || jsonb_build_array(jsonb_build_object('row_no', row_.row_no, 'site_code', row_.site_code, 'cells', cells, 'pre_errors', pres));
   END LOOP;
   IF jsonb_array_length(v_rows) = 0 THEN
-    PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'No typed task column of this file belongs to a site of the PMIS: nothing can be entered.'));
+    PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'No typed task column of this file belongs to a site of GSDN Workspace: nothing can be entered.'));
   END IF;
   res := public.imp_stage_master_core('TPL-MASTER', tv.version, r.file_name, r.file_sha256,
     jsonb_build_array(jsonb_build_object('sheet', mpart ->> 'sheet', 'header_checksum', mpart ->> 'header_checksum', 'rows', v_rows)), p_mode, 'master_import', gid, hw);

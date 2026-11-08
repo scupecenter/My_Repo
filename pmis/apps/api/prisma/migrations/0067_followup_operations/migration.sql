@@ -148,8 +148,8 @@ BEGIN
   BEGIN
     PERFORM public.mail_to_system_admins('integrity_head',
       left('[PMIS] ' || CASE r.log WHEN 'audit' THEN 'Audit Log' ELSE 'Security log' END || ' integrity check ' || st || ': head ' || left(coalesce(r.head_hash, 'none'), 12), 200),
-      'A log integrity check finished in GSDN PMIS. Keep this mail: the head hash is an anchor kept outside the database.' || E'\n'
-      || 'اكتمل فحص سلامة السجل في GSDN PMIS. احتفظ بهذه الرسالة: بصمة الرأس مرجع محفوظ خارج قاعدة البيانات.' || E'\n\n'
+      'A log integrity check finished in GSDN Workspace. Keep this mail: the head hash is an anchor kept outside the database.' || E'\n'
+      || 'اكتمل فحص سلامة السجل في GSDN Workspace. احتفظ بهذه الرسالة: بصمة الرأس مرجع محفوظ خارج قاعدة البيانات.' || E'\n\n'
       || 'Log: ' || r.log || E'\n' || 'Result: ' || st || E'\n' || 'Checked positions: ' || r.from_seq::text || ' to ' || r.to_seq::text || E'\n'
       || 'Head hash (SHA-256): ' || coalesce(nullif(btrim(r.head_hash), ''), 'none (empty chain)') || E'\n' || 'Run: ' || r.id::text || ' (' || r.trigger || ')' || E'\n'
       || 'Finished at: ' || public.log_ts_text(r.finished_at) || ' (UTC)' || E'\n\n'

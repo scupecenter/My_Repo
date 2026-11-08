@@ -307,7 +307,7 @@ export class ProtectedStorage implements ObjectStorage {
   }
 
   /**
-   * Content the PMIS generated itself, with no user file inside (CSV log exports, owner answer Q195): encrypted like every object but not sent to the
+   * Content GSDN Workspace generated itself, with no user file inside (CSV log exports, owner answer Q195): encrypted like every object but not sent to the
    * virus scanner, so a clamd outage does not stop the export. The caller sanitizes the content (CSV cells that could run as a formula are quoted).
    * A zip of uploaded files never comes here: it is built only from files that passed the scan.
    */

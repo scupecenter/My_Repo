@@ -742,7 +742,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- grey cells: a value that differs from what the PMIS holds is reported, never read (R5)
+  -- grey cells: a value that differs from what GSDN Workspace holds is reported, never read (R5)
   FOR col IN SELECT c ->> 'code' AS code, c ->> 'task' AS task, c ->> 'field' AS field, c ->> 'header' AS header
              FROM jsonb_array_elements(p_cols) c
              WHERE c ->> 'kind' = 'task' AND coalesce((c ->> 'derived')::boolean, false)
@@ -978,7 +978,7 @@ END $$;
 
 -- TPL-MASTER: the Master sheet is split into one stream batch per stream (the stream template's own version and columns decide the rows), and each register sheet
 -- is staged as the register's own template. Each part follows its own flow; they share group_id, and source = master_template (the parallel-run import path:
--- every row keeps its sheet and file row in source_ref, and its diff against what the PMIS holds). A part the caller may not import is skipped, with the reason.
+-- every row keeps its sheet and file row in source_ref, and its diff against what GSDN Workspace holds). A part the caller may not import is skipped, with the reason.
 -- p_parts = [{sheet, header_checksum, rows}]; the rows of the Master sheet carry `cells` keyed by the codes of the Master columns.
 CREATE OR REPLACE FUNCTION imp_stage_master(p_template text, p_version int, p_file_name text, p_sha text, p_parts jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$

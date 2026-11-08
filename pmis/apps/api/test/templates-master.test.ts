@@ -162,7 +162,7 @@ describe('upload: split into one batch per part', () => {
   // a download and its upload must see the same TPL-MASTER version: the suites that issue new versions hold the same lock
   beforeEach(async () => { await db.query('SELECT pg_advisory_lock(770101)'); });
   afterEach(async () => { await db.query('SELECT pg_advisory_unlock(770101)'); });
-  it('stages the Master sheet as one batch per stream and each register sheet as its own, grouped; each follows its own flow; warnings for what the PMIS does not own', async () => {
+  it('stages the Master sheet as one batch per stream and each register sheet as its own, grouped; each follows its own flow; warnings for what GSDN Workspace does not own', async () => {
     const m = await masterTeam();
     const dl = await downloadTemplate(m.as.entry.api, 'TPL-MASTER');
     const withMaster = await fillTemplate(dl.buffer, [{
@@ -172,9 +172,9 @@ describe('upload: split into one batch per part', () => {
     const withAsBuilt = await fillTemplate(withMaster, [{ 'Site ID': m.siteCode, 'As-Built Date': day('2026-04-01') }], { sheet: 'As-Built' });
     const file = await fillTemplate(withAsBuilt, [], { sheet: 'Master', edit: (wb) => {
       const ws = wb.getWorksheet('Master')!;
-      ws.getRow(1).getCell(200).value = 'My own notes';            // a column the PMIS does not own
+      ws.getRow(1).getCell(200).value = 'My own notes';            // a column GSDN Workspace does not own
       ws.getRow(2).getCell(200).value = 'see me';
-      wb.addWorksheet('Scratch').addRow(['a sheet the PMIS does not know']);
+      wb.addWorksheet('Scratch').addRow(['a sheet GSDN Workspace does not know']);
     } });
     const res = await uploadFile(m.as.entry.api, file);
     expect(res.status).toBe(202);
@@ -260,7 +260,7 @@ describe('upload: split into one batch per part', () => {
     // a claimed checksum that is not the issued one
     const forged = await fillTemplate(f1, [], { sheet: 'Master', edit: (wb) => { wb.getWorksheet('_tpl')!.eachRow((r) => { if (String(r.getCell(1).value) === 'header_checksum') r.getCell(2).value = 'f'.repeat(64); }); } });
     expect((await uploadFile(m.as.entry.api, forged)).body).toMatchObject({ reason: 'checksum_mismatch' });
-    // only calculated columns filled: there is nothing the PMIS can enter
+    // only calculated columns filled: there is nothing GSDN Workspace can enter
     const calcOnly = await fillTemplate(dl.buffer, [{ [M.site]: m.siteCode, [M.calc]: day('2026-05-05') }], { sheet: 'Master' });
     const none = await uploadFile(m.as.entry.api, calcOnly);
     expect(none.status).toBe(422);

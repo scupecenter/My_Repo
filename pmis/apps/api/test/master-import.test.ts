@@ -108,7 +108,7 @@ async function fixture(): Promise<Fixture> {
 }
 
 describe('legacy Master import: identification, preview and the comparison report (Q1, Q211)', () => {
-  it('identifies the file by its sheets and headers, compares every cell with the PMIS, writes nothing, keeps the original and logs the use', async () => {
+  it('identifies the file by its sheets and headers, compares every cell with GSDN Workspace, writes nothing, keeps the original and logs the use', async () => {
     const admin = await plainAdmin(app, db);
     const f = await fixture();
     const buf = await masterFile([
@@ -142,7 +142,7 @@ describe('legacy Master import: identification, preview and the comparison repor
     expect((await diffsOf(admin.api, run.id, '&kind=exception')).every((x) => x.kind === 'exception')).toBe(true);
     expect((await diffsOf(admin.api, run.id, `&site_code=${f.other.code}`)).every((x) => x.site_code === f.other.code)).toBe(true);
 
-    // nothing changed in the PMIS
+    // nothing changed in GSDN Workspace
     expect(await taskRow(db, f.b4)).toMatchObject({ state: 'open', actual_date: null });
     // the use is audited and in the System Log; the original is kept as uploaded
     const au = await q<{ after: Record<string, any> }>(db, `SELECT after FROM audit_log WHERE action = 'master_import.preview' AND entity_id = $1`, [run.id]);

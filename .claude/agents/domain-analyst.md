@@ -1,6 +1,6 @@
 ---
 name: domain-analyst
-description: Business analyst for GSDN PMIS. Use to turn the blueprint, Master workbook and decisions log into user stories, acceptance criteria, the task catalogue, business-rule specs and open questions.
+description: Business analyst for GSDN Workspace. Use to turn the blueprint, Master workbook and decisions log into user stories, acceptance criteria, the task catalogue, business-rule specs and open questions.
 model: opus
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash

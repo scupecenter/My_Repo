@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: nightly logical copy of the PMIS database (pg_dump, custom format), as an extra to the pgBackRest backups (owner answer Q196).
+# GSDN Workspace: nightly logical copy of GSDN Workspace database (pg_dump, custom format), as an extra to the pgBackRest backups (owner answer Q196).
 # The dump is streamed straight into its own restic repository (DB_DUMP_RESTIC_REPOSITORY, with its own password file, so its keys
 # are kept apart from the pgBackRest keys). Retention: 14 daily, 8 weekly and 12 monthly snapshots (tag db-dump).
 # Run at 03:00 by gsdn-pmis-db-dump.timer, as postgres. Writes one job_runs row (name db_dump).

@@ -334,7 +334,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 ## 3. C list: data the owner must provide
 
 1. **Q4 Holiday calendar.** The official Libyan public holidays for 2026 and 2027 (date, EN/AR name, national or religious) from an approved source; confirmation or correction of the 18 tentative religious dates in `db/seed/holidays-2026-2027.csv`; and the person who confirms them each year.
-2. **Q8 Role mapping.** An approved mapping of the 15 Master `StaffRole` values to the PMIS roles, including which values are ambiguous (for example the generic "Site Engineer") and must become import exceptions.
+2. **Q8 Role mapping.** An approved mapping of the 15 Master `StaffRole` values to GSDN Workspace roles, including which values are ambiguous (for example the generic "Site Engineer") and must become import exceptions.
 3. **Q104 List values.** Codes, EN labels, AR labels, and the critical (approval-blocking) mark for CompanyType, CoStatus, TeamType, TeamStatus, Severity, QIResult, Activity, IssueStatus, RiskCat, ScopeCWTE, RiskResponse, RiskStatus, Trend, EHSCheck, ReviewStatus, SiteType, TowerOwner, TowerType, Ownership, TestPit, WLVendor and the As-Built vendor and type lists. Also the Arabic labels of the new fields.
 4. **Q107 Warehouse.** Confirmed need quantity per need unit for every TE item other than LPU Kit / Router / Cabinet / Battery (Cambium and Intracom sectors, MW half-link items, accessories). The manufacturer codes for the 10 TE items that have none (`SFP-SM-10G-10KM`, `ERKA-2X2-5`, `ERKA-4X0-75`, `FIBER-OUTDOOR`, `TELECOM-BRACKET`, `FIBER-CLAMP-4L8R`, and so on). Confirmation that CW-01…CW-28 may stay as internal codes.
 5. **Q116 Pipeline.** The choice between variant A (rings) and variant B (flat segmented track), after the working previews from P2.
@@ -363,7 +363,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 **D6 (Q6 vs Q65). TE Dispatch Complete.** Q65 (owner, 2026-10-29) says "TE Dispatch Complete = the date of the latest TE DN". The Q6 answer says "dispatch completion compares with the approved need of the site".
 - (a) Keep Q65: the date of the latest TE DN; the need rules only feed the warehouse KPIs.
 - (b) Replace Q65: complete when the approved need is met, with the latest DN date as the date.
-- (c) Both: the Q65 date for the Master comparison, and the need-based status in the PMIS.
+- (c) Both: the Q65 date for the Master comparison, and the need-based status in GSDN Workspace.
 
 **D16 (Q16 vs Q121). Health index status.** The six factors are defined in rules.md §9, and Q121 approved D and I and removed the draft label (built, 0046). The Q16 answer says the definitions are "not given" and the indices stay experimental.
 - (a) Keep Q121: no draft label; review rules.md §9 if any factor is wrong.
@@ -413,7 +413,7 @@ Where the table says "verified", the behaviour was checked in the migration or s
 |---|---|
 | D0 | **All answers are binding owner decisions.** Build them. |
 | D4b | Tentative holidays **count** as holidays now, with a **"tentative date" badge** on the affected due dates; corrected when confirmed. |
-| D6 | **Both:** the date of the latest TE DN for the Master comparison (Q65), and a need-based complete / short status inside the PMIS. |
+| D6 | **Both:** the date of the latest TE DN for the Master comparison (Q65), and a need-based complete / short status inside GSDN Workspace. |
 | D16 | **Draft label only on the factors not yet approved** (all except D and I). |
 | D108b | RF Height is a **number in metres plus an optional note** (for values like "30/45"). |
 | D112 | An older template version is **accepted when only non-input columns changed**; rejected when any input column changed. |

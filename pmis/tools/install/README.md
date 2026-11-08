@@ -1,6 +1,6 @@
-# GSDN PMIS installer (Ubuntu)
+# GSDN Workspace installer (Ubuntu)
 
-`install-ubuntu.sh` installs or upgrades the PMIS on an Ubuntu 22.04 or 24.04 server. `update.sh` pulls the code and
+`install-ubuntu.sh` installs or upgrades GSDN Workspace on an Ubuntu 22.04 or 24.04 server. `update.sh` pulls the code and
 runs the installer again with every answer taken from the last run. Answers are kept in `/etc/gsdn-pmis/install.conf`
 (no secrets).
 
@@ -19,8 +19,8 @@ The first question of the certificate step is the menu. Options 0 to 3 keep thei
 | 3 | Self-signed | `/etc/ssl/gsdn-pmis/` |
 | 4 | A Let's Encrypt certificate already on this server, used in place | `/etc/letsencrypt/live/<name>/` (read where certbot keeps it, not copied) |
 
-Use option 4 when another certificate on the server is renewed by certbot and the PMIS must follow its renewals.
-Option 2 copies the files, so a renewal never reaches the PMIS.
+Use option 4 when another certificate on the server is renewed by certbot and GSDN Workspace must follow its renewals.
+Option 2 copies the files, so a renewal never reaches GSDN Workspace.
 
 ### Option 4
 
@@ -96,7 +96,7 @@ The steps and the commands of the owner after an update are in `infra/RUNBOOK.md
 
 ## Outbound mail and the integrity anchors (migration 0055, Q167, Q171)
 
-The PMIS mails the security alerts to every active System Admin (and, later, the notification kinds listed in the setting `mail.notification_kinds`).
+GSDN Workspace mails the security alerts to every active System Admin (and, later, the notification kinds listed in the setting `mail.notification_kinds`).
 The SMTP settings live only in `/etc/gsdn-pmis/pmis.env`. A first install writes them empty; **every update keeps them as they are**. With
 `SMTP_HOST` empty, mail is off: nothing leaves the server and the System Log records what would have been sent (kind, masked address, subject;
 never the body).
@@ -107,7 +107,7 @@ never the body).
 | `SMTP_PORT` | 587 for STARTTLS, 465 for implicit TLS, 25 for a relay without TLS | `587` |
 | `SMTP_TLS` | `starttls` (required: a relay that does not offer it is refused, never downgraded), `tls` (port 465) or `none` | `starttls` |
 | `SMTP_USER`, `SMTP_PASS` | The account the relay wants, both or neither. Never logged, never shown on screen | `pmis-relay` |
-| `SMTP_FROM` | The sender, an address or `Name <address>` | `GSDN PMIS <pmis-noreply@aljeel.ly>` |
+| `SMTP_FROM` | The sender, an address or `Name <address>` | `GSDN Workspace <pmis-noreply@aljeel.ly>` |
 | `SMTP_TLS_REJECT_UNAUTHORIZED` | `true` (default) checks the relay certificate; `false` only for a test relay | `true` |
 | `SMTP_CA_FILE` | The internal CA certificate when the relay uses one (readable by the service user) | `/etc/gsdn-pmis/relay-ca.pem` |
 | `SMTP_ALLOW_PLAIN_AUTH` | `true` allows a password over `SMTP_TLS=none` (a relay on the same host only) | (empty) |

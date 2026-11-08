@@ -1,6 +1,6 @@
 ---
 name: qa-engineer
-description: QA and test automation for GSDN PMIS. Use to write test plans from acceptance criteria, Playwright E2E tests (EN and AR, light and dark), API contract tests, and to verify each phase gate.
+description: QA and test automation for GSDN Workspace. Use to write test plans from acceptance criteria, Playwright E2E tests (EN and AR, light and dark), API contract tests, and to verify each phase gate.
 model: haiku
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash

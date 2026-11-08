@@ -1,6 +1,6 @@
 ---
 name: frontend-engineer
-description: React/TypeScript engineer for GSDN PMIS web app (apps/web). Use to implement screens from the design and the OpenAPI contract, with i18n, RTL, theming and tests.
+description: React/TypeScript engineer for GSDN Workspace web app (apps/web). Use to implement screens from the design and the OpenAPI contract, with i18n, RTL, theming and tests.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash

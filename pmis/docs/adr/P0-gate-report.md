@@ -16,7 +16,7 @@
 | API contract | OpenAPI 3.1, version 0.1.0. It covers every endpoint P1 needs: sign-in and session, me, users, assignments (bulk), roles, permission profiles, groups, delegations, regions, sites (list, detail, task grid), tasks (detail, entry, submit, review, approve, reject with note, claim, release, comments, history, upload, download, admin override), approvals inbox (bulk), matrix, workflow versions and site migration, audit log read and export, settings read. It passes `redocly lint` (recommended rules) with no errors; four intentional 302 redirect endpoints are ignored. It generates TypeScript types that compile. | `contracts/openapi.yaml`, `contracts/redocly.yaml` |
 
 ### How to look at it (demo steps)
-1. Open `design/GSDN_PMIS_Prototype_v2.html` in a browser. Sign in as a demo user. Then go to My Work → a site → open a task drawer → Approvals → Responsibility Matrix → Users & Roles. Switch to Arabic and to dark mode from the top bar.
+1. Open `design/GSDN_Workspace_Prototype_v2.html` in a browser. Sign in as a demo user. Then go to My Work → a site → open a task drawer → Approvals → Responsibility Matrix → Users & Roles. Switch to Arabic and to dark mode from the top bar.
 2. Read `docs/spec/rules.md` §2 (gates) and §10 (approval rules). Then pick two stories, for example WF-04 self-skip and VI-03b visibility from several roles.
 3. Open `db/erd.md` for the data model in plain words.
 4. Optional, technical: run `npx -y @redocly/cli@1 lint pmis/contracts/openapi.yaml --config pmis/contracts/redocly.yaml`, or paste the file into any OpenAPI viewer to browse the API.

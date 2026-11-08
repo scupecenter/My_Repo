@@ -29,7 +29,7 @@ describe('P7 in the Warehouse screen', () => {
     expect(screen.getByTestId(`wh-dispatch-date-${c0}`)).toHaveTextContent('2026-10-18');
     expect(screen.getByTestId(`wh-dispatch-status-${c1}`)).toHaveTextContent(locale === 'ar' ? 'ناقص' : 'Short');
     expect(screen.getByTestId(`wh-dispatch-date-${c1}`)).toHaveTextContent('—');
-    // the date is kept even when the PMIS status is not complete (D6: two separate values)
+    // the date is kept even when GSDN Workspace status is not complete (D6: two separate values)
     expect(screen.getByTestId(`wh-dispatch-status-${c2}`)).toHaveTextContent(locale === 'ar' ? 'بانتظار الضبط' : 'Pending configuration');
     expect(screen.getByTestId(`wh-dispatch-date-${c2}`)).toHaveTextContent('2026-10-18');
     expect(within(screen.getByTestId(`wh-dispatch-${c0}`)).getByRole('link')).toHaveAttribute('href', `/sites/${siteIdOf(0)}?tab=warehouse`);

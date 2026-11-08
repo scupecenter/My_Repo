@@ -154,7 +154,7 @@ describe('the template mapping screen (Q207)', () => {
     const bad = await admin.api.call('post', '/template-mapping', { changes: [{ op: 'upsert', task_code: 'B7', field_key: 'submitted_date', label: 'x', read_only: false }], reason: 'try', dry_run: true });
     expect(bad.status).toBe(422);
     expect(bad.body.errors[0]).toMatchObject({ path: '/changes/0/read_only', code: 'calculated_field' });
-    // a Master column the PMIS does not own is never mapped
+    // a Master column GSDN Workspace does not own is never mapped
     const own = await admin.api.call('post', '/template-mapping', { changes: [{ ...change, master_col: 'V' }], reason: 'try', dry_run: true });
     expect(own.body.errors[0]).toMatchObject({ code: 'column_not_owned' });
 

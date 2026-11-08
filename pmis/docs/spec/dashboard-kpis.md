@@ -1,4 +1,4 @@
-# Dashboard KPIs: the legacy reference and the PMIS mapping (P3)
+# Dashboard KPIs: the legacy reference and GSDN Workspace mapping (P3)
 
 ## Sources
 - **Legacy dashboard (LD).** `docs/reference/legacy-dashboard/GSDN_Dashboard.html`, the repo copy with the XSS fixes. Its app script is `src/app.js` embedded verbatim (checked). Line numbers below are `app.js` lines, cited as "LD L123".
@@ -9,7 +9,7 @@
 - **Other spec.** `rules.md` §1–§9 and `stories-dashboard.md` (DB-01 … DB-13).
 - **Contract.** `contracts/openapi.yaml`, tags `dashboard` and `project-status`, plus `/sites` for the drill-downs.
 
-The legacy dashboard is the reference for KPI definitions and pipeline style (CLAUDE.md). The Master Dashboard sheet (D66, D67) is a separate design: its six tables are specified in DB-01 … DB-07, and §7 shows where the two meet. Where they differ from the legacy code, the PMIS follows BP §06 dict and CLAUDE.md (§8).
+The legacy dashboard is the reference for KPI definitions and pipeline style (CLAUDE.md). The Master Dashboard sheet (D66, D67) is a separate design: its six tables are specified in DB-01 … DB-07, and §7 shows where the two meet. Where they differ from the legacy code, GSDN Workspace follows BP §06 dict and CLAUDE.md (§8).
 
 ---
 
@@ -99,7 +99,7 @@ The dashboard finds each column by its three header rows, never by its position 
 |---|---|---|---|---|---|---|---|
 | OV-01 | Health pill | B-14 | Project Status SPI; site overdue | all | none | `GET /dashboard/health-index` (`score`, `band`) | Replaced by the health index (rules.md §9; DF-08). Band thresholds open (Q35) |
 | OV-02 | Lede text | On-Air done of app; RFI done; weighted Actual vs Planned; sites behind baseline; ECD at the On-Air rate | DP, BZ, Project Status | all | none | pipeline + project-status | Working days and the 6-week rate (DF-02, DF-04) |
-| OV-03 | Weighted physical progress (hero) | Project Status Actual, with the Planned tick and SPI (SPI ≥ 0.95 ok, ≥ 0.85 watch) | Project Status sheet | **ignores** site filters (LD note L841) | none | `GET /project-status` (`progress_pct`, activities, `weight_set`) | Computed by the PMIS (rules.md §6). Planned and SPI show "not available" until plan dates are complete (DB-08). Region and site scopes exist (rules.md §6 site filter). Ends at HOTO (CLAUDE.md) |
+| OV-03 | Weighted physical progress (hero) | Project Status Actual, with the Planned tick and SPI (SPI ≥ 0.95 ok, ≥ 0.85 watch) | Project Status sheet | **ignores** site filters (LD note L841) | none | `GET /project-status` (`progress_pct`, activities, `weight_set`) | Computed by GSDN Workspace (rules.md §6). Planned and SPI show "not available" until plan dates are complete (DB-08). Region and site scopes exist (rules.md §6 site filter). Ends at HOTO (CLAUDE.md) |
 | OV-04 | Site RFI | msAgg(j = RFI): done / app, bar, plan tick, delta, + period | BZ, BY | all | `ms` RFI done | `GET /dashboard/milestone-pipeline` node MS4 | The contract node lacks `plan` and `period` (G-D02) |
 | OV-05 | On-Air | msAgg(On-Air), as OV-04 | DP, DO | all | `ms` On-Air done | node MS6 | as OV-04 |
 | OV-06 | HOTO | msAgg(HOTO), as OV-04 (no period) | EY, EX | all | `ms` HOTO done | node MS9 | as OV-04 |
@@ -186,7 +186,7 @@ The config is at LD L917–L930.
   - No endpoint (G-D12).
 - **SC-20, SLA durations.** For each SLA step of the section: SLA max (wd), Completed n, Median, P85, Within max % (≤ max), and Open over max / open. Values come from the SLA sheet (working days).
   - PMIS must differ:
-    - the source is the PMIS SLA engine (rules.md §3);
+    - the source is GSDN Workspace SLA engine (rules.md §3);
     - D-1 starts from MS4 (CLAUDE.md, DF-21).
   - BP §06 dict also asks for P90 and the maximum.
   - Gap G-D11 (DB-10).
@@ -255,7 +255,7 @@ The config is at LD L917–L930.
 
 ---
 
-## 5. KPIs the PMIS adds (not in the legacy dashboard)
+## 5. KPIs GSDN Workspace adds (not in the legacy dashboard)
 
 | ID | KPI | Definition | PMIS source | Notes |
 |---|---|---|---|---|
@@ -294,7 +294,7 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | (5) WH · Complete Units | DB-06 | none |
 | (6) Swap & Relocation | DB-07 | OV-18, OV-19 |
 
-## 8. Where the PMIS definition must differ from the legacy code
+## 8. Where GSDN Workspace definition must differ from the legacy code
 
 | ID | Difference | Legacy | PMIS | Source |
 |---|---|---|---|---|
@@ -302,7 +302,7 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | DF-02 | Working days | `days()` counts calendar days for overdue, age, variance, slips and issue age | Working days (Fri/Sat weekend plus holidays, rules.md §3) | BP §06 dict ("in working days") |
 | DF-03 | One reference date | Report Date plus a time-shiftable "as of" | Today. History comes from frozen weekly snapshots. BP §06 lists the double reference date as a bug of the current dashboard. Keeping "period from" is open (Q34) | BP §06 dict, row 571 |
 | DF-04 | Forecast velocity | Last 8 weeks ÷ 8 | Average of the last 6 weeks including zero weeks. ECD = today + remaining ÷ velocity | BP §06 dict "Burn-up · ECD" |
-| DF-05 | Project Status scope | Read from the Master sheet (which already ends at HOTO) | Computed by the PMIS, ends at HOTO, editable weights. The pipeline still shows Final Closure | CLAUDE.md; D65; D66 |
+| DF-05 | Project Status scope | Read from the Master sheet (which already ends at HOTO) | Computed by GSDN Workspace, ends at HOTO, editable weights. The pipeline still shows Final Closure | CLAUDE.md; D65; D66 |
 | DF-06 | Final Closure | A partial funnel in the CW Quality tab | A separate Final Closure KPI (PX-01) | CLAUDE.md; rules.md §6.1 |
 | DF-07 | Delay | Only "behind baseline" | Delay attribution by party (PX-02) | CLAUDE.md; rules.md §8 |
 | DF-08 | Health | SPI / behind-share pill | Health index (PX-03) | CLAUDE.md; rules.md §9 |
@@ -362,7 +362,7 @@ They are listed so that the P3 backlog is complete (BP §06 dict rows 540–570)
 | Reference date | Q34: default today; a past date reads the weekly snapshot dated that day, otherwise it is computed from dated facts; `basis.source` says which | The legacy "period from" is not kept. |
 | Snapshots | PX-08 and DB-12: `site_snapshots` per site, `progress_snapshots` per region and for the project (Project Status, headline, pipeline, streams, health); written by `dash_snapshot_take`, never rewritten | Every Thursday (D186, since 0059; Sunday from 0046) and on the last day of each month (Q127, sections 11 and 12). |
 
-Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source the PMIS does not hold yet; none was invented.
+Not built (they stay in the backlog of sections 3 to 6): OV-07 and OV-10 (forecast, rate, burn-up, the weekly series), OV-13 (decisions required), OV-16 (risk matrix), OV-17 (data quality), OV-18 and OV-19 (Swap and Dismantle tables), PX-07 (WH Complete Units), PX-06 (Exceptions & Alerts), SC-13 (checkpoints), SC-18 (biggest slips), SC-26 and SC-27 (partner scorecards), SC-28 to SC-34 (quality and closure funnels). Each needs an owner answer or a source GSDN Workspace does not hold yet; none was invented.
 
 ## 11. Owner answers Q118 to Q127, built in contract 0.11.0 (migration 0046)
 

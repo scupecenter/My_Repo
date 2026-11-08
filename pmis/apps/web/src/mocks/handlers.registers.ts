@@ -446,8 +446,8 @@ export const registerHandlers = [
       for (const p of [...parts].reverse()) R().batches.unshift(p);
       save();
       const warnings = [
-        { code: 'column_not_owned', sheet: 'Master', column: 'Milestone / PRE-CW Completion Date', count: 3, message: 'The column "Milestone / PRE-CW Completion Date" is calculated by the PMIS: 3 value(s) ignored.' },
-        { code: 'extra_column', sheet: 'Master', column: 'My own notes', message: 'The column "My own notes" is not owned by the PMIS: it is ignored.' },
+        { code: 'column_not_owned', sheet: 'Master', column: 'Milestone / PRE-CW Completion Date', count: 3, message: 'The column "Milestone / PRE-CW Completion Date" is calculated by GSDN Workspace: 3 value(s) ignored.' },
+        { code: 'extra_column', sheet: 'Master', column: 'My own notes', message: 'The column "My own notes" is not owned by GSDN Workspace: it is ignored.' },
         ...(text.includes('skipgecol') ? [] : []),
       ];
       return HttpResponse.json({ ...toBatch(parts[0]!), parts: parts.map(toBatch), warnings }, { status: 202, headers: { ETag: `"${parts[0]!.version}"` } });

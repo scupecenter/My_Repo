@@ -37,7 +37,7 @@ Every upload must be a template the system issued, with its ID and version embed
    - Nothing reaches the target tables until a row is approved (ADR 0004 §9).
    - An "Undo batch" is an admin override that uses the stored before values.
 6. **Legacy Master path (Q1). Proposed default, pending the owner:**
-   - The normal path is the template `TPL-MASTER`. The PMIS can **stamp** a user's copy of the live Master: the user uploads it once to `POST /templates/TPL-MASTER/stamp`, and the system returns the same workbook with `_tpl` added. Later uploads then follow item 4 with no exception.
+   - The normal path is the template `TPL-MASTER`. GSDN Workspace can **stamp** a user's copy of the live Master: the user uploads it once to `POST /templates/TPL-MASTER/stamp`, and the system returns the same workbook with `_tpl` added. Later uploads then follow item 4 with no exception.
    - Until that happens, there is an **admin-only legacy path**:
      - it accepts a file without `_tpl` only if it matches the known Master fingerprint (`TPL-MASTER-LEGACY`). The fingerprint is a subset match, not a checksum: every required sheet name, and every header in `mapping.csv` that has a `target_field`, must be present by name. Extra columns are ignored;
      - it is open only while the setting `legacy_master_import_until` (a date covering the migration and the parallel run) is in the future;

@@ -61,7 +61,7 @@ const tAr = await page.title(), h1Ar = await page.textContent('#title');
 ok(await page.getAttribute('html', 'dir') === 'rtl', 'default is RTL Arabic');
 await page.click('#langBtn');
 const tEn = await page.title();
-ok(tEn !== tAr && tEn === 'GSDN PMIS — Infrastructure Sizing Tool' && (await page.textContent('#title')) !== h1Ar, `AR->EN toggle changes title ("${tEn}")`);
+ok(tEn !== tAr && tEn === 'GSDN Workspace — Infrastructure Sizing Tool' && (await page.textContent('#title')) !== h1Ar, `AR->EN toggle changes title ("${tEn}")`);
 ok(await page.getAttribute('html', 'dir') === 'ltr', 'EN is LTR');
 ok(/v1\.0/.test(await page.textContent('#subtitle')), 'version label in header');
 await page.click('#langBtn');

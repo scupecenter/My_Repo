@@ -1,5 +1,5 @@
 const {chromium}=require('playwright');
-const URL='file://'+require('path').resolve(__dirname,'../../GSDN_PMIS_Prototype_v2.html');
+const URL='file://'+require('path').resolve(__dirname,'../../GSDN_Workspace_Prototype_v2.html');
 const out=[];const ok=(n,c,x)=>{out.push((c?'PASS ':'FAIL ')+n+(x?' — '+x:''));if(!c)process.exitCode=1};
 (async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:1360,height:860},acceptDownloads:true});const p=await ctx.newPage();const errs=[];
 p.on('console',m=>{if(m.type()==='error')errs.push('console: '+m.text())});p.on('pageerror',e=>errs.push('pageerror: '+e.message));

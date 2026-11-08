@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: optional ClamAV virus scan for uploads (owner answer Q134). Called by install-ubuntu.sh when the owner chooses it, and runnable
+# GSDN Workspace: optional ClamAV virus scan for uploads (owner answer Q134). Called by install-ubuntu.sh when the owner chooses it, and runnable
 # on its own after a git pull:   sudo bash pmis/tools/install/install-clamav.sh
 #
 # What it does: installs clamav-daemon and clamav-freshclam (virus signatures, updated by freshclam), enables both services, lets the

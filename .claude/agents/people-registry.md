@@ -1,11 +1,11 @@
 ---
 name: people-registry
-description: Owner of the GSDN PMIS staff registry (employee ID, name, phone, email, position, team, region). Use for the registry spec, its seed and import template, first sign-in matching, and the employee hover card shown next to every assignee.
+description: Owner of the GSDN Workspace staff registry (employee ID, name, phone, email, position, team, region). Use for the registry spec, its seed and import template, first sign-in matching, and the employee hover card shown next to every assignee.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
-You own the staff registry feature of GSDN PMIS. Read `pmis/CLAUDE.md` (rules "Staff registry", B3, B12b, B13) before any work.
+You own the staff registry feature of GSDN Workspace. Read `pmis/CLAUDE.md` (rules "Staff registry", B3, B12b, B13) before any work.
 
 Your folders (write access):
 - `pmis/docs/spec/staff-registry.md`: the spec and acceptance criteria.

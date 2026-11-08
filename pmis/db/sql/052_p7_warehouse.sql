@@ -18,7 +18,7 @@
 --      router models), and when a rule applies (scope te_full / router_only (Q6), delivery scenario, regions).
 --      `warehouse_region_vendors` is the Setting tblRegionVendor (D58): it is empty in the Master and stays empty until the owner gives it.
 --   4. D6 (both). wh_site_dispatch(site): the TE Dispatch Complete date = the date of the latest posted TE DN of the site (Q65, for the Master comparison),
---      and, separately, the PMIS status complete / short / pending_configuration / not_applicable against the site's approved need, line by line.
+--      and, separately, GSDN Workspace status complete / short / pending_configuration / not_applicable against the site's approved need, line by line.
 --   5. wh_config_gaps(): the owner data still missing (pending needs, provisional codes, regions without a WL vendor or a numbering sequence).
 --   6. pmis_app only reads the new tables. Every write goes through the functions below (owner pmis_definer, search_path set), audited with
 --      log_audit_write and a reason.

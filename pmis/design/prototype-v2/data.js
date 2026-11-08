@@ -1,4 +1,4 @@
-/* GSDN PMIS prototype · synthetic data on the new Master structure (all names and values are fictional) */
+/* GSDN Workspace prototype · synthetic data on the new Master structure (all names and values are fictional) */
 const REPORT = "2026-10-20";
 const REGIONS = ["Tripoli Area", "Middle Area", "WM Area", "Zawia Area", "Benghazi Area", "GM Area", "Sebha Area"];
 const REG_CODE = { "Tripoli Area": "TR", "Middle Area": "MI", "WM Area": "WM", "Zawia Area": "ZW", "Benghazi Area": "BG", "GM Area": "GM", "Sebha Area": "SB" };

@@ -6,7 +6,7 @@
 --      `allow_other`) and list_values (a stable code, EN/AR labels, aliases, functional groups, order, active). The code is the value stored in the
 --      records, so nothing already saved changes; a label can be renamed, a value is deactivated, never deleted. register_fields.list_catalogue links a
 --      field to its catalogue, and register_fields.options keeps the active codes of the catalogue (materialised, so every existing reader keeps working).
---      Seeds: the values of each list as the PMIS has them today (the field's closed list, else the Master Setting list of the same name), plus every
+--      Seeds: the values of each list as GSDN Workspace has them today (the field's closed list, else the Master Setting list of the same name), plus every
 --      value already saved in a record (nothing is lost). Agreed by the owner and `confirmed`: TeamSpecialization (8 values; the old text CW is kept as an
 --      inactive value), StaffStatus (Active / Inactive) and CompletionStatus (the execution status Done / Pending / N/A). Every other list is `pending`
 --      (a draft for the owner's review, Q104 class C) and keeps working. A list that was free text keeps accepting another value while it is not
@@ -121,7 +121,7 @@ DO $$ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 2. Seeds (data, not code). The values are the ones the PMIS uses today: the closed list of the field, else the Master Setting list of that name.
+-- 2. Seeds (data, not code). The values are the ones GSDN Workspace uses today: the closed list of the field, else the Master Setting list of that name.
 -- ---------------------------------------------------------------------------------------------------------------------
 INSERT INTO list_catalogues (code, name_en, name_ar, critical, status, allow_other, description) VALUES
   ('ProcScope',          'Procurement scope',       'نطاق المشتريات',        true,  'pending',   false, 'Drives the task sources and the Matrix rows of Procurement.'),
@@ -206,7 +206,7 @@ INSERT INTO p5_links VALUES
   ('warehouse', 'txn_status', 'TxnStatus'), ('warehouse', 'condition', 'Condition'), ('warehouse', 'reason', 'ReturnReason'),
   ('meetings', 'meeting_type', 'MeetingType');
 
--- Master Setting values of the lists that were free text in the PMIS (the field had no closed list).
+-- Master Setting values of the lists that were free text in GSDN Workspace (the field had no closed list).
 CREATE TEMP TABLE p5_master (catalogue text, ord int, code text);
 INSERT INTO p5_master
 SELECT v.catalogue, t.ord, t.code

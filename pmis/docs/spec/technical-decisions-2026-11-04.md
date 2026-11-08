@@ -44,7 +44,7 @@ The questions are in [`open-questions.md`](open-questions.md). This file gives o
 | Q273 | Confirmed as built. A number issued by a sequence is never reused. |
 | Q274 | A wrong Doc No. on a posted document is corrected only by a reversing document (RN or ADJ) that references the wrong one. There is no admin override: posted stock history is never edited. |
 | Q275 | Confirmed: the comparison report tags those rows "Master blank: need not covered" and does not count them as differences. |
-| Q276 | Confirmed: the Doc Date of an approved TE DN, and approved in the PMIS means "Dispatched". |
+| Q276 | Confirmed: the Doc Date of an approved TE DN, and approved in GSDN Workspace means "Dispatched". |
 | Q277 | **Owner data:** the quantity per unit and the WL vendor of each region. The needs stay `pending_configuration` until then. |
 | Q278 | **Owner data:** the manufacturer codes of the 6 generated items. CW-01 to CW-28 stay internal codes. |
 | Q279 | **Owner data:** where the approved BOQ of a site comes from. Accessories stay outside the need until then. |
@@ -224,11 +224,11 @@ The offline helper `tools/master-import/fill-templates.py` (gap G3). Questions i
 
 | Q | Decision | Kind |
 |---|---|---|
-| Q490 | Non-numeric text in a number cell (and any text in a date cell that is not a date) is copied as found and listed in the report, so the PMIS refuses it visibly. Only "N/A", "Pending" and "Cancelled" are blanked. | Confirmed as built |
+| Q490 | Non-numeric text in a number cell (and any text in a date cell that is not a date) is copied as found and listed in the report, so GSDN Workspace refuses it visibly. Only "N/A", "Pending" and "Cancelled" are blanked. | Confirmed as built |
 | Q491 | Text dates with day and month both 12 or less are read **day first** (dd/mm/yyyy, the Libyan convention). Each such cell is listed in the report as `date_day_first_assumed` with its address and old and new value, for the L2 reviewer. The flag `--month-first` switches the assumption (event `date_month_first_assumed`). Unambiguous dates are unchanged. | Change |
 | Q492 | `--include-personal` stays off. Landlord, contact, phone and e-mail data are not loaded until the owner decides Q469 in writing. Then only a System Admin runs the tool with the flag, on the server or an Aljeel machine, never a personal device. The tool prints a one-line warning when the flag is used. | Confirmed, with the warning added |
 | Q493 | The first run on the owner's machine lists the Master headers it cannot find (names only). The owner sends the list and the mapping files are corrected in a small follow-up. | Confirmed process |
-| Q494 | Procurement **Record Type** is derived per row: `po` when the PO / WO No. is filled, otherwise `pr` (codes of the Procurement register's record types `pr`, `po`, `wo`, migration 0019; a `wo` row is corrected by the Procurement team). **Delivery** and **Team** are left blank; each copied row is listed as `needs_delivery_team` and the Procurement team completes them in the PMIS before submitting. | Change |
+| Q494 | Procurement **Record Type** is derived per row: `po` when the PO / WO No. is filled, otherwise `pr` (codes of the Procurement register's record types `pr`, `po`, `wo`, migration 0019; a `wo` row is corrected by the Procurement team). **Delivery** and **Team** are left blank; each copied row is listed as `needs_delivery_team` and the Procurement team completes them in GSDN Workspace before submitting. | Change |
 
 ## Decided 2026-11-05 (2)
 
@@ -266,7 +266,7 @@ The owner delegated Q480 and Q485 to Q489 to the technical lead. All six keep th
 | Q480 | When nobody holds the `reassign` grant in the new region, the region-move notice goes to the active System Admins, and the audit row records the fallback. B12b already lets a System Admin keep, reassign or act on behalf; the Project Manager is not added, because the notice is about reassignment, which is not their grant. Naming the leads per region removes the fallback. | Confirmed as built |
 | Q485 | Documents uploaded later on a flagged task are not sent to L2: the task is already approved (the unit of approval is the whole task) and reopening it for documents would create a second approval of history. The slot shows `uploaded`, the flag clears with an audit row (`task_historical_no_documents_cleared`), and the health index keeps counting the slot as incomplete until a reviewer approves it in the document view. | Confirmed as built |
 | Q486 | No marking after staging. The mark is chosen at upload (or when the Master run is applied) by the System Admin with a step-up; a batch staged without it is discarded and uploaded again. A later "accept without documents" action on a staged batch would be a second door to the same override and is not added. | Confirmed as built |
-| Q487 | History stays out of the SLA and on-time figures by default (the existing override rule, `dashboard.exclude_overrides` on), is always flagged, and still counts in Project Status progress, because the work was done. The figures then describe the work run in the PMIS. | Confirmed as built |
+| Q487 | History stays out of the SLA and on-time figures by default (the existing override rule, `dashboard.exclude_overrides` on), is always flagged, and still counts in Project Status progress, because the work was done. The figures then describe the work run in GSDN Workspace. | Confirmed as built |
 | Q488 | No mail or in-app notice at 7 days left or on closing. The waiver is opened on purpose by a System Admin for a planned load, the Settings screen shows its state and end date, and the self-closing is audited. A notice can be added later as a notification kind if the load runs late. | Confirmed as built |
 | Q489 | The cutoff date of an open waiver cannot change. To change it the System Admin closes the waiver and opens it again, which starts a new 30-day window and a new audit trail; a batch marked earlier is accepted only while the waiver it was marked under is open with the same cutoff. | Confirmed as built |
 

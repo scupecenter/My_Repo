@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: point-in-time restore of the PMIS database into a SCRATCH cluster (owner answer Q196; RTO 4 hours, CLAUDE.md).
+# GSDN Workspace: point-in-time restore of GSDN Workspace database into a SCRATCH cluster (owner answer Q196; RTO 4 hours, CLAUDE.md).
 # It never touches the live cluster: the data directory must be new or empty and outside DB_LIVE_PGDATA, and the port must be neither
 # 5432 nor the live PMIS port. The restored server runs on the given port, is verified, then stopped (unless --keep-running).
 #

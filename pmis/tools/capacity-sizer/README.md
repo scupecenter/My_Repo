@@ -1,7 +1,7 @@
-# GSDN PMIS — Infrastructure Sizing Tool v1.0 (2026-10-26)
+# GSDN Workspace — Infrastructure Sizing Tool v1.0 (2026-10-26)
 
 ## English
-A standalone, offline calculator that estimates servers (vCPU, RAM, disk), storage growth, backups and restore time for the GSDN PMIS components (nginx, web, API, workers, PostgreSQL 16, Redis, MinIO) on an on-prem Docker Compose server.
+A standalone, offline calculator that estimates servers (vCPU, RAM, disk), storage growth, backups and restore time for the GSDN Workspace components (nginx, web, API, workers, PostgreSQL 16, Redis, MinIO) on an on-prem Docker Compose server.
 
 - **Open:** double-click `index.html` (any modern browser; no installation, no network needed; Cairo font is used when online, system fonts otherwise).
 - Fill the report details, pick a preset or edit the inputs; results update live. The inputs are kept in the page link (`#...`), so copying the link reproduces the sizing.
@@ -10,7 +10,7 @@ A standalone, offline calculator that estimates servers (vCPU, RAM, disk), stora
 - Check: `node tests/check.mjs` (needs Playwright).
 
 ## العربية
-أداة مستقلة تعمل دون اتصال بالشبكة لتقدير الخوادم (vCPU وRAM والقرص) ونمو التخزين والنسخ الاحتياطي وزمن الاستعادة لمكوّنات GSDN PMIS (nginx والويب وAPI والعمّال وPostgreSQL 16 وRedis وMinIO) على خادم داخلي بنظام Docker Compose.
+أداة مستقلة تعمل دون اتصال بالشبكة لتقدير الخوادم (vCPU وRAM والقرص) ونمو التخزين والنسخ الاحتياطي وزمن الاستعادة لمكوّنات GSDN Workspace (nginx والويب وAPI والعمّال وPostgreSQL 16 وRedis وMinIO) على خادم داخلي بنظام Docker Compose.
 
 - **الفتح:** افتح الملف `index.html` بأي متصفح حديث (دون تثبيت أو اتصال؛ يُستخدم خط Cairo عند توفر الإنترنت وإلا خط النظام).
 - املأ بيانات التقرير، اختر إعداداً جاهزاً أو عدّل المدخلات؛ تتحدث النتائج مباشرة. تُحفظ المدخلات في رابط الصفحة (`#...`) فيعيد نسخ الرابط الحساب نفسه.

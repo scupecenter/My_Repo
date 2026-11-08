@@ -1,4 +1,4 @@
-# One row per register. template_id is read from the _tpl sheet of the template the PMIS issued.
+# One row per register. template_id is read from the _tpl sheet of the template GSDN Workspace issued.
 # header_row / first_data_row are Excel row numbers in the Master sheet. key_headers = the template's natural key (template_definitions.match_keys).
 # needs_headers = template columns the owner's file cannot fill; every copied row with one still blank is listed as needs_delivery_team.
 # site_scoped = no: the key column is not a Site ID (Risk Register), so it is not checked against the Master sheet.

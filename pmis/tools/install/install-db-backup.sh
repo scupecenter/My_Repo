@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: optional database backup with pgBackRest (owner answer Q196). Called by install-ubuntu.sh when the owner chooses it, and
+# GSDN Workspace: optional database backup with pgBackRest (owner answer Q196). Called by install-ubuntu.sh when the owner chooses it, and
 # runnable on its own:   sudo bash pmis/tools/install/install-db-backup.sh
 #
 # What it sets up: WAL archiving every 5 minutes (archive_timeout; the RPO is 15 minutes), a nightly full backup, repositories
@@ -51,7 +51,7 @@ for f in db-common.sh db-backup.sh db-backup-check.sh db-dump.sh db-restore.sh; 
 done
 [[ -d /etc/postgresql/$PG_VER/$PG_CLUSTER ]] || { echo "PostgreSQL $PG_VER cluster '$PG_CLUSTER' not found." >&2; exit 1; }
 
-# Port and database name of the PMIS, from DATABASE_URL.
+# Port and database name of GSDN Workspace, from DATABASE_URL.
 DB_URL=$(sed -n 's/^DATABASE_URL=//p' "$CONF")
 read -r PMIS_DB_PORT PMIS_DB_NAME < <(python3 -c '
 import sys, urllib.parse
@@ -268,7 +268,7 @@ echo "==> Timers"
 unit_timer() { # unit_timer NAME ONCALENDAR DESCRIPTION EXEC_ARG
   cat >/etc/systemd/system/$1.service <<EOF
 [Unit]
-Description=GSDN PMIS: $3
+Description=GSDN Workspace: $3
 After=postgresql@$PG_VER-$PG_CLUSTER.service
 
 [Service]

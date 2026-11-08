@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: test of the database backup scripts on a THROW-AWAY PostgreSQL 16 cluster (never the live one).
+# GSDN Workspace: test of the database backup scripts on a THROW-AWAY PostgreSQL 16 cluster (never the live one).
 # It creates the cluster pmisbk on port 55440 (TEST_PORT), archives WAL with pgBackRest into a temporary repository, takes a full backup,
 # writes rows before and after a recovery target, runs the late-backup check (expects it to alert once, then not again), restores to the
 # target into a scratch directory on port 55441 and checks the row count. It also checks that db-restore.sh refuses the live port and the

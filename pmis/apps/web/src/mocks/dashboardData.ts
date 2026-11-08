@@ -33,7 +33,7 @@ const SNAPSHOT_KINDS: Record<string, 'weekly' | 'month_end'> = { '2026-10-31': '
 const REBUILT = new Set(['2026-10-22']);
 const VIEWS = [{ code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', ms: ['MS2', 'MS3', 'MS4'] }, { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', ms: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'] },
   { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', ms: ['MS10'] }];
-/** The central Project Status items of the seed weight set (Q118): project-wide, no data in the PMIS, a manual percentage each. */
+/** The central Project Status items of the seed weight set (Q118): project-wide, no data in GSDN Workspace, a manual percentage each. */
 export const CENTRAL_ITEMS = [
   ['1.3', 'HLD', 'التصميم عالي المستوى (HLD)', 15, 'A1'], ['1.5', 'Technical document templates', 'قوالب المستندات الفنية', 10, 'A1'],
   ['3.2', 'BTS', 'BTS', 14.45, 'A3'], ['3.3', 'PtP', 'PtP', 14.45, 'A3'], ['3.4', 'CPE', 'CPE', 8.5, 'A3'], ['3.5', 'Battery', 'البطاريات', 17, 'A3'],

@@ -1,4 +1,4 @@
-# GSDN PMIS - Entity Relationship Diagram
+# GSDN Workspace - Entity Relationship Diagram
 
 Source of truth: `apps/api/prisma/schema.prisma` (75 models, PostgreSQL 16). Field names are snake_case and shared with the importer mapping (`tools/master-import/mapping.csv`). Task codes (`task_definitions.code`, for example `CW_STA`, `TE_PAC`) must be aligned with the domain-analyst task catalogue once it exists in `docs/spec/`.
 

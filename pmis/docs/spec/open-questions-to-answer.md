@@ -1,4 +1,4 @@
-# GSDN PMIS — open questions to answer
+# GSDN Workspace — open questions to answer
 
 108 questions still open on 2026-11-03. Write your answer under each one after **Answer:**, then upload this file back.
 Leave an answer empty to keep the proposed default (the system already works with it). You may answer in Arabic or English.
@@ -13,7 +13,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 **The Master upload has no `_tpl` sheet.** CLAUDE.md rejects uploads without an embedded ID. The live Master file contains no `_tpl` sheet, but must be uploadable during migration and the 1-month parallel run.
 
-**Proposed default / question:** The PMIS issues a "Master template" by adding `_tpl` (TPL-MASTER, version) to the user's copy once. Until then, an admin-only "legacy Master import" path accepts it, identified by sheet names and headers, and writes every use to the System Log.
+**Proposed default / question:** GSDN Workspace issues a "Master template" by adding `_tpl` (TPL-MASTER, version) to the user's copy once. Until then, an admin-only "legacy Master import" path accepts it, identified by sheet names and headers, and writes every use to the System Log.
 
 **Answer:** 
 
@@ -76,7 +76,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 **Role list mismatch.** Setting StaffRole (15 values, for example "Team Lead (GECOL)", "Team Lead (Fiber)", "CW Engineer") does not match the 6 main roles and 9 sub-roles in CLAUDE.md.
 
-**Proposed default / question:** The PMIS uses the CLAUDE.md roles. Import maps the Master values (Team Lead (CW) → CW Team Lead, CW Engineer / Site Engineer → Site Engineers (CW), Team Lead (GECOL) → GECOL Power Team, and so on). The mapping table is editable and approved by the owner.
+**Proposed default / question:** GSDN Workspace uses the CLAUDE.md roles. Import maps the Master values (Team Lead (CW) → CW Team Lead, CW Engineer / Site Engineer → Site Engineers (CW), Team Lead (GECOL) → GECOL Power Team, and so on). The mapping table is editable and approved by the owner.
 
 **Answer:** 
 
@@ -101,7 +101,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q11
 
-**Several issues per site vs the Master.** The Master holds one issue per site (GA:GE). The PMIS allows several. For the parallel-run export, which issue goes into GA:GE?
+**Several issues per site vs the Master.** The Master holds one issue per site (GA:GE). GSDN Workspace allows several. For the parallel-run export, which issue goes into GA:GE?
 
 **Proposed default / question:** Export the oldest open issue, or the latest closed one when none is open, and append "+N more" in Remark.
 
@@ -491,7 +491,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q157
 
-**Email change for an M365 account.** A request needs the password re-entered, which an M365 user does not have in the PMIS; the API refuses it (403) and the page tells them to ask an admin. When M365 sign-in is built, should the PMIS email follow Entra (and a request need an M365 step-up), and what happens on approval to a user with an Entra link, since the first-sign-in match uses the email?
+**Email change for an M365 account.** A request needs the password re-entered, which an M365 user does not have in GSDN Workspace; the API refuses it (403) and the page tells them to ask an admin. When M365 sign-in is built, should GSDN Workspace email follow Entra (and a request need an M365 step-up), and what happens on approval to a user with an Entra link, since the first-sign-in match uses the email?
 
 **Proposed default / question:** Keep admin-only for M365 accounts until ADR 0002 sign-in is built; then require an M365 step-up and block approval while `m365_object_id` is set unless the new address is the Entra one.
 
@@ -777,7 +777,7 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q205
 
-**Stream templates: which task a Master column writes (migration 0049).** The Master has one column where the PMIS has two tasks, and the spec table (registers-and-streams §2.3) names both: CW MOS Planned/Actual (AY, AZ) are B8 or B9; CW Installation Planned/Actual Start and End (BK:BN) are B10 or B11; the item lists BA:BC and BD:BJ sit on B10 and B11; Report/Layout Submitted and Approved (AR, AS) are B5, B6 or B7. Snags Found/Cleared (BS, BT, EG, EH, FC, FD, FH, FI) are Yes/N/A lists in the spec but the QC snags are records.
+**Stream templates: which task a Master column writes (migration 0049).** The Master has one column where GSDN Workspace has two tasks, and the spec table (registers-and-streams §2.3) names both: CW MOS Planned/Actual (AY, AZ) are B8 or B9; CW Installation Planned/Actual Start and End (BK:BN) are B10 or B11; the item lists BA:BC and BD:BJ sit on B10 and B11; Report/Layout Submitted and Approved (AR, AS) are B5, B6 or B7. Snags Found/Cleared (BS, BT, EG, EH, FC, FD, FH, FI) are Yes/N/A lists in the spec but the QC snags are records.
 
 **Proposed default / question:** Seeded in `template_task_fields` (data, editable): AY/AZ on B8, BK:BN on B11, the snag lists as plain task values (the QC snags stay the QC module's), AR and AS not mapped (read only), AT/AU/CG/CH/DB/DC mapped to the submitted and approved dates the workflow sets (read only). A task with no Master column (A1 to A5, B1 to B3, B6, B9, B10, C1 to C4, D1, D4b, D12, D17 and so on) has its own Planned Date and Actual Date columns. Confirm the mapping, or say which task each Master column belongs to.
 
@@ -831,9 +831,9 @@ Short answers are fine, for example: `default`, `yes`, `no`, `option 2`, or a se
 
 ### Q211
 
-**TPL-MASTER and the parallel run.** A file is a PMIS-issued template (hidden `_tpl`); the real Master has none (Q1). Every row keeps its source (`Sheet!row`, file name and hash) and its diff against what the PMIS holds; the comparison report is the list of those diffs per part.
+**TPL-MASTER and the parallel run.** A file is a PMIS-issued template (hidden `_tpl`); the real Master has none (Q1). Every row keeps its source (`Sheet!row`, file name and hash) and its diff against what GSDN Workspace holds; the comparison report is the list of those diffs per part.
 
-**Proposed default / question:** Confirm that the real Master reaches the PMIS through the one-time import (`tools/master-import`), and that TPL-MASTER is the path for files the PMIS issued. Say whether the comparison report needs its own screen or export.
+**Proposed default / question:** Confirm that the real Master reaches GSDN Workspace through the one-time import (`tools/master-import`), and that TPL-MASTER is the path for files GSDN Workspace issued. Say whether the comparison report needs its own screen or export.
 
 **Answer:** 
 

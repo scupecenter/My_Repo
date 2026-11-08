@@ -1,4 +1,4 @@
--- 009: local sign-in (owner decision 2026-10-28, ADR 0012). Users created in the PMIS sign in with an identifier
+-- 009: local sign-in (owner decision 2026-10-28, ADR 0012). Users created in GSDN Workspace sign in with an identifier
 -- (4-digit employee ID, email or E.164 phone) and a password. Microsoft 365 comes later and lives beside it.
 --
 -- Password hashes (argon2id, PHC string) are made and checked by the API. pmis_app cannot read or write local_credentials:

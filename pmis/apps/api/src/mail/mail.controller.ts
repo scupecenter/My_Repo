@@ -36,7 +36,7 @@ export class MailController {
 
 /**
  * The external monitoring path (owner answer Q167): `GET /health`, no session, words only (no counts, no names, no addresses), so a monitor outside the
- * PMIS (Zabbix, Uptime Kuma, a cron with curl) can raise its own alarm when the PMIS or its mail is down. 200 when the database answers, 503 otherwise.
+ * PMIS (Zabbix, Uptime Kuma, a cron with curl) can raise its own alarm when GSDN Workspace or its mail is down. 200 when the database answers, 503 otherwise.
  */
 @Controller('health')
 export class HealthController {

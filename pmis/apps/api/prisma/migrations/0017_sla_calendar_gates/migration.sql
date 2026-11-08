@@ -257,7 +257,7 @@ ON CONFLICT (code) DO NOTHING;
 UPDATE permit_records p SET has_expiry = t.has_expiry FROM permit_types t WHERE t.code = p.permit_type AND p.has_expiry IS NULL;
 
 -- 3b. SLA start and end events of the seeded rule set (Master SLA sheet row 4 "From -> To", mapped to task codes of workflow v1).
--- "OPEN" = the start event is a register field the PMIS does not read yet (search ring, TSSR submission, MOP, cutover window): the
+-- "OPEN" = the start event is a register field GSDN Workspace does not read yet (search ring, TSSR submission, MOP, cutover window): the
 -- clock starts the day the task opens (open question in the report). The 5 planning links and E2E rows follow the SLA sheet.
 UPDATE sla_rules r SET start_ref = v.start_ref, end_ref = v.end_ref, code = v.sla_code
 FROM (VALUES
@@ -757,7 +757,7 @@ END $$;
 
 -- Baseline proposal (Master Baseline sheet D:L; owner answer Q48). The proposed dates walk forward from the start (the actual Site Release, else
 -- its planned date, else the first baseline date) by the SLA MAX durations of the version in force, with WORKDAY.INTL on the calendar.
--- Q48 (default accepted): D-1 is added to the TE Completion proposal, because the PMIS measures D-1 (TE Access) after the Site RFI; every
+-- Q48 (default accepted): D-1 is added to the TE Completion proposal, because GSDN Workspace measures D-1 (TE Access) after the Site RFI; every
 -- date from TE Completion on carries d1_added = true so the parallel run can tag the difference "D-1 added". Setting calc.baseline_include_d1
 -- (default true) switches it off. Scope flags decide which stages apply (rules.md section 1). Not exposed by the API yet (no endpoint in the contract).
 CREATE OR REPLACE FUNCTION sla_max_wd(p_site uuid, p_code text) RETURNS integer

@@ -107,7 +107,7 @@ interface ParsedStreamRow {
   pre_errors: { column: string; field: string; code: string; message: string }[];
 }
 
-/** A note about a whole upload (never blocking): a column or sheet the PMIS does not read, a part that was skipped. */
+/** A note about a whole upload (never blocking): a column or sheet GSDN Workspace does not read, a part that was skipped. */
 export interface UploadWarning {
   code: 'column_not_owned' | 'extra_column' | 'unknown_sheet' | 'part_skipped';
   sheet?: string;
@@ -117,7 +117,7 @@ export interface UploadWarning {
 }
 
 const OWNER_TEXT: Record<string, string> = {
-  calc: 'calculated by the PMIS', identity: 'owned by the RF & Design register', scope: 'owned by the site scope (Change Control)', baseline: 'owned by the Baseline',
+  calc: 'calculated by GSDN Workspace', identity: 'owned by the RF & Design register', scope: 'owned by the site scope (Change Control)', baseline: 'owned by the Baseline',
   dismantle: 'owned by the Dismantle register (TPL-DIS)', issues: 'owned by the Issue Log (TPL-ISS)', row: 'a row number',
 };
 
@@ -168,7 +168,7 @@ export class ImportService {
 
     // 1. the hidden sheet
     const tplSheet = wb.worksheets.find((w) => w.name === TPL_SHEET);
-    if (!tplSheet) return this.reject(auth, requestId, 'tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing. Download the template from the PMIS.', ctx);
+    if (!tplSheet) return this.reject(auth, requestId, 'tpl_missing', 'This file is not an approved PMIS template: the hidden _tpl sheet is missing. Download the template from GSDN Workspace.', ctx);
     const kv = new Map<string, string>();
     tplSheet.eachRow((row) => {
       const k = this.text(row.getCell(1));
@@ -279,13 +279,13 @@ export class ImportService {
       if (!r[0]) throw new ProblemException(500, 'internal_error', {});
       return r[0].id;
     });
-    if (!id) throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns the PMIS does not read.' }]);
+    if (!id) throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns GSDN Workspace does not read.' }]);
     return id;
   }
 
   /**
    * TPL-MASTER: every sheet of the file is a part (the Master sheet, or the sheet of a register). The columns are found by their header, so a column added to the
-   * file does not break the upload: it is ignored with a warning, as is a sheet the PMIS does not know and every value in a column the PMIS does not own. A sheet that
+   * file does not break the upload: it is ignored with a warning, as is a sheet GSDN Workspace does not know and every value in a column GSDN Workspace does not own. A sheet that
    * lacks an issued header is refused. The database then splits the Master sheet into one batch per stream, stages each register sheet as the register's own
    * template, and answers one batch per part (they share `group_id`).
    */
@@ -322,7 +322,7 @@ export class ImportService {
       }
       const known = new Set(part.columns.map((c) => c.header));
       for (const h of byName.keys()) {
-        if (!known.has(h)) warnings.push({ code: 'extra_column', sheet: ws.name, column: h, message: `The column "${h}" is not owned by the PMIS: it is ignored.` });
+        if (!known.has(h)) warnings.push({ code: 'extra_column', sheet: ws.name, column: h, message: `The column "${h}" is not owned by GSDN Workspace: it is ignored.` });
       }
       const colAt = (i: number): number | undefined => byName.get((part.columns[i] as TplColumn).header);
       const ignored = new Map<string, number>();
@@ -340,7 +340,7 @@ export class ImportService {
       if (tooMany) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The sheet "${ws.name}" has more than ${max} rows. Split it.`, { ...ctx, max_rows: max, sheet: ws.name });
       for (const [h, count] of ignored) {
         const col = part.columns.find((c) => c.header === h);
-        warnings.push({ code: 'column_not_owned', sheet: ws.name, column: h, count, message: `The column "${h}" is ${OWNER_TEXT[col?.owner ?? 'calc'] ?? 'not owned by the PMIS'}: ${count} value(s) ignored.` });
+        warnings.push({ code: 'column_not_owned', sheet: ws.name, column: h, count, message: `The column "${h}" is ${OWNER_TEXT[col?.owner ?? 'calc'] ?? 'not owned by GSDN Workspace'}: ${count} value(s) ignored.` });
       }
       if (rows.length > 0) staged.push({ sheet: ws.name, header_checksum: sha256(part.columns.map((c) => c.header).join(unitSeparator)), rows });
     }
@@ -358,7 +358,7 @@ export class ImportService {
       warnings.push({ code: 'part_skipped', sheet: sk.sheet, message: `${sk.sheet}${sk.kind === 'stream' ? ` (${sk.ref})` : ''} was not staged: ${sk.detail ?? sk.reason ?? 'refused'}` });
     }
     if (result.batches.length === 0) {
-      throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns the PMIS does not read.' }]);
+      throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns GSDN Workspace does not read.' }]);
     }
     const dtos: Record<string, unknown>[] = [];
     for (const b of result.batches) dtos.push(await this.getBatch(auth, b.id));
@@ -389,7 +389,7 @@ export class ImportService {
 
   /**
    * One row of a stream template or of the Master sheet: the Site ID and the cells of the task columns, keyed by column code. A grey task column is sent too (the
-   * database compares it with what the PMIS holds and reports a difference, never reads it); a grey info column is only counted for the warning of the upload.
+   * database compares it with what GSDN Workspace holds and reports a difference, never reads it); a grey info column is only counted for the warning of the upload.
    */
   private parseStreamRow(
     row: ExcelJS.Row, n: number, cols: TplColumn[], sheet: string, colAt: (i: number) => number | undefined,
@@ -414,7 +414,7 @@ export class ImportService {
       if (c.derived) {
         if (r.kind === 'value') {
           out.cells[c.code] = this.typed(c, r.val);
-          // a file that was not pre-filled has nothing typed in a grey column that the PMIS put there: the value is the user's, and it is ignored
+          // a file that was not pre-filled has nothing typed in a grey column that GSDN Workspace put there: the value is the user's, and it is ignored
           if (notes?.countDerived) notes.ignored.set(c.header, (notes.ignored.get(c.header) ?? 0) + 1);
         }
         return;

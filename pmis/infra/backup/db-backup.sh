@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: base backups of the PMIS database with pgBackRest (owner answer Q196; RPO 15 minutes and RTO 4 hours, CLAUDE.md).
+# GSDN Workspace: base backups of GSDN Workspace database with pgBackRest (owner answer Q196; RPO 15 minutes and RTO 4 hours, CLAUDE.md).
 # PostgreSQL archives the WAL continuously (archive_command = pgbackrest archive-push, set by tools/install/install-db-backup.sh).
 # A point-in-time restore needs one base backup and the WAL after it. This script takes the base backups.
 #

@@ -1,6 +1,6 @@
 /**
  * The shared rule language (ADR 0009 section 7) as far as documents need it: all, any, not, eq, in, is_yes, is_na. Evaluated here, never in SQL and never
- * with eval. The answer is true, false, or null when an operand has no value (the PMIS cannot judge: the slot is neither added nor removed, and Data Entry
+ * with eval. The answer is true, false, or null when an operand has no value (GSDN Workspace cannot judge: the slot is neither added nor removed, and Data Entry
  * can declare that the document applies). `count` and `lookup` are not evaluated yet and answer null.
  */
 export type Rule = Record<string, unknown> | null;

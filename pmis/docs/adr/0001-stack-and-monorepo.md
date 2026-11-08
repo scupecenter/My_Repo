@@ -5,7 +5,7 @@
 - Related: CLAUDE.md "Default stack", ORCHESTRATION.md folder ownership.
 
 ## Context
-The PMIS replaces the Excel Site Master. It runs on one internal server with a standby server and no cloud services. Eight agents work in parallel, each in its own folders. They need one place to find the API contract and one build. The web app must be able to work against mocks before the API exists ("contract first").
+GSDN Workspace replaces the Excel Site Master. It runs on one internal server with a standby server and no cloud services. Eight agents work in parallel, each in its own folders. They need one place to find the API contract and one build. The web app must be able to work against mocks before the API exists ("contract first").
 
 ## Decision
 1. **Runtime and languages.** Node.js 22 LTS and TypeScript 5 in strict mode everywhere. pnpm workspaces with a single lockfile. No Turborepo for now: pnpm filters are enough at this size.

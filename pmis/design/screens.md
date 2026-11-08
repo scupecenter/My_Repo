@@ -1,6 +1,6 @@
-# GSDN PMIS screens: purpose, states and shortcuts
+# GSDN Workspace screens: purpose, states and shortcuts
 
-Prototype: `GSDN_PMIS_Prototype_v2.html` (offline, hash routes). Tokens: `tokens.css` and `tokens.json` (frappe-ui 1.0.2).
+Prototype: `GSDN_Workspace_Prototype_v2.html` (offline, hash routes). Tokens: `tokens.css` and `tokens.json` (frappe-ui 1.0.2).
 Every screen works in English LTR and Arabic RTL (logical CSS, mirrored chevrons, `dir` set on `<html>`), in light and dark, and down to 390 px width.
 
 ## States (apply to every screen unless a row says otherwise)
@@ -21,7 +21,7 @@ Permission rules used in the prototype: view < entry < review < approve < admin.
 ## Screens
 
 ### Login
-Purpose: one field, "Email, employee ID or phone", and one button, "Continue with Microsoft". The PMIS looks the text up in the staff registry (email, 4-digit ID, or phone in any common format) and sends the browser to Microsoft 365 with that person's email as `login_hint`; Microsoft does the password and MFA, the PMIS stores no passwords. The screen is identical whether a match is found or not (no match = Microsoft sign-in without a hint, nothing on screen reveals who is registered). After Microsoft, a first-time user enters the 4-digit employee ID once; it must exist in the registry and not be linked to another account. Demo users stay for the prototype.
+Purpose: one field, "Email, employee ID or phone", and one button, "Continue with Microsoft". GSDN Workspace looks the text up in the staff registry (email, 4-digit ID, or phone in any common format) and sends the browser to Microsoft 365 with that person's email as `login_hint`; Microsoft does the password and MFA, GSDN Workspace stores no passwords. The screen is identical whether a match is found or not (no match = Microsoft sign-in without a hint, nothing on screen reveals who is registered). After Microsoft, a first-time user enters the 4-digit employee ID once; it must exist in the registry and not be linked to another account. Demo users stay for the prototype.
 Empty: an empty field is allowed (Microsoft sign-in without a hint). Loading: "Verifying" on the ID check (simulated). Error: ID not 4 digits, or not found ("Contact a System Admin"), inline under the field with `role=alert`; the lookup itself never errors. No-permission: a new account goes to Pending assignment.
 Shortcuts: `Enter` in the field continues; `Enter` submits the ID; language and theme buttons are on the card.
 
@@ -69,7 +69,7 @@ Four steps: choose template, upload file, preview changes (new / changed / same 
 ### Users & Roles (admin)
 Three views. By role: pick a main role or sub-role, see everyone assigned (permission, regions, modules, validity), tick rows to remove, edit in bulk (permission, regions, modules, dates), or also assign to another role; below, a searchable multi-select of every registered employee (including pending ones) with defaults for permission, regions, modules and validity, then "Assign N people". By person: one employee with several role rows, each with its own role, permission, regions, modules, from and until; add or remove rows; copy assignments to other people (add or replace); status and team. Pending assignment: new accounts with a button to assign. Export CSV; Import from Excel template links to Templates (the TPL-ROLES file is issued, its import is not wired in the prototype). All changes need step-up and are audited with before and after. A user's effective permission is the highest of the active rows; the last active admin cannot be deactivated.
 Empty: "Nobody holds this role yet", "No roles yet", "No pending accounts". Shortcuts: `/` search, `Enter` on a role row.
-MFA exemption (owner request 2026-10-25): in By person, each employee has a "PMIS MFA requirement" box. A System Admin (or a delegate holding the "MFA exemption" right) can set an exemption until a date or until revoked, with a reason and their own step-up; the user is emailed, an "MFA exempt" badge shows here and in the people list, and clearing it also needs a reason and step-up. Nobody can exempt themselves (the button is disabled with a hint). It removes only the PMIS check; Entra Conditional Access is IT's. States: expired exemptions show "Expired on {date}" and count as required. No-permission for others: the box is read-only with an explanation.
+MFA exemption (owner request 2026-10-25): in By person, each employee has a "PMIS MFA requirement" box. A System Admin (or a delegate holding the "MFA exemption" right) can set an exemption until a date or until revoked, with a reason and their own step-up; the user is emailed, an "MFA exempt" badge shows here and in the people list, and clearing it also needs a reason and step-up. Nobody can exempt themselves (the button is disabled with a hint). It removes only GSDN Workspace check; Entra Conditional Access is IT's. States: expired exemptions show "Expired on {date}" and count as required. No-permission for others: the box is read-only with an explanation.
 
 ### Groups (admin)
 Named sets with members and the number of matrix cells using the group. System Admins cannot drop below one active member. Empty: "No members". Shortcuts: `Enter` selects a group.

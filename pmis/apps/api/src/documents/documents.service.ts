@@ -62,7 +62,7 @@ export interface DocumentSlotDto {
   can_upload: boolean;
   blank_form_file_id: string | null;
   valid_to: string | null;
-  /** Q226: the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order): the task cannot be approved. */
+  /** Q226: the rule of this conditional document waits for data GSDN Workspace does not have yet (no approved Procurement order): the task cannot be approved. */
   determination_pending: boolean;
   /** Q229: the slot kept the approval of the previous version of its record (setting documents.new_version_inherit). */
   inherited_approval: boolean;

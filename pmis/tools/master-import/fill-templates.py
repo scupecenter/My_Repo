@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 fill-templates.py: offline helper that copies the register sheets of the owner's Master workbook into the approved
-templates issued by the PMIS (gap G3 of docs/plans/2026-11-04-master-template-data-load.md).
+templates issued by GSDN Workspace (gap G3 of docs/plans/2026-11-04-master-template-data-load.md).
 
 Rules it keeps (CLAUDE.md "Approved templates only"):
-  * it never invents a template: every template must carry the hidden `_tpl` sheet (template_id + version) issued by the PMIS;
+  * it never invents a template: every template must carry the hidden `_tpl` sheet (template_id + version) issued by GSDN Workspace;
   * it never changes `_tpl`, the header row, the grey (never-read) columns, the drop-downs or the protection of a template;
   * it fixes only what is mechanical (spaces, dates typed as text, numbers typed as text, list case, "N/A" in a date cell);
     everything else is copied exactly as found and listed in the report;
@@ -13,7 +13,7 @@ Rules it keeps (CLAUDE.md "Approved templates only"):
   * the Markdown summary holds counts and cell addresses only. The CSV holds old and new values of the cells it changed,
     never of a personal column.
 
-Nothing is uploaded: the owner uploads each filled template through the PMIS (batch, then L2).
+Nothing is uploaded: the owner uploads each filled template through GSDN Workspace (batch, then L2).
 
 Usage:
   python3 -I fill-templates.py --master Master.xlsx --out OUT_DIR TEMPLATE.xlsx [TEMPLATE2.xlsx ...] [--include-personal]
@@ -126,7 +126,7 @@ class Template:
         # not read-only: the file is written back. Links are never kept; no VBA.
         self.wb = openpyxl.load_workbook(path, data_only=False, keep_vba=False, keep_links=False)
         if TPL_SHEET not in self.wb.sheetnames:
-            raise Refused(f'{path.name}: no _tpl sheet. This is not a template issued by the PMIS; download it again from the Templates page.')
+            raise Refused(f'{path.name}: no _tpl sheet. This is not a template issued by GSDN Workspace; download it again from the Templates page.')
         kv = {}
         for row in self.wb[TPL_SHEET].iter_rows(min_row=1, max_col=2, values_only=True):
             if row[0] is not None:
@@ -153,7 +153,7 @@ class Template:
         if claimed and header_checksum(self.headers) != claimed:
             raise Refused(f'{path.name}: the header row does not match the checksum in _tpl; the template was changed')
         if any(self.ws.cell(r, cc).value not in (None, '') for r in range(2, min(self.ws.max_row, 400) + 1) for cc in range(1, len(self.headers) + 1)):
-            raise Refused(f'{path.name}: the data sheet already holds rows. Use a blank template from the PMIS.')
+            raise Refused(f'{path.name}: the data sheet already holds rows. Use a blank template from GSDN Workspace.')
         self.cols = self._describe()
 
     def _lists(self) -> dict[str, list[str]]:
@@ -469,7 +469,7 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
         for h in (reg.get('needs_headers') or '').split('|'):
             c = tcols.get(norm_header(h)) if h else None
             if c is not None and not c['grey'] and tpl.ws.cell(out_row, c['idx']).value in (None, ''):
-                rep.add('needs_delivery_team', f"{get_column_letter(c['idx'])}{out_row}", '', c['header'], '', '', 'to be completed in the PMIS before submitting')
+                rep.add('needs_delivery_team', f"{get_column_letter(c['idx'])}{out_row}", '', c['header'], '', '', 'to be completed in GSDN Workspace before submitting')
         out_row += 1
         rep.rows_copied += 1
     return rep
@@ -516,8 +516,8 @@ def write_reports(out_dir: Path, base: str, tpl: Template, reg: dict, rep: Repor
     labels = [('changed', 'Cells changed by normalisation'),
               ('date_day_first_assumed', 'Text dates read day first (dd/mm/yyyy), to be checked by L2'),
               ('date_month_first_assumed', 'Text dates read month first (--month-first), to be checked by L2'),
-              ('needs_delivery_team', 'Cells the Procurement team completes in the PMIS before submitting'), ('blanked', 'Cells blanked (N/A, Pending, Cancelled or empty text)'),
-              ('outside_list', 'Values outside their list (copied as found)'), ('not_normalised', 'Values the PMIS may refuse (copied as found)'),
+              ('needs_delivery_team', 'Cells the Procurement team completes in GSDN Workspace before submitting'), ('blanked', 'Cells blanked (N/A, Pending, Cancelled or empty text)'),
+              ('outside_list', 'Values outside their list (copied as found)'), ('not_normalised', 'Values GSDN Workspace may refuse (copied as found)'),
               ('date_outside_range', 'Dates outside 2020-2035'), ('master_header_not_found', 'Mapped Master headers not found'),
               ('map_unknown_template_header', 'Mapping rows whose template header does not exist')]
     for ev, label in labels:
@@ -538,7 +538,7 @@ def write_reports(out_dir: Path, base: str, tpl: Template, reg: dict, rep: Repor
             lines.append(f"| {h} | {c['blank']} | {c['no_source']} | {c['personal_skipped']} | {c['grey_not_filled']} |")
     if master_facts.get('external_links'):
         lines += ['', 'Note: the Master workbook carries an external-link part. It was not followed.']
-    lines += ['', 'Next: upload this filled template in the PMIS Templates page. It becomes one batch for L1, then L2.', '']
+    lines += ['', 'Next: upload this filled template in GSDN Workspace Templates page. It becomes one batch for L1, then L2.', '']
     md.write_text('\n'.join(lines), encoding='utf-8')
     return csv_path, md
 
@@ -546,7 +546,7 @@ def write_reports(out_dir: Path, base: str, tpl: Template, reg: dict, rep: Repor
 # ---------------------------------------------------------------------------------------------------------------------
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description='Fill PMIS-issued register templates from the owner Master workbook.')
-    ap.add_argument('templates', nargs='+', help='blank templates downloaded from the PMIS (each with its _tpl sheet)')
+    ap.add_argument('templates', nargs='+', help='blank templates downloaded from GSDN Workspace (each with its _tpl sheet)')
     ap.add_argument('--master', required=True, help="the owner's Master workbook (.xlsx, values only)")
     ap.add_argument('--out', required=True, help='output folder (filled templates and reports)')
     ap.add_argument('--maps', default=str(Path(__file__).resolve().parent / 'register-maps'), help='folder with index.csv and one CSV per register')

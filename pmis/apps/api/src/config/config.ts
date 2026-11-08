@@ -118,7 +118,7 @@ export interface AppConfig {
 
 const ADDR_RE = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$/;
 
-/** "GSDN PMIS <pmis@example.ly>" or "pmis@example.ly". Returns null when it is not one of the two forms (no line breaks, no quotes). */
+/** "GSDN Workspace <pmis@example.ly>" or "pmis@example.ly". Returns null when it is not one of the two forms (no line breaks, no quotes). */
 export function parseFrom(v: string): { address: string; header: string } | null {
   const t = v.trim();
   const m = /^([^<>"\r\n]{1,80}?)\s*<([^<>\s]+)>$/.exec(t);

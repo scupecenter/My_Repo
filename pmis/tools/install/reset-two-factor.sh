@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: reset (or switch off) a user's two-factor on the server, for the case where the only System Admin lost the authenticator
+# GSDN Workspace: reset (or switch off) a user's two-factor on the server, for the case where the only System Admin lost the authenticator
 # and no other admin can do it in Users & Roles (ADR 0014). Run as root on the server:
 #   sudo bash pmis/tools/install/reset-two-factor.sh admin@example.com            reset: the user enrols again with a new one-time code
 #   sudo bash pmis/tools/install/reset-two-factor.sh admin@example.com --disable   switch two-factor off for the user

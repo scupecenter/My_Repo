@@ -555,7 +555,7 @@ export class AssignmentsService {
   }
 
   /**
-   * A person created in the PMIS or at first sign-in is `pending_assignment`. The first assignment makes the account usable:
+   * A person created in GSDN Workspace or at first sign-in is `pending_assignment`. The first assignment makes the account usable:
    * the status becomes `active` through idm_set_user_status (it needs users.edit, which a System Admin holds). Someone who
    * may assign but not edit users leaves the status as it is; the person is then still "pending" and an admin finishes it.
    */

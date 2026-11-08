@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: shared settings and helpers for the database backup scripts (owner answer Q196). Sourced by db-backup.sh,
+# GSDN Workspace: shared settings and helpers for the database backup scripts (owner answer Q196). Sourced by db-backup.sh,
 # db-backup-check.sh, db-dump.sh and db-restore.sh. Not run on its own. See infra/RUNBOOK.md, section 8 (database backup).
 #
 # Settings come from the environment, then from DB_BACKUP_ENV (default /etc/pgbackrest/db-backup.env, written by
@@ -28,7 +28,7 @@ DB_LIVE_PGDATA=${DB_LIVE_PGDATA:-/var/lib/postgresql/16/main}
 DB_CHECK_STATE=${DB_CHECK_STATE:-/var/lib/gsdn-pmis/db-backup-check.state}
 PG_BIN=${PG_BIN:-/usr/lib/postgresql/16/bin}
 
-# psql as the current (postgres) user, to the PMIS database, over the local socket.
+# psql as the current (postgres) user, to GSDN Workspace database, over the local socket.
 db_psql() { psql -X -q -At -v ON_ERROR_STOP=1 -p "$PMIS_DB_PORT" -d "$PMIS_DB_NAME" "$@"; }
 
 # pgBackRest for this stanza. Options go before the command.

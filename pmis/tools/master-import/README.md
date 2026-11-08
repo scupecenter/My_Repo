@@ -1,12 +1,12 @@
-# fill-templates.py: fill the PMIS register templates from the Master
+# fill-templates.py: fill GSDN Workspace register templates from the Master
 
-An offline helper (gap G3 of `docs/plans/2026-11-04-master-template-data-load.md`). It copies the register sheets of the owner's Master workbook into the templates the PMIS issued. It never uploads anything and never creates a template: the PMIS still rejects any file without the embedded `_tpl` id and version, and every upload still becomes a batch that goes to L2.
+An offline helper (gap G3 of `docs/plans/2026-11-04-master-template-data-load.md`). It copies the register sheets of the owner's Master workbook into the templates GSDN Workspace issued. It never uploads anything and never creates a template: GSDN Workspace still rejects any file without the embedded `_tpl` id and version, and every upload still becomes a batch that goes to L2.
 
 Python 3 and `openpyxl` only (`pip install openpyxl`). Run it on your own computer. Keep the real Master outside the repository.
 
 ## Step by step
 
-1. **Download blank templates** from the PMIS (Templates page): TPL-RF, TPL-ACQ, TPL-PRM, TPL-PO, TPL-GECOL, TPL-HLC, TPL-ASB, TPL-RSK, as many as you want to load. Do not edit them. A template that already has rows, or whose header row was changed, is refused.
+1. **Download blank templates** from GSDN Workspace (Templates page): TPL-RF, TPL-ACQ, TPL-PRM, TPL-PO, TPL-GECOL, TPL-HLC, TPL-ASB, TPL-RSK, as many as you want to load. Do not edit them. A template that already has rows, or whose header row was changed, is refused.
 2. **Save the Master as `.xlsx`** (values only, no macros). If Excel shows an external link, break it first (Data, Edit Links, Break Link). The tool does not follow links either way.
 3. **Run the tool** with a new, empty output folder:
 
@@ -26,10 +26,10 @@ Python 3 and `openpyxl` only (`pip install openpyxl`). Run it on your own comput
 
    **First run (Q493):** the report lists every mapped Master header the tool could not find, and every mapping row that matches no template column (names only, no data). Send that list to the project team: the mapping files are corrected in a small follow-up, then run again.
 
-   Text dates with day and month both 12 or less (for example 05/06/2025) are read day first and listed as `date_day_first_assumed` (cell, old and new value) so the L2 reviewer can check them. Procurement rows are listed as `needs_delivery_team`: the Procurement team fills Delivery and Team in the PMIS before submitting.
+   Text dates with day and month both 12 or less (for example 05/06/2025) are read day first and listed as `date_day_first_assumed` (cell, old and new value) so the L2 reviewer can check them. Procurement rows are listed as `needs_delivery_team`: the Procurement team fills Delivery and Team in GSDN Workspace before submitting.
 
-   Fix what you can in the Master and run again into a new folder. Values outside lists and text in date or number cells are copied as found: the PMIS shows them as refused rows.
-5. **Upload each filled template** on the PMIS Templates page (the same file you filled). It becomes one batch for L1, and L2 then approves it row by row or all at once. Load in the order of section 3.2 of the plan.
+   Fix what you can in the Master and run again into a new folder. Values outside lists and text in date or number cells are copied as found: GSDN Workspace shows them as refused rows.
+5. **Upload each filled template** on GSDN Workspace Templates page (the same file you filled). It becomes one batch for L1, and L2 then approves it row by row or all at once. Load in the order of section 3.2 of the plan.
 
 ## What the tool changes, and what it does not
 
@@ -47,7 +47,7 @@ A row is skipped when it has no Site ID, when the Site ID is not on the Master s
 
 ## Mapping files
 
-`register-maps/index.csv` names the Master sheet, header row, first data row and key of each register. `register-maps/<register>.csv` has one row per template column: `template_header` (as the PMIS issues it), `master_header` (the header in the Master; `a|b` gives alternatives for renamed columns), `master_column` (the letter, documentation only), `transform`, `personal`. A template column with an empty `master_header` has no source in the owner's file and stays blank. If the PMIS re-issues a template with new headers, edit the matching row; the report lists every mapping row that matches nothing.
+`register-maps/index.csv` names the Master sheet, header row, first data row and key of each register. `register-maps/<register>.csv` has one row per template column: `template_header` (as GSDN Workspace issues it), `master_header` (the header in the Master; `a|b` gives alternatives for renamed columns), `master_column` (the letter, documentation only), `transform`, `personal`. A template column with an empty `master_header` has no source in the owner's file and stays blank. If GSDN Workspace re-issues a template with new headers, edit the matching row; the report lists every mapping row that matches nothing.
 
 ## Tests
 

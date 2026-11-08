@@ -203,7 +203,7 @@ export type ImportBatchOutcome = S['ImportBatchOutcome'];
 /** A batch answered by a send or a decision carries what the call did. */
 export type ImportBatchResult = ImportBatch & { outcome?: ImportBatchOutcome };
 export type UploadWarning = S['UploadWarning'];
-/** The answer of an upload: a TPL-MASTER file answers the first batch plus every batch of the file (`parts`) and what the PMIS ignored or skipped (`warnings`). */
+/** The answer of an upload: a TPL-MASTER file answers the first batch plus every batch of the file (`parts`) and what GSDN Workspace ignored or skipped (`warnings`). */
 export type UploadedBatch = ImportBatch & { parts?: ImportBatch[]; warnings?: UploadWarning[] };
 /** The path of the review screen of a batch: a stream batch has no register. */
 export const batchPath = (b: Pick<ImportBatch, 'id' | 'register_key' | 'stream'> & { entity?: ImportBatch['entity'] }, fallbackKey?: string | null): string =>

@@ -1,6 +1,6 @@
 ---
 name: devops-security
-description: DevOps and security for GSDN PMIS. Use for Docker/Compose, CI pipelines, environments, secrets handling, backups, observability and security review (OWASP, auth, file upload safety).
+description: DevOps and security for GSDN Workspace. Use for Docker/Compose, CI pipelines, environments, secrets handling, backups, observability and security review (OWASP, auth, file upload safety).
 model: haiku
 effort: low
 tools: Read, Grep, Glob, Write, Edit, Bash

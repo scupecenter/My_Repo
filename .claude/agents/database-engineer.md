@@ -1,6 +1,6 @@
 ---
 name: database-engineer
-description: PostgreSQL/Prisma engineer for GSDN PMIS. Use for the data model, migrations, constraints, indexes, row-level region security, seed and synthetic data, and the import mapping from the Excel Site Master.
+description: PostgreSQL/Prisma engineer for GSDN Workspace. Use for the data model, migrations, constraints, indexes, row-level region security, seed and synthetic data, and the import mapping from the Excel Site Master.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Write, Edit, Bash
