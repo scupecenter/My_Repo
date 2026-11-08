@@ -281,7 +281,7 @@ export class TemplatesService {
         if (c.type === 'multi_user' && Array.isArray(v)) v.forEach((x) => typeof x === 'string' && userIds.add(x));
         if (c.type === 'multi_site' && Array.isArray(v)) v.forEach((x) => typeof x === 'string' && siteIds.add(x));
         if (c.type === 'warehouse_item' && typeof v === 'string') itemIds.add(v);
-        if (c.type === 'child_list' && Array.isArray(v)) for (const row of v as Record<string, unknown>[]) if (typeof row.owner === 'string') userIds.add(row.owner);
+        if (c.type === 'child_list' && Array.isArray(v)) for (const row of v as Record<string, unknown>[]) { if (typeof row.owner === 'string') userIds.add(row.owner); if (typeof row.user_id === 'string') userIds.add(row.user_id); }
       }
     }
     const sitesById = siteIds.size ? await this.db.tx.$queryRaw<{ id: string; site_code: string }[]>(Prisma.sql`SELECT id::text AS id, site_code FROM sites WHERE id = ANY(${[...siteIds]}::uuid[])`) : [];
@@ -301,7 +301,10 @@ export class TemplatesService {
           if (c.type === 'multi_list' && Array.isArray(v)) v = v.join('; ');
           if (c.type === 'warehouse_item' && typeof v === 'string') v = itemsById.find((x) => x.id === v)?.item_code ?? v;
           // a child list is shown, one row per line, and never read back (the rows are entered in the PMIS, so an action is never entered twice)
-          if (c.type === 'child_list' && Array.isArray(v)) {
+          if (c.code === 'members' && Array.isArray(v)) {
+            // Q519: the members are typed back as "employee ID:role[:lead]" (read on upload)
+            v = (v as Record<string, unknown>[]).map((m) => `${person(m.user_id)}:${String(m.member_role ?? '')}${m.is_lead === true ? ':lead' : ''}`).join('; ');
+          } else if (c.type === 'child_list' && Array.isArray(v)) {
             v = (v as Record<string, unknown>[]).map((row) => Object.entries(row).filter(([k]) => k !== 'id').map(([k, x]) => `${k}: ${k === 'owner' ? person(x) : String(x)}`).join(' | ')).join('\n');
           }
           out[c.code] = v;
