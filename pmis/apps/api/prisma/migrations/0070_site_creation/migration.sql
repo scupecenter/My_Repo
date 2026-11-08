@@ -2,7 +2,7 @@
 -- technical decisions) and the three small load fixes G2, G8 and G9. Contract 0.14.0, CHANGELOG 98.
 -- Mirror: db/sql/069_site_creation.sql (kept byte-identical).
 --
---   1. G1 / Q460  The PMIS creates sites. The identity of a site comes from the Master sheet (Site ID, region, cluster, delivery scenario, scope flags AA:AF,
+--   1. G1 / Q460  GSDN Workspace creates sites. The identity of a site comes from the Master sheet (Site ID, region, cluster, delivery scenario, scope flags AA:AF,
 --                 names, coordinates); RF & Design enriches the site later through its feed (P4a, 0062). There are two entry ways, both ending at L2:
 --                   (a) manual:  site_draft_create / _save / _submit / _decide / _discard (POST /sites creates a draft, L1 submits, L2 decides);
 --                   (b) bulk:    the approved template TPL-SITE-NEW ("New sites": an issued file with the hidden _tpl sheet), staged by imp_stage_site_batch,
@@ -1170,7 +1170,7 @@ BEGIN
   INSERT INTO public.master_reconciliation_runs (id, file_name, file_sha256, file_size, storage_key, structure, created_by)
   VALUES (rid, left(p_file_name, 200), p_sha, p_size, p_storage_key, v_structure, actor);
 
-  -- 2. every row: the cells in Master letters, the site, the comparison with what the PMIS holds
+  -- 2. every row: the cells in Master letters, the site, the comparison with what GSDN Workspace holds
   FOR el IN SELECT x FROM jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x LOOP
     cells := '{}'::jsonb;
     FOR k, val IN SELECT * FROM jsonb_each(coalesce(el -> 'cells', '{}'::jsonb)) LOOP
@@ -1204,7 +1204,7 @@ BEGIN
       mv := cells -> (c ->> 'letter') ->> 'v';
       IF NOT (pm ? (c ->> 'letter')) THEN
         IF mv IS NOT NULL THEN ignored := ignored + 1; END IF;
-        CONTINUE;                                                        -- a column the PMIS does not compare (calculated gates, SLA, Dismantle ...)
+        CONTINUE;                                                        -- a column GSDN Workspace does not compare (calculated gates, SLA, Dismantle ...)
       END IF;
       pv := pm ->> (c ->> 'letter');
       compared := compared + 1;

@@ -300,7 +300,7 @@ export class TemplatesService {
           if (c.type === 'multi_site' && Array.isArray(v)) v = v.map((id) => sitesById.find((x) => x.id === id)?.site_code ?? String(id)).join('; ');
           if (c.type === 'multi_list' && Array.isArray(v)) v = v.join('; ');
           if (c.type === 'warehouse_item' && typeof v === 'string') v = itemsById.find((x) => x.id === v)?.item_code ?? v;
-          // a child list is shown, one row per line, and never read back (the rows are entered in the PMIS, so an action is never entered twice)
+          // a child list is shown, one row per line, and never read back (the rows are entered in GSDN Workspace, so an action is never entered twice)
           if (c.code === 'members' && Array.isArray(v)) {
             // Q519: the members are typed back as "employee ID:role[:lead]" (read on upload)
             v = (v as Record<string, unknown>[]).map((m) => `${person(m.user_id)}:${String(m.member_role ?? '')}${m.is_lead === true ? ':lead' : ''}`).join('; ');
@@ -616,16 +616,16 @@ export class TemplatesService {
       ? [
         `GSDN Workspace approved template ${t.template_id}, version ${t.current_version}${t.kind === 'master' ? ' (the whole Master)' : ` (stream ${t.stream_code})`}.`,
         t.kind === 'master'
-          ? 'Fill the sheet "Master" (one row per site, the Master column order) and the register sheets, and upload the same file in the PMIS. Do not rename, move or delete the columns you use, and do not change the header row.'
-          : 'Fill the sheet "Data" (one row per site) and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
-        'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
+          ? 'Fill the sheet "Master" (one row per site, the Master column order) and the register sheets, and upload the same file in GSDN Workspace. Do not rename, move or delete the columns you use, and do not change the header row.'
+          : 'Fill the sheet "Data" (one row per site) and upload the same file in GSDN Workspace. Do not rename, move, add or delete columns, and do not change the header row: GSDN Workspace refuses a changed file.',
+        'Files from an older version of the template are refused: download the template again when GSDN Workspace issues a new version.',
         'Grey columns are calculated, set by the workflow (submitted and approved dates), or owned by a register (for example As-Built): they are shown for information and are never read. Enter register data in its register.',
         'Leave a cell empty to keep the current value. An empty cell never clears a value.',
         'Submit for Review (the default): each task you fill is entered as the Data Entry holder (L1) and submitted; it needs its actual date and its mandatory documents (upload them on the task first), exactly as on the task screen. Save Draft / Planning (chosen at upload) saves the planned dates and values without submitting (Q206).',
         'A pending task is started with its Actual Start (or, for a task without an Actual Start column, its actual date); today is never used (Q209).',
         'A task that is locked by a closed gate, waits for a predecessor, or is already in review is held, never refused; send the batch again once it opens (Q208). Nothing is approved until L2 (Data Reviewer & Approver) decides each task.',
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas. The sheet "Columns" lists every header with its Master column and task.',
-        ...(t.kind === 'master' ? ['Columns that the PMIS does not own are ignored with a warning. The upload is split into one batch per stream and per register sheet; each follows its own flow.'] : []),
+        ...(t.kind === 'master' ? ['Columns that GSDN Workspace does not own are ignored with a warning. The upload is split into one batch per stream and per register sheet; each follows its own flow.'] : []),
         '',
         'قالب معتمد من نظام GSDN Workspace. املأ الورقة وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
         'الأعمدة الرمادية محسوبة أو يحددها سير العمل أو يملكها سجل آخر: تظهر للعلم ولا تُقرأ. أدخل بيانات السجلات في سجلها. الخلية الفارغة لا تمسح قيمة موجودة.',
@@ -634,8 +634,8 @@ export class TemplatesService {
       : t.kind === 'sites'
       ? [
         `GSDN Workspace approved template ${t.template_id}, version ${t.current_version} (New sites).`,
-        'Fill the sheet "Data" (one row per new site) and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
-        'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
+        'Fill the sheet "Data" (one row per new site) and upload the same file in GSDN Workspace. Do not rename, move, add or delete columns, and do not change the header row: GSDN Workspace refuses a changed file.',
+        'Files from an older version of the template are refused: download the template again when GSDN Workspace issues a new version.',
         'Required: Site ID, Region, Site Name (EN) and Delivery Scenario. The Site ID is unique for ever: a Site ID that exists, also one of a cancelled site, is refused. The region may be a region name, its code or a known alias (for example "Tripoli Area").',
         'Scope columns take Yes, No or blank. A cluster that does not exist yet is created in the region of the site when L2 approves. Overall Status is Not Started (or blank) or Cancelled: a Cancelled row creates the site and then cancels it, so its history exists.',
         'Landlord and contact details (names, phones, e-mails) are not loaded: the template has no such columns.',
@@ -648,9 +648,9 @@ export class TemplatesService {
       ]
       : [
         `GSDN Workspace approved template ${t.template_id}, version ${t.current_version}.`,
-        'Fill the sheet "Data" and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
-        'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
-        'Grey columns are calculated or fixed by the PMIS. They are shown for information and are never read.',
+        'Fill the sheet "Data" and upload the same file in GSDN Workspace. Do not rename, move, add or delete columns, and do not change the header row: GSDN Workspace refuses a changed file.',
+        'Files from an older version of the template are refused: download the template again when GSDN Workspace issues a new version.',
+        'Grey columns are calculated or fixed by GSDN Workspace. They are shown for information and are never read.',
         'Leave a cell empty to keep the current value. An empty cell never clears a value.',
         'The Record ID column is filled in a pre-filled copy. A row with a Record ID updates that record; a row without one is matched by its key (see the register), or creates a new record.',
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas.',

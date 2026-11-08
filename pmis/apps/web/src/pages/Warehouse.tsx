@@ -262,7 +262,7 @@ function Stock() {
   );
 }
 
-/** D6: per TE site, the Q65 date (latest approved TE DN) and the PMIS need status, side by side. */
+/** D6: per TE site, the Q65 date (latest approved TE DN) and GSDN Workspace need status, side by side. */
 function Dispatch() {
   const { t } = useTranslation();
   const [status, setStatus] = useState('');

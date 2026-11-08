@@ -29,7 +29,7 @@
 --   6. Issues -> issues and Risks -> risks (the site detail's open issue count and the health index inputs).
 --   7. Q113: As-Built has two parts, record types cw_part and te_part, each with its own L1 -> L2 approval (one logical record per site and part).
 --      BU (cw_as_built_submitted) is filled by the CW part's submission (Yes, or N/A for a part declared not applicable) with cw_submitted_date;
---      EF (as_built_date) is the TE part's submission date (typed by L1 when the vendor submitted earlier, otherwise the PMIS submission date).
+--      EF (as_built_date) is the TE part's submission date (typed by L1 when the vendor submitted earlier, otherwise GSDN Workspace submission date).
 --      Never the approval date. Existing records are migrated. as_built_records keeps one row per site with both parts.
 --   8. Q108: the item-type fields WL / MW antenna type and router type pick an active Warehouse item of their group (as_built_type_sources; the
 --      options follow the Warehouse catalogue); whole numbers also for the unit qty. RF Height is read as a number (D108b, P5 owns the type).
@@ -388,7 +388,7 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 UPDATE register_definitions SET record_types = ARRAY['cw_part', 'te_part'], multiple_per_site = true WHERE register_key = 'as_built';
 UPDATE template_definitions SET match_keys = '[["site_code","record_type"]]'::jsonb WHERE register_key = 'as_built' AND kind = 'register';
--- BU is filled by the CW part's submission (never typed); EF stays typed for a vendor submission before the PMIS entry, else the submission date fills it.
+-- BU is filled by the CW part's submission (never typed); EF stays typed for a vendor submission before GSDN Workspace entry, else the submission date fills it.
 UPDATE register_fields SET derived = true, section = 'CW submission' WHERE register_key = 'as_built' AND code = 'cw_as_built_submitted';
 UPDATE task_field_sources SET record_type = 'cw_part' WHERE register_key = 'as_built' AND field_code = 'cw_as_built_submitted';
 UPDATE task_field_sources SET record_type = 'te_part' WHERE register_key = 'as_built' AND field_code = 'as_built_date';

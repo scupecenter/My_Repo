@@ -22,7 +22,7 @@ beforeAll(async () => {
   await fake.listen();
   mailCfg = {
     enabled: true, host: '127.0.0.1', port: fake.port, tls: 'none', user: 'pmis-relay', pass: 'relay-secret-Pass-1', fromAddress: 'pmis@aljeel.test',
-    fromHeader: 'GSDN PMIS <pmis@aljeel.test>', rejectUnauthorized: true, timeoutMs: 5000, heloName: 'pmis.test',
+    fromHeader: 'GSDN Workspace <pmis@aljeel.test>', rejectUnauthorized: true, timeoutMs: 5000, heloName: 'pmis.test',
   };
   app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_P9M as string, mail: mailCfg, appBaseUrl: 'https://pmis.aljeel.test' });
   db = new PgClient({ connectionString: process.env.TEST_SUPER_URL_P9M });
@@ -64,9 +64,9 @@ describe('SMTP settings from the environment', () => {
   });
 
   it('reads host, port, TLS mode, credentials and the sender with its display name', () => {
-    const c = loadConfig({ ...BASE_ENV, SMTP_HOST: 'relay.aljeel.local', SMTP_USER: 'u', SMTP_PASS: 'p', SMTP_FROM: 'GSDN PMIS <pmis@aljeel.ly>', APP_BASE_URL: 'https://pmis.aljeel.local/' });
+    const c = loadConfig({ ...BASE_ENV, SMTP_HOST: 'relay.aljeel.local', SMTP_USER: 'u', SMTP_PASS: 'p', SMTP_FROM: 'GSDN Workspace <pmis@aljeel.ly>', APP_BASE_URL: 'https://pmis.aljeel.local/' });
     expect(c.mail).toMatchObject({ enabled: true, host: 'relay.aljeel.local', port: 587, tls: 'starttls', user: 'u', pass: 'p', fromAddress: 'pmis@aljeel.ly',
-      fromHeader: 'GSDN PMIS <pmis@aljeel.ly>', rejectUnauthorized: true });
+      fromHeader: 'GSDN Workspace <pmis@aljeel.ly>', rejectUnauthorized: true });
     expect(c.appBaseUrl).toBe('https://pmis.aljeel.local');
     expect(loadConfig({ ...BASE_ENV, SMTP_HOST: 'r', SMTP_PORT: '465', SMTP_FROM: 'pmis@aljeel.ly' }).mail).toMatchObject({ tls: 'tls', port: 465 });
   });
@@ -82,11 +82,11 @@ describe('SMTP settings from the environment', () => {
 
 describe('the SMTP client', () => {
   it('encodes an Arabic subject and refuses a header with a line break', () => {
-    const enc = encodeHeader('تنبيه أمني من نظام إدارة المشاريع GSDN PMIS');
+    const enc = encodeHeader('تنبيه أمني من نظام إدارة المشاريع GSDN Workspace');
     expect(enc).toMatch(/^=\?UTF-8\?B\?/);
     expect(() => encodeHeader('a\r\nBcc: someone@example.test')).toThrow(SmtpError);
     const { data } = buildMessage(mailCfg, { to: 'a@example.test', subject: 'Hello', text: 'line 1\n.line 2' });
-    expect(data).toMatch(/^From: "GSDN PMIS" <pmis@aljeel\.test>\r\nTo: <a@example\.test>\r\nSubject: Hello\r\n/);
+    expect(data).toMatch(/^From: "GSDN Workspace" <pmis@aljeel\.test>\r\nTo: <a@example\.test>\r\nSubject: Hello\r\n/);
     expect(data).toContain('Content-Transfer-Encoding: base64');
     expect(() => buildMessage(mailCfg, { to: 'a@example.test\r\nBcc: b@example.test', subject: 'x', text: 'y' })).toThrow(SmtpError);
   });
@@ -329,7 +329,7 @@ describe('the admin endpoints and the health check', () => {
     const { admin, api } = await adminApi(app, db);
     let st = await api.call('get', '/admin/mail/status');
     expect(st.status).toBe(200);
-    expect(st.body).toMatchObject({ enabled: true, settings: { host: '127.0.0.1', port: fake.port, tls: 'none', from: 'GSDN PMIS <pmis@aljeel.test>', auth: true } });
+    expect(st.body).toMatchObject({ enabled: true, settings: { host: '127.0.0.1', port: fake.port, tls: 'none', from: 'GSDN Workspace <pmis@aljeel.test>', auth: true } });
     expect(JSON.stringify(st.body)).not.toContain('relay-secret');
     expect(['unverified', 'verified', 'failing']).toContain(st.body.state);
     const t = await api.call('post', '/admin/mail/test');

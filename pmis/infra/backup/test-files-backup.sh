@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: smoke test of files-backup.sh with a fake restic (no repository, no network, no database).
+# GSDN Workspace: smoke test of files-backup.sh with a fake restic (no repository, no network, no database).
 # Checks that the integrity anchor directory (LOG_ANCHOR_DIR, Q257) travels in the same snapshot as the stored files, and that a missing or unset
 # directory is noted without stopping the backup.
 #

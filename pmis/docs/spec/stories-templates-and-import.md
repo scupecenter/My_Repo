@@ -67,6 +67,6 @@ Sources:
 
 ## TI-08 Master-format export for the parallel run
 - **Given** the parallel run
-  **When** the PMIS exports a Master-format file
+  **When** GSDN Workspace exports a Master-format file
   **Then** it is compared automatically with the live Master.
   **And** the differences are listed per site and column.

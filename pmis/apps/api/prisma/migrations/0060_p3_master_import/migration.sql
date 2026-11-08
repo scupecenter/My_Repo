@@ -17,7 +17,7 @@
 --      with the list of the changed columns. tpl_version_compat() is the column-level diff; the staging functions call it.
 --   4. Q207: tpl_mapping_save() is the mapping screen's writer (System Admin or a delegate of templates.edit; reason; test run that rolls back and answers
 --      the impact; the next template versions are issued by the triggers of 0051 and carry the reason). A calculated or register-owned field never becomes
---      a typed column, and a Master column that the PMIS does not own is never mapped.
+--      a typed column, and a Master column that GSDN Workspace does not own is never mapped.
 --   5. Q8 and Q10: role_aliases and region_aliases, editable data used by the legacy import. Unknown, unmapped and ambiguous values are import exceptions;
 --      an imported job title never grants a right. The role mapping is owner data that is not available yet: every Master StaffRole value is seeded
 --      unmapped or ambiguous.
@@ -25,7 +25,7 @@
 --      "+N more" appended to the remark). It feeds the comparison report and the Master-format export when that is built.
 --   7. Q1 and Q211: the admin-only legacy Master import and the parallel-run comparison report. master_reconciliation_runs keeps every upload of the real
 --      Master (no `_tpl`): file name, SHA-256, size, the stored original, the structure check, the summary, who and when. mi_stage_run() identifies the file
---      by its sheet names and headers, checks the structure, and writes the per-cell differences against what the PMIS holds (master_reconciliation_diffs)
+--      by its sheet names and headers, checks the structure, and writes the per-cell differences against what GSDN Workspace holds (master_reconciliation_diffs)
 --      without changing anything. mi_apply_run() (reason, step-up) enters the typed task columns through the TPL-MASTER staging and the batch flow
 --      (source master_import), so every validation, gate, holder and L2 decision of a manual entry applies. mi_resolve_diff() records the resolution of
 --      one difference. Every use is written to the audit log (log_audit_write) and the System Log (log_system_write).
@@ -334,7 +334,7 @@ BEGIN
           IF jsonb_array_length(e) = 0 AND ti.state = 'open' AND (NOT draft OR p ? 'actual_start' OR p ? 'actual_date')
              AND public.imp_start_date(tc, p, ti) IS NULL THEN
             e := e || jsonb_build_array(public.imp_task_note(p_cols, tc, 'actual_start', 'actual_start_required',
-              'The task is pending: type its Actual Start. The PMIS never uses today as the start of an earlier piece of work (Q209).'));
+              'The task is pending: type its Actual Start. GSDN Workspace never uses today as the start of an earlier piece of work (Q209).'));
           END IF;
         END IF;
 
@@ -726,7 +726,7 @@ BEGIN
       IF t.state = 'open' AND (NOT draft OR flds ? 'actual_start' OR flds ? 'actual_date') THEN
         start_d := public.imp_start_date(r.task_code, flds, t);
         IF start_d IS NULL THEN
-          RAISE EXCEPTION 'wf:actual_start_required:{"detail": "The task is pending: type its Actual Start. The PMIS never uses today as the start of an earlier piece of work (Q209)."}';
+          RAISE EXCEPTION 'wf:actual_start_required:{"detail": "The task is pending: type its Actual Start. GSDN Workspace never uses today as the start of an earlier piece of work (Q209)."}';
         END IF;
         PERFORM public.wf_start(t.id, NULL, start_d);
       END IF;
@@ -1151,7 +1151,7 @@ CREATE TABLE master_reconciliation_diffs (
   region_id       INTEGER,
   master_col      TEXT,
   header          TEXT,
-  field           TEXT,                             -- what the PMIS holds the value in (task:field, site field, issue projection)
+  field           TEXT,                             -- what GSDN Workspace holds the value in (task:field, site field, issue projection)
   master_value    TEXT,
   pmis_value      TEXT,
   kind            TEXT NOT NULL CHECK (kind IN ('diff', 'missing_in_pmis', 'missing_in_master', 'exception')),
@@ -1196,7 +1196,7 @@ BEGIN
   RETURN s;
 END $$;
 
--- What the PMIS holds for one site in every Master column it compares: {letter: text}. A letter that is missing is not compared.
+-- What GSDN Workspace holds for one site in every Master column it compares: {letter: text}. A letter that is missing is not compared.
 CREATE OR REPLACE FUNCTION mi_pmis_row(p_site uuid) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
 DECLARE s record; out jsonb; f record; v text; res jsonb; vals text[]; iss jsonb;
@@ -1260,7 +1260,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
   WHERE mc.is_active
 $$;
 
--- Q1 / Q211. Identifies the uploaded file as the Site Master, checks its structure and writes the comparison with what the PMIS holds. Nothing else changes.
+-- Q1 / Q211. Identifies the uploaded file as the Site Master, checks its structure and writes the comparison with what GSDN Workspace holds. Nothing else changes.
 -- p_sheets = [sheet names]; p_headers = [{col, header}] of the Master sheet (the header of a column is its group and name, as in master_columns);
 -- p_rows = [{row_no, cells: {file column letter: {v, f}}}]; p_staff = [{row_no, name, role, region, status}] (Setting sheet, Project Staff).
 CREATE OR REPLACE FUNCTION mi_stage_run(p_file_name text, p_sha text, p_size bigint, p_storage_key text, p_sheets jsonb, p_headers jsonb, p_rows jsonb, p_staff jsonb) RETURNS uuid
@@ -1322,7 +1322,7 @@ BEGIN
   INSERT INTO public.master_reconciliation_runs (id, file_name, file_sha256, file_size, storage_key, structure, created_by)
   VALUES (rid, left(p_file_name, 200), p_sha, p_size, p_storage_key, v_structure, actor);
 
-  -- 2. every row: the cells in Master letters, the site, the comparison with what the PMIS holds
+  -- 2. every row: the cells in Master letters, the site, the comparison with what GSDN Workspace holds
   FOR el IN SELECT x FROM jsonb_array_elements(coalesce(p_rows, '[]'::jsonb)) x LOOP
     cells := '{}'::jsonb;
     FOR k, val IN SELECT * FROM jsonb_each(coalesce(el -> 'cells', '{}'::jsonb)) LOOP
@@ -1356,7 +1356,7 @@ BEGIN
       mv := cells -> (c ->> 'letter') ->> 'v';
       IF NOT (pm ? (c ->> 'letter')) THEN
         IF mv IS NOT NULL THEN ignored := ignored + 1; END IF;
-        CONTINUE;                                                        -- a column the PMIS does not compare (calculated gates, SLA, Dismantle ...)
+        CONTINUE;                                                        -- a column GSDN Workspace does not compare (calculated gates, SLA, Dismantle ...)
       END IF;
       pv := pm ->> (c ->> 'letter');
       compared := compared + 1;
@@ -1481,7 +1481,7 @@ BEGIN
     v_rows := v_rows || jsonb_build_array(jsonb_build_object('row_no', row_.row_no, 'site_code', row_.site_code, 'cells', cells, 'pre_errors', pres));
   END LOOP;
   IF jsonb_array_length(v_rows) = 0 THEN
-    PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'No typed task column of this file belongs to a site of the PMIS: nothing can be entered.'));
+    PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'No typed task column of this file belongs to a site of GSDN Workspace: nothing can be entered.'));
   END IF;
   res := public.imp_stage_master_core('TPL-MASTER', tv.version, r.file_name, r.file_sha256,
     jsonb_build_array(jsonb_build_object('sheet', mpart ->> 'sheet', 'header_checksum', mpart ->> 'header_checksum', 'rows', v_rows)), p_mode, 'master_import', gid);

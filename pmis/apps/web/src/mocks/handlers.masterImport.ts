@@ -80,7 +80,7 @@ export const masterImportHandlers = [
     const name = f.name.toLowerCase();
     if (name.endsWith('.xlsm')) return rejected('macros_not_allowed', 'This is a macro-enabled workbook. Save it as a plain .xlsx.');
     const text = await f.text();
-    if (text.includes('_tpl')) return rejected('is_pmis_template', 'This file is a template issued by the PMIS (it has the _tpl sheet): upload it on the Templates page.');
+    if (text.includes('_tpl')) return rejected('is_pmis_template', 'This file is a template issued by GSDN Workspace (it has the _tpl sheet): upload it on the Templates page.');
     if (!text.includes('Master')) return rejected('not_a_master', 'This file is not the Site Master: it has no sheet "Master".');
     const base = st().runs[0]!;
     const run: MasterImportRun = { ...base, id: `run-${st().runs.length + 1}`, file_name: f.name, file_sha256: 'b2'.repeat(32), file_size: f.size, status: 'previewed', created_at: now(),

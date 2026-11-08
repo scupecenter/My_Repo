@@ -47,7 +47,7 @@ Minimum viable team is 5 agents: merge 2 into 1, 3 into 4, and 8 into 5. Teams l
 - Performance work, security review, backup and restore, the deployment runbook, and user acceptance testing with real data.
 
 ## How to run it with Claude Code
-1. The PMIS lives in `pmis/` of this repository, beside the dashboard. Agent definitions are in `.claude/agents/` at the repository root. Work goes to a `develop` branch, or to the session's designated branch.
+1. GSDN Workspace lives in `pmis/` of this repository, beside the dashboard. Agent definitions are in `.claude/agents/` at the repository root. Work goes to a `develop` branch, or to the session's designated branch.
 2. Start one Claude Code session in this repository and tell it: *"Act as tech-lead. Follow ORCHESTRATION.md phase P0. Delegate to the subagents in .claude/agents and report at each gate."*
 3. tech-lead spawns the other agents through the Agent tool. To run them truly in parallel, each one works in its own git worktree or cloud session, on a branch `agent/<name>/<topic>`, and opens a PR to `develop`.
 4. The product owner reviews and approves at each gate. Agents never merge to `main`.

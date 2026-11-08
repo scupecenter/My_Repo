@@ -81,7 +81,7 @@ The four forms bind to these records:
 
 ### 1.2 Fields
 
-| # | Form field (DN form) | Source in the PMIS | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (DN form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | DN Ref. No. | Generated form `number`, taken at generation (§6) | WH movement "Doc No." (D61) | P | `form.number` | No Prisma table (G-F01) |
 | 2 | DN Date | Date of generation, in the Africa/Tripoli timezone | WH movement "Date" | P | `form.date` | ASSUMPTION: issue date = generation date |
@@ -130,7 +130,7 @@ Serial numbers:
 
 ### 2.2 Fields
 
-| # | Form field (RN form) | Source in the PMIS | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (RN form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | RN Ref. No. | Generated form `number` (§6) | WH "Doc No." | P | `form.number` | G-F01 |
 | 2 | RN Date | Date of generation | WH "Date" | P | `form.date` | ASSUMPTION as for the DN |
@@ -153,7 +153,7 @@ Serial numbers:
 ### 2.3 Warehouse effect (CLAUDE.md; WH summary rows)
 - Approval of the signed RN posts the return. Until then the quantity shows as "pending return".
 - In the Master, Returned Good goes back into On Hand. Returned Faulty / Damaged is counted separately and is not in On Hand (WH summary rows 4 and 5, D61).
-- **ASSUMPTION:** the PMIS keeps the same split, so the condition is needed per line (Q23).
+- **ASSUMPTION:** GSDN Workspace keeps the same split, so the condition is needed per line (Q23).
 
 ---
 
@@ -166,7 +166,7 @@ Serial numbers:
 
 ### 3.2 Fields: header and section 1, "Site Info."
 
-| # | Form field (PAC form) | Source in the PMIS | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (PAC form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | PAC Ref. No. | Generated form `number` (§6) | — | P | `form.number` | |
 | 2 | PAC Date | ASSUMPTION: the acceptance date entered in the prepare screen (default today). On approval of the signed scan it becomes B13 `actual_date`, which is Master BV | BV | P (E) | `pac.date` | Open, Q26 |
@@ -266,7 +266,7 @@ Task B15 "CW FAC" maps to Master FC, FD and FE (CW FAC Date) and starts SLA B-15
 
 ### 4.2 Fields
 
-| # | Form field (FAC form) | Source in the PMIS | Master | Fill | Proposed placeholder | Notes |
+| # | Form field (FAC form) | Source in GSDN Workspace | Master | Fill | Proposed placeholder | Notes |
 |---|---|---|---|---|---|---|
 | 1 | FAC Ref. No. | Generated form `number` | — | P | `form.number` | |
 | 2 | FAC Date | ASSUMPTION: entered in the prepare screen (default today). On approval it becomes B15 `actual_date` (FE) | FE | P (E) | `fac.date` | Same pattern as the PAC Date (Q26) |

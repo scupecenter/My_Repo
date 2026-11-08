@@ -2199,7 +2199,7 @@
     "rule_master": "The file is split into one batch per stream and per register sheet. A column or a sheet GSDN Workspace does not own is ignored with a warning.",
     "parts_title": "The file became {{count}} batch(es). Each follows its own flow.",
     "warnings_title": "{{count}} warning(s): nothing was refused, but some of the file was not read.",
-    "warn_column_not_owned": "Column \"{{column}}\" ({{sheet}}): {{count}} value(s) ignored. The PMIS calculates it or another register owns it.",
+    "warn_column_not_owned": "Column \"{{column}}\" ({{sheet}}): {{count}} value(s) ignored. GSDN Workspace calculates it or another register owns it.",
     "warn_extra_column": "Column \"{{column}}\" ({{sheet}}) is not part of the template: ignored.",
     "warn_unknown_sheet": "Sheet \"{{sheet}}\" is not part of the template: ignored.",
     "warn_part_skipped": "Sheet {{sheet}} was not staged.",

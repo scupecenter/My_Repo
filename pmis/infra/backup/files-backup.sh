@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: nightly backup of the stored files (owner answer Q134), with restic.
+# GSDN Workspace: nightly backup of the stored files (owner answer Q134), with restic.
 #
 # What it backs up: the local document directory (STORAGE_DIR), or the MinIO bucket (S3_*), copied first to a staging directory with `mc mirror`.
 # Every object is already encrypted by the API (FILE_ENC_KEY); restic encrypts the repository again, with its own password.

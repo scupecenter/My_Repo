@@ -6,7 +6,7 @@
 - Update 2026-11-02 (later): self-service profile (migration 0044, contract 0.9.2). The password change of item 5 is also offered on "My profile" (`POST /me/password`, same policy, lock and session rules); users may turn two-factor on themselves and off unless an admin enforced it (ADR 0014 amendment 2); the login email changes only through an email change request that an admin approves.
 
 ## Context
-- The Entra app registration is not available yet, and the owner wants people to use the PMIS now.
+- The Entra app registration is not available yet, and the owner wants people to use GSDN Workspace now.
 - Owner answers (2026-10-28):
   1. A System Admin creates the account and gives a **temporary password**; the user must change it at the first sign-in. No email is needed.
   2. The sign-in box stays **one identifier**: 4-digit employee ID, email or phone, plus the password.
@@ -33,7 +33,7 @@
 10. **Audit.** Account creation, password change, reset, lockout and bootstrap write audit rows; sign-in attempts go to the System Log, then to the security log when it exists (db-gaps).
 
 ## Consequences
-- People can use the PMIS before IT registers the Entra app.
+- People can use GSDN Workspace before IT registers the Entra app.
 - Local sign-in is outside Entra Conditional Access: Entra MFA and device policies do not apply to it (risk already accepted by the owner in ADR 0002 §10). TOTP closes most of the gap and is the next security item.
 - Password handling is now our responsibility: hashing, lockout, rate limits and the reset flow are tested in CI (`apps/api` tests run as `pmis_app` against PostgreSQL 16).
 - Deployments must run `db/sql/app_grants.sql` after migrations so `pmis_app` has its table rights and the narrowing of migrations 0002, 0009 and 0010 is applied again.

@@ -1,6 +1,6 @@
 ---
 name: backend-engineer
-description: NestJS API engineer for GSDN PMIS (apps/api/src). Use for auth, RBAC and region filtering, the approval workflow engine, responsibility matrix, template issue/validate/import, registers, audit and system logs, notifications and calculations.
+description: NestJS API engineer for GSDN Workspace (apps/api/src). Use for auth, RBAC and region filtering, the approval workflow engine, responsibility matrix, template issue/validate/import, registers, audit and system logs, notifications and calculations.
 model: sonnet
 effort: high
 tools: Read, Grep, Glob, Write, Edit, Bash

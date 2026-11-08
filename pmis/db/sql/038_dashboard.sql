@@ -55,7 +55,7 @@ BEGIN
       (ws, 'A8', 'Training & Handover',           'التدريب والتسليم',          5,  80);
     -- measure_rule: {"method":"tasks","tasks":[codes],"plan":milestone} counts approved / applicable instances of those tasks (a milestone task has the
     -- code of its milestone, MS1..MS10) and plans against the baseline of the milestone `plan`. {"method":"none","central":true} is a project-wide
-    -- item with no data in the PMIS yet: it is left out and its weight is redistributed (rules.md section 6).
+    -- item with no data in GSDN Workspace yet: it is left out and its weight is redistributed (rules.md section 6).
     INSERT INTO weight_items (activity_id, code, name, weight, unit, measure_rule, source, sort)
     SELECT a.id, v.code, v.name, v.weight, v.unit, v.rule::jsonb, v.source, v.sort
     FROM (VALUES

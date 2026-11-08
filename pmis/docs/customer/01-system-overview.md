@@ -10,7 +10,7 @@
 
 ## 1. الغرض والنطاق
 
-- **GSDN PMIS** نظام لإدارة مشروع تسليم مواقع GSDN (مواقع اتصالات في 7 مناطق ليبية). يحلّ محل ملف Excel «Site Master» كمرجع وحيد للبيانات، ويفرض **اعتماداً على ثلاثة مستويات** على كل مهمة. (CLAUDE.md)
+- **GSDN Workspace** نظام لإدارة مشروع تسليم مواقع GSDN (مواقع اتصالات في 7 مناطق ليبية). يحلّ محل ملف Excel «Site Master» كمرجع وحيد للبيانات، ويفرض **اعتماداً على ثلاثة مستويات** على كل مهمة. (CLAUDE.md)
 - **المناطق السبع:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. (CLAUDE.md)
 - **سيناريوهات التسليم:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **الحالة العامة للموقع:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **الاستضافة:** خادم داخلي في الشركة، وليس سحابة. (CLAUDE.md، ADR 0001)
@@ -185,7 +185,7 @@
 
 ## 1. Purpose and scope
 
-- **GSDN PMIS** manages the GSDN site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
+- **GSDN Workspace** manages the GSDN site-delivery project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master as the system of record and puts a **3-level approval workflow** on every task. (CLAUDE.md)
 - **Regions:** Tripoli, Middle, WM, Zawia, Benghazi, GM, Sebha. **Delivery scenarios:** New Build, Expansion, Hot Swap, Cold Swap, Relocation. **Overall status:** Not Started, In Progress, On Hold, Completed, Cancelled. (CLAUDE.md)
 - **Hosting:** an internal company server, never cloud. (CLAUDE.md, ADR 0001)
 - **Out of scope for now:** the mobile app (later, designed for now), HSE incidents and clock-in (deferred to mobile), team capacity and certificates (dropped), generated TE forms (deferred), local password sign-in (deferred). (CLAUDE.md)
@@ -280,11 +280,11 @@ Separate modules, each with its own menu: **Procurement (PR/PO/WO), Contractors,
 
 ## 9. Sign-in
 
-- **One box (owner decision 2026-10-25):** the employee types their email, employee ID or registered phone. The PMIS looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; **Microsoft performs the actual sign-in** (password, MFA, Conditional Access). **The PMIS never stores passwords.** The screen behaves the same whether or not a match is found, so it does not reveal who is registered. After the callback, the token's account must match the registry row. (CLAUDE.md, ADR 0002 §9b)
+- **One box (owner decision 2026-10-25):** the employee types their email, employee ID or registered phone. GSDN Workspace looks it up in the staff registry and sends the browser to Microsoft 365 with that person's email as `login_hint`; **Microsoft performs the actual sign-in** (password, MFA, Conditional Access). **GSDN Workspace never stores passwords.** The screen behaves the same whether or not a match is found, so it does not reveal who is registered. After the callback, the token's account must match the registry row. (CLAUDE.md, ADR 0002 §9b)
 - **First sign-in:** the account is created as "Pending assignment" and sees nothing until an admin assigns the role, team (CW/TE/both), permission level, regions and modules. The employee ID is entered once. (CLAUDE.md, ADR 0002)
 - **Local sign-in** (employee ID or phone + PMIS password) is **deferred to a later phase**; the proposed design is kept in ADR 0002 §10, and the staff registry is used now so no rework is needed. (CLAUDE.md)
 - **MFA:** enforced through Entra Conditional Access. The API checks the token's `amr` claim behind an admin toggle that is **off until IT enables MFA**. Step-up re-authentication is required for final approval, role/matrix/group changes, delegation, deletes and admin overrides. One break-glass local admin account (TOTP, internal network only) exists; every use is logged and emailed. (CLAUDE.md)
-- **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or delegate) can remove the PMIS MFA requirement for a registered user, until revoked or until an end date, with a reason and the admin's own step-up. Nobody exempts themselves; it is audited, the user is emailed, and an "MFA exempt" badge shows. **It does not change MFA enforced by Entra**, which IT changes in Entra. (CLAUDE.md)
+- **Per-user MFA exemption (owner request 2026-10-25):** a System Admin (or delegate) can remove GSDN Workspace MFA requirement for a registered user, until revoked or until an end date, with a reason and the admin's own step-up. Nobody exempts themselves; it is audited, the user is emailed, and an "MFA exempt" badge shows. **It does not change MFA enforced by Entra**, which IT changes in Entra. (CLAUDE.md)
 - UI language: English by default, Arabic (RTL) as an instant switch; light and dark themes; Cairo font; ERPNext (frappe-ui) colours without the ERPNext logo or name. The final Aljeel brand is **to be confirmed**. (CLAUDE.md)
 
 ![Sign-in](../../design/screens/latest/01-login.png)
@@ -338,7 +338,7 @@ Every create, rename, edit, deactivate or delete of configuration is a System Ad
 
 (CLAUDE.md)
 1. **Pilot on one region (Tripoli) for 2 weeks.**
-2. **Parallel run for 1 month:** the PMIS exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
+2. **Parallel run for 1 month:** GSDN Workspace exports a Master-format file and compares it automatically with the live Master. **The Master is retired after one month without material differences.**
 3. **Training per role:** short Arabic videos, an in-app guide on first use, one live session per role group, and a Project Support champion.
 4. **Acceptance criteria:** critical-path E2E tests pass, the real Master import matches 100% of milestone dates, no open critical bugs, and the performance targets are met.
 5. Real data is uploaded through the system once complete; until then, synthetic data only.

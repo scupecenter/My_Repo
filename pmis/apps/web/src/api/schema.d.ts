@@ -2168,7 +2168,7 @@ export interface paths {
         put?: never;
         /**
          * Add a slot to the task (one more candidate, or a conditional document that applies)
-         * @description For a document type placed on the task: a document that is `conditional` and whose rule the PMIS cannot evaluate yet (declare that it applies), or one more slot of the same type for another candidate
+         * @description For a document type placed on the task: a document that is `conditional` and whose rule GSDN Workspace cannot evaluate yet (declare that it applies), or one more slot of the same type for another candidate
          *     (`candidate_label`, for example each SAR candidate of A1). Allowed to Data Entry (L1) while the task is pending or ongoing. 409 `duplicate` when a slot of that type and label exists already.
          */
         post: operations["addTaskSlot"];
@@ -3057,7 +3057,7 @@ export interface paths {
         };
         /**
          * Health for an external monitor (no session; words only)
-         * @description For a monitor outside the PMIS (owner answer Q167). No counts, names or addresses. 200 with `ok` or `degraded` (mail failing, an integrity break, a failed job in the last 24 hours); 503 `down` when the database does not answer. The API itself does not limit it; a reverse proxy in front may answer 429.
+         * @description For a monitor outside GSDN Workspace (owner answer Q167). No counts, names or addresses. 200 with `ok` or `degraded` (mail failing, an integrity break, a failed job in the last 24 hours); 503 `down` when the database does not answer. The API itself does not limit it; a reverse proxy in front may answer 429.
          */
         get: operations["getHealth"];
         put?: never;
@@ -3822,7 +3822,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The 45 SLA sheet columns D:AV and the PMIS task of each (Q14)
+         * The 45 SLA sheet columns D:AV and GSDN Workspace task of each (Q14)
          * @description 0.12.0. Needs `admin.settings` view. B-10a and B-10b are both measured by B10 (flag `rt_or_gf`); B-6 is tagged `inherited` (Q13).
          */
         get: operations["listSlaMasterColumns"];
@@ -4080,8 +4080,8 @@ export interface paths {
         /** MFA exemption of a user */
         get: operations["getMfaExemption"];
         /**
-         * Exempt a user from the PMIS MFA requirement
-         * @description Removes only the PMIS `amr = mfa` check for sign-in and step-up of that user. MFA enforced by Entra Conditional Access is not affected. Needs a reason and the acting admin's own step-up. Nobody can exempt themselves (403 `self_beneficiary`). The user is emailed and sees an "MFA exempt" badge on Users & Roles.
+         * Exempt a user from GSDN Workspace MFA requirement
+         * @description Removes only GSDN Workspace `amr = mfa` check for sign-in and step-up of that user. MFA enforced by Entra Conditional Access is not affected. Needs a reason and the acting admin's own step-up. Nobody can exempt themselves (403 `self_beneficiary`). The user is emailed and sees an "MFA exempt" badge on Users & Roles.
          */
         put: operations["setMfaExemption"];
         post?: never;
@@ -5194,7 +5194,7 @@ export interface paths {
          * @description Needs `import` on `templates` (403 otherwise, before the file is read). Then, in order: the form (one file, size limit 5 MB, 2000 data rows; larger answers 413 or 422 `size_or_rows_exceeded`), a plain `.xlsx` package without macros, embedded objects or external links (`not_xlsx`, `macros_not_allowed`), the hidden `_tpl` sheet (`tpl_missing`, `tpl_invalid`), a known and active template (`template_unknown_or_inactive`), the current version (`outdated_version`; the message names both versions), the template the user selected (`wrong_template`), the header checksum (`checksum_mismatch`), and the caller's right to create or edit in the register (`import_not_allowed`).
          *     The first failure answers 422 `template_rejected` with `reason` = TemplateRejectReason, writes a System Log row (`source = template-check`, the reason, the file name and hash) and creates no batch.
          *     A file that passes is read as values (a formula or a text starting with `=` is a cell error), staged by the database and answered 202 with the batch in status `validated`: each row is resolved inside the caller's regions, matched to a record by `Record ID` or by the register's natural key, validated with the same rules as manual entry, and classified. Rows with errors stay in the batch as `error` and never go on. Nothing reaches the register until the uploader sends the batch and the rows are approved.
-         *     **Stream templates and TPL-MASTER (0.11.5).** A stream file is staged as one batch of task rows (`stream` set, `register_key` null): see the 0.11.3 line of the versions list for the checks. A TPL-MASTER file answers the first batch of its parts with `group_id`, `parts` (every batch, in the order Master sheet streams then register sheets) and `warnings`; 422 `validation_failed` when no cell can be entered (the values are only in columns the PMIS does not read), 422 `template_rejected` (`checksum_mismatch`) when a sheet lost an issued header, and `import_not_allowed` only when no part may be imported. A task upload (`task_id`) accepts a stream template of the task's stream only.
+         *     **Stream templates and TPL-MASTER (0.11.5).** A stream file is staged as one batch of task rows (`stream` set, `register_key` null): see the 0.11.3 line of the versions list for the checks. A TPL-MASTER file answers the first batch of its parts with `group_id`, `parts` (every batch, in the order Master sheet streams then register sheets) and `warnings`; 422 `validation_failed` when no cell can be entered (the values are only in columns GSDN Workspace does not read), 422 `template_rejected` (`checksum_mismatch`) when a sheet lost an issued header, and `import_not_allowed` only when no part may be imported. A task upload (`task_id`) accepts a stream template of the task's stream only.
          */
         post: operations["uploadImportBatch"];
         delete?: never;
@@ -5338,7 +5338,7 @@ export interface paths {
          * Upload the real Site Master (no _tpl): identify, check, compare; nothing is applied
          * @description Admin-only path for the real Master (Q1): System Admin or a delegate of `administer` on `templates` (403 before the file is read). The package guard of the templates applies (size 5 MB, no macros, embedded objects, external links or zip bomb).
          *     The file is identified by its sheet names (`Master`) and the three Master header rows (group, sub-group, name), and its structure is checked against the 187 Master columns: a missing typed column refuses it (`structure_mismatch`); a moved or extra column is reported. A file with a `_tpl` sheet is a PMIS template (`is_pmis_template`: upload it on the Templates page).
-         *     The original is stored as uploaded with its SHA-256. Every Master row is compared with what the PMIS holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
+         *     The original is stored as uploaded with its SHA-256. Every Master row is compared with what GSDN Workspace holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
          *     Each refusal answers 422 `template_rejected` with `reason` and writes a System Log row (`source = master-import`); each accepted upload is audited and logged.
          */
         post: operations["uploadLegacyMaster"];
@@ -5488,7 +5488,7 @@ export interface paths {
         /**
          * Test (dry run) or save a change of the template mapping
          * @description System Admin or a delegate of `edit` on `templates` for all regions (403 otherwise). A reason is required. `dry_run: true` applies the change in a transaction that is rolled back and answers the impact per template (columns added, removed, changed; the version a save would issue; batches still in preview). A save issues the next versions of the templates whose columns change, with the reason, and is audited with before and after.
-         *     Field-level errors: `calculated_field` (a field the workflow sets, a calculated or register-owned field, or a task a template never writes, cannot become typed), `column_not_owned` (a Master column the PMIS does not own), `unknown_task`.
+         *     Field-level errors: `calculated_field` (a field the workflow sets, a calculated or register-owned field, or a task a template never writes, cannot become typed), `column_not_owned` (a Master column GSDN Workspace does not own), `unknown_task`.
          */
         post: operations["saveTemplateMapping"];
         delete?: never;
@@ -7061,7 +7061,7 @@ export interface paths {
         };
         /**
          * The central Project Status items with their manual percentage and its history (0.11.0, Q118)
-         * @description The central items of the Project Status weight set in force (project-wide items the PMIS holds no data for), the value in force today and every entry, newest first. Needs `dashboard.view`. `can_edit` says whether the caller may add a value: the Project Manager (a role of the setting `dashboard.manual_items.roles`, default PM, on an all-regions assignment), a System Admin, or anyone holding `dashboard.project_status` edit for all regions.
+         * @description The central items of the Project Status weight set in force (project-wide items GSDN Workspace holds no data for), the value in force today and every entry, newest first. Needs `dashboard.view`. `can_edit` says whether the caller may add a value: the Project Manager (a role of the setting `dashboard.manual_items.roles`, default PM, on an all-regions assignment), a System Admin, or anyone holding `dashboard.project_status` edit for all regions.
          */
         get: operations["listManualProjectStatusItems"];
         put?: never;
@@ -8608,7 +8608,7 @@ export interface components {
             blank_form_file_id?: string | null;
             /** Format: date */
             valid_to?: string | null;
-            /** @description 0.12.4 (Q226): the rule of this conditional document waits for data the PMIS does not have yet (no approved Procurement order with a delivery). Shown as not required; the task cannot be approved until it is decided or Data Entry declares that the document applies. */
+            /** @description 0.12.4 (Q226): the rule of this conditional document waits for data GSDN Workspace does not have yet (no approved Procurement order with a delivery). Shown as not required; the task cannot be approved until it is decided or Data Entry declares that the document applies. */
             determination_pending?: boolean;
             /** @description 0.12.4 (Q229): the slot kept the approval of the previous version of its record; a replacement sends it back to L2. */
             inherited_approval?: boolean;
@@ -9183,7 +9183,7 @@ export interface components {
          * @enum {string}
          */
         SlaEndEvent: "gecol.installation_finish" | "hlc.installation_date" | "hlc.in_service_date" | "task.layout_submitted_date";
-        /** @description 0.12.0 (Q14). One of the 45 step columns D:AV of the Master SLA sheet and the PMIS task that measures it. */
+        /** @description 0.12.0 (Q14). One of the 45 step columns D:AV of the Master SLA sheet and GSDN Workspace task that measures it. */
         SlaMasterColumn: {
             seq: number;
             /** @description Column letter of the SLA sheet (D to AV). */
@@ -9422,7 +9422,7 @@ export interface components {
             /** @description Percent inside the activity, at most 3 decimals. 0 means not weighted. */
             weight: number;
             unit?: string | null;
-            /** @description How the item is measured, as a JSON object in text (0.7.2): `{"method":"tasks","tasks":["A2"],"plan":"MS1"}` counts the approved and the applicable instances of those task codes (a milestone task has the code of its milestone, MS1 to MS10) and plans against the baseline of the milestone `plan`; `{"method":"none","central":true}` is a project-wide item with no data in the PMIS yet: it is left out and its weight redistributed. Any other text is kept and measures nothing. */
+            /** @description How the item is measured, as a JSON object in text (0.7.2): `{"method":"tasks","tasks":["A2"],"plan":"MS1"}` counts the approved and the applicable instances of those task codes (a milestone task has the code of its milestone, MS1 to MS10) and plans against the baseline of the milestone `plan`; `{"method":"none","central":true}` is a project-wide item with no data in GSDN Workspace yet: it is left out and its weight redistributed. Any other text is kept and measures nothing. */
             measure_rule?: string | null;
             source?: string | null;
         };
@@ -9918,7 +9918,7 @@ export interface components {
         /** @description A note about a whole TPL-MASTER upload. Never blocking. */
         UploadWarning: {
             /**
-             * @description `column_not_owned`: values were typed in a column the PMIS calculates or another register owns (count given), `extra_column`: a column that is not in the issued template, `unknown_sheet`: a sheet that is not part of the template, `part_skipped`: a sheet or stream the caller may not import (the reason is in `message`).
+             * @description `column_not_owned`: values were typed in a column GSDN Workspace calculates or another register owns (count given), `extra_column`: a column that is not in the issued template, `unknown_sheet`: a sheet that is not part of the template, `part_skipped`: a sheet or stream the caller may not import (the reason is in `message`).
              * @enum {string}
              */
             code: "column_not_owned" | "extra_column" | "unknown_sheet" | "part_skipped";
@@ -10266,7 +10266,7 @@ export interface components {
             /** @description The Master column letter. */
             master_col?: string | null;
             header?: string | null;
-            /** @description Where the PMIS holds the value (`B4:actual_date`, a site field, the issue projection). */
+            /** @description Where GSDN Workspace holds the value (`B4:actual_date`, a site field, the issue projection). */
             field?: string | null;
             /** @description The value of the file (the cached value of a formula cell). */
             master_value?: string | null;
@@ -11777,7 +11777,7 @@ export interface components {
             quarantine_pending?: number;
         };
         /**
-         * @description D6: the PMIS status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.
+         * @description D6: GSDN Workspace status against the approved need of the site. pending_configuration = a need the owner has not given, or a count that cannot be made yet (no WL vendor, no approved RF design): never complete.
          * @enum {string}
          */
         DispatchNeedStatus: "complete" | "short" | "pending_configuration" | "not_applicable";
@@ -20766,7 +20766,7 @@ export interface operations {
                     "application/json": components["schemas"]["ImportBatch"] & {
                         /** @description TPL-MASTER only: every batch of the file (a stream batch per stream with a task cell, a register batch per register sheet with rows). */
                         parts?: components["schemas"]["ImportBatch"][];
-                        /** @description TPL-MASTER only: what the PMIS ignored or skipped. */
+                        /** @description TPL-MASTER only: what GSDN Workspace ignored or skipped. */
                         warnings?: components["schemas"]["UploadWarning"][];
                     };
                 };

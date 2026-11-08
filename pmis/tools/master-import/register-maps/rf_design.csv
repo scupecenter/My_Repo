@@ -1,4 +1,4 @@
-# template_header = header issued by the PMIS (register_fields.label_en). master_header = header in the Master sheet; "a|b" lists alternatives (first found wins).
+# template_header = header issued by GSDN Workspace (register_fields.label_en). master_header = header in the Master sheet; "a|b" lists alternatives (first found wins).
 # master_column is documentation only (letter in the owner's file, plan section 2.2). Columns with no Master source have an empty master_header.
 template_header,master_header,master_column,transform,personal,notes
 Site ID,Site ID,B,site_id,,key

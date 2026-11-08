@@ -90,7 +90,7 @@ const FORBIDDEN_PARTS = [/vbaproject/i, /^xl\/macrosheets\//i, /^xl\/dialogsheet
 export function guardXlsx(fileName: string, buf: Buffer): GuardResult {
   const lower = fileName.toLowerCase();
   if (lower.endsWith('.xlsm') || lower.endsWith('.xlsb') || lower.endsWith('.xls') || lower.endsWith('.xltm')) {
-    return { ok: false, reason: 'macros_not_allowed', detail: 'Only plain .xlsx workbooks made from the PMIS template are accepted (no macros, no .xls, .xlsb or .xlsm).' };
+    return { ok: false, reason: 'macros_not_allowed', detail: 'Only plain .xlsx workbooks made from GSDN Workspace template are accepted (no macros, no .xls, .xlsb or .xlsm).' };
   }
   if (!lower.endsWith('.xlsx')) return { ok: false, reason: 'not_xlsx', detail: 'The file must be an .xlsx workbook.' };
   const entries = readDirectory(buf);

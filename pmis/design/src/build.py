@@ -16,8 +16,8 @@ HOL=list(csv.DictReader(open(D+'../db/seed/holidays-2026-2027.csv',encoding='utf
 data+='const HOLIDAYS='+json.dumps(HOL,ensure_ascii=False).replace('<','\\u003c')+';\n'
 js=''.join(open(P+f).read()+'\n' for f in ['i18n.js','core.js','people.js','flow.js','shell.js','views1.js','views2.js','views3.js','views4.js','main.js','views5.js','views6.js','boot.js'])
 html='''<!doctype html>
-<html lang="en" dir="ltr" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSDN PMIS · Prototype v2</title>
-<!-- GSDN PMIS prototype v2. Single file, offline, vanilla JS, no external requests. Tokens: frappe-ui@1.0.2 (MIT) via tokens.css. All data is synthetic. -->
+<html lang="en" dir="ltr" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GSDN Workspace · Prototype v2</title>
+<!-- GSDN Workspace prototype v2. Single file, offline, vanilla JS, no external requests. Tokens: frappe-ui@1.0.2 (MIT) via tokens.css. All data is synthetic. -->
 <style>
 %s
 %s
@@ -27,5 +27,5 @@ html='''<!doctype html>
 %s
 %s
 </script></body></html>'''%(fonts,open(D+'tokens.css').read(),open(P+'app.css').read(),data,js)
-open(D+'GSDN_PMIS_Prototype_v2.html','w').write(html)
+open(D+'GSDN_Workspace_Prototype_v2.html','w').write(html)
 print(len(html))

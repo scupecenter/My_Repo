@@ -1,6 +1,6 @@
-# GSDN PMIS: business rules (P0)
+# GSDN Workspace: business rules (P0)
 
-Sources: Blueprint v1.1 (`docs/reference/GSDN_PMIS_Blueprint_v1.1.html`, cited as "BP §nn"), the decisions log (`docs/reference/GSDN_Rebuild_Decisions.md`, cited as Dnn), the Master (`GSDN_Site_Master.xlsx`, cited by sheet and column), and `pmis/CLAUDE.md` (cited as "CLAUDE.md", binding product-owner decisions of 2026-10-24).
+Sources: Blueprint v1.1 (`docs/reference/GSDN_Workspace_Blueprint_v1.1.html`, cited as "BP §nn"), the decisions log (`docs/reference/GSDN_Rebuild_Decisions.md`, cited as Dnn), the Master (`GSDN_Site_Master.xlsx`, cited by sheet and column), and `pmis/CLAUDE.md` (cited as "CLAUDE.md", binding product-owner decisions of 2026-10-24).
 Anything not stated in a source is marked **ASSUMPTION** and is listed in `open-questions.md` when it matters.
 Task codes are those in `task-catalogue.csv` (BP §03 step table).
 
@@ -69,7 +69,7 @@ if S > R:                      # suspended on G0
 else:
     gate = G0
 ```
-**Owner answer Q180 (2026-11-04), built in migration 0052:** the PMIS uses the **effective** dates, not the approval dates: the suspension starts on `suspension_start` and ends on the `resumption_date` of the first approved (or applied) resumption whose effective date is later; each falls back to its approval date when the effective date is empty. The window is **[start, resume)**: the start day is suspended, the resumption day is a working day again. A candidate date inside a window moves to the resumption date (and is checked again from there); inside a window without a resumption the gate stays locked. Both the effective and the approval dates are kept on the record (`cc_suspension_windows` flags a retroactive window). Drafts and rejected requests never count. The Master formula above stays the comparison value of the parallel run.
+**Owner answer Q180 (2026-11-04), built in migration 0052:** GSDN Workspace uses the **effective** dates, not the approval dates: the suspension starts on `suspension_start` and ends on the `resumption_date` of the first approved (or applied) resumption whose effective date is later; each falls back to its approval date when the effective date is empty. The window is **[start, resume)**: the start day is suspended, the resumption day is a working day again. A candidate date inside a window moves to the resumption date (and is checked again from there); inside a window without a resumption the gate stays locked. Both the effective and the approval dates are kept on the record (`cc_suspension_windows` flags a retroactive window). Drafts and rejected requests never count. The Master formula above stays the comparison value of the parallel run.
 - A suspension approved after the gate opened does not move that gate. It sets Overall Status to On Hold (§2.4), and the next gate is evaluated against it when that gate's candidate date arrives.
 - SLA during a suspension: the SLA counter stops in the contractor scorecard only. It keeps running in project KPIs. (BP §03)
   - ASSUMPTION: suspended working days are the working days between an approved Suspension and the next approved Resumption, and they are subtracted from the contractor-attributed delay (§8).
@@ -78,7 +78,7 @@ else:
 The first rule that matches applies:
 1. **Cancelled**: an approved Cancellation row exists in Change Control.
 2. **Completed**: Final Closure (FM) is valid.
-3. **On Hold**: on the Report Date (in the PMIS, today), the latest approved Suspension is after the latest approved Resumption.
+3. **On Hold**: on the Report Date (in GSDN Workspace, today), the latest approved Suspension is after the latest approved Resumption.
 4. **In Progress**: Current Milestone is not "Not Started".
 5. **Not Started**: none of the above.
 

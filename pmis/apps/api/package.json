@@ -2,7 +2,7 @@
   "name": "@gsdn/pmis-api",
   "private": true,
   "version": "0.1.0",
-  "description": "GSDN PMIS API (NestJS, Prisma, PostgreSQL 16): local sign-in and user/group admin",
+  "description": "GSDN Workspace API (NestJS, Prisma, PostgreSQL 16): local sign-in and user/group admin",
   "engines": {
     "node": ">=22"
   },

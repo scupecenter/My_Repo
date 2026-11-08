@@ -1,4 +1,4 @@
-# GSDN PMIS: runbook
+# GSDN Workspace: runbook
 
 This runbook covers the storage protection of uploaded files (owner answer Q134; ADR 0008, amendment 2026-11-02). Every command runs on the
 PMIS server as root unless it says otherwise. Secrets are read from `/etc/gsdn-pmis/pmis.env` and `/etc/gsdn-pmis/backup.env`; never paste
@@ -170,7 +170,7 @@ Manual runs: `storage-cli.js purge-exports` and `storage-cli.js rescan` (same en
 Owner answer Q196 (binding): base backups with continuous WAL (point-in-time recovery), pgBackRest as the extra logical copy, encrypted,
 off the server, one copy in another building, and a tested restore. Q198 covers the keys (8.4). The scripts are in `infra/backup/`
 (`db-backup.sh`, `db-backup-check.sh`, `db-dump.sh`, `db-restore.sh`, shared `db-common.sh`); the installer is
-`tools/install/install-db-backup.sh`. Commands run on the PMIS server as root unless they say `postgres`.
+`tools/install/install-db-backup.sh`. Commands run on GSDN Workspace server as root unless they say `postgres`.
 
 ### 8.1 What is protected, and how
 
@@ -238,7 +238,7 @@ A pgBackRest cipher key is not rotated in place: add a new repository with a new
 ### 8.5 Point-in-time restore (into a scratch cluster, never the live one)
 
 `db-restore.sh` restores into a new directory, starts a scratch server on another port, runs an optional verification SQL file and stops
-the server. It refuses port 5432 and the PMIS port, the live data directory, and any non-empty target.
+the server. It refuses port 5432 and GSDN Workspace port, the live data directory, and any non-empty target.
 
 ```bash
 sudo install -d -o postgres -g postgres /var/restore

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: optional nightly backup of the stored files with restic (owner answer Q134). Called by install-ubuntu.sh when the owner chooses it,
+# GSDN Workspace: optional nightly backup of the stored files with restic (owner answer Q134). Called by install-ubuntu.sh when the owner chooses it,
 # and runnable on its own:   sudo bash pmis/tools/install/install-file-backup.sh
 #
 # Why restic: it encrypts the repository, deduplicates, keeps snapshots with a retention policy in one command (14 daily, 8 weekly, 12 monthly)
@@ -69,7 +69,7 @@ install -d -m 755 /usr/local/lib/gsdn-pmis
 install -m 755 "$SCRIPT" /usr/local/lib/gsdn-pmis/files-backup.sh   # a copy, so the timer does not depend on the checkout
 cat >/etc/systemd/system/gsdn-pmis-files-backup.service <<EOF
 [Unit]
-Description=GSDN PMIS nightly backup of the stored files (restic)
+Description=GSDN Workspace nightly backup of the stored files (restic)
 After=network-online.target gsdn-pmis-api.service
 Wants=network-online.target
 
@@ -86,7 +86,7 @@ IOSchedulingClass=idle
 EOF
 cat >/etc/systemd/system/gsdn-pmis-files-backup.timer <<'EOF'
 [Unit]
-Description=Nightly backup of the GSDN PMIS stored files
+Description=Nightly backup of the GSDN Workspace stored files
 
 [Timer]
 OnCalendar=*-*-* 02:30:00

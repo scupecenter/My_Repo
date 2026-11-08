@@ -1,4 +1,4 @@
-// GSDN PMIS - Prisma schema (PostgreSQL 16)
+// GSDN Workspace - Prisma schema (PostgreSQL 16)
 // Migrations only: never hand-edit the database. Raw SQL (append-only trigger, RLS) lives in db/sql/ and is
 // applied through a Prisma migration (prisma migrate dev --create-only, then paste the SQL file).
 // Field names are snake_case on purpose: they match db/sql, the importer mapping.csv and the API contract.
@@ -358,7 +358,7 @@ model RoleDefaultModule {
 
 model User {
   id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  m365_object_id       String?     @unique // Entra ID oid claim; null for an account created in the PMIS (local sign-in, migration 0010)
+  m365_object_id       String?     @unique // Entra ID oid claim; null for an account created in GSDN Workspace (local sign-in, migration 0010)
   email                String      @unique // lower case (check constraint)
   phone                String?     @unique // E.164, a local sign-in identifier
   manager_id           String?     @db.Uuid // direct manager (migration 0011); set only through idm_set_user_org
@@ -1572,7 +1572,7 @@ model RegionAlias {
   @@map("region_aliases")
 }
 
-// Q8 (0060): a Master StaffRole value and the PMIS role it means (mapped, ambiguous or unmapped). Never a grant. Written only by imp_alias_save.
+// Q8 (0060): a Master StaffRole value and GSDN Workspace role it means (mapped, ambiguous or unmapped). Never a grant. Written only by imp_alias_save.
 model RoleAlias {
   alias      String   @id
   label      String
@@ -1933,7 +1933,7 @@ model SiteScopeException {
   @@map("site_scope_exceptions")
 }
 
-// Migration 0052 (Q14): the 45 columns D:AV of the Master SLA sheet and the PMIS task that measures each.
+// Migration 0052 (Q14): the 45 columns D:AV of the Master SLA sheet and GSDN Workspace task that measures each.
 model SlaMasterColumn {
   seq            Int     @id
   master_column  String  @unique

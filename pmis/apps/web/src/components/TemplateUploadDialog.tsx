@@ -14,7 +14,7 @@ import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalCh
  * Upload dialog (contract 0.7.0, 0.11.5): pick the filled template and send it. The server checks the hidden `_tpl` sheet, the version and the header row,
  * so a refusal comes back with its reason (an old version, a changed header, macros, too large) and is shown here, in the dialog, with the server's own words.
  * On success the caller opens the batch review. A TPL-MASTER file is split into one batch per part: the dialog lists the parts and the warnings first
- * (columns and sheets the PMIS does not own are ignored), then the caller opens the first batch.
+ * (columns and sheets GSDN Workspace does not own are ignored), then the caller opens the first batch.
  */
 export function TemplateUploadDialog({ open, onClose, templateId, templateName, taskId, kind = 'register', onDone }: {
   open: boolean; onClose: () => void; templateId: string; templateName: string; taskId?: string; kind?: 'register' | 'stream' | 'master' | 'sites'; onDone: (b: ImportBatch) => void;

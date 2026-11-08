@@ -1,4 +1,4 @@
-# GSDN PMIS API
+# GSDN Workspace API
 
 NestJS 11, TypeScript strict, Prisma 6 client, PostgreSQL 16. Built so far: local sign-in (ADR 0012), `/me`, users and groups
 administration. Contract: `../../contracts/openapi.yaml` (0.3.0). Every route not in that list answers problem+json 404 `not_found`.

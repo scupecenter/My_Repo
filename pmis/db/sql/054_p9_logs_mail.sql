@@ -416,7 +416,7 @@ BEGIN
   BEGIN
     PERFORM public.mail_enqueue_internal('notification.' || NEW.kind, e, NEW.user_id, '[PMIS] ' || regexp_replace(left(NEW.title, 180), '[\r\n]+', ' ', 'g'),
       NEW.title || E'\n\n' || coalesce(NEW.body || E'\n\n', '') || CASE WHEN NEW.link IS NOT NULL THEN 'Open: {{app_url}}' || NEW.link || E'\n\n' ELSE '' END
-        || 'GSDN PMIS. You receive this because the notification type is sent by email.',
+        || 'GSDN Workspace. You receive this because the notification type is sent by email.',
       'notification:' || NEW.id::text, false, jsonb_build_object('notification_id', NEW.id));
   EXCEPTION WHEN others THEN
     PERFORM public.log_system_write('warn', 'mail', 'notification mail not queued', jsonb_build_object('notification_id', NEW.id, 'kind', NEW.kind, 'error', left(SQLERRM, 200)), NEW.user_id, NULL);
@@ -500,10 +500,10 @@ BEGIN
   IF public.log_severity_rank(p_severity) >= public.log_severity_rank(minsev) THEN
     BEGIN
       PERFORM public.mail_to_system_admins('security_alert', left('[PMIS] ' || upper(p_severity) || ' security alert: ' || ttl, 200),
-        'A security alert was raised in GSDN PMIS.' || E'\n' || 'تنبيه أمني في نظام GSDN PMIS.' || E'\n\n'
+        'A security alert was raised in GSDN Workspace.' || E'\n' || 'تنبيه أمني في نظام GSDN Workspace.' || E'\n\n'
         || 'Severity: ' || p_severity || E'\n' || 'Rule: ' || p_rule || E'\n' || 'Alert: ' || ttl || E'\n' || 'Raised at: ' || public.log_ts_text(t_at) || ' (UTC)' || E'\n\n'
         || 'Open the alert: {{app_url}}/admin/security-alerts?id=' || aid::text || E'\n\n'
-        || 'This mail holds no log details. Sign in to the PMIS to see them and to acknowledge the alert.',
+        || 'This mail holds no log details. Sign in to GSDN Workspace to see them and to acknowledge the alert.',
         'security_alert:' || aid::text,
         jsonb_build_object('alert_id', aid, 'rule', p_rule, 'severity', p_severity, 'mandatory', p_rule IN ('retention_reduced', 'audit_integrity_failure', 'break_glass_used')));
     EXCEPTION WHEN others THEN

@@ -2,7 +2,7 @@
 -- Mirror: db/sql/045_dashboard_owner_answers.sql (kept identical to prisma/migrations/0046_dashboard_owner_answers/migration.sql).
 --
 -- What this adds
---   * Q118  Manual percentage of the central Project Status items (the project-wide items with no data in the PMIS: 1.3, 1.5, 3.2 to 3.9,
+--   * Q118  Manual percentage of the central Project Status items (the project-wide items with no data in GSDN Workspace: 1.3, 1.5, 3.2 to 3.9,
 --           6.1, 6.6, 7.7, 8.1). ps_manual_values keeps every entry (value, effective date, reason, who, when; one version number per item),
 --           append-only. ps_manual_set writes one (audited through log_audit_write). The value in force on a date is the entry with the latest
 --           effective date on or before it (the highest version on the same date). A measured central item counts in every Project Status

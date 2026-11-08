@@ -1,7 +1,7 @@
 // v6 checks: sign-in lookup, work calendar, staff registry + visibility, absence, MFA exemption, workflow freeze, DLP, forms, registers, matrix hover card. Run: NODE_PATH=$(npm root -g) node tests/v6.js
 process.on('unhandledRejection',e=>{console.log(out.join('\n').split('\n').filter(x=>!x.startsWith('PASS')).join('\n'));console.error(String(e).slice(0,400));process.exit(1)});
 const {chromium}=require('playwright');const path=require('path');
-const URL='file://'+path.resolve(__dirname,'../../GSDN_PMIS_Prototype_v2.html');const SH=path.resolve(__dirname,'../../screens/latest/');
+const URL='file://'+path.resolve(__dirname,'../../GSDN_Workspace_Prototype_v2.html');const SH=path.resolve(__dirname,'../../screens/latest/');
 const out=[];const ok=(n,c,x)=>{out.push((c?'PASS ':'FAIL ')+n+(x?' — '+x:''));if(!c)process.exitCode=1};
 (async()=>{const b=await chromium.launch();const ctx=await b.newContext({viewport:{width:1440,height:900},acceptDownloads:true});const p=await ctx.newPage();const errs=[];
 p.on('console',m=>{if(m.type()==='error')errs.push('console: '+m.text())});p.on('pageerror',e=>errs.push('pageerror: '+e.message+' @'+String(e.stack).split('\n').slice(1,3).join('|').slice(0,200)));

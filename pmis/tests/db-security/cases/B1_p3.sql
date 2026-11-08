@@ -131,7 +131,7 @@ UPDATE import_batches SET mode = 'draft' WHERE id = '{{BATCH_STREAM_TRI}}';
 -- @end
 
 -- @case P3-15
--- @title Alice reads what the PMIS holds for a site through the comparison reader
+-- @title Alice reads what GSDN Workspace holds for a site through the comparison reader
 -- @category p3-master-import
 -- @actor ALICE
 -- @region 1

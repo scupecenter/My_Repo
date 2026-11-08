@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# GSDN PMIS: interactive installer and upgrader for Ubuntu 22.04 / 24.04.
+# GSDN Workspace: interactive installer and upgrader for Ubuntu 22.04 / 24.04.
 #
 # Installs what the repository can run today (see HANDOVER.md §2 and ADR 0012):
-#   - PostgreSQL 16 with the PMIS database, the pmis_app role and every migration not applied yet
+#   - PostgreSQL 16 with GSDN Workspace database, the pmis_app role and every migration not applied yet
 #   - the API (apps/api, NestJS) as the systemd service gsdn-pmis-api: local sign-in, users and groups
 #   - the first System Admin (asked here, only while none exists)
 #   - document storage: a directory on local disk (default) or, optionally, a MinIO server on this machine (installed here, with its bucket
@@ -226,7 +226,7 @@ UPGRADE=0; [[ -n $PREV_DB_NAME ]] && UPGRADE=1
 
 cat <<EOF
 
-GSDN PMIS installer
+GSDN Workspace installer
 Repository: $PMIS_DIR
 Ubuntu:     $PRETTY_NAME
 Mode:       $( (( UPGRADE )) && echo "upgrade of the existing installation (previous answers are the defaults)" || echo "new installation" )
@@ -254,7 +254,7 @@ fi
 echo "  1) Let's Encrypt  (needs a public domain pointing to this server and port 80 reachable)"
 echo "  2) My own certificate files (for example from your internal CA)"
 echo "  3) Self-signed    (you must then install the certificate as trusted on every client PC)"
-echo "  4) A Let's Encrypt certificate already on this server, used in place (no copy: certbot renewals reach the PMIS)"
+echo "  4) A Let's Encrypt certificate already on this server, used in place (no copy: certbot renewals reach GSDN Workspace)"
 if (( HAVE_CERT )); then DEF_TLS=0; elif [[ $PREV_TLS_MODE == le-existing ]]; then DEF_TLS=4; elif (( IS_IP )); then DEF_TLS=3; else DEF_TLS=1; fi
 # Non-interactive: TLS_MODE=0..4 (or le-existing) skips this question. Option 4 also needs TLS_LE_NAME=<name>.
 # Example: sudo env TLS_MODE=le-existing TLS_LE_NAME=pmis.example.ly bash pmis/tools/install/install-ubuntu.sh
@@ -299,7 +299,7 @@ say "3/6 Database (PostgreSQL 16, listens on localhost only)"
 # Other PostgreSQL clusters on this server are left alone; PMIS gets its own 16/main cluster.
 PG16_PORT=$(awk '/^port *=/ {print $3}' /etc/postgresql/16/main/postgresql.conf 2>/dev/null || true)
 if command -v pg_lsclusters >/dev/null && pg_lsclusters -h 2>/dev/null | grep -q .; then
-  echo "PostgreSQL clusters already on this server (only 16/main is used by the PMIS):"
+  echo "PostgreSQL clusters already on this server (only 16/main is used by GSDN Workspace):"
   pg_lsclusters | sed 's/^/   /'
 fi
 if [[ -n $PG16_PORT ]]; then
@@ -367,7 +367,7 @@ if (( ADMINS > 0 )); then
   echo "A System Admin already exists ($ADMINS). Create more users from Users & Roles in the app."
 else
   NEED_ADMIN=1
-  echo "This account signs in to the PMIS first and creates everybody else. Use real details of the admin (not synthetic)."
+  echo "This account signs in to GSDN Workspace first and creates everybody else. Use real details of the admin (not synthetic)."
   ask ADMIN_NAME  "Full name"
   ask ADMIN_EMAIL "Email"
   [[ $ADMIN_EMAIL == *@*.* ]] || die "That does not look like an email."
@@ -546,7 +546,7 @@ EOF
   chown root:gsdn-minio "$CONF_DIR/minio.env"; chmod 640 "$CONF_DIR/minio.env"
   cat > /etc/systemd/system/gsdn-pmis-minio.service <<EOF
 [Unit]
-Description=GSDN PMIS MinIO object storage
+Description=GSDN Workspace MinIO object storage
 After=network.target
 
 [Service]
@@ -614,7 +614,7 @@ KEEP_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(FILE_ENC_KEY_ID|FILE_ENC
 grep -q '^FILE_ENC_KEY_ID=' <<<"$KEEP_LINES" || KEEP_LINES="${KEEP_LINES:+$KEEP_LINES
 }FILE_ENC_KEY_ID=k1"
 # Outbound mail (owner answer Q167, migration 0055) and the integrity anchors (Q171). The SMTP lines are filled by IT on the server and are kept as
-# they are on every update; a first install writes them empty (mail off: the PMIS records what it would have sent). See tools/install/README.md.
+# they are on every update; a first install writes them empty (mail off: GSDN Workspace records what it would have sent). See tools/install/README.md.
 MAIL_LINES=$( [[ -r $CONF_DIR/pmis.env ]] && grep -E '^(SMTP_HOST|SMTP_PORT|SMTP_USER|SMTP_PASS|SMTP_FROM|SMTP_TLS|SMTP_TLS_REJECT_UNAUTHORIZED|SMTP_CA_FILE|SMTP_ALLOW_PLAIN_AUTH|SMTP_TIMEOUT_MS|SMTP_HELO_NAME|APP_BASE_URL)=' "$CONF_DIR/pmis.env" || true )
 grep -q '^SMTP_HOST=' <<<"$MAIL_LINES" || MAIL_LINES="${MAIL_LINES:+$MAIL_LINES
 }SMTP_HOST=
@@ -628,7 +628,7 @@ ANCHOR_DIR=${ANCHOR_DIR:-/var/lib/gsdn-pmis/log-anchors}
 install -d -m 750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$ANCHOR_DIR"
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
-# GSDN PMIS settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
+# GSDN Workspace settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
 NODE_ENV=production
 APP_URL=$APP_URL
 HOST=127.0.0.1
@@ -663,7 +663,7 @@ chown root:"$SERVICE_USER" "$CONF_DIR/pmis.env"; chmod 640 "$CONF_DIR/pmis.env";
 
 cat > /etc/systemd/system/gsdn-pmis-api.service <<EOF
 [Unit]
-Description=GSDN PMIS API
+Description=GSDN Workspace API
 After=network.target postgresql@16-main.service$API_AFTER
 Requires=postgresql@16-main.service
 

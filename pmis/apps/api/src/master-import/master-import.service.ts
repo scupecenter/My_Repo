@@ -99,7 +99,7 @@ export class MasterImportService {
       throw e;
     }
     if (wb.sheetNames.includes(TPL_SHEET)) {
-      return this.reject(auth, requestId, 'is_pmis_template', 'This file is a template issued by the PMIS (it has the _tpl sheet): upload it on the Templates page. The legacy path is for the real Master only.', ctx);
+      return this.reject(auth, requestId, 'is_pmis_template', 'This file is a template issued by GSDN Workspace (it has the _tpl sheet): upload it on the Templates page. The legacy path is for the real Master only.', ctx);
     }
     const master = wb.sheet('Master', MAX_ROWS + 10);
     const headers = master ? masterHeaders(master) : [];

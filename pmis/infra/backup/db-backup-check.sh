@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: alert when a database backup or the WAL archive is late (owner answer Q196; RPO 15 minutes, CLAUDE.md).
+# GSDN Workspace: alert when a database backup or the WAL archive is late (owner answer Q196; RPO 15 minutes, CLAUDE.md).
 # Run every 15 minutes by gsdn-pmis-db-check.timer, as postgres. It checks:
 #   1. WAL archiving: archive_mode is on, a WAL segment was archived within WAL_LATE_SECONDS (default 1200 = 20 minutes), and the last
 #      archive attempt did not fail after the last success.

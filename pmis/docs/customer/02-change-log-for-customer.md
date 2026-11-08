@@ -128,7 +128,7 @@
 | Date | Decision | Code |
 |---|---|---|
 | 2026-10-25 | **Staff registry:** the 4-digit employee ID is shown beside every assignee's name with a small card on hover; no hard delete, deactivate only. | B13 (per CLAUDE.md) |
-| 2026-10-25 | **Per-user MFA exemption inside the PMIS** (reason and the admin's own step-up; nobody exempts themselves; audited and emailed). It does not cancel MFA enforced by Entra. | — |
+| 2026-10-25 | **Per-user MFA exemption inside GSDN Workspace** (reason and the admin's own step-up; nobody exempts themselves; audited and emailed). It does not cancel MFA enforced by Entra. | — |
 | 2026-10-25 (3) | **One sign-in box:** email, employee ID or phone; Microsoft 365 then performs the sign-in. No passwords in the system; the screen does not reveal whether a person is registered. | — |
 | 2026-10-25 (3) | **Local sign-in (ID/phone + password) deferred to a later phase.** | — |
 | 2026-10-25 (3) | **Phone and email on the card:** visible to all registered staff by default; the admin can choose who sees each field or hide it for one employee. | — |

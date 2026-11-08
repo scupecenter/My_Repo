@@ -6,7 +6,7 @@
 ## Context
 The owner wants a screen for messages between employees and their managers, and announcements to everyone or to chosen
 users, groups, roles and departments. A recipient answers an announcement in a pop-up with agree or disagree; a
-disagreement needs a note. The PMIS had no direct manager and no department, so both are added.
+disagreement needs a note. GSDN Workspace had no direct manager and no department, so both are added.
 
 Owner answers (2026-10-28):
 1. Messages are between an employee and their **direct manager**, a new field set by the admin. A System Admin can write to anyone.

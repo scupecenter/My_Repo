@@ -34,7 +34,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 | CI | `.github/workflows/ci.yml` | Four jobs: `api` (typecheck, lint, build, tests on PostgreSQL 16), `web` (typecheck, lint, unit tests, build, Playwright e2e), `contract` (Redocly lint of `openapi.yaml`), `installer` (bash syntax and shellcheck). Runs on pull requests to `main` and on pushes to `main`. |
 | Installer | `tools/install/` | `install-ubuntu.sh` and `update.sh`, the Ubuntu installer scripts. |
 | Capacity sizer | `tools/capacity-sizer/index.html` | Customer sizing tool, a single HTML page (Arabic, RTL). |
-| Design | `design/tokens.*`, `design/GSDN_PMIS_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
+| Design | `design/tokens.*`, `design/GSDN_Workspace_Prototype_v2.html`, `design/screens/` | Clickable prototype, 120 Playwright checks passing |
 | CW forms | `design/forms/` | DN, RN, PAC, FAC as HTML templates rendered to A4 PDF |
 | Agents | `../.claude/agents/*.md`, `ORCHESTRATION.md` | 9 agents with their models and folders |
 | References | `docs/reference/` | Blueprint v1.1, decisions D1–D88, the Master user manual, and the previous standalone dashboard (`legacy-dashboard/`, read-only, the KPI reference for P3) |
@@ -56,7 +56,7 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
   npm i -D playwright   # if not installed
   node tests/test.js
   ```
-  Open `design/GSDN_PMIS_Prototype_v2.html` in a browser. Demo login ID `1001`.
+  Open `design/GSDN_Workspace_Prototype_v2.html` in a browser. Demo login ID `1001`.
 - **Forms:**
   ```
   cd design/forms

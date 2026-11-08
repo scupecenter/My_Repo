@@ -553,7 +553,7 @@ BEGIN
   END IF;
 END $$;
 
--- Q13: the Layout Submitted Date is a typed date (never in the future, inside the date range of the PMIS). Checked on every write path.
+-- Q13: the Layout Submitted Date is a typed date (never in the future, inside the date range of GSDN Workspace). Checked on every write path.
 CREATE OR REPLACE FUNCTION task_values_guard() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, public AS $$
 DECLARE v jsonb := NEW.values -> 'layout_submitted_date'; d date;
@@ -728,9 +728,9 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 4. Q14: the 45 SLA sheet columns D:AV and the PMIS task that measures each one
+-- 4. Q14: the 45 SLA sheet columns D:AV and GSDN Workspace task that measures each one
 -- ---------------------------------------------------------------------------------------------------------------------
--- task_code NULL = the column has no task of its own in the PMIS (an end-to-end figure or a Change Control window), the comparison computes it.
+-- task_code NULL = the column has no task of its own in GSDN Workspace (an end-to-end figure or a Change Control window), the comparison computes it.
 -- flag_condition: an extra site condition for the column (B-10a / B-10b split B10 by the Master O value RT / GF). inherited: the Master value is
 -- kept for compatibility only and does not measure a real cycle (Q13: B-6 runs AR -> AR on analysis sites).
 CREATE TABLE sla_master_columns (
@@ -753,7 +753,7 @@ INSERT INTO sla_master_columns (seq, master_column, sla_code, name_en, from_to, 
   (5, 'H', 'B-4', 'CW Survey', 'CW Access → CW Survey Actual', 'CW scope', 'B4', NULL, false, NULL),
   (6, 'I', 'B-5', 'STA / ST Analysis', 'CW Survey Actual → Report Submitted (Master AR)', 'CW scope and Analysis Type STA / ST', 'B5', NULL, false, NULL),
   (7, 'J', 'B-6', 'Layout Submission', 'Report Submitted (analysis sites) or CW Survey → Layout Submission (AR)', 'CW scope', 'B6', NULL, true,
-     'Q13: the Master has one date (AR) for the report and the layout, so B-6 is 0 on analysis sites. Kept as a Master-compatible inherited value; the PMIS measures the Layout Submitted Date (end event task.layout_submitted_date) once a rule set uses it.'),
+     'Q13: the Master has one date (AR) for the report and the layout, so B-6 is 0 on analysis sites. Kept as a Master-compatible inherited value; GSDN Workspace measures the Layout Submitted Date (end event task.layout_submitted_date) once a rule set uses it.'),
   (8, 'K', 'B-7', 'Layout Approval', 'Layout Submission → Approval', 'CW scope', 'B7', NULL, false, NULL),
   (9, 'L', 'B-8', 'Tower MOS', 'Layout Approval → CW MOS', 'Tower = Yes', 'B8', NULL, false, NULL),
   (10, 'M', 'B-9', 'Adaption MOS', 'Layout Approval → CW MOS', 'Adaption only', 'B9', NULL, false, NULL),
@@ -768,7 +768,7 @@ INSERT INTO sla_master_columns (seq, master_column, sla_code, name_en, from_to, 
   (19, 'V', 'E2E-B1', 'Full CW · Adaption only', 'PR Date (Outsourced) / PO / WO Date (In-House) → CW PAC Actual', 'Adaption only', NULL, 'adaption_only', false, 'End to end, from B1 / B2 to B13.'),
   (20, 'W', 'E2E-B2', 'Full CW · with Tower RT', 'PR Date (Outsourced) / PO / WO Date (In-House) → CW PAC Actual', 'Tower = Yes and RT', NULL, 'rt_or_gf=RT', false, 'End to end, from B1 / B2 to B13.'),
   (21, 'X', 'E2E-B3', 'Full CW · with Tower GF', 'PR Date (Outsourced) / PO / WO Date (In-House) → CW PAC Actual', 'Tower = Yes and GF', NULL, 'rt_or_gf=GF', false, 'End to end, from B1 / B2 to B13.'),
-  (22, 'Y', 'D-1', 'TE Access Permission', 'Site Release → TE Access Date', 'TE scope', 'D1', NULL, false, 'Q2: the PMIS starts D-1 at MS4, or MS1 when the Site RFI is N/A; not measured for Hot / Cold Swap. The comparison applies the same documented change.'),
+  (22, 'Y', 'D-1', 'TE Access Permission', 'Site Release → TE Access Date', 'TE scope', 'D1', NULL, false, 'Q2: GSDN Workspace starts D-1 at MS4, or MS1 when the Site RFI is N/A; not measured for Hot / Cold Swap. The comparison applies the same documented change.'),
   (23, 'Z', 'D-2', 'TE Survey', 'TE Access → TE Survey', 'TE scope', 'D2', NULL, false, NULL),
   (24, 'AA', 'D-3', 'DN Submission', 'TE Survey → DN Submitted', 'TE scope', 'D3', NULL, false, NULL),
   (25, 'AB', 'D-4', 'DN Approval', 'DN Submitted → DN Approved', 'TE scope', 'D4', NULL, false, NULL),

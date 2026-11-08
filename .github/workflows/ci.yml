@@ -1,4 +1,4 @@
-# GSDN PMIS continuous integration.
+# GSDN Workspace continuous integration.
 # Runs the checks a contributor runs locally (see pmis/infra/README.md to reproduce them).
 #
 # Secrets: none. The PostgreSQL passwords below are CI-only test values for a throwaway

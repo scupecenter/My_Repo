@@ -11,7 +11,7 @@ const needAdmin = () => guard() ?? (viewer()?.key === 'pm' ? null : problem(403,
 
 let status: MailStatus = {
   enabled: true, state: 'unverified', verified_at: null, last_sent_at: '2026-11-03T08:00:00.000000Z', last_error: '451 4.3.0 try later',
-  settings: { host: 'relay.aljeel.local', port: 587, tls: 'starttls', from: 'GSDN PMIS <pmis@aljeel.example>', auth: true, verify_certificate: true },
+  settings: { host: 'relay.aljeel.local', port: 587, tls: 'starttls', from: 'GSDN Workspace <pmis@aljeel.example>', auth: true, verify_certificate: true },
   counts: { queued: 1, retrying: 1, sending: 0, dead: 1, dead_24h: 1, sent_24h: 12, logged_24h: 0, suppressed_24h: 0 },
 };
 let outbox: MailOutboxItem[] = [

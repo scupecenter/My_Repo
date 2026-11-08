@@ -7,7 +7,7 @@ Owner request of 2026-10-29 (CLAUDE.md "SITE 360 and streams" and "Two entry way
 
 Sources and how they are cited:
 - **CLAUDE.md**: the binding owner decisions.
-- **BP §nn**: Blueprint v1.1, `docs/reference/GSDN_PMIS_Blueprint_v1.1.html`.
+- **BP §nn**: Blueprint v1.1, `docs/reference/GSDN_Workspace_Blueprint_v1.1.html`.
 - **Dnn**: the decisions log, `docs/reference/GSDN_Rebuild_Decisions.md`.
 - **Sheet!Col**: a column of `GSDN_Site_Master.xlsx` (repository root). Formulas were read with openpyxl without `data_only`. Master data starts on row 5 and register data on row 3 (D45, D81).
 - **cat**: `task-catalogue.csv`. **seed**: `db/sql/012_reference_seed.sql`.
@@ -57,7 +57,7 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 - `TPL-SITE-DA`, `TPL-SITE-CW`, `TPL-SITE-TE`, `TPL-SITE-CL`: one row per site; Site ID, then Site Name, Region and Delivery Scenario in grey, then for each task of the stream its fields in Master column order with the Master names where a Master column exists (the data is `template_task_fields` and `master_columns`, Q205, Q207). Every task has Planned Date and Actual Date; typed values and lists come from the Master Setting lists. Grey and never read: the dates the workflow sets (submitted, approved), milestone dates, calculated tasks, the fields another register owns (As-Built dates, the vendor) and the dates of tasks whose date comes from a register (Q212). Dismantle (E1 to E3) is not on any stream template.
 - Upload: each cell goes to its task. The database runs the task's own save on the real task inside a rolled-back savepoint, so the rules are those of manual entry (holder of L1, edit right and region, state, date limits, no future actual date), then the checks of the submit (the actual date, the mandatory documents). A task locked by a closed gate is refused, a task that waits for a predecessor or is in review is held `pending_previous_approval` (Q208), an approved or N/A task is refused, a grey value is never read (warning when it differs), SLA warnings never block. One batch row per touched task; a stream batch has no register.
 - Flow: the uploader's send starts each pending task, saves and submits it as L1 (the task functions of the task screen, with the import row); L2 decides each row (`wf_review`, `wf_approve`, `wf_reject`) with the same grants, holders, step-up, gates and successors; held rows and row-by-row or all-at-once decisions work as for registers. The task history and the audit show "via batch".
-- `TPL-MASTER`: the Master sheet (187 columns in Master order, the columns the PMIS does not write grey) and one sheet per register the caller may view. The upload is split into one batch per stream and per register sheet, all with one `group_id`; each follows its own flow. A column or a sheet the PMIS does not own is ignored with a warning; every row keeps its source (`Sheet!row`) and its diff (the parallel-run comparison, Q211).
+- `TPL-MASTER`: the Master sheet (187 columns in Master order, the columns GSDN Workspace does not write grey) and one sheet per register the caller may view. The upload is split into one batch per stream and per register sheet, all with one `group_id`; each follows its own flow. A column or a sheet GSDN Workspace does not own is ignored with a warning; every row keeps its source (`Sheet!row`) and its diff (the parallel-run comparison, Q211).
 - Every template regenerates with a new version when its fields change (a custom field, a task or stage, a mapping row); a file of an older version is refused (`outdated_version`); every download is audited.
 
 ### 1.2 Validation applied to every register
@@ -185,7 +185,7 @@ In the grid the columns are grouped as in Master row 1. "Task" names the task (c
 | BW | GECOL Status | calc | GECOL Status (Master BW) → C2 |
 | BX | HLC Fiber Status | calc | HLC Status (Master BX) → C4 |
 | BY | Baseline Site RFI | calc | Baseline |
-| BZ | Milestone Site RFI | calc in the Master; task MS4 in the PMIS (CLAUDE.md; WF-11) | Master BZ |
+| BZ | Milestone Site RFI | calc in the Master; task MS4 in GSDN Workspace (CLAUDE.md; WF-11) | Master BZ |
 | CA | Gate TE Installation Readiness | calc | Master CA. Shown in TE (SR-R1) |
 
 **TE stream**
@@ -406,7 +406,7 @@ Template IDs follow the existing `TPL-*` codes (`rules.md` §10). New codes are 
 | Z, AA, AB | Title Verified, Lease Termination Notice Date, Site Handback Date (Restored) | list:YesNo, date, date |
 | AC, AD, AE | Feeds Master, Acquisition Completed Date, Acquisition Status | calc (D35) |
 | AF | Remark | text |
-| AG, AH | RF Row, Select Key (helpers) | not carried into the PMIS (D10 helpers) |
+| AG, AH | RF Row, Select Key (helpers) | not carried into GSDN Workspace (D10 helpers) |
 
 - **Template:** `TPL-ACQ`. Columns B, E:H, K:AB, AF.
 - **Form sections:** Candidate (E:J) · Survey (K:N) · Selection (O:P) · Owner and contact (Q:U) · Contract and lease (V:AB) · Remark.
@@ -534,7 +534,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
   - It reads Site Calc H, I, J and Master FZ (the Need excludes cancelled sites).
 - **Fields:** B Type list:RefWHType (PL / OPEN / ADJ / TE DN / CW DN / TE RN / CW RN) · C Doc No. text, key · D Date date · E Site ID ref · F Site Name calc · G Status list:TxnStatus (Approved / Dispatched / Received / Cancelled) · H Condition list:Condition · I Reason list:ReturnReason · J Remark text · K Check calc · L:BH one quantity column per item (number; whole for pcs / set, D73).
 - **Template:** `TPL-WH`. Columns B:E, G:J, L:BH. Item headers are generated from the active item master.
-- **Need units:** the PMIS reads the Need Unit row, not fixed item columns (Q66).
+- **Need units:** GSDN Workspace reads the Need Unit row, not fixed item columns (Q66).
 
 **c) Serials** (`tblWHSerials`, one row per serial, D62):
 - **Key:** Serial No. (unique; "Duplicate serial").
@@ -584,7 +584,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
   - Scope Change and Relocation → AA:AF, Z and the recalculation (`rules.md` §4).
   - Baseline Re-plan → the reason for a new baseline version (D63). Data Correction → the versioning of approved values (BP §03).
 - **Fields:** B Change ID text, key · C Site ID ref · D Site Name calc · E Change Type list:ChangeType · F Change Scope list:ChangeScope (Field / Part / Site) · G Field / Scope Item text · H Old Value text · I New Value text · J Reason / Remark text · K Request Date date · L Approval list:ApprStatus · M Approved By user · N Approval Date date · O Change Ticket ID text.
-- **Template:** `TPL-CC`. Columns B, C, E:O. The PMIS fills L:N from the workflow until Q45 is settled.
+- **Template:** `TPL-CC`. Columns B, C, E:O. GSDN Workspace fills L:N from the workflow until Q45 is settled.
 - **Form sections:** Change (E:G) · Values (H:I) · Reason (J) · Request (K, O) · Approval (L:N, read-only, from the workflow).
 - **Validation:**
   - Scope Change and Data Correction need G, H and I.
@@ -612,11 +612,11 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 ### 3.12 Issue Log (`issues`) — no sheet. It replaces Master GA:GE (CLAUDE.md; BP §09)
 - **Key:** Issue ID (generated, ASSUMPTION). **Several issues per site** (CLAUDE.md).
 - **Links:** an optional blocked gate or task (BP §09). It feeds the Dashboard "open issues" and "older than the Expiring alert" (rows 53–54) and the health index factor I (`rules.md` §9). It is created from a materialized risk or from a repeated daily-plan reason (BP §09). Master-format export: Q11.
-- **Fields:** Site ID ref · Pending Issue text (GA) · Issue Owner (GB; list:IssueOwners, empty today; Q70) · Issue Raised Date date (GC) · Issue Status list:IssueStatus (GD) · Remark text (GE). Added by the PMIS (BP §09): Blocked gate / task, Due Date, Resolution Date, Root Cause, Corrective Action, photo (file).
+- **Fields:** Site ID ref · Pending Issue text (GA) · Issue Owner (GB; list:IssueOwners, empty today; Q70) · Issue Raised Date date (GC) · Issue Status list:IssueStatus (GD) · Remark text (GE). Added by GSDN Workspace (BP §09): Blocked gate / task, Due Date, Resolution Date, Root Cause, Corrective Action, photo (file).
 - **Template:** `TPL-ISS` (ASSUMPTION). Columns Site ID, GA:GE and the added fields, plus Issue ID for updates.
 - **Form sections:** Issue · Ownership and dates · Resolution · Attachments.
 - **Validation:** owner, raised date and status are required (DQ24). Display order follows D41.
-- **Master columns GA:GE (owner answer Q11, 2026-11-04; built as `mx_issue_cells`, migration 0060).** For Master compatibility only, one issue of the site fills GA:GE: the **oldest open issue** (earliest raised date; ties broken by the record id), and when none is open, the **latest closed issue** (latest resolution date, else raised date; ties broken by the record id). An issue is closed when its status is Closed, Resolved, Done or Cancelled. The remark keeps its text and gets " (+N more)" when the site has N other issues; the text is never replaced. The full Issue Log is exported separately (its own register export, `TPL-ISS`). The PMIS screens show critical issues first, so the Master rule never hides the most important one. The comparison report of the parallel run (Q211) compares GA:GE with this projection (reason `issue_projection`).
+- **Master columns GA:GE (owner answer Q11, 2026-11-04; built as `mx_issue_cells`, migration 0060).** For Master compatibility only, one issue of the site fills GA:GE: the **oldest open issue** (earliest raised date; ties broken by the record id), and when none is open, the **latest closed issue** (latest resolution date, else raised date; ties broken by the record id). An issue is closed when its status is Closed, Resolved, Done or Cancelled. The remark keeps its text and gets " (+N more)" when the site has N other issues; the text is never replaced. The full Issue Log is exported separately (its own register export, `TPL-ISS`). GSDN Workspace screens show critical issues first, so the Master rule never hides the most important one. The comparison report of the parallel run (Q211) compares GA:GE with this projection (reason `issue_projection`).
 
 ### 3.13 Risk Register (`risks`) — sheet Risk Register, `tblRiskRegister` (18 columns, D70)
 - **Key:** Risk ID (unique; DQ25). **No site key**: E Affected Sites is a number, not a list of sites (Q69).
@@ -654,7 +654,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
 
 ### 3.16 Dismantle (`dismantle`) — Master FN:FW and DH; own matrix row (B11)
 Owner decision 2026-10-31 (plan §1), amends the earlier one-row layout. Dismantle is its own register with **two parts: CW Dismantle and TE Dismantle**. It stays outside the stream mapping (Q41).
-- **Key:** Site ID + part (CW or TE). *(owner decision 2026-10-31)* Each site has up to one CW part and one TE part. The Master keeps one row per site (FN:FW), so the PMIS writes the two parts to the CW and TE column groups.
+- **Key:** Site ID + part (CW or TE). *(owner decision 2026-10-31)* Each site has up to one CW part and one TE part. The Master keeps one row per site (FN:FW), so GSDN Workspace writes the two parts to the CW and TE column groups.
 - **Flow** (each part runs these 8 steps; data that belongs to another register stays there, §2.7):
 
 | Step | Data | Source of truth |

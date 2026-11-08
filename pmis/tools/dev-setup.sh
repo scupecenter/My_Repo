@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: developer / cloud-session setup.
+# GSDN Workspace: developer / cloud-session setup.
 # Starts PostgreSQL 16 with the CI test password, installs npm dependencies,
 # and installs the pre-commit security scan tools. Test-only values, same as
 # .github/workflows/ci.yml. Idempotent and non-fatal.

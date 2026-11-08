@@ -233,7 +233,7 @@ sequenceDiagram
 (ADR 0002) **Details:**
 - The browser **holds no Entra tokens**; the session lives on the server in Redis, with an 8-hour idle timeout and a 12-hour maximum, and an `X-CSRF-Token` header on every write request.
 - The user is matched on `oid`, never on email; `tid` must be the Aljeel tenant, otherwise sign-in is refused and written to the System Log.
-- The `require_mfa` toggle is off until IT enables it. A single user can be exempted inside the PMIS only (it does not change Entra).
+- The `require_mfa` toggle is off until IT enables it. A single user can be exempted inside GSDN Workspace only (it does not change Entra).
 - Break-glass account: username, password and TOTP, internal network only, session up to 60 minutes, locked for 15 minutes after 5 failures, and an email to all admins on use.
 - Losing Redis signs everyone out but loses no data.
 - **Local password sign-in is deferred** (ADR 0002 §10).

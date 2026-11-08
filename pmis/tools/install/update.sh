@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GSDN PMIS: update an existing installation to the latest code, without questions.
+# GSDN Workspace: update an existing installation to the latest code, without questions.
 # Pulls the branch, applies new migrations, rebuilds and restarts the API and the web app. Data and settings are kept.
 #   sudo bash pmis/tools/install/update.sh
 set -euo pipefail
@@ -11,7 +11,7 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 echo "==> Pulling $BRANCH"
 git pull --ff-only origin "$BRANCH"
 git log --oneline -1
-# 0074 (CHANGELOG 106): raise proxy_read_timeout of the PMIS site to at least 300 s, also when the installer below stops early. Only that directive, only
+# 0074 (CHANGELOG 106): raise proxy_read_timeout of GSDN Workspace site to at least 300 s, also when the installer below stops early. Only that directive, only
 # when it is lower; the file is put back when nginx -t refuses the result, and nginx is reloaded only after a good test. Running it again changes nothing.
 patch_nginx_timeout() {
   local site=/etc/nginx/sites-available/gsdn-pmis want=300 backup

@@ -59,7 +59,7 @@ describe('the slots of a task', () => {
     expect((await slots(f.e.api, f.taskId)).map((s) => s.doc_code)).toEqual(['A2']);
   });
 
-  it('shows a conditional document only when its rule applies, and lets Data Entry declare one the PMIS cannot judge', async () => {
+  it('shows a conditional document only when its rule applies, and lets Data Entry declare one GSDN Workspace cannot judge', async () => {
     // B5 (STA / ST analysis): the B4 report applies when the analysis type is STA or ST
     const f = await docFlow(app, db, 'B5');
     // nothing says the analysis is needed: the document is on the task as "not required" (Data Entry could declare it)
@@ -74,7 +74,7 @@ describe('the slots of a task', () => {
     expect((await slots(f.e.api, f.taskId))[0]!.status).toBe('not_required');
     expect((await f.e.api.call('get', `/tasks/${f.taskId}`)).body.missing_for_submit).toEqual([]);
 
-    // A3: the civil aviation permit depends on a site field the PMIS does not hold: Data Entry says it applies
+    // A3: the civil aviation permit depends on a site field GSDN Workspace does not hold: Data Entry says it applies
     const g = await docFlow(app, db, 'A3');
     expect((await slots(g.e.api, g.taskId)).map((s) => `${s.doc_code}:${s.status}`)).toEqual(['A3:missing', 'A3_CAA:not_required']);
     const add = await g.e.api.call('post', `/tasks/${g.taskId}/slots`, { doc_code: 'A3_CAA' });
