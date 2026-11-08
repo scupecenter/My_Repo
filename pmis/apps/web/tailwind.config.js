@@ -13,7 +13,7 @@ export default {
         done: v('done'), doneBg: v('doneBg'), doneInk: v('doneInk'),
         open: v('open'), openBg: v('openBg'), openInk: v('openInk'),
         wait: v('wait'), waitBg: v('waitBg'), waitInk: v('waitInk'),
-        late: v('late'), lateBg: v('lateBg'), lateInk: v('lateInk'),
+        late: v('late'), lateBg: v('lateBg'), lateInk: v('lateInk'), lateOn: v('lateOn'),
         ...stateColors,
         lock: v('lock'), lockBg: v('lockBg'), lockInk: v('lockInk'), scrim: v('scrim'),
       },

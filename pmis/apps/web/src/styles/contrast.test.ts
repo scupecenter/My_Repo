@@ -30,9 +30,9 @@ function ratio(v: Vars, fg: string, bg: string) {
 }
 
 const TEXT: [string, string][] = [
-  ['--ink', '--bg'], ['--ink', '--card'], ['--mute', '--card'], ['--mute', '--bg'], ['--ink', '--hover'], ['--ink', '--sideOn'], ['--mute', '--card2'],
+  ['--ink', '--bg'], ['--ink', '--card'], ['--mute', '--card'], ['--mute', '--bg'], ['--ink', '--hover'], ['--mute', '--hover'], ['--ink', '--sideOn'], ['--mute', '--card2'],
   ['--accentInk', '--accent'], ['--accentText', '--card'], ['--accentText', '--accentSoft'], ['--link', '--card'],
-  ['--doneInk', '--doneBg'], ['--openInk', '--openBg'], ['--waitInk', '--waitBg'], ['--lateInk', '--lateBg'], ['--lockInk', '--lockBg'],
+  ['--doneInk', '--doneBg'], ['--openInk', '--openBg'], ['--waitInk', '--waitBg'], ['--lateInk', '--lateBg'], ['--lateOn', '--late'], ['--lockInk', '--lockBg'],
   ...['done', 'progress', 'late', 'locked', 'na', 'planned'].map((s): [string, string] => [`--state-${s}-fg`, `--state-${s}-bg`]),
 ];
 
