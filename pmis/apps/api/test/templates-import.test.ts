@@ -741,3 +741,37 @@ function crc32(b: Buffer): number {
 }
 
 void getBinary;
+
+describe('Procurement template carries the assignment members (Q519)', () => {
+  it('reads "ID:role:lead; ID:role" into the members, and refuses an unknown ID, a bad role and a read-only caller', async () => {
+    const t = await tplTeam(app, db, 'procurement', 'procurement', R);
+    const m1 = await actor(app, db, { regions: [R], modules: null });
+    const m2 = await actor(app, db, { regions: [R], modules: null });
+    const H2 = { site: 'Site ID', scope: 'Scope', delivery: 'Delivery', status: 'Order Status', start: 'Planned start', end: 'Planned end', members: 'Members (engineers)' };
+    const dl = await downloadTemplate(t.entry.api, 'TPL-PO');
+    const base = { [H2.scope]: 'Survey', [H2.delivery]: 'In-House', [H2.status]: 'Open', [H2.start]: '2026-11-10', [H2.end]: '2026-11-12' };
+    const sites = [t.site, await makeSite(db, R, { prefix: 'TPLM' }), await makeSite(db, R, { prefix: 'TPLM' }), await makeSite(db, R, { prefix: 'TPLM' })];
+    const filled = await fillTemplate(dl.buffer, [
+      { ...base, [H2.site]: sites[0]!.code, [H2.members]: `${m1.user.employeeId}:supervisor:lead; ${m2.user.employeeId}:executor` },
+      { ...base, [H2.site]: sites[1]!.code, [H2.members]: `0000:executor` },
+      { ...base, [H2.site]: sites[2]!.code, [H2.members]: `${m1.user.employeeId}:captain` },
+      { ...base, [H2.site]: sites[3]!.code, [H2.members]: `${m1.user.employeeId}` },
+    ]);
+    const up = await uploadFile(t.entry.api, filled, 'members.xlsx');
+    expect(up.status).toBe(202);
+    const rows = await rowsOf(t.entry.api, up.body.id);
+    const row = (code: string) => rows.find((r) => r.site_code === code || r.key?.startsWith(code))!;
+    expect(row(sites[0]!.code)).toMatchObject({ action: 'create', errors: [] });
+    expect(row(sites[0]!.code).diff.members.new).toEqual([
+      expect.objectContaining({ user_id: m1.user.id, member_role: 'supervisor', is_lead: true }),
+      expect.objectContaining({ user_id: m2.user.id, member_role: 'executor' }),
+    ]);
+    expect(row(sites[1]!.code).errors[0]).toMatchObject({ column: H2.members, code: 'unknown_user' });
+    expect(row(sites[2]!.code).errors[0]).toMatchObject({ field: 'members/0/member_role' });
+    expect(row(sites[3]!.code).errors[0]).toMatchObject({ column: H2.members, code: 'invalid' });
+
+    // a caller without the import right cannot upload the file
+    const viewer = await actor(app, db, { grants: [...G('procurement', 'view'), ...G('templates', 'view')], regions: [R], modules: null });
+    expect((await uploadFile(viewer.api, filled, 'members.xlsx')).status).toBe(403);
+  });
+});

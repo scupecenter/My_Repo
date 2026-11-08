@@ -3,8 +3,8 @@ import { login } from './helpers';
 
 // Site Register streams, switched from the sidebar sub-menus (the page has no tab bars): EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
-  { locale: 'en', theme: 'light', title: 'Site Register', cw: 'Civil Works', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
-  { locale: 'ar', theme: 'dark', title: 'سجل المواقع', cw: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
+  { locale: 'en', theme: 'light', title: 'SITE 360', cw: 'Civil Works', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
+  { locale: 'ar', theme: 'dark', title: 'SITE 360', cw: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
 ] as const;
 
 for (const c of CASES) {
@@ -58,8 +58,8 @@ for (const c of CASES) {
 
 // Work views (Q98, contract 0.4.7): O&M from its sidebar sub-menu; an old ?view=TE link still opens, with no tab bar.
 const VIEW_CASES = [
-  { locale: 'en', theme: 'light', te: 'TE Register', om: 'O&M' },
-  { locale: 'ar', theme: 'dark', te: 'سجل التركيبات', om: 'التشغيل والصيانة' },
+  { locale: 'en', theme: 'light', te: 'Installation (TE)', om: 'O&M' },
+  { locale: 'ar', theme: 'dark', te: 'التركيبات', om: 'التشغيل والصيانة' },
 ] as const;
 
 for (const c of VIEW_CASES) {

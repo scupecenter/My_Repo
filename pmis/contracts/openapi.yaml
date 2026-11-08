@@ -12045,7 +12045,7 @@ components:
     ExportPartKey:
       type: string
       description: Part key. Every register key used by `/registers` (including `dismantle`), plus the four non-register parts.
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, sites, milestones, tasks, project_status]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances, sites, milestones, tasks, project_status]
     ExportPart:
       type: object
       required: [key, label_en, label_ar, master_sheet]
@@ -15088,7 +15088,7 @@ components:
     # ---------------------------------------------------------- registers (B11) and Dismantle
     RegisterKey:
       type: string
-      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle]
+      enum: [procurement, contractors, gecol, hlc, permits_hse, warehouse, quality, issues, risks, change_control, readiness_handover, as_built, meetings, dismantle, car_dispatcher, financial_advances]
     RegisterField:
       type: object
       required: [code, label_en, type]

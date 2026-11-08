@@ -69,9 +69,9 @@ describe('base32 and the otpauth URI', () => {
     expect(() => base32Decode('not*base32')).toThrow();
   });
 
-  it('names the issuer "GSDN PMIS", SHA1, 6 digits and 30 seconds', () => {
+  it('names the issuer "GSDN Workspace", SHA1, 6 digits and 30 seconds', () => {
     const uri = otpauthUri('JBSWY3DPEHPK3PXP', 'ali.test@example.test');
-    expect(uri).toBe('otpauth://totp/GSDN%20PMIS:ali.test%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30');
+    expect(uri).toBe('otpauth://totp/GSDN%20Workspace:ali.test%40example.test?secret=JBSWY3DPEHPK3PXP&issuer=GSDN%20Workspace&algorithm=SHA1&digits=6&period=30');
   });
 });
 

@@ -235,6 +235,7 @@ export class ImportService {
     });
     if (tooMany) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The file has more than ${max} rows. Split it.`, { ...ctx, max_rows: max });
     if (rows.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The file has no data rows.' }]);
+    if (current.kind !== 'stream') await this.resolveMembers(rows as ParsedRow[], cols);
 
     // 6. staging in the database, which decides every row again
     const payload = JSON.stringify(rows);
@@ -477,6 +478,36 @@ export class ImportService {
       target[c.code] = this.typed(c, val);
     });
     return any ? out : null;
+  }
+
+  /**
+   * Q519: the Procurement "members" cell is text, "1234:supervisor:lead; 5678:executor" (employee ID or e-mail : role : optional "lead").
+   * It becomes the member rows (user ids); the role and the one-lead rule are checked by the database like any manual entry.
+   */
+  private async resolveMembers(rows: ParsedRow[], cols: TplColumn[]): Promise<void> {
+    const header = cols.find((c) => c.code === 'members')?.header ?? 'members';
+    const todo = rows.filter((r) => typeof r.data.members === 'string');
+    if (todo.length === 0) return;
+    const parsed = new Map<ParsedRow, string[][]>();
+    const keys = new Set<string>();
+    for (const r of todo) {
+      const parts = (r.data.members as string).split(/[;\n]/).map((x) => x.trim()).filter(Boolean).map((x) => x.split(':').map((y) => y.trim()));
+      const bad = parts.find((p) => p.length < 2 || p.length > 3 || !p[0] || !p[1] || (p[2] !== undefined && p[2].toLowerCase() !== 'lead'));
+      if (bad) { r.pre_errors.push({ column: header, field: 'members', code: 'invalid', message: `Write each member as "employee ID:role" or "employee ID:role:lead", separated by ";" (got "${bad.join(':')}").` }); delete r.data.members; continue; }
+      parts.forEach((p) => keys.add(p[0]!.toLowerCase()));
+      parsed.set(r, parts);
+    }
+    const users = keys.size ? await this.db.tx.$queryRaw<{ id: string; employee_id: string | null; email: string }[]>(Prisma.sql`
+      SELECT id::text AS id, btrim(employee_id) AS employee_id, lower(email) AS email FROM users WHERE deleted_at IS NULL AND (btrim(employee_id) = ANY(${[...keys]}::text[]) OR lower(email) = ANY(${[...keys]}::text[]))`) : [];
+    for (const [r, parts] of parsed) {
+      const list: Record<string, unknown>[] = [];
+      parts.forEach((p, i) => {
+        const hit = users.filter((u) => u.employee_id === p[0] || u.email === p[0]!.toLowerCase());
+        if (hit.length !== 1) r.pre_errors.push({ column: header, field: `members/${i}/user_id`, code: 'unknown_user', message: `Unknown employee ID "${p[0]}": type the 4-digit employee ID of an existing user.` });
+        else list.push({ user_id: hit[0]!.id, member_role: p[1], ...(p[2] ? { is_lead: true } : {}) });
+      });
+      r.data.members = list;
+    }
   }
 
   private typed(c: TplColumn, v: unknown): unknown {

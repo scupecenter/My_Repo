@@ -252,10 +252,10 @@ describe('enrolment is forced at the next sign-in', () => {
     const start = await api.pendingCall('/auth/local/2fa/enrol/start', { enrol_code: enrolCode });
     expect(start.status).toBe(200);
     expect(start.headers['cache-control']).toMatch(/no-store/);
-    expect(start.body.issuer).toBe('GSDN PMIS');
+    expect(start.body.issuer).toBe('GSDN Workspace');
     expect(start.body.secret).toMatch(/^[A-Z2-7]{32}$/);
     expect(start.body.otpauth_uri).toBe(
-      `otpauth://totp/GSDN%20PMIS:${encodeURIComponent(u.email)}?secret=${start.body.secret}&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30`,
+      `otpauth://totp/GSDN%20Workspace:${encodeURIComponent(u.email)}?secret=${start.body.secret}&issuer=GSDN%20Workspace&algorithm=SHA1&digits=6&period=30`,
     );
     // stored encrypted: not the clear secret, and a pmis_app read is impossible (see the grants test)
     const st = await state(u.id);

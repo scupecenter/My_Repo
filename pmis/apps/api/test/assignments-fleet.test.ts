@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -414,9 +412,34 @@ describe('milestones and gates do not change with the MOB tasks', () => {
 });
 
 describe('document rules judge the raw record, never the viewer-masked projection', () => {
-  it('documents.service reads r.data for the slot rules (the amounts mask is for what a user is shown)', () => {
-    const src = readFileSync(resolve(__dirname, '../src/documents/documents.service.ts'), 'utf8');
-    expect(src).not.toContain('reg_data_for');
-    expect(readFileSync(resolve(__dirname, '../src/registers/registers.service.ts'), 'utf8')).toContain('reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data');
+  it('adds the slot of a document conditional on the advance amount for a reader who cannot see amounts', async () => {
+    const c = await setup();
+    const code = `ADV_AMT_${uniq()}`.slice(0, 30).toUpperCase();
+    const spec = {
+      kind: 'scanned_document', form_kind: null, name_en: 'Large advance form', name_ar: 'نموذج عهدة كبيرة', mandatory: false, condition_rule: { eq: ['record.data.requested_amount', 7351] },
+      placements: [{ target: 'register', ref: 'financial_advances', record_type: 'advance' }], formats: ['pdf'], max_size_mb: 5, min_files: 1, max_files: null, photo_rules: null,
+      expiry_tracked: false, blank_form_file_id: null, is_active: true,
+    };
+    const dt = await db.query(`INSERT INTO document_types (code, name_en, kind, is_active, lib_managed, published_version, needs_review, updated_at) VALUES ($1, 'Large advance form', 'scanned_document', false, true, 0, false, now()) RETURNING id`, [code]);
+    try {
+      await db.query('SELECT doc_apply_spec($1, $2::jsonb)', [dt.rows[0].id, JSON.stringify(spec)]);
+      await db.query(`SELECT doc_snapshot_version($1, 'new_only', DATE '2024-01-01', 'test', 0)`, [dt.rows[0].id]);
+      await db.query('UPDATE document_types SET is_active = true WHERE id = $1', [dt.rows[0].id]);
+      const asg = await assignment(c);
+      const adv = (await children(c.fin, 'advance', asg))[0]!;
+      const p = await patch(c.fin.entry.api, 'financial_advances', adv.id, adv.version, { data: { advance_kind: 'Daily allowance', requested_amount: 7351 } });
+      expect(p.status).toBe(200);
+
+      // the viewer is not the custodian and holds no entry or approve cell: the amount is masked in what they are shown
+      const shown = await c.viewerFin.api.call('get', recPath('financial_advances', adv.id));
+      expect(shown.body.data).toMatchObject({ amounts_hidden: true });
+      expect(shown.body.data.requested_amount).toBeUndefined();
+      // ... and the slot rule still holds, because it reads the stored record
+      const slots = await c.viewerFin.api.call('get', recPath('financial_advances', adv.id, '/slots'));
+      expect(slots.status).toBe(200);
+      expect((slots.body.items as { doc_code: string }[]).map((x) => x.doc_code)).toContain(code);
+    } finally {
+      await db.query('UPDATE document_types SET is_active = false WHERE id = $1', [dt.rows[0].id]);
+    }
   });
 });
