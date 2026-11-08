@@ -4,7 +4,7 @@ import { login } from './helpers';
 // Site Register streams, switched from the sidebar sub-menus (the page has no tab bars): EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
   { locale: 'en', theme: 'light', title: 'SITE 360', cw: 'Civil Works', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },
-  { locale: 'ar', theme: 'dark', title: 'SITE 360', cw: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
+  { locale: 'ar', theme: 'dark', title: 'الموقع 360', cw: 'الأعمال المدنية', dismantle: 'الفك', na: /إظهار المواقع غير المنطبقة \(\d+\)/ },
 ] as const;
 
 for (const c of CASES) {

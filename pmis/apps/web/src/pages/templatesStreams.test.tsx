@@ -205,7 +205,7 @@ describe('Arabic', () => {
     renderApp(<Routed />, { route: '/templates', locale: 'ar' });
     const u = userEvent.setup();
     expect(document.documentElement.dir).toBe('rtl');
-    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toHaveTextContent('SITE 360: الأعمال المدنية');
+    expect(await screen.findByTestId('tpl-row-TPL-SITE-CW')).toHaveTextContent('الموقع 360: الأعمال المدنية');
     expect(screen.getByTestId('tpl-kind-TPL-MASTER')).toHaveTextContent('الماستر كاملًا');
     expect(screen.getByTestId('tpl-streams-note')).toHaveTextContent('الأعمدة الرمادية');
     await u.click(screen.getByTestId('tpl-upload-TPL-MASTER'));

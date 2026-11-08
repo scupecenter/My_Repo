@@ -40,11 +40,11 @@ describe('SITE 360: streams', () => {
     await signIn('pm');
     const names = { DESIGN_ACQ: 'التصميم والاستحواذ', CW: 'الأعمال المدنية', TE: 'التركيبات', CLOSURE: 'التسليم والإغلاق' };
     renderApp(<Sites />, { route: '/sites', locale: 'ar' });
-    expect(screen.getByRole('heading', { name: 'SITE 360' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'الموقع 360' })).toBeInTheDocument();
     cleanup();
     for (const [code, name] of Object.entries(names)) {
       renderApp(<Sites />, { route: `/sites?stream=${code}`, locale: 'ar' });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${name}`);
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`الموقع 360: ${name}`);
       cleanup();
     }
   });
@@ -119,7 +119,7 @@ describe('SITE 360: views (contract 0.4.7)', () => {
       expect(screen.queryByTestId('stream-tabs')).toBeNull();
       cleanup();
       renderApp(<Sites />, { route: `/sites?view=${view}`, locale: 'ar' });
-      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${ar}`));
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`الموقع 360: ${ar}`));
       cleanup();
     }
   });
