@@ -174,7 +174,7 @@ describe('forced enrolment', () => {
     const key = screen.getByTestId('enrol-key').textContent!.replace(/\s/g, '');
     expect(key).toMatch(/^[A-Z2-7]{32}$/);
     expect(cred('engineer')!.tf!.pending).toBe(key);
-    expect(otpauth(key, 'sami.nuri@example.com')).toContain('issuer=GSDN%20PMIS');
+    expect(otpauth(key, 'sami.nuri@example.com')).toContain('issuer=GSDN%20Workspace');
 
     await u.type(screen.getByTestId('enrol-code'), '000000');
     await u.click(screen.getByTestId('enrol-submit'));
@@ -210,8 +210,8 @@ describe('forced enrolment', () => {
     expect(wrong.code).toBe('invalid_enrol_code');
     expect(cred('engineer')!.tf!.pending).toBeNull();
     const started = await api.post<{ secret: string; otpauth_uri: string; issuer: string }>('/auth/local/2fa/enrol/start', { body: { enrol_code: ENROL } });
-    expect(started.issuer).toBe('GSDN PMIS');
-    expect(started.otpauth_uri).toMatch(/^otpauth:\/\/totp\/GSDN%20PMIS:/);
+    expect(started.issuer).toBe('GSDN Workspace');
+    expect(started.otpauth_uri).toMatch(/^otpauth:\/\/totp\/GSDN%20Workspace:/);
     // the code is checked again at the confirm step, and used up there
     const noCode = await fail(api.post('/auth/local/2fa/enrol/confirm', { body: { code: await codeAt(started.secret) } }));
     expect(noCode.status).toBe(422);

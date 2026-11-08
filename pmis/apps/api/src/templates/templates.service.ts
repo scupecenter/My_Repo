@@ -558,7 +558,7 @@ export class TemplatesService {
     t: TemplateRow, parts: BookPart[], meta: { prefill: boolean; employeeId: string | null; issuedAt: Date }, extraKv: [string, string | number][],
   ): Promise<Buffer> {
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'GSDN PMIS';
+    wb.creator = 'GSDN Workspace';
     wb.created = meta.issuedAt;
     wb.title = `${t.template_id} v${t.current_version}`;
     const isSite = t.kind === 'stream' || t.kind === 'master';
@@ -614,7 +614,7 @@ export class TemplatesService {
     ins.getColumn(1).width = 110;
     const lines = isSite
       ? [
-        `GSDN PMIS approved template ${t.template_id}, version ${t.current_version}${t.kind === 'master' ? ' (the whole Master)' : ` (stream ${t.stream_code})`}.`,
+        `GSDN Workspace approved template ${t.template_id}, version ${t.current_version}${t.kind === 'master' ? ' (the whole Master)' : ` (stream ${t.stream_code})`}.`,
         t.kind === 'master'
           ? 'Fill the sheet "Master" (one row per site, the Master column order) and the register sheets, and upload the same file in the PMIS. Do not rename, move or delete the columns you use, and do not change the header row.'
           : 'Fill the sheet "Data" (one row per site) and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
@@ -627,13 +627,13 @@ export class TemplatesService {
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas. The sheet "Columns" lists every header with its Master column and task.',
         ...(t.kind === 'master' ? ['Columns that the PMIS does not own are ignored with a warning. The upload is split into one batch per stream and per register sheet; each follows its own flow.'] : []),
         '',
-        'قالب معتمد من نظام GSDN PMIS. املأ الورقة وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
+        'قالب معتمد من نظام GSDN Workspace. املأ الورقة وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
         'الأعمدة الرمادية محسوبة أو يحددها سير العمل أو يملكها سجل آخر: تظهر للعلم ولا تُقرأ. أدخل بيانات السجلات في سجلها. الخلية الفارغة لا تمسح قيمة موجودة.',
         'تُدخل كل مهمة تملؤها بصفة مُدخل البيانات (L1) وتُرسل، وتحتاج تاريخها الفعلي ومستنداتها الإلزامية كما في شاشة المهمة. المهمة المقفلة ببوابة مغلقة تُرفض، وتُعلَّق التي تنتظر سابقتها أو قيد المراجعة. لا يُعتمد شيء قبل قرار L2.',
       ]
       : t.kind === 'sites'
       ? [
-        `GSDN PMIS approved template ${t.template_id}, version ${t.current_version} (New sites).`,
+        `GSDN Workspace approved template ${t.template_id}, version ${t.current_version} (New sites).`,
         'Fill the sheet "Data" (one row per new site) and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
         'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
         'Required: Site ID, Region, Site Name (EN) and Delivery Scenario. The Site ID is unique for ever: a Site ID that exists, also one of a cancelled site, is refused. The region may be a region name, its code or a known alias (for example "Tripoli Area").',
@@ -642,12 +642,12 @@ export class TemplatesService {
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas.',
         'The upload becomes a batch. No site exists until the rows have gone through L1 (you send the batch) and L2 (Data Reviewer & Approver approves each row or all at once, with step-up).',
         '',
-        'قالب معتمد من نظام GSDN PMIS لإنشاء مواقع جديدة. املأ الورقة Data (صف لكل موقع) وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
+        'قالب معتمد من نظام GSDN Workspace لإنشاء مواقع جديدة. املأ الورقة Data (صف لكل موقع) وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
         'المطلوب: رقم الموقع والمنطقة والاسم بالإنجليزية وسيناريو التسليم. رقم الموقع لا يتكرر أبدا حتى لموقع ملغى. لا تُحمَّل بيانات المالك وجهات الاتصال.',
         'لا يُنشأ أي موقع قبل أن يعتمده مراجع البيانات (L2) بعد إرسال الدفعة منك (L1).',
       ]
       : [
-        `GSDN PMIS approved template ${t.template_id}, version ${t.current_version}.`,
+        `GSDN Workspace approved template ${t.template_id}, version ${t.current_version}.`,
         'Fill the sheet "Data" and upload the same file in the PMIS. Do not rename, move, add or delete columns, and do not change the header row: the PMIS refuses a changed file.',
         'Files from an older version of the template are refused: download the template again when the PMIS issues a new version.',
         'Grey columns are calculated or fixed by the PMIS. They are shown for information and are never read.',
@@ -656,7 +656,7 @@ export class TemplatesService {
         'Dates are typed as dates (yyyy-mm-dd). Cells must hold values, not formulas.',
         'The upload becomes a batch. Nothing reaches the register until each row has gone through the normal Entry then Review / Approve levels of its register.',
         '',
-        'قالب معتمد من نظام GSDN PMIS. املأ الورقة Data وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
+        'قالب معتمد من نظام GSDN Workspace. املأ الورقة Data وأعد رفع الملف نفسه. لا تغيّر صف العناوين ولا الأعمدة، فالنظام يرفض الملف المعدَّل أو القديم.',
         'تبقى الخلية الفارغة بلا تغيير ولا تمسح قيمة موجودة. تمرّ كل صفوف الرفع على مستويات الإدخال والمراجعة والاعتماد المعتادة.',
       ];
     lines.forEach((l, i) => { const cell = ins.getCell(i + 1, 1); cell.value = l; cell.alignment = { wrapText: true, vertical: 'top' }; });

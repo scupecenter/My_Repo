@@ -113,7 +113,7 @@ export function decryptSecret(key: Buffer, userId: string, envelope: string): Bu
   if (!envelope.startsWith('v1:')) throw new Error('unknown envelope');
   const raw = Buffer.from(envelope.slice(3), 'base64url');
   if (raw.length < 12 + 16 + 1) throw new Error('short envelope');
-  const d = createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12));
+  const d = createDecipheriv('aes-256-gcm', key, raw.subarray(0, 12), { authTagLength: 16 });
   d.setAAD(Buffer.from(userId));
   d.setAuthTag(raw.subarray(12, 28));
   return Buffer.concat([d.update(raw.subarray(28)), d.final()]);

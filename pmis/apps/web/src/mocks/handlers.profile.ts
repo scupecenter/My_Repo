@@ -258,7 +258,7 @@ export const profileHandlers = [
     c.tf = { on: false, secret: null, pending: null, codes: [], lastStep: null, failures: c.tf?.failures ?? 0, enforced: false, selfPending: secret };
     save();
     const email = emailOf(acct());
-    return HttpResponse.json({ secret, otpauth_uri: otpauth(secret, email), issuer: 'GSDN PMIS', account: email, algorithm: 'SHA1', digits: 6, period: 30 });
+    return HttpResponse.json({ secret, otpauth_uri: otpauth(secret, email), issuer: 'GSDN Workspace', account: email, algorithm: 'SHA1', digits: 6, period: 30 });
   }),
 
   http.post(`${B}/me/two-factor/enrol/confirm`, async ({ request }) => {

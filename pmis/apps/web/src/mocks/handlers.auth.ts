@@ -179,7 +179,7 @@ export const authHandlers = [
     c.tf!.pending = newSecret();
     const email = whoOf(p.account).email ?? p.account;
     save();
-    return HttpResponse.json({ secret: c.tf!.pending, otpauth_uri: otpauth(c.tf!.pending, email), issuer: 'GSDN PMIS', account: email, algorithm: 'SHA1', digits: 6, period: 30 });
+    return HttpResponse.json({ secret: c.tf!.pending, otpauth_uri: otpauth(c.tf!.pending, email), issuer: 'GSDN Workspace', account: email, algorithm: 'SHA1', digits: 6, period: 30 });
   }),
 
   http.post(`${B}/auth/local/2fa/enrol/confirm`, async ({ request }) => {

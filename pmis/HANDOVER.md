@@ -111,11 +111,4 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 4. ~~MOB tasks on old sites~~ closed by Q520: they stay locked until the admin opens them (intended).
 5. ~~Web: MSW mock handlers for the new endpoints~~ done (changelog 113, `mocks/handlers.fleet.ts`). The local `rk` cast stays until `schema.d.ts` is regenerated with `car_dispatcher` and `financial_advances` in `RegisterKey`.
 
-Earlier list (kept for history):
-From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):
-1. Update `docs/spec/registers-and-streams.md` to match the plan (stream and stage boundary, O&M view, Dismantle flow, document section, write-through editing). Done (changelog 43). Q37, Q40, Q41 and Q73 in `open-questions.md` already carry the owner updates.
-2. Add `CHANGELOG.md` entry (43) for these documentation updates and the owner decisions. Done (changelog 43).
-3. Dismantle register: **done in the API (migrations 0021 and 0022, changelog 44 and 45) and in the web (generic register page)**. Owner decisions on Q101 recorded. Still open: the Warehouse RN link that closes a part (Q101), an approved Excel template, the O&M role, the handover engineer field and write-through edits. Full status: the "Status" section of `docs/plans/2026-10-31-dismantle-stream-views-documents.md`.
-4. Screens: CW, TE and O&M tabs done (contract 0.4.7, migration 0023, changelog 46). Changelog 47: O&M view fix (0024), remaining registers (0025), Warehouse (0026), As-Built items (0027), contract 0.4.8. Next: web screens for them, write-through edits, then document type settings. UI/UX upgrade plan (8 phases): `docs/plans/2026-11-01-ui-ux-unified-proposal.md` (Q100 answered) with the O&M team switch setting (Q102).
-5. Document section: configurable types, placement, naming and formats (including e-mail `.eml`, `.msg`, `.html`, `.mht`); add the e-mail formats to the ADR 0008 magic-byte allow-list.
-6. Later phase, not now: the CPE / end-user installation module (plan section 5).
+Earlier lists are superseded: every item built since is recorded in `CHANGELOG.md` (entries 43 to 113). Still planned for a later phase: the CPE / end-user installation module and the mobile app.

@@ -1,6 +1,6 @@
 # Database security suite (P1-QA-02)
 
-Runs the negative cases of the GSDN PMIS database as the application role `pmis_app`. Every case is an attack that the
+Runs the negative cases of the GSDN Workspace database as the application role `pmis_app`. Every case is an attack that the
 database must refuse. A case passes only when the refusal happens with the expected SQLSTATE (and message), and no row
 changes. The suite builds its own scratch database, so it never touches a real one.
 
