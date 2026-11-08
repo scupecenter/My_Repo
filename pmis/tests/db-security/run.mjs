@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// GSDN PMIS: database security suite (P1-QA-02).
+// GSDN Workspace: database security suite (P1-QA-02).
 //
 // Builds a scratch database, applies the migrations and the grants, loads synthetic fixtures, then runs every negative
 // case as the application role pmis_app and checks the outcome. Zero dependencies: it drives the psql client.
@@ -373,7 +373,7 @@ if (listOnly) {
   process.exit(0);
 }
 
-console.log(`GSDN PMIS database security suite: database ${cfg.db} on ${cfg.host}:${cfg.port}`);
+console.log(`GSDN Workspace database security suite: database ${cfg.db} on ${cfg.host}:${cfg.port}`);
 console.log('Building the scratch database');
 const ids = buildDatabase();
 

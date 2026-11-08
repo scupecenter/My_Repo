@@ -64,7 +64,7 @@ export function wrapDataKey(master: Buffer, dataKey: Buffer): Buffer {
 
 export function unwrapDataKey(master: Buffer, wrapped: Buffer): Buffer {
   if (wrapped.length !== WRAPPED_KEY_BYTES) throw new Error('wrapped data key has the wrong size');
-  const d = createDecipheriv('aes-256-gcm', master, wrapped.subarray(0, NONCE_BYTES));
+  const d = createDecipheriv('aes-256-gcm', master, wrapped.subarray(0, NONCE_BYTES), { authTagLength: TAG_BYTES });
   d.setAAD(WRAP_AAD);
   d.setAuthTag(wrapped.subarray(NONCE_BYTES, NONCE_BYTES + TAG_BYTES));
   return Buffer.concat([d.update(wrapped.subarray(NONCE_BYTES + TAG_BYTES)), d.final()]);
@@ -109,7 +109,7 @@ export class GcmEncryptor {
 
 /** Streaming AES-256-GCM decryption. The tag is checked at the end: a changed byte makes the stream fail (an error event). */
 export function gcmDecryptStream(dataKey: Buffer, nonce: Buffer, tag: Buffer): Transform {
-  const d = createDecipheriv('aes-256-gcm', dataKey, nonce);
+  const d = createDecipheriv('aes-256-gcm', dataKey, nonce, { authTagLength: TAG_BYTES });
   d.setAuthTag(tag);
   return new Transform({
     transform: (chunk: Buffer, _enc, cb) => {

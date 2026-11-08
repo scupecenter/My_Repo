@@ -326,7 +326,7 @@ export class MasterImportService {
     const dtos = await this.diffDtos(rows);
     const regions = new Map((await this.db.tx.$queryRaw<{ id: number; name_en: string }[]>(Prisma.sql`SELECT id, name_en FROM regions`)).map((r) => [r.id, r.name_en]));
     const wb = new ExcelJS.Workbook();
-    wb.creator = 'GSDN PMIS';
+    wb.creator = 'GSDN Workspace';
     const ws = wb.addWorksheet('Differences');
     ws.columns = [
       { header: 'Site ID', key: 'site', width: 14 }, { header: 'Region', key: 'region', width: 12 }, { header: 'Source (Sheet!row)', key: 'src', width: 16 },

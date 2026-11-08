@@ -7731,7 +7731,7 @@ export interface components {
         TwoFactorEnrolment: {
             /** @description Base32 manual key. Shown only in this answer. */
             secret: string;
-            /** @description otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code. */
+            /** @description otpauth://totp/GSDN%20Workspace:<account>?secret=...&issuer=GSDN%20Workspace&algorithm=SHA1&digits=6&period=30, for the QR code. */
             otpauth_uri: string;
             /** @constant */
             issuer: "GSDN Workspace";

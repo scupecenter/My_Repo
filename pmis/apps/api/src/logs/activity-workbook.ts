@@ -30,7 +30,7 @@ export interface WorkbookInput {
  */
 export async function activityWorkbook(d: WorkbookInput): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'GSDN PMIS';
+  wb.creator = 'GSDN Workspace';
   wb.created = d.generatedAt;
   const name = (id: string | null): string => (id ? d.people.get(id)?.display_name ?? id : '');
   const emp = (id: string | null): string => (id ? d.people.get(id)?.employee_id ?? '' : '');
@@ -40,7 +40,7 @@ export async function activityWorkbook(d: WorkbookInput): Promise<Buffer> {
     const ws = wb.addWorksheet(title, {
       views: [{ state: 'frozen', ySplit: 1 }],
       pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9 },
-      headerFooter: { oddFooter: `GSDN PMIS · ${title} · ${d.month} · &P / &N` },
+      headerFooter: { oddFooter: `GSDN Workspace · ${title} · ${d.month} · &P / &N` },
     });
     ws.columns = widths.map((w) => ({ width: w }));
     for (const r of [header, ...rows]) {
@@ -80,7 +80,7 @@ export async function activityWorkbook(d: WorkbookInput): Promise<Buffer> {
     [28, 14, 12, 28, 24, 30, 18, 38, 18, 14, 48],
     d.exceptions.map((x) => [x.at, x.kind, emp(x.actor_id), name(x.actor_id), name(x.on_behalf_of), x.action, x.entity_type, x.entity_id ?? '', x.module_key ?? '', region(x.region_id), x.reason ?? '']));
   sheet('About', ['Item', 'Value'], [30, 90], [
-    ['Report', 'GSDN PMIS monthly activity report'],
+    ['Report', 'GSDN Workspace monthly activity report'],
     ['Month', d.month],
     ['Period (UTC)', `${d.from} to ${d.to}`],
     ['Calendar month in', d.timeZone],

@@ -8,7 +8,7 @@ async function main(): Promise<void> {
   const app = await createApp(config);
   app.enableShutdownHooks();
   await app.listen(config.port, config.host);
-  new Logger('main').log(`GSDN PMIS API listening on ${config.host}:${config.port}`);
+  new Logger('main').log(`GSDN Workspace API listening on ${config.host}:${config.port}`);
 }
 
 main().catch((e: unknown) => {

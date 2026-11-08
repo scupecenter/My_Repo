@@ -367,7 +367,7 @@ function fillSheet(ws: ExcelJS.Worksheet, rows: Cell[][], widths: number[]): voi
  */
 export async function exportWorkbook(d: Json, streams: { name: string; data: Json }[], filters: Query): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'GSDN PMIS';
+  wb.creator = 'GSDN Workspace';
   wb.created = new Date();
   fillSheet(wb.addWorksheet('Project Overview'), exportRows(d), [24, 44, 24, 16]);
   for (const s of streams) fillSheet(wb.addWorksheet(s.name), exportRows(s.data), [24, 44, 24, 16]);

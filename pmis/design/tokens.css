@@ -1,4 +1,4 @@
-/* GSDN PMIS design tokens. SINGLE SOURCE: this file. design/tokens.css is a generated copy: run `npm run sync:tokens` in apps/web after editing.
+/* GSDN Workspace design tokens. SINGLE SOURCE: this file. design/tokens.css is a generated copy: run `npm run sync:tokens` in apps/web after editing.
    Source: frappe-ui@1.0.2 (MIT), tailwind/tokens.js + tokens/{colors,effects,radius,typography}.js; Figma file kMYnZ9ougpSSQBdjZCgtdX
    Colors, radius, shadows, focus rings and type sizes are taken from the package, not from memory.
    Layer 1 (frappe raw): --surface-*, --ink-*, --outline-* (oklch). Layer 2 (semantic): --bg --card --ink --accent --done ...

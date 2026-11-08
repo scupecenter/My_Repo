@@ -12201,7 +12201,7 @@ components:
       required: [secret, otpauth_uri, issuer, account, algorithm, digits, period]
       properties:
         secret: { type: string, description: 'Base32 manual key. Shown only in this answer.' }
-        otpauth_uri: { type: string, description: 'otpauth://totp/GSDN%20PMIS:<account>?secret=...&issuer=GSDN%20PMIS&algorithm=SHA1&digits=6&period=30, for the QR code.' }
+        otpauth_uri: { type: string, description: 'otpauth://totp/GSDN%20Workspace:<account>?secret=...&issuer=GSDN%20Workspace&algorithm=SHA1&digits=6&period=30, for the QR code.' }
         issuer: { type: string, const: GSDN Workspace }
         account: { type: string, description: The user's email. }
         algorithm: { type: string, const: SHA1 }
