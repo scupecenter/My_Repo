@@ -31,7 +31,7 @@ const STREAMS = [
 export const MOCK_SNAPSHOT_DATES = ['2026-10-31', '2026-10-29', '2026-10-22'];
 const SNAPSHOT_KINDS: Record<string, 'weekly' | 'month_end'> = { '2026-10-31': 'month_end', '2026-10-29': 'weekly', '2026-10-22': 'weekly' };
 const REBUILT = new Set(['2026-10-22']);
-const VIEWS = [{ code: 'CW', name_en: 'CW Register', name_ar: 'سجل الأعمال المدنية', ms: ['MS2', 'MS3', 'MS4'] }, { code: 'TE', name_en: 'TE Register', name_ar: 'سجل التركيبات', ms: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'] },
+const VIEWS = [{ code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', ms: ['MS2', 'MS3', 'MS4'] }, { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', ms: ['MS5', 'MS6', 'MS7', 'MS8', 'MS9'] },
   { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', ms: ['MS10'] }];
 /** The central Project Status items of the seed weight set (Q118): project-wide, no data in the PMIS, a manual percentage each. */
 export const CENTRAL_ITEMS = [

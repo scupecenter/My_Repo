@@ -1,6 +1,6 @@
-# GSDN PMIS — project rules for every agent
+# GSDN Workspace — project rules for every agent
 
-GSDN PMIS is a project management information system for the GSDN site-delivery
+GSDN Workspace is a project management information system for the GSDN site-delivery
 project (telecom sites across 7 Libyan regions). It replaces the Excel Site Master
 as the system of record, with a two-level approval workflow on every task: L1 Data Entry and L2 Data Reviewer & Approver (owner decision 2026-11-01).
 
@@ -50,17 +50,17 @@ Read before any work:
   - There is **no separate assignments register**: the Procurement record is the assignment, for companies (PO/WO, Outsourced or TE Vendor) and for internal teams (internal work order, In-House). Field work without a PO/WO (Survey, Acquisition Visit, Inspection, Maintenance, Emergency) is a Procurement record with one of these scopes, In-House, no PR. Its "Assignment" section adds the Aljeel engineers (each supervisor or executor), the field-work dates, "vehicle required" and "advance required" (a "not required" answer needs a reason), and a derived **Ready to mobilize** (approved, vehicle reserved or not required, advance actually disbursed or not required). These fields have no Master column; the PR-PO export is unchanged.
   - Two new registers, each with its own matrix row: **Car Dispatcher** (vehicles and bookings; a vehicle can never be reserved twice for overlapping dates; one booking opens per approved assignment, more can be added; extension or new request) and **Financial Advances** (individual by default, group with one named custodian; requested, approved and disbursed amounts, expenses with receipts approved by the Finance L2 and never by the custodian, settlement with a derived balance; top-up or extension linked to the original; may stay open after the work closes; LYD only; amounts visible only to Finance, the Project Manager, the custodian and the custodian's Team Lead). The Car Dispatcher has nothing to do with the Warehouse DN/RN dispatch. Advances are field custody only, not project accounting. Neither register is part of the Master-format export.
   - Approving an assignment at L2 opens the booking and the advance requests together. Workflow tasks MOB-1 (stage 1), MOB-2 (stage 2, after B2) and MOB-5 (stage 5) follow "Ready to mobilize"; they count toward no milestone and sit in no gate condition, so milestones, gates, weights and existing SLA are unchanged.
-- **Site Register and streams (owner decision 2026-10-29).**
-  - The Sites module is named **Site Register** (سجل المواقع).
+- **SITE 360 and streams (owner decision 2026-10-29).**
+  - The Sites module is named **SITE 360**.
   - It has a **stream filter** and one **sub-section per stream**. A sub-section shows and works on the sites' status in that stream only: its tasks, current step, late items and milestone.
-  - **Navigation (owner decision 2026-11-05).** Site Register is a main menu of its own: "All sites" (the whole site data) and six sub-menus, each limited to its boundaries: Design & Acquisition (stage 1), Civil Works (2–4), Installation TE (5–8), Handover & Closure (9–10), Dismantle (the Dismantle register, E1–E3) and O&M (after HOTO: TE DLP/FAC and Final Closure; it overlaps Handover & Closure on those, accepted). Every register (Procurement, GECOL, HLC, Permits & HSE, Warehouse, Quality, Issue Log, Risk Register, Change Control Log, Readiness & Handover, As-Built, Meetings, RF & Design, Acquisition, Contractors, Car Dispatcher, Financial Advances) sits under the main menu **Registers & Logs** (السجلات والقيود).
+  - **Navigation (owner decision 2026-11-05).** SITE 360 is a main menu of its own: "All sites" (the whole site data) and six sub-menus, each limited to its boundaries: Design & Acquisition (stage 1), Civil Works (2–4), Installation TE (5–8), Handover & Closure (9–10), Dismantle (the Dismantle register, E1–E3) and O&M (after HOTO: TE DLP/FAC and Final Closure; it overlaps Handover & Closure on those, accepted). Every register (Procurement, GECOL, HLC, Permits & HSE, Warehouse, Quality, Issue Log, Risk Register, Change Control Log, Readiness & Handover, As-Built, Meetings, RF & Design, Acquisition, Contractors, Car Dispatcher, Financial Advances) sits under the main menu **Registers & Logs** (السجلات والقيود).
   - Default streams are seed data, admin-configurable and versioned with the workflow:
     - Design & Acquisition: stage 1;
     - Civil Works: stages 2–4;
     - Installation (TE): stages 5–8;
     - Handover & Closure: stages 9–10.
   - Spec: `docs/spec/registers-and-streams.md`.
-- **Two entry ways everywhere (owner confirmation 2026-10-29).** The Site Register and every other register accept either manual entry or an approved template (download, fill, upload the same template). Both go through L1 → L2.
+- **Two entry ways everywhere (owner confirmation 2026-10-29).** The SITE 360 and every other register accept either manual entry or an approved template (download, fill, upload the same template). Both go through L1 → L2.
 - The Audit Log records every user action with before and after values. It is append-only and nobody can edit it. The System/Error Log is kept separately.
 - Audit Log readers (decision B4): System Admins and the Project Manager see all of it. Each Team Lead sees the entries for their own modules and regions only. Anyone else gets it only through the `view_audit` grant in the permission grid, scoped like any other grant (B3). Every read of the Audit Log is itself audited.
 - **Messages and announcements (owner decision 2026-10-28, ADR 0013).**

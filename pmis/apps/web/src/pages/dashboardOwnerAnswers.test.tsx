@@ -26,7 +26,7 @@ describe('Dashboard follow-up of the owner answers (Q118 to Q127)', () => {
     page();
     await screen.findByTestId('dash-progress-value');
     const sel = screen.getByTestId('dash-filter-view');
-    expect(within(sel).getAllByRole('option').map((o) => o.textContent)).toEqual(['All views', 'CW Register', 'TE Register', 'O&M']);
+    expect(within(sel).getAllByRole('option').map((o) => o.textContent)).toEqual(['All views', 'Civil Works', 'Installation (TE)', 'O&M']);
     await u.selectOptions(sel, 'CW');
     await waitFor(() => expect(seen.some((s) => s.includes('view=CW'))).toBe(true));
     await waitFor(() => expect(within(screen.getByTestId('dash-pipeline')).queryByTestId('pipe-node-MS1')).toBeNull());

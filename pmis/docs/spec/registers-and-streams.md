@@ -1,9 +1,9 @@
 # Registers and streams (P1)
 
-Owner request of 2026-10-29 (CLAUDE.md "Site Register and streams" and "Two entry ways everywhere"):
-1. The Sites module is the **Site Register** (سجل المواقع). The other registers are separate sections.
-2. The Site Register has a **stream filter** and one **sub-section per stream**. A sub-section shows and works on the sites' status in that stream only.
-3. Every register, and the Site Register, accepts **manual entry** or an **approved template** (download, fill, upload the same file). Both go through Entry → Review → Approve.
+Owner request of 2026-10-29 (CLAUDE.md "SITE 360 and streams" and "Two entry ways everywhere"):
+1. The Sites module is the **SITE 360** (سجل المواقع). The other registers are separate sections.
+2. The SITE 360 has a **stream filter** and one **sub-section per stream**. A sub-section shows and works on the sites' status in that stream only.
+3. Every register, and the SITE 360, accepts **manual entry** or an **approved template** (download, fill, upload the same file). Both go through Entry → Review → Approve.
 
 Sources and how they are cited:
 - **CLAUDE.md**: the binding owner decisions.
@@ -36,12 +36,12 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 | R1 | There are two entry ways: a manual form, or an approved template that is downloaded, filled and uploaded again. Both create the same record versions and follow the same approval. | CLAUDE.md "Two entry ways everywhere" |
 | R2 | Each record goes through Entry → Review → Approve with the levels of its Responsibility Matrix row. Every register and Dismantle has its own row with 1 to 3 levels. Self-skip, rejection one level back with a note, and self-approval work as for tasks. | CLAUDE.md B11, B5, B6; `stories-workflow.md` WF-01..WF-06 |
 | R3 | **Which matrix row approves a record that closes a task** is open (Q43). *Default:* the task's stage row approves a record that is the source of a task (for example the first CW order for B1/B2), in one approval with the task. The register row approves every other record (a second order, a renewal, a contractor). | ASSUMPTION; BP §02 "the data is one, entered from either side" |
-| R4 | A template is issued with a hidden sheet `_tpl` that holds `template_id`, `version` and `register_key` (plus `stream` for Site Register templates). Its header row repeats the Master header names in Master column order, so it looks like the Master sheet. Headers are locked, and drop-downs come from the Setting lists. | CLAUDE.md "Approved templates only"; `stories-templates-and-import.md` TI-01 |
+| R4 | A template is issued with a hidden sheet `_tpl` that holds `template_id`, `version` and `register_key` (plus `stream` for SITE 360 templates). Its header row repeats the Master header names in Master column order, so it looks like the Master sheet. Headers are locked, and drop-downs come from the Setting lists. | CLAUDE.md "Approved templates only"; `stories-templates-and-import.md` TI-01 |
 | R5 | Grey (calc) columns may be shown in a pre-filled copy. They are locked, greyed and ignored on upload. | D16; BP §17; TI-03 |
 | R6 | Every upload is validated row by row with the manual-entry rules, then shown as a diff preview (new, changed, identical). It becomes a batch that is reviewed and approved row by row or all at once. | CLAUDE.md; TI-04, TI-05, WF-08 |
 | R7 | A row is matched to an existing record by the register's **natural key** (§3). A key that does not match creates a new record. A hidden `record_id` column in pre-filled copies takes precedence over the natural key. | ASSUMPTION |
 | R8 | A file without a valid `_tpl`, with an unknown ID or with a retired version is rejected and written to the System Log. | CLAUDE.md; TI-02 |
-| R9 | Approved values are never overwritten silently. A later change is a new version that goes through approval again. A change to an approved Site Register value that drives a gate or milestone needs Change Control when it is a scope change (AA:AF, Z, relocation). | BP §03 "scope change"; D53 |
+| R9 | Approved values are never overwritten silently. A later change is a new version that goes through approval again. A change to an approved SITE 360 value that drives a gate or milestone needs Change Control when it is a scope change (AA:AF, Z, relocation). | BP §03 "scope change"; D53 |
 | R10 | Registers keep the CLAUDE.md custom-field rules: an admin-added field can appear in templates and exports with a Master export column. A field change issues a new template version, and old versions are rejected with a clear message. | CLAUDE.md "Custom fields" |
 
 **Built (migration 0037, contract 0.7.0) for the registers:**
@@ -53,7 +53,7 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 - R1, R2 and RE-06/RE-07: a batch is an entry into the normal flow. The uploader (L1 Data Entry) sends it and each valid row becomes a register record submitted through `reg_save_record`, `reg_new_version` and `reg_transition_record`; L2 then approves rows one by one or all at once, or returns them to L1 with a note. An update is a new version (R9). A row whose record has an open version is held "pending previous approval" and "approve all" leaves it. The audit and the history show "via batch".
 - Not built yet: undo of an applied batch (TI-06).
 
-**Built (migration 0051, contract 0.11.5) for the Site Register streams and the Master (SR-09 to SR-11, Q73):**
+**Built (migration 0051, contract 0.11.5) for the SITE 360 streams and the Master (SR-09 to SR-11, Q73):**
 - `TPL-SITE-DA`, `TPL-SITE-CW`, `TPL-SITE-TE`, `TPL-SITE-CL`: one row per site; Site ID, then Site Name, Region and Delivery Scenario in grey, then for each task of the stream its fields in Master column order with the Master names where a Master column exists (the data is `template_task_fields` and `master_columns`, Q205, Q207). Every task has Planned Date and Actual Date; typed values and lists come from the Master Setting lists. Grey and never read: the dates the workflow sets (submitted, approved), milestone dates, calculated tasks, the fields another register owns (As-Built dates, the vendor) and the dates of tasks whose date comes from a register (Q212). Dismantle (E1 to E3) is not on any stream template.
 - Upload: each cell goes to its task. The database runs the task's own save on the real task inside a rolled-back savepoint, so the rules are those of manual entry (holder of L1, edit right and region, state, date limits, no future actual date), then the checks of the submit (the actual date, the mandatory documents). A task locked by a closed gate is refused, a task that waits for a predecessor or is in review is held `pending_previous_approval` (Q208), an approved or N/A task is refused, a grey value is never read (warning when it differs), SLA warnings never block. One batch row per touched task; a stream batch has no register.
 - Flow: the uploader's send starts each pending task, saves and submits it as L1 (the task functions of the task screen, with the import row); L2 decides each row (`wf_review`, `wf_approve`, `wf_reject`) with the same grants, holders, step-up, gates and successors; held rows and row-by-row or all-at-once decisions work as for registers. The task history and the audit show "via batch".
@@ -63,7 +63,7 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 ### 1.2 Validation applied to every register
 | # | Check | Source |
 |---|---|---|
-| V1 | The Site ID must exist in the Site Register. A register row with an unknown site is refused. | DQ02 (`Data Quality!E5`); `PR-PO!O` "Site not in Master"; list `SiteIDs` = `tblRF[Site ID]` |
+| V1 | The Site ID must exist in the SITE 360. A register row with an unknown site is refused. | DQ02 (`Data Quality!E5`); `PR-PO!O` "Site not in Master"; list `SiteIDs` = `tblRF[Site ID]` |
 | V2 | A date must lie between DateMin (2020-01-01) and DateMax (2035-12-31). An actual date may not be in the future. | D13; Setting B6:B7; BP §03 alert 11 |
 | V3 | A list value must be in its Setting list. | DQ26; D15 |
 | V4 | Required fields must be filled. "Blank never means N/A": N/A is an explicit value. | DQ06 "How to fix" |
@@ -77,20 +77,20 @@ These map to the contract field types (`text, number, date, list, multi_list, ye
 
 ---
 
-## 2. Site Register (Master sheet) and streams
+## 2. SITE 360 (Master sheet) and streams
 
-### 2.1 What the Site Register is
+### 2.1 What the SITE 360 is
 - There is one row per site, and its key is **Site ID** (Master B). Duplicates are refused (DQ01).
 - **Identity** (Master C:Q, S) is read from RF & Design by Site ID (D46, BP §02 item 4). R is read from As-Built (`Master!R` = `cAB_Configuration`). T is read from Acquisition (`Master!T` = Acquisition Completed Date of the selected candidate).
 - **Scope** is typed on the site: Project Phase X, Delivery Batch Y, Delivery Scenario Z, scope flags AA:AF and CW Delivery Model AG. These columns are mandatory (DQ06, `rules.md` §1).
 - **Workflow columns** U:FW are the task dates and statuses of the 10 stages and of Dismantle. They are entered through the tasks (cat `master_columns`). Gates and milestones are calc (`rules.md` §2).
 - **Status** FX:FZ is calc (`rules.md` §2.4). **Issue** GA:GE is replaced by the Issue Log register (§3.12).
-- **Update 2026-11-05 (Q460, migration 0070):** the Site Register creates sites, by hand (`POST /sites`, a draft) or from the approved template `TPL-SITE-NEW`, both ending at L2 of the Matrix row `site_creation`; the identity comes from the Master sheet and RF & Design enriches the site later through its feed. The default below is superseded.
+- **Update 2026-11-05 (Q460, migration 0070):** the SITE 360 creates sites, by hand (`POST /sites`, a draft) or from the approved template `TPL-SITE-NEW`, both ending at L2 of the Matrix row `site_creation`; the identity comes from the Master sheet and RF & Design enriches the site later through its feed. The default below is superseded.
 - **Update 2026-11-05 (Q476, migration 0072):** the RF & Design feed fills the latitude and longitude of the site only while the site has none (a complete pair); once a site has coordinates they change only through a Change Control proposal (Q473). The fill is audited as `site_coordinates_fed`, a record that names other coordinates as `site_coordinates_kept` (not applied).
-- Where a new site is created (Site Register or RF & Design) is open (Q46). *Default:* the Site Register "New site" form has an Identity section whose fields are stored in the RF & Design record of the same site.
+- Where a new site is created (SITE 360 or RF & Design) is open (Q46). *Default:* the SITE 360 "New site" form has an Identity section whose fields are stored in the RF & Design record of the same site.
 
 ### 2.2 Streams (default seed, admin-configurable, versioned with the workflow)
-Source: CLAUDE.md "Site Register and streams". Stage numbers and tasks: cat; seed `stage_definitions`.
+Source: CLAUDE.md "SITE 360 and streams". Stage numbers and tasks: cat; seed `stage_definitions`.
 
 | Stream code | Name EN / AR | Stages | Milestones | Gates | Tasks (cat) |
 |---|---|---|---|---|---|
@@ -115,11 +115,11 @@ Rules:
   - `On Hold` and `Cancelled` from Overall Status (FZ) show as an overlay.
 - **SR-R4, the current step** is the first task of the stream that applies and is not approved, in catalogue order. Its state is one of Locked, Pending, Ongoing, Submitted, In review, Rejected (BP §03 "step states").
 - **SR-R5, editing in a sub-section** is limited to the stream's tasks. Fields of other streams appear read-only (identity, scope, the entry milestone of the previous stream). *(owner decision 2026-10-31)* Data owned by another register is editable from the view as a write-through edit to that register (§2.7). A matrix holder edits only the tasks of the stages they hold (CLAUDE.md Matrix; MX-01).
-- **SR-R6, the stream filter** in the main Site Register view keeps the columns of the chosen streams, plus Identity, Scope and Status. With no filter, all Master column groups show in Master order (BP §07 "site grid").
+- **SR-R6, the stream filter** in the main SITE 360 view keeps the columns of the chosen streams, plus Identity, Scope and Status. With no filter, all Master column groups show in Master order (BP §07 "site grid").
 - **Entry milestone of the next stream:** the TE sub-section shows the Site RFI date (or Site Release where RFI is N/A) read-only as its start condition. G5 opens from it (Master CA; D-1 SLA start, CLAUDE.md).
 - **Dashboard independence:** the Dashboard keeps its D67 blocks (CW block of 7 milestones; TE block of 6 milestones including HOTO and Final Closure) whatever the stream mapping. The stream KPIs below are sub-section headers, not the D67 tables.
 
-### 2.3 Site Register fields (Master sheet)
+### 2.3 SITE 360 fields (Master sheet)
 In the grid the columns are grouped as in Master row 1. "Task" names the task (cat) whose approval writes the column.
 
 **Identity (all streams, read-only in sub-sections)**
@@ -301,7 +301,7 @@ Pattern for counts (D67): Scope = Done + Pending (its turn has come, including u
 | | DLP ending in the next 30 days (ASSUMPTION, uses the Expiring alert of D13) | Setting B8 |
 
 ### 2.6 Work views CW / TE / O&M (owner decision 2026-10-31)
-Source: `docs/plans/2026-10-31-dismantle-stream-views-documents.md` §2; CLAUDE.md. Site Register shows all work per site. Under it are three views, and each view shows only its own steps.
+Source: `docs/plans/2026-10-31-dismantle-stream-views-documents.md` §2; CLAUDE.md. SITE 360 shows all work per site. Under it are three views, and each view shows only its own steps.
 
 | View | Starts | Ends | Owner |
 |---|---|---|---|
@@ -313,12 +313,12 @@ Source: `docs/plans/2026-10-31-dismantle-stream-views-documents.md` §2; CLAUDE.
 - The **O&M view and an O&M role are built now**. O&M users are added later.
 - **FAC (responsibility, not display):** until the O&M team is assigned (`views.om_team_assigned` = false), CW FAC stays with the CW Team Lead and TE FAC with the TE Team Lead, who acts on TE FAC from the O&M tab (Q40). After the assignment, O&M acts on TE FAC. The matrix holders are not changed by the switch.
 - **Final Closure (Z1)** is always approved by the Project Manager (B2) and is shown in the O&M view.
-- The four-stream table in §2.2 stays the seed mapping of stages to streams and the Site Register filter (owner decision 2026-11-01, Q98). The three views are tabs beside it (contract 0.4.7 `view`, migration 0023 `workflow_views`): CW = stages 2-4 plus CW DLP (B14) and CW FAC (B15); TE = stages 5-9 through TE PAC, KPI acceptance and HOTO (TE FAC is not in TE); O&M = always everything after HOTO: TE DLP / TE FAC (D18) and Final Closure (Z1). O&M membership is fixed (migration 0030) and does not depend on `views.om_team_assigned`; that setting only decides who acts on TE FAC (Q102 final, owner decision 2026-11-01). Stage 1 (Design & Acquisition) shows only in the all-work view. Stream and view combine as an intersection. The Dashboard D67 blocks are unchanged.
+- The four-stream table in §2.2 stays the seed mapping of stages to streams and the SITE 360 filter (owner decision 2026-11-01, Q98). The three views are tabs beside it (contract 0.4.7 `view`, migration 0023 `workflow_views`): CW = stages 2-4 plus CW DLP (B14) and CW FAC (B15); TE = stages 5-9 through TE PAC, KPI acceptance and HOTO (TE FAC is not in TE); O&M = always everything after HOTO: TE DLP / TE FAC (D18) and Final Closure (Z1). O&M membership is fixed (migration 0030) and does not depend on `views.om_team_assigned`; that setting only decides who acts on TE FAC (Q102 final, owner decision 2026-11-01). Stage 1 (Design & Acquisition) shows only in the all-work view. Stream and view combine as an intersection. The Dashboard D67 blocks are unchanged.
 
 ### 2.7 Source of truth and write-through editing (owner decision 2026-10-31, option 2)
 Source: plan §4; Q73.
 - Each register (Procurement, Permits & HSE, Warehouse, Dismantle, GECOL, HLC, ...) is the source of truth for its data.
-- The work views (Site Register, CW, TE, O&M) **read** from the registers and show progress per site.
+- The work views (SITE 360, CW, TE, O&M) **read** from the registers and show progress per site.
 - A user may also **edit from a work view**. The change is saved to the **source register**, with the same permission checks, approvals and audit log as an edit made in the register. **The view never keeps its own copy.**
 - Master columns that are typed in tasks today (BU, EF, FO/FT, see §4 gaps) move to their source register under this rule: BU and EF to As-Built (Q68), FO and FT to Dismantle / Procurement (Q49–Q52). The exact moves of other typed columns (for example CD, DN and RN dates) are not decided: Q99.
 - This replaces the stream-only edit scope of SR-R5 where it conflicts: a field owned by another register is editable from the view through that register's rules, not read-only. ASSUMPTION: it still needs the holder's permission on that register's matrix row.
@@ -590,7 +590,7 @@ Three record kinds, with one matrix row "Warehouse" (CLAUDE.md B11):
   - Scope Change and Data Correction need G, H and I.
   - A Resumption needs an earlier approved Suspension (ASSUMPTION).
   - Approval Date ≥ Request Date.
-  - Scope changes of AA:AF and Z are applied to the Site Register only after approval (R9).
+  - Scope changes of AA:AF and Z are applied to the SITE 360 only after approval (R9).
 
 ### 3.11 Readiness & Handover (`readiness_handover`) — sheet Readiness & Handover, `tblReadiness` (22 columns, D55)
 - **Key:** Site ID. **One row per site** (Guide row 24).
@@ -897,15 +897,15 @@ Gaps found while tracing (each one is a question):
 
 ## 5. Acceptance criteria
 
-### 5.1 Site Register and streams (SR)
+### 5.1 SITE 360 and streams (SR)
 **SR-01 Name and menu**
 - **Given** a signed-in user with the `sites` module
   **When** they open the navigation
-  **Then** the module reads "Site Register" (EN) and "سجل المواقع" (AR).
+  **Then** the module reads "SITE 360" (EN) and "سجل المواقع" (AR).
   **And** each other register is a separate menu entry, shown only if the user may use it (CLAUDE.md; B3).
 
 **SR-02 Stream filter**
-- **Given** the Site Register list
+- **Given** the SITE 360 list
   **When** the user selects one or more streams in the stream filter
   **Then** only the Identity, Scope and Status columns and the columns of the chosen streams are shown (SR-R6).
   **And** the filter combines with Region, Phase, Batch, Scenario and status filters.
@@ -993,7 +993,7 @@ Gaps found while tracing (each one is a question):
 
 **SR-12 Visibility in streams**
 - **Given** a user limited to the CW module and the Benghazi region
-  **When** they open the Site Register
+  **When** they open the SITE 360
   **Then** only the CW stream filter value and the CW sub-section are offered, and only Benghazi sites are listed (B3).
 
 ### 5.2 Common register entry (RE)

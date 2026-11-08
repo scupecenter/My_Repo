@@ -1,4 +1,4 @@
-# GSDN PMIS: Handover to the implementation developer
+# GSDN Workspace: Handover to the implementation developer
 
 > **ملخص بالعربي:** انتهت مرحلة P0 (التأسيس) والمرحلة P1 قيد التنفيذ على `main` بعد الدمج #48: واجهة الـAPI موجودة (العقد 0.4.9، الهجرات حتى 0030)، وتشمل تسجيل الدخول المحلي ومحرك الموافقات وسجل المواقع ومواعيد SLA والبوابات وأول أربعة سجلات (المشتريات وGECOL وHLC والتصاريح) ومصفوفة المسؤوليات. يوجد CI ومثبّت لـUbuntu. قرارات المالك بتاريخ 2026-10-31 (سجل Dismantle، عروض CW/TE/O&M، قسم المستندات) مسجلة في `docs/plans/`؛ بُني منها سجل Dismantle في الواجهة الخلفية (الهجرتان 0021 و0022) وشاشته في الويب والباقي لم يُبنَ بعد. مالك المنتج يبقى صاحب القرار في البوابات واختبار القبول ورفع البيانات الحقيقية.
 
@@ -106,9 +106,9 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 
 **Open follow-ups from PR #101:**
 1. A real test for a conditional document-slot rule evaluated on the raw record data (today only a source guard checks that `documents.service.ts` does not use `reg_data_for`).
-2. A custodian alone cannot request a top-up of their own advance (only a Finance entry holder can).
-3. The Procurement `members` list cannot be entered through the approved template, only by hand.
-4. MOB tasks on sites that existed before 0076 stay locked until the admin opens them.
+2. ~~Custodian top-up~~ closed by Q518: only Finance enters financial data.
+3. The Procurement `members` list cannot be entered through the approved template yet (Q519 requires it).
+4. ~~MOB tasks on old sites~~ closed by Q520: they stay locked until the admin opens them (intended).
 5. Web: no MSW mock handlers for the new endpoints (tests use `server.use`); a local `rk` cast covers the new register keys.
 
 Earlier list (kept for history):

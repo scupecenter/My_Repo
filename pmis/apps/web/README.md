@@ -1,4 +1,4 @@
-# GSDN PMIS web (phase 1)
+# GSDN Workspace web (phase 1)
 
 React 18, TypeScript, Vite, Tailwind (tokens from `design/tokens.css`), TanStack Query, react-router, react-i18next (EN + AR, RTL by `dir` + logical CSS only). Auth is the backend-for-frontend session cookie (ADR 0002): no MSAL and no tokens in the browser. Sign-in is a local PMIS account now (ADR 0012); Microsoft 365 stays in the code behind `VITE_M365_ENABLED`.
 
