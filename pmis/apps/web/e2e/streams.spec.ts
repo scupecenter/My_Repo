@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { login } from './helpers';
 
+// These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
+
 // Site Register streams, switched from the sidebar sub-menus (the page has no tab bars): EN/light and AR/dark (RTL, dark tokens), against the mock layer.
 const CASES = [
   { locale: 'en', theme: 'light', title: 'SITE 360', cw: 'Civil Works', dismantle: 'Dismantle', na: /Show N\/A sites \(\d+\)/ },

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { api, API_BASE } from '@/api/client';
 import { server } from '@/mocks/server';
 import { siteIdOf, taskIdOf } from '@/mocks/sites';
@@ -11,6 +11,9 @@ import { Site } from './Site';
 import { Sites } from './Sites';
 import { Route, Routes } from 'react-router-dom';
 import type { TaskDetail } from '@/api/types';
+
+// These tests drive the list grid; the site page now opens on the Excel-like row by default (2026-11-08).
+beforeEach(() => localStorage.setItem('pmis.site.layout', '"list"'));
 
 const SITE = siteIdOf(0), A1 = taskIdOf(0, 0), A2 = taskIdOf(0, 1);
 const siteRoute = (q = '') => ({ route: `/sites/${SITE}${q}` });
@@ -94,6 +97,22 @@ describe('Task grid', () => {
     await signIn('reviewer');
     renderApp(<SiteAt />, siteRoute());
     await userEvent.click(await screen.findByTestId(`grid-open-${A1}`));
+    expect(await screen.findByTestId('task-drawer')).toBeInTheDocument();
+  });
+});
+
+describe('Site page: Excel-like row (2026-11-08)', () => {
+  it('opens on the horizontal row, opens the drawer from a task column, and switches to the list', async () => {
+    localStorage.removeItem('pmis.site.layout');
+    await signIn('reviewer');
+    renderApp(<SiteAt />, siteRoute());
+    const row = await screen.findByTestId('task-row');
+    expect(row.querySelectorAll('[data-testid^="row-stage-"]').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByTestId('site-layout-list'));
+    expect(await screen.findByTestId(`grid-open-${A1}`)).toBeInTheDocument();
+    expect(localStorage.getItem('pmis.site.layout')).toBe('"list"');
+    await userEvent.click(screen.getByTestId('site-layout-row'));
+    await userEvent.click(within(await screen.findByTestId('task-row')).getByTestId(`row-open-${A1}`));
     expect(await screen.findByTestId('task-drawer')).toBeInTheDocument();
   });
 });

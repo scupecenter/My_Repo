@@ -17,12 +17,15 @@ import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { TaskGrid } from '@/components/TaskGrid';
+import { TaskRow } from '@/components/TaskRow';
+import { loadPref, savePref } from '@/lib/localPref';
 import { DISMANTLE_CODE, isRealStream, statusOf, streamName, withDismantle } from '@/lib/streams';
 
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
 const STREAM_TONE: Record<string, string> = { done: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', not_started: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
 
 // ExportColumnCode values (stable codes of the `tasks` part).
+const LAYOUT_KEY = 'pmis.site.layout'; // per-viewer choice: Excel-like row (default, owner request 2026-11-08) or the list
 const TASK_COLUMNS: TasksExportColumnCode[] = ['site_code', 'task_code', 'task_name', 'task_state', 'due_date', 'sla_status'];
 
 export function Site() {
@@ -45,6 +48,7 @@ export function Site() {
   const docsTab = section !== ''; // a section other than the task grid
   const taskId = sp.get('task');
   const [ids, setIds] = useState<string[]>([]);
+  const [layout, setLayout] = useState<'row' | 'list'>(() => (loadPref<string>(LAYOUT_KEY, 'row') === 'list' ? 'list' : 'row'));
   const setParam = (k: string, v: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (v) n.set(k, v); else n.delete(k); return n; }, { replace: true });
   const setStream = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('stream', code); else n.delete('stream'); return n; }, { replace: true });
   const setView = (code: string) => setSp((p) => { const n = new URLSearchParams(p); n.delete('stage'); if (code) n.set('view', code); else n.delete('view'); return n; }, { replace: true });
@@ -107,12 +111,16 @@ export function Site() {
       )}
       {!docsTab && <>
       <div className="mb-2 flex items-center gap-2"><h2 className="me-auto font-semibold">{t('site.tasks')}{stage && <button className="btn ms-2 px-2 py-0.5 text-xs" data-testid="stage-clear" onClick={() => setParam('stage', null)}>{t('site.all_stages')}</button>}</h2>
+        <div className="flex rounded-md border border-line" role="group" aria-label={t('site.layout')}>
+          {(['row', 'list'] as const).map((l) => <button key={l} type="button" aria-pressed={layout === l} data-testid={`site-layout-${l}`} onClick={() => { setLayout(l); savePref(LAYOUT_KEY, l); }} className={`px-2 py-1 text-xs ${layout === l ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{t(`site.layout_${l}`)}</button>)}
+        </div>
         <ExportViewButton testid="grid-export-view" source="tasks" filters={{ site_id: siteId, ...(stage ? { stage_code: stage } : {}) }} columns={TASK_COLUMNS} /></div>
       {dismantle ? <p className="card p-6 text-mute" data-testid="site-dismantle-todo">{t('site.dismantle_todo')}</p>
         : st?.state === 'na' ? <p className="card p-6 text-mute" data-testid="site-stream-na">{t('site.stream_na')}</p>
         : grid.isLoading ? <p className="text-mute">{t('common.loading')}</p>
+        : layout === 'row' ? <TaskRow stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />
         : <TaskGrid key={`${stream}|${view}|${stage ?? 'all'}`} siteId={siteId} stages={stages} selected={taskId ?? sp.get('row')} onVisible={setIds} onOpen={(id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true })} />}
-      <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>
+      {layout === 'list' && <p className="mt-2 text-xs text-mute">{t('grid.keys')}</p>}
       </>}
       <TaskDrawer nav={{ ids, onGo: (id) => setSp((p) => { const n = new URLSearchParams(p); n.set('task', id); n.set('row', id); return n; }, { replace: true }) }} registerFields={grid.data?.stages.flatMap((x) => x.tasks).find((x) => x.id === taskId)?.register_fields} taskId={taskId} onClose={() => setParam('task', null)} />
     </div>

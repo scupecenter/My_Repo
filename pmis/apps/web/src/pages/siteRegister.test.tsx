@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
 import type { Page, SiteListItem, SiteTasks, TaskDetail } from '@/api/types';
 import i18n from '@/i18n';
@@ -14,6 +14,9 @@ import { Route, Routes } from 'react-router-dom';
 import { Approvals } from './Approvals';
 import { Site } from './Site';
 import { Sites } from './Sites';
+
+// These tests drive the list grid; the site page now opens on the Excel-like row by default (2026-11-08).
+beforeEach(() => localStorage.setItem('pmis.site.layout', '"list"'));
 
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
 const A1 = taskIdOf(0, 0);

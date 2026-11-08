@@ -2,6 +2,9 @@ import { test } from '@playwright/test';
 import { login } from './helpers';
 import path from 'node:path';
 
+// These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
+
 // Run with: SHOTS=1 npx playwright test e2e/screenshots.spec.ts
 const OUT = path.resolve('../../design/screens/app');
 test.skip(!process.env.SHOTS, 'screenshots are generated on demand');

@@ -29,7 +29,7 @@ const DEFS: ColDef[] = [
 const LABEL: Record<string, string> = { code: 'grid.code', task: 'grid.task', ball: 'grid.ball', plan: 'grid.plan', actual: 'grid.actual', sla: 'grid.sla', status: 'grid.status', docs: 'grid.docs', template: 'grid.template' };
 const QUICK = { late: (x: TaskSummary) => x.sla?.colour === 'red', docs: (x: TaskSummary) => !!x.slots_required && (x.slots_filled ?? 0) < x.slots_required } as const;
 type Quick = keyof typeof QUICK;
-const STATE_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', entry: 'bg-openBg text-openInk', open: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', in_approval: 'bg-waitBg text-waitInk', locked: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
+export const STATE_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', entry: 'bg-openBg text-openInk', open: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', in_approval: 'bg-waitBg text-waitInk', locked: 'bg-lockBg text-lockInk', na: 'bg-lockBg text-lockInk' };
 const SLA_TONE: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk', none: 'bg-lockBg text-lockInk' };
 const editable = (t: TaskSummary) => t.state === 'entry' || t.state === 'open';
 const isIso = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
