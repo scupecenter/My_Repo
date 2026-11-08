@@ -102,14 +102,14 @@ The owner decisions of 2026-10-31 are in `docs/plans/2026-10-31-dismantle-stream
 - Unknown business rule → add it to `docs/spec/open-questions.md` and use a configurable default. Never invent one.
 
 ## 7. Next
-**Current state (2026-11-07):** built up to migration 0076, contract 0.15.0, `CHANGELOG.md` entry 111: field assignments in Procurement, Car Dispatcher, Financial Advances and tasks MOB-1/2/5 (decisions Q495–Q516), database, API and web screens done (PR #101).
+**Current state (2026-11-08):** built up to migration 0078, contract 0.15.0, `CHANGELOG.md` entry 113 (entry 111 below): field assignments in Procurement, Car Dispatcher, Financial Advances and tasks MOB-1/2/5 (decisions Q495–Q516), database, API and web screens done (PR #101).
 
 **Open follow-ups from PR #101:**
-1. A real test for a conditional document-slot rule evaluated on the raw record data (today only a source guard checks that `documents.service.ts` does not use `reg_data_for`).
+1. ~~A real test for a conditional document-slot rule on the raw record data~~ done (changelog 113): `test/assignments-fleet.test.ts`.
 2. ~~Custodian top-up~~ closed by Q518: only Finance enters financial data.
-3. The Procurement `members` list cannot be entered through the approved template yet (Q519 requires it).
+3. ~~The Procurement `members` list through the approved template~~ done (changelog 113, migration 0078): text `1234:supervisor:lead; 5678:executor`.
 4. ~~MOB tasks on old sites~~ closed by Q520: they stay locked until the admin opens them (intended).
-5. Web: no MSW mock handlers for the new endpoints (tests use `server.use`); a local `rk` cast covers the new register keys.
+5. ~~Web: MSW mock handlers for the new endpoints~~ done (changelog 113, `mocks/handlers.fleet.ts`). The local `rk` cast stays until `schema.d.ts` is regenerated with `car_dispatcher` and `financial_advances` in `RegisterKey`.
 
 Earlier list (kept for history):
 From `docs/plans/2026-10-31-dismantle-stream-views-documents.md` (decided 2026-10-31, not yet built):
