@@ -179,7 +179,7 @@ function NotificationBell({ count }: { count: number }) {
       <Popover.Trigger asChild>
         <button className="btn relative" data-testid="topbar-bell" aria-label={t('top.notifications')}>
           <Bell size={16} />
-          {count > 0 && <span data-testid="bell-count" className="absolute -top-2 -end-2 grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-accentInk">{count}</span>}
+          {count > 0 && <span data-testid="bell-count" className="absolute -top-2 -end-2 grid h-5 min-w-5 place-items-center rounded-full bg-late px-1 text-xs text-lateOn">{count}</span>}
         </button>
       </Popover.Trigger>
       <Popover.Portal>
