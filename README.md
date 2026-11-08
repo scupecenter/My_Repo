@@ -1,4 +1,4 @@
-# GSDN PMIS
+# GSDN Workspace
 
 Project management information system for the GSDN telecom site-delivery project (7 Libyan regions). It replaces the Excel Site Master as the system of record, with a 3-level approval workflow on every task.
 
