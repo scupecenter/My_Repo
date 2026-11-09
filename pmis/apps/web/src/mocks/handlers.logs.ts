@@ -72,6 +72,22 @@ let sessions = [
 ];
 const exportsDone = new Set<string>();
 
+/** System Log rows (synthetic), newest first, in the shapes LogsService.systemList answers (details = the stored context). */
+const systemLog = [
+  { id: 81, at: '2026-11-09T08:12:44Z', level: 'warn', source: 'template-check', code: null, message: 'template upload rejected: not_xlsx', request_id: 'req-81a', user: ACTOR,
+    route: null, details: { reason: 'not_xlsx', detail: 'The file could not be read as an Excel workbook.', load_error: 'End of data reached (data length = 0, requested read 30)',
+      file_name: 'GECOL_Tripoli_<b>week45</b>.xlsx', size: 48213, template: { code: 'TPL-GECOL', version: 3 } } },
+  { id: 80, at: '2026-11-09T07:58:02Z', level: 'error', source: 'mail', code: null, message: 'mail given up', request_id: null, user: LEAD, route: null,
+    details: { kind: 'approval_reminder', to: 'o***@example.com', error: 'connect ECONNREFUSED 10.20.0.25:25', permanent: false } },
+  { id: 79, at: '2026-11-08T21:40:10Z', level: 'warn', source: 'master-import', code: 'row_skipped', message: 'master import: row skipped (unknown region)', request_id: 'req-79c', user: ACTOR,
+    route: 'POST /api/v1/master-import', details: { sheet: 'Site Master', row: 112, region: 'Atlantis', code: 'row_skipped' } },
+  { id: 78, at: '2026-11-08T09:00:01Z', level: 'warn', source: 'template-check', code: null, message: 'template upload rejected: tpl_invalid', request_id: 'req-77', user: ACTOR,
+    route: 'POST /api/v1/import-batches', details: { reason: 'tpl_invalid', detail: 'The hidden sheet _tpl is missing.', file_name: 'Permits.xlsx', size: 10240 } },
+  { id: 77, at: '2026-11-07T02:00:04Z', level: 'info', source: 'api', code: null, message: 'daily job ran', request_id: null, user: null, route: null, details: { sla_applied: 4 } },
+  { id: 76, at: '2026-11-06T13:15:00Z', level: 'error', source: 'storage', code: null, message: 'object store write failed, retried', request_id: 'req-76', user: LEAD, route: 'POST /api/v1/documents',
+    details: {} },
+];
+
 export const logsHandlers = [
   http.get(`${B}/audit-log`, ({ request }) => {
     const g = guard(); if (g) return g;
@@ -112,12 +128,20 @@ export const logsHandlers = [
       && (c.entity_id === u.searchParams.get('entity_id') || u.searchParams.get('entity_type') === 'task'));
     return HttpResponse.json({ items });
   }),
+  // 0.15.2: the System Log screen. A System Admin or view on admin.system_log (log_can_read_ops); filters as LogsService.systemList: level, source (exact),
+  // request_id, q (message text case-insensitive, or a request ID exactly), from (inclusive), to (exclusive); newest first.
   http.get(`${B}/system-log`, ({ request }) => {
-    const g = needAdmin(); if (g) return g;
-    return pageOf([
-      { id: 77, at: '2026-11-02T09:00:01Z', level: 'warn', source: 'template-check', code: null, message: 'template rejected: tpl_invalid', request_id: 'req-77', user: ACTOR, route: 'POST /api/v1/import-batches', details: {} },
-      { id: 76, at: '2026-11-02T02:00:04Z', level: 'info', source: 'job', code: null, message: 'daily job ran', request_id: null, user: null, route: null, details: { sla_applied: 4 } },
-    ], lim(new URL(request.url)));
+    const g = guard(); if (g) return g;
+    if (!isAdmin() && !viewer()?.nav.includes('admin.system_log')) return problem(403, 'action_forbidden', 'A System Admin (or view on admin.system_log) is needed.');
+    const u = new URL(request.url);
+    const f = (k: string) => u.searchParams.get(k) || '';
+    const level = f('level');
+    if (level && !['info', 'warn', 'error'].includes(level)) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/level', code: 'invalid' }] });
+    const text = f('q').toLowerCase();
+    const from = f('from') ? Date.parse(f('from')) : null, to = f('to') ? Date.parse(f('to')) : null;
+    const rows = systemLog.filter((r) => (!level || r.level === level) && (!f('source') || r.source === f('source')) && (!f('request_id') || r.request_id === f('request_id'))
+      && (!text || r.message.toLowerCase().includes(text) || r.request_id === f('q')) && (from === null || Date.parse(r.at) >= from) && (to === null || Date.parse(r.at) < to));
+    return pageOf(rows, lim(u));
   }),
   http.get(`${B}/admin/sessions`, () => {
     const g = needAdmin(); if (g) return g;

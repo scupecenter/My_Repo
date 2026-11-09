@@ -31,9 +31,13 @@ describe('the layout model (lib/navLayout)', () => {
   });
 
   it('the catalogue of the migration lists exactly the screens of the menu (so a saved layout is never refused for a real screen)', () => {
-    const sql = readFileSync(path(process.cwd(), '../api/prisma/migrations/0081_nav_layout/migration.sql'), 'utf8');
-    const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(sql)![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
-    expect(list).toEqual(NAV_SIDE.map((n) => n.key));
+    const read = (m: string) => readFileSync(path(process.cwd(), `../api/prisma/migrations/${m}/migration.sql`), 'utf8');
+    const list = /unnest\(\s*ARRAY\[([^\]]+)\]/.exec(read('0081_nav_layout'))![1]!.match(/'([^']+)'/g)!.map((s) => s.slice(1, -1));
+    // Later releases add their screens in their own migration (0082: the System Log), one INSERT ... VALUES row per key: (key, default group, ord, added_in).
+    const added = [...read('0082_nav_system_log').matchAll(/INSERT INTO nav_item_catalogue[^;]*?VALUES\s*\('([^']+)',\s*'([^']+)'/g)].map((m) => ({ key: m[1]!, group: m[2]! }));
+    expect(added).toEqual([{ key: 'logs.system', group: 'logs' }]);
+    expect([...list, ...added.map((a) => a.key)].sort()).toEqual(NAV_SIDE.map((n) => n.key).sort());
+    for (const a of added) expect(NAV_SIDE.find((n) => n.key === a.key)?.group).toBe(a.group);
     expect(cleanNavLayout(defaultLayout()).errors).toEqual([]);
   });
 

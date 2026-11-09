@@ -7,13 +7,13 @@ import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
 import { tripoliToday } from '@/lib/today';
 
-const q = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"` : s; };
+export const csvCell = (v: unknown) => { const s = String(v ?? ''); return /[",\n\r]/.test(s) || /^[=+\-@]/.test(s) ? `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"` : s; };
 /** CSV built in the browser from what is on screen. A leading = + - @ is neutralised so a spreadsheet never runs it as a formula. */
 export function reportCsv(r: Report): string {
   const head = ['employee_id', 'name', 'actions', 'field_changes', 'approvals', 'sign_ins', 'failed_sign_ins'];
   const rows = r.users.map((u) => [u.user.employee_id, u.user.display_name, u.actions, u.field_changes, u.approvals, u.sign_ins, u.failed_sign_ins]);
   const sens = r.sensitive.map((s) => [s.at, s.actor.display_name, s.action, s.entity_type, s.entity_label, s.summary]);
-  return ['﻿' + [head, ...rows].map((l) => l.map(q).join(',')).join('\n'), '', ['at', 'actor', 'action', 'entity_type', 'entity', 'summary'].join(','), ...sens.map((l) => l.map(q).join(','))].join('\n');
+  return ['﻿' + [head, ...rows].map((l) => l.map(csvCell).join(',')).join('\n'), '', ['at', 'actor', 'action', 'entity_type', 'entity', 'summary'].join(','), ...sens.map((l) => l.map(csvCell).join(','))].join('\n');
 }
 
 export function ActivityReport() {

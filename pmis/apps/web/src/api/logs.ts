@@ -194,3 +194,27 @@ export function useSetAlertSettings() {
 
 /** The monthly workbook (Q169): six sheets, no security log. Resolves with the file name. */
 export const downloadActivityXlsx = (month: string) => downloadFile('/reports/activity', { month, format: 'xlsx' });
+
+// ---------------------------------------------------------------- System Log (owner request 2026-11-09, contract 0.15.2)
+export type SystemLogEntry = components['schemas']['SystemLogEntry'];
+export type SysLevel = SystemLogEntry['level'];
+export const SYS_LEVELS: SysLevel[] = ['error', 'warn', 'info'];
+/** Sources the server writes today (the filter also takes any other text). */
+export const SYS_SOURCES = ['api', 'template-check', 'master-import', 'mail', 'storage', 'integrity', 'contractors', 'assignments', 'job'];
+export type SysFilter = { level: string; source: string; from: string; to: string; q: string };
+export const EMPTY_SYS_FILTER: SysFilter = { level: '', source: '', from: '', to: '', q: '' };
+
+/** The day after a YYYY-MM-DD date (calendar arithmetic in UTC, so no time zone can shift it). */
+const nextDay = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+const isDay = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+/**
+ * Query of GET /system-log. The dates are Tripoli calendar days (Africa/Tripoli is UTC+02:00 all year, no daylight saving): `from` is the start of
+ * its day, `to` the start of the next day (the server's `to` is exclusive), so "to = today" includes all of today.
+ */
+export function sysQuery(f: SysFilter) {
+  return {
+    level: f.level, source: f.source.trim(), q: f.q.trim(),
+    from: isDay(f.from) ? `${f.from}T00:00:00+02:00` : '', to: isDay(f.to) ? `${nextDay(f.to)}T00:00:00+02:00` : '',
+  };
+}
+export const useSystemLog = (f: SysFilter) => usePaged<SystemLogEntry>('system-log', '/system-log', sysQuery(f));
