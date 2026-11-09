@@ -102,7 +102,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect([...sub.querySelectorAll('a')].map((a) => a.getAttribute('data-testid'))).toEqual(['nav-sites-stream-DESIGN_ACQ', 'nav-sites-stream-CW', 'nav-sites-stream-TE', 'nav-sites-stream-CLOSURE', 'nav-dismantle', 'nav-sites-view-OM']);
     expect(screen.getByTestId('nav-group-registers')).not.toContainElement(screen.getByTestId('nav-dismantle'));
     const regs = [...screen.getByTestId('nav-group-registers').querySelectorAll('a')].map((a) => a.getAttribute('data-testid'));
-    expect(regs).toEqual(['procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'contractor_reports'].map((k) => `nav-${k}`));
+    expect(regs).toEqual(['procurement', 'gecol', 'hlc', 'permits_hse', 'warehouse', 'quality', 'issues', 'risks', 'change_control', 'readiness', 'as_built', 'meetings', 'rf_design', 'acquisition', 'contractors', 'car_dispatcher', 'financial_advances', 'contractor_reports'].map((k) => `nav-${k}`));
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('Change Control Log');
   });
 
