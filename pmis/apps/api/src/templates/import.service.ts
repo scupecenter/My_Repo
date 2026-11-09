@@ -19,7 +19,7 @@ import { DocumentsService } from '../documents/documents.service';
 import { ImportJobsService } from './import-jobs.service';
 import { DATA_SHEET, LISTS_SHEET, MASTER_INFO_PREFILLED, STREAM_INFO_PREFILLED, TPL_SHEET, TemplatesService, TplColumn, TplPart } from './templates.service';
 import { UploadedFile, importMaxRows } from './upload.interceptor';
-import { guardXlsx } from './xlsx-guard';
+import { explainUnreadable, guardXlsx } from './xlsx-guard';
 
 export type RejectReason =
   | 'size_or_rows_exceeded' | 'tpl_missing' | 'template_unknown_or_inactive' | 'outdated_version' | 'wrong_template' | 'checksum_mismatch' | 'import_not_allowed'
@@ -162,8 +162,9 @@ export class ImportService {
     const wb = new ExcelJS.Workbook();
     try {
       await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
-    } catch {
-      return this.reject(auth, requestId, 'not_xlsx', 'The file could not be read as an Excel workbook.', ctx);
+    } catch (e) {
+      const why = explainUnreadable(file.buffer, e);
+      return this.reject(auth, requestId, 'not_xlsx', why.detail, { ...ctx, load_error: why.logged });
     }
 
     // 1. the hidden sheet
