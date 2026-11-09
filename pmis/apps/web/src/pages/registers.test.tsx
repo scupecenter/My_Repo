@@ -52,6 +52,16 @@ describe('Register list', () => {
     renderApp(<Routed />, at('nothing'));
     expect(await screen.findByTestId('page-register-soon')).toBeInTheDocument();
   });
+
+  it('opens the Car Dispatcher and the Financial Advances as live registers, not the coming-soon page', async () => {
+    await signIn('pm');
+    for (const key of ['car_dispatcher', 'financial_advances']) {
+      const { unmount } = renderApp(<Routed />, at(key));
+      expect(await screen.findByRole('heading', { level: 1, name: key === 'car_dispatcher' ? 'Car Dispatcher' : 'Financial Advances' })).toBeInTheDocument();
+      expect(screen.queryByTestId('page-register-soon')).toBeNull();
+      unmount();
+    }
+  });
 });
 
 describe('Manual entry: create, submit, approve (L1 then L2)', () => {

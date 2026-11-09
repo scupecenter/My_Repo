@@ -125,13 +125,41 @@ export const meetings: RegisterDefinition = {
     F('legacy_converted_at', 'Old text converted on', 'تاريخ تحويل النص القديم', 'date', 'Old text (to convert)', { read_only: true }),
   ],
 };
+// Plan 2026-11-07 (Q495-Q512): the Car Dispatcher (vehicles and bookings, not site-scoped) and the Financial Advances (advance, expense, settlement).
+export const carDispatcher: RegisterDefinition = {
+  register_key: 'car_dispatcher' as RegisterDefinition['register_key'], name_en: 'Car Dispatcher', name_ar: 'حجز وتوزيع السيارات', module_key: 'car_dispatcher', site_scoped: false, multiple_per_site: true, record_types: ['vehicle', 'booking'], approval_levels: 2,
+  fields: [
+    F('plate_no', 'Plate number', 'رقم اللوحة', 'text', 'Vehicle', { in_list: true }), F('vehicle_type', 'Vehicle type', 'نوع السيارة', 'text', 'Vehicle', { in_list: true }),
+    F('model', 'Model', 'الطراز', 'text', 'Vehicle'), F('home_region', 'Home region', 'منطقة السيارة', 'text', 'Vehicle'),
+    F('driver_name', 'Driver', 'السائق', 'text', 'Vehicle'), F('permit_expiry', 'Permit expiry', 'انتهاء التصريح', 'date', 'Vehicle'),
+    F('insurance_expiry', 'Insurance expiry', 'انتهاء التأمين', 'date', 'Vehicle'),
+    F('vehicle_status', 'Vehicle status', 'حالة السيارة', 'list', 'Vehicle', { in_list: true, options: ['available', 'under_maintenance', 'out_of_service'] }),
+    F('from_date', 'From', 'من تاريخ', 'date', 'Booking', { in_list: true }), F('to_date', 'To', 'إلى تاريخ', 'date', 'Booking', { in_list: true }),
+    F('required_type', 'Required type', 'النوع المطلوب', 'text', 'Booking'),
+    F('booking_state', 'Booking state', 'حالة الحجز', 'list', 'Booking', { in_list: true, options: ['requested', 'waiting_vehicle', 'reserved', 'on_trip', 'returned', 'cancelled'] }),
+    F('waiting_reason', 'Waiting reason', 'سبب الانتظار', 'text', 'Booking'),
+  ],
+};
+export const financialAdvances: RegisterDefinition = {
+  register_key: 'financial_advances' as RegisterDefinition['register_key'], name_en: 'Financial Advances', name_ar: 'العهد المالية', module_key: 'financial_advances', site_scoped: true, multiple_per_site: true, record_types: ['advance', 'expense', 'settlement'], approval_levels: 2,
+  fields: [
+    F('advance_scope', 'Scope', 'نوع العهدة', 'list', 'Advance', { in_list: true, options: ['individual', 'group'] }),
+    F('requested_amount', 'Requested (LYD)', 'المطلوب (د.ل)', 'number', 'Advance', { in_list: true }), F('approved_amount', 'Approved (LYD)', 'المعتمد (د.ل)', 'number', 'Advance'),
+    F('disbursed_amount', 'Disbursed (LYD)', 'المصروف (د.ل)', 'number', 'Advance'), F('disbursed_date', 'Disbursed on', 'تاريخ الصرف', 'date', 'Advance'),
+    F('payment_ref', 'Payment reference', 'مرجع الدفع', 'text', 'Advance'),
+    F('advance_state', 'Advance state', 'حالة العهدة', 'list', 'Advance', { in_list: true, options: ['requested', 'approved_for_disbursement', 'disbursed', 'settlement_in_progress', 'settled', 'closed', 'cancelled'] }),
+    F('expense_date', 'Expense date', 'تاريخ المصروف', 'date', 'Expense'), F('amount', 'Amount (LYD)', 'المبلغ (د.ل)', 'number', 'Expense'),
+    F('description', 'Description', 'الوصف', 'text', 'Expense'),
+    F('returned_amount', 'Returned (LYD)', 'المرتجع (د.ل)', 'number', 'Settlement'), F('settlement_note', 'Settlement note', 'ملاحظة التسوية', 'text', 'Settlement'),
+  ],
+};
 export const REGISTER_DEFS: RegisterDefinition[] = [
   procurement, more('contractors', 'Contractors', 'المقاولون', 'contractors', false, ['company', 'team']), gecol, hlc, permits,
   more('warehouse', 'Warehouse', 'المخزن', 'warehouse', false, ['te_dn', 'cw_dn', 'te_rn', 'cw_rn', 'pl', 'open', 'adj']),
   more('quality', 'Quality', 'الجودة', 'quality', true, ['qc', 'snag', 'itp', 'ncr']), more('issues', 'Issue Log', 'سجل المشاكل', 'issues', true), more('risks', 'Risk Register', 'سجل المخاطر', 'risks', false),
   more('change_control', 'Change Control', 'ضبط التغيير', 'change_control', true), more('readiness_handover', 'Readiness & Handover', 'الجاهزية والتسليم', 'readiness', true),
   more('as_built', 'As-Built', 'كما نُفّذ', 'as_built', true, ['cw_part', 'te_part']), meetings,
-  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle,
+  more('rf_design', 'RF Design', 'تصميم RF', 'rf_design', true), more('acquisition', 'Acquisition', 'الاستحواذ', 'acquisition', true), dismantle, carDispatcher, financialAdvances,
 ];
 /** The template of each register (contract 0.7.0: one `TPL-*` per register, issued by the database). Only these four have a sample upload in the mock. */
 export const REGISTER_TEMPLATES: Record<string, RegisterKey> = { 'TPL-PO': 'procurement', 'TPL-GECOL': 'gecol', 'TPL-HLC': 'hlc', 'TPL-PRM': 'permits_hse' };
