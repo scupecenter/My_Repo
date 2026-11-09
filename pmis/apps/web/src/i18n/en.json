@@ -419,7 +419,11 @@
     "stream_na": "The stream does not apply to this site.",
     "dismantle_todo": "Dismantle has no stream in the API yet (owner decision Q41), so there are no tasks to show here.",
     "streams": "Streams",
-    "sections": "Sections"
+    "sections": "Sections",
+    "layout": "Task layout",
+    "layout_row": "Row",
+    "layout_list": "List",
+    "no_tasks": "No tasks in this view."
   },
   "grid": {
     "title": "Task grid",
@@ -1588,10 +1592,36 @@
     "in_service": "In service",
     "execution": "Execution"
   },
-  "procAssign": { "title": "Assignment", "role": "Role", "supervisor": "Supervisor", "executor": "Executor", "lead": "Lead", "none": "No members yet.", "readiness": "Readiness",
-    "ready": { "not_ready": "Not ready", "awaiting_vehicle": "Awaiting vehicle", "awaiting_advance": "Awaiting advance", "awaiting_both": "Awaiting vehicle and advance", "ready_to_mobilize": "Ready to mobilize" } },
-  "fleet": { "pick_dates": "Set the from and to dates first", "none_free": "No vehicle is free for these dates.", "already_reserved": "This vehicle is already reserved for overlapping dates. Choose another vehicle or other dates.",
-    "extend": "Extend", "extend_to": "Extend to", "extended": "Extension draft created", "top_up": "Top-up", "top_up_amount": "Extra amount (LYD)", "period_to": "Extend period to", "topped_up": "Top-up draft created", "balance": "Balance", "hidden": "hidden" },
+  "procAssign": {
+    "title": "Assignment",
+    "role": "Role",
+    "supervisor": "Supervisor",
+    "executor": "Executor",
+    "lead": "Lead",
+    "none": "No members yet.",
+    "readiness": "Readiness",
+    "ready": {
+      "not_ready": "Not ready",
+      "awaiting_vehicle": "Awaiting vehicle",
+      "awaiting_advance": "Awaiting advance",
+      "awaiting_both": "Awaiting vehicle and advance",
+      "ready_to_mobilize": "Ready to mobilize"
+    }
+  },
+  "fleet": {
+    "pick_dates": "Set the from and to dates first",
+    "none_free": "No vehicle is free for these dates.",
+    "already_reserved": "This vehicle is already reserved for overlapping dates. Choose another vehicle or other dates.",
+    "extend": "Extend",
+    "extend_to": "Extend to",
+    "extended": "Extension draft created",
+    "top_up": "Top-up",
+    "top_up_amount": "Extra amount (LYD)",
+    "period_to": "Extend period to",
+    "topped_up": "Top-up draft created",
+    "balance": "Balance",
+    "hidden": "hidden"
+  },
   "registers": {
     "new": "New record",
     "new_hint": "A new draft. Fill the sections, save it, then submit it for review.",

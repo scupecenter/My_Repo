@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { api, API_BASE, ApiError } from '@/api/client';
 import type { Page, SiteListItem, SiteTasks, TaskDetail } from '@/api/types';
 import i18n from '@/i18n';
@@ -14,6 +14,9 @@ import { Route, Routes } from 'react-router-dom';
 import { Approvals } from './Approvals';
 import { Site } from './Site';
 import { Sites } from './Sites';
+
+// These tests drive the list grid; the site page now opens on the Excel-like row by default (2026-11-08).
+beforeEach(() => localStorage.setItem('pmis.site.layout', '"list"'));
 
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
 const A1 = taskIdOf(0, 0);
@@ -40,11 +43,11 @@ describe('SITE 360: streams', () => {
     await signIn('pm');
     const names = { DESIGN_ACQ: 'التصميم والاستحواذ', CW: 'الأعمال المدنية', TE: 'التركيبات', CLOSURE: 'التسليم والإغلاق' };
     renderApp(<Sites />, { route: '/sites', locale: 'ar' });
-    expect(screen.getByRole('heading', { name: 'SITE 360' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'الموقع 360' })).toBeInTheDocument();
     cleanup();
     for (const [code, name] of Object.entries(names)) {
       renderApp(<Sites />, { route: `/sites?stream=${code}`, locale: 'ar' });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${name}`);
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`الموقع 360: ${name}`);
       cleanup();
     }
   });
@@ -119,7 +122,7 @@ describe('SITE 360: views (contract 0.4.7)', () => {
       expect(screen.queryByTestId('stream-tabs')).toBeNull();
       cleanup();
       renderApp(<Sites />, { route: `/sites?view=${view}`, locale: 'ar' });
-      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`SITE 360: ${ar}`));
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(`الموقع 360: ${ar}`));
       cleanup();
     }
   });

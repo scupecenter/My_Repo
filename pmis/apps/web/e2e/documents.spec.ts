@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { login, stepUp } from './helpers';
 
+// These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
+
 /** The document upload module on the mock layer: a slot takes a good file and refuses a bad one, Submit follows the mandatory slots, the site Documents tab and the Document Library. */
 for (const locale of ['en', 'ar'] as const) {
   test(`upload to a named slot, refuse a program, submit, then find the file on the Documents tab (${locale})`, async ({ page }) => {

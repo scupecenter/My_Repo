@@ -97,7 +97,7 @@ describe('GET /me', () => {
     expect(res.headers['etag']).toMatch(/^"\d+"$/);
     expect(res.body.is_system_admin).toBe(true);
     expect([...res.body.effective.nav].sort()).toEqual([...NAV_KEYS].sort());
-    expect(res.body.effective.nav).toEqual(expect.arrayContaining(['sites', 'admin.users', 'admin.groups', 'audit', 'my_work']));
+    expect(res.body.effective.nav).toEqual(expect.arrayContaining(['sites', 'admin.users', 'admin.groups', 'audit', 'my_work', 'procurement', 'car_dispatcher', 'financial_advances', 'dismantle']));
     expect(res.body.effective.grants).toEqual(expect.arrayContaining([{ module_key: '*', action: 'view', region_ids: 'all' }, { module_key: '*', action: 'administer', region_ids: 'all' }]));
     expect(res.body.groups).toEqual([expect.objectContaining({ name: 'System Admins', is_system_admins: true })]);
     expect(res.body.assignments).toEqual([]);

@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { login, stepUp } from './helpers';
 
+// These specs drive the list grid; the site page opens on the Excel-like row by default (2026-11-08).
+test.beforeEach(async ({ page }) => { await page.addInitScript(() => { if (!localStorage.getItem('pmis.site.layout')) localStorage.setItem('pmis.site.layout', '"list"'); }); });
+
 
 for (const locale of ['en', 'ar'] as const) {
   test(`site -> edit date -> upload -> submit -> switch account -> approve (${locale})`, async ({ page }) => {

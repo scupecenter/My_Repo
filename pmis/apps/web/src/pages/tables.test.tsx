@@ -9,11 +9,13 @@ import { MyWork } from './MyWork';
 import { Site } from './Site';
 import { Sites } from './Sites';
 
+
 const SITE = siteIdOf(0), A1 = taskIdOf(0, 0), A2 = taskIdOf(0, 1);
 const SiteAt = () => <Routes><Route path="/sites/:siteId" element={<Site />} /></Routes>;
 const DEFS: ColDef[] = [{ id: 'code', w: 80, pinned: true }, { id: 'a', w: 100 }, { id: 'b', w: 100 }, { id: 'c', w: 100, off: true }, { id: 'sec', w: 100, forbidden: true }];
 
-beforeEach(() => { localStorage.clear(); sessionStorage.clear(); });
+// The grid tests drive the list layout; the site page now opens on the Excel-like row by default (2026-11-08).
+beforeEach(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('pmis.site.layout', '"list"'); });
 
 describe('column prefs (pure)', () => {
   it('keeps the pinned column first, drops forbidden and unknown ids, and appends new columns', () => {

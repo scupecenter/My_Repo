@@ -229,7 +229,7 @@ describe('Sidebar tree (N1-N12)', () => {
     expect(screen.getByTestId('nav-sites-stream-CLOSURE')).toHaveTextContent('التسليم والإغلاق');
     expect(screen.getByTestId('nav-dismantle')).toHaveTextContent('الفك');
     expect(screen.getByTestId('nav-sites-view-OM')).toHaveTextContent('التشغيل والصيانة');
-    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveTextContent('SITE 360');
+    expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveTextContent('الموقع 360');
     expect(screen.getByTestId('nav-group-toggle-registers')).toHaveTextContent('السجلات والقيود');
     expect(screen.getByTestId('nav-change_control')).toHaveTextContent('سجل التغييرات');
     expect(screen.getByTestId('nav-group-toggle-site_register')).toHaveAttribute('aria-expanded', 'true');
