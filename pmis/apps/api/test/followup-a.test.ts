@@ -42,12 +42,15 @@ describe('Q300: the database refuses an overlapping assignment', () => {
     const role = await makeRole(db, { profile: await makeProfile(db, [['sites', 'view']]) });
     return { user, role };
   }
+  // A distinct default valid_from per row: two rows in the same millisecond would hit the unique (user, role, valid_from)
+  // index instead of the overlap check under test.
+  let seq = 0;
   /** One assignment with its region and module rows, in one transaction (the deferred check runs at COMMIT). */
   async function insert(c: Pg, f: Fix, o: { regions?: number[]; modules?: string[]; allRegions?: boolean; allModules?: boolean; from?: string; to?: string | null }): Promise<string> {
     const a = await c.query(
       `INSERT INTO user_role_assignments (user_id, role_id, permission_level, valid_from, valid_to, all_regions, all_modules)
        VALUES ($1, $2, 'view', $3::timestamptz, $4::timestamptz, $5, $6) RETURNING id`,
-      [f.user.id, f.role, o.from ?? new Date(Date.now() - 3_600_000).toISOString(), o.to ?? null, o.allRegions ?? false, o.allModules ?? false]);
+      [f.user.id, f.role, o.from ?? new Date(Date.now() - 3_600_000 + seq++).toISOString(), o.to ?? null, o.allRegions ?? false, o.allModules ?? false]);
     const id = a.rows[0].id as string;
     for (const r of o.regions ?? []) await c.query('INSERT INTO user_role_assignment_regions (assignment_id, region_id) VALUES ($1, $2)', [id, r]);
     for (const m of o.modules ?? []) await c.query('INSERT INTO user_role_assignment_modules (assignment_id, module_key) VALUES ($1, $2)', [id, m]);
