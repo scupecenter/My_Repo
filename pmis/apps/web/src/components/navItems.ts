@@ -41,6 +41,7 @@ export const NAV: { key: string; to: string; icon: Concept; group: 'work' | 'sit
   { key: 'audit', to: '/audit', icon: 'audit', group: 'logs' },
   { key: 'logs.field_changes', to: '/admin/logs/field-changes', icon: 'fieldChanges', group: 'logs' },
   { key: 'admin.security_log', to: '/admin/security-log', icon: 'securityLog', group: 'logs' },
+  { key: 'logs.system', to: '/admin/logs/system', icon: 'issue', group: 'logs' },
   { key: 'logs.online', to: '/admin/logs/online', icon: 'online', group: 'logs' },
   { key: 'logs.alerts', to: '/admin/logs/alerts', icon: 'alerts', group: 'logs' },
   { key: 'logs.job_runs', to: '/admin/logs/job-runs', icon: 'jobRuns', group: 'logs' },
@@ -56,6 +57,11 @@ export const BY_GRANT: Record<string, string> = {
 };
 /** Entries shown when the caller may use any one of these modules (0.12.9, P4b: the contractors reports and the read-only match table, Q147). */
 export const ANY_OF: Record<string, string[]> = { contractor_reports: ['procurement', 'contractors'] };
+/**
+ * Entries opened by `view` on a module that is not a screen of the server's module list (the rule of the API: a System Admin, or view on the module; a full
+ * delegation holds view on every module). The System Log (owner request 2026-11-09): GET /system-log answers 403 to anyone else (log_can_read_ops).
+ */
+export const BY_MODULE_VIEW: Record<string, string> = { 'logs.system': 'admin.system_log' };
 /** Entries only a System Admin sees (the server answers 403 to anyone else). */
 export const ADMIN_ONLY = new Set(['logs.online', 'logs.alerts', 'logs.job_runs', 'logs.deployments', 'logs.integrity', 'logs.mail']);
 export type NavItem = (typeof NAV)[number];

@@ -6835,7 +6835,7 @@ export interface paths {
         };
         /**
          * System/Error Log (12 months, then purged)
-         * @description Needs `view` on `admin.system_log` (System Admin). Separate from the Audit Log. Template rejections appear here (`source = template-check`).
+         * @description A System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise). Separate from the Audit Log. Template rejections appear here (`source = template-check`, message `template upload rejected: <reason>`). Newest first (0.15.2: documented).
          */
         get: operations["listSystemLog"];
         put?: never;
@@ -13197,7 +13197,7 @@ export interface components {
             note?: string;
             via?: components["schemas"]["WorkflowVia"];
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`. */
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
@@ -13485,13 +13485,14 @@ export interface components {
             at: string;
             /** @enum {string} */
             level: "info" | "warn" | "error";
-            /** @enum {string} */
-            source: "api" | "web" | "worker" | "auth" | "template-check" | "import" | "pdf" | "job";
+            /** @description Where the row came from (0.15.2: an open list), for example `api`, `template-check`, `master-import`, `mail`, `storage`, `integrity`, `job`. */
+            source: string;
             code?: string | null;
             message: string;
             request_id?: string | null;
             user?: components["schemas"]["UserRef"] | null;
             route?: string | null;
+            /** @description The stored context (JSON). Data only: clients show it as text, never as markup. */
             details?: {
                 [key: string]: unknown;
             } | null;
@@ -26974,10 +26975,14 @@ export interface operations {
         parameters: {
             query?: {
                 level?: "info" | "warn" | "error";
+                /** @description Exact source, for example `template-check`, `master-import`, `mail` or `api`. */
                 source?: string;
                 request_id?: string;
+                /** @description Text in the message (case-insensitive), or a request ID matched exactly. */
                 q?: string;
+                /** @description Inclusive. */
                 from?: string;
+                /** @description Exclusive. */
                 to?: string;
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */

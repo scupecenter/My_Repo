@@ -341,6 +341,20 @@ The owner asked (in Arabic, 2026-11-09) to "change the order of the side menu an
 | Database | `nav_layout_json()` (every signed-in user) and `admin_set_nav_layout(layout, reason, version)` (null layout = reset); internal `nav_layout_clean` and `nav_layout_heading` are closed to `pmis_app`. All SECURITY DEFINER, `search_path = pg_catalog, public, pg_temp`, owner `pmis_definer`, PUBLIC revoked. The key is guarded against a direct insert, an update on the old or the new key and a delete (`settings_guarded_keys` of 0072), also for an administrator's own session; `pmis_app` reads the catalogue and writes nothing in it. The setting row is created by the migration (JSON null) so the version read before the first save is the one the save checks. |
 | Open | Per-user layouts were not built (decision 1: one shared layout). The command palette keeps its own order. |
 
+## Decided 2026-11-09: System Log screen
+
+The owner asked (2026-11-09) for a System Log screen under Logs & monitoring, to read why a template upload was refused. Built on the existing `GET /system-log`; migration 0082, contract 0.15.2, CHANGELOG 121.
+
+| Topic | Decision |
+|---|---|
+| Who | The rule of the API (`log_can_read_ops`): a System Admin or `view` on `admin.system_log`. The menu entry `logs.system` uses the same rule (a new web map `BY_MODULE_VIEW`: a System Admin, a `view` grant on the module or on `*`), because `admin.system_log` is not in the server's nav list. |
+| Filters | Only what `systemList` already had: level, source (exact; the field suggests the sources written today), text (message, case-insensitive, or a request ID exactly) and dates. No API change. The dates are Tripoli calendar days: `from` = start of the day, `to` = start of the next day (`to` is exclusive), sent with `+02:00` (Libya has no daylight saving). |
+| Source | `SystemLogEntry.source` becomes an open string in the contract: the old enum did not match what the server writes (`mail`, `master-import`, `storage`, ...). Additive for readers. |
+| Context | The drawer shows `details` (the stored context) as a key/value list, nested values as indented JSON, always as text (never markup: a file name can hold anything). A copy button puts the whole row as JSON on the clipboard. |
+| Saved views | The screen key `system-log` is added to `sv_screen_module` (module `admin.system_log`), so shared views reach only readers of the System Log. |
+| Export | There is no server export of the System Log; the Export button builds a CSV of the rows on screen in the browser (formula-safe, like the activity report), for a System Admin or the `export` grant. A server-side, audited export is left for later if the owner wants one. |
+| Menu catalogue | `logs.system` is added to `nav_item_catalogue` by 0082 (heading `logs`). A saved layout without it shows it at the end of the Logs heading until the layout is saved again. |
+
 ## Follow-up work (the "Change" rows)
 
 | Package | Change | Questions |

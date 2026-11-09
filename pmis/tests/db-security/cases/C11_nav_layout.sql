@@ -198,11 +198,11 @@ SELECT nav_layout_clean('{"headings": []}'::jsonb);
 -- @end
 
 -- @case NL-31
--- @title Control: Alice reads the layout (the default: null), the catalogue, and may not edit it
+-- @title Control: Alice reads the layout (the default: null), the catalogue (42 keys of 0081 and logs.system of 0082), and may not edit it
 -- @category nav-layout
 -- @actor ALICE
 -- @region 1
--- @expect output true|false|42
+-- @expect output true|false|43
 SELECT (nav_layout_json() ->> 'is_default') || '|' || (nav_layout_json() ->> 'can_edit') || '|' || jsonb_array_length(nav_layout_json() -> 'catalogue');
 -- @end
 
