@@ -1,4 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
 
 /**
  * Safety checks on an uploaded workbook before any library parses it (file upload safety, CLAUDE.md "Approved templates only"):
@@ -136,4 +137,48 @@ export function explainUnreadable(buf: Buffer, err: unknown): { detail: string; 
     return { logged, detail: 'The file has formulas copied across cells. Paste the data as values only (Paste Special › Values), save as "Excel Workbook (*.xlsx)" and upload it again.' };
   }
   return { logged, detail: 'The file could not be read as an Excel workbook. Open it in Excel, paste the data as values only (no formulas), save it as "Excel Workbook (*.xlsx)" and upload it again.' };
+}
+
+const SSML_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+
+/**
+ * Some programs other than desktop Excel (for example exports written with the OpenXML SDK) bind the SpreadsheetML namespace to a prefix
+ * (`<x:workbook xmlns:x="…">`). The XML is valid, but the readers here match the plain element names, so such a file reads as having no
+ * sheets ("Cannot read properties of undefined (reading 'sheets')", owner report 2026-11-09). This rewrites only the XML parts of `xl/`
+ * whose SpreadsheetML elements carry a prefix, to the plain form Excel itself writes, and returns the repacked package; null when nothing
+ * needed it. Call it only on a buffer that passed guardXlsx (the sizes are already bounded there).
+ */
+export function normalizeSpreadsheetPrefixes(buf: Buffer): Buffer | null {
+  const entries = readDirectory(buf);
+  const wb = entries?.find((e) => e.name === 'xl/workbook.xml');
+  const wbXml = wb ? readSmall(buf, wb) : null;
+  if (wbXml === null || !prefixFor(wbXml)) return null;
+  const files = unzipSync(new Uint8Array(buf.buffer, buf.byteOffset, buf.length));
+  let changed = false;
+  for (const [name, data] of Object.entries(files)) {
+    if (!name.startsWith('xl/') || !name.endsWith('.xml')) continue;
+    const text = strFromU8(data);
+    const p = prefixFor(text);
+    if (!p) continue;
+    files[name] = strToU8(unprefix(text, p));
+    changed = true;
+  }
+  return changed ? Buffer.from(zipSync(files, { level: 6 })) : null;
+}
+
+/** The prefix bound to the SpreadsheetML main namespace on the root element, when that root has no default namespace of its own. */
+function prefixFor(xml: string): string | null {
+  const root = /<([A-Za-z_][\w.-]*):[A-Za-z_][\w.-]*\b[^>]*>/.exec(xml.replace(/^\uFEFF?(<\?xml[^>]*\?>\s*)?/, ''));
+  if (!root) return null;
+  const p = root[1]!;
+  const tag = root[0];
+  if (!tag.includes(`xmlns:${p}="${SSML_MAIN}"`) || /\sxmlns="/.test(tag)) return null;
+  return p;
+}
+
+function unprefix(xml: string, p: string): string {
+  const esc = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return xml
+    .replace(new RegExp(`<(/?)${esc}:`, 'g'), '<$1')
+    .replace(`xmlns:${p}="${SSML_MAIN}"`, `xmlns="${SSML_MAIN}"`);
 }

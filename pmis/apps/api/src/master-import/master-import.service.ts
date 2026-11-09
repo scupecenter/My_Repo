@@ -19,7 +19,7 @@ import { TaskViewService } from '../workflow/task-view.service';
 import { ImportJobsService } from '../templates/import-jobs.service';
 import { TPL_SHEET } from '../templates/templates.service';
 import type { UploadedFile } from '../templates/upload.interceptor';
-import { guardXlsx } from '../templates/xlsx-guard';
+import { guardXlsx, normalizeSpreadsheetPrefixes } from '../templates/xlsx-guard';
 import { OoxmlError, OoxmlWorkbook, SheetCell, masterHeaders } from './ooxml-reader';
 
 /**
@@ -93,7 +93,7 @@ export class MasterImportService {
 
     let wb: OoxmlWorkbook;
     try {
-      wb = new OoxmlWorkbook(file.buffer, ['Master', 'Setting']);
+      wb = new OoxmlWorkbook(normalizeSpreadsheetPrefixes(file.buffer) ?? file.buffer, ['Master', 'Setting']);
     } catch (e) {
       if (e instanceof OoxmlError) return this.reject(auth, requestId, 'not_xlsx', 'The file could not be read as an Excel workbook.', ctx);
       throw e;
