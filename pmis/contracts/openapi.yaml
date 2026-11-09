@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.0
+  version: 0.15.1
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.1 (2026-11-09): additive. The editable side menu (owner request 2026-11-09, technical decision "Decided 2026-11-09: editable side menu" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0081; CHANGELOG 119). New `GET /settings/nav-layout` (every signed-in user: the shared layout of the side menu, null while the code's default applies, the catalogue of screen keys, who changed it and when, the ETag, `can_edit`) and `PUT /settings/nav-layout` (a System Admin or a delegate of `settings` edit for all regions, 403 `action_forbidden` otherwise; a reason and If-Match; `layout: null` returns to the default; 422 `validation_failed` with field errors for a bad tree; 409 `invalid_transition` for the layout in force). Schemas `NavLayoutSetting`, `NavLayout`, `NavHeading`, `NavSubHeading`, `NavLayoutInput`. Audited as `nav_layout_update` / `nav_layout_reset` with before and after. The permission and module filter of the menu is unchanged and applies after the layout.
     - 0.15.0 (2026-11-07): additive. Field assignments in Procurement, the Car Dispatcher and Financial Advances (owner decisions Q495 to Q516, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`; migration 0076; CHANGELOG 111). (1) Procurement is the assignment: new `ProcScope` values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (In-House, no PR) and, in the Assignment section of `RegisterRecord.data` (register `procurement`, no Master column, the PR-PO export is unchanged): `members` (rows `{user_id, member_role: supervisor|executor, is_lead}`), `planned_start`, `planned_end`, `actual_end`, `vehicle_required` + `vehicle_not_required_reason`, `advance_required` + `advance_not_required_reason` (a "not required" answer needs its reason: 422 `reason_required` at submit) and the derived read-only `readiness` (`not_ready` is never returned; `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close`. (2) Two registers with the generic `/registers/{register_key}/records` endpoints, two levels and their own Matrix rows (empty in the seed): `car_dispatcher` (record types `vehicle`, `booking`; not site-scoped; fields in `docs/spec/registers-and-streams.md` section 3.20; derived `bookable`, `out_of_region`) and `financial_advances` (record types `advance`, `expense`, `settlement`; site-scoped; section 3.21; derived `balance`, `currency` = LYD). Permission modules `car_dispatcher` and `financial_advances`. Neither is part of the Master-format export. (3) Link rule: the L2 approval of a Procurement record with field work opens, in the same transaction and once only, one draft `booking` (when `vehicle_required`) and one draft individual `advance` per member (when `advance_required`). (4) New endpoints: `POST /registers/car_dispatcher/records/{record_id}/extend` (child booking draft), `POST /registers/financial_advances/records/{record_id}/top-up` (child advance draft: top-up and/or extension), `GET /fleet/availability` (bookable vehicles free in a date range), `GET /registers/procurement/records/{record_id}/readiness`. (5) New `ErrorCode` `vehicle_already_reserved` (409): a vehicle is never reserved for overlapping dates (database EXCLUDE constraint). An expense or settlement is never approved by its custodian (403 `self_approval_forbidden`). The amounts of Financial Advances (`requested_amount`, `approved_amount`, `disbursed_amount`, `amount`, `returned_amount`, `balance`) are absent from `data` (with `amounts_hidden: true`) for anyone but Finance, the Project Manager, the custodian and the custodian's manager (Q512); the same projection applies to search, template downloads and document contexts. (6) The workflow tasks `MOB-1` (stage 1), `MOB-2` (stage 2, after B2) and `MOB-5` (stage 5) are added without changing any milestone, gate, weight or existing SLA (`counts_toward_milestone` false, no document; SLA 2 to 3 working days from the L2 approval of the Procurement record, start event `REC:procurement`).
     - 0.14.6 (2026-11-05): register and stream batches in the background, and the threshold in Settings (technical decision of 2026-11-05 (6), `docs/spec/technical-decisions-2026-11-04.md`; migration 0075; CHANGELOG 108). Additive. (1) `POST /import-batches/{batch_id}/submit` of a register batch (any approved register template) or of a stream batch (TPL-SITE-DA / -CW / -TE / -CL and the stream parts of a TPL-MASTER file) with more rows to send than `imports.async_rows`, and `POST /import-batches/{batch_id}/decisions` of such a batch with `approve`, `review` or `reject` (all rows or the rows listed) of more rows than the threshold, answer **202** with the batch `processing` and its `progress`, as New sites batches since 0.14.4. Every check of the request is made before the 202: the uploader, If-Match, the state, the notes of a return (422 `note_required`), the authority of the person on at least one of the rows (403 `not_eligible_holder`, nothing queued), the grid right (403), and the step-up when the send can be a self-approval (the sender holds L2 of the register row or of a task of the rows) or when the decision approves (401 `step_up_required`, nothing queued). The rows are then done in chunks (register rows 50, stream rows 25, New sites 25), each committed on its own under the same person, every row checked again by the same functions (holders, levels, documents, gates, snags, the historical-load mark and cutoff); a stream send synchronises the conditional documents of each chunk's tasks inside that chunk. A row that would need a step-up the run does not have is left as it was and counted in `progress.failed` (code `step_up_required`). At the end the batch has its usual status, its one audit row and its notices. A discard and a Save Draft batch's return stay at once (200). (2) `ImportBatchProgress` gains `action` (`approve`, `review`, `reject`; null for a send), `batch_kind` (`site`, `register`, `stream`), `decided`, `held` and `saved`. (3) `POST /master-import/runs/{run_id}/apply`: the staging stays in the request; each staged batch with more rows than the threshold is sent in the background by the same admin and the answer is **202** with the run `applied`, `outcome.batches[].queued` / `job_id` / `rows`, and the new `MasterImportRun.progress` (`MasterImportRunProgress`: the background sends of the run's batches, rows done of rows total); a smaller apply answers 200 as before (`progress` null). (4) `GET /settings/imports` and `PUT /settings/imports` (`ImportsSettings`, `ImportsSettingsInput`): the threshold `async_rows` (default 50, range 10 to 500), who changed it last and when; every signed-in user reads it; a System Admin or a delegate of `settings` edit for all regions changes it with a reason and If-Match (403 `action_forbidden` otherwise; 422 out of range or unknown key; 412 stale; 409 the same value), audited as `imports_async_rows_update` with before and after.
     - 0.14.5 (2026-11-05): the site map of the dashboard (OV-12, SC-10; gap G-D05; owner request 2026-11-05 and the technical decision "site map" in `docs/spec/technical-decisions-2026-11-04.md`; no migration; CHANGELOG 107). Additive. (1) `GET /dashboard/site-map` (`getDashboardSiteMap`): one compact row per visible active site (`SiteMapItem`: id, Site ID, names EN/AR, region, sub-region, cluster, latitude and longitude with `has_coordinates` (lat 18 to 34.5, lon 8 to 26, as OV-12), overall status, delivery scenario, tower owner, the current stream and milestone (the first milestone of the site's own workflow version that is neither reached nor N/A), the last milestone reached, `on_air_reached` (the On-Air milestone MS6 reached), `late_task_count`, `behind_baseline` and `late`, `task_progress_pct`), the stream and milestone names of the workflow versions in use, the regions of the list and `counts` (total, cancelled, with and without valid coordinates). The sites are those of the caller's `dashboard.view` regions that are also in the caller's `sites.view` regions (B3; the row-level filter as for `GET /sites`); a caller without `sites.view` anywhere is 403 `module_forbidden`. Cancelled sites are listed (the map hides them unless asked). No custom field, no landlord or contact data. Not audited (a read, like `GET /dashboard`). (2) `GET /sites` takes `coordinates=missing` (sites not cancelled without valid coordinates, the link of the map) and `coordinates=valid`. (3) `SiteDetail` adds `tower_owner`, `tower_type` and `tower_height_m` (the site card of the map).
@@ -6796,6 +6797,60 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ImportsSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/nav-layout:
+    get:
+      tags: [settings]
+      operationId: getNavLayout
+      summary: The shared layout of the side menu
+      description: |
+        0.15.1. Every signed-in user may read it. `layout` is null while the default of the code applies. The web merges it with the screens it knows: a saved key of a
+        screen that no longer exists is ignored, a screen missing from the layout is shown at the end of its default heading, and the permission and module filter of
+        the menu applies after the layout (a heading whose screens are all hidden is hidden). `catalogue` lists the screen keys a layout may hold. `can_edit` is true for
+        a System Admin or a delegate of `settings` edit for all regions.
+      x-db-path: nav_layout_json
+      responses:
+        '200':
+          description: The layout.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NavLayoutSetting'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setNavLayout
+      summary: Save the layout of the side menu, or return to the default (reason, If-Match, audited)
+      description: |
+        0.15.1. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+        and If-Match are required. `layout: null` returns to the default of the code (audited `nav_layout_reset`); any other layout is checked and saved (audited
+        `nav_layout_update`), both with the layout, who and when before and after. Rules (422 `validation_failed`, paths under `/layout`): 1 to 30 main headings, at most
+        100 headings in all and 200 entries in a heading; an id `^[a-z][a-z0-9_-]{0,39}$` unique among all headings (`duplicate_id`); `name_en` and `name_ar` required,
+        1 to 60 characters after trimming (`required`, `too_long`); `icon` null or a code of the web icon set; a main heading holds screen keys and sub-headings, a
+        sub-heading only screen keys (`too_deep`); a key must be in the catalogue (`unknown_item`) and appear once (`duplicate_item`); at most 64 KiB (`too_large`); an
+        unknown field is `unknown_field`. No URL or new screen can be added. Saving the layout in force, or resetting while the default applies, is 409 `invalid_transition`.
+      x-db-path: admin_set_nav_layout
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/NavLayoutInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/NavLayoutSetting'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -15539,6 +15594,67 @@ components:
         updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'Who changed it last (null: the value of the installation).' }
         version: { type: integer, description: The ETag value. }
         can_edit: { type: boolean }
+    NavSubHeading:
+      type: object
+      description: '0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level.'
+      additionalProperties: false
+      required: [id, name_en, name_ar, children]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_-]{0,39}$', description: 'Unique among all headings.' }
+        name_en: { type: string, minLength: 1, maxLength: 60 }
+        name_ar: { type: string, minLength: 1, maxLength: 60 }
+        icon: { type: [string, 'null'], pattern: '^[a-zA-Z][a-zA-Z0-9]{0,39}$', description: 'A concept of the web icon set (lib/icons.ts), or none.' }
+        children:
+          type: array
+          maxItems: 200
+          items: { type: string, description: 'A screen key of the catalogue.' }
+    NavHeading:
+      type: object
+      description: '0.15.1. A main heading of the side menu: screen keys and sub-headings, in order.'
+      additionalProperties: false
+      required: [id, name_en, name_ar, children]
+      properties:
+        id: { type: string, pattern: '^[a-z][a-z0-9_-]{0,39}$', description: 'Unique among all headings. The default headings are work, site_register, registers, data, admin, logs.' }
+        name_en: { type: string, minLength: 1, maxLength: 60 }
+        name_ar: { type: string, minLength: 1, maxLength: 60 }
+        icon: { type: [string, 'null'], pattern: '^[a-zA-Z][a-zA-Z0-9]{0,39}$' }
+        children:
+          type: array
+          maxItems: 200
+          items:
+            oneOf:
+              - { type: string, description: 'A screen key of the catalogue.' }
+              - $ref: '#/components/schemas/NavSubHeading'
+    NavLayout:
+      type: object
+      description: '0.15.1. The shared order of the side menu (setting `nav.layout`).'
+      additionalProperties: false
+      required: [headings]
+      properties:
+        headings:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items: { $ref: '#/components/schemas/NavHeading' }
+    NavLayoutSetting:
+      type: object
+      description: '0.15.1. The layout of the side menu with who changed it and when.'
+      required: [layout, is_default, catalogue, version, can_edit]
+      properties:
+        layout: { oneOf: [{ $ref: '#/components/schemas/NavLayout' }, { type: 'null' }], description: 'null: the default of the code applies.' }
+        is_default: { type: boolean }
+        catalogue: { type: array, items: { type: string }, description: 'The screen keys a layout may hold (validation; labels, icons, routes and rights are in the web).' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }], description: 'Who changed it last (null: never changed through the screen).' }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    NavLayoutInput:
+      allOf:
+        - $ref: '#/components/schemas/WithReason'
+        - type: object
+          required: [layout]
+          properties:
+            layout: { oneOf: [{ $ref: '#/components/schemas/NavLayout' }, { type: 'null' }], description: 'null returns to the default of the code.' }
     ImportsSettingsInput:
       allOf:
         - $ref: '#/components/schemas/WithReason'

@@ -1,17 +1,19 @@
-import { ChevronDown, ChevronRight, ChevronUp, Star, X } from 'lucide-react';
-import { useRef, useState, type ReactNode, type RefObject, type KeyboardEvent as KE, type PointerEvent as PE } from 'react';
+import { ChevronDown, ChevronRight, ChevronUp, Pencil, Star, X } from 'lucide-react';
+import { useMemo, useRef, useState, type ReactNode, type RefObject, type KeyboardEvent as KE, type PointerEvent as PE } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink, useLocation } from 'react-router-dom';
+import { useNavLayout } from '@/api/settings';
 import { useStreams, useViews } from '@/api/sites';
 import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
+import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, streamName, viewName, withDismantle } from '@/lib/streams';
+import { NavLayoutEditor } from './NavLayoutEditor';
 import { SITE_OM_VIEW, SITE_STREAM_SUBMENUS, type NavItem } from './navItems';
 
 export const SIDEBAR_MIN = 200;
 export const SIDEBAR_MAX = 400;
 export const SIDEBAR_DEFAULT = 240;
-const GROUPS = ['work', 'site_register', 'registers', 'data', 'admin', 'logs'] as const;
 const K = { collapsed: 'pmis.nav.collapsed', sites: 'pmis.nav.sites_open', favs: 'pmis.nav.favs', recent: 'pmis.nav.recent' };
 const RECENT_MAX = 5;
 
@@ -50,8 +52,13 @@ function SiteSubmenus({ onNavigate, dismantle }: { onNavigate?: () => void; dism
 
 /** Collapsible tree, favourites, recent items, filter, icon-only mode. Nav items arrive already filtered by the server's permission list. */
 export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onNavigate }: { items: NavItem[]; compact: boolean; unread: number; alerts?: number; activeKey: string | undefined; onNavigate?: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const loc = useLocation();
+  // The shared layout of the menu (contract 0.15.1): the default of the code until a System Admin saves one, or when it cannot be read.
+  const navQ = useNavLayout();
+  const saved = navQ.data?.layout ?? null;
+  const layout = useMemo(() => resolveLayout(saved), [saved]);
+  const [editing, setEditing] = useState(false);
   const [collapsed, setCollapsed] = useState<string[]>(() => loadList(K.collapsed));
   const [sitesOpen, setSitesOpen] = useState<boolean>(() => loadPref<boolean>(K.sites, true) !== false);
   const [favs, setFavs] = useState<string[]>(() => loadList(K.favs));
@@ -116,6 +123,60 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
   const favItems = favs.map(byKey).filter((x): x is NavItem => !!x);
   const recentItems = recent.filter((k) => k !== activeKey).map(byKey).filter((x): x is NavItem => !!x);
 
+  /** A screen of a heading. The Site Register entry carries its sub-menus; Dismantle sits among them when it is in the same heading as the Site Register. */
+  const itemNode = (k: string, siblings: string[]) => {
+    const n = byKey(k);
+    if (!n) return null;
+    const hasSites = !compact && siblings.includes('sites') && !!byKey('sites');
+    if (n.key === 'dismantle' && hasSites) return null; // shown among the Site Register sub-menus
+    if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
+    const dm = siblings.includes('dismantle') ? byKey('dismantle') : undefined;
+    return (
+      <div key={n.key}>
+        {row(n, {
+          testid: `nav-${n.key}`,
+          active: loc.pathname.startsWith('/sites') && !subOn, plain: true,
+          extra: (
+            <>
+              <button type="button" data-testid="nav-sites-toggle" aria-expanded={sitesOpen} aria-label={`${t(sitesOpen ? 'nav.collapse' : 'nav.expand')}: ${label(n)}`} onClick={toggleSites} className="rounded-md p-1 text-faint hover:bg-hover">
+                <ChevronRight size={14} aria-hidden className={`${sitesOpen ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
+              </button>
+              {pin(n)}
+            </>
+          ),
+        })}
+        {sitesOpen && <SiteSubmenus onNavigate={onNavigate} dismantle={dm} />}
+      </div>
+    );
+  };
+  /** A main heading or a sub-heading of the shared layout, hidden when none of its screens is open to the caller (the filter applies after the layout). */
+  const renderHeading = (h: NavHead | NavSub, sub: boolean): ReactNode => {
+    const visible = keysOf(h).filter((k) => byKey(k));
+    if (!visible.length) return null;
+    const open = compact || !collapsed.includes(h.id);
+    const hasActive = visible.some((k) => k === activeKey) || (visible.includes('sites') && loc.pathname.startsWith('/sites'));
+    const concept = headingIcon(h);
+    const Icon = concept ? ICONS[concept] : null;
+    const direct = (h.children as (string | NavSub)[]).filter((c): c is string => typeof c === 'string');
+    return (
+      <div key={h.id} className={sub ? 'mb-1 ms-3' : 'mb-3'} data-testid={`nav-group-${h.id}`} data-active={hasActive || undefined} data-depth={sub ? 2 : 1}>
+        {compact
+          ? (!sub && <div className="mx-2 my-1 border-t border-line" aria-hidden />)
+          : (
+            <button type="button" data-testid={`nav-group-toggle-${h.id}`} aria-expanded={open} onClick={() => toggleGroup(h.id)}
+              className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
+              <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
+              {Icon && <Icon {...ICON_PROPS} size={14} className="shrink-0" />}
+              {headingName(h, i18n.language)}
+            </button>
+          )}
+        {open && h.children.map((c) => (typeof c === 'string' ? itemNode(c, direct) : renderHeading(c, true)))}
+      </div>
+    );
+  };
+
+  if (editing && !compact) return <NavLayoutEditor setting={navQ.data} onDone={() => setEditing(false)} />;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {!compact && (
@@ -152,50 +213,17 @@ export function SidebarBody({ items, compact, unread, alerts = 0, activeKey, onN
                 {recentItems.map((n) => row(n, { testid: `nav-recent-${n.key}`, active: false }))}
               </div>
             )}
-            {GROUPS.map((g) => {
-              const list = items.filter((i) => i.group === g);
-              if (!list.length) return null;
-              const open = compact || !collapsed.includes(g);
-              const hasActive = list.some((i) => i.key === activeKey) || (g === 'site_register' && loc.pathname.startsWith('/sites'));
-              return (
-                <div key={g} className="mb-3" data-testid={`nav-group-${g}`} data-active={hasActive || undefined}>
-                  {compact
-                    ? <div className="mx-2 my-1 border-t border-line" aria-hidden />
-                    : (
-                      <button type="button" data-testid={`nav-group-toggle-${g}`} aria-expanded={open} onClick={() => toggleGroup(g)}
-                        className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold hover:bg-hover ${hasActive ? 'text-accentText' : 'text-mute'}`}>
-                        <ChevronRight size={14} aria-hidden className={`transition-transform motion-reduce:transition-none ${open ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />{t(`nav.group_${g}`)}
-                      </button>
-                    )}
-                  {open && list.map((n) => {
-                    const hasSites = !compact && !!byKey('sites');
-                    if (n.key === 'dismantle' && hasSites) return null; // shown among the Site Register sub-menus
-                    if (n.key !== 'sites' || compact) return row(n, { testid: `nav-${n.key}`, extra: pin(n) });
-                    const dm = byKey('dismantle');
-                    return (
-                      <div key={n.key}>
-                        {row(n, {
-                          testid: `nav-${n.key}`,
-                          active: loc.pathname.startsWith('/sites') && !subOn, plain: true,
-                          extra: (
-                            <>
-                              <button type="button" data-testid="nav-sites-toggle" aria-expanded={sitesOpen} aria-label={`${t(sitesOpen ? 'nav.collapse' : 'nav.expand')}: ${label(n)}`} onClick={toggleSites} className="rounded-md p-1 text-faint hover:bg-hover">
-                                <ChevronRight size={14} aria-hidden className={`${sitesOpen ? 'rotate-90 rtl:-rotate-90' : 'rtl:rotate-180'}`} />
-                              </button>
-                              {pin(n)}
-                            </>
-                          ),
-                        })}
-                        {sitesOpen && <SiteSubmenus onNavigate={onNavigate} dismantle={dm} />}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
+            {layout.headings.map((h) => renderHeading(h, false))}
           </>
         )}
       </nav>
+      {!compact && navQ.data?.can_edit && (
+        <div className="px-3 pt-2">
+          <button type="button" className="btn btn-sm w-full justify-center" data-testid="nav-edit" onClick={() => { setQ(''); setEditing(true); }}>
+            <Pencil size={14} aria-hidden />{t('navEdit.edit')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

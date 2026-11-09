@@ -341,6 +341,8 @@ describe('hybrid mode list', () => {
       'GET /dashboard/site-map',
       // contract 0.14.6: the background threshold of batches (Settings, Imports)
       'GET /settings/imports', 'PUT /settings/imports',
+      // contract 0.15.1: the shared layout of the side menu
+      'GET /settings/nav-layout', 'PUT /settings/nav-layout',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);
