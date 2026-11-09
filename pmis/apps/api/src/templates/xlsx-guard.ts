@@ -118,3 +118,22 @@ export function guardXlsx(fileName: string, buf: Buffer): GuardResult {
   }
   return { ok: true };
 }
+
+/**
+ * Why a workbook that passed the guard could not be parsed, in words the user can act on (owner report 2026-11-09).
+ * `logged` is a short technical cause for the System Log (first line of the parser error, no cell values).
+ */
+export function explainUnreadable(buf: Buffer, err: unknown): { detail: string; logged: string } {
+  const msg = err instanceof Error ? (err.message.split('\n')[0] ?? '') : String(err);
+  const logged = msg.slice(0, 200);
+  const entries = readDirectory(buf);
+  const wb = entries?.find((e) => e.name === 'xl/workbook.xml');
+  const wbXml = wb ? readSmall(buf, wb) : null;
+  if (wbXml !== null && /purl\.oclc\.org\/ooxml\/spreadsheetml/i.test(wbXml)) {
+    return { logged: logged || 'strict_ooxml', detail: 'The file was saved as "Strict Open XML Spreadsheet". In Excel choose File › Save As › "Excel Workbook (*.xlsx)" and upload it again.' };
+  }
+  if (/shared formula/i.test(msg)) {
+    return { logged, detail: 'The file has formulas copied across cells. Paste the data as values only (Paste Special › Values), save as "Excel Workbook (*.xlsx)" and upload it again.' };
+  }
+  return { logged, detail: 'The file could not be read as an Excel workbook. Open it in Excel, paste the data as values only (no formulas), save it as "Excel Workbook (*.xlsx)" and upload it again.' };
+}
