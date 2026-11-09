@@ -80,4 +80,5 @@ BEGIN
   EXECUTE format('GRANT UPDATE (%s) ON sites TO pmis_app', cols);
 END $$;
 REVOKE ALL ON import_batch_jobs FROM pmis_app;  -- 0074 / 0075: the background runs of a big batch (New sites, register, stream, Master apply) only through imp_async_start, imp_async_step, imp_async_chunk_tasks, imp_async_pending, imp_async_abandon and imp_batch_job_json (owner pmis_definer)
+REVOKE ALL ON import_uploads FROM pmis_app;  -- 0083: the uploads staged in the background and their parsed rows only through imp_upload_start, imp_upload_step, imp_upload_pending, imp_upload_abandon, imp_upload_json, imp_uploads_running_json and mi_stage_start (owner pmis_definer)
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON nav_item_catalogue FROM pmis_app;  -- 0081: the keys of the side menu (validation of nav.layout) are written only by migrations; the layout itself changes only through admin_set_nav_layout

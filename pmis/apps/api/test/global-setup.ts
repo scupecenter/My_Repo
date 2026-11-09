@@ -154,6 +154,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const asyDb = await buildDatabase(adminUrl, asy, appPassword, true);
   process.env.TEST_DATABASE_URL_ASYNC = asyDb.appUrl;
   process.env.TEST_SUPER_URL_ASYNC = asyDb.superUrl;
+  // The background-upload database (migration 0083): the suite seeds synthetic sites with every task and changes imports.async_rows to stage the same file in the
+  // request and in the background (every other suite reads the threshold).
+  const bgu = `${dbName}_bgup`;
+  const bguDb = await buildDatabase(adminUrl, bgu, appPassword);
+  process.env.TEST_DATABASE_URL_BGUP = bguDb.appUrl;
+  process.env.TEST_SUPER_URL_BGUP = bguDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -194,6 +200,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${dashP2} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hw} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
     await a.end();
   };
 }

@@ -70,7 +70,8 @@ export class ImportBatchesController {
 
   @Get(':id')
   async get(@Auth() auth: AuthContext, @Param('id') id: string, @Res({ passthrough: true }) res: Response) {
-    const dto = await this.imports.getBatch(auth, id);
+    // 0083: also an upload of the caller while it is staged in the background (status parsing), then the batch(es) it produced
+    const dto = await this.imports.getBatchOrUpload(auth, id);
     res.setHeader('ETag', etagHeader(dto.version as number));
     return dto;
   }

@@ -1778,7 +1778,8 @@
     "in_house_no_contractor": "In-house work names the internal team, not a contractor.",
     "outsourced_no_internal_team": "Outsourced work takes its contractor from the Procurement order.",
     "execution_mode_required": "Choose the execution mode (Outsourced or In-House) first.",
-    "batch_processing": "This batch is being processed. Wait until it ends, then try again."
+    "batch_processing": "This batch is being processed. Wait until it ends, then try again.",
+    "upload_processing": "This file is already being checked. Wait until it ends, then open its batches."
   },
   "batch": {
     "title": "Upload review: {{name}}",
@@ -1884,7 +1885,9 @@
     "processing_tasks": "Tasks submitted {{done}} of {{total}} ({{pct}}%)",
     "processing_tasks_decided": "Tasks decided {{done}} of {{total}} ({{pct}}%)",
     "processing_failed": "The background processing stopped after {{done}} of {{total}} rows. The rows done are kept; the others are still waiting.",
-    "processing_errors": "{{count}} row(s) failed: see the rows marked with an error."
+    "processing_errors": "{{count}} row(s) failed: see the rows marked with an error.",
+    "parsing_parts": "Checking the file: {{pct}}% ({{done}} of {{total}} rows, part {{part}} of {{parts}})",
+    "parsing_note": "The file is checked in the background. You can leave this page; the batches appear here when the check ends."
   },
   "batchStatus": {
     "parsing": "Checking",
@@ -2241,7 +2244,8 @@
     "mode_draft": "Save Draft / Planning",
     "mode_draft_hint": "The planned dates and values are saved without submitting. Nothing goes to L2 and no milestone moves.",
     "kind_sites": "New sites",
-    "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it."
+    "rule_sites": "One row per new site. Each valid row becomes a site draft when you send the batch; no site exists until L2 approves it.",
+    "open_running": "This file is already being checked: open it"
   },
   "follow": {
     "follow": "Follow",
@@ -3504,7 +3508,15 @@
     "mode": "Mode",
     "mode_submit": "Submit for Review",
     "mode_draft": "Save Draft / Planning",
-    "reason": "Reason"
+    "reason": "Reason",
+    "uploaded_staging": "The Master is being compared in the background.",
+    "already_staging": "This file is already being compared: its run is open.",
+    "staging_title": "Comparing the Master",
+    "staging_rows": "Comparing the Master: {{pct}}% ({{done}} of {{total}} rows)",
+    "staging_note": "The rows are compared in the background. The differences appear when the comparison ends; the run can be applied after that.",
+    "staging_failed": "The comparison of this file did not end. Upload the file again.",
+    "status_staging": "Comparing",
+    "status_failed": "Failed"
   },
   "tmap": {
     "title": "Template mapping",
@@ -3986,5 +3998,15 @@
     "export": "Export CSV",
     "exported": "The current view was downloaded.",
     "shown": "{{count}} shown"
+  },
+  "upload": {
+    "title": "Checking the uploaded file",
+    "hint": "Big files are checked part by part. Nothing is sent into the flow until you open the batch and send it.",
+    "stop": "Stop checking",
+    "stopped": "The check of the file was stopped.",
+    "failed": "The file could not be checked.",
+    "failed_parts_one": "{{count}} part was staged before it stopped; it is listed in the batches.",
+    "failed_parts_other": "{{count}} parts were staged before it stopped; they are listed in the batches.",
+    "done": "The file was checked. Open the batch of each part."
   }
 }

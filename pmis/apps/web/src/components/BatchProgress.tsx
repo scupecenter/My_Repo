@@ -46,10 +46,15 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
   const wrap = 'mb-3 rounded-md border border-line bg-card p-3';
 
   if (b.status === 'parsing') {
-    const p = typeof job?.progress === 'number' ? Math.min(100, Math.max(0, Math.round(job.progress * 100))) : null;
-    const r = (job?.result ?? {}) as Record<string, unknown>;
+    // 0.15.3: a big upload staged in the background reports its own progress (rows checked of the file's rows, parts staged); a parse job is the older shape
+    const up = b.progress?.kind === 'upload' ? b.progress : null;
+    const p = up ? Math.min(100, Math.max(0, up.percent)) : typeof job?.progress === 'number' ? Math.min(100, Math.max(0, Math.round(job.progress * 100))) : null;
+    const r = (up ?? job?.result ?? {}) as Record<string, unknown>;
     const done = typeof r.rows_done === 'number' ? r.rows_done : null, total = typeof r.rows_total === 'number' ? r.rows_total : null;
-    const label = p === null ? t('batchProgress.parsing_wait') : done !== null && total !== null ? t('batchProgress.parsing_rows', { pct: p, done, total }) : t('batchProgress.parsing', { pct: p });
+    const parts = up && (up.parts_total ?? 0) > 1 ? { part: Math.min((up.parts_done ?? 0) + 1, up.parts_total ?? 0), parts: up.parts_total ?? 0 } : null;
+    const label = p === null ? t('batchProgress.parsing_wait')
+      : done !== null && total !== null ? (parts ? t('batchProgress.parsing_parts', { pct: p, done, total, ...parts }) : t('batchProgress.parsing_rows', { pct: p, done, total }))
+      : t('batchProgress.parsing', { pct: p });
     const id = 'batch-progress-parsing-label';
     return (
       <section className={wrap} data-testid="batch-progress" data-phase="parsing" aria-label={t('batchProgress.title')}>
@@ -60,6 +65,7 @@ export function BatchProgress({ batch: b, job, site }: { batch: ImportBatch; job
             ? <span className="absolute inset-y-0 start-0 w-1/3 animate-pulse rounded-full bg-open" data-testid="batch-progress-indeterminate" />
             : <span className="block h-full rounded-full bg-open transition-all" style={{ width: `${p}%` }} />}
         </div>
+        {up && <p className="mt-2 text-xs text-mute" role="status" data-testid="batch-progress-parsing-note">{t('batchProgress.parsing_note')}</p>}
       </section>
     );
   }

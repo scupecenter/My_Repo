@@ -24,7 +24,9 @@ export class MasterImportController {
   @HttpCode(201)
   @UseInterceptors(UploadInterceptor)
   async upload(@Auth() auth: AuthContext, @Upload() file: UploadedFile | undefined, @Req() req: Request & { id?: string }, @Res({ passthrough: true }) res: Response) {
-    const dto = await this.mi.upload(auth, file, req.id);
+    const { accepted, ...dto } = await this.mi.upload(auth, file, req.id);
+    // 0083: a big Master is compared in the background: 202 with the run in status staging and its progress
+    if (accepted) res.status(202);
     res.setHeader('ETag', etagHeader(dto.version as number));
     return dto;
   }

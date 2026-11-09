@@ -14,7 +14,7 @@ export type ErrorCode =
   | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
   | 'list_not_configured'
   | 'email_not_verified'
-  | 'batch_processing' | 'vehicle_already_reserved';
+  | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing';
 
 export interface FieldError {
   path: string;
@@ -73,6 +73,7 @@ const TITLES: Record<string, string> = {
   mail_not_configured: 'Mail is not configured',
   email_not_verified: 'The new email address is not confirmed',
   batch_processing: 'The batch is being processed',
+  upload_processing: 'The file is being checked',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

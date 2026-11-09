@@ -17,6 +17,7 @@ import { DbService } from '../db/db.service';
 import { StorageService, newObjectKey } from '../documents/storage.service';
 import { TaskViewService } from '../workflow/task-view.service';
 import { ImportJobsService } from '../templates/import-jobs.service';
+import { UPLOAD_ASYNC_FACTOR } from '../templates/import.service';
 import { TPL_SHEET } from '../templates/templates.service';
 import type { UploadedFile } from '../templates/upload.interceptor';
 import { guardXlsx, normalizeSpreadsheetPrefixes } from '../templates/xlsx-guard';
@@ -45,7 +46,7 @@ const resolveBody = z.object({ resolution: z.enum(['open', 'pmis_correct', 'mast
 interface RunRow {
   id: string; file_name: string; file_sha256: string; file_size: bigint; status: string; structure: Record<string, unknown>; summary: Record<string, unknown>;
   created_by: string; created_at: Date; applied_by: string | null; applied_at: Date | null; apply_reason: string | null; apply_mode: string | null; group_id: string | null;
-  outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string; progress: Record<string, unknown> | null;
+  outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string; progress: Record<string, unknown> | null; staging: Record<string, unknown> | null;
 }
 
 interface DiffRow {
@@ -123,6 +124,12 @@ export class MasterImportService {
     // the original is kept as it was uploaded (never given a _tpl sheet)
     const key = newObjectKey('imports');
     await this.storage.store.put(key, file.buffer);
+    // 0083: a Master with more data rows than imports.async_rows is compared in the background: the identification and structure checks and the run
+    // (status staging) now, the rows chunk by chunk under the same person's signed context (ImportJobsService, imp_upload_step)
+    // (the rows that name a site count: a formula or numbering row of an empty Master is compared in no time)
+    const siteCol = headers.find((h) => /(^|\/\s*)Site ID$/i.test(h.header.trim()))?.col ?? 'B';
+    const siteRows = rows.filter((r) => { const c = r.cells[siteCol]; return !!c && !c.f && String(c.v ?? '').trim() !== ''; }).length;
+    if (siteRows > (await this.asyncRows())) return this.startStaging(auth, requestId, ctx, file, sha, key, wb.sheetNames, headers, rows, staff);
     let id: string;
     await this.db.tx.$executeRaw`SAVEPOINT mi_stage`;
     try {
@@ -143,6 +150,41 @@ export class MasterImportService {
       throw p;
     }
     return this.getRun(auth, id);
+  }
+
+  /** 0083: the data rows above which a legacy Master is compared in the background (as the template uploads: 4 x imports.async_rows, default 200). */
+  private async asyncRows(): Promise<number> {
+    const r = await this.db.tx.$queryRaw<{ r: { async_rows?: number } | null }[]>(Prisma.sql`SELECT imports_async_json() AS r`);
+    const n = Number(r[0]?.r?.async_rows);
+    return UPLOAD_ASYNC_FACTOR * (Number.isFinite(n) && n > 0 ? n : 50);
+  }
+
+  private async startStaging(
+    auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, file: UploadedFile, sha: string, key: string, sheets: string[], headers: unknown,
+    rows: unknown[], staff: unknown[],
+  ): Promise<Record<string, unknown>> {
+    const until = await this.stepUp.validUntil(auth);
+    let started: { run_id: string; upload_id: string };
+    await this.db.tx.$executeRaw`SAVEPOINT mi_stage`;
+    try {
+      const r = await this.db.tx.$queryRaw<{ r: { run_id: string; upload_id: string } }[]>(Prisma.sql`
+        SELECT mi_stage_start(${file.originalname.slice(0, 200)}::text, ${sha}::text, ${file.size}::bigint, ${key}::text, ${JSON.stringify(sheets)}::jsonb,
+          ${JSON.stringify(headers)}::jsonb, ${JSON.stringify(rows)}::jsonb, ${JSON.stringify(staff)}::jsonb, ${until}::timestamptz) AS r`);
+      started = (r[0] as { r: { run_id: string; upload_id: string } }).r;
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT mi_stage`;
+    } catch (e) {
+      await this.storage.store.remove(key).catch(() => undefined);
+      const p = e instanceof ProblemException ? e : mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT mi_stage`;
+      if (p.code === 'template_rejected') {
+        const reason = String((p.opts.extra as { reason?: string } | undefined)?.reason ?? 'not_a_master');
+        return this.reject(auth, requestId, reason, p.opts.detail ?? 'The file is not the Site Master.', ctx);
+      }
+      throw p;
+    }
+    this.jobs.kick(started.upload_id);
+    return { ...(await this.getRun(auth, started.run_id)), accepted: true };
   }
 
   /** The Project Staff block of the Setting sheet (Name, Role, Region, Status under the title "Project Staff"). */
@@ -173,7 +215,7 @@ export class MasterImportService {
     return Prisma.sql`
       SELECT r.id::text AS id, r.file_name, r.file_sha256, r.file_size, r.status, r.structure, r.summary, r.created_by::text AS created_by, r.created_at,
         r.applied_by::text AS applied_by, r.applied_at, r.apply_reason, r.apply_mode, r.group_id::text AS group_id, r.outcome, r.version, r.storage_key IS NOT NULL AS has_file,
-        mi_run_progress_json(r.id) AS progress,
+        mi_run_progress_json(r.id) AS progress, mi_run_staging_json(r.id) AS staging,
         to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM master_reconciliation_runs r WHERE ${where} ${tail}`;
   }
@@ -187,6 +229,8 @@ export class MasterImportService {
       group_id: r.group_id, outcome: r.outcome, has_file: r.has_file, version: r.version,
       // 0075: the background sends of the batches of an applied run (null when every batch was sent in the request)
       progress: r.progress ?? null,
+      // 0083: the comparison of a big file in the background (status staging, then previewed; failed when it could not end); null for a file compared in the request
+      staging: r.staging ?? null,
     }));
   }
 
@@ -277,7 +321,12 @@ export class MasterImportService {
   async apply(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
     const body = parse(applyBody, raw);
-    await this.getRun(auth, id);
+    const run = await this.getRun(auth, id);
+    // 0083: a run still compared in the background, or whose comparison failed, cannot be applied (the database refuses it too)
+    if (run.status === 'staging') {
+      throw new ProblemException(409, 'upload_processing', { detail: 'The file is still being compared. Wait until the comparison ends.', extra: { run_id: id } });
+    }
+    if (run.status === 'failed') throw new ProblemException(409, 'invalid_transition', { detail: 'The comparison of this file did not end: upload the file again.' });
     if (body.historical_load) {
       // Q462: a System Admin (never a delegate), then a step-up; the database checks both again, and the open waiver
       const a = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT coalesce(app_actor_is_system_admin(), false) AS ok`;

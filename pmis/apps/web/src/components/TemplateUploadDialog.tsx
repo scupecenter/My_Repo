@@ -6,15 +6,19 @@ import { Link } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
 import { useUploadBatch } from '@/api/registers';
-import { batchPath, type ImportBatch, type UploadedBatch } from '@/api/types';
+import type { ImportBatch, UploadedBatch } from '@/api/types';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from './HistoricalLoadOption';
+import { UploadResult } from './UploadResult';
 
 /**
  * Upload dialog (contract 0.7.0, 0.11.5): pick the filled template and send it. The server checks the hidden `_tpl` sheet, the version and the header row,
  * so a refusal comes back with its reason (an old version, a changed header, macros, too large) and is shown here, in the dialog, with the server's own words.
  * On success the caller opens the batch review. A TPL-MASTER file is split into one batch per part: the dialog lists the parts and the warnings first
  * (columns and sheets GSDN Workspace does not own are ignored), then the caller opens the first batch.
+ * 0.15.3: a big file is staged in the background: the answer is the upload in status `parsing`, so the dialog closes at once into the batch page, which shows
+ * "Checking the file" with the real progress and then the batch (or the parts) the file produced. The same file while it is checked answers 409
+ * `upload_processing`: the dialog offers to open the check in progress.
  */
 export function TemplateUploadDialog({ open, onClose, templateId, templateName, taskId, kind = 'register', onDone }: {
   open: boolean; onClose: () => void; templateId: string; templateName: string; taskId?: string; kind?: 'register' | 'stream' | 'master' | 'sites'; onDone: (b: ImportBatch) => void;
@@ -28,22 +32,23 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
   const offer = useHistoricalOffer(open && kind === 'stream' && mode === 'submit');
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
   const [result, setResult] = useState<UploadedBatch | null>(null);
-  const [error, setError] = useState<{ text: string; detail?: string; reason?: string } | null>(null);
+  const [error, setError] = useState<{ text: string; detail?: string; reason?: string; uploadId?: string } | null>(null);
   const reset = () => { setFile(null); setError(null); setResult(null); setHist(NO_HISTORICAL); upload.reset(); };
   const close = () => { reset(); onClose(); };
   const send = () => {
     if (!file) return;
     setError(null);
     upload.mutate({ file, template_id: templateId, task_id: taskId, mode: kind === 'register' || kind === 'sites' ? 'submit' : mode, ...(offer && hist.on ? { historical_load_reason: hist.reason.trim() } : {}) }, {
-      onSuccess: (b) => { if (b.parts?.length || b.warnings?.length) setResult(b); else { reset(); onDone(b); } },
+      // 0.15.3: a big file answers `parsing`: the batch page follows its progress
+      onSuccess: (b) => { if (b.status !== 'parsing' && (b.parts?.length || b.warnings?.length)) setResult(b); else { reset(); onDone(b); } },
       onError: (e) => setError({
         text: registerErrorMessage(t, e),
         detail: e instanceof ApiError && e.problem.detail && e.code === 'template_rejected' ? e.problem.detail : undefined,
         reason: e instanceof ApiError ? String(e.problem.reason ?? '') : undefined,
+        uploadId: e instanceof ApiError && e.code === 'upload_processing' && typeof e.problem.upload_id === 'string' ? e.problem.upload_id : undefined,
       }),
     });
   };
-  const partName = (p: ImportBatch) => (p.stream ? t(`tpl.stream_${p.stream}`, { defaultValue: p.stream }) : p.part_sheet ?? p.register_key ?? p.template_id);
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) close(); }}>
       <Dialog.Portal>
@@ -82,7 +87,9 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
                 <div role="alert" data-testid="template-upload-error" data-reason={error.reason ?? ''} className="rounded-md bg-lateBg p-3 text-sm text-lateInk">
                   <p className="font-semibold">{error.text}</p>
                   {error.detail && <p className="mt-1" data-testid="template-upload-detail">{error.detail}</p>}
-                  <p className="mt-1 text-xs">{t('tpl.rejection_logged')}</p>
+                  {error.uploadId
+                    ? <Link className="mt-1 inline-block font-semibold underline" data-testid="template-upload-open-running" to={`/templates/batches/${error.uploadId}`} onClick={close}>{t('tpl.open_running')}</Link>
+                    : <p className="mt-1 text-xs">{t('tpl.rejection_logged')}</p>}
                 </div>
               )}
               <div className="flex justify-end gap-2">
@@ -93,32 +100,7 @@ export function TemplateUploadDialog({ open, onClose, templateId, templateName, 
           )}
           {result && (
             <div className="space-y-3" data-testid="template-upload-result">
-              {!!result.parts?.length && (
-                <div>
-                  <p className="font-semibold">{t('tpl.parts_title', { count: result.parts.length })}</p>
-                  <ul className="mt-1 list-disc space-y-0.5 ps-5 text-sm" data-testid="template-upload-parts">
-                    {result.parts.map((p) => (
-                      <li key={p.id} data-testid={`upload-part-${p.id}`}>
-                        <Link className="font-semibold underline" to={batchPath(p)} onClick={() => { reset(); onClose(); }}>{partName(p)}</Link>
-                        <span className="text-mute"> · {p.part_sheet} · {t('batch.diff', { create: p.counts.create ?? 0, update: p.counts.update ?? 0, unchanged: p.counts.unchanged ?? 0 })}{!!p.counts.error && ` · ${t('batch.invalid', { count: p.counts.error })}`}{!!p.counts.held && ` · ${t('batch.held_count', { count: p.counts.held })}`}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {!!result.warnings?.length && (
-                <div role="status" className="rounded-md bg-waitBg p-3 text-sm text-waitInk" data-testid="template-upload-warnings">
-                  <p className="font-semibold">{t('tpl.warnings_title', { count: result.warnings.length })}</p>
-                  <ul className="mt-1 list-disc ps-5">
-                    {result.warnings.map((w, i) => (
-                      <li key={`${w.code}-${w.sheet ?? ''}-${w.column ?? ''}-${i}`} data-testid={`upload-warning-${w.code}`}>
-                        {t(`tpl.warn_${w.code}`, { sheet: w.sheet ?? '', column: w.column ?? '', count: w.count ?? 0, defaultValue: w.message })}
-                        {w.code === 'part_skipped' && <span className="block text-xs">{w.message}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              <UploadResult result={result} onOpen={() => { reset(); onClose(); }} />
               <div className="flex justify-end gap-2">
                 <button className="btn btn-primary" data-testid="template-upload-open" onClick={() => { const b = result; reset(); onDone(b); }}>{t('tpl.open_first')}</button>
               </div>

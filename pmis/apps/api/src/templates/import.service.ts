@@ -25,6 +25,9 @@ export type RejectReason =
   | 'size_or_rows_exceeded' | 'tpl_missing' | 'template_unknown_or_inactive' | 'outdated_version' | 'wrong_template' | 'checksum_mismatch' | 'import_not_allowed'
   | 'not_xlsx' | 'macros_not_allowed' | 'tpl_invalid';
 
+/** 0083: an upload is staged in the background above this many times imports.async_rows data rows (default 4 x 50 = 200). */
+export const UPLOAD_ASYNC_FACTOR = 4;
+
 const BATCH_STATUSES = ['parsing', 'validated', 'in_review', 'in_approval', 'partially_approved', 'approved', 'rejected', 'applied', 'undone', 'failed', 'discarded', 'processing'];
 
 const uploadBody = z.object({
@@ -70,6 +73,15 @@ interface BatchRow {
   c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint;
   progress: Record<string, unknown> | null;
   ts: string;
+}
+
+/** 0083: an upload staged in the background, as imp_upload_json answers it to its uploader (never the parsed rows). */
+interface UploadJson {
+  upload_id: string; kind: 'single' | 'master' | 'legacy'; state: 'running' | 'done' | 'failed'; template_id: string; template_version: number; file_template_version: number | null;
+  file_name: string; mode: string; task_id: string | null; historical_load: boolean; register_key: string | null; stream: string | null; entity: string | null;
+  uploaded_by: string; uploaded_at: string; group_id: string | null; warnings: UploadWarning[]; batches: { id: string; sheet: string; kind: string; ref: string; template_id: string }[];
+  skipped: { sheet: string; kind: string; ref: string; reason?: string; detail?: string }[]; error: { code: string | null; reason: string | null; detail: string | null } | null;
+  progress: Record<string, unknown>;
 }
 
 /** The answer of imp_async_start (migration 0074): queued = the batch is processed in the background (202, status processing). */
@@ -254,6 +266,14 @@ export class ImportService {
     if (rows.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The file has no data rows.' }]);
     if (current.kind !== 'stream') await this.resolveMembers(rows as ParsedRow[], cols);
 
+    // 0083: a file with more data rows than imports.async_rows is staged in the background (the checks above and those of the staging before its rows run now)
+    if (rows.length > (await this.asyncRows())) {
+      return this.startUpload(auth, requestId, ctx, {
+        templateId, version, checksum: issued.header_checksum, kind: 'single', fileName: file.originalname, sha: String(ctx.sha256), taskId: body.task_id ?? null,
+        mode: body.mode ?? 'submit', hwReason: body.historical_load_reason ?? null, parts: rows, warnings: [], fileRows: rows.length,
+      });
+    }
+
     // 6. staging in the database, which decides every row again
     const payload = JSON.stringify(rows);
     const id = await this.stage(auth, requestId, ctx, templateId, version, issued.header_checksum, file.originalname, String(ctx.sha256), body.task_id ?? null, payload, body.mode ?? 'submit', body.historical_load_reason ?? null);
@@ -298,6 +318,92 @@ export class ImportService {
     });
     if (!id) throw problems.validation([{ path: '/file', code: 'empty', message: 'No cell of the file can be entered: the values are in columns GSDN Workspace does not read.' }]);
     return id;
+  }
+
+  /**
+   * 0083: the data rows above which an upload is staged in the background: UPLOAD_ASYNC_FACTOR times the setting imports.async_rows of 0074 / 0075 (default
+   * 4 x 50 = 200). Staging a row costs less than sending it: 200 rows of a full Master sheet take about 5 s, so smaller files keep their immediate answer.
+   */
+  private async asyncRows(): Promise<number> {
+    const r = await this.db.tx.$queryRaw<{ r: { async_rows?: number } | null }[]>(Prisma.sql`SELECT imports_async_json() AS r`);
+    const n = Number(r[0]?.r?.async_rows);
+    return UPLOAD_ASYNC_FACTOR * (Number.isFinite(n) && n > 0 ? n : 50);
+  }
+
+  /**
+   * 0083: records the background staging of an upload. imp_upload_start runs every check the staging makes before its rows (a refusal is answered and
+   * logged as today) and stores the parsed rows where only the staging functions can read them; the run starts once the request has committed.
+   */
+  private async startUpload(auth: AuthContext, requestId: string | undefined, ctx: Record<string, unknown>, u: {
+    templateId: string; version: number; checksum: string | null; kind: 'single' | 'master'; fileName: string; sha: string; taskId: string | null; mode: string;
+    hwReason: string | null; parts: unknown[]; warnings: UploadWarning[]; fileRows: number;
+  }): Promise<Record<string, unknown>> {
+    const until = await this.stepUp.validUntil(auth);
+    const out = await this.guarded(auth, requestId, ctx, async () => {
+      const r = await this.db.tx.$queryRaw<{ r: UploadJson | null }[]>(Prisma.sql`
+        SELECT imp_upload_start(${u.templateId}::text, ${u.version}::int, ${u.checksum}::text, ${u.kind}::text, ${u.fileName.slice(0, 200)}::text, ${u.sha}::text, ${u.taskId}::uuid,
+          ${u.mode}::text, ${u.hwReason}::text, ${JSON.stringify(u.parts)}::jsonb, ${JSON.stringify(u.warnings)}::jsonb, ${u.fileRows}::int, ${until}::timestamptz) AS r`);
+      const x = r[0]?.r;
+      if (!x) throw new ProblemException(500, 'internal_error', {});
+      return x;
+    });
+    this.jobs.kick(out.upload_id);
+    return this.uploadDto(out);
+  }
+
+  /** 0083: the upload of the caller (null when it is not one, or not the caller's). */
+  private async uploadOf(id: string): Promise<UploadJson | null> {
+    if (!uuidSchema.safeParse(id).success) return null;
+    const r = await this.db.tx.$queryRaw<{ r: UploadJson | null }[]>(Prisma.sql`SELECT imp_upload_json(${id}::uuid) AS r`);
+    return r[0]?.r ?? null;
+  }
+
+  private partWarnings(u: Pick<UploadJson, 'warnings' | 'skipped'>): UploadWarning[] {
+    return [...(u.warnings ?? []), ...(u.skipped ?? []).map((sk) => ({
+      code: 'part_skipped' as const, sheet: sk.sheet, message: `${sk.sheet}${sk.kind === 'stream' ? ` (${sk.ref})` : ''} was not staged: ${sk.detail ?? sk.reason ?? 'refused'}`,
+    }))];
+  }
+
+  /**
+   * 0083: an upload while it is staged (status `parsing`, its progress) or when it failed (status `failed`, its error), in the shape of a batch so the batch page
+   * can show it. Its id is the upload's; once staged, the same id answers the batch(es) the file produced (getBatchOrUpload).
+   */
+  private async uploadDto(u: UploadJson): Promise<Record<string, unknown>> {
+    const refs = await this.view.userRefs([u.uploaded_by]);
+    return {
+      id: u.upload_id, upload_id: u.upload_id, template_id: u.template_id, template_version: u.template_version, source: u.kind === 'master' ? 'master_template' : 'template',
+      file_name: u.file_name, status: u.state === 'failed' ? 'failed' : 'parsing', current_level: 1, levels_required: 2,
+      counts: { create: 0, update: 0, unchanged: 0, error: 0, pending: 0, approved: 0, rejected: 0, held: 0, saved: 0 },
+      mode: u.mode, file_template_version: u.file_template_version, historical_load: null, job_id: null, progress: u.progress,
+      task_id: u.task_id, site_id: null, register_key: u.register_key, entity: u.entity, stream: u.stream, group_id: u.group_id, part_sheet: null, note: null,
+      uploaded_at: u.uploaded_at, version: 0, uploaded_by: refs.get(u.uploaded_by) ?? { id: u.uploaded_by },
+      upload: { id: u.upload_id, kind: u.kind, state: u.state, batch_ids: u.batches.map((b) => b.id), error: u.error },
+      warnings: this.partWarnings(u),
+    };
+  }
+
+  /**
+   * GET /import-batches/{id}: a batch, or (0083) an upload of the caller. A staged upload answers what the synchronous upload answered: the batch it produced,
+   * or for a Master file the first part with `group_id`, `parts` and `warnings`; `upload_id` names the upload.
+   */
+  async getBatchOrUpload(auth: AuthContext, id: string): Promise<Record<string, unknown>> {
+    try {
+      return await this.getBatch(auth, id);
+    } catch (e) {
+      if (!(e instanceof ProblemException) || e.getStatus() !== 404) throw e;
+      const u = await this.uploadOf(id);
+      if (!u) throw e;
+      if (u.state !== 'done' || u.batches.length === 0) return this.uploadDto(u);
+      const dtos: Record<string, unknown>[] = [];
+      for (const b of u.batches) {
+        try { dtos.push(await this.getBatch(auth, b.id)); } catch { /* a part the caller can no longer see */ }
+      }
+      if (dtos.length === 0) return this.uploadDto(u);
+      const first = dtos[0] as Record<string, unknown>;
+      return u.kind === 'master'
+        ? { ...first, upload_id: u.upload_id, group_id: u.group_id, parts: dtos, warnings: this.partWarnings(u) }
+        : { ...first, upload_id: u.upload_id };
+    }
   }
 
   /**
@@ -362,6 +468,14 @@ export class ImportService {
       if (rows.length > 0) staged.push({ sheet: ws.name, header_checksum: sha256(part.columns.map((c) => c.header).join(unitSeparator)), rows });
     }
     if (staged.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The file has no data rows.' }]);
+
+    // 0083: a Master file with more data rows (all its sheets) than imports.async_rows is staged in the background, one part per transaction
+    const fileRows = staged.reduce((n, p) => n + p.rows.length, 0);
+    if (fileRows > (await this.asyncRows())) {
+      return this.startUpload(auth, requestId, ctx, {
+        templateId, version, checksum: null, kind: 'master', fileName, sha: String(ctx.sha256), taskId: null, mode, hwReason: null, parts: staged, warnings, fileRows,
+      });
+    }
 
     const payload = JSON.stringify(staged);
     const result = await this.guarded(auth, requestId, ctx, async () => {
@@ -660,10 +774,17 @@ export class ImportService {
       conds.push(Prisma.sql`b.group_id = ${group}::uuid`);
     }
     if (cursor) conds.push(Prisma.sql`(b.created_at, b.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
+    // 0083: the caller's uploads still being staged come first (status parsing), on the first page of an unfiltered list or of status=parsing
+    const parsing: Record<string, unknown>[] = [];
+    if (!cursor && (status === undefined || status === 'parsing') && template === undefined && reg === undefined && stream === undefined && group === undefined) {
+      const r = await this.db.tx.$queryRaw<{ r: UploadJson[] | null }[]>(Prisma.sql`SELECT imp_uploads_running_json() AS r`);
+      for (const u of r[0]?.r ?? []) parsing.push(await this.uploadDto(u));
+    }
+    if (status === 'parsing') return { items: parsing, page: { limit, next_cursor: null } };
     const rows = await this.db.tx.$queryRaw<BatchRow[]>(this.batchSelect(Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY b.created_at DESC, b.id DESC LIMIT ${limit + 1}`));
     const page = rows.slice(0, limit);
     const last = page[page.length - 1];
-    return { items: await this.dtos(page), page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
+    return { items: [...parsing, ...(await this.dtos(page))], page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.ts, last.id]) : null } };
   }
 
   async listRows(auth: AuthContext, id: string, q: Record<string, unknown>): Promise<{ items: unknown[]; page: { limit: number; next_cursor: string | null } }> {
@@ -746,9 +867,18 @@ export class ImportService {
     }
   }
 
+  /** 0083: a send or a decision on an upload that is still being staged waits for its end. */
+  private async refuseParsing(id: string, e: unknown): Promise<never> {
+    const u = e instanceof ProblemException && e.getStatus() === 404 ? await this.uploadOf(id) : null;
+    if (u && u.state === 'running') {
+      throw new ProblemException(409, 'upload_processing', { detail: 'The file is still being checked. Wait until it ends, then send its batch.', extra: { upload_id: u.upload_id } });
+    }
+    throw e;
+  }
+
   async submit(auth: AuthContext, id: string, ifMatch: string | undefined): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
-    const batch = await this.getBatch(auth, id);
+    const batch = await this.getBatch(auth, id).catch((e: unknown) => this.refuseParsing(id, e));
     const until = await this.stepUp.validUntil(auth);
     // 0074 / 0075: a big batch (New sites, register, stream) is sent in the background; a stream send then synchronises the documents of each chunk's tasks in that chunk
     const queued = await this.queue(auth, id, Prisma.sql`SELECT imp_async_start(${id}::uuid, ${version}::int, 'submit', NULL, NULL, NULL, NULL, ${until}::timestamptz) AS r`);
@@ -784,7 +914,16 @@ export class ImportService {
     if (body.action === 'reject' && body.scope === 'all' && !body.note?.trim()) {
       throw new ProblemException(422, 'note_required', { detail: 'A return needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     }
-    const batch = await this.getBatch(auth, id);
+    // 0083: "discard" on an upload still being staged stops it (the uploader only; the database checks it); the parts staged so far stay as batches
+    if (body.action === 'discard') {
+      const u = await this.uploadOf(id);
+      if (u && u.state === 'running') {
+        await this.call<Record<string, unknown>>(auth, Prisma.sql`SELECT imp_upload_abandon(${id}::uuid, ${'Stopped by the uploader.'}::text) AS r`);
+        const after = await this.uploadOf(id);
+        return after ? this.uploadDto(after) : this.getBatchOrUpload(auth, id);
+      }
+    }
+    const batch = await this.getBatch(auth, id).catch((e: unknown) => this.refuseParsing(id, e));
     // the level action needs the grid right on the register's module: approve for L2 (the database checks the level holders again for every row)
     const key = String(batch.register_key ?? '');
     const mod = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = ${key}`);
