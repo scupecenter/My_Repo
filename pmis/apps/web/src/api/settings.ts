@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -87,6 +87,18 @@ export const useSetImportsSettings = () => {
   const qc = useQueryClient();
   return useMutation<ImportsSettings, ApiError, { version: number; async_rows: number; reason: string }>({
     mutationFn: ({ version, ...body }) => api.put('/settings/imports', { version, body }), onSettled: () => refresh(qc, 'imports-settings'),
+  });
+};
+
+/** 0.15.1: the shared layout of the side menu (nav.layout). Read by everyone; changed by a System Admin or an all-regions delegate of settings, with a reason. */
+export const useNavLayout = (enabled = true) =>
+  useQuery({ queryKey: ['nav-layout'], queryFn: () => api.get<NavLayoutSetting>('/settings/nav-layout'), enabled, staleTime: 60_000 });
+export const useSetNavLayout = () => {
+  const qc = useQueryClient();
+  return useMutation<NavLayoutSetting, ApiError, { version: number; layout: NavLayoutT | null; reason: string }>({
+    mutationFn: ({ version, ...body }) => api.put('/settings/nav-layout', { version, body }),
+    onSuccess: (data) => qc.setQueryData(['nav-layout'], data),
+    onSettled: () => refresh(qc, 'nav-layout'),
   });
 };
 

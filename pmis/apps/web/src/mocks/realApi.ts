@@ -350,6 +350,9 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.14.6 (migration 0075; apps/api: settings): the background threshold of batches (imports.async_rows) in Settings, Imports.
   ['get', '/settings/imports'],
   ['put', '/settings/imports'],
+  // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
+  ['get', '/settings/nav-layout'],
+  ['put', '/settings/nav-layout'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

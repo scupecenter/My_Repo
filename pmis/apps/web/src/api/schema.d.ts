@@ -4317,6 +4317,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/nav-layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The shared layout of the side menu
+         * @description 0.15.1. Every signed-in user may read it. `layout` is null while the default of the code applies. The web merges it with the screens it knows: a saved key of a
+         *     screen that no longer exists is ignored, a screen missing from the layout is shown at the end of its default heading, and the permission and module filter of
+         *     the menu applies after the layout (a heading whose screens are all hidden is hidden). `catalogue` lists the screen keys a layout may hold. `can_edit` is true for
+         *     a System Admin or a delegate of `settings` edit for all regions.
+         */
+        get: operations["getNavLayout"];
+        /**
+         * Save the layout of the side menu, or return to the default (reason, If-Match, audited)
+         * @description 0.15.1. A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise, also for a delegate limited to some regions). A reason
+         *     and If-Match are required. `layout: null` returns to the default of the code (audited `nav_layout_reset`); any other layout is checked and saved (audited
+         *     `nav_layout_update`), both with the layout, who and when before and after. Rules (422 `validation_failed`, paths under `/layout`): 1 to 30 main headings, at most
+         *     100 headings in all and 200 entries in a heading; an id `^[a-z][a-z0-9_-]{0,39}$` unique among all headings (`duplicate_id`); `name_en` and `name_ar` required,
+         *     1 to 60 characters after trimming (`required`, `too_long`); `icon` null or a code of the web icon set; a main heading holds screen keys and sub-headings, a
+         *     sub-heading only screen keys (`too_deep`); a key must be in the catalogue (`unknown_item`) and appear once (`duplicate_item`); at most 64 KiB (`too_large`); an
+         *     unknown field is `unknown_field`. No URL or new screen can be added. Saving the layout in force, or resetting while the default applies, is 409 `invalid_transition`.
+         */
+        put: operations["setNavLayout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/historical-waiver": {
         parameters: {
             query?: never;
@@ -11290,6 +11323,48 @@ export interface components {
             /** @description The ETag value. */
             version: number;
             can_edit: boolean;
+        };
+        /** @description 0.15.1. A sub-heading of the side menu (under a main heading): screen keys only, no deeper level. */
+        NavSubHeading: {
+            /** @description Unique among all headings. */
+            id: string;
+            name_en: string;
+            name_ar: string;
+            /** @description A concept of the web icon set (lib/icons.ts), or none. */
+            icon?: string | null;
+            children: string[];
+        };
+        /** @description 0.15.1. A main heading of the side menu: screen keys and sub-headings, in order. */
+        NavHeading: {
+            /** @description Unique among all headings. The default headings are work, site_register, registers, data, admin, logs. */
+            id: string;
+            name_en: string;
+            name_ar: string;
+            icon?: string | null;
+            children: (string | components["schemas"]["NavSubHeading"])[];
+        };
+        /** @description 0.15.1. The shared order of the side menu (setting `nav.layout`). */
+        NavLayout: {
+            headings: components["schemas"]["NavHeading"][];
+        };
+        /** @description 0.15.1. The layout of the side menu with who changed it and when. */
+        NavLayoutSetting: {
+            /** @description null: the default of the code applies. */
+            layout: components["schemas"]["NavLayout"] | null;
+            is_default: boolean;
+            /** @description The screen keys a layout may hold (validation; labels, icons, routes and rights are in the web). */
+            catalogue: string[];
+            /** Format: date-time */
+            updated_at?: string | null;
+            /** @description Who changed it last (null: never changed through the screen). */
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        NavLayoutInput: components["schemas"]["WithReason"] & {
+            /** @description null returns to the default of the code. */
+            layout: components["schemas"]["NavLayout"] | null;
         };
         ImportsSettingsInput: components["schemas"]["WithReason"] & {
             async_rows: number;
@@ -22185,6 +22260,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getNavLayout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The layout. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavLayoutSetting"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setNavLayout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NavLayoutInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NavLayoutSetting"];
                 };
             };
             401: components["responses"]["Unauthorized"];

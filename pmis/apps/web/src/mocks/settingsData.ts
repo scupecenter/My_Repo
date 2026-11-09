@@ -89,6 +89,8 @@ export function initCfg() {
     mailKinds: { kinds: [] as string[], unknown: [] as string[], version: 1, updated_at: null as string | null, updated_by: null as string | null },
     // 0.14.6: imports.async_rows, the background threshold of batches (default 50, never changed in the seed)
     imports: { async_rows: 50, version: 1, updated_at: null as string | null, updated_by: null as string | null },
+    // 0.15.1: nav.layout, the shared order of the side menu (null: the default of the code)
+    navLayout: { layout: null as unknown, version: 1, updated_at: null as string | null, updated_by: null as string | null },
     freeze: { active: true, starts_on: '2026-11-01', ends_on: '2027-01-31', lifted: false, lifted_at: null, lifted_by: null, lift_reason: null, blocked_operations: ['publishWorkflowVersion'], version: 1 },
     dlp: { current: { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' }, history: [
       { version: 2, cw_months: 3, te_months: 12, effective_from: '2026-09-01', reason: 'Contract terms', changed_by: ref('1001'), changed_at: '2026-09-01T08:00:00Z' },

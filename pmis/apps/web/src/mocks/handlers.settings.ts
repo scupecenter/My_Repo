@@ -5,6 +5,7 @@ import { API_BASE } from '@/api/client';
 import type { ContractorRulesInput, Holiday, NotificationPolicyInput, SecurityLogEntry, SlaPublishPreview, SlaRuleSet, SlaTaskRule, TeamScopeMatch, TeamScopeMatchInput, TeamSpecialization, WeightSet } from '@/api/types';
 import { tripoliToday } from '@/lib/today';
 import { weightIssues } from '@/lib/weights';
+import { NAV_SIDE } from '@/lib/navLayout';
 import { db, save, stepUpValid, viewer } from './db';
 import { guard, page, problem, stepUp } from './handlers';
 import { byId, uid } from './ids';
@@ -212,6 +213,52 @@ const progress = (s: Pick<WeightSet, 'activities'>) => Math.round(s.activities.r
 /** Q440: the confirmation state, with what stops a confirmation (the current and the next year need holidays, none tentative). A store saved before 0.14.2 starts from the seed. */
 const CC = () => (C().calConfirm ??= initCfg().calConfirm);
 const MK = () => (C().mailKinds ??= initCfg().mailKinds);
+/** 0.15.1: nav.layout (a store saved before 0.15.1 starts from the seed). */
+const NL = () => (C().navLayout ??= initCfg().navLayout);
+const navView = () => {
+  const c = NL();
+  return { layout: c.layout ?? null, is_default: c.layout == null, catalogue: NAV_SIDE.map((n) => n.key), updated_at: c.updated_at, updated_by: c.updated_by ? ref(c.updated_by) : null, version: c.version, can_edit: isAdmin() };
+};
+/** The rules of admin_set_nav_layout (migration 0081): the clean layout or the field errors. Exported for unit tests. */
+export function cleanNavLayout(raw: unknown): { layout: unknown; errors: { path: string; code: string }[] } {
+  const errs: { path: string; code: string }[] = [];
+  const known = new Set(NAV_SIDE.map((n) => n.key));
+  const keys = new Set<string>(); const ids = new Set<string>();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { layout: null, errors: [{ path: '/layout', code: 'invalid' }] };
+  for (const k of Object.keys(raw)) if (k !== 'headings') errs.push({ path: `/layout/${k}`, code: 'unknown_field' });
+  const hs = (raw as { headings?: unknown }).headings;
+  if (!Array.isArray(hs)) return { layout: null, errors: [...errs, { path: '/layout/headings', code: 'required' }] };
+  if (hs.length < 1 || hs.length > 30) return { layout: null, errors: [...errs, { path: '/layout/headings', code: 'too_many' }] };
+  let n = 0;
+  const head = (h: unknown, p: string, depth: 1 | 2): unknown => {
+    n++;
+    if (!h || typeof h !== 'object' || Array.isArray(h)) { errs.push({ path: p, code: 'invalid' }); return null; }
+    const o = h as Record<string, unknown>;
+    for (const k of Object.keys(o)) if (!['id', 'name_en', 'name_ar', 'icon', 'children'].includes(k)) errs.push({ path: `${p}/${k}`, code: 'unknown_field' });
+    if (typeof o.id !== 'string' || !/^[a-z][a-z0-9_-]{0,39}$/.test(o.id)) errs.push({ path: `${p}/id`, code: 'invalid' });
+    else if (ids.has(o.id)) errs.push({ path: `${p}/id`, code: 'duplicate_id' }); else ids.add(o.id);
+    for (const f of ['name_en', 'name_ar']) {
+      const v = typeof o[f] === 'string' ? (o[f] as string).trim() : '';
+      if (!v) errs.push({ path: `${p}/${f}`, code: 'required' }); else if (v.length > 60) errs.push({ path: `${p}/${f}`, code: 'too_long' });
+    }
+    if (o.icon != null && (typeof o.icon !== 'string' || !/^[a-zA-Z][a-zA-Z0-9]{0,39}$/.test(o.icon))) errs.push({ path: `${p}/icon`, code: 'invalid' });
+    if (!Array.isArray(o.children)) { errs.push({ path: `${p}/children`, code: 'required' }); return null; }
+    if (o.children.length > 200) errs.push({ path: `${p}/children`, code: 'too_many' });
+    const kids = o.children.map((c: unknown, i: number) => {
+      const cp = `${p}/children/${i}`;
+      if (typeof c === 'string') {
+        if (!known.has(c)) errs.push({ path: cp, code: 'unknown_item' }); else if (keys.has(c)) errs.push({ path: cp, code: 'duplicate_item' }); else keys.add(c);
+        return c;
+      }
+      if (c && typeof c === 'object' && !Array.isArray(c)) { if (depth === 2) { errs.push({ path: cp, code: 'too_deep' }); return null; } return head(c, cp, 2); }
+      errs.push({ path: cp, code: 'invalid' }); return null;
+    });
+    return { id: o.id, name_en: String(o.name_en ?? '').trim(), name_ar: String(o.name_ar ?? '').trim(), icon: typeof o.icon === 'string' ? o.icon : null, children: kids };
+  };
+  const out = hs.map((h, i) => head(h, `/layout/headings/${i}`, 1));
+  if (n > 100) errs.push({ path: '/layout/headings', code: 'too_many' });
+  return errs.length ? { layout: null, errors: errs } : { layout: { headings: out }, errors: [] };
+}
 /** 0.14.6: imports.async_rows (a store saved before 0.14.6 starts from the seed). */
 const IM = () => (C().imports ??= initCfg().imports);
 const importsView = () => {
@@ -373,6 +420,26 @@ export const settingsHandlers = [
     if (IM().async_rows === b.async_rows) return problem(409, 'invalid_transition', `The threshold is already ${String(b.async_rows)} rows.`);
     Object.assign(IM(), { async_rows: b.async_rows as number, version: IM().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
     const j = importsView();
+    return HttpResponse.json(j, tag(j.version));
+  }),
+
+  // ------------------------------------------------------------------ 0.15.1: the shared layout of the side menu
+  http.get(`${B}/settings/nav-layout`, () => { const g = guard(); if (g) return g; const j = navView(); return HttpResponse.json(j, tag(j.version)); }),
+  http.put(`${B}/settings/nav-layout`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const p = ver(request, NL().version); if (p) return p;
+    const b = await body<{ layout?: unknown; reason?: string } & Record<string, unknown>>(request);
+    const errs: { path: string; code: string }[] = Object.keys(b).filter((k) => !['layout', 'reason'].includes(k)).map((k) => ({ path: `/${k}`, code: 'unknown_field' }));
+    if ((b.reason ?? '').trim().length < 3 || (b.reason ?? '').length > 1000) errs.push({ path: '/reason', code: 'required' });
+    if (!('layout' in b)) errs.push({ path: '/layout', code: 'required' });
+    const clean = b.layout === null ? { layout: null, errors: [] } : cleanNavLayout(b.layout);
+    errs.push(...clean.errors);
+    if (errs.length) return fields(...errs);
+    const cur = NL().layout ?? null;
+    if (JSON.stringify(cur) === JSON.stringify(clean.layout)) return problem(409, 'invalid_transition', clean.layout === null ? 'The menu already follows the default layout.' : 'This is already the layout of the menu.');
+    Object.assign(NL(), { layout: clean.layout, version: NL().version + 1, updated_at: new Date().toISOString(), updated_by: viewer()!.employee_id! }); save();
+    const j = navView();
     return HttpResponse.json(j, tag(j.version));
   }),
 
