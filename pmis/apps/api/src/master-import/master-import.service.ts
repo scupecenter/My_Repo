@@ -91,9 +91,12 @@ export class MasterImportService {
     const guard = guardXlsx(file.originalname, file.buffer);
     if (!guard.ok) return this.reject(auth, requestId, guard.reason ?? 'not_xlsx', guard.detail ?? 'The file is not accepted.', ctx);
 
+    // a file with prefixed SpreadsheetML is rewritten to the plain form, and the rewrite passes the same guard before it is read
+    const repacked = normalizeSpreadsheetPrefixes(file.buffer);
+    const source = repacked && guardXlsx(file.originalname, repacked).ok ? repacked : file.buffer;
     let wb: OoxmlWorkbook;
     try {
-      wb = new OoxmlWorkbook(normalizeSpreadsheetPrefixes(file.buffer) ?? file.buffer, ['Master', 'Setting']);
+      wb = new OoxmlWorkbook(source, ['Master', 'Setting']);
     } catch (e) {
       if (e instanceof OoxmlError) return this.reject(auth, requestId, 'not_xlsx', 'The file could not be read as an Excel workbook.', ctx);
       throw e;

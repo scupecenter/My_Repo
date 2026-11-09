@@ -164,7 +164,9 @@ export class ImportService {
       await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
     } catch (first) {
       // a file written by another program with prefixed SpreadsheetML (x:workbook) reads once it is put in the plain form Excel writes
-      const plain = normalizeSpreadsheetPrefixes(file.buffer);
+      const repacked = normalizeSpreadsheetPrefixes(file.buffer);
+      // the repacked package goes through the same guard before the parser sees it
+      const plain = repacked && guardXlsx(file.originalname, repacked).ok ? repacked : null;
       let e: unknown = first;
       if (plain) {
         try {
