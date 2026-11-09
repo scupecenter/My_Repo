@@ -1,5 +1,5 @@
 import { inflateRawSync } from 'node:zlib';
-import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import { strFromU8, strToU8, zipSync } from 'fflate';
 
 /**
  * Safety checks on an uploaded workbook before any library parses it (file upload safety, CLAUDE.md "Approved templates only"):
@@ -36,6 +36,9 @@ function readDirectory(buf: Buffer): Entry[] | null {
     }
   }
   if (eocd < 0) return null;
+  // one disk only, and no zip64 locator in front of the end record: Excel never writes either, and another parser could read them differently
+  if (buf.readUInt16LE(eocd + 4) !== 0 || buf.readUInt16LE(eocd + 6) !== 0 || buf.readUInt16LE(eocd + 8) !== buf.readUInt16LE(eocd + 10)) return null;
+  if (eocd >= 20 && buf.readUInt32LE(eocd - 20) === 0x07064b50) return null;
   const count = buf.readUInt16LE(eocd + 10);
   const dirSize = buf.readUInt32LE(eocd + 12);
   const dirOffset = buf.readUInt32LE(eocd + 16);
@@ -146,24 +149,45 @@ const SSML_MAIN = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
  * (`<x:workbook xmlns:x="…">`). The XML is valid, but the readers here match the plain element names, so such a file reads as having no
  * sheets ("Cannot read properties of undefined (reading 'sheets')", owner report 2026-11-09). This rewrites only the XML parts of `xl/`
  * whose SpreadsheetML elements carry a prefix, to the plain form Excel itself writes, and returns the repacked package; null when nothing
- * needed it. Call it only on a buffer that passed guardXlsx (the sizes are already bounded there).
+ * needed it. Call it only on a buffer that passed guardXlsx, and run guardXlsx again on the result before any parser sees it.
  */
 export function normalizeSpreadsheetPrefixes(buf: Buffer): Buffer | null {
   const entries = readDirectory(buf);
   const wb = entries?.find((e) => e.name === 'xl/workbook.xml');
   const wbXml = wb ? readSmall(buf, wb) : null;
   if (wbXml === null || !prefixFor(wbXml)) return null;
-  const files = unzipSync(new Uint8Array(buf.buffer, buf.byteOffset, buf.length));
+  // Rebuild the package from the entries guardXlsx already checked (this module's own directory reader), never from a second ZIP parser:
+  // each entry is inflated to exactly its verified size, and a duplicate name or an unreadable entry stops the rewrite.
+  if (!entries) return null;
+  const files: Record<string, Uint8Array> = {};
   let changed = false;
-  for (const [name, data] of Object.entries(files)) {
-    if (!name.startsWith('xl/') || !name.endsWith('.xml')) continue;
+  for (const e of entries) {
+    if (Object.prototype.hasOwnProperty.call(files, e.name)) return null;
+    const data = entryBytes(buf, e);
+    if (data === null) return null;
+    files[e.name] = data;
+    if (!e.name.startsWith('xl/') || !e.name.endsWith('.xml')) continue;
     const text = strFromU8(data);
     const p = prefixFor(text);
     if (!p) continue;
-    files[name] = strToU8(unprefix(text, p));
+    files[e.name] = strToU8(unprefix(text, p));
     changed = true;
   }
   return changed ? Buffer.from(zipSync(files, { level: 6 })) : null;
+}
+
+/** The bytes of one checked entry, inflated to exactly its declared size (the size guardXlsx verified); null otherwise. */
+function entryBytes(buf: Buffer, e: Entry): Uint8Array | null {
+  if (e.offset + 30 > buf.length || buf.readUInt32LE(e.offset) !== 0x04034b50) return null;
+  const start = e.offset + 30 + buf.readUInt16LE(e.offset + 26) + buf.readUInt16LE(e.offset + 28);
+  if (start + e.compressed > buf.length) return null;
+  const raw = buf.subarray(start, start + e.compressed);
+  try {
+    const out = e.method === 0 ? raw : e.method === 8 ? inflateRawSync(raw, { maxOutputLength: Math.max(1, e.size) }) : null;
+    return out !== null && out.length === e.size ? new Uint8Array(out) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The prefix bound to the SpreadsheetML main namespace on the root element, when that root has no default namespace of its own. */

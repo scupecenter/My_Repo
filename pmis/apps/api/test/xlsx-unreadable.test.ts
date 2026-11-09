@@ -77,3 +77,18 @@ describe('normalizeSpreadsheetPrefixes: a file with prefixed SpreadsheetML (x:wo
     expect(normalizeSpreadsheetPrefixes(pkg('<y:workbook xmlns:y="urn:other"/>'))).toBeNull();
   });
 });
+
+describe('guardXlsx: end-of-directory record that another ZIP reader could read differently (security review 2026-11-09)', () => {
+  it('refuses a package whose entries-on-this-disk count differs from the total, or that spans disks', () => {
+    const ok = pkg('<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>');
+    expect(guardXlsx('ok.xlsx', ok).ok).toBe(true);
+    const eocd = ok.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    const split = Buffer.from(ok);
+    split.writeUInt16LE(split.readUInt16LE(eocd + 8) + 1, eocd + 8);
+    expect(guardXlsx('split.xlsx', split)).toMatchObject({ ok: false, reason: 'not_xlsx' });
+    const disk = Buffer.from(ok);
+    disk.writeUInt16LE(1, eocd + 4);
+    expect(guardXlsx('disk.xlsx', disk)).toMatchObject({ ok: false, reason: 'not_xlsx' });
+    expect(normalizeSpreadsheetPrefixes(split)).toBeNull();
+  });
+});
