@@ -48,9 +48,13 @@ repair_storage_owner() {
   [[ -r $env ]] || return 0
   dir=$(sed -n 's/^STORAGE_DIR=//p' "$env" | tail -1)
   [[ $dir == /* && $dir != / && -d $dir ]] && id -u "$user" >/dev/null 2>&1 || return 0
-  n=$(find "$dir" ! -user "$user" -print | wc -l)
+  # Hardened (security review 2026-11-10): the store is writable by the service user, so a path could be swapped for a link between find and chown.
+  # Only real directories and single-link regular files on the same file system are changed; -execdir works from a descriptor-anchored
+  # directory with the bare name, chown -h never follows a link, and links, devices and other types are left alone.
+  local sel=( -xdev ! -user "$user" \( -type d -o \( -type f -links 1 \) \) )
+  n=$(find "$dir" "${sel[@]}" -print | wc -l)
   [[ $n -gt 0 ]] || return 0
-  find "$dir" ! -user "$user" -exec chown -h "$user:$user" {} +
+  find "$dir" "${sel[@]}" -execdir chown -h "$user:$user" {} +
   echo "==> document store: $n item(s) in $dir given back to $user"
 }
 repair_storage_owner
