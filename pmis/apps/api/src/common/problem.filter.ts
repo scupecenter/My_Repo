@@ -82,6 +82,17 @@ export class ProblemFilter implements ExceptionFilter {
     const message = e instanceof Error ? e.message.split('\n')[0] : String(e);
     const prismaCode = e instanceof Prisma.PrismaClientKnownRequestError ? ` prisma=${e.code}` : '';
     this.log.error(`${req.method} ${req.originalUrl.split('?')[0]} request_id=${requestId} ${name}${prismaCode}: ${message}`);
-    void this.syslog?.write('error', 'unexpected_error', { name, route: `${req.method} ${req.route?.path ?? ''}` }, undefined, requestId);
+    // The System Log row names the cause an administrator can act on without the service journal (owner request 2026-11-10): for an operating-system
+    // error its code, call and path (for example EACCES, mkdir, a folder of the document store), for a database error its Prisma code. The free text
+    // of other errors is not stored, as before: it can quote values.
+    const ctx: Record<string, unknown> = { name, route: `${req.method} ${req.route?.path ?? ''}` };
+    if (e instanceof Prisma.PrismaClientKnownRequestError) ctx.prisma_code = e.code;
+    const sys = e as { code?: unknown; syscall?: unknown; path?: unknown };
+    if (e instanceof Error && typeof sys.code === 'string' && /^E[A-Z]+$/.test(sys.code)) {
+      ctx.code = sys.code;
+      if (typeof sys.syscall === 'string') ctx.syscall = sys.syscall.slice(0, 40);
+      if (typeof sys.path === 'string') ctx.path = sys.path.slice(0, 300);
+    }
+    void this.syslog?.write('error', 'unexpected_error', ctx, undefined, requestId);
   }
 }
