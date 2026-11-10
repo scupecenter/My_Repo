@@ -505,6 +505,18 @@ cd "$API_SRC"
 npm ci --no-audit --no-fund
 npx prisma generate >/dev/null
 npm run build
+# 2026-11-10 (owner report): with a strict root umask (077) "install -d" made /var/lib/gsdn-pmis 0700 root, so the API (the service user) could not
+# reach the document store below it (EACCES on mkdir). A service folder is created with umask 022, its own parent of the GSDN Workspace data root is
+# made traversable (0755: it only holds the service folders, each 0700/0750 and owned by the service user), and the service user must be able to
+# write it before the installer goes on.
+service_dir() {
+  local dir=$1 mode=$2 parent
+  (umask 022; install -d -m "$mode" -o "$SERVICE_USER" -g "$SERVICE_USER" "$dir")
+  parent=$(dirname "$dir")
+  if [[ $parent == /var/lib/gsdn-pmis && -d $parent && ! -L $parent ]]; then chown root:root "$parent"; chmod 755 "$parent"; fi
+  runuser -u "$SERVICE_USER" -- test -w "$dir" || die "The service user $SERVICE_USER cannot write $dir. A folder above it is closed to that user; check with: namei -l $dir"
+}
+
 install -d /opt/gsdn-pmis
 rm -rf "$API_ROOT.new"
 install -d "$API_ROOT.new"
@@ -599,7 +611,7 @@ S3_REGION=us-east-1"
   echo "MinIO is up on 127.0.0.1:$MINIO_PORT; bucket pmis (private)."
 else
   API_AFTER=''
-  install -d -m 700 -o "$SERVICE_USER" -g "$SERVICE_USER" "$STORAGE_DIR"
+  service_dir "$STORAGE_DIR" 700
   S3_LINES="STORAGE_DIR=$STORAGE_DIR"
 fi
 
@@ -625,7 +637,7 @@ SMTP_PASS=
 SMTP_FROM="
 ANCHOR_DIR=$( [[ -r $CONF_DIR/pmis.env ]] && sed -n 's/^LOG_ANCHOR_DIR=//p' "$CONF_DIR/pmis.env" || true )
 ANCHOR_DIR=${ANCHOR_DIR:-/var/lib/gsdn-pmis/log-anchors}
-install -d -m 750 -o "$SERVICE_USER" -g "$SERVICE_USER" "$ANCHOR_DIR"
+service_dir "$ANCHOR_DIR" 750
 umask 027
 cat > "$CONF_DIR/pmis.env" <<EOF
 # GSDN Workspace settings written by install-ubuntu.sh on $(date -Is). Keep this file private.
