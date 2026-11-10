@@ -7,7 +7,7 @@ import { ImportJobsService, type PendingJob } from '../src/templates/import-jobs
 import { q } from './calc-helpers';
 import { Api, startApp } from './helpers';
 import { G } from './reg-helpers';
-import { TPL_GRANTS_ENTRY, downloadTemplate, load, uploadFile } from './tpl-helpers';
+import { TPL_GRANTS_ENTRY, downloadTemplate, fillTemplate, load, uploadFile } from './tpl-helpers';
 import { Actor, actor, plainAdmin } from './wf-helpers';
 
 /**
@@ -302,6 +302,25 @@ describe('a big legacy Master is compared in the background', () => {
     // the same structure, summary, rows and differences (ord, reasons, values) as the comparison in the request
     const got = (await runSnapshot(runId)) as { run: Record<string, unknown> };
     expect(got).toEqual(want);
+    await setAsyncRows(50);
+  }, 300_000);
+});
+
+describe('a big one-template upload (a single batch) is staged in the background (owner report 2026-11-10)', () => {
+  it('New sites with more rows than the threshold: 202 parsing, then the batch of every row (no "column reference kind is ambiguous")', async () => {
+    await setAsyncRows(10);
+    const n = 45;
+    const rows = Array.from({ length: n }, (_, i) => ({ 'Site ID': `NS${TAG}${String(i).padStart(3, '0')}`, Region: 'Sebha', 'Site Name (EN)': `Big ${i}`, 'Delivery Scenario': 'New Build' }));
+    const file = await fillTemplate((await downloadTemplate(admin.api, 'TPL-SITE-NEW')).buffer, rows);
+    const up = await uploadFile(admin.api, file);
+    expect(up.status).toBe(202);
+    expect(up.body).toMatchObject({ status: 'parsing', template_id: 'TPL-SITE-NEW' });
+    const id = up.body.id as string;
+    expect(await jobs.resumeAll(0)).toBe(1);
+    const done = await get(admin, id);
+    expect(done.status).toBe(200);
+    expect(done.body).toMatchObject({ status: 'validated', entity: 'site', counts: { create: n, error: 0 } });
+    expect((await q<{ state: string }>(db, 'SELECT state FROM import_uploads WHERE id = $1', [id]))[0]!.state).toBe('done');
     await setAsyncRows(50);
   }, 300_000);
 });

@@ -40,5 +40,20 @@ patch_nginx_timeout() {
 }
 patch_nginx_timeout
 
+# 2026-11-10 (owner report): a folder inside the document store created by root (for example by a restore or a manual copy) made the API fail with
+# EACCES when it created imports/<year>/<month>. Give anything in the store that the service user does not own back to it. Symbolic links are not
+# followed, nothing outside the store is touched, and the modes are kept. Running it again changes nothing.
+repair_storage_owner() {
+  local env=/etc/gsdn-pmis/pmis.env dir user=gsdn-pmis n
+  [[ -r $env ]] || return 0
+  dir=$(sed -n 's/^STORAGE_DIR=//p' "$env" | tail -1)
+  [[ $dir == /* && $dir != / && -d $dir ]] && id -u "$user" >/dev/null 2>&1 || return 0
+  n=$(find "$dir" ! -user "$user" -print | wc -l)
+  [[ $n -gt 0 ]] || return 0
+  find "$dir" ! -user "$user" -exec chown -h "$user:$user" {} +
+  echo "==> document store: $n item(s) in $dir given back to $user"
+}
+repair_storage_owner
+
 # The installer may have changed in this pull: run the new copy.
 exec bash "$REPO/pmis/tools/install/install-ubuntu.sh" --update
