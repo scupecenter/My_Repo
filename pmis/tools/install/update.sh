@@ -40,5 +40,24 @@ patch_nginx_timeout() {
 }
 patch_nginx_timeout
 
+# 2026-11-10 (owner report): a folder inside the document store created by root (for example by a restore or a manual copy) made the API fail with
+# EACCES when it created imports/<year>/<month>. Give anything in the store that the service user does not own back to it. Symbolic links are not
+# followed, nothing outside the store is touched, and the modes are kept. Running it again changes nothing.
+repair_storage_owner() {
+  local env=/etc/gsdn-pmis/pmis.env dir user=gsdn-pmis n
+  [[ -r $env ]] || return 0
+  dir=$(sed -n 's/^STORAGE_DIR=//p' "$env" | tail -1)
+  [[ $dir == /* && $dir != / && -d $dir ]] && id -u "$user" >/dev/null 2>&1 || return 0
+  # Hardened (security review 2026-11-10): the store is writable by the service user, so a path could be swapped for a link between find and chown.
+  # Only real directories and single-link regular files on the same file system are changed; -execdir works from a descriptor-anchored
+  # directory with the bare name, chown -h never follows a link, and links, devices and other types are left alone.
+  local sel=( -xdev ! -user "$user" \( -type d -o \( -type f -links 1 \) \) )
+  n=$(find "$dir" "${sel[@]}" -print | wc -l)
+  [[ $n -gt 0 ]] || return 0
+  find "$dir" "${sel[@]}" -execdir chown -h "$user:$user" {} +
+  echo "==> document store: $n item(s) in $dir given back to $user"
+}
+repair_storage_owner
+
 # The installer may have changed in this pull: run the new copy.
 exec bash "$REPO/pmis/tools/install/install-ubuntu.sh" --update
