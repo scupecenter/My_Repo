@@ -76,7 +76,8 @@ BEGIN
   REVOKE UPDATE ON sites FROM pmis_app;
   SELECT string_agg(format('%I', a.attname), ', ' ORDER BY a.attnum) INTO cols
   FROM pg_attribute a WHERE a.attrelid = 'public.sites'::regclass AND a.attnum > 0 AND NOT a.attisdropped
-    AND a.attname NOT IN ('id', 'site_code', 'name', 'name_ar', 'region_id', 'cluster_id', 'latitude', 'longitude');
+    AND a.attname NOT IN ('id', 'site_code', 'name', 'name_ar', 'region_id', 'cluster_id', 'latitude', 'longitude',
+                          'workflow_locks', 'workflow_locks_changed_at', 'workflow_locks_changed_by', 'workflow_locks_reason');  -- 0085: the locks change only through site_workflow_locks_set
   EXECUTE format('GRANT UPDATE (%s) ON sites TO pmis_app', cols);
 END $$;
 REVOKE ALL ON import_batch_jobs FROM pmis_app;  -- 0074 / 0075: the background runs of a big batch (New sites, register, stream, Master apply) only through imp_async_start, imp_async_step, imp_async_chunk_tasks, imp_async_pending, imp_async_abandon and imp_batch_job_json (owner pmis_definer)

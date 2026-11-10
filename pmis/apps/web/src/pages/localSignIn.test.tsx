@@ -343,6 +343,8 @@ describe('hybrid mode list', () => {
       'GET /settings/imports', 'PUT /settings/imports',
       // contract 0.15.1: the shared layout of the side menu
       'GET /settings/nav-layout', 'PUT /settings/nav-layout',
+      // contract 0.15.4: the per-site workflow locks and the status of the sites of an import
+      'POST /sites/workflow-locks', 'PUT /sites/:id/workflow-locks', 'GET /master-import/runs/:id/sites', 'GET /import-batches/:id/sites',
     ]);
     expect(realApiHandlers(false)).toHaveLength(0);
     expect(realApiHandlers(true)).toHaveLength(REAL_API_AUTH_USERS.length);

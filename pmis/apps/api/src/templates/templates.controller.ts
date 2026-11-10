@@ -6,6 +6,7 @@ import { Auth } from '../auth/decorators';
 import { IdempotencyService } from '../common/idempotency.service';
 import { etagHeader } from '../common/etag';
 import { problems } from '../common/problem';
+import { SiteLocksService } from '../sites/site-locks.service';
 import { ImportService } from './import.service';
 import { TemplatesService, XLSX_MIME } from './templates.service';
 import { UploadInterceptor, type UploadedFile } from './upload.interceptor';
@@ -48,6 +49,7 @@ export class ImportBatchesController {
   constructor(
     private readonly imports: ImportService,
     private readonly idem: IdempotencyService,
+    private readonly locks: SiteLocksService,
   ) {}
 
   @Get()
@@ -79,6 +81,13 @@ export class ImportBatchesController {
   @Get(':id/rows')
   rows(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>) {
     return this.imports.listRows(auth, id, q);
+  }
+
+  /** Contract 0.15.4 (migration 0085): the status of every site of the batch (of the file, for a Master file), with its warnings and data gaps. */
+  @Get(':id/sites')
+  async sites(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>) {
+    const b = await this.imports.getBatch(auth, id);
+    return this.locks.statusPage({ kind: 'batch', id, groupId: (b.group_id as string | null) ?? null }, q);
   }
 
   @Post(':id/submit')

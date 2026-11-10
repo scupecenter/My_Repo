@@ -5,6 +5,7 @@ import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { XLSX_MIME } from '../templates/templates.service';
 import { UploadInterceptor, type UploadedFile } from '../templates/upload.interceptor';
+import { SiteLocksService } from '../sites/site-locks.service';
 import { MappingService } from './mapping.service';
 import { MasterImportService } from './master-import.service';
 
@@ -13,7 +14,7 @@ const safeName = (n: string): string => n.replace(/[^A-Za-z0-9._-]/g, '_').slice
 /** Q1 / Q211: the admin-only legacy Master import and the parallel-run comparison report (tag templates). */
 @Controller('master-import')
 export class MasterImportController {
-  constructor(private readonly mi: MasterImportService) {}
+  constructor(private readonly mi: MasterImportService, private readonly locks: SiteLocksService) {}
 
   @Get('runs')
   list(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
@@ -36,6 +37,13 @@ export class MasterImportController {
     const dto = await this.mi.getRun(auth, id);
     res.setHeader('ETag', etagHeader(dto.version as number));
     return dto;
+  }
+
+  /** Contract 0.15.4 (migration 0085): the status of every site of the file, with its warnings and data gaps (gaps=only: the incomplete sites). */
+  @Get('runs/:id/sites')
+  async sites(@Auth() auth: AuthContext, @Param('id') id: string, @Query() q: Record<string, unknown>) {
+    const run = await this.mi.getRun(auth, id);
+    return this.locks.statusPage({ kind: 'run', id, groupId: (run.group_id as string | null) ?? null }, q);
   }
 
   @Get('runs/:id/diffs')

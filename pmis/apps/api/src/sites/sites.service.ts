@@ -50,6 +50,10 @@ interface SiteRow {
   next_milestone_col: string | null;
   workflow_version: number;
   workflow_id: string;
+  /** 0085: false = an "open" site (the sequencing locks do not apply). */
+  workflow_locks: boolean;
+  /** 0085: the missing required values of the site (site_data_gap_count). */
+  data_gaps: number;
   total: bigint | null;
 }
 
@@ -207,6 +211,8 @@ export class SitesService {
     const stream = oneParam(q, 'stream');
     const view = oneParam(q, 'view');
     const sort = oneParam(q, 'sort') ?? 'site_code';
+    const locks = oneParam(q, 'workflow_locks');
+    const gaps = oneParam(q, 'data_gaps');
     const regionIds = this.intList(q, 'region_id', 1, 7);
     if (scenario !== undefined && !SCENARIOS.includes(scenario)) throw problems.validation([{ path: '/scenario', code: 'invalid', message: 'Unknown delivery scenario.' }]);
     if (status !== undefined && !STATUSES.includes(status)) throw problems.validation([{ path: '/overall_status', code: 'invalid', message: 'Unknown overall status.' }]);
@@ -214,6 +220,8 @@ export class SitesService {
     if (!(SORTS as readonly string[]).includes(sort)) throw problems.validation([{ path: '/sort', code: 'invalid', message: 'Unknown sort.' }]);
     if (coords !== undefined && coords !== 'missing' && coords !== 'valid') throw problems.validation([{ path: '/coordinates', code: 'invalid', message: 'coordinates is missing or valid.' }]);
     if (wfv !== undefined && !/^[0-9]{1,6}$/.test(wfv)) throw problems.validation([{ path: '/workflow_version', code: 'invalid', message: 'workflow_version is a positive integer.' }]);
+    if (locks !== undefined && locks !== 'locked' && locks !== 'open') throw problems.validation([{ path: '/workflow_locks', code: 'invalid', message: 'workflow_locks is locked or open.' }]);
+    if (gaps !== undefined && gaps !== 'with' && gaps !== 'without') throw problems.validation([{ path: '/data_gaps', code: 'invalid', message: 'data_gaps is with or without.' }]);
     if (stream !== undefined) await this.requireGroup('stream', stream);
     if (view !== undefined) await this.requireGroup('view', view);
 
@@ -226,6 +234,8 @@ export class SitesService {
     if (cluster) where.push(Prisma.sql`c.cluster_code = ${cluster}`);
     if (batch) where.push(Prisma.sql`s.delivery_batch = ${batch}`);
     if (wfv) where.push(Prisma.sql`wd.version = ${Number(wfv)}`);
+    if (locks) where.push(Prisma.sql`s.workflow_locks = ${locks === 'locked'}`);
+    if (gaps) where.push(gaps === 'with' ? Prisma.sql`site_data_gap_count(s.id) > 0` : Prisma.sql`site_data_gap_count(s.id) = 0`);
     // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
     if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
     else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);
@@ -276,13 +286,19 @@ export class SitesService {
       )
       SELECT vis.id::text AS id, vis.site_code, vis.name, vis.name_ar, vis.region_id, vis.cluster_code_v AS cluster_code, vis.delivery_scenario::text AS delivery_scenario,
         vis.overall_status::text AS overall_status, vis.current_milestone AS current_milestone_col, vis.next_milestone AS next_milestone_col,
-        vis.wf_version AS workflow_version, vis.workflow_version_id::text AS workflow_id, count(*) OVER () AS total
+        vis.wf_version AS workflow_version, vis.workflow_version_id::text AS workflow_id, vis.workflow_locks, count(*) OVER () AS total
       FROM vis LEFT JOIN ss ON ss.site_id = vis.id
       ${post.length > 0 ? Prisma.sql`WHERE ${Prisma.join(post, ' AND ')}` : Prisma.empty}
       ORDER BY ${order}, vis.id
       LIMIT ${limit + 1} OFFSET ${offset}`);
 
     const page = rows.slice(0, limit);
+    if (page.length > 0) {
+      // 0085: the data gaps of the page only (one call per shown site)
+      const g = await this.db.tx.$queryRaw<{ id: string; n: number }[]>(Prisma.sql`SELECT x.id::text AS id, site_data_gap_count(x.id) AS n FROM unnest(${page.map((p) => p.id)}::uuid[]) AS x(id)`);
+      const m = new Map(g.map((r) => [r.id, Number(r.n)]));
+      for (const p of page) p.data_gaps = m.get(p.id) ?? 0;
+    }
     const items = await this.listItems(page, stream, view);
     return {
       items,
@@ -359,6 +375,8 @@ export class SitesService {
       current_milestone: lastDone ? lastDone.code : (scope.length === all.length ? site.current_milestone_col : null),
       next_milestone: current ? current.code : null,
       workflow_version: site.workflow_version,
+      workflow_locks: site.workflow_locks !== false,
+      data_gaps: Number(site.data_gaps ?? 0),
       late_task_count: scope.reduce((n, r) => n + Number(r.late), 0),
       waiting_approval_count: scope.reduce((n, r) => n + Number(r.waiting), 0),
       rail,
@@ -394,7 +412,8 @@ export class SitesService {
         s.longitude::float8 AS longitude, s.address, s.site_type, s.project_phase, s.tower_owner, s.tower_type, s.tower_height_m::float8 AS tower_height_m, s.delivery_batch, s.cw_delivery_model,
         s.scope_tower_erection::text AS scope_tower_erection, s.scope_site_adaption::text AS scope_site_adaption, s.scope_gecol_power::text AS scope_gecol_power,
         s.scope_hlc_fiber::text AS scope_hlc_fiber, s.scope_te_full::text AS scope_te_full, s.scope_te_ip_router_only::text AS scope_te_ip_router_only,
-        s.updated_at, s.custom, 1::bigint AS total
+        s.updated_at, s.custom, s.workflow_locks, site_data_gap_count(s.id) AS data_gaps, s.workflow_locks_changed_at, s.workflow_locks_reason,
+        s.workflow_locks_changed_by::text AS workflow_locks_changed_by, swl_can_manage(s.id) AS workflow_locks_can_manage, site_data_gaps(s.id) AS data_gap_detail, 1::bigint AS total
       FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id LEFT JOIN clusters c ON c.id = s.cluster_id
       WHERE s.id = ${id}::uuid ${regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`}`);
     return rows[0];
@@ -439,6 +458,14 @@ export class SitesService {
         te_ip_router_only: flag(site.scope_te_ip_router_only),
       },
       cluster_progress: cluster,
+      // 0085: who switched the locks last, why, and whether the caller may switch them; the data gaps one by one
+      workflow_locks_info: {
+        changed_at: site.workflow_locks_changed_at ?? null,
+        changed_by: site.workflow_locks_changed_by ? (await this.view.userRefs([String(site.workflow_locks_changed_by)])).get(String(site.workflow_locks_changed_by)) ?? null : null,
+        reason: site.workflow_locks_reason ?? null,
+        can_manage: site.workflow_locks_can_manage === true,
+      },
+      data_gap_items: ((site.data_gap_detail as { items?: unknown[] } | null)?.items ?? []),
       pipeline: nodes,
       // Q349: the site page follows the same setting as the dashboard (dashboard.pipeline_variant: A = rings, B = flat track)
       pipeline_variant: (await this.db.tx.$queryRaw<{ v: string }[]>`SELECT dash_pipeline_variant() AS v`)[0]?.v === 'B' ? 'B' : 'A',

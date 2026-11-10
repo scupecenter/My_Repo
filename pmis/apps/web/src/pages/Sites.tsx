@@ -8,6 +8,7 @@ import { downloadTemplate, useTemplates } from '@/api/registers';
 import { useRegions, useSites, useStreams, useViews } from '@/api/sites';
 import { batchPath } from '@/api/types';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
+import { LocksDialog } from '@/components/WorkflowLocks';
 import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
@@ -23,9 +24,9 @@ import { useVirtual } from '@/components/useVirtual';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
 const ROWS = { comfortable: 52, compact: 38 } as const;
-const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }];
+const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
 const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
-const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone' };
+const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
 const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
@@ -58,17 +59,24 @@ export function Sites() {
   // 0.14.5: the sites the map cannot draw (the link of the dashboard map), and the map layout of the register (SC-10)
   const coordinates = sp.get('coordinates') === 'missing' ? 'missing' : '';
   const asMap = sp.get('layout') === 'map';
+  // 0.15.4 (migration 0085): the workflow locks (locked / open) and the sites with data gaps
+  const locks = ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? (sp.get('workflow_locks') as string) : '';
+  const gaps = sp.get('data_gaps') === 'with' ? 'with' : '';
+  const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}) };
+  const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
   const sel = sp.get('sel') ?? '';
-  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0);
+  const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
-  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
   const me = useMe(true).data;
   const newTpl = useTemplates().data?.find((x) => x.template_id === 'TPL-SITE-NEW');
   const canCreate = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'sites' && (g.action as string) === 'create');
+  // 0.15.4: who may switch the workflow locks (a System Admin or the delegated right to unlock); the server checks the region of every site
+  const canUnlock = isAdmin(me) || !!me?.effective.grants.some((g) => g.module_key === 'overrides.unlock' && (g.action as string) === 'administer');
   const [upSites, setUpSites] = useState(false);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
@@ -81,9 +89,9 @@ export function Sites() {
   const real = !!stream && isRealStream(stream, streamsQ.data); // Dismantle has no API stream yet: nothing is fetched for it
   const dismantle = stream === DISMANTLE_CODE && !real;
 
-  const q = useSites({ ...f, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap);
+  const q = useSites({ ...f, ...extra, ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(real ? { stream } : {}), ...(view ? { view } : {}) }, !dismantle && !asMap);
   // Sites where the stream does not apply are not in the stream list. They come from the unfiltered list (their `streams[]` says "na").
-  const allQ = useSites({ ...f, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap);
+  const allQ = useSites({ ...f, ...extra, stage_code: '', ...(bucket ? { bucket } : {}), ...(coordinates ? { coordinates } : {}), ...(view ? { view } : {}) }, real && !asMap);
   const { hasNextPage: moreAll, isFetchingNextPage: fetchingAll, fetchNextPage: nextAll } = allQ;
   useEffect(() => { if (real && moreAll && !fetchingAll) void nextAll(); }, [real, moreAll, fetchingAll, nextAll]);
   const inStream = q.data?.pages.flatMap((p) => p.items) ?? [];
@@ -122,6 +130,8 @@ export function Sites() {
     ...(f.overall_status ? [{ key: 'overall_status', label: t('table.filter_status', { v: t(`status.${f.overall_status}`) }), onRemove: () => set('overall_status')('') }] : []),
     ...(f.stage_code ? [{ key: 'stage_code', label: t('table.filter_stage', { v: stageName(f.stage_code) }), onRemove: () => set('stage_code')('') }] : []),
     ...(coordinates ? [{ key: 'coordinates', label: t('table.filter_coords'), onRemove: () => setParams({ coordinates: '' }) }] : []),
+    ...(locks ? [{ key: 'workflow_locks', label: `${t('locks.filter')}: ${t(locks === 'open' ? 'locks.filter_open' : 'locks.filter_locked')}`, onRemove: () => setParams({ workflow_locks: '' }) }] : []),
+    ...(gaps ? [{ key: 'data_gaps', label: t('locks.quick_gaps'), onRemove: () => setParams({ data_gaps: '' }) }] : []),
     ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
   ];
 
@@ -138,6 +148,8 @@ export function Sites() {
       case 'scenario': return s.delivery_scenario ? <Trunc text={t(`scenario.${s.delivery_scenario}`)} /> : <Empty />;
       case 'status': return <span className={`chip ${TONE[s.overall_status]}`}>{t(`status.${s.overall_status}`)}</span>;
       case 'pipeline': return <MiniRail rail={s.rail} />;
+      case 'locks': return <span className={`chip ${s.workflow_locks === false ? 'bg-waitBg text-waitInk' : 'bg-lockBg text-lockInk'}`} data-testid={`site-locks-${s.site_code}`}>{t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}</span>;
+      case 'gaps': return s.data_gaps ? <span className="chip bg-lateBg text-lateInk" data-testid={`site-gaps-${s.site_code}`}>{s.data_gaps}</span> : <Empty />;
       default: { // late
         const n = real ? st?.late_count : s.late_task_count;
         return n ? <span className="chip bg-lateBg text-lateInk" data-testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</span> : <Empty />;
@@ -165,6 +177,8 @@ export function Sites() {
         <Select id="stage" value={f.stage_code} onChange={set('stage_code')} all={t('sites.all_stages')} options={stageOptions.map((s) => [s, stageName(s)])} />
         <QuickFilter testid="sites-quick-mine" on={bucket === 'mine'} onClick={() => setParams({ bucket: bucket === 'mine' ? '' : 'mine', sel: '' })}>{t('table.mine')}</QuickFilter>
         <QuickFilter testid="sites-quick-late" on={bucket === 'late'} onClick={() => setParams({ bucket: bucket === 'late' ? '' : 'late', sel: '' })}>{t('table.late')}</QuickFilter>
+        <Select id="locks" value={locks} onChange={(v) => setParams({ workflow_locks: v, sel: '' })} all={t('locks.filter')} options={[['locked', t('locks.filter_locked')], ['open', t('locks.filter_open')]]} />
+        <QuickFilter testid="sites-quick-gaps" on={!!gaps} onClick={() => setParams({ data_gaps: gaps ? '' : 'with', sel: '' })}>{t('locks.quick_gaps')}</QuickFilter>
         {real && (
           <label className="flex items-center gap-2 text-sm" title={t('sites.na_hint')}>
             <input type="checkbox" data-testid="sites-show-na" checked={showNa} onChange={(e) => setShowNa(e.target.checked)} />
@@ -215,9 +229,13 @@ export function Sites() {
       )}
       <BulkBar testid="sites-bulk" count={picked.size} loaded={items.length} total={total} onClear={() => setPicked(new Set())}>
         {picked.size === 1 && <button type="button" className="btn" data-testid="sites-bulk-open" onClick={() => { const s = items.find((x) => picked.has(x.site_code)); if (s) nav(linkTo(s)); }}>{t('table.open_selected')}</button>}
+        {canUnlock && <><button type="button" className="btn" data-testid="sites-bulk-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
+          <button type="button" className="btn" data-testid="sites-bulk-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button></>}
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
+      {locksDlg !== null && <LocksDialog target={{ site_ids: items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={picked.size} testid="sites-locks-dialog"
+        onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}
     </div>

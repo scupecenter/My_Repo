@@ -309,7 +309,9 @@
     "upload_template": "Upload",
     "coords_missing": "Without valid coordinates",
     "map": "Map",
-    "table": "Table"
+    "table": "Table",
+    "locks": "Locks",
+    "gaps": "Data gaps"
   },
   "scenario": {
     "new_build": "New Build",
@@ -1345,7 +1347,8 @@
   "override": {
     "badge": "Admin override",
     "historical_title": "Accepted without its mandatory documents under the historical load. The flag clears by itself when the documents are uploaded.",
-    "historical_note": "This task was accepted without its mandatory documents ({{docs}}) under the historical load (cutoff date {{cutoff}}). The flag clears when the documents are uploaded."
+    "historical_note": "This task was accepted without its mandatory documents ({{docs}}) under the historical load (cutoff date {{cutoff}}). The flag clears when the documents are uploaded.",
+    "bypass_title": "Approved while the workflow locks of its site were off, before {{why}}. Treated as an admin override in the KPIs."
   },
   "badges": {
     "local": "Local sign-in",
@@ -4008,5 +4011,50 @@
     "failed_parts_one": "{{count}} part was staged before it stopped; it is listed in the batches.",
     "failed_parts_other": "{{count}} parts were staged before it stopped; they are listed in the batches.",
     "done": "The file was checked. Open the batch of each part."
+  },
+  "locks": {
+    "on": "Locks: on",
+    "off": "Locks: off",
+    "on_title": "Workflow locks are on: a task waits for its predecessors and for the gate in front of its stage.",
+    "off_title": "Workflow locks are off: dates are entered in any order. Two-level approval, documents and checks still apply; an approval that skips a lock is flagged \"Admin override\".",
+    "open": "Open the locks",
+    "lock": "Lock again",
+    "open_title_one": "Open the workflow locks",
+    "open_title_other": "Open the workflow locks of {{count}} sites",
+    "lock_title_one": "Lock the workflow again",
+    "lock_title_other": "Lock the workflow of {{count}} sites again",
+    "open_note": "Tasks will not wait for their predecessors or a closed gate. Gates and milestones are still computed. A task approved while it would have been held is flagged \"Admin override\" and treated as an override in the KPIs.",
+    "lock_note": "The order of work applies again. Tasks opened only by the switch and still untouched are locked again; tasks already entered keep going.",
+    "done_one": "Workflow locks changed on {{count}} site.",
+    "done_other": "Workflow locks changed on {{count}} sites.",
+    "gaps_one": "{{count}} data gap",
+    "gaps_other": "{{count}} data gaps",
+    "gap_task": "{{task}} has no actual date while {{next}} has one",
+    "gap_field": "Missing: {{field}}",
+    "field_delivery_scenario": "Delivery scenario",
+    "sites_title": "Sites of this import",
+    "gaps_only": "Missing data only",
+    "sites_empty": "No site.",
+    "lock_all": "Lock all these sites again",
+    "stream": "Stream",
+    "milestone": "Next milestone",
+    "done": "Done",
+    "column": "Workflow locks",
+    "missing": "Missing data",
+    "missing_n": "{{warnings}} warning(s), {{gaps}} gap(s)",
+    "filter": "Workflow locks",
+    "filter_locked": "Locked",
+    "filter_open": "Open",
+    "quick_gaps": "Data gaps",
+    "bulk": "Workflow locks…",
+    "bulk_open": "Open the locks",
+    "bulk_lock": "Lock again",
+    "col_locked": "Locked",
+    "col_open": "Open",
+    "field": "Workflow locks",
+    "field_locked": "Locked (default)",
+    "field_open_opt": "Open",
+    "field_hint": "Open: the tasks of the new site are not held by predecessors or gates. Needs a System Admin or the delegated right to unlock when the site is approved.",
+    "historical_note": "The historical option also opens the workflow locks of every site of the file first (audited per site with this reason), so all historical data is accepted as it is. Missing values are warnings, not errors. Lock the sites again afterwards from the site page or SITE 360."
   }
 }

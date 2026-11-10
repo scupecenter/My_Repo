@@ -93,6 +93,7 @@ export class ProjectStatusService {
         workflow_versions: meta.workflow_versions ?? [],
         override_flagged_count: flagged,
         historical_flagged_count: Number(meta.historical_flagged_count ?? 0),
+        lock_bypass_flagged_count: Number(meta.lock_bypass_flagged_count ?? 0),
         overrides_excluded: exclude,
         weight_set: weightSet,
       },

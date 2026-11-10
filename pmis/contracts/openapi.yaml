@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.3
+  version: 0.15.4
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.4 (2026-11-10): historical data without locks, per-site workflow locks, the missing data of a historical load (owner requests 2026-11-10; technical decisions "Decided 2026-11-10: historical data without locks; per-site workflow locks" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0085; CHANGELOG 125). Additive. (1) `SiteListItem.workflow_locks` (true = the sequencing locks apply, as before; false = an "open" site: a task is not held by its predecessors or a closed gate, dates are entered in any order by hand, by a template and by the Master import; L1/L2, holders, rights, step-up, audit, field validation and the mandatory documents still apply; gates and milestones are still computed) and `SiteListItem.data_gaps` (the missing required values of the site); `GET /sites` filters `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`); `SiteDetail.workflow_locks_info` (who, when, why, `can_manage`) and `SiteDetail.data_gap_items`. (2) `PUT /sites/{site_id}/workflow-locks` and `POST /sites/workflow-locks` (a selection, or every site of a Master import run or of an import batch, with one reason): a System Admin or a holder of the delegable right `unlock` (`overrides.unlock` administer) for the region; a reason (422) and a step-up (401); 403 `action_forbidden` otherwise; audited per site (`site_workflow_locks_set`, before/after, flagged as an admin override when opening). Opening a site opens its locked tasks for entry; switching back to Locked re-locks the tasks that are still untouched and still held. (3) `TaskSummary.lock_bypassed` / `lock_bypass_reason`: a task approved on an open site while a predecessor or a gate would have held it; shown with the "Admin override" badge and treated as an override in the KPIs (`KpiMeta.lock_bypass_flagged_count`, included in `override_flagged_count`). (4) The historical-load option (0.14.3) of `POST /master-import/runs/{run_id}/apply` and of a stream template upload first sets the sites of the file to open (audited per site with the reason of the load), so no row is held for a predecessor or a gate; missing data is never an error: warnings `missing_actual_date` (the row is saved, not submitted), `missing_actual_start` (the task starts on its actual date), `missing_predecessor_date`, and a cell of an approved, N/A or absent task is not read (warning); invalid values stay errors of their own cell. (5) `GET /master-import/runs/{run_id}/sites` and `GET /import-batches/{batch_id}/sites` (`SiteImportStatus`): every site of the file with its status, warnings, errors and data gaps; `gaps=only`. (6) `SiteDraftInput.workflow_locks` (Locked by default, Open needs the right of (2) when L2 approves, 403 otherwise) and the New sites template column "Workflow Locks".
     - 0.15.3 (2026-11-09): big template uploads staged in the background (owner report 2026-11-09: a "Master (all sheets)" upload of about 469 sites, and the legacy Master preview, answered 500 after the 30 s request transaction; technical decision "Decided 2026-11-09: big template uploads staged in the background" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0083; CHANGELOG 122). Additive. (1) `POST /import-batches`: a file with more data rows (all its sheets) than 4 times the setting `imports.async_rows` (default 4 x 50 = 200) is staged in the background. Every check of the upload still runs in the request, in the same order and with the same answers (the right, the size, the package guard, `_tpl`, version, template, headers, and the checks the staging makes before its rows: the import right, the regions, the task of a per-task upload, the historical-load option); then the answer is **202** with the upload in status `parsing`: `id` (= `upload_id`; for TPL-MASTER also `group_id`), `progress` (`ImportBatchProgress` with `kind` = `upload`: `parts_total`, `parts_done`, `rows_total` = data rows of the file, `rows_done`, `percent`), `warnings`, `upload` (`ImportUploadInfo`). Each part (a stream batch of the Master sheet, a register sheet, the one batch of another template; a stream part 100 file rows at a time) is staged in a transaction of its own under the uploader's signed context, by the same database functions as the request, so the batches, rows, errors, warnings and audit rows are those the request would have produced. `GET /import-batches/{batch_id}` with the upload's id answers the upload while it is `parsing` (or `failed`, with `upload.error`), then the batch it produced (for TPL-MASTER the first part with `group_id`, `parts` and `warnings`, as the synchronous answer), with `upload_id`. `GET /import-batches` lists the caller's uploads in `parsing` first (unfiltered first page, or `status=parsing`). The same file of the same person while it is parsed answers 409 `upload_processing` (new `ErrorCode`, `upload_id`); a send of the upload id answers 409 `upload_processing`; `POST .../decisions` `discard` on the upload id stops it (the uploader only; the parts staged so far stay as batches). Only the uploader sees the upload; a run left behind by a restart is resumed by the API. Smaller files are staged in the request as before (202, status `validated`). (2) `POST /master-import/runs`: a Master with more data rows than 4 times `imports.async_rows` (default 200) answers **202** with the run in the new status `staging` and `MasterImportRun.staging` (`MasterImportStagingProgress`: rows done of rows total, percent); the identification and structure checks still answer 422 in the request; the rows are compared 100 at a time in the background, then the run is `previewed` with the same summary and differences; `failed` when the comparison could not end. `POST /master-import/runs/{run_id}/apply` of a `staging` run answers 409 `upload_processing`, of a `failed` run 409 `invalid_transition`. The same file of the same person while it is compared answers 409 `upload_processing` (`upload_id`, `run_id`). (3) Measured with 470 synthetic sites: the TPL-MASTER staging went from 98 s to 11 s and the Master import apply from 87 s to 6 s (the staging no longer grows a jsonb array row by row); the apply stays in the request.
     - 0.15.2 (2026-11-09): additive. The System Log screen under Logs & monitoring (owner request 2026-11-09; migration 0082; CHANGELOG 121). (1) `GET /system-log` is documented as built: readable by a System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise); `q` searches the message text (case-insensitive) or matches a request ID exactly; `from` is inclusive and `to` exclusive; newest first. (2) `SystemLogEntry.source` is an open string: the enum listed sources the server never writes and missed those it does (`api`, `template-check`, `master-import`, `mail`, `storage`, `integrity`, `contractors`, `assignments`, `job`...); `details` is the stored context (for a refused template upload: `reason`, `detail`, `load_error`, `file_name`, `size`); it is data, never markup. (3) `SavedViewScreenKey` gains `system-log` (module `admin.system_log`, so a shared view reaches only people who may read the System Log). The side-menu catalogue gains `logs.system`.
     - 0.15.1 (2026-11-09): additive. The editable side menu (owner request 2026-11-09, technical decision "Decided 2026-11-09: editable side menu" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0081; CHANGELOG 119). New `GET /settings/nav-layout` (every signed-in user: the shared layout of the side menu, null while the code's default applies, the catalogue of screen keys, who changed it and when, the ETag, `can_edit`) and `PUT /settings/nav-layout` (a System Admin or a delegate of `settings` edit for all regions, 403 `action_forbidden` otherwise; a reason and If-Match; `layout: null` returns to the default; 422 `validation_failed` with field errors for a bad tree; 409 `invalid_transition` for the layout in force). Schemas `NavLayoutSetting`, `NavLayout`, `NavHeading`, `NavSubHeading`, `NavLayoutInput`. Audited as `nav_layout_update` / `nav_layout_reset` with before and after. The permission and module filter of the menu is unchanged and applies after the layout.
@@ -2613,6 +2614,8 @@ paths:
           style: form
           explode: true
           schema: { type: array, items: { type: string, pattern: '^[a-z0-9_]+:.+$' } }
+        - { name: workflow_locks, in: query, description: '0.15.4: `locked` keeps the sites whose sequencing locks apply, `open` the sites whose locks are off.', schema: { type: string, enum: [locked, open] } }
+        - { name: data_gaps, in: query, description: '0.15.4: `with` keeps the sites with at least one missing required value (`data_gaps` > 0), `without` the others.', schema: { type: string, enum: [with, without] } }
         - { name: sort, in: query, schema: { type: string, enum: [site_code, -site_code, region, -region, stage, -stage, due_date, -due_date], default: site_code } }
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
@@ -2654,6 +2657,57 @@ paths:
               schema: { $ref: '#/components/schemas/SiteDraft' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/workflow-locks:
+    post:
+      tags: [sites]
+      operationId: setSitesWorkflowLocks
+      summary: Switch the workflow locks of many sites with one reason (0.15.4)
+      description: |
+        Exactly one of `site_ids`, `master_run_id` (every site of a Master import run; a System Admin or a delegate of templates administer) or `import_batch_id` (every site of
+        a batch the caller may see). The caller must be a System Admin or hold the delegable right `unlock` (`overrides.unlock` administer) for the region of every site
+        (403 `action_forbidden`, nothing changes; a site the caller cannot see is 404), give a reason of 3 to 2000 characters (422) and a fresh step-up (401). Each site is
+        audited (`site_workflow_locks_set`, before/after). Opening a site opens its locked tasks for entry (not the calculated milestones, the dismantle and mobilisation tasks);
+        locking it again re-locks the tasks that were opened only by the switch, are still untouched and still held.
+      x-db-path: site_workflow_locks_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteWorkflowLocksBulkInput' }
+      responses:
+        '200':
+          description: The result per site.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteWorkflowLocksResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/workflow-locks:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    put:
+      tags: [sites]
+      operationId: setSiteWorkflowLocks
+      summary: Switch the workflow locks of one site (0.15.4)
+      description: 'The rules of `POST /sites/workflow-locks` for one site. Setting the value it already has changes nothing (`changed` 0).'
+      x-db-path: site_workflow_locks_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteWorkflowLocksInput' }
+      responses:
+        '200':
+          description: The result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteWorkflowLocksResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/Unprocessable' }
   /sites/{site_id}:
     parameters:
@@ -8231,6 +8285,34 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /import-batches/{batch_id}/sites:
+    parameters:
+    - {$ref: '#/components/parameters/BatchId'}
+    get:
+      tags: [templates]
+      operationId: listImportBatchSites
+      summary: 'Every site of the batch with its status, warnings and data gaps (0.15.4)'
+      description: 'The sites of the rows of the batch (of the caller''s regions); `warnings` and `errors` count the rows of the batch (of every part of a Master file); `gaps=only` keeps the sites with a warning or a data gap.'
+      parameters:
+      - {name: gaps, in: query, schema: {type: string, enum: [only]}}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Sites by Site ID.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/SiteImportStatus'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
   /import-batches/{batch_id}/rows:
     parameters:
     - {$ref: '#/components/parameters/BatchId'}
@@ -8472,6 +8554,34 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/MasterImportRun'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /master-import/runs/{run_id}/sites:
+    parameters:
+    - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+    get:
+      tags: [templates]
+      operationId: listMasterImportRunSites
+      summary: 'Every site of the file with its status, warnings and data gaps (0.15.4)'
+      description: 'A System Admin or a delegate of templates administer; the sites of the caller''s regions. `warnings` and `errors` count the rows of the batches of the apply; `data_gaps` the missing required values of the site now. `gaps=only` keeps the sites with a warning or a data gap.'
+      parameters:
+      - {name: gaps, in: query, schema: {type: string, enum: [only]}}
+      - {$ref: '#/components/parameters/Limit'}
+      - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Sites by Site ID.
+          content:
+            application/json:
+              schema:
+                allOf:
+                - {$ref: '#/components/schemas/PageEnvelope'}
+                - type: object
+                  properties:
+                    items:
+                      type: array
+                      items: {$ref: '#/components/schemas/SiteImportStatus'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
@@ -12886,6 +12996,69 @@ components:
             total_tasks: { type: integer, description: 'Counting tasks of the stream that are not N/A.' }
             late_count: { type: integer, description: 'Open tasks past their due date.' }
             milestone_date: { type: [string, 'null'], format: date, description: 'Date of the milestone that closes the stream (the milestone task of its last stage) once approved.' }
+    SiteWorkflowLocksInput:
+      type: object
+      additionalProperties: false
+      required: [locked, reason]
+      properties:
+        locked: { type: boolean, description: 'true = Locked (the sequencing locks apply), false = Open.' }
+        reason: { type: string, minLength: 3, maxLength: 2000 }
+    SiteWorkflowLocksBulkInput:
+      type: object
+      additionalProperties: false
+      required: [locked, reason]
+      description: 'Exactly one of `site_ids`, `master_run_id`, `import_batch_id`.'
+      properties:
+        locked: { type: boolean }
+        reason: { type: string, minLength: 3, maxLength: 2000 }
+        site_ids: { type: array, minItems: 1, maxItems: 5000, items: { type: string, format: uuid } }
+        master_run_id: { type: string, format: uuid }
+        import_batch_id: { type: string, format: uuid }
+    SiteWorkflowLocksResult:
+      type: object
+      required: [workflow_locks, changed, unchanged, sites]
+      properties:
+        workflow_locks: { type: boolean }
+        changed: { type: integer }
+        unchanged: { type: integer }
+        sites:
+          type: array
+          items:
+            type: object
+            required: [site_id, site_code, workflow_locks, changed]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              workflow_locks: { type: boolean }
+              changed: { type: boolean }
+              tasks_opened: { type: array, items: { type: string }, description: 'Task codes opened for entry by the switch.' }
+              tasks_relocked: { type: array, items: { type: string }, description: 'Task codes locked again (still untouched and still held).' }
+    SiteDataGap:
+      type: object
+      required: [kind]
+      properties:
+        kind: { type: string, enum: [missing_actual_date, missing_field] }
+        task_code: { type: string, description: 'missing_actual_date: the task without an actual date.' }
+        successor_code: { type: string, description: 'missing_actual_date: a successor that has an actual date.' }
+        field: { type: string, description: 'missing_field: the site field (`delivery_scenario`).' }
+    SiteImportStatus:
+      type: object
+      required: [site_id, site_code, region_id, overall_status, workflow_locks, done_tasks, total_tasks, warnings, errors, data_gaps]
+      properties:
+        site_id: { type: string, format: uuid }
+        site_code: { type: string }
+        name: { type: string }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        overall_status: { $ref: '#/components/schemas/OverallStatus' }
+        workflow_locks: { type: boolean }
+        current_stream: { type: [string, 'null'], description: 'The stream of the next milestone (or of the last one when all are done).' }
+        current_milestone: { type: [string, 'null'] }
+        next_milestone: { type: [string, 'null'] }
+        done_tasks: { type: integer }
+        total_tasks: { type: integer }
+        warnings: { type: integer, description: 'Warnings of the rows of the import (missing data and the other warnings).' }
+        errors: { type: integer, description: 'Rows of the import refused for an invalid value.' }
+        data_gaps: { type: integer, description: 'The missing required values of the site now.' }
     SiteListItem:
       type: object
       required: [id, site_code, name, region_id, overall_status, rail]
@@ -12907,6 +13080,8 @@ components:
         streams: { type: array, items: { $ref: '#/components/schemas/StreamStatus' }, description: 'One entry per stream of the site''s workflow version, in order.' }
         views: { type: array, items: { $ref: '#/components/schemas/ViewRef' }, description: '0.4.7. One entry per view of the site''s workflow version, in order (the tabs). The stages and tasks of each view are in `GET /sites/{site_id}/tasks`.' }
         custom: { $ref: '#/components/schemas/CustomValues' }
+        workflow_locks: { type: boolean, description: '0.15.4: true = the sequencing locks apply (predecessors, gates); false = an "open" site (dates in any order; an approval that bypasses a lock is flagged).' }
+        data_gaps: { type: integer, minimum: 0, description: '0.15.4: the missing required values of the site (a task without an actual date while a successor has one; no delivery scenario).' }
     PipelineNode:
       type: object
       required: [code, kind, name_en, state]
@@ -12950,6 +13125,19 @@ components:
                 hlc_fiber: { $ref: '#/components/schemas/ScopeFlag' }
                 te_full: { $ref: '#/components/schemas/ScopeFlag' }
                 te_ip_router_only: { $ref: '#/components/schemas/ScopeFlag' }
+            workflow_locks_info:
+              type: object
+              description: '0.15.4: the last switch of the workflow locks and whether the caller may switch them.'
+              required: [can_manage]
+              properties:
+                changed_at: { type: [string, 'null'], format: date-time }
+                changed_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+                reason: { type: [string, 'null'] }
+                can_manage: { type: boolean, description: 'A System Admin, or the delegable right `unlock` for the region.' }
+            data_gap_items:
+              type: array
+              description: '0.15.4: the data gaps one by one.'
+              items: { $ref: '#/components/schemas/SiteDataGap' }
             pipeline_variant:
               $ref: '#/components/schemas/PipelineVariant'
               description: '0.13.2 (Q349). The pipeline style of the site page: the same setting as the dashboard (`dashboard.pipeline_variant`, A = rings, B = flat track).'
@@ -13072,6 +13260,8 @@ components:
         last_return_note: { type: [string, 'null'] }
         admin_override: { type: boolean }
         historical_no_documents: { type: boolean, description: 'Q462 (0.14.3): the task was submitted without its mandatory documents under the historical-load waiver. Shown as the "Admin override" badge; cleared when the documents are uploaded. Treated like an admin override in the KPIs.' }
+        lock_bypassed: { type: boolean, description: '0.15.4: approved on a site whose workflow locks were off while a predecessor or a gate would have held it. Shown as the "Admin override" badge; treated like an admin override in the KPIs; cleared when the task leaves the approved state.' }
+        lock_bypass_reason: { type: [string, 'null'], description: '0.15.4: the lock it bypassed: `predecessor_open:<codes>` or `gate_closed:<gate>`.' }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
         holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
@@ -16595,6 +16785,7 @@ components:
         longitude: { type: [number, string, 'null'], description: 'With latitude, in range (-180 to 180).' }
         address: { type: [string, 'null'], maxLength: 500 }
         rf_survey_date: { type: [string, 'null'], format: date, description: 'Not in the future.' }
+        workflow_locks: { type: [string, 'null'], description: '0.15.4: `Locked` (the default) or `Open` (also `locked` / `open`, Arabic مقفل / مفتوح). Open needs, when L2 approves, a System Admin or the delegable right `unlock` for the region (403 `action_forbidden`); the switch is audited with the creation. Other values: 422 `invalid`.' }
     SiteDraft:
       type: object
       required: [id, site_code, region_id, status, data, version, created_by, created_at, allowed_actions]
@@ -17600,6 +17791,7 @@ components:
         workflow_versions: { type: array, items: { type: integer }, description: 'Active versions read (per site).' }
         override_flagged_count: { type: integer, description: 'Admin overrides flagged in, or excluded from, this KPI. 0.14.3: includes the tasks flagged `historical_no_documents`.' }
         historical_flagged_count: { type: integer, description: 'Q462 (0.14.3): only the tasks flagged `historical_no_documents` (accepted without documents under the historical-load waiver).' }
+        lock_bypass_flagged_count: { type: integer, description: '0.15.4: only the tasks flagged `lock_bypassed` (approved on an open site while a lock would have held them); also counted in `override_flagged_count`.' }
         overrides_excluded: { type: boolean }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
     MilestonePipelineNode:

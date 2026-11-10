@@ -14,7 +14,7 @@ const SITE_SCENARIOS = ['Indoor', 'Outdoor'];
 const FLAGS = ['scope_tower_erection', 'scope_site_adaption', 'scope_gecol_power', 'scope_hlc_fiber', 'scope_te_full', 'scope_te_ip_router_only'] as const;
 const TEXT = ['site_code', 'name', 'name_ar', 'owner_site_id', 'cluster_code', 'site_type', 'project_phase', 'delivery_batch', 'cw_delivery_model', 'sub_region', 'latitude', 'longitude', 'address', 'rf_survey_date'] as const;
 type Form = Record<string, string>;
-const EMPTY: Form = { region_id: '', delivery_scenario: 'new_build', site_scenario: '', overall_status: '', ...Object.fromEntries(TEXT.map((k) => [k, ''])), ...Object.fromEntries(FLAGS.map((k) => [k, ''])) };
+const EMPTY: Form = { region_id: '', delivery_scenario: 'new_build', site_scenario: '', overall_status: '', workflow_locks: '', ...Object.fromEntries(TEXT.map((k) => [k, ''])), ...Object.fromEntries(FLAGS.map((k) => [k, ''])) };
 const TONE: Record<string, string> = { entry: 'bg-waitBg text-waitInk', in_approval: 'bg-openBg text-openInk', approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', discarded: 'bg-lockBg text-lockInk' };
 
 /** What the form sends: blank fields are left out (a blank scope flag is "not set"). */
@@ -32,7 +32,7 @@ const toForm = (d: SiteDraft): Form => {
   const f: Form = { ...EMPTY };
   for (const [k, v] of Object.entries(d.data ?? {})) {
     if (v === null || v === undefined) continue;
-    f[k] = (FLAGS as readonly string[]).includes(k) ? (v === 'yes' ? 'Yes' : 'No') : String(v);
+    f[k] = (FLAGS as readonly string[]).includes(k) ? (v === 'yes' ? 'Yes' : 'No') : k === 'workflow_locks' ? (/^open$/i.test(String(v)) ? 'Open' : '') : String(v);
   }
   return f;
 };
@@ -125,6 +125,9 @@ export function NewSite() {
           {field('cw_delivery_model', t('newSite.cw_delivery_model'))}
           {FLAGS.map((k) => select(k, t(`newSite.${k}`), [['Yes', t('newSite.yes')], ['No', t('newSite.no')]], { blank: '—' }))}
           {select('overall_status', t('newSite.overall_status'), [['Not Started', t('status.not_started')], ['Cancelled', t('status.cancelled')]], { blank: t('status.not_started') })}
+          {/* 0.15.4 (migration 0085): Locked by default; Open needs the right to unlock when L2 approves */}
+          {select('workflow_locks', t('locks.field'), [['Open', t('locks.field_open_opt')]], { blank: t('locks.field_locked') })}
+          {f.workflow_locks === 'Open' && <p className="text-xs text-mute sm:col-span-2" data-testid="ns-workflow-locks-hint">{t('locks.field_hint')}</p>}
         </fieldset>
         <p className="text-sm text-mute" data-testid="ns-privacy-note">{t('newSite.privacy')}</p>
         <div className="flex flex-wrap gap-2">

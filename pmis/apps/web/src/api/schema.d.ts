@@ -1674,6 +1674,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sites/workflow-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch the workflow locks of many sites with one reason (0.15.4)
+         * @description Exactly one of `site_ids`, `master_run_id` (every site of a Master import run; a System Admin or a delegate of templates administer) or `import_batch_id` (every site of
+         *     a batch the caller may see). The caller must be a System Admin or hold the delegable right `unlock` (`overrides.unlock` administer) for the region of every site
+         *     (403 `action_forbidden`, nothing changes; a site the caller cannot see is 404), give a reason of 3 to 2000 characters (422) and a fresh step-up (401). Each site is
+         *     audited (`site_workflow_locks_set`, before/after). Opening a site opens its locked tasks for entry (not the calculated milestones, the dismantle and mobilisation tasks);
+         *     locking it again re-locks the tasks that were opened only by the switch, are still untouched and still held.
+         */
+        post: operations["setSitesWorkflowLocks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/workflow-locks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Switch the workflow locks of one site (0.15.4)
+         * @description The rules of `POST /sites/workflow-locks` for one site. Setting the value it already has changes nothing (`changed` 0).
+         */
+        put: operations["setSiteWorkflowLocks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites/{site_id}": {
         parameters: {
             query?: never;
@@ -5260,6 +5306,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/import-batches/{batch_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Every site of the batch with its status, warnings and data gaps (0.15.4)
+         * @description The sites of the rows of the batch (of the caller's regions); `warnings` and `errors` count the rows of the batch (of every part of a Master file); `gaps=only` keeps the sites with a warning or a data gap.
+         */
+        get: operations["listImportBatchSites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/import-batches/{batch_id}/rows": {
         parameters: {
             query?: never;
@@ -5397,6 +5466,28 @@ export interface paths {
         };
         /** One run with its structure check and summary */
         get: operations["getMasterImportRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/master-import/runs/{run_id}/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Every site of the file with its status, warnings and data gaps (0.15.4)
+         * @description A System Admin or a delegate of templates administer; the sites of the caller's regions. `warnings` and `errors` count the rows of the batches of the apply; `data_gaps` the missing required values of the site now. `gaps=only` keeps the sites with a warning or a data gap.
+         */
+        get: operations["listMasterImportRunSites"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8338,6 +8429,68 @@ export interface components {
              */
             milestone_date?: string | null;
         };
+        SiteWorkflowLocksInput: {
+            /** @description true = Locked (the sequencing locks apply), false = Open. */
+            locked: boolean;
+            reason: string;
+        };
+        /** @description Exactly one of `site_ids`, `master_run_id`, `import_batch_id`. */
+        SiteWorkflowLocksBulkInput: {
+            locked: boolean;
+            reason: string;
+            site_ids?: string[];
+            /** Format: uuid */
+            master_run_id?: string;
+            /** Format: uuid */
+            import_batch_id?: string;
+        };
+        SiteWorkflowLocksResult: {
+            workflow_locks: boolean;
+            changed: number;
+            unchanged: number;
+            sites: {
+                /** Format: uuid */
+                site_id: string;
+                site_code: string;
+                workflow_locks: boolean;
+                changed: boolean;
+                /** @description Task codes opened for entry by the switch. */
+                tasks_opened?: string[];
+                /** @description Task codes locked again (still untouched and still held). */
+                tasks_relocked?: string[];
+            }[];
+        };
+        SiteDataGap: {
+            /** @enum {string} */
+            kind: "missing_actual_date" | "missing_field";
+            /** @description missing_actual_date: the task without an actual date. */
+            task_code?: string;
+            /** @description missing_actual_date: a successor that has an actual date. */
+            successor_code?: string;
+            /** @description missing_field: the site field (`delivery_scenario`). */
+            field?: string;
+        };
+        SiteImportStatus: {
+            /** Format: uuid */
+            site_id: string;
+            site_code: string;
+            name?: string;
+            region_id: components["schemas"]["RegionId"];
+            overall_status: components["schemas"]["OverallStatus"];
+            workflow_locks: boolean;
+            /** @description The stream of the next milestone (or of the last one when all are done). */
+            current_stream?: string | null;
+            current_milestone?: string | null;
+            next_milestone?: string | null;
+            done_tasks: number;
+            total_tasks: number;
+            /** @description Warnings of the rows of the import (missing data and the other warnings). */
+            warnings: number;
+            /** @description Rows of the import refused for an invalid value. */
+            errors: number;
+            /** @description The missing required values of the site now. */
+            data_gaps: number;
+        };
         SiteListItem: {
             /** Format: uuid */
             id: string;
@@ -8360,6 +8513,10 @@ export interface components {
             /** @description 0.4.7. One entry per view of the site's workflow version, in order (the tabs). The stages and tasks of each view are in `GET /sites/{site_id}/tasks`. */
             views?: components["schemas"]["ViewRef"][];
             custom?: components["schemas"]["CustomValues"];
+            /** @description 0.15.4: true = the sequencing locks apply (predecessors, gates); false = an "open" site (dates in any order; an approval that bypasses a lock is flagged). */
+            workflow_locks?: boolean;
+            /** @description 0.15.4: the missing required values of the site (a task without an actual date while a successor has one; no delivery scenario). */
+            data_gaps?: number;
         };
         PipelineNode: {
             code: string;
@@ -8406,6 +8563,17 @@ export interface components {
                 te_full?: components["schemas"]["ScopeFlag"];
                 te_ip_router_only?: components["schemas"]["ScopeFlag"];
             };
+            /** @description 0.15.4: the last switch of the workflow locks and whether the caller may switch them. */
+            workflow_locks_info?: {
+                /** Format: date-time */
+                changed_at?: string | null;
+                changed_by?: components["schemas"]["UserRef"] | null;
+                reason?: string | null;
+                /** @description A System Admin, or the delegable right `unlock` for the region. */
+                can_manage: boolean;
+            };
+            /** @description 0.15.4: the data gaps one by one. */
+            data_gap_items?: components["schemas"]["SiteDataGap"][];
             /** @description 0.13.2 (Q349). The pipeline style of the site page: the same setting as the dashboard (`dashboard.pipeline_variant`, A = rings, B = flat track). */
             pipeline_variant?: components["schemas"]["PipelineVariant"];
             /** @description Information only ("6 of 9 sites at TE PAC"). */
@@ -8547,6 +8715,10 @@ export interface components {
             admin_override?: boolean;
             /** @description Q462 (0.14.3): the task was submitted without its mandatory documents under the historical-load waiver. Shown as the "Admin override" badge; cleared when the documents are uploaded. Treated like an admin override in the KPIs. */
             historical_no_documents?: boolean;
+            /** @description 0.15.4: approved on a site whose workflow locks were off while a predecessor or a gate would have held it. Shown as the "Admin override" badge; treated like an admin override in the KPIs; cleared when the task leaves the approved state. */
+            lock_bypassed?: boolean;
+            /** @description 0.15.4: the lock it bypassed: `predecessor_open:<codes>` or `gate_closed:<gate>`. */
+            lock_bypass_reason?: string | null;
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
             holder_account_status?: components["schemas"]["UserAccountStatus"];
@@ -12424,6 +12596,8 @@ export interface components {
              * @description Not in the future.
              */
             rf_survey_date?: string | null;
+            /** @description 0.15.4: `Locked` (the default) or `Open` (also `locked` / `open`, Arabic مقفل / مفتوح). Open needs, when L2 approves, a System Admin or the delegable right `unlock` for the region (403 `action_forbidden`); the switch is audited with the creation. Other values: 422 `invalid`. */
+            workflow_locks?: string | null;
         };
         SiteDraft: {
             /** Format: uuid */
@@ -13595,6 +13769,8 @@ export interface components {
             override_flagged_count?: number;
             /** @description Q462 (0.14.3): only the tasks flagged `historical_no_documents` (accepted without documents under the historical-load waiver). */
             historical_flagged_count?: number;
+            /** @description 0.15.4: only the tasks flagged `lock_bypassed` (approved on an open site while a lock would have held them); also counted in `override_flagged_count`. */
+            lock_bypass_flagged_count?: number;
             overrides_excluded?: boolean;
             weight_set?: components["schemas"]["WeightSetRef"];
         };
@@ -17373,6 +17549,10 @@ export interface operations {
                 coordinates?: "missing" | "valid";
                 /** @description Filter on custom fields shown in filters, as `code:value` pairs (repeatable). */
                 custom?: string[];
+                /** @description 0.15.4: `locked` keeps the sites whose sequencing locks apply, `open` the sites whose locks are off. */
+                workflow_locks?: "locked" | "open";
+                /** @description 0.15.4: `with` keeps the sites with at least one missing required value (`data_gaps` > 0), `without` the others. */
+                data_gaps?: "with" | "without";
                 sort?: "site_code" | "-site_code" | "region" | "-region" | "stage" | "-stage" | "due_date" | "-due_date";
                 limit?: components["parameters"]["Limit"];
                 /** @description Opaque cursor from `page.next_cursor`. */
@@ -17424,6 +17604,64 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setSitesWorkflowLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteWorkflowLocksBulkInput"];
+            };
+        };
+        responses: {
+            /** @description The result per site. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteWorkflowLocksResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    setSiteWorkflowLocks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteWorkflowLocksInput"];
+            };
+        };
+        responses: {
+            /** @description The result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteWorkflowLocksResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
             422: components["responses"]["Unprocessable"];
         };
     };
@@ -24027,6 +24265,39 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listImportBatchSites: {
+        parameters: {
+            query?: {
+                gaps?: "only";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                /** @description Import batch. */
+                batch_id: components["parameters"]["BatchId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sites by Site ID. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SiteImportStatus"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listImportBatchRows: {
         parameters: {
             query?: {
@@ -24286,6 +24557,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MasterImportRun"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMasterImportRunSites: {
+        parameters: {
+            query?: {
+                gaps?: "only";
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sites by Site ID. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["SiteImportStatus"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];

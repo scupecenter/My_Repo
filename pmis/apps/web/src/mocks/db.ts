@@ -90,6 +90,8 @@ const fresh = () => ({
   notifications: seedNotifications(),
   /** 0.14.0 (Q460): the site drafts (manual entry of new sites); a site exists only when L2 approves. */
   siteDrafts: [] as (SiteDraft & { by: string })[],
+  /** 0.15.4 (migration 0085): the workflow locks switched on mock sites (site id -> locked; absent = locked). */
+  siteLocks: {} as Record<string, boolean>,
   /** Phase 4b: follows, weekly status updates and the comment threads of register records. */
   x: initX(),
   admin: initAdmin(),

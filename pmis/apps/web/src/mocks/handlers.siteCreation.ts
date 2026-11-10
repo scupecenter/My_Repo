@@ -15,7 +15,7 @@ const B = API_BASE;
 const REGIONS: Record<string, number> = { tripoli: 1, 'tripoli area': 1, middle: 2, 'middle area': 2, wm: 3, zawia: 4, 'zawia area': 4, benghazi: 5, 'benghazi area': 5, gm: 6, sebha: 7, 'sebha area': 7, 'سبها': 7, 'طرابلس': 1 };
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const ALLOWED = new Set(['site_code', 'region', 'region_id', 'name', 'name_ar', 'owner_site_id', 'cluster_code', 'delivery_scenario', 'site_scenario', 'site_type', 'project_phase', 'delivery_batch',
-  'cw_delivery_model', 'scope_tower_erection', 'scope_site_adaption', 'scope_gecol_power', 'scope_hlc_fiber', 'scope_te_full', 'scope_te_ip_router_only', 'overall_status', 'sub_region', 'latitude', 'longitude', 'address', 'rf_survey_date']);
+  'cw_delivery_model', 'scope_tower_erection', 'scope_site_adaption', 'scope_gecol_power', 'scope_hlc_fiber', 'scope_te_full', 'scope_te_ip_router_only', 'overall_status', 'sub_region', 'latitude', 'longitude', 'address', 'rf_survey_date', 'workflow_locks']);
 const FLAGS = ['scope_tower_erection', 'scope_site_adaption', 'scope_gecol_power', 'scope_hlc_fiber', 'scope_te_full', 'scope_te_ip_router_only'];
 type Stored = SiteDraft & { by: string };
 type Err = { path: string; code: string; message: string };
@@ -77,6 +77,11 @@ function clean(raw: Record<string, unknown>, self?: string): { data: Record<stri
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || Number.isNaN(Date.parse(d))) err('rf_survey_date', 'invalid', 'A date as yyyy-mm-dd.');
     else if (d > new Date().toISOString().slice(0, 10)) err('rf_survey_date', 'future_date', 'An actual date cannot be in the future.');
     else data.rf_survey_date = d;
+  }
+  // 0.15.4 (migration 0085): Workflow locks, Locked (default) or Open
+  if (has(raw.workflow_locks)) {
+    const w = String(raw.workflow_locks).trim().toLowerCase();
+    if (w === 'locked' || w === 'open') data.workflow_locks = w; else err('workflow_locks', 'invalid', 'Workflow locks is Locked or Open.');
   }
   return { data, errors, warnings };
 }
@@ -175,6 +180,8 @@ export const siteCreationHandlers = [
       Object.assign(d, { status: 'entry', return_count: (d.return_count ?? 0) + 1, last_return_note: body.note.trim(), decision_note: body.note.trim(), decided_by: user(), decided_at: new Date().toISOString() });
     } else {
       if (!stepUpValid()) return stepUp();
+      // 0.15.4: a site created Open needs a System Admin (or the delegated right to unlock) at the approval
+      if (d.data?.workflow_locks === 'open' && viewer()?.key !== 'pm') return problem(403, 'action_forbidden', 'A site with its workflow locks off is approved only by a System Admin or a holder of the delegated right to unlock.');
       Object.assign(d, { status: 'approved', site_id: siteMeta(0).id, decided_by: user(), decided_at: new Date().toISOString(), self_approval: mine(d) });
     }
     touch(d);

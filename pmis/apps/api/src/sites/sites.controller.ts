@@ -1,15 +1,16 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { SiteDraftsService } from './site-drafts.service';
+import { SiteLocksService } from './site-locks.service';
 import { SitesService } from './sites.service';
 
 /** The Site Register (سجل المواقع): site list with streams, site detail, task grid. */
 @Controller('sites')
 export class SitesController {
-  constructor(private readonly sites: SitesService, private readonly drafts: SiteDraftsService) {}
+  constructor(private readonly sites: SitesService, private readonly drafts: SiteDraftsService, private readonly locks: SiteLocksService) {}
 
   /** Contract 0.14.0 (Q460): propose a new site. This creates a draft; the site exists only when L2 approves it. */
   @Post()
@@ -18,6 +19,13 @@ export class SitesController {
     const draft = await this.drafts.create(auth, body);
     res.setHeader('ETag', etagHeader(draft.version as number));
     return draft;
+  }
+
+  /** Contract 0.15.4 (migration 0085): switch the workflow locks of many sites (a selection, or the sites of a Master import run or of an import batch), one reason. */
+  @Post('workflow-locks')
+  @HttpCode(200)
+  setLocks(@Auth() auth: AuthContext, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.locks.setMany(auth, body);
   }
 
   @Get()
@@ -50,6 +58,12 @@ export class SitesController {
   @HttpCode(201)
   propose(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
     return this.sites.propose(auth, id, body);
+  }
+
+  /** Contract 0.15.4 (migration 0085): switch the workflow locks of one site (a System Admin or the delegated right to unlock; a reason and a step-up). */
+  @Put(':id/workflow-locks')
+  setSiteLocks(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Record<string, unknown>> {
+    return this.locks.setOne(auth, id, body);
   }
 
   @Get(':id/tasks')
