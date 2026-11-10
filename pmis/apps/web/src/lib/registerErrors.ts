@@ -15,6 +15,7 @@ export function registerErrorMessage(t: TFunction, e: unknown): string {
     if (e.code === 'item_in_use') return t('regErrors.item_in_use');
     if (e.code === 'freeze_active') return t('regErrors.freeze_active');
     if (e.code === 'batch_processing') return t('regErrors.batch_processing');   // 0.14.4: a big batch is still processed in the background
+    if (e.code === 'upload_processing') return t('regErrors.upload_processing');   // 0.15.3: the same file is still being checked in the background
   }
   return taskErrorMessage(t, e);
 }

@@ -4,7 +4,7 @@
 // staged at upload, sent into the flow by the uploader, decided row by row or all at once by L2, held rows listed.
 import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
-import type { BallInCourt, ImportBatch, ImportRow, RegisterDefinition, RegisterKey, RegisterRecord, RegisterRecordStep } from '@/api/types';
+import type { BallInCourt, ImportBatch, ImportRow, RegisterDefinition, RegisterKey, RegisterRecord, RegisterRecordStep, UploadWarning } from '@/api/types';
 import { DATE_MAX, DATE_MIN, hasExpiry, validateRecord, visibleData } from '@/lib/registerForms';
 import { db, save, stepUpValid, viewer, accountStatus } from './db';
 import { guard, page, problem, stepUp } from './handlers';
@@ -166,6 +166,21 @@ function withRowIds(def: RegisterDefinition, data: Record<string, unknown>): Rec
   return data;
 }
 const invalid = (errors: { path: string; code: string }[]) => problem(422, 'validation_failed', 'Validation failed', { errors });
+
+/** 0.15.3: an upload staged in the background (a TPL-MASTER test file named with `bigmaster<rows>`). */
+interface MockUpload { id: string; file_name: string; parts: ReturnType<typeof makeStreamBatch>[]; rows_total: number; rows_done: number; created_at: string; warnings: UploadWarning[] }
+const UPLOADS = new Map<string, MockUpload>();
+function uploadDto(u: MockUpload): ImportBatch {
+  const pct = u.rows_total ? Math.floor((100 * u.rows_done) / u.rows_total) : 0, parts = u.parts.length;
+  return {
+    id: u.id, upload_id: u.id, template_id: 'TPL-MASTER', template_version: 3, source: 'master_template', file_name: u.file_name, status: 'parsing', current_level: 1, levels_required: 2,
+    counts: { create: 0, update: 0, unchanged: 0, error: 0, pending: 0, approved: 0, rejected: 0, held: 0, saved: 0 }, mode: 'submit', file_template_version: null, historical_load: null,
+    job_id: null, register_key: null, entity: null, stream: null, group_id: u.id, part_sheet: null, note: null, task_id: null, site_id: null, uploaded_at: u.created_at, version: 0,
+    progress: { kind: 'upload', state: 'running', rows_total: u.rows_total, rows_done: u.rows_done, percent: pct, parts_total: parts, parts_done: Math.min(parts - 1, Math.floor((pct * parts) / 100)),
+      started_at: u.created_at, updated_at: new Date().toISOString(), finished_at: null, error: null },
+    upload: { id: u.id, kind: 'master', state: 'running', batch_ids: [], error: null }, warnings: u.warnings,
+  } as ImportBatch;
+}
 
 export const registerHandlers = [
   http.get(`${B}/registers`, () => {
@@ -443,6 +458,14 @@ export const registerHandlers = [
       }
       const gid = crypto.randomUUID(), parts = [makeStreamBatch('CW', 'TPL-SITE-CW', f.name, gid), makeStreamBatch('TE', 'TPL-SITE-TE', f.name, gid), makeBatch('gecol', 'TPL-GECOL', f.name)];
       Object.assign(parts[2]!, { group_id: gid, part_sheet: 'GECOL' });
+      const bigRows = /bigmaster(\d+)/.exec(text);
+      if (bigRows) {
+        // 0.15.3: a big file is staged in the background: 202 `parsing` with the progress; each read of the upload stages 100 more rows, then it answers its parts
+        const up: MockUpload = { id: gid, file_name: f.name, parts, rows_total: Number(bigRows[1]), rows_done: 0, created_at: new Date().toISOString(), warnings: [
+          { code: 'column_not_owned', sheet: 'Master', column: 'Milestone / PRE-CW Completion Date', count: 3, message: 'The column "Milestone / PRE-CW Completion Date" is calculated by GSDN Workspace: 3 value(s) ignored.' }] };
+        UPLOADS.set(gid, up);
+        return HttpResponse.json(uploadDto(up), { status: 202, headers: { ETag: '"0"' } });
+      }
       for (const p of [...parts].reverse()) R().batches.unshift(p);
       save();
       const warnings = [
@@ -469,6 +492,16 @@ export const registerHandlers = [
   }),
   http.get(`${B}/import-batches/:id`, ({ params }) => {
     const g = guard(); if (g) return g;
+    const up = UPLOADS.get(String(params.id));
+    if (up) {
+      // 0.15.3: the upload moves by 100 rows per read; once staged, the same id answers the first part with the parts and the warnings
+      if (up.rows_done < up.rows_total) {
+        up.rows_done = Math.min(up.rows_total, up.rows_done + 100);
+        if (up.rows_done >= up.rows_total) { for (const p of [...up.parts].reverse()) R().batches.unshift(p); save(); }
+        if (up.rows_done < up.rows_total) return HttpResponse.json(uploadDto(up), { headers: { ETag: '"0"' } });
+      }
+      return HttpResponse.json({ ...toBatch(up.parts[0]!), upload_id: up.id, group_id: up.id, parts: up.parts.map(toBatch), warnings: up.warnings }, { headers: { ETag: `"${up.parts[0]!.version}"` } });
+    }
     const b = R().batches.find((x) => x.id === params.id);
     if (!b) return problem(404, 'not_found', 'Batch not found');
     if (b.run?.state === 'running') { advanceRun(b); save(); }   // 0.14.4: the background run moves by one chunk per read

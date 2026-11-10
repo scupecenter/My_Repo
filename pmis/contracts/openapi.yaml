@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.2
+  version: 0.15.3
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.3 (2026-11-09): big template uploads staged in the background (owner report 2026-11-09: a "Master (all sheets)" upload of about 469 sites, and the legacy Master preview, answered 500 after the 30 s request transaction; technical decision "Decided 2026-11-09: big template uploads staged in the background" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0083; CHANGELOG 122). Additive. (1) `POST /import-batches`: a file with more data rows (all its sheets) than 4 times the setting `imports.async_rows` (default 4 x 50 = 200) is staged in the background. Every check of the upload still runs in the request, in the same order and with the same answers (the right, the size, the package guard, `_tpl`, version, template, headers, and the checks the staging makes before its rows: the import right, the regions, the task of a per-task upload, the historical-load option); then the answer is **202** with the upload in status `parsing`: `id` (= `upload_id`; for TPL-MASTER also `group_id`), `progress` (`ImportBatchProgress` with `kind` = `upload`: `parts_total`, `parts_done`, `rows_total` = data rows of the file, `rows_done`, `percent`), `warnings`, `upload` (`ImportUploadInfo`). Each part (a stream batch of the Master sheet, a register sheet, the one batch of another template; a stream part 100 file rows at a time) is staged in a transaction of its own under the uploader's signed context, by the same database functions as the request, so the batches, rows, errors, warnings and audit rows are those the request would have produced. `GET /import-batches/{batch_id}` with the upload's id answers the upload while it is `parsing` (or `failed`, with `upload.error`), then the batch it produced (for TPL-MASTER the first part with `group_id`, `parts` and `warnings`, as the synchronous answer), with `upload_id`. `GET /import-batches` lists the caller's uploads in `parsing` first (unfiltered first page, or `status=parsing`). The same file of the same person while it is parsed answers 409 `upload_processing` (new `ErrorCode`, `upload_id`); a send of the upload id answers 409 `upload_processing`; `POST .../decisions` `discard` on the upload id stops it (the uploader only; the parts staged so far stay as batches). Only the uploader sees the upload; a run left behind by a restart is resumed by the API. Smaller files are staged in the request as before (202, status `validated`). (2) `POST /master-import/runs`: a Master with more data rows than 4 times `imports.async_rows` (default 200) answers **202** with the run in the new status `staging` and `MasterImportRun.staging` (`MasterImportStagingProgress`: rows done of rows total, percent); the identification and structure checks still answer 422 in the request; the rows are compared 100 at a time in the background, then the run is `previewed` with the same summary and differences; `failed` when the comparison could not end. `POST /master-import/runs/{run_id}/apply` of a `staging` run answers 409 `upload_processing`, of a `failed` run 409 `invalid_transition`. The same file of the same person while it is compared answers 409 `upload_processing` (`upload_id`, `run_id`). (3) Measured with 470 synthetic sites: the TPL-MASTER staging went from 98 s to 11 s and the Master import apply from 87 s to 6 s (the staging no longer grows a jsonb array row by row); the apply stays in the request.
     - 0.15.2 (2026-11-09): additive. The System Log screen under Logs & monitoring (owner request 2026-11-09; migration 0082; CHANGELOG 121). (1) `GET /system-log` is documented as built: readable by a System Admin or `view` on `admin.system_log` (403 `action_forbidden` otherwise); `q` searches the message text (case-insensitive) or matches a request ID exactly; `from` is inclusive and `to` exclusive; newest first. (2) `SystemLogEntry.source` is an open string: the enum listed sources the server never writes and missed those it does (`api`, `template-check`, `master-import`, `mail`, `storage`, `integrity`, `contractors`, `assignments`, `job`...); `details` is the stored context (for a refused template upload: `reason`, `detail`, `load_error`, `file_name`, `size`); it is data, never markup. (3) `SavedViewScreenKey` gains `system-log` (module `admin.system_log`, so a shared view reaches only people who may read the System Log). The side-menu catalogue gains `logs.system`.
     - 0.15.1 (2026-11-09): additive. The editable side menu (owner request 2026-11-09, technical decision "Decided 2026-11-09: editable side menu" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0081; CHANGELOG 119). New `GET /settings/nav-layout` (every signed-in user: the shared layout of the side menu, null while the code's default applies, the catalogue of screen keys, who changed it and when, the ETag, `can_edit`) and `PUT /settings/nav-layout` (a System Admin or a delegate of `settings` edit for all regions, 403 `action_forbidden` otherwise; a reason and If-Match; `layout: null` returns to the default; 422 `validation_failed` with field errors for a bad tree; 409 `invalid_transition` for the layout in force). Schemas `NavLayoutSetting`, `NavLayout`, `NavHeading`, `NavSubHeading`, `NavLayoutInput`. Audited as `nav_layout_update` / `nav_layout_reset` with before and after. The permission and module filter of the menu is unchanged and applies after the layout.
     - 0.15.0 (2026-11-07): additive. Field assignments in Procurement, the Car Dispatcher and Financial Advances (owner decisions Q495 to Q516, plan `docs/plans/2026-11-07-assignments-fleet-advances.md`; migration 0076; CHANGELOG 111). (1) Procurement is the assignment: new `ProcScope` values `Survey`, `Acquisition Visit`, `Inspection`, `Maintenance`, `Emergency` (In-House, no PR) and, in the Assignment section of `RegisterRecord.data` (register `procurement`, no Master column, the PR-PO export is unchanged): `members` (rows `{user_id, member_role: supervisor|executor, is_lead}`), `planned_start`, `planned_end`, `actual_end`, `vehicle_required` + `vehicle_not_required_reason`, `advance_required` + `advance_not_required_reason` (a "not required" answer needs its reason: 422 `reason_required` at submit) and the derived read-only `readiness` (`not_ready` is never returned; `awaiting_vehicle`, `awaiting_advance`, `awaiting_both`, `ready_to_mobilize`), `ready_date`, `open_advances_after_close`. (2) Two registers with the generic `/registers/{register_key}/records` endpoints, two levels and their own Matrix rows (empty in the seed): `car_dispatcher` (record types `vehicle`, `booking`; not site-scoped; fields in `docs/spec/registers-and-streams.md` section 3.20; derived `bookable`, `out_of_region`) and `financial_advances` (record types `advance`, `expense`, `settlement`; site-scoped; section 3.21; derived `balance`, `currency` = LYD). Permission modules `car_dispatcher` and `financial_advances`. Neither is part of the Master-format export. (3) Link rule: the L2 approval of a Procurement record with field work opens, in the same transaction and once only, one draft `booking` (when `vehicle_required`) and one draft individual `advance` per member (when `advance_required`). (4) New endpoints: `POST /registers/car_dispatcher/records/{record_id}/extend` (child booking draft), `POST /registers/financial_advances/records/{record_id}/top-up` (child advance draft: top-up and/or extension), `GET /fleet/availability` (bookable vehicles free in a date range), `GET /registers/procurement/records/{record_id}/readiness`. (5) New `ErrorCode` `vehicle_already_reserved` (409): a vehicle is never reserved for overlapping dates (database EXCLUDE constraint). An expense or settlement is never approved by its custodian (403 `self_approval_forbidden`). The amounts of Financial Advances (`requested_amount`, `approved_amount`, `disbursed_amount`, `amount`, `returned_amount`, `balance`) are absent from `data` (with `amounts_hidden: true`) for anyone but Finance, the Project Manager, the custodian and the custodian's manager (Q512); the same projection applies to search, template downloads and document contexts. (6) The workflow tasks `MOB-1` (stage 1), `MOB-2` (stage 2, after B2) and `MOB-5` (stage 5) are added without changing any milestone, gate, weight or existing SLA (`counts_toward_milestone` false, no document; SLA 2 to 3 working days from the L2 approval of the Procurement record, start event `REC:procurement`).
@@ -8180,8 +8181,9 @@ paths:
         Needs `import` on `templates` (403 otherwise, before the file is read). Then, in order: the form (one file, size limit 5 MB, 2000 data rows; larger answers 413 or 422 `size_or_rows_exceeded`), a plain `.xlsx` package without macros, embedded objects or external links (`not_xlsx`, `macros_not_allowed`), the hidden `_tpl` sheet (`tpl_missing`, `tpl_invalid`), a known and active template (`template_unknown_or_inactive`), the current version (`outdated_version`; the message names both versions), the template the user selected (`wrong_template`), the header checksum (`checksum_mismatch`), and the caller's right to create or edit in the register (`import_not_allowed`).
         The first failure answers 422 `template_rejected` with `reason` = TemplateRejectReason, writes a System Log row (`source = template-check`, the reason, the file name and hash) and creates no batch.
         A file that passes is read as values (a formula or a text starting with `=` is a cell error), staged by the database and answered 202 with the batch in status `validated`: each row is resolved inside the caller's regions, matched to a record by `Record ID` or by the register's natural key, validated with the same rules as manual entry, and classified. Rows with errors stay in the batch as `error` and never go on. Nothing reaches the register until the uploader sends the batch and the rows are approved.
+        **Big files (0.15.3).** A file with more data rows (all its sheets) than 4 times the setting `imports.async_rows` (default 200) passes every check above in the request, then answers 202 with the upload in status `parsing` (`id` = `upload_id`, `progress` of `kind` `upload`, `warnings`); its parts are staged in the background, each in a transaction of its own under the uploader's context, with the same functions and the same result as the synchronous staging. Poll `GET /import-batches/{id}`: once staged it answers the batch the file produced (TPL-MASTER: the first part with `group_id`, `parts`, `warnings`). The same file of the same person while it is parsed answers 409 `upload_processing`.
         **Stream templates and TPL-MASTER (0.11.5).** A stream file is staged as one batch of task rows (`stream` set, `register_key` null): see the 0.11.3 line of the versions list for the checks. A TPL-MASTER file answers the first batch of its parts with `group_id`, `parts` (every batch, in the order Master sheet streams then register sheets) and `warnings`; 422 `validation_failed` when no cell can be entered (the values are only in columns GSDN Workspace does not read), 422 `template_rejected` (`checksum_mismatch`) when a sheet lost an issued header, and `import_not_allowed` only when no part may be imported. A task upload (`task_id`) accepts a stream template of the task's stream only.
-      x-db-path: imp_stage_batch (stream and register templates), imp_stage_master (TPL-MASTER)
+      x-db-path: imp_stage_batch (stream and register templates), imp_stage_master (TPL-MASTER), imp_upload_start / imp_upload_step (0.15.3, a big file)
       parameters:
       - {$ref: '#/components/parameters/IdempotencyKey'}
       requestBody:
@@ -8199,7 +8201,7 @@ paths:
                 historical_load_reason: {type: string, minLength: 3, maxLength: 2000, description: 'Q462 (0.14.3): marks the batch "historical load: accept without documents". A System Admin only, with a step-up, while `GET /settings/historical-waiver` is open; a Site Register stream template in submit mode only (422 `validation_failed` otherwise; 403 `action_forbidden` for anyone else; 409 `invalid_transition` when the waiver is closed). The rows whose task has an actual date on or before the cutoff date are not refused for missing documents (warning `historical_no_documents`); the batch is sent by the same System Admin (the uploader).'}
       responses:
         '202':
-          description: Accepted. The file is parsed and staged in the request, so the batch is already `validated` (`job_id` stays null; `parsing` is kept for a future background parse).
+          description: 'Accepted. A file up to 4 times `imports.async_rows` data rows (default 200) is staged in the request, so the batch is already `validated`. A bigger file (0.15.3) answers the upload in status `parsing` with its `progress`; its batches follow in the background. `job_id` stays null.'
           headers:
             ETag: {$ref: '#/components/headers/ETag'}
           content:
@@ -8207,6 +8209,7 @@ paths:
               schema: {$ref: '#/components/schemas/ImportBatch'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /import-batches/{batch_id}:
@@ -8216,6 +8219,7 @@ paths:
       tags: [templates]
       operationId: getImportBatch
       summary: One batch (status and counts follow the rows and the records they created)
+      description: '0.15.3: also the id of an upload staged in the background (the uploader only): the upload while it is `parsing` or `failed`, then the batch it produced, with `upload_id` (TPL-MASTER: the first part with `group_id`, `parts`, `warnings`).'
       responses:
         '200':
           description: Batch.
@@ -8422,7 +8426,8 @@ paths:
         The file is identified by its sheet names (`Master`) and the three Master header rows (group, sub-group, name), and its structure is checked against the 187 Master columns: a missing typed column refuses it (`structure_mismatch`); a moved or extra column is reported. A file with a `_tpl` sheet is a PMIS template (`is_pmis_template`: upload it on the Templates page).
         The original is stored as uploaded with its SHA-256. Every Master row is compared with what GSDN Workspace holds for its site (`MasterImportDiff`); the role and region values go through the alias tables (Q8, Q10). Nothing else changes.
         Each refusal answers 422 `template_rejected` with `reason` and writes a System Log row (`source = master-import`); each accepted upload is audited and logged.
-      x-db-path: mi_stage_run
+        **Big files (0.15.3).** A Master with more data rows than 4 times `imports.async_rows` (default 200) passes the identification and structure checks in the request, then answers 202 with the run in status `staging` and `staging` (its progress); the rows are compared 100 at a time in the background under the same person, then the run is `previewed` with the same summary and differences as a comparison in the request. The same file of the same person while it is compared answers 409 `upload_processing`.
+      x-db-path: mi_stage_run, mi_stage_start (0.15.3, a big file)
       requestBody:
         required: true
         content:
@@ -8440,8 +8445,16 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/MasterImportRun'}
+        '202':
+          description: '0.15.3: a big file; the run in status `staging`, compared in the background (poll `GET /master-import/runs/{run_id}`).'
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MasterImportRun'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
         '413': {$ref: '#/components/responses/PayloadTooLarge'}
         '422': {$ref: '#/components/responses/Unprocessable'}
   /master-import/runs/{run_id}:
@@ -8540,6 +8553,7 @@ paths:
       description: |
         The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
         **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
+        **0.15.3:** a run still compared in the background (`staging`) answers 409 `upload_processing`; a run whose comparison failed (`failed`) answers 409 `invalid_transition`. Measured with 470 synthetic sites the staging of the apply now takes about 6 s (87 s before) and stays in the request.
       x-step-up: true
       x-db-path: mi_apply_run
       parameters:
@@ -11945,6 +11959,8 @@ components:
         count: { type: integer, description: '0.4.2. With `open_snags`: the number of open snags of the stream that block the task.' }
         scope: { type: string, enum: [CW, TE], description: '0.4.2. With `open_snags`: the stream of the blocking snags.' }
         existing_id: { type: string, format: uuid, description: '0.4.5. With `duplicate` on a register record: the record that exists already (GECOL and HLC have one per site; make a new version of it).' }
+        upload_id: { type: [string, 'null'], format: uuid, description: '0.15.3. With `upload_processing`: the upload of the same file still being checked (open `GET /import-batches/{upload_id}`).' }
+        run_id: { type: string, format: uuid, description: '0.15.3. With `upload_processing` on `POST /master-import/runs` or an apply: the run still being compared.' }
         order_scope: { type: [string, 'null'], description: '0.9.1. With `team_scope_mismatch`: the scope of the Procurement order.' }
         team_specialization: { type: [string, 'null'], description: '0.9.1. With `team_scope_mismatch`: the specialization of the team (null when the team has none).' }
         conflicts: { type: array, items: { $ref: '#/components/schemas/ScopeConflict' }, description: '0.12.0. With `scope_scenario_conflict`: the tasks where the scenario and the scope flags disagree.' }
@@ -12011,6 +12027,7 @@ components:
         - email_not_verified
         - batch_processing
         - vehicle_already_reserved
+        - upload_processing
     PageEnvelope:
       type: object
       required: [items, page]
@@ -14405,10 +14422,13 @@ components:
     ImportBatchProgress:
       type: object
       description: '0.14.4: the background run of a big New sites batch; 0.14.6: also of a register or a stream batch. It is done in chunks (New sites 25 rows, register 50, stream 25), each committed on its own, so `rows_done` and the counts of the batch move while it runs.'
-      required: [job_id, kind, state, rows_total, rows_done, percent]
+      required: [kind, state, rows_total, rows_done, percent]
       properties:
-        job_id: { type: string, format: uuid }
-        kind: { type: string, enum: [submit, decide], description: '`submit`: the send of the uploader (a self-approval creates the sites or approves the records and tasks); `decide`: an L2 decision.' }
+        job_id: { type: string, format: uuid, description: 'The run of a send or a decision (absent for an upload).' }
+        kind: { type: string, enum: [submit, decide, upload], description: '`submit`: the send of the uploader (a self-approval creates the sites or approves the records and tasks); `decide`: an L2 decision; `upload` (0.15.3): the staging of a big upload (`rows_total` = data rows of the file, `rows_done` = rows checked so far).' }
+        parts_total: { type: integer, description: '0.15.3, kind `upload`: the batches to stage (a stream of the Master sheet, a register sheet, or the one batch of another template).' }
+        parts_done: { type: integer, description: '0.15.3, kind `upload`: the parts staged so far.' }
+        chunks: { type: integer, description: '0.15.3, kind `upload`: the transactions done so far.' }
         action: { type: [string, 'null'], enum: [approve, review, reject, null], description: '0.14.6: the decision of a `decide` run; null for a send.' }
         batch_kind: { type: string, enum: [site, register, stream], description: '0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).' }
         decided: { type: integer, description: '0.14.6: rows decided (a review that passed a level counts too).' }
@@ -14426,6 +14446,22 @@ components:
         updated_at: { type: string, format: date-time }
         finished_at: { type: [string, 'null'], format: date-time }
         error: { type: [string, 'null'] }
+    ImportUploadInfo:
+      type: object
+      description: '0.15.3: an upload staged in the background, as its uploader sees it (never the rows of the file).'
+      required: [id, kind, state]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [single, master], description: '`master`: a TPL-MASTER file (several parts); `single`: any other template (one batch).' }
+        state: { type: string, enum: [running, done, failed] }
+        batch_ids: { type: array, items: { type: string, format: uuid }, description: The batches staged so far. }
+        error:
+          type: [object, 'null']
+          description: 'Why the staging ended without a batch: `code` (`template_rejected` with `reason`, `validation_failed`, `empty`, `stopped` ...) and `detail`.'
+          properties:
+            code: { type: [string, 'null'] }
+            reason: { type: [string, 'null'] }
+            detail: { type: [string, 'null'] }
     ImportBatch:
       type: object
       required: [id, template_id, template_version, status, counts, version]
@@ -14439,6 +14475,7 @@ components:
           type: string
           enum: [parsing, validated, in_review, in_approval, partially_approved, approved, rejected, applied, undone, failed, discarded, processing]
           description: |
+            `parsing` (0.15.3): a big upload is being staged in the background (see `progress`, kind `upload`); `id` is the upload's. `failed` (0.15.3): the background staging of an upload ended without a batch (`upload.error`).
             `processing` (0.14.4, 0.14.6): a big batch (New sites, register, stream) is being sent or decided in the background (see `progress`); a send, a decision or a discard answers 409 `batch_processing` until it ends, then the batch shows its usual status.
             `validated`: staged, waiting for the uploader. `in_approval`: sent; the records wait for L2. `partially_approved`: some rows decided. `approved`: every row decided, at least one approved. `rejected`: every row returned. `discarded`: closed before it was sent.
             The status follows the rows and the records they created, so an approval made in the register screen counts too. `in_review`, `applied` and `undone` are not used for registers (two fixed levels; undo is not built).
@@ -14465,8 +14502,12 @@ components:
             rejected: { type: integer }
             held: { type: integer, description: Rows held `pending_previous_approval`. }
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
-        job_id: { type: [string, 'null'], description: 'Parse job (`GET /jobs/{job_id}`) while status is `parsing`.' }
-        progress: { oneOf: [ { $ref: '#/components/schemas/ImportBatchProgress' }, { type: 'null' } ], description: '0.14.4 / 0.14.6: the latest background run of a big batch (send or decision); null when the batch never had one.' }
+        job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
+        upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
+        upload: { $ref: '#/components/schemas/ImportUploadInfo' }
+        parts: { type: array, items: { $ref: '#/components/schemas/ImportBatch' }, description: 'TPL-MASTER only: every batch of the file (the upload answer, and 0.15.3 the answer of a staged upload id).' }
+        warnings: { type: array, items: { $ref: '#/components/schemas/UploadWarning' }, description: 'The upload answer, and 0.15.3 an upload staged in the background.' }
+        progress: { oneOf: [ { $ref: '#/components/schemas/ImportBatchProgress' }, { type: 'null' } ], description: '0.14.4 / 0.14.6: the latest background run of a big batch (send or decision); null when the batch never had one. 0.15.3: the staging of an upload in status `parsing` (kind `upload`).' }
         task_id: { type: [string, 'null'], format: uuid, description: 'Set when the file was uploaded from beside a task.' }
         site_id: { type: [string, 'null'], format: uuid, description: 'The task''s site when `task_id` is set.' }
         uploaded_by: { $ref: '#/components/schemas/UserRef' }
@@ -14530,7 +14571,7 @@ components:
         file_name: { type: string }
         file_sha256: { type: string }
         file_size: { type: integer }
-        status: { type: string, enum: [previewed, applied] }
+        status: { type: string, enum: [previewed, applied, staging, failed], description: '0.15.3: `staging` while a big file is compared in the background (see `staging`), `failed` when that comparison could not end (it cannot be applied).' }
         structure:
           type: object
           description: 'The identification and structure check: `identified`, `columns_expected`, `columns_found`, `missing` [{letter, header, typed}], `moved` [{header, expected, found}], `extra` [headers], `missing_typed`, `sheets`, `register_sheets_missing`, `has_tpl`.'
@@ -14549,7 +14590,22 @@ components:
         outcome: { oneOf: [{ $ref: '#/components/schemas/MasterImportOutcome' }, { type: 'null' }] }
         has_file: { type: boolean, description: The original file is stored. }
         progress: { oneOf: [{ $ref: '#/components/schemas/MasterImportRunProgress' }, { type: 'null' }], description: '0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied).' }
+        staging: { oneOf: [{ $ref: '#/components/schemas/MasterImportStagingProgress' }, { type: 'null' }], description: '0.15.3: the comparison of a big file in the background; null when the file was compared in the request.' }
         version: { type: integer }
+    MasterImportStagingProgress:
+      type: object
+      description: '0.15.3: the comparison of a big legacy Master in the background, 100 rows per transaction.'
+      required: [state, rows_total, rows_done, percent]
+      properties:
+        upload_id: { type: string, format: uuid }
+        state: { type: string, enum: [running, done, failed] }
+        rows_total: { type: integer, description: The data rows of the Master sheet. }
+        rows_done: { type: integer }
+        percent: { type: integer, minimum: 0, maximum: 100 }
+        started_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        error: { type: [string, 'null'] }
     MasterImportRunProgress:
       type: object
       description: '0.14.6: the background sends of the batches of an applied Master import run, summed over its batches (each batch also has its own `ImportBatch.progress`).'

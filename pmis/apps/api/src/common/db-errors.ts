@@ -75,6 +75,12 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'The batch is being processed. Wait until it ends.',
         extra: { rows_done: typeof extra.rows_done === 'number' ? extra.rows_done : null, rows_total: typeof extra.rows_total === 'number' ? extra.rows_total : null },
       });
+    case 'upload_processing':
+      // 0083: the same file of the same person is already being staged (or compared) in the background
+      return new ProblemException(409, 'upload_processing', {
+        detail: detail ?? 'This file is already being checked. Wait until it ends.',
+        extra: { upload_id: typeof extra.upload_id === 'string' ? extra.upload_id : null, ...(typeof extra.run_id === 'string' ? { run_id: extra.run_id } : {}) },
+      });
     case 'vehicle_already_reserved':
       // 0076: the btree_gist exclusion of vehicle_reservations (or the check before it) refused an overlapping reservation
       return new ProblemException(409, 'vehicle_already_reserved', { detail: detail ?? 'The vehicle is already reserved for overlapping dates.' });

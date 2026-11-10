@@ -210,8 +210,9 @@ export type UploadWarning = S['UploadWarning'];
 /** The answer of an upload: a TPL-MASTER file answers the first batch plus every batch of the file (`parts`) and what GSDN Workspace ignored or skipped (`warnings`). */
 export type UploadedBatch = ImportBatch & { parts?: ImportBatch[]; warnings?: UploadWarning[] };
 /** The path of the review screen of a batch: a stream batch has no register. */
-export const batchPath = (b: Pick<ImportBatch, 'id' | 'register_key' | 'stream'> & { entity?: ImportBatch['entity'] }, fallbackKey?: string | null): string =>
-  b.stream || b.entity === 'site' ? `/templates/batches/${b.id}` : `/registers/${b.register_key ?? fallbackKey ?? ''}/batches/${b.id}`;
+/** The page of a batch. 0.15.3: an upload still being checked that has no register (a TPL-MASTER file) opens under Templates. */
+export const batchPath = (b: Pick<ImportBatch, 'id' | 'register_key' | 'stream'> & { entity?: ImportBatch['entity']; upload?: ImportBatch['upload'] }, fallbackKey?: string | null): string =>
+  b.stream || b.entity === 'site' || (b.upload && !b.register_key) ? `/templates/batches/${b.id}` : `/registers/${b.register_key ?? fallbackKey ?? ''}/batches/${b.id}`;
 export type WarehouseItem = S['WarehouseItem'];
 export type StockLevel = S['StockLevel'];
 export type StockMovement = S['StockMovement'];

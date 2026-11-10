@@ -40,8 +40,12 @@ export function ReconciliationPage() {
     if (!file) return;
     setError(null);
     upload.mutate(file, {
-      onSuccess: (r) => { setFile(null); toast(t('mi.uploaded')); open(r.id); },
-      onError: (e) => setError({ text: registerErrorMessage(t, e), detail: e instanceof ApiError ? e.problem.detail : undefined, reason: e instanceof ApiError ? String(e.problem.reason ?? '') : undefined }),
+      // 0.15.3: a big Master is compared in the background (status staging): the run opens at once with its progress
+      onSuccess: (r) => { setFile(null); toast(r.status === 'staging' ? t('mi.uploaded_staging') : t('mi.uploaded')); open(r.id); },
+      onError: (e) => {
+        if (e instanceof ApiError && e.code === 'upload_processing' && typeof e.problem.run_id === 'string') { setFile(null); toast(t('mi.already_staging')); open(e.problem.run_id); return; }
+        setError({ text: registerErrorMessage(t, e), detail: e instanceof ApiError ? e.problem.detail : undefined, reason: e instanceof ApiError ? String(e.problem.reason ?? '') : undefined });
+      },
     });
   };
   const forbidden = runs.error instanceof ApiError && runs.error.status === 403;
@@ -86,7 +90,7 @@ export function ReconciliationPage() {
                       onClick={() => open(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') open(r.id); }}>
                       <td className="p-2 font-semibold">{r.file_name}</td>
                       <td className="mono p-2 text-mute">{r.file_sha256.slice(0, 12)}</td>
-                      <td className="p-2"><span className={`chip ${r.status === 'applied' ? 'bg-doneBg text-doneInk' : 'bg-waitBg text-waitInk'}`}>{t(`mi.status_${r.status}`)}</span></td>
+                      <td className="p-2"><span className={`chip ${r.status === 'applied' ? 'bg-doneBg text-doneInk' : r.status === 'failed' ? 'bg-lateBg text-lateInk' : r.status === 'staging' ? 'bg-openBg text-openInk' : 'bg-waitBg text-waitInk'}`}>{t(`mi.status_${r.status}`)}</span></td>
                       <td className="p-2">{num(r.summary, 'rows')}</td>
                       <td className="p-2">{num(r.summary, 'diffs')}</td>
                       <td className="p-2">{num(r.summary, 'exceptions')}</td>
@@ -133,6 +137,31 @@ function RunProgress({ p }: { p: MasterImportRunProgress }) {
   );
 }
 
+/**
+ * 0.15.3: a big Master is compared in the background, 100 rows per transaction. The bar follows the rows compared; the page reads the run again every 3 s and
+ * shows the differences when the comparison ends. A comparison that could not end says why (the run cannot be applied; upload the file again).
+ */
+function RunStaging({ r }: { r: MasterImportRun }) {
+  const { t } = useTranslation();
+  const p = r.staging;
+  if (r.status === 'failed') {
+    return <p role="alert" className="card p-3 text-sm text-lateInk" data-testid="mi-staging-failed">{t('mi.staging_failed')}{p?.error ? ` ${p.error}` : ''}</p>;
+  }
+  if (r.status !== 'staging') return null;
+  const total = p?.rows_total ?? 0, done = p?.rows_done ?? 0, pct = p?.percent ?? 0;
+  const label = t('mi.staging_rows', { pct, done, total });
+  return (
+    <section className="card p-3" data-testid="mi-staging" aria-busy="true" aria-label={t('mi.staging_title')}>
+      <p id="mi-staging-label" className="mb-1 text-sm font-semibold" data-testid="mi-staging-label">{label}</p>
+      <div role="progressbar" aria-labelledby="mi-staging-label" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} aria-valuetext={label}
+        className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="mi-staging-bar">
+        <span className="block h-full rounded-full bg-open transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="mt-2 text-xs text-mute" role="status">{t('mi.staging_note')}</p>
+    </section>
+  );
+}
+
 function RunDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -169,6 +198,7 @@ function RunDetail({ id }: { id: string }) {
         <p className="text-mute">{t('mi.staff', { mapped: num(r.summary, 'staff_mapped'), rows: num(r.summary, 'staff_rows') })}</p>
         {r.status === 'applied' && <p data-testid="mi-applied" className="font-semibold">{t('mi.applied', { mode: t(`mi.mode_${r.apply_mode}`), reason: r.apply_reason ?? '' })}</p>}
       </div>
+      <RunStaging r={r} />
       {r.progress && <RunProgress p={r.progress} />}
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2">

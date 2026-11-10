@@ -19,10 +19,15 @@ export const IMPORT_RESUME_EVERY_MS = 2 * 60_000;
 export const IMPORT_RESUME_IDLE_S = 60;
 /** Consecutive chunk failures (not row failures, which are recorded on the row) after which the run is stopped. */
 export const IMPORT_MAX_CHUNK_FAILURES = 3;
+/** 0083: the rows of a stream part (or of a legacy Master) read in one transaction of an upload staged in the background. */
+export const UPLOAD_CHUNK_ROWS = 100;
 
 export interface PendingJob {
   job_id: string;
-  batch_id: string;
+  /** The batch of a send or a decision; null for an upload being staged (0083). */
+  batch_id: string | null;
+  /** 0083: the run stages an upload (job_id is the upload's id): imp_upload_step instead of imp_async_step. */
+  upload?: boolean;
   actor_id: string;
   actor_active: boolean;
   stepup_until: Date | null;
@@ -34,6 +39,7 @@ export interface PendingJob {
 
 export interface JobProgress {
   job_id?: string;
+  upload_id?: string;
   state: 'running' | 'done' | 'failed' | 'busy';
   rows_total?: number;
   rows_done?: number;
@@ -48,6 +54,9 @@ export interface JobProgress {
  * step-up is the one the database verified and stored at the request; the API only repeats its expiry in the context, for the audit rows.
  * After a restart, the resume job (every 2 minutes and once at start-up, when JOBS_ENABLED is on; recorded in job_runs as `import_batch_resume`) takes
  * the runs left in `processing`.
+ * 0083 (technical decision of 2026-11-09): the same service stages a big upload (POST /import-batches, POST /master-import/runs) in the background: the
+ * request records it (imp_upload_start, mi_stage_start) and answers 202 `parsing` / `staging`; each step (imp_upload_step) is a transaction under the
+ * uploader's signed context; the resume job takes the uploads left in `parsing` too.
  */
 @Injectable()
 export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -135,14 +144,21 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     await this.process(job);
   }
 
-  /** The runs left in processing for at least `idleSeconds` (0: every running one). Read without a person (job context). */
+  /**
+   * The runs left in processing for at least `idleSeconds` (0: every running one), and (0083) the uploads still being staged. Read without a person (job
+   * context).
+   */
   async pending(idleSeconds: number): Promise<PendingJob[]> {
     try {
       return await this.db.client.$transaction(async (tx) => {
         await applyContext(tx, jobContext('import_batch_resume'));
-        return tx.$queryRaw<PendingJob[]>(Prisma.sql`
+        const batches = await tx.$queryRaw<PendingJob[]>(Prisma.sql`
           SELECT job_id::text AS job_id, batch_id::text AS batch_id, actor_id::text AS actor_id, actor_active, stepup_until, session_id::text AS session_id, auth_method, mfa, request_id
           FROM imp_async_pending(${idleSeconds}::int)`);
+        const uploads = await tx.$queryRaw<PendingJob[]>(Prisma.sql`
+          SELECT upload_id::text AS job_id, NULL::text AS batch_id, true AS upload, actor_id::text AS actor_id, actor_active, stepup_until, session_id::text AS session_id, auth_method, mfa, request_id
+          FROM imp_upload_pending(${idleSeconds}::int)`);
+        return [...uploads, ...batches];
       });
     } catch (e) {
       this.log.warn(`reading the pending runs failed: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);
@@ -182,6 +198,7 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
    * (the conditional documents that apply now are slots before the engine counts the missing ones, as the synchronous send does for all its tasks).
    */
   async step(job: PendingJob, chunk?: number): Promise<JobProgress> {
+    if (job.upload) return this.uploadStep(job, chunk);
     const size = chunk ?? null;
     const ctx = this.contextOf(job);
     return this.db.client.$transaction(async (tx) => {
@@ -197,10 +214,26 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     }, { maxWait: 10_000, timeout: IMPORT_CHUNK_TIMEOUT_MS });
   }
 
-  private contextOf(job: PendingJob) {
+  /**
+   * 0083: one step of an upload staged in the background (a part, or the next rows of a stream part or of a legacy Master), in its own transaction under the
+   * uploader's newly signed context. The database checks that the person is the uploader and records what the staging refuses.
+   */
+  private async uploadStep(job: PendingJob, chunk?: number): Promise<JobProgress> {
+    const ctx = this.contextOf(job, 'import_upload');
+    const r = await this.db.client.$transaction(async (tx) => {
+      await applyContext(tx, ctx);
+      return tx.$queryRaw<{ r: { state?: string; rows_total?: number; rows_done?: number } | null }[]>(Prisma.sql`
+        SELECT imp_upload_step(${job.job_id}::uuid, ${chunk ?? UPLOAD_CHUNK_ROWS}::int) AS r`);
+    }, { maxWait: 10_000, timeout: IMPORT_CHUNK_TIMEOUT_MS });
+    const p = r[0]?.r;
+    const state = p?.state === 'running' || p?.state === 'done' || p?.state === 'failed' || p?.state === 'busy' ? p.state : 'failed';
+    return { upload_id: job.job_id, state, rows_total: p?.rows_total, rows_done: p?.rows_done };
+  }
+
+  private contextOf(job: PendingJob, name = 'import_batch') {
     const until = job.stepup_until ? new Date(job.stepup_until) : null;
     return {
-      ...jobContext('import_batch'),
+      ...jobContext(name),
       userId: job.actor_id,
       sessionId: job.session_id,
       authMethod: (job.auth_method === 'local' || job.auth_method === 'oidc' || job.auth_method === 'break_glass' ? job.auth_method : null) as 'local' | 'oidc' | 'break_glass' | null,
@@ -238,8 +271,10 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
   private async abandon(job: PendingJob, reason: string, asPerson: boolean): Promise<void> {
     try {
       await this.db.client.$transaction(async (tx) => {
-        await applyContext(tx, asPerson ? this.contextOf(job) : jobContext('import_batch_resume'));
-        await tx.$queryRaw(Prisma.sql`SELECT imp_async_abandon(${job.job_id}::uuid, ${reason}::text) AS r`);
+        await applyContext(tx, asPerson ? this.contextOf(job, job.upload ? 'import_upload' : 'import_batch') : jobContext('import_batch_resume'));
+        await tx.$queryRaw(job.upload
+          ? Prisma.sql`SELECT imp_upload_abandon(${job.job_id}::uuid, ${reason}::text) AS r`
+          : Prisma.sql`SELECT imp_async_abandon(${job.job_id}::uuid, ${reason}::text) AS r`);
       });
     } catch (e) {
       this.log.warn(`import run ${job.job_id}: could not be stopped: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);

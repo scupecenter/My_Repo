@@ -83,16 +83,25 @@ export const masterImportHandlers = [
     if (text.includes('_tpl')) return rejected('is_pmis_template', 'This file is a template issued by GSDN Workspace (it has the _tpl sheet): upload it on the Templates page.');
     if (!text.includes('Master')) return rejected('not_a_master', 'This file is not the Site Master: it has no sheet "Master".');
     const base = st().runs[0]!;
-    const run: MasterImportRun = { ...base, id: `run-${st().runs.length + 1}`, file_name: f.name, file_sha256: 'b2'.repeat(32), file_size: f.size, status: 'previewed', created_at: now(),
-      applied_by: null, applied_at: null, apply_reason: null, apply_mode: null, group_id: null, outcome: null, version: 1 };
+    // 0.15.3: a big Master (a test file named with `bigmaster<rows>`) is compared in the background: 202 `staging`, 100 rows more per read
+    const big = /bigmaster(\d+)/.exec(text), t0 = now();
+    const run: MasterImportRun = { ...base, id: `run-${st().runs.length + 1}`, file_name: f.name, file_sha256: 'b2'.repeat(32), file_size: f.size, status: big ? 'staging' : 'previewed', created_at: t0,
+      applied_by: null, applied_at: null, apply_reason: null, apply_mode: null, group_id: null, outcome: null, version: 1,
+      staging: big ? { upload_id: uid('upload'), state: 'running', rows_total: Number(big[1]), rows_done: 0, percent: 0, started_at: t0, updated_at: t0, finished_at: null, error: null } : null };
     st().runs = [run, ...st().runs];
     st().diffs[run.id] = (st().diffs[base.id] ?? []).map((x) => ({ ...x, id: `${x.id}-${run.id}`, resolution: 'open' as const, resolution_note: null }));
-    return HttpResponse.json(run, { status: 201, headers: { ETag: `"${run.version}"` } });
+    return HttpResponse.json(run, { status: big ? 202 : 201, headers: { ETag: `"${run.version}"` } });
   }),
   http.get(`${B}/master-import/runs/:id`, ({ params }) => {
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (r?.progress?.state === 'running') advance(r);   // 0.14.6: each read moves the background sends by one chunk of 25 rows
+    if (r?.status === 'staging' && r.staging) {
+      // 0.15.3: each read compares 100 more rows; the run is previewed with the last ones
+      const s = r.staging, done = Math.min(s.rows_total, s.rows_done + 100), t = now();
+      Object.assign(s, { rows_done: done, percent: s.rows_total ? Math.floor((100 * done) / s.rows_total) : 100, updated_at: t });
+      if (done >= s.rows_total) { Object.assign(s, { state: 'done', percent: 100, finished_at: t }); r.status = 'previewed'; }
+    }
     return r ? HttpResponse.json(r, { headers: { ETag: `"${r.version}"` } }) : problem(404, 'not_found', 'Not found');
   }),
   http.get(`${B}/master-import/runs/:id/diffs`, ({ params, request }) => {
@@ -113,6 +122,7 @@ export const masterImportHandlers = [
     const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string } };
     if (!body.reason || body.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required', message: 'A reason is required.' }] });
     if (r.status === 'applied') return problem(409, 'invalid_transition', 'Not possible now', { detail: 'This run was already applied.' });
+    if (r.status === 'staging') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'The file is still being compared. Wait until the comparison ends.', run_id: r.id } as never);
     if (!stepUpValid()) return stepUp();
     if (body.historical_load) {
       // Q462 (0.14.3): a System Admin, the submit mode, a reason, the waiver open

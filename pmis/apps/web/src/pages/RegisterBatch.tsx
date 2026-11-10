@@ -7,6 +7,7 @@ import { batchPath, type ImportBatch, type ImportBatchOutcome, type ImportRow, t
 import { batchTotals, BatchProgress } from '@/components/BatchProgress';
 import { useBatchValueFormat, type ShowValue } from '@/components/batchFormat';
 import { RejectDialog } from '@/components/RejectDialog';
+import { UploadStaging } from '@/components/UploadStaging';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { useToast } from '@/components/Toast';
 import { useVirtual } from '@/components/useVirtual';
@@ -88,10 +89,12 @@ export function RegisterBatch() {
   const { key: keyParam = '', batchId = '' } = useParams();
   const batch = useBatch(batchId);
   const b = batch.data;
+  // 0.15.3: the id of a big upload staged in the background: its progress while it is checked, then what it produced
+  const upload = !!b && ((!!b.upload && (b.status === 'parsing' || b.status === 'failed')) || (!!b.upload_id && b.id !== batchId));
   const key = keyParam || b?.register_key || '';
   const stream = b?.stream ?? null;
   const siteBatch = b?.entity === 'site'; // a New sites batch (contract 0.14.0): its rows are site drafts, and a site is created when L2 approves a row
-  const rows = useBatchRows(batchId, !!b);
+  const rows = useBatchRows(batchId, !!b && !upload);
   const submit = useSubmitBatch(), decide = useDecideBatch();
   const [show, setShow] = useState<'all' | 'valid' | 'invalid' | 'held'>('all');
   const [returning, setReturning] = useState<'all' | string | null>(null);
@@ -123,6 +126,7 @@ export function RegisterBatch() {
     decide.mutate({ batch: x, req }, { onSuccess: (r) => { ok(r.outcome); if (r.status === 'processing') toast(t('batch.processing_started')); else if (done) toast(done); }, onError: fail });
 
   if (batch.isError) return <div data-testid="page-register-batch"><p role="alert" className="text-lateInk">{t('regErrors.not_found')}</p>{back}</div>;
+  if (b && upload) return <UploadStaging batch={b} routeId={batchId} />;
   const step = b ? (STEP_OF[b.status] ?? 1) : 1;
   return (
     <div data-testid="page-register-batch" data-status={b?.status}>
