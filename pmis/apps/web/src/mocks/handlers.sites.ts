@@ -61,8 +61,11 @@ export const siteHandlers = [
       .filter((x) => bucket !== 'late' || (x.late_task_count ?? 0) > 0)
       .filter((x) => !stream || x.streams?.find((s) => s.code === stream)?.state !== 'na')
       .filter((x) => !stage || (stream ? x.rail.find((r) => r.state === 'current' || r.state === 'late')?.code === stage : x.current_milestone === stage));
-    const slice = items.slice(start, start + limit), next = start + limit < items.length ? String(start + limit) : null;
-    return HttpResponse.json({ items: slice, page: { limit, next_cursor: next, total: items.length } });
+    // 0.15.4: the workflow locks and the data gaps
+    const wl = u.get('workflow_locks'), dg = u.get('data_gaps');
+    const items2 = items.filter((x) => (!wl || (wl === 'open') === (x.workflow_locks === false)) && (!dg || (dg === 'with') === ((x.data_gaps ?? 0) > 0)));
+    const slice = items2.slice(start, start + limit), next = start + limit < items2.length ? String(start + limit) : null;
+    return HttpResponse.json({ items: slice, page: { limit, next_cursor: next, total: items2.length } });
   }),
   http.get(`${B}/sites/:id`, ({ params }) => {
     const g = guard(); if (g) return g;

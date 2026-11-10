@@ -11,6 +11,7 @@ import {
 } from '@/api/masterImport';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
 import { BatchProgress } from '@/components/BatchProgress';
+import { ImportSitesPanel } from '@/components/WorkflowLocks';
 import { HistoricalLoadOption, historicalReady, NO_HISTORICAL, type HistoricalChoice } from '@/components/HistoricalLoadOption';
 import { PageHeader } from '@/components/PageHeader';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/States';
@@ -235,6 +236,8 @@ function RunDetail({ id }: { id: string }) {
         {diffs.isLoading && <LoadingSkeleton />}
         {diffs.isSuccess && !diffs.data.items.length && <EmptyState testid="mi-no-diffs" title={t('mi.no_diffs')} />}
       </div>
+      {/* 0.15.4 (migration 0085): every site of the file with its status and its missing data; the sites opened by a historical load are locked again here */}
+      {r.status === 'applied' && <ImportSitesPanel source="run" id={r.id} canManage />}
       {applying && <ApplyDialog run={r} onClose={() => setApplying(false)} />}
       {resolving && <ResolveDialog diff={resolving} onClose={() => setResolving(null)} />}
     </section>

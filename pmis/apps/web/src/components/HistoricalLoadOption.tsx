@@ -23,6 +23,8 @@ export function HistoricalLoadOption({ waiver, value, onChange, testid = 'hl' }:
           <span className="block text-mute" data-testid={`${testid}-hint`}>{t('hw.option_hint', { cutoff: waiver.cutoff_date ?? '' })}</span>
         </span>
       </label>
+      {/* 0.15.4 (migration 0085): the historical option opens the workflow locks of the sites of the file first */}
+      {value.on && <p className="text-xs text-waitInk" data-testid={`${testid}-locks-note`}>{t('locks.historical_note')}</p>}
       {value.on && (
         <div>
           <label htmlFor={`${testid}-reason`} className="font-semibold">{t('hw.option_reason')}</label>

@@ -1,6 +1,6 @@
 import type { DocumentSlot, PipelineNode, SiteDetail, SiteListItem, SiteTasks, StreamStatus } from '@/api/types';
 import type { View } from '@/api/types';
-import { db, toSummary, type MockTask } from './db';
+import { db, toSummary, viewer, type MockTask } from './db';
 import { STAGE_CODES } from './matrixData';
 
 export const TODAY = '2026-10-25';
@@ -153,6 +153,11 @@ export function streamStatuses(i: number, view?: string): StreamStatus[] {
 /** Tasks of a site in the stream and the view (an intersection, contract 0.4.7). */
 export const scopedTasks = (i: number, stream?: string, view?: string) => siteTasks(i).filter((t) => (!stream || streamOfStage(t.stage_code) === stream) && inView(t, view));
 
+/** 0.15.4 (migration 0085): the workflow locks of a mock site (switched in `db().siteLocks`), and a synthetic data-gap count (every seventh site has two). */
+export const locksOf = (siteId: string): boolean => db().siteLocks?.[siteId] ?? true;
+export const gapsOf = (i: number): number => (i % 7 === 3 ? 2 : 0);
+const gapItemsOf = (i: number): SiteDetail['data_gap_items'] => (gapsOf(i) ? [{ kind: 'missing_actual_date', task_code: 'B3', successor_code: 'B4' }, { kind: 'missing_field', field: 'delivery_scenario' }] : []);
+
 export function listItem(i: number, stream?: string, view?: string): SiteListItem {
   const m = siteMeta(i), tasks = scopedTasks(i, stream, view);
   const pipe = pipelineOf(i).filter((n) => (!stream || streamOfStage(n.code) === stream) && (!view || tasks.some((t) => t.stage_code === n.code)));
@@ -162,7 +167,7 @@ export function listItem(i: number, stream?: string, view?: string): SiteListIte
     current_milestone: cur?.code ?? null, next_milestone: pipe.find((n) => n.state === 'planned')?.code ?? null, workflow_version: 1,
     late_task_count: tasks.filter((t) => t.sla?.colour === 'red' && t.state !== 'approved').length,
     waiting_approval_count: tasks.filter((t) => t.state === 'in_review' || t.state === 'in_approval').length, rail: bad(pipe) as SiteListItem['rail'],
-    streams: streamStatuses(i, view), views: VIEW_REFS,
+    streams: streamStatuses(i, view), views: VIEW_REFS, workflow_locks: locksOf(m.id), data_gaps: gapsOf(i),
   };
 }
 
@@ -173,6 +178,7 @@ export function detail(i: number): SiteDetail {
     // the map has synthetic coordinates (mapGeo); the site page keeps none, so the identity proposals start empty
     tower_owner: mapGeo(i).tower_owner, sub_region: NAMES[i % NAMES.length], owner_site_id: `OWN-${1000 + i}`, tower_type: i % 3 === 0 ? 'Monopole' : 'Lattice', tower_height_m: 24 + (i % 4) * 6,
     cluster_progress: { cluster_code: m.cluster, sites_total: 9, sites_at_te_pac: 1 + (i % 6), kpi_acceptance_date: null },
+    workflow_locks_info: { changed_at: null, changed_by: null, reason: null, can_manage: viewer()?.key === 'pm' }, data_gap_items: gapItemsOf(i),
     counts: { open_snags: i % 4, open_issues: i % 3, documents_missing: siteTasks(i).reduce((a, t) => a + (t.slots_required ?? 0) - (t.slots_filled ?? 0), 0) },
   } as SiteDetail;
 }

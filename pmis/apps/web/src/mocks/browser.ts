@@ -22,5 +22,6 @@ import { realApiHandlers } from './realApi';
 import { logsWebHandlers } from './handlers.logsWeb';
 import { viewsHandlers } from './handlers.views';
 import { masterImportHandlers } from './handlers.masterImport';
+import { workflowLocksHandlers } from './handlers.workflowLocks';
 import { p9Handlers } from './handlers.p9';
-export const worker = setupWorker(...realApiHandlers(), ...masterImportHandlers, ...viewsHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);
+export const worker = setupWorker(...realApiHandlers(), ...masterImportHandlers, ...workflowLocksHandlers, ...viewsHandlers, ...logsWebHandlers, ...p9Handlers, ...logsHandlers, ...xHandlers, ...p4cHandlers, ...listHandlers, ...registerHandlers, ...warehouseHandlers, ...fleetHandlers, ...authHandlers, ...profileHandlers, ...qcHandlers, ...documentHandlers, ...settingsHandlers, ...handlers, ...scenarioHandlers, ...siteCreationHandlers, ...siteHandlers, ...adminHandlers, ...orgHandlers, ...dashboardHandlers);

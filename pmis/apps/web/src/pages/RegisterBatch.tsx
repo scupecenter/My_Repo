@@ -12,6 +12,8 @@ import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { useToast } from '@/components/Toast';
 import { useVirtual } from '@/components/useVirtual';
 import { registerErrorMessage } from '@/lib/registerErrors';
+import { ImportSitesPanel } from '@/components/WorkflowLocks';
+
 
 const ACTION_TONE: Record<string, string> = { create: 'bg-doneBg text-doneInk', update: 'bg-openBg text-openInk', unchanged: 'bg-lockBg text-lockInk', error: 'bg-lateBg text-lateInk' };
 const DECISION_TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', rejected: 'bg-lateBg text-lateInk', pending: 'bg-waitBg text-waitInk', pending_previous_approval: 'bg-lockBg text-lockInk', saved: 'bg-openBg text-openInk' };
@@ -192,6 +194,8 @@ export function RegisterBatch() {
               <ul className="mt-1 list-disc ps-5">{held.map((r) => <li key={r.id} data-testid={`batch-held-${rowId(r)}`}><span className="mono">{r.key}</span> {t('batch.row_no', { n: r.row_no })}{r.hold_reason && r.hold_reason !== 'open_version' ? ` · ${t(`batch.hold_${r.hold_reason}`)}` : ''}</li>)}</ul>
             </div>
           )}
+          {/* 0.15.4 (migration 0085): the sites of a stream batch with their status and missing data */}
+          {stream && b && <ImportSitesPanel source="batch" id={b.id} canManage />}
           {outcome && !!outcome.failed.length && (
             <div role="alert" className="mb-3 rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="batch-outcome-failed">
               <p className="font-semibold">{t('batch.failed_title', { count: outcome.failed.length })}</p>

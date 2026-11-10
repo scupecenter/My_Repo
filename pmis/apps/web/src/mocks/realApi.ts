@@ -353,6 +353,12 @@ export const REAL_API_AUTH_USERS = [
   // Contract 0.15.1 (migration 0081; apps/api: settings): the shared layout of the side menu.
   ['get', '/settings/nav-layout'],
   ['put', '/settings/nav-layout'],
+  // Contract 0.15.4 (migration 0085; apps/api: sites, master-import, templates): the per-site workflow locks (one site, many sites) and the status of the sites of
+  // an import (missing data per site). The new site fields ride on the paths above.
+  ['post', '/sites/workflow-locks'],
+  ['put', '/sites/:id/workflow-locks'],
+  ['get', '/master-import/runs/:id/sites'],
+  ['get', '/import-batches/:id/sites'],
 ] as const;
 
 /** `GET /users/deleted` and `GET /users/picker` are other operations that the `:id` pattern would swallow; they stay mocked. */

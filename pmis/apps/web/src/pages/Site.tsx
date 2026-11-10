@@ -13,6 +13,7 @@ import { SiteApplicability } from '@/components/SiteApplicability';
 import { SiteDispatchPanel } from '@/components/SiteDispatch';
 import { useSiteDispatch } from '@/api/warehouse';
 import { ViewTabs } from '@/components/ViewTabs';
+import { DataGapsChip, LocksChip } from '@/components/WorkflowLocks';
 import { Pipeline } from '@/components/Pipeline';
 import { TaskDrawer } from '@/components/TaskDrawer';
 import { ExportViewButton } from '@/components/ExportDialog';
@@ -72,6 +73,9 @@ export function Site() {
               {s.name_ar && <p dir="rtl" lang="ar" className="text-lg text-mute" data-testid="site-name-ar">{s.name_ar}</p>}
               <p className="text-mute" data-testid="site-meta">{(i18n.language === 'ar' && region?.name_ar) || region?.name_en} · {s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : ''}{s.cluster_code ? ` · ${s.cluster_code}` : ''}</p>
             </div>
+            {/* 0.15.4 (migration 0085): the workflow locks of the site (chip and, for an authorized user, the switch) and its data gaps */}
+            <LocksChip siteId={s.id} locked={s.workflow_locks !== false} canManage={!!s.workflow_locks_info?.can_manage} />
+            <DataGapsChip count={s.data_gaps ?? 0} items={s.data_gap_items} />
             <FollowButton target={{ kind: 'site', id: s.id }} entityId={s.id} />
             <span className={`chip ${TONE[s.overall_status]}`} data-testid="site-status">{t(`status.${s.overall_status}`)}</span>
           </div>

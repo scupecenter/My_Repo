@@ -1,8 +1,26 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './client';
-import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
+import type { Comment, DocumentFile, Group, Matrix, MatrixPatch, Page, Region, Role, SiteDetail, SiteImportStatus, SiteWorkflowLocksResult, SiteDraft, SiteDraftInput, SiteListItem, SiteTasks, Stream, ViewRef, TaskDetail, TaskEntryPatch, TaskSummary, TransitionResult, UserPickerItem, WorkflowStep } from './types';
 
-export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string; coordinates?: string };
+export type SiteFilters = { q: string; region_id: string; scenario: string; overall_status: string; stage_code: string; stream?: string; view?: string; bucket?: string; coordinates?: string;
+  /** 0.15.4: locked / open */ workflow_locks?: string; /** 0.15.4: with / without */ data_gaps?: string };
+
+/** 0.15.4 (migration 0085): switch the workflow locks of one site, of a selection, or of every site of a Master import run or a batch (reason, step-up). */
+export type LocksTarget = { site_id: string } | { site_ids: string[] } | { master_run_id: string } | { import_batch_id: string };
+export function useSetWorkflowLocks() {
+  const qc = useQueryClient();
+  return useMutation<SiteWorkflowLocksResult, ApiError, { target: LocksTarget; locked: boolean; reason: string }>({
+    mutationFn: ({ target, locked, reason }) => ('site_id' in target
+      ? api.put<SiteWorkflowLocksResult>(`/sites/${target.site_id}/workflow-locks`, { body: { locked, reason } })
+      : api.post<SiteWorkflowLocksResult>('/sites/workflow-locks', { body: { locked, reason, ...target } })),
+    onSettled: () => { for (const k of ['site', 'sites', 'site-tasks', 'import-sites']) void qc.invalidateQueries({ queryKey: [k] }); },
+  });
+}
+
+/** 0.15.4: the status of every site of a Master import run or of an import batch, with its warnings and data gaps. */
+export const useImportSites = (source: 'run' | 'batch', id: string, gapsOnly: boolean, enabled = true) =>
+  useQuery({ queryKey: ['import-sites', source, id, gapsOnly], enabled: enabled && !!id,
+    queryFn: () => api.get<Page<SiteImportStatus>>(source === 'run' ? `/master-import/runs/${id}/sites` : `/import-batches/${id}/sites`, { query: { limit: 200, ...(gapsOnly ? { gaps: 'only' } : {}) } }) });
 
 export const useRegions = () => useQuery({ queryKey: ['regions'], staleTime: Infinity, queryFn: () => api.get<{ items: Region[] }>('/regions').then((r) => r.items) });
 

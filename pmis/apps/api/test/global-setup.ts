@@ -160,6 +160,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const bguDb = await buildDatabase(adminUrl, bgu, appPassword);
   process.env.TEST_DATABASE_URL_BGUP = bguDb.appUrl;
   process.env.TEST_SUPER_URL_BGUP = bguDb.superUrl;
+  // The workflow-locks database (migration 0085): the suite opens the historical-load waiver, switches the workflow locks of its sites and reads the dashboard
+  // counts of the lock bypasses, which no other suite may meet.
+  const wl = `${dbName}_wl`;
+  const wlDb = await buildDatabase(adminUrl, wl, appPassword);
+  process.env.TEST_DATABASE_URL_WL = wlDb.appUrl;
+  process.env.TEST_SUPER_URL_WL = wlDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -201,6 +207,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hw} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
     await a.end();
   };
 }
