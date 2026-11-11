@@ -111,7 +111,16 @@ echo "==> Directories and keys (created once, never printed)"
 install -d -m 750 -o root -g postgres "$DIR"
 install -d -m 750 -o root -g postgres "$DIR/conf.d"
 install -d -m 750 -o postgres -g postgres /var/log/pgbackrest
-install -d -m 750 -o postgres -g postgres /var/lib/gsdn-pmis
+# The data root /var/lib/gsdn-pmis also holds the document store and the log anchors of the API (service user gsdn-pmis): it stays root 0755.
+# An older version of this script made it postgres 0750, which locked the API out of its document store (EACCES on mkdir, owner report
+# 2026-11-11). The backup check state now lives in its own postgres folder below it; a state file at the old place is moved there.
+if [[ -d /var/lib/gsdn-pmis && ! -L /var/lib/gsdn-pmis ]]; then chown root:root /var/lib/gsdn-pmis; chmod 755 /var/lib/gsdn-pmis; fi
+(umask 022; install -d -m 755 -o root -g root /var/lib/gsdn-pmis)
+install -d -m 750 -o postgres -g postgres /var/lib/gsdn-pmis/db-backup
+if [[ -f /var/lib/gsdn-pmis/db-backup-check.state && ! -L /var/lib/gsdn-pmis/db-backup-check.state && ! -e /var/lib/gsdn-pmis/db-backup/db-backup-check.state ]]; then
+  mv /var/lib/gsdn-pmis/db-backup-check.state /var/lib/gsdn-pmis/db-backup/db-backup-check.state
+  chown postgres:postgres /var/lib/gsdn-pmis/db-backup/db-backup-check.state
+fi
 install -d -m 750 -o postgres -g postgres /var/lib/postgresql/.ssh 2>/dev/null || true
 umask 077
 [[ -e $SECRET ]] || install -m 640 -o root -g postgres /dev/null "$SECRET"
@@ -219,7 +228,7 @@ echo "==> Settings in $ENV_FILE (no secret)"
   echo "PMIS_DB_PORT=$PMIS_DB_PORT"
   echo "PMIS_DB_NAME=$PMIS_DB_NAME"
   echo "DB_LIVE_PGDATA=/var/lib/postgresql/$PG_VER/$PG_CLUSTER"
-  echo "DB_CHECK_STATE=/var/lib/gsdn-pmis/db-backup-check.state"
+  echo "DB_CHECK_STATE=/var/lib/gsdn-pmis/db-backup/db-backup-check.state"
   echo "DB_BACKUP_REPO1=$DB_BACKUP_REPO1"
   echo "DB_BACKUP_REPO2=${DB_BACKUP_REPO2:-}"
   echo "DB_DUMP_RESTIC_REPOSITORY=${DB_DUMP_RESTIC_REPOSITORY:-}"

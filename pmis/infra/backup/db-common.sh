@@ -25,7 +25,7 @@ DB_BACKUP_MONTHLY_REPO=${DB_BACKUP_MONTHLY_REPO:-} # optional: monthly full copy
 PMIS_DB_PORT=${PMIS_DB_PORT:-5432}
 PMIS_DB_NAME=${PMIS_DB_NAME:-pmis}
 DB_LIVE_PGDATA=${DB_LIVE_PGDATA:-/var/lib/postgresql/16/main}
-DB_CHECK_STATE=${DB_CHECK_STATE:-/var/lib/gsdn-pmis/db-backup-check.state}
+DB_CHECK_STATE=${DB_CHECK_STATE:-/var/lib/gsdn-pmis/db-backup/db-backup-check.state}
 PG_BIN=${PG_BIN:-/usr/lib/postgresql/16/bin}
 
 # psql as the current (postgres) user, to GSDN Workspace database, over the local socket.
