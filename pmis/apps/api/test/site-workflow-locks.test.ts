@@ -5,6 +5,7 @@ import type { Client as PgClient } from 'pg';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { q } from './calc-helpers';
+import { ImportJobsService } from '../src/templates/import-jobs.service';
 import { Api, delegate, loggedIn, makeUser, startApp, superDbWl } from './helpers';
 import { day, uploadFile } from './tpl-helpers';
 import { SITE_APPROVE_GRANTS, filled } from './tpl-stream-helpers';
@@ -337,6 +338,61 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     expect(back.status, JSON.stringify(back.body)).toBe(200);
     expect(back.body.changed).toBe(4);
     expect(await locksOf(full.id)).toBe(true);
+  });
+
+  it('a big historical apply runs in the background (0086): all or nothing, a refusal there changes nothing and the file can be applied again', async () => {
+    const jobs = app.get(ImportJobsService);
+    jobs.autoStart = false;
+    await db.query(`UPDATE settings SET value = to_jsonb(2) WHERE key = 'imports.async_rows'`);
+    try {
+      const t = await team(['B3', 'B4']);
+      const sites = [await makeSite(db, R, { prefix: 'WLB' }), await makeSite(db, R, { prefix: 'WLB' }), await makeSite(db, R, { prefix: 'WLB' })];
+      const b4: Record<string, string> = {};
+      for (const s of sites) { await makeTask(db, s, 'B3', 'open'); b4[s.id] = await makeTask(db, s, 'B4', 'locked'); }
+      expect((await openWaiver(t.admin)).status).toBe(200);
+      const run = await uploadMaster(t.admin.api, await masterFile(sites.map((s, i) => ({ A: i + 1, B: s.code, AO: day('2026-02-10') }))));
+      expect(run.status, JSON.stringify(run.body)).toBe(201);
+      const body = { mode: 'submit', reason: 'Initial load', historical_load: { reason: REASON } };
+      const queued = await t.admin.api.call('post', `/master-import/runs/${run.body.id}/apply`, body, { 'If-Match': `"${run.body.version}"` });
+      expect(queued.status, JSON.stringify(queued.body)).toBe(202);
+      expect(queued.body).toMatchObject({ status: 'applying', outcome: null, applying: { state: 'running', sites_total: 3 } });
+      for (const s of sites) expect(await locksOf(s.id)).toBe(true);                       // nothing changed in the request
+      // the waiver closes before the background run: the run is refused there, nothing changes, the run can be applied again
+      const close = await t.admin.api.call('put', '/settings/historical-waiver', { open: false, reason: 'Closed before the run' });
+      expect(close.status, JSON.stringify(close.body)).toBe(200);
+      const job = (await jobs.pending(0)).find((x) => x.apply && x.job_id === queued.body.applying.job_id)!;
+      await jobs.process(job);
+      const failed = await t.admin.api.call('get', `/master-import/runs/${run.body.id}`);
+      expect(failed.body).toMatchObject({ status: 'previewed', applying: { state: 'failed', error_code: 'invalid_transition' } });
+      expect(failed.body.applying.error).toContain('waiver is closed');
+      for (const s of sites) {
+        expect(await locksOf(s.id)).toBe(true);
+        expect((await task(b4[s.id]!)).state).toBe('locked');
+      }
+      expect((await audit('master_import.apply_failed', run.body.id)).at(-1)).toMatchObject({ after: { status: 'previewed', code: 'invalid_transition' } });
+
+      // again with the waiver open: applied in the background, every site opened (audited), B4 submitted before B3
+      expect((await openWaiver(t.admin)).status).toBe(200);
+      const again = await t.admin.api.call('post', `/master-import/runs/${run.body.id}/apply`, body, { 'If-Match': `"${failed.body.version}"` });
+      expect(again.status, JSON.stringify(again.body)).toBe(202);
+      await jobs.process((await jobs.pending(0)).find((x) => x.apply && x.job_id === again.body.applying.job_id)!);
+      const done = await t.admin.api.call('get', `/master-import/runs/${run.body.id}`);
+      expect(done.body).toMatchObject({ status: 'applied', apply_reason: 'Initial load', applying: { state: 'done' } });
+      expect(done.body.outcome.batches).toHaveLength(1);
+      // its batch has more rows than the threshold too: sent in the background, as after an apply in the request (0075)
+      const bq = done.body.outcome.batches[0] as { id: string; queued?: boolean };
+      expect(bq.queued).toBe(true);
+      await jobs.process((await jobs.pending(0)).find((x) => x.batch_id === bq.id)!);
+      for (const s of sites) {
+        expect(await locksOf(s.id)).toBe(false);
+        expect((await audit('site_workflow_locks_set', s.id)).at(-1)).toMatchObject({ after: { workflow_locks: false, source: 'historical_master_import', tasks_opened: ['B4'] } });
+        expect((await task(b4[s.id]!)).state).toBe('in_approval');
+      }
+      expect(await audit('master_import.apply', run.body.id)).toHaveLength(1);
+    } finally {
+      await db.query(`UPDATE settings SET value = to_jsonb(50) WHERE key = 'imports.async_rows'`);
+      jobs.autoStart = true;
+    }
   });
 
   it('a stream template upload with the historical option holds nothing; without it the row is held', async () => {

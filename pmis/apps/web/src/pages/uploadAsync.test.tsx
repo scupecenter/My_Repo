@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { API_BASE } from '@/api/client';
+import { API_BASE, api } from '@/api/client';
 import { RUN_POLL } from '@/api/masterImport';
 import { BATCH_POLL } from '@/api/registers';
 import type { ImportBatch } from '@/api/types';
@@ -92,5 +92,38 @@ describe('a big legacy Master (0.15.3)', () => {
     // the comparison ends: the bar goes, the apply comes
     await waitFor(() => expect(screen.queryByTestId('mi-staging')).not.toBeInTheDocument(), { timeout: 10_000 });
     expect(await screen.findByTestId('mi-apply')).toBeInTheDocument();
+  }, 30_000);
+
+  it('0.15.5: applies a big Master in the background: the run shows "applying", then the applied result, and cannot be applied twice meanwhile', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    renderApp(<Routed />, { route: '/templates/master-import' });
+    const u = userEvent.setup();
+    expect(await screen.findByTestId('mi-run-run-0001')).toBeInTheDocument();
+    await u.upload(screen.getByTestId('mi-file'), new File(['Master sheet bigmaster469'], 'GSDN_Site_Master.xlsx'));
+    await u.click(screen.getByTestId('mi-upload'));
+    await u.click(await screen.findByTestId('mi-apply', {}, { timeout: 10_000 }));
+    await u.click(screen.getByTestId('mi-mode-draft'));
+    await u.type(screen.getByTestId('mi-apply-reason'), 'Initial load');
+    await u.click(screen.getByTestId('mi-apply-confirm'));
+    const applying = await screen.findByTestId('mi-applying');
+    expect(within(applying).getByTestId('mi-applying-label')).toHaveTextContent('Applying 469 sites in the background');
+    expect(screen.queryByTestId('mi-apply')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('mi-applied')).toHaveTextContent('Save Draft / Planning'), { timeout: 10_000 });
+    expect(screen.queryByTestId('mi-applying')).not.toBeInTheDocument();
+  }, 30_000);
+
+  it('0.15.5: in Arabic, the background apply says so', async () => {
+    await signIn('pm');
+    await api.post('/__mock/step-up');
+    renderApp(<Routed />, { route: '/templates/master-import', locale: 'ar' });
+    const u = userEvent.setup();
+    await u.upload(await screen.findByTestId('mi-file'), new File(['Master sheet bigmaster120'], 'GSDN_Site_Master.xlsx'));
+    await u.click(screen.getByTestId('mi-upload'));
+    await u.click(await screen.findByTestId('mi-apply', {}, { timeout: 10_000 }));
+    await u.click(screen.getByTestId('mi-mode-draft'));
+    await u.type(screen.getByTestId('mi-apply-reason'), 'Initial load');
+    await u.click(screen.getByTestId('mi-apply-confirm'));
+    expect(within(await screen.findByTestId('mi-applying')).getByTestId('mi-applying-label')).toHaveTextContent('يُطبَّق 120 موقعًا في الخلفية');
   }, 30_000);
 });

@@ -21,6 +21,11 @@ export const IMPORT_RESUME_IDLE_S = 60;
 export const IMPORT_MAX_CHUNK_FAILURES = 3;
 /** 0083: the rows of a stream part (or of a legacy Master) read in one transaction of an upload staged in the background. */
 export const UPLOAD_CHUNK_ROWS = 100;
+/**
+ * 0086: the limit of the background apply of a big Master import, one transaction (all or nothing, as in the request): 470 sites took 71 s in the tests, so a
+ * slower server keeps a wide margin.
+ */
+export const MI_APPLY_TIMEOUT_MS = 20 * 60_000;
 
 export interface PendingJob {
   job_id: string;
@@ -28,6 +33,8 @@ export interface PendingJob {
   batch_id: string | null;
   /** 0083: the run stages an upload (job_id is the upload's id): imp_upload_step instead of imp_async_step. */
   upload?: boolean;
+  /** 0086: the run applies a big Master import (job_id is the apply run's id): mi_apply_step. */
+  apply?: boolean;
   actor_id: string;
   actor_active: boolean;
   stepup_until: Date | null;
@@ -57,6 +64,8 @@ export interface JobProgress {
  * 0083 (technical decision of 2026-11-09): the same service stages a big upload (POST /import-batches, POST /master-import/runs) in the background: the
  * request records it (imp_upload_start, mi_stage_start) and answers 202 `parsing` / `staging`; each step (imp_upload_step) is a transaction under the
  * uploader's signed context; the resume job takes the uploads left in `parsing` too.
+ * 0086 (owner report 2026-11-11): the apply of a big Master import (POST /master-import/runs/:id/apply, status `applying`) runs here too, as one transaction
+ * (mi_apply_step); the resume job takes the applies left running.
  */
 @Injectable()
 export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -158,7 +167,10 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
         const uploads = await tx.$queryRaw<PendingJob[]>(Prisma.sql`
           SELECT upload_id::text AS job_id, NULL::text AS batch_id, true AS upload, actor_id::text AS actor_id, actor_active, stepup_until, session_id::text AS session_id, auth_method, mfa, request_id
           FROM imp_upload_pending(${idleSeconds}::int)`);
-        return [...uploads, ...batches];
+        const applies = await tx.$queryRaw<PendingJob[]>(Prisma.sql`
+          SELECT job_id::text AS job_id, NULL::text AS batch_id, true AS apply, actor_id::text AS actor_id, actor_active, stepup_until, session_id::text AS session_id, auth_method, mfa, request_id
+          FROM mi_apply_pending(${idleSeconds}::int)`);
+        return [...applies, ...uploads, ...batches];
       });
     } catch (e) {
       this.log.warn(`reading the pending runs failed: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);
@@ -198,6 +210,7 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
    * (the conditional documents that apply now are slots before the engine counts the missing ones, as the synchronous send does for all its tasks).
    */
   async step(job: PendingJob, chunk?: number): Promise<JobProgress> {
+    if (job.apply) return this.applyStep(job);
     if (job.upload) return this.uploadStep(job, chunk);
     const size = chunk ?? null;
     const ctx = this.contextOf(job);
@@ -228,6 +241,26 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
     const p = r[0]?.r;
     const state = p?.state === 'running' || p?.state === 'done' || p?.state === 'failed' || p?.state === 'busy' ? p.state : 'failed';
     return { upload_id: job.job_id, state, rows_total: p?.rows_total, rows_done: p?.rows_done };
+  }
+
+  /**
+   * 0086: the background apply of a big Master import: the same mi_apply_run, in one transaction of its own under the newly signed context of the person who
+   * asked for it. Its batches with more rows than the threshold are then sent in the background, one after the other (as after an apply in the request).
+   */
+  private async applyStep(job: PendingJob): Promise<JobProgress> {
+    const ctx = this.contextOf(job, 'master_import_apply');
+    const r = await this.db.client.$transaction(async (tx) => {
+      await applyContext(tx, ctx);
+      return tx.$queryRaw<{ r: { state?: string; outcome?: { batches?: { queued?: boolean; job_id?: string }[] } } | null }[]>(Prisma.sql`
+        SELECT mi_apply_step(${job.job_id}::uuid) AS r`);
+    }, { maxWait: 10_000, timeout: MI_APPLY_TIMEOUT_MS });
+    const p = r[0]?.r;
+    const state = p?.state === 'done' || p?.state === 'failed' || p?.state === 'busy' ? p.state : 'failed';
+    if (state === 'done') {
+      const queued = (p?.outcome?.batches ?? []).filter((b) => b.queued && typeof b.job_id === 'string').map((b) => b.job_id as string);
+      this.kickInOrder(queued);
+    }
+    return { job_id: job.job_id, state };
   }
 
   private contextOf(job: PendingJob, name = 'import_batch') {
@@ -271,10 +304,12 @@ export class ImportJobsService implements OnApplicationBootstrap, OnModuleDestro
   private async abandon(job: PendingJob, reason: string, asPerson: boolean): Promise<void> {
     try {
       await this.db.client.$transaction(async (tx) => {
-        await applyContext(tx, asPerson ? this.contextOf(job, job.upload ? 'import_upload' : 'import_batch') : jobContext('import_batch_resume'));
-        await tx.$queryRaw(job.upload
-          ? Prisma.sql`SELECT imp_upload_abandon(${job.job_id}::uuid, ${reason}::text) AS r`
-          : Prisma.sql`SELECT imp_async_abandon(${job.job_id}::uuid, ${reason}::text) AS r`);
+        await applyContext(tx, asPerson ? this.contextOf(job, job.apply ? 'master_import_apply' : job.upload ? 'import_upload' : 'import_batch') : jobContext('import_batch_resume'));
+        await tx.$queryRaw(job.apply
+          ? Prisma.sql`SELECT mi_apply_abandon(${job.job_id}::uuid, ${reason}::text) AS r`
+          : job.upload
+            ? Prisma.sql`SELECT imp_upload_abandon(${job.job_id}::uuid, ${reason}::text) AS r`
+            : Prisma.sql`SELECT imp_async_abandon(${job.job_id}::uuid, ${reason}::text) AS r`);
       });
     } catch (e) {
       this.log.warn(`import run ${job.job_id}: could not be stopped: ${e instanceof Error ? e.message.split('\n')[0] : 'unknown'}`);

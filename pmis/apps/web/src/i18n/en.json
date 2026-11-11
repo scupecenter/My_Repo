@@ -3519,7 +3519,13 @@
     "staging_note": "The rows are compared in the background. The differences appear when the comparison ends; the run can be applied after that.",
     "staging_failed": "The comparison of this file did not end. Upload the file again.",
     "status_staging": "Comparing",
-    "status_failed": "Failed"
+    "status_failed": "Failed",
+    "status_applying": "Applying",
+    "applying_queued": "The file is being applied in the background. The page shows the result when it ends.",
+    "applying_title": "Applying the Master",
+    "applying_running": "Applying {{sites}} sites in the background…",
+    "applying_note": "The whole file is applied in one go (all or nothing). It takes about a minute for 500 sites; you can leave this page.",
+    "applying_failed": "The background apply did not end, nothing was changed. You can apply the file again."
   },
   "tmap": {
     "title": "Template mapping",
