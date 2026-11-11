@@ -116,10 +116,15 @@ install -d -m 750 -o postgres -g postgres /var/log/pgbackrest
 # 2026-11-11). The backup check state now lives in its own postgres folder below it; a state file at the old place is moved there.
 if [[ -d /var/lib/gsdn-pmis && ! -L /var/lib/gsdn-pmis ]]; then chown root:root /var/lib/gsdn-pmis; chmod 755 /var/lib/gsdn-pmis; fi
 (umask 022; install -d -m 755 -o root -g root /var/lib/gsdn-pmis)
-install -d -m 750 -o postgres -g postgres /var/lib/gsdn-pmis/db-backup
-if [[ -f /var/lib/gsdn-pmis/db-backup-check.state && ! -L /var/lib/gsdn-pmis/db-backup-check.state && ! -e /var/lib/gsdn-pmis/db-backup/db-backup-check.state ]]; then
-  mv /var/lib/gsdn-pmis/db-backup-check.state /var/lib/gsdn-pmis/db-backup/db-backup-check.state
-  chown postgres:postgres /var/lib/gsdn-pmis/db-backup/db-backup-check.state
+# The parent was postgres-owned before: a link or a file planted at db-backup by then is removed, never followed (security review 2026-11-11).
+BKSTATE_DIR=/var/lib/gsdn-pmis/db-backup
+if [[ -L $BKSTATE_DIR || ( -e $BKSTATE_DIR && ! -d $BKSTATE_DIR ) ]]; then rm -f -- "$BKSTATE_DIR"; fi
+[[ -d $BKSTATE_DIR ]] || mkdir -m 750 -- "$BKSTATE_DIR"
+[[ -d $BKSTATE_DIR && ! -L $BKSTATE_DIR ]] || { echo "$BKSTATE_DIR is not a plain directory" >&2; exit 1; }
+chown -h postgres:postgres "$BKSTATE_DIR"; chmod 750 "$BKSTATE_DIR"
+if [[ -f /var/lib/gsdn-pmis/db-backup-check.state && ! -L /var/lib/gsdn-pmis/db-backup-check.state && ! -e $BKSTATE_DIR/db-backup-check.state && ! -L $BKSTATE_DIR/db-backup-check.state ]]; then
+  mv -- /var/lib/gsdn-pmis/db-backup-check.state "$BKSTATE_DIR/db-backup-check.state"
+  chown -h postgres:postgres "$BKSTATE_DIR/db-backup-check.state"
 fi
 install -d -m 750 -o postgres -g postgres /var/lib/postgresql/.ssh 2>/dev/null || true
 umask 077
