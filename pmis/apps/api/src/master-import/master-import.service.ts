@@ -47,6 +47,7 @@ interface RunRow {
   id: string; file_name: string; file_sha256: string; file_size: bigint; status: string; structure: Record<string, unknown>; summary: Record<string, unknown>;
   created_by: string; created_at: Date; applied_by: string | null; applied_at: Date | null; apply_reason: string | null; apply_mode: string | null; group_id: string | null;
   outcome: Record<string, unknown> | null; version: number; has_file: boolean; ts: string; progress: Record<string, unknown> | null; staging: Record<string, unknown> | null;
+  applying: Record<string, unknown> | null;
 }
 
 interface DiffRow {
@@ -215,7 +216,7 @@ export class MasterImportService {
     return Prisma.sql`
       SELECT r.id::text AS id, r.file_name, r.file_sha256, r.file_size, r.status, r.structure, r.summary, r.created_by::text AS created_by, r.created_at,
         r.applied_by::text AS applied_by, r.applied_at, r.apply_reason, r.apply_mode, r.group_id::text AS group_id, r.outcome, r.version, r.storage_key IS NOT NULL AS has_file,
-        mi_run_progress_json(r.id) AS progress, mi_run_staging_json(r.id) AS staging,
+        mi_run_progress_json(r.id) AS progress, mi_run_staging_json(r.id) AS staging, mi_run_applying_json(r.id) AS applying,
         to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM master_reconciliation_runs r WHERE ${where} ${tail}`;
   }
@@ -231,6 +232,8 @@ export class MasterImportService {
       progress: r.progress ?? null,
       // 0083: the comparison of a big file in the background (status staging, then previewed; failed when it could not end); null for a file compared in the request
       staging: r.staging ?? null,
+      // 0086: the apply of a big file in the background (status applying, then applied; back to previewed with the error when it could not end)
+      applying: r.applying ?? null,
     }));
   }
 
@@ -327,6 +330,10 @@ export class MasterImportService {
       throw new ProblemException(409, 'upload_processing', { detail: 'The file is still being compared. Wait until the comparison ends.', extra: { run_id: id } });
     }
     if (run.status === 'failed') throw new ProblemException(409, 'invalid_transition', { detail: 'The comparison of this file did not end: upload the file again.' });
+    // 0086: a file applied in the background cannot be applied again while that run goes on (the database refuses it too)
+    if (run.status === 'applying') {
+      throw new ProblemException(409, 'upload_processing', { detail: 'This file is being applied in the background. Wait until it ends.', extra: { run_id: id } });
+    }
     if (body.historical_load) {
       // Q462: a System Admin (never a delegate), then a step-up; the database checks both again, and the open waiver
       const a = await this.db.tx.$queryRaw<{ ok: boolean }[]>`SELECT coalesce(app_actor_is_system_admin(), false) AS ok`;
@@ -338,6 +345,11 @@ export class MasterImportService {
     const outcome = await this.call<Record<string, unknown>>(auth, body.historical_load
       ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify({ reason: body.historical_load.reason })}::jsonb) AS r`
       : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
+    // 0086: a file with more sites than imports.async_rows is applied in the background (status applying): 202, the run is started once the request commits
+    if (outcome.queued_apply === true && typeof outcome.job_id === 'string') {
+      this.jobs.kick(outcome.job_id);
+      return { ...(await this.getRun(auth, id)), outcome: null, accepted: true };
+    }
     const queued = ((outcome.batches ?? []) as { queued?: boolean; job_id?: string }[]).filter((b) => b.queued && b.job_id);
     this.jobs.kickInOrder(queued.map((b) => b.job_id as string));
     return { ...(await this.getRun(auth, id)), outcome, ...(queued.length > 0 ? { accepted: true } : {}) };

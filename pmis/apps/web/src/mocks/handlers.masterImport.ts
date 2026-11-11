@@ -9,6 +9,9 @@ import { guard, page, problem, stepUp } from './handlers';
 import { uid } from './ids';
 import { isSystemAdmin, waiver, waiverToday, waiverView } from './waiverData';
 
+/** 0.15.5: the background applies of the mock (run id → the run once applied, after two reads). */
+const applyLater = new Map<string, { reads: number; run: Partial<MasterImportRun> }>();
+
 const B = API_BASE;
 
 interface State { runs: MasterImportRun[]; diffs: Record<string, MasterImportDiff[]>; fields: TemplateTaskField[]; aliases: { region: ImportAlias[]; role: ImportAlias[] } }
@@ -86,6 +89,7 @@ export const masterImportHandlers = [
     // 0.15.3: a big Master (a test file named with `bigmaster<rows>`) is compared in the background: 202 `staging`, 100 rows more per read
     const big = /bigmaster(\d+)/.exec(text), t0 = now();
     const run: MasterImportRun = { ...base, id: `run-${st().runs.length + 1}`, file_name: f.name, file_sha256: 'b2'.repeat(32), file_size: f.size, status: big ? 'staging' : 'previewed', created_at: t0,
+      summary: big ? { ...base.summary, rows: Number(big[1]), sites_matched: Number(big[1]) } : base.summary,
       applied_by: null, applied_at: null, apply_reason: null, apply_mode: null, group_id: null, outcome: null, version: 1,
       staging: big ? { upload_id: uid('upload'), state: 'running', rows_total: Number(big[1]), rows_done: 0, percent: 0, started_at: t0, updated_at: t0, finished_at: null, error: null } : null };
     st().runs = [run, ...st().runs];
@@ -96,6 +100,16 @@ export const masterImportHandlers = [
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (r?.progress?.state === 'running') advance(r);   // 0.14.6: each read moves the background sends by one chunk of 25 rows
+    if (r?.status === 'applying' && r.applying) {
+      // 0.15.5: the background apply of a big file ends at the second read (all or nothing)
+      const later = applyLater.get(r.id);
+      if (later && ++later.reads >= 2) {
+        const t = now();
+        Object.assign(r.applying, { state: 'done', updated_at: t, finished_at: t });
+        Object.assign(r, later.run, { version: r.version + 1 });
+        applyLater.delete(r.id);
+      }
+    }
     if (r?.status === 'staging' && r.staging) {
       // 0.15.3: each read compares 100 more rows; the run is previewed with the last ones
       const s = r.staging, done = Math.min(s.rows_total, s.rows_done + 100), t = now();
@@ -122,6 +136,7 @@ export const masterImportHandlers = [
     const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string } };
     if (!body.reason || body.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required', message: 'A reason is required.' }] });
     if (r.status === 'applied') return problem(409, 'invalid_transition', 'Not possible now', { detail: 'This run was already applied.' });
+    if (r.status === 'applying') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'This file is being applied in the background. Wait until it ends.', run_id: r.id } as never);
     if (r.status === 'staging') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'The file is still being compared. Wait until the comparison ends.', run_id: r.id } as never);
     if (!stepUpValid()) return stepUp();
     if (body.historical_load) {
@@ -137,6 +152,15 @@ export const masterImportHandlers = [
       batches: [{ id: uid('batch'), ref: 'CW', template_id: 'TPL-SITE-CW', submitted: big || draft ? 0 : 1, saved: draft && !big ? 1 : 0, held: 0, failed: 0, errors: 0,
         ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }], skipped: [] };
     const t0 = now();
+    // 0.15.5: a file with more sites than imports.async_rows (50) is applied in the background: 202 `applying`, then `applied` with its outcome
+    const sites = Number((r.summary as Record<string, unknown>).sites_matched ?? 0);
+    if (sites > 50) {
+      applyLater.set(r.id, { reads: 0, run: { status: 'applied', applied_at: t0, apply_reason: body.reason ?? null, apply_mode: outcome.mode, group_id: outcome.group_id, outcome,
+        applied_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' }, progress: null } });
+      Object.assign(r, { status: 'applying', version: r.version + 1,
+        applying: { job_id: uid('apply'), state: 'running', sites_total: sites, started_at: t0, updated_at: t0, finished_at: null, error_code: null, error: null } });
+      return HttpResponse.json({ ...r, outcome: null }, { status: 202, headers: { ETag: `"${r.version}"` } });
+    }
     Object.assign(r, { status: 'applied', applied_at: t0, apply_reason: body.reason, apply_mode: outcome.mode, group_id: outcome.group_id, outcome, version: r.version + 1,
       applied_by: { id: uid('1001'), display_name: 'Project Manager', employee_id: '1001' },
       progress: big ? { state: 'running', batches: 1, batches_running: 1, rows_total: rowsToSend, rows_done: 0, percent: 0, submitted: 0, saved: 0, approved: 0, held: 0, failed: 0,

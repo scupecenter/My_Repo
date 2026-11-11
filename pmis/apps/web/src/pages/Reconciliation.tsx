@@ -91,7 +91,7 @@ export function ReconciliationPage() {
                       onClick={() => open(r.id)} onKeyDown={(e) => { if (e.key === 'Enter') open(r.id); }}>
                       <td className="p-2 font-semibold">{r.file_name}</td>
                       <td className="mono p-2 text-mute">{r.file_sha256.slice(0, 12)}</td>
-                      <td className="p-2"><span className={`chip ${r.status === 'applied' ? 'bg-doneBg text-doneInk' : r.status === 'failed' ? 'bg-lateBg text-lateInk' : r.status === 'staging' ? 'bg-openBg text-openInk' : 'bg-waitBg text-waitInk'}`}>{t(`mi.status_${r.status}`)}</span></td>
+                      <td className="p-2"><span className={`chip ${r.status === 'applied' ? 'bg-doneBg text-doneInk' : r.status === 'failed' ? 'bg-lateBg text-lateInk' : r.status === 'staging' || r.status === 'applying' ? 'bg-openBg text-openInk' : 'bg-waitBg text-waitInk'}`}>{t(`mi.status_${r.status}`)}</span></td>
                       <td className="p-2">{num(r.summary, 'rows')}</td>
                       <td className="p-2">{num(r.summary, 'diffs')}</td>
                       <td className="p-2">{num(r.summary, 'exceptions')}</td>
@@ -163,6 +163,29 @@ function RunStaging({ r }: { r: MasterImportRun }) {
   );
 }
 
+/**
+ * 0.15.5: a big Master is applied in the background, in one transaction (all or nothing). While it runs the page reads the run every 3 s; a refused background
+ * apply puts the run back to previewed with its error, and the file can be applied again.
+ */
+function RunApplying({ r }: { r: MasterImportRun }) {
+  const { t } = useTranslation();
+  const p = r.applying;
+  if (r.status === 'previewed' && p?.state === 'failed') {
+    return <p role="alert" className="card p-3 text-sm text-lateInk" data-testid="mi-applying-failed">{t('mi.applying_failed')}{p.error ? ` ${p.error}` : ''}</p>;
+  }
+  if (r.status !== 'applying') return null;
+  const label = t('mi.applying_running', { sites: p?.sites_total ?? 0 });
+  return (
+    <section className="card p-3" data-testid="mi-applying" aria-busy="true" aria-label={t('mi.applying_title')}>
+      <p id="mi-applying-label" className="mb-1 text-sm font-semibold" data-testid="mi-applying-label">{label}</p>
+      <div role="progressbar" aria-labelledby="mi-applying-label" aria-valuetext={label} className="relative h-3 w-full overflow-hidden rounded-full bg-card2" data-testid="mi-applying-bar">
+        <span className="absolute inset-y-0 start-0 block w-1/3 animate-pulse rounded-full bg-open" />
+      </div>
+      <p className="mt-2 text-xs text-mute" role="status">{t('mi.applying_note')}</p>
+    </section>
+  );
+}
+
 function RunDetail({ id }: { id: string }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -200,6 +223,7 @@ function RunDetail({ id }: { id: string }) {
         {r.status === 'applied' && <p data-testid="mi-applied" className="font-semibold">{t('mi.applied', { mode: t(`mi.mode_${r.apply_mode}`), reason: r.apply_reason ?? '' })}</p>}
       </div>
       <RunStaging r={r} />
+      <RunApplying r={r} />
       {r.progress && <RunProgress p={r.progress} />}
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2">
@@ -255,7 +279,7 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
   const [err, setErr] = useState<string | null>(null);
   const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim() } } : {}) }, {
-    onSuccess: (r) => { toast(r.progress?.state === 'running' ? t('mi.applied_processing') : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
+    onSuccess: (r) => { toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing') : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
     onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
   });
   return (

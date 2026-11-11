@@ -5572,6 +5572,7 @@ export interface paths {
          * @description The typed task columns of the run's rows are staged through the TPL-MASTER staging as the caller (`ImportBatch.source` `master_import`, one `group_id`) and sent: `submit` enters and submits each task for L2, `draft` saves the plan without submission. The same checks as a person on the task decide every row (L1 holder, region, gates, dates, documents); refused rows stay `error` rows of the batches. A run is applied once, and a file (SHA-256) is applied once (409 `invalid_transition`). Needs a reason and a step-up.
          *     **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
          *     **0.15.3:** a run still compared in the background (`staging`) answers 409 `upload_processing`; a run whose comparison failed (`failed`) answers 409 `invalid_transition`. Measured with 470 synthetic sites the staging of the apply now takes about 6 s (87 s before) and stays in the request.
+         *     **0.15.5:** a file with more sites than `imports.async_rows` is applied in the background after the same checks: 202 with the run `applying` (see `applying`), then `applied` with its `outcome` (or `previewed` again with `applying.error` when the background apply was refused). A second apply meanwhile answers 409 `upload_processing`. Measured with 470 synthetic sites with every task, a historical apply: 405 s in the request before, 32 ms for the request and about 70 s in the background now.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -10425,10 +10426,10 @@ export interface components {
             file_sha256: string;
             file_size: number;
             /**
-             * @description 0.15.3: `staging` while a big file is compared in the background (see `staging`), `failed` when that comparison could not end (it cannot be applied).
+             * @description 0.15.3: `staging` while a big file is compared in the background (see `staging`), `failed` when that comparison could not end (it cannot be applied). 0.15.5: `applying` while a big file is applied in the background (see `applying`).
              * @enum {string}
              */
-            status: "previewed" | "applied" | "staging" | "failed";
+            status: "previewed" | "applied" | "staging" | "failed" | "applying";
             /** @description The identification and structure check: `identified`, `columns_expected`, `columns_found`, `missing` [{letter, header, typed}], `moved` [{header, expected, found}], `extra` [headers], `missing_typed`, `sheets`, `register_sheets_missing`, `has_tpl`. */
             structure: {
                 [key: string]: unknown;
@@ -10458,7 +10459,26 @@ export interface components {
             progress?: components["schemas"]["MasterImportRunProgress"] | null;
             /** @description 0.15.3: the comparison of a big file in the background; null when the file was compared in the request. */
             staging?: components["schemas"]["MasterImportStagingProgress"] | null;
+            /** @description 0.15.5: the latest apply of the file in the background; null when it was never applied in the background. */
+            applying?: components["schemas"]["MasterImportApplyProgress"] | null;
             version: number;
+        };
+        /** @description 0.15.5: the apply of a big legacy Master in the background, one transaction (all or nothing). `failed`: the run is `previewed` again and can be applied again. */
+        MasterImportApplyProgress: {
+            /** Format: uuid */
+            job_id: string;
+            /** @enum {string} */
+            state: "running" | "done" | "failed";
+            /** @description The sites of the file that GSDN Workspace knows. */
+            sites_total: number;
+            /** Format: date-time */
+            started_at?: string;
+            /** Format: date-time */
+            updated_at?: string;
+            /** Format: date-time */
+            finished_at?: string | null;
+            error_code?: string | null;
+            error?: string | null;
         };
         /** @description 0.15.3: the comparison of a big legacy Master in the background, 100 rows per transaction. */
         MasterImportStagingProgress: {
@@ -24716,7 +24736,7 @@ export interface operations {
                     };
                 };
             };
-            /** @description 0.14.6: applied; one or more staged batches are sent in the background (see `progress` and `outcome.batches[].queued`). Poll `GET /master-import/runs/{run_id}` until `progress.state` is `done`. */
+            /** @description 0.14.6: applied; one or more staged batches are sent in the background (see `progress` and `outcome.batches[].queued`). Poll `GET /master-import/runs/{run_id}` until `progress.state` is `done`. 0.15.5: or the whole apply of a big file runs in the background (status `applying`, `outcome` null): poll until the status is `applied` (or `previewed` with `applying.state` `failed`). */
             202: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -24724,7 +24744,7 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MasterImportRun"] & {
-                        outcome?: components["schemas"]["MasterImportOutcome"];
+                        outcome?: components["schemas"]["MasterImportOutcome"] | null;
                     };
                 };
             };

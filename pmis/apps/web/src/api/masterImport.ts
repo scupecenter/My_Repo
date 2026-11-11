@@ -21,6 +21,7 @@ export type DiffFilters = { kind: string; reason: string; resolution: string; si
 export const useMasterRuns = () => useQuery({ queryKey: ['master-runs'], retry: false, queryFn: () => api.get<Page<MasterImportRun>>('/master-import/runs', { query: { limit: 50 } }) });
 export type MasterImportRunProgress = S['MasterImportRunProgress'];
 export type MasterImportStagingProgress = S['MasterImportStagingProgress'];
+export type MasterImportApplyProgress = S['MasterImportApplyProgress'];
 /** 0.14.6: how often an applied run whose batches are sent in the background is read again. */
 export const RUN_POLL = { ms: 3000 };
 /** The run; while its batches are sent in the background (`progress.state` running) it is read again every 3 s, and the batch lists once more when it ends. */
@@ -29,7 +30,8 @@ export function useMasterRun(id: string | undefined) {
   const q = useQuery({
     queryKey: ['master-run', id], enabled: !!id, retry: false, queryFn: () => api.get<MasterImportRun>(`/master-import/runs/${id}`),
     // 0.15.3: a big file is compared in the background (status staging): read again until it is previewed (or failed)
-    refetchInterval: (x) => (x.state.data?.progress?.state === 'running' || x.state.data?.status === 'staging' ? RUN_POLL.ms : false),
+    // 0.15.5: a big file is applied in the background (status applying): read again until it is applied (or previewed again after a failure)
+    refetchInterval: (x) => (x.state.data?.progress?.state === 'running' || x.state.data?.status === 'staging' || x.state.data?.status === 'applying' ? RUN_POLL.ms : false),
   });
   const was = useRef<string | undefined>(undefined);
   const st = q.data?.progress?.state;
@@ -46,6 +48,10 @@ export function useMasterRun(id: string | undefined) {
     if (wasStatus.current === 'staging' && status && status !== 'staging') {
       void qc.invalidateQueries({ queryKey: ['master-diffs', id] });
       void qc.invalidateQueries({ queryKey: ['master-runs'] });
+    }
+    if (wasStatus.current === 'applying' && status && status !== 'applying') {
+      void qc.invalidateQueries({ queryKey: ['master-runs'] });
+      void qc.invalidateQueries({ queryKey: ['import-batches'] });
     }
     wasStatus.current = status;
   }, [status, id, qc]);

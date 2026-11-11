@@ -56,7 +56,7 @@ export class MasterImportController {
   async apply(@Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const { accepted, ...dto } = await this.mi.apply(auth, id, ifMatch, body);
     res.setHeader('ETag', etagHeader(dto.version as number));
-    // 0075: some batches are sent in the background (progress in `progress`): 202 Accepted
+    // 0075: some batches are sent in the background (progress in `progress`): 202 Accepted. 0086: or the whole apply of a big file (status applying)
     if (accepted) res.status(202);
     return dto;
   }

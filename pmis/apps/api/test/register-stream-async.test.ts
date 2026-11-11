@@ -446,7 +446,7 @@ const uploadMaster = async (api: Api, buf: Buffer): Promise<Record<string, any>>
 };
 
 describe('the Master import apply sends a big staged batch in the background', () => {
-  it('answers 202 with the run applied and the progress of its batch; the rows are sent in chunks by the same admin; a small apply stays 200', async () => {
+  it('answers 202 with the run applying (0086), applies it in the background, then sends its batch in chunks by the same admin; a small apply stays 200', async () => {
     const MR = 3;   // no matrix cell of B4 in region 3 on this database: the System Admin is the holder of last resort, as in master-import.test.ts
     const admin = await plainAdmin(app, db);
     const tasks: string[] = [];
@@ -462,11 +462,20 @@ describe('the Master import apply sends a big staged batch in the background', (
     try {
       const ok = await admin.api.call('post', `/master-import/runs/${run.id}/apply`, { mode: 'submit', reason: 'Initial load in the background' }, { 'If-Match': `"${run.version}"` });
       expect(ok.status).toBe(202);
-      expect(ok.body).toMatchObject({ status: 'applied', progress: { state: 'running', batches: 1, rows_total: ROWS, rows_done: 0 } });
+      // 0086: more sites than imports.async_rows: the request only checks and records the apply (status applying, nothing staged yet)
+      expect(ok.body).toMatchObject({ status: 'applying', outcome: null, progress: null, applying: { state: 'running', sites_total: ROWS } });
       expect(ok.body.accepted).toBeUndefined();
-      const b = ok.body.outcome.batches[0];
+      expect(await count(`SELECT 1 FROM import_batches WHERE source = 'master_import' AND group_id IS NOT NULL AND id IN (SELECT batch_id FROM import_batch_rows WHERE site_code = ANY($1::text[]))`, [codes])).toBe(0);
+      expect((await admin.api.call('post', `/master-import/runs/${run.id}/apply`, { mode: 'submit', reason: 'twice' }, { 'If-Match': `"${ok.body.version}"` })).body.code).toBe('upload_processing');
+      const aj = (await jobs.pending(0)).find((x) => x.apply && x.job_id === ok.body.applying.job_id);
+      expect(aj).toBeTruthy();
+      await jobs.process(aj!);
+      const applied = await admin.api.call('get', `/master-import/runs/${run.id}`);
+      expect(applied.body).toMatchObject({ status: 'applied', applying: { state: 'done' }, progress: { state: 'running', batches: 1, rows_total: ROWS, rows_done: 0 } });
+      const b = applied.body.outcome.batches[0];
       expect(b).toMatchObject({ queued: true, rows: ROWS, submitted: 0, ref: 'CW' });
-      expect((await taskStates(tasks)).every((t) => t.state === 'open')).toBe(true);           // nothing sent in the request
+      expect((await taskStates(tasks)).every((t) => t.state === 'open')).toBe(true);           // nothing sent yet: the batch is sent in chunks
+      expect(await count(`SELECT 1 FROM audit_log WHERE action = 'master_import.apply_queued' AND entity_id = $1`, [run.id])).toBe(1);
       await jobs.process(await runOf(b.id));
       expect(spy).not.toHaveBeenCalled();                                                     // as before: the apply never synchronised the documents
     } finally {
