@@ -81,6 +81,13 @@ export async function superDbWl(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the historical-registers database (migration 0088; see global-setup). */
+export async function superDbHreg(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HREG });
+  await c.connect();
+  return c;
+}
+
 export async function superDbHw(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HW });
   await c.connect();

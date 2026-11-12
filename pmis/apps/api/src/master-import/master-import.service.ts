@@ -22,6 +22,7 @@ import { TPL_SHEET } from '../templates/templates.service';
 import type { UploadedFile } from '../templates/upload.interceptor';
 import { guardXlsx, normalizeSpreadsheetPrefixes } from '../templates/xlsx-guard';
 import { OoxmlError, OoxmlWorkbook, SheetCell, masterHeaders } from './ooxml-reader';
+import { RegisterSheets, RegisterTemplate, loadRegisterMaps, readRegisterSheets, registerSheetNames } from './register-sheets';
 
 /**
  * Q1 and Q211: the admin-only legacy import of the real Site Master (no `_tpl`) and the comparison report of the parallel run.
@@ -40,7 +41,8 @@ const applyBody = z.object({
   mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
   // Q462 (0073): mark the batches "historical load: accept without documents" (a System Admin under the open waiver)
   // 0087 (owner decision 2026-11-12, "Direct approval"): approve every submitted task of the load at once as an admin override (no L2); historical load only
-  historical_load: z.object({ reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional() }).strict().optional(),
+  // 0088 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the run's stored file; historical load only
+  historical_load: z.object({ reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional(), registers: z.boolean().optional() }).strict().optional(),
 }).strict().superRefine((b, ctx) => {
   if (b.historical_load?.approve_directly && b.mode !== 'submit') {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mode'], message: 'Approving directly is for the submit mode of the historical load.' });
@@ -346,10 +348,16 @@ export class MasterImportService {
       await this.stepUp.require(auth);
     }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
+    const hl = body.historical_load;
+    // 0088: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
+    const registers = hl?.registers ? await this.readRegisters(auth, id, String(run.file_name), String(run.file_sha256)) : null;
+    const hist = hl ? { reason: hl.reason, ...(hl.approve_directly ? { approve_directly: true } : {}), ...(hl.registers ? { registers: true } : {}) } : null;
     // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
-    const outcome = await this.call<Record<string, unknown>>(auth, body.historical_load
-      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(body.historical_load.approve_directly ? { reason: body.historical_load.reason, approve_directly: true } : { reason: body.historical_load.reason })}::jsonb) AS r`
-      : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
+    const outcome = await this.call<Record<string, unknown>>(auth, registers
+      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(hist)}::jsonb, ${JSON.stringify(registers)}::jsonb) AS r`
+      : hist
+        ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(hist)}::jsonb) AS r`
+        : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
     // 0086: a file with more sites than imports.async_rows is applied in the background (status applying): 202, the run is started once the request commits
     if (outcome.queued_apply === true && typeof outcome.job_id === 'string') {
       this.jobs.kick(outcome.job_id);
@@ -358,6 +366,40 @@ export class MasterImportService {
     const queued = ((outcome.batches ?? []) as { queued?: boolean; job_id?: string }[]).filter((b) => b.queued && b.job_id);
     this.jobs.kickInOrder(queued.map((b) => b.job_id as string));
     return { ...(await this.getRun(auth, id)), outcome, ...(queued.length > 0 ? { accepted: true } : {}) };
+  }
+
+  /**
+   * 0088: the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register), mapped onto the
+   * current register templates by the shipped maps (register-sheets.ts). The stored bytes must be the file of the run (SHA-256) and pass the same package guard
+   * as at the upload. Personal columns are never read.
+   */
+  private async readRegisters(auth: AuthContext, id: string, fileName: string, sha: string): Promise<RegisterSheets & { file_sha256: string }> {
+    const k = await this.db.tx.$queryRaw<{ storage_key: string | null }[]>(Prisma.sql`SELECT storage_key FROM master_reconciliation_runs WHERE id = ${id}::uuid`);
+    const key = k[0]?.storage_key;
+    if (!key) throw new ProblemException(409, 'invalid_transition', { detail: 'The original file of this run is not stored: upload the Master again to load its register sheets.' });
+    const chunks: Buffer[] = [];
+    for await (const c of await this.storage.store.get(key)) chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c as Uint8Array));
+    const buf = Buffer.concat(chunks);
+    if (sha256(buf) !== sha) {
+      await this.syslog.write('warn', 'legacy Master import: the stored file does not match its run', { run_id: id }, auth.user.id, undefined, 'master-import');
+      throw new ProblemException(409, 'invalid_transition', { detail: 'The stored file does not match this run: upload the Master again.' });
+    }
+    const guard = guardXlsx(fileName, buf);
+    if (!guard.ok) throw new ProblemException(422, 'template_rejected', { detail: guard.detail ?? 'The file is not accepted.', extra: { reason: guard.reason ?? 'not_xlsx' } });
+    const repacked = normalizeSpreadsheetPrefixes(buf);
+    const source = repacked && guardXlsx(fileName, repacked).ok ? repacked : buf;
+    const maps = loadRegisterMaps();
+    const tpl = await this.db.tx.$queryRaw<RegisterTemplate[]>(Prisma.sql`
+      SELECT d.template_id, d.register_key, v.version, v.columns FROM template_definitions d JOIN template_versions v ON v.template_def_id = d.id AND v.is_current
+      WHERE d.kind = 'register' AND d.is_active AND d.template_id = ANY(${maps.map((m) => m.template_id)}::text[])`);
+    let wb: OoxmlWorkbook;
+    try {
+      wb = new OoxmlWorkbook(source, registerSheetNames(maps));
+    } catch (e) {
+      if (e instanceof OoxmlError) throw new ProblemException(422, 'template_rejected', { detail: 'The file could not be read as an Excel workbook.', extra: { reason: 'not_xlsx' } });
+      throw e;
+    }
+    return { file_sha256: sha, ...readRegisterSheets(wb, maps, new Map(tpl.map((t) => [t.template_id, t]))) };
   }
 
   async resolve(auth: AuthContext, id: string, raw: unknown): Promise<Record<string, unknown>> {

@@ -166,6 +166,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wlDb = await buildDatabase(adminUrl, wl, appPassword);
   process.env.TEST_DATABASE_URL_WL = wlDb.appUrl;
   process.env.TEST_SUPER_URL_WL = wlDb.superUrl;
+  // The historical-registers database (migration 0088): the suite opens the historical-load waiver, loads the register sheets of a synthetic Master and changes
+  // imports.async_rows to run the same apply in the background; it reads the register records it approves, which no other suite may meet.
+  const hreg = `${dbName}_hreg`;
+  const hregDb = await buildDatabase(adminUrl, hreg, appPassword);
+  process.env.TEST_DATABASE_URL_HREG = hregDb.appUrl;
+  process.env.TEST_SUPER_URL_HREG = hregDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -208,6 +214,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${hreg} WITH (FORCE)`);
     await a.end();
   };
 }

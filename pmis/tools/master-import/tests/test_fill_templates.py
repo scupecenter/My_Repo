@@ -275,7 +275,7 @@ class FillTests(unittest.TestCase):
                 self.assertFalse(isinstance(v, str) and v[:1] in ('=', '+', '-', '@'), v)  # CSV-safe
 
     def test_shipped_maps_are_consistent(self):
-        reg = ft.load_registers(HERE.parent / 'register-maps')
+        reg = ft.load_registers(ft.DEFAULT_MAPS)
         self.assertEqual(set(reg), {'TPL-RF', 'TPL-ACQ', 'TPL-PRM', 'TPL-PO', 'TPL-GECOL', 'TPL-HLC', 'TPL-ASB', 'TPL-RSK'})
         for tid, r in reg.items():
             heads = [c['template_header'] for c in r['columns']]
@@ -286,6 +286,10 @@ class FillTests(unittest.TestCase):
         acq = {c['template_header']: c for c in reg['TPL-ACQ']['columns']}
         for h in ('Owner / Landlord', 'Contact Person', 'Phone', 'E-mail'):
             self.assertEqual(acq[h]['personal'], 'yes')
+        # the As-Built TE columns are the te_part record (a fixed value: the key is Site ID and Record Type)
+        asb = {c['template_header']: c for c in reg['TPL-ASB']['columns']}
+        self.assertEqual(asb['Record Type']['transform'], 'const:te_part')
+        self.assertEqual(reg['TPL-ASB']['key_headers'], 'Site ID|Record Type')
 
 
 class DateAndProcurementTests(unittest.TestCase):

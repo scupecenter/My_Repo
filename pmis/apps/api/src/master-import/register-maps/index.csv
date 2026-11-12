@@ -9,5 +9,5 @@ permits_hse,TPL-PRM,Permission Log,1,3,Site ID,Site ID|Type|Valid From,,yes,
 procurement,TPL-PO,PR-PO,1,3,Site ID,Site ID|Scope|PR No.|PO / WO No.,PR No.|PO / WO No.,yes,Delivery|Team
 gecol,TPL-GECOL,GECOL,1,3,Site ID,Site ID,,yes,
 hlc,TPL-HLC,HLC,1,3,Site ID,Site ID,,yes,
-as_built,TPL-ASB,As-Built,3,5,Site ID,Site ID,,yes,
+as_built,TPL-ASB,As-Built,3,5,Site ID,Site ID|Record Type,,yes,
 risks,TPL-RSK,Risk Register,1,2,Risk ID,Risk ID,,no,

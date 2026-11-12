@@ -95,6 +95,8 @@ interface RecordRow {
   return_count: number;
   last_return_note: string | null;
   self_approval: boolean;
+  /** 0088: approved directly by the historical Master import (the Admin override badge) */
+  historical_direct_approved: boolean;
   task_id: string | null;
   task_code: string | null;
   created_by: string | null;
@@ -324,7 +326,7 @@ export class RegistersService {
       SELECT r.id::text AS id, r.entity_id::text AS entity_id, r.version_no, r.supersedes_id::text AS supersedes_id, r.is_current, r.register_key, r.record_type,
         r.site_id::text AS site_id, s.site_code, r.region_id, r.state, r.current_level, r.levels_required, reg_levels(r.id) AS n_levels,
         r.ball_in_court_user_id::text AS pinned, reg_data_for(r.id, r.register_key, r.record_type, r.entity_id, r.data) AS data, r.custom, r.external_party_id::text AS external_party_id, r.return_count, r.last_return_note,
-        r.self_approval, r.task_id::text AS task_id, td.code AS task_code, r.created_by::text AS created_by, r.created_at, r.updated_at, r.approved_at,
+        r.self_approval, r.historical_direct_approved, r.task_id::text AS task_id, td.code AS task_code, r.created_by::text AS created_by, r.created_at, r.updated_at, r.approved_at,
         r.approved_by::text AS approved_by, r.source, r.version,
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
         reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
@@ -532,6 +534,7 @@ export class RegistersService {
         return_count: r.return_count,
         last_return_note: r.last_return_note,
         self_approval: r.self_approval,
+        historical_direct_approved: r.historical_direct_approved,
         source: r.source,
         created_at: r.created_at,
         updated_at: r.updated_at,

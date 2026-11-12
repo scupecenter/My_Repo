@@ -48,6 +48,8 @@ TPL_VERSION = re.compile(r'^[0-9]{1,6}$')
 BLANK_TOKENS = {'n/a', 'na', 'pending', 'cancelled', 'canceled'}  # plan section 5.2 / G10
 PERSONAL_HEADER = re.compile(r'landlord|contact|phone|e-?mail', re.I)
 OPEN_ENDED = {'open-ended', 'open ended', 'openended'}
+# One source of truth (CHANGELOG 130): the maps ship with the API, which loads the same register sheets in "Master import and comparison" (migration 0088).
+DEFAULT_MAPS = Path(__file__).resolve().parent.parent.parent / 'apps' / 'api' / 'src' / 'master-import' / 'register-maps'
 MAX_ENTRIES = 1000
 MAX_UNCOMPRESSED = 200 * 1024 * 1024
 NUMBER = re.compile(r'^[+-]?\d+(\.\d+)?$')
@@ -406,10 +408,11 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
                 if p['src'] is not None and p['src'] < len(raw) and raw[p['src']] not in (None, ''):
                     rep.col(col['header'], 'personal_skipped')
                 continue
-            if p['src'] is None or p['src'] >= len(raw):
+            const = (p['map'].get('transform') or '').startswith('const:')
+            if not const and (p['src'] is None or p['src'] >= len(raw)):
                 continue
-            v = raw[p['src']]
-            src_addr = f"{get_column_letter(p['src'] + 1)}{xl_row}"
+            v = raw[p['src']] if p['src'] is not None and p['src'] < len(raw) else None
+            src_addr = f"{get_column_letter(p['src'] + 1)}{xl_row}" if p['src'] is not None else ''
             if p['col']['key'] == site['col']['key']:
                 new, ev, note = sid, ('changed' if sid != sid_raw else None), 'site id trimmed / upper case'
             elif p['map'].get('transform') == 'record_type_po_pr':
@@ -418,6 +421,12 @@ def fill(tpl: Template, reg: dict, book: MasterBook, master_ids: set[str] | None
                 opts = col['options'] or []
                 new = next((o for o in opts if o.casefold() == new), new)
                 ev, note = ('outside_list' if opts and new not in opts else 'derived'), 'record type from PO / WO No.'
+            elif const:
+                # a fixed value for every copied row (As-Built: the TE configuration columns are the te_part record)
+                new = p['map']['transform'][len('const:'):].strip()
+                opts = col['options'] or []
+                new = next((o for o in opts if o.casefold() == new.casefold()), new)
+                ev, note = ('outside_list' if opts and new not in opts else 'derived'), 'fixed value of the mapping'
             elif p['map'].get('transform') == 'open_ended_no' and isinstance(v, str) and clean_text(v).casefold() in OPEN_ENDED:
                 new, ev, note = 'No', 'changed', 'Open-ended to No'
             else:
@@ -549,7 +558,7 @@ def main(argv=None) -> int:
     ap.add_argument('templates', nargs='+', help='blank templates downloaded from GSDN Workspace (each with its _tpl sheet)')
     ap.add_argument('--master', required=True, help="the owner's Master workbook (.xlsx, values only)")
     ap.add_argument('--out', required=True, help='output folder (filled templates and reports)')
-    ap.add_argument('--maps', default=str(Path(__file__).resolve().parent / 'register-maps'), help='folder with index.csv and one CSV per register')
+    ap.add_argument('--maps', default=str(DEFAULT_MAPS), help='folder with index.csv and one CSV per register')
     ap.add_argument('--include-personal', action='store_true', help='also copy landlord, contact, phone and e-mail columns (default off, decision Q469)')
     ap.add_argument('--month-first', action='store_true', help='read text dates with day and month both 12 or less as mm/dd/yyyy (default: dd/mm/yyyy)')
     ap.add_argument('--master-sheet', default='Master', help='sheet that lists the valid Site IDs')
