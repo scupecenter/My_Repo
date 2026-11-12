@@ -46,7 +46,7 @@ CREATE TABLE admin_overrides (
   reverted_at    timestamptz,
   reverted_by    uuid REFERENCES users (id),
   revert_reason  text,
-  CONSTRAINT admin_overrides_entity_check CHECK ((entity = 'task') = (task_id IS NOT NULL)),
+  CONSTRAINT admin_overrides_task_link_check CHECK ((entity = 'task') = (task_id IS NOT NULL)),
   CONSTRAINT admin_overrides_revert_check CHECK ((reverted_at IS NULL) = (reverted_by IS NULL))
 );
 CREATE INDEX admin_overrides_task_idx ON admin_overrides (task_id, created_at DESC) WHERE task_id IS NOT NULL;

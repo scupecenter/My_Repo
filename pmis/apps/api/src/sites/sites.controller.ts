@@ -66,6 +66,22 @@ export class SitesController {
     return this.locks.setOne(auth, id, body);
   }
 
+  /** Migration 0088 (owner decision 2026-11-12 (2)): a System Admin edits the site directly (identity, scenario, scope flags, custom fields): a reason and a step-up. */
+  @Post(':id/admin-edits')
+  @HttpCode(200)
+  async adminEdit(
+    @Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response,
+  ): Promise<Record<string, unknown>> {
+    const site = await this.sites.adminEdit(auth, id, ifMatch, body);
+    res.setHeader('ETag', etagHeader(site.version as number));
+    return site;
+  }
+
+  @Get(':id/admin-edits')
+  adminEdits(@Auth() auth: AuthContext, @Param('id') id: string) {
+    return this.sites.adminEdits(auth, id);
+  }
+
   @Get(':id/tasks')
   tasks(@Auth() auth: AuthContext, @Param('id') id: string, @Query() query: Record<string, unknown>) {
     return this.sites.tasks(auth, id, query);
