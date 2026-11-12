@@ -133,7 +133,9 @@ export const masterImportHandlers = [
     const g = adminOnly(); if (g) return g;
     const r = st().runs.find((x) => x.id === params.id);
     if (!r) return problem(404, 'not_found', 'Not found');
-    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string } };
+    const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean }; approve_directly?: unknown };
+    // 0.15.6: approve_directly exists only inside historical_load (an unknown field elsewhere)
+    if (body.approve_directly !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: approve_directly' }] });
     if (!body.reason || body.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required', message: 'A reason is required.' }] });
     if (r.status === 'applied') return problem(409, 'invalid_transition', 'Not possible now', { detail: 'This run was already applied.' });
     if (r.status === 'applying') return problem(409, 'upload_processing', 'The file is being checked', { detail: 'This file is being applied in the background. Wait until it ends.', run_id: r.id } as never);
@@ -148,8 +150,10 @@ export const masterImportHandlers = [
     }
     // 0.14.6: a staged batch with more rows than imports.async_rows (50) is sent in the background: 202 with the run's progress
     const rowsToSend = Number((r.summary as Record<string, unknown>).applicable ?? 0), big = rowsToSend > 50, draft = body.mode === 'draft';
-    const outcome = { group_id: uid('group'), mode: draft ? 'draft' as const : 'submit' as const, queued: big ? 1 : 0,
+    const direct = !!body.historical_load?.approve_directly;   // 0.15.6: the submitted rows are approved at once (admin override, no L2)
+    const outcome = { group_id: uid('group'), mode: draft ? 'draft' as const : 'submit' as const, queued: big ? 1 : 0, approve_directly: direct,
       batches: [{ id: uid('batch'), ref: 'CW', template_id: 'TPL-SITE-CW', submitted: big || draft ? 0 : 1, saved: draft && !big ? 1 : 0, held: 0, failed: 0, errors: 0,
+        approved: direct && !big && !draft ? 1 : 0,
         ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }], skipped: [] };
     const t0 = now();
     // 0.15.5: a file with more sites than imports.async_rows (50) is applied in the background: 202 `applying`, then `applied` with its outcome

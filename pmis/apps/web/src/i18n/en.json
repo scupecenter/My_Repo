@@ -1348,7 +1348,8 @@
     "badge": "Admin override",
     "historical_title": "Accepted without its mandatory documents under the historical load. The flag clears by itself when the documents are uploaded.",
     "historical_note": "This task was accepted without its mandatory documents ({{docs}}) under the historical load (cutoff date {{cutoff}}). The flag clears when the documents are uploaded.",
-    "bypass_title": "Approved while the workflow locks of its site were off, before {{why}}. Treated as an admin override in the KPIs."
+    "bypass_title": "Approved while the workflow locks of its site were off, before {{why}}. Treated as an admin override in the KPIs.",
+    "direct_title": "Approved directly by the historical load of the Master, with no L2 step (admin override). Treated as an override in the SLA figures; counted in progress."
   },
   "badges": {
     "local": "Local sign-in",
@@ -3522,6 +3523,9 @@
     "status_failed": "Failed",
     "status_applying": "Applying",
     "applying_queued": "The file is being applied in the background. The page shows the result when it ends.",
+    "approve_directly": "Approve directly (no L2) — admin override",
+    "approve_directly_warn": "Every task of this load that has an actual date is approved at once, with no L2 review. Each one is flagged \"Admin override\" and audited with your reason. Use it only for historical data that is already final.",
+    "approved_directly_toast": "Applied: {{count}} task(s) approved directly (admin override).",
     "applying_title": "Applying the Master",
     "applying_running": "Applying {{sites}} sites in the background…",
     "applying_note": "The whole file is applied in one go (all or nothing). It takes about a minute for 500 sites; you can leave this page.",

@@ -39,8 +39,13 @@ const MAX_ROWS = 5000;
 const applyBody = z.object({
   mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
   // Q462 (0073): mark the batches "historical load: accept without documents" (a System Admin under the open waiver)
-  historical_load: z.object({ reason: z.string().trim().min(3).max(2000) }).strict().optional(),
-}).strict();
+  // 0087 (owner decision 2026-11-12, "Direct approval"): approve every submitted task of the load at once as an admin override (no L2); historical load only
+  historical_load: z.object({ reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional() }).strict().optional(),
+}).strict().superRefine((b, ctx) => {
+  if (b.historical_load?.approve_directly && b.mode !== 'submit') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['mode'], message: 'Approving directly is for the submit mode of the historical load.' });
+  }
+});
 const resolveBody = z.object({ resolution: z.enum(['open', 'pmis_correct', 'master_correct', 'fixed', 'ignored']), note: z.string().max(1000).optional() }).strict();
 
 interface RunRow {
@@ -343,7 +348,7 @@ export class MasterImportService {
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
     const outcome = await this.call<Record<string, unknown>>(auth, body.historical_load
-      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify({ reason: body.historical_load.reason })}::jsonb) AS r`
+      ? Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean, ${JSON.stringify(body.historical_load.approve_directly ? { reason: body.historical_load.reason, approve_directly: true } : { reason: body.historical_load.reason })}::jsonb) AS r`
       : Prisma.sql`SELECT mi_apply_run(${id}::uuid, ${version}::int, ${body.mode}::text, ${body.reason}::text, ${stepOk}::boolean) AS r`);
     // 0086: a file with more sites than imports.async_rows is applied in the background (status applying): 202, the run is started once the request commits
     if (outcome.queued_apply === true && typeof outcome.job_id === 'string') {

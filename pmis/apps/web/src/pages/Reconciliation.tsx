@@ -277,9 +277,17 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open; a draft has no document check
   const offer = useHistoricalOffer(mode === 'submit');
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
+  // 0.15.6 (owner decision 2026-11-12): approve the submitted tasks of the historical load directly, as an admin override (no L2); only with the historical option
+  const [directChoice, setDirect] = useState(false);
+  const direct = !!offer && hist.on && directChoice;
   const [err, setErr] = useState<string | null>(null);
-  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim() } } : {}) }, {
-    onSuccess: (r) => { toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing') : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
+  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim(), ...(direct ? { approve_directly: true } : {}) } } : {}) }, {
+    onSuccess: (r) => {
+      const approved = (r.outcome?.batches ?? []).reduce((n, b) => n + (b.approved ?? 0), 0);
+      toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing')
+        : r.outcome?.approve_directly ? t('mi.approved_directly_toast', { count: approved }) : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 }));
+      onClose();
+    },
     onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
   });
   return (
@@ -296,6 +304,15 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
             ))}
           </fieldset>
           {offer && <HistoricalLoadOption waiver={offer} value={hist} onChange={setHist} testid="hl" />}
+          {offer && hist.on && (
+            <div className="space-y-1 rounded-md border border-line bg-waitBg p-3 text-sm" data-testid="mi-direct-option">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" data-testid="mi-approve-directly" checked={directChoice} onChange={(e) => setDirect(e.target.checked)} />
+                <span className="font-semibold text-waitInk">{t('mi.approve_directly')}</span>
+              </label>
+              {directChoice && <p role="note" className="text-xs text-lateInk" data-testid="mi-approve-directly-warn">{t('mi.approve_directly_warn')}</p>}
+            </div>
+          )}
           <div>
             <label htmlFor="mi-reason" className="text-sm font-semibold">{t('mi.reason')}</label>
             <textarea id="mi-reason" className="input mt-1 w-full" data-testid="mi-apply-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
