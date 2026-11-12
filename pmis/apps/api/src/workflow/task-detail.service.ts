@@ -6,6 +6,7 @@ import { problems } from '../common/problem';
 import { uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { DocumentFileDto, DocumentSlotDto, DocumentsService } from '../documents/documents.service';
+import { OverrideDto, OverrideJson, overrideDtos } from './override-dto';
 import { LevelCode, TaskRow, TaskSummaryDto, TaskViewService, UserRefDto, levelCode, taskSelect } from './task-view.service';
 
 export interface AllowedActionDto {
@@ -46,6 +47,10 @@ export type TaskDetailDto = TaskSummaryDto & {
   workflow_version: number;
   /** Q462 (0073): why the task carries `historical_no_documents`; null when it does not. */
   historical_load: { batch_id: string; cutoff_date: string | null; flagged_at: Date | null; missing_documents: string[]; reason: string | null } | null;
+  /** Migration 0088: the admin date overrides of the task, newest first, with whether each can still be reverted. */
+  overrides: OverrideDto[];
+  /** Migration 0088: the caller may override a date of this task (a System Admin; the task is not N/A or skipped). */
+  can_override: boolean;
 };
 
 @Injectable()
@@ -96,7 +101,19 @@ export class TaskDetailService {
       na_reason: row.na_reason,
       workflow_version: row.workflow_version,
       historical_load: await this.historicalLoad(row),
+      overrides: await this.overrides(row.id),
+      can_override: !['na', 'skipped'].includes(row.state) && (await this.isAdmin(auth)),
     };
+  }
+
+  private async overrides(taskId: string): Promise<OverrideDto[]> {
+    const rows = await this.db.tx.$queryRaw<{ r: OverrideJson[] }[]>(Prisma.sql`SELECT task_overrides_json(${taskId}::uuid) AS r`);
+    return overrideDtos(this.view, rows[0]?.r ?? []);
+  }
+
+  private async isAdmin(auth: AuthContext): Promise<boolean> {
+    const r = await this.db.tx.$queryRaw<{ a: boolean }[]>(Prisma.sql`SELECT coalesce(app_user_is_system_admin(${auth.user.id}::uuid), false) AS a`);
+    return r[0]?.a === true;
   }
 
   private async historicalLoad(row: TaskRow): Promise<TaskDetailDto['historical_load']> {
