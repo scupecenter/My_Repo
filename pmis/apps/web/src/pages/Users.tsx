@@ -1,4 +1,4 @@
-import { Check, RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX, X } from 'lucide-react';
+import { Check, Mail, RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -9,6 +9,8 @@ import type { DeletedUser, User } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { AssignDialog } from '@/components/AssignDialog';
+import { InvitationsTab } from '@/components/InvitationsTab';
+import { InviteDialog } from '@/components/InviteDialog';
 import { CreateUserDialog, LocalBadges, TwoFactorBadge } from '@/components/UserDialogs';
 import { hasGrant, isAdmin } from '@/lib/perm';
 import { OnlineNow } from '@/pages/OnlineNow';
@@ -178,13 +180,13 @@ export function Users() {
   const me = useMe(true);
   const loc = useLocation(), go = useNavigate();
   const search = new URLSearchParams(loc.search);
-  const [listTab, setListTab] = useState<'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes'>(search.has('email_changes') ? 'email_changes' : search.has('phone_changes') ? 'phone_changes' : 'active');
+  const [listTab, setListTab] = useState<'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes' | 'invitations'>(search.has('email_changes') ? 'email_changes' : search.has('phone_changes') ? 'phone_changes' : 'active');
   // Online now is the third sub-tab, beside Deleted; it keeps its own URL (/admin/online).
-  const tab: 'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes' | 'online' = loc.pathname.startsWith('/admin/online') ? 'online' : listTab;
+  const tab: 'active' | 'deleted' | 'departments' | 'email_changes' | 'phone_changes' | 'invitations' | 'online' = loc.pathname.startsWith('/admin/online') ? 'online' : listTab;
   const canList = !!me.data?.effective.nav.includes('admin.users' as never);
   // 0.9.2: who decides email changes (the server checks again: System Admin, or a delegate holding users.edit for all regions)
   const canDecide = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'edit' && ['users', 'admin.users', '*'].includes(g.module_key as string) && g.region_ids === 'all');
-  const subTabs = [...(canList ? (['active', 'deleted', 'departments'] as const) : []), ...(canList && canDecide ? (['email_changes', 'phone_changes'] as const) : []), ...(hasGrant(me.data, 'manage_users') ? (['online'] as const) : [])];
+  const subTabs = [...(canList ? (['active', 'deleted', 'departments', 'invitations'] as const) : []), ...(canList && canDecide ? (['email_changes', 'phone_changes'] as const) : []), ...(hasGrant(me.data, 'manage_users') ? (['online'] as const) : [])];
   const pick = (k: (typeof subTabs)[number]) => {
     if (k === 'online') return go('/admin/online');
     setListTab(k);
@@ -195,6 +197,7 @@ export function Users() {
   const [sel, setSel] = useState<Record<string, User>>({});
   const [dlg, setDlg] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const canCreate = isAdmin(me.data) || !!me.data?.effective.grants.some((g) => (g.action as string) === 'create' && ['users', 'admin.users'].includes(g.module_key as string));
   const users = useUsers(f), roles = useRoles();
   const items = users.data?.items ?? [];
@@ -207,7 +210,7 @@ export function Users() {
       <div role="tablist" className="mb-3 flex gap-1">
         {subTabs.map((k) => <button key={k} role="tab" aria-selected={tab === k} data-testid={`users-tab-${k}`} className={`btn ${tab === k ? 'btn-accent' : ''}`} onClick={() => pick(k)}>{t(k === 'online' ? 'nav.admin.online' : k === 'departments' ? 'dept.tab' : k === 'email_changes' ? 'emailChange.tab' : k === 'phone_changes' ? 'phoneChange.tab' : `users.tab_${k}`)}</button>)}
       </div>
-      {tab === 'online' ? <OnlineNow embedded /> : tab === 'email_changes' ? <EmailChangesTab /> : tab === 'phone_changes' ? <PhoneChangesTab /> : tab === 'deleted' ? <DeletedTab /> : tab === 'departments' ? <Departments /> : <>
+      {tab === 'online' ? <OnlineNow embedded /> : tab === 'invitations' ? <InvitationsTab /> : tab === 'email_changes' ? <EmailChangesTab /> : tab === 'phone_changes' ? <PhoneChangesTab /> : tab === 'deleted' ? <DeletedTab /> : tab === 'departments' ? <Departments /> : <>
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className="input max-w-64" data-testid="users-search" aria-label={t('users.search')} placeholder={t('users.search')} value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
         <select className="input w-auto" data-testid="users-filter-status" aria-label={t('users.status')} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })}>
@@ -219,6 +222,7 @@ export function Users() {
           {(roles.data ?? []).map((r) => <option key={r.id} value={r.id}>{r.name_en}</option>)}
         </select>
         <span className="flex-1" />
+        {canCreate && <button className="btn" data-testid="users-invite" onClick={() => setInviting(true)}><Mail size={16} />{t('invite.open')}</button>}
         {canCreate && <button className="btn" data-testid="users-new" onClick={() => setCreating(true)}><UserRoundPlus size={16} />{t('newUser.open')}</button>}
         <button className="btn btn-accent" data-testid="users-assign" onClick={() => setDlg(true)}><UserPlus size={16} />{chosen.length ? t('users.assign_selected', { count: chosen.length }) : t('users.assign')}</button>
       </div>
@@ -250,6 +254,7 @@ export function Users() {
       </div>
       </>}
       {act && <ActDialog act={act} onClose={() => setAct(null)} />}
+      {inviting && <InviteDialog onClose={() => setInviting(false)} />}
       {creating && <CreateUserDialog onClose={() => setCreating(false)} />}
       {dlg && <AssignDialog open onClose={() => { setDlg(false); setSel({}); }} initialMode={chosen.length === 1 ? 'person' : 'role'}
         initialPeople={chosen.map((u) => ({ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? '' }))} />}
