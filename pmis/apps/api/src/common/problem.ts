@@ -12,7 +12,7 @@ export type ErrorCode =
   | 'scope_scenario_conflict'
   | 'too_many_rows' | 'integrity_too_large' | 'mail_not_configured'
   | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
-  | 'list_not_configured'
+  | 'list_not_configured' | 'confirmation_mismatch'
   | 'email_not_verified'
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing';
 
@@ -46,6 +46,7 @@ const TITLES: Record<string, string> = {
   document_rule_pending: 'A document rule cannot be decided yet',
   file_pending_scan: 'The file waits for the virus scan',
   list_not_configured: 'A critical list has no value yet',
+  confirmation_mismatch: 'The typed confirmation does not match',
   vehicle_already_reserved: 'The vehicle is already reserved for overlapping dates',
   empty_cell: 'A level in use has no holder',
   role_in_use: 'The role is in use',

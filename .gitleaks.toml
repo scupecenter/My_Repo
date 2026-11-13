@@ -1,0 +1,14 @@
+# gitleaks configuration: the default rules plus an allowlist for known synthetic values.
+# The project uses synthetic data only (pmis/CLAUDE.md). API test files carry fake keys and
+# passwords for throwaway test databases, and the capacity sizer uses a browser storage key name.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic test values and non-secret identifiers"
+paths = [
+  '''pmis/apps/api/test/.*\.ts''',
+]
+regexes = [
+  '''gsdn-pmis-sizing-scenarios-v1''',
+]
