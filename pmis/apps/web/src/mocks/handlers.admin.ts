@@ -114,6 +114,17 @@ export const adminHandlers = [
     A().users.push(u); A().deleted = A().deleted.filter((x) => x !== d); save();
     return HttpResponse.json(detail(u), tag(u.version));
   }),
+  http.post(`${B}/users/:id/purge`, async ({ params, request }) => {
+    const g = needAdmin(); if (g) return g;
+    const d = A().deleted.find((x) => uid(x.employee_id) === params.id);
+    if (!d) return problem(404, 'not_found', 'Deleted user not found');
+    if (!stepUpValid()) return stepUp();
+    const b = (await request.json()) as { reason?: string; confirm_text?: string };
+    const r = noReason(b); if (r) return r;
+    if (b.confirm_text?.trim() !== d.employee_id && b.confirm_text?.trim().toLowerCase() !== d.email.toLowerCase()) return problem(422, 'confirmation_mismatch', 'Typed confirmation does not match', { errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
+    A().deleted = A().deleted.filter((x) => x !== d); save();
+    return HttpResponse.json({ id: params.id, display_name: d.name_en, purged_at: now(), purged_by: ref(viewer()!.employee_id!), purge_reason: b.reason!.trim(), deleted_at: d.deleted_at, delete_reason: d.reason, identifiers: { email: null, employee_id: d.employee_id, phone: null } });
+  }),
   http.get(`${B}/users/:id/assignments`, ({ params, request }) => {
     const g = needAdmin(); if (g) return g;
     const e = eOf(params.id as string) ?? (userBy(params.id as string)?.local ? '' : undefined);

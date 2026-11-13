@@ -16,7 +16,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 import { MailPort } from '../mail/mail.port';
 import { notifyByMail, PROFILE_MAIL } from '../me/profile.service';
-import { AssignmentDto, GroupRef, PickerItem, UserDto, UsersRepo } from './users.repo';
+import { AssignmentDto, GroupRef, PickerItem, PurgedUserDto, UserDto, UsersRepo } from './users.repo';
 
 const reason = z.string().trim().min(3).max(1000);
 const employeeId = z.string().regex(/^[0-9]{4}$/);
@@ -38,6 +38,8 @@ const patchSchema = z.object({
 
 const deleteSchema = z.object({ reason: z.string().trim().min(3).max(500) }).strict();
 const restoreSchema = z.object({ reason }).strict();
+/** 0089: permanent delete. `confirm_text` is the account's employee ID or e-mail, typed by the admin. */
+const purgeSchema = z.object({ reason: z.string().trim().min(3).max(500), confirm_text: z.string().trim().min(1).max(254) }).strict();
 
 const orgSchema = z.object({
   manager_id: z.string().uuid().nullable(),
@@ -195,14 +197,19 @@ export class UsersService {
     return next;
   }
 
-  /** GET /users/deleted: soft-deleted users, newest deletion first. Email, employee ID and phone stay unique, so all can be restored. */
-  async listDeleted(auth: AuthContext, q: Query): Promise<{ items: (UserDto & { can_restore: boolean; restore_blocked_reason: null })[]; page: { limit: number; next_cursor: null; total: number } }> {
+  /**
+   * GET /users/deleted: soft-deleted users, newest deletion first (permanently deleted ones are tombstones and are not listed).
+   * A deleted user keeps its e-mail, employee ID and phone, so they stay unique and a restore normally works; `can_restore` is still
+   * computed against every other account (0089) and says why not.
+   */
+  async listDeleted(auth: AuthContext, q: Query): Promise<{ items: (UserDto & { can_restore: boolean; restore_blocked_reason: string | null })[]; page: { limit: number; next_cursor: null; total: number } }> {
     await this.access.requireModuleView(auth, 'admin.users');
     const text = one(q, 'q')?.trim();
     const { rows, total } = await this.repo.list({ deleted: true }, 200, null, text ? likePattern(text) : null);
+    const blockers = await this.repo.restoreBlockers(rows.map((u) => u.id));
     const items = rows
       .sort((a, b) => (b.deleted_at?.getTime() ?? 0) - (a.deleted_at?.getTime() ?? 0))
-      .map((u) => ({ ...u, can_restore: true, restore_blocked_reason: null }));
+      .map((u) => ({ ...u, can_restore: !blockers.has(u.id), restore_blocked_reason: blockers.get(u.id) ?? null }));
     return { items, page: { limit: 200, next_cursor: null, total } };
   }
 
@@ -222,6 +229,29 @@ export class UsersService {
     const next = await this.repo.find(id);
     if (!next) throw new ProblemException(500, 'internal_error', {});
     return { ...next, can_restore: true, restore_blocked_reason: null };
+  }
+
+  /**
+   * POST /users/{id}/purge (0089, owner decision 3 of 2026-11-12): permanent delete of an already soft-deleted user. The row stays as a tombstone
+   * (name and history kept); the e-mail, employee ID, phone and Entra link are released so a new account can use them. System Admin only
+   * (a delegate gets 403), reason, step-up and the typed confirmation (employee ID or e-mail) are required.
+   */
+  async purge(auth: AuthContext, id: string, raw: unknown): Promise<PurgedUserDto> {
+    const body = parse(purgeSchema, raw);
+    await this.access.requireAdmin('users', 'delete');
+    if (!(await this.access.isSystemAdmin())) throw problems.forbidden('action_forbidden', 'Permanent delete is for System Admins only.');
+    await this.stepUp.require(auth);
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound();
+    const alreadyPurged = await this.repo.findPurged(id);
+    if (alreadyPurged) throw new ProblemException(409, 'invalid_transition', { detail: 'The account was already deleted permanently.' });
+    if (!(await this.repo.find(id))) throw problems.notFound();
+    await this.db.tx.$executeRaw`SELECT idm_purge_user(${id}::uuid, ${body.reason}::text, ${body.confirm_text}::text)`;
+    await this.db.tx.$executeRaw`SET CONSTRAINTS ALL IMMEDIATE`;
+    await this.syslog.write('info', 'session_revoked_by_admin', { target_user: id, reason: 'user_purged' }, auth.user.id);
+    this.states.invalidate(id);
+    const next = await this.repo.findPurged(id);
+    if (!next) throw new ProblemException(500, 'internal_error', {});
+    return next;
   }
 
   /** POST /users/{id}/restore (B14): back to the status before the delete; local sign-in on again. */
