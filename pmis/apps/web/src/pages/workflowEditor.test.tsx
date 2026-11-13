@@ -65,4 +65,48 @@ describe('Settings, Workflow', () => {
     await waitFor(() => expect(screen.getByTestId('wfe-version-2')).toHaveTextContent('Published'));
     expect(screen.queryByTestId('wfe-publish')).toBeNull();
   }, 60_000);
+
+  it('inserts a task between A1 and A2 with the chain preview, refuses a cycle, and edits successors from the dependency view', async () => {
+    await signIn('pm');
+    await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('wfe-new-draft'));
+    await reasonAndSave(u, 'wfe-draft-dialog');
+    await u.click(await screen.findByTestId('wfe-insert-MS1'));
+    await u.type(await screen.findByTestId('wfe-ins-code'), 'MID1');
+    await u.type(screen.getByTestId('wfe-ins-en'), 'Middle step');
+    await u.click(screen.getByTestId('wfe-ins-pred-opt-A1'));
+    await u.click(screen.getByTestId('wfe-ins-succ-opt-A2'));
+    await u.click(screen.getByTestId('wfe-ins-remove'));
+    const chain = await screen.findByTestId('wfe-ins-rewire-A2');
+    expect(chain).toHaveTextContent('A1');
+    expect(chain).toHaveTextContent('MID1');
+    expect(chain).toHaveTextContent(/old link removed/);
+    // swapping the ends closes a cycle (A2 already comes after A1): the preview says so and saving is off
+    await u.click(screen.getByTestId('wfe-ins-pred-opt-A1'));
+    await u.click(screen.getByTestId('wfe-ins-succ-opt-A2'));
+    await u.click(screen.getByTestId('wfe-ins-pred-opt-A2'));
+    await u.click(screen.getByTestId('wfe-ins-succ-opt-A1'));
+    expect(await screen.findByTestId('wfe-ins-cycle')).toBeInTheDocument();
+    await u.type(screen.getByTestId('wfe-insert-dialog-reason'), REASON);
+    expect(screen.getByTestId('wfe-insert-dialog-submit')).toBeDisabled();
+    await u.click(screen.getByTestId('wfe-ins-pred-opt-A2'));
+    await u.click(screen.getByTestId('wfe-ins-succ-opt-A1'));
+    await u.click(screen.getByTestId('wfe-ins-pred-opt-A1'));
+    await u.click(screen.getByTestId('wfe-ins-succ-opt-A2'));
+    await waitFor(() => expect(screen.getByTestId('wfe-ins-rewire-A2')).toBeInTheDocument());
+    await u.click(screen.getByTestId('wfe-insert-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('wfe-preds-A2')).toHaveTextContent('MID1'));
+    expect(screen.getByTestId('wfe-preds-A2')).not.toHaveTextContent('A1');
+    expect(screen.getByTestId('wfe-preds-MID1')).toHaveTextContent('A1');
+
+    // the dependency view lists what waits for MID1 and lets the admin edit its successors
+    await u.click(within(screen.getByTestId('wfe-deps-MS1')).getByText('Dependency chain'));
+    expect(screen.getByTestId('wfe-dep-MID1')).toHaveTextContent('A2');
+    await u.click(screen.getByTestId('wfe-dep-succ-MID1'));
+    await u.click(await screen.findByTestId('wfe-succ-opt-A2'));
+    await reasonAndSave(u, 'wfe-succ-dialog');
+    await waitFor(() => expect(screen.getByTestId('wfe-preds-A2')).not.toHaveTextContent('MID1'));
+  }, 60_000);
 });

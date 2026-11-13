@@ -53,6 +53,25 @@ const reaches = (v: Ver, from: string, target: string, seen = new Set<string>())
   return (v.tasks.find((x) => x.task_code === from)?.predecessors ?? []).some((p) => reaches(v, p, target, seen));
 };
 
+interface InsertBody { stage_code?: string; predecessors?: string[]; successors?: string[]; remove_direct_links?: boolean; counts_toward_milestone?: boolean }
+/** The preview of an insert: the rewiring of each successor and the cycle check (a chosen successor that already comes before a chosen predecessor). */
+const plan = (v: Ver, b: InsertBody) => {
+  const preds = [...new Set(b.predecessors ?? [])];
+  const succs = [...new Set(b.successors ?? [])];
+  const errors: { path: string; code: string; message: string }[] = [];
+  if (preds.some((c) => !v.tasks.some((x) => x.task_code === c))) errors.push({ path: '/predecessors', code: 'unknown', message: 'unknown predecessor' });
+  if (succs.some((c) => !v.tasks.some((x) => x.task_code === c))) errors.push({ path: '/successors', code: 'unknown', message: 'unknown successor' });
+  if (errors.length === 0 && succs.some((s) => preds.some((p) => reaches(v, p, s)))) errors.push({ path: '/successors', code: 'cycle', message: 'cycle' });
+  const rewiring = errors.length ? [] : succs.map((s) => {
+    const x = v.tasks.find((k) => k.task_code === s)!;
+    const removed = b.remove_direct_links ? x.predecessors.filter((c) => preds.includes(c)) : [];
+    return { successor: s, name_en: x.name_en, name_ar: x.name_ar, stage_code: x.stage_code, predecessors_before: x.predecessors, removed_links: removed, predecessors_after: x.predecessors.filter((c) => !removed.includes(c)) };
+  });
+  const published = v.status === 'published';
+  return { valid: errors.length === 0, errors, predecessors: preds, successors: succs, rewiring, removed_link_count: rewiring.reduce((a, r) => a + r.removed_links.length, 0),
+    warnings: published && (b.counts_toward_milestone ?? true) ? ['counting_task_may_move_milestone'] : [], version_status: v.status, open_sites: published ? 12 : 0, master_confirmation_needed: false, confirmation_phrase: null };
+};
+
 export const workflowEditorHandlers = [
   http.get(`${B}/workflow/versions`, () => {
     if (untouched()) return undefined;
@@ -78,6 +97,47 @@ export const workflowEditorHandlers = [
     const g = guard(); if (g) return g;
     const v = state.find((x) => x.version === Number(params.version));
     return v ? reply(v) : problem(404, 'not_found', 'The workflow version does not exist.');
+  }),
+  http.post(`${B}/workflow/versions/:version/tasks/insert-preview`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need create on task definitions.');
+    const v = state.find((x) => x.version === Number(params.version));
+    if (!v) return problem(404, 'not_found', 'The workflow version does not exist.');
+    return HttpResponse.json(plan(v, (await request.json()) as InsertBody));
+  }),
+  http.post(`${B}/workflow/versions/:version/tasks/insert`, async ({ params, request }) => {
+    const b = (await request.json()) as InsertBody & { code?: string; name_en?: string; name_ar?: string | null; reason?: string; add_to_open_sites?: boolean };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const v = w.v;
+    if (!/^[A-Z][A-Z0-9_-]{0,19}$/.test(b.code ?? '')) return fieldErr('/code', 'invalid');
+    if (v.tasks.some((x) => x.task_code === b.code)) return problem(409, 'duplicate', 'A task with this code exists already in the version.');
+    const pl = plan(v, b);
+    if (!pl.valid) return fieldErr(pl.errors[0]!.path, pl.errors[0]!.code);
+    const n = Math.max(0, ...v.tasks.filter((x) => x.stage_code === b.stage_code).map((x) => x.sort_order)) + 10;
+    v.tasks.push({ ...t(b.code!, b.stage_code!, 0, b.name_en ?? '', '', b.predecessors ?? []), sort_order: n, name_ar: b.name_ar ?? null, counts_toward_milestone: b.counts_toward_milestone ?? true });
+    for (const r of pl.rewiring) {
+      const s = v.tasks.find((x) => x.task_code === r.successor)!;
+      s.predecessors = [...r.predecessors_after, b.code!].sort();
+    }
+    v.etag += 1;
+    return HttpResponse.json({ task_code: b.code, warnings: pl.warnings, rewiring: pl.rewiring, open_sites_added: b.add_to_open_sites && v.status === 'published' ? 12 : 0, version: json(v) }, { status: 201, headers: { ETag: `"${v.etag}"` } });
+  }),
+  http.put(`${B}/workflow/versions/:version/tasks/:task/successors`, async ({ params, request }) => {
+    const b = (await request.json()) as { successors?: string[]; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const x = w.v.tasks.find((k) => k.task_code === params.task);
+    if (!x) return problem(404, 'not_found', 'The task does not exist in this version.');
+    const list = b.successors ?? [];
+    if (list.includes(x.task_code)) return fieldErr('/successors', 'self');
+    if (list.some((c) => !w.v.tasks.some((k) => k.task_code === c))) return fieldErr('/successors', 'unknown');
+    if (list.some((c) => reaches(w.v, x.task_code, c))) return fieldErr('/successors', 'cycle');
+    for (const k of w.v.tasks) {
+      const has = k.predecessors.includes(x.task_code);
+      if (has && !list.includes(k.task_code)) k.predecessors = k.predecessors.filter((c) => c !== x.task_code);
+      if (!has && list.includes(k.task_code)) k.predecessors = [...k.predecessors, x.task_code].sort();
+    }
+    w.v.etag += 1;
+    return reply(w.v);
   }),
   http.post(`${B}/workflow/versions/:version/tasks`, async ({ params, request }) => {
     const b = (await request.json()) as { stage_code?: string; code?: string; name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; predecessors?: string[]; reason?: string };

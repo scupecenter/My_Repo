@@ -45,4 +45,14 @@ export const useReorderTasks = (v: number, etag: number) => useWrite<{ stage: st
 export const useMilestoneLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/milestones/${code}`, { body, version: e }));
 export const useGateLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/gates/${code}`, { body, version: e }));
 export const usePublish = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string; confirm_master_impact?: string }, WorkflowVersion>(v, etag, (body, e) => api.post(`${base(v)}/publish`, { body, version: e }));
+export type InsertInput = TaskCreateInput & { successors?: string[]; remove_direct_links?: boolean; add_to_open_sites?: boolean };
+export type TaskInsertPreview = S['TaskInsertPreview'];
+export type TaskInsertResult = S['TaskInsertResult'];
+export const useInsertTask = (v: number, etag: number) => useWrite<InsertInput, TaskInsertResult>(v, etag, (body, e) => api.post(`${base(v)}/tasks/insert`, { body, version: e }));
+export const useSetSuccessors = (v: number, etag: number) => useWrite<{ code: string; successors: string[]; reason: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/successors`, { body, version: e }));
+/** The preview writes nothing: a mutation only because it is a POST with a body. */
+export const usePreviewInsert = (v: number) =>
+  useMutation<TaskInsertPreview, ApiError, { stage_code: string; predecessors: string[]; successors: string[]; remove_direct_links: boolean; counts_toward_milestone: boolean }>({
+    mutationFn: (body) => api.post(`${base(v)}/tasks/insert-preview`, { body }),
+  });
 export type { Wrap };
