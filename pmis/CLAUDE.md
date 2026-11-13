@@ -34,7 +34,7 @@ Read before any work:
 - The unit of approval is the whole task: dates plus documents.
 - A rejection goes back from L2 to L1 and must carry a note. Every task has a comment thread.
 - Rejection of a self-approval (decision B6, adapted): when one person holds L1 and L2, a later reopening or rejection by an admin returns the task to that person at L1 with the note; resubmission is again a self-approval and is logged again.
-- Batch uploads can be approved row by row or all at once.
+- Batch uploads can be approved row by row or all at once. **System Admin "approve all as is" (owner decision 2026-11-12, migration 0087):** a System Admin can approve every open row of a task-stream upload batch in one call, whoever holds L2 (reason and step-up, audited per row). Rows that lack an actual date, a document or another required value are approved with what they have and flagged "incomplete" and "admin override" (excluded or flagged in KPIs like other overrides); the gaps stay visible through `site_data_gaps`. Uploaders keep the normal path.
 - **Staff absence and reassignment (decision B12b).** Nothing moves automatically when someone is absent. The assigned person stays on the task until their Team Lead (or anyone with the `reassign` grant for that module and region, or a System Admin) decides. The lead has three choices per task, per site, or for all of the person's open tasks:
   1. keep the person on it;
   2. reassign it to another eligible person (a task-level holder change; the Responsibility Matrix itself is not changed);
