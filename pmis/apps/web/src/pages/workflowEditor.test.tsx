@@ -157,4 +157,27 @@ describe('Settings, Workflow', () => {
     await waitFor(() => expect(within(screen.getByTestId('wfe-migrations')).queryByRole('button', { name: 'Revert' })).toBeNull());
     expect(screen.getByTestId('wfe-migrations')).toHaveTextContent('Reverted');
   }, 90_000);
+
+  it('deletes a task added in the draft for good, deactivates a used one, and discards the draft', async () => {
+    await signIn('pm');
+    await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('wfe-new-draft'));
+    await reasonAndSave(u, 'wfe-draft-dialog');
+    await screen.findByTestId('wfe-editor');
+    await u.click(await screen.findByTestId('wfe-add-MS1'));
+    await u.type(await screen.findByTestId('wfe-code'), 'TMP1');
+    await u.type(screen.getByTestId('wfe-name-en'), 'Temp');
+    await reasonAndSave(u, 'wfe-task-dialog');
+    await u.click(await screen.findByTestId('wfe-del-TMP1'));
+    await reasonAndSave(u, 'wfe-remove-dialog');
+    await waitFor(() => expect(screen.queryByTestId('wfe-task-TMP1')).not.toBeInTheDocument());
+    await u.click(screen.getByTestId('wfe-del-A4'));
+    await reasonAndSave(u, 'wfe-remove-dialog');
+    await waitFor(() => expect(screen.getByTestId('wfe-task-A4')).toHaveClass('opacity-60'));
+    await u.click(screen.getByTestId('wfe-discard'));
+    await reasonAndSave(u, 'wfe-discard-dialog');
+    await waitFor(() => expect(screen.queryByTestId('wfe-editor')).not.toBeInTheDocument());
+  });
 });

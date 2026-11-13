@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import {
-  useCreateDraft, useCreateTask, useGateLight, useInsertTask, useReplaceStructure, type GateCondition, useMilestoneLight, usePreviewInsert, usePublish, useReorderTasks, useSetPredecessors, useSetSuccessors, useUpdateTask, useWorkflowVersion, useWorkflowVersions,
+  useCreateDraft, useRemoveItem, useDiscardDraft, useCreateTask, useGateLight, useInsertTask, useReplaceStructure, type GateCondition, useMilestoneLight, usePreviewInsert, usePublish, useReorderTasks, useSetPredecessors, useSetSuccessors, useUpdateTask, useWorkflowVersion, useWorkflowVersions,
   type TaskPlacement, type WorkflowVersion,
 } from '@/api/workflowEditor';
 import { errText, FormDialog } from '@/components/FormDialog';
@@ -67,23 +67,23 @@ export function Workflow() {
           <p className="text-sm text-mute">{t('wfe.new_draft_hint')}</p>
         </FormDialog>
       )}
-      {open !== null && <Editor version={open} />}
+      {open !== null && <Editor version={open} onGone={() => setOpen(null)} />}
       <MigrationLog />
     </section>
   );
 }
 
-function Editor({ version }: { version: number }) {
+function Editor({ version, onGone }: { version: number; onGone: () => void }) {
   const q = useWorkflowVersion(version);
   const { t } = useTranslation();
   if (q.isError) return <p role="alert" className="text-lateInk">{t('errors.generic')}</p>;
   if (!q.data) return <p>…</p>;
-  return <VersionEditor v={q.data} key={`${q.data.version}-${q.data.version_etag}`} />;
+  return <VersionEditor v={q.data} onGone={onGone} key={`${q.data.version}-${q.data.version_etag}`} />;
 }
 
-type Dlg = null | { kind: 'create'; stage: string } | { kind: 'edit'; task: P } | { kind: 'preds'; task: P } | { kind: 'succs'; task: P } | { kind: 'insert'; stage: string } | { kind: 'milestone'; m: M } | { kind: 'gate'; g: G } | { kind: 'publish' } | { kind: 'structure' } | { kind: 'migrate' };
+type Dlg = null | { kind: 'remove'; what: 'task' | 'milestone' | 'gate'; code: string } | { kind: 'discard' } | { kind: 'create'; stage: string } | { kind: 'edit'; task: P } | { kind: 'preds'; task: P } | { kind: 'succs'; task: P } | { kind: 'insert'; stage: string } | { kind: 'milestone'; m: M } | { kind: 'gate'; g: G } | { kind: 'publish' } | { kind: 'structure' } | { kind: 'migrate' };
 
-function VersionEditor({ v }: { v: WorkflowVersion }) {
+function VersionEditor({ v, onGone }: { v: WorkflowVersion; onGone: () => void }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const err = useErr();
@@ -106,6 +106,8 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
   const msLight = useMilestoneLight(v.version, etag);
   const gateLight = useGateLight(v.version, etag);
   const publish = usePublish(v.version, etag);
+  const removeItem = useRemoveItem(v.version, etag);
+  const discard = useDiscardDraft(v.version, etag);
   const done = (msg: string) => ({ onSuccess: () => { toast(msg); setDlg(null); } });
   const nm = (x: { name_en?: string; name_ar?: string | null }) => (ar && x.name_ar ? x.name_ar : x.name_en ?? '');
 
@@ -119,6 +121,7 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-bold">v{v.version} · {t(`wfe.status_${v.status}`)}</h3>
         {isDraft && canEdit && <button className="btn" data-testid="wfe-structure" onClick={() => { replace.reset(); setDlg({ kind: 'structure' }); }}>{t('wfe.edit_structure')}</button>}
+        {isDraft && canEdit && <button className="btn" data-testid="wfe-discard" onClick={() => { discard.reset(); setDlg({ kind: 'discard' }); }}>{t('wfe.discard_draft')}</button>}
         {!isDraft && v.can_publish && <button className="btn" data-testid="wfe-migrate" onClick={() => setDlg({ kind: 'migrate' })}>{t('wfe.migrate_sites')}</button>}
         {isDraft && v.can_publish && <button className="btn btn-accent" data-testid="wfe-publish" disabled={!v.validation?.valid} onClick={() => { publish.reset(); setDlg({ kind: 'publish' }); }}>{t('wfe.publish')}</button>}
       </div>
@@ -135,6 +138,7 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-semibold">{mi + 1}. {nm(m)} <span className="mono text-mute">{m.code}</span></h4>
               {canEdit && <button className="btn" data-testid={`wfe-ms-${m.code}`} onClick={() => { msLight.reset(); setDlg({ kind: 'milestone', m }); }}><Pencil size={14} aria-hidden /> {t('wfe.edit_names')}</button>}
+              {canEdit && <button className="btn" data-testid={`wfe-ms-del-${m.code}`} onClick={() => { removeItem.reset(); setDlg({ kind: 'remove', what: 'milestone', code: m.code }); }}>{t('wfe.remove')}</button>}
               {canEdit && <button className="btn" data-testid={`wfe-insert-${m.code}`} onClick={() => { insertTask.reset(); setDlg({ kind: 'insert', stage: m.code }); }}><Split size={14} aria-hidden /> {t('wfe.insert_task')}</button>}
               {canEdit && <button className="btn" data-testid={`wfe-add-${m.code}`} onClick={() => { createTask.reset(); setDlg({ kind: 'create', stage: m.code }); }}><Plus size={14} aria-hidden /> {t('wfe.add_task')}</button>}
             </div>
@@ -152,6 +156,7 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
                         <button className="btn" aria-label={t('wfe.up')} disabled={i === 0 || reorder.isPending} onClick={() => move(m.code, codes, i, -1)}><ArrowUp size={14} aria-hidden /></button>
                         <button className="btn" aria-label={t('wfe.down')} disabled={i === rows.length - 1 || reorder.isPending} onClick={() => move(m.code, codes, i, 1)}><ArrowDown size={14} aria-hidden /></button>
                         <button className="btn" data-testid={`wfe-edit-${p.task_code}`} onClick={() => { updateTask.reset(); setDlg({ kind: 'edit', task: p }); }}>{t('wfe.edit_task')}</button>
+                        <button className="btn" data-testid={`wfe-del-${p.task_code}`} onClick={() => { removeItem.reset(); setDlg({ kind: 'remove', what: 'task', code: p.task_code }); }}>{t('wfe.remove')}</button>
                         <button className="btn" data-testid={`wfe-pred-${p.task_code}`} onClick={() => { setPreds.reset(); setDlg({ kind: 'preds', task: p }); }}>{t('wfe.predecessors')}</button>
                       </>}
                     </td>
@@ -165,6 +170,7 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
               <p className="mt-2 text-sm text-mute" data-testid={`wfe-gate-${gate.code}`}>
                 {t('wfe.gate')} {gate.code}: {nm(gate)} · SLA {gate.sla_min_wd ?? '-'}/{gate.sla_max_wd ?? '-'}
                 {canEdit && <button className="btn ms-2" data-testid={`wfe-gate-edit-${gate.code}`} onClick={() => { gateLight.reset(); setDlg({ kind: 'gate', g: gate }); }}>{t('wfe.edit_names')}</button>}
+                {canEdit && <button className="btn ms-2" data-testid={`wfe-gate-del-${gate.code}`} onClick={() => { removeItem.reset(); setDlg({ kind: 'remove', what: 'gate', code: gate.code }); }}>{t('wfe.remove')}</button>}
               </p>
             )}
           </section>
@@ -190,6 +196,14 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
         onSubmit={(f, reason) => msLight.mutate({ code: dlg.m.code, ...f, reason }, done(t('wfe.saved')))} />}
       {dlg?.kind === 'gate' && <LightDialog title={t('wfe.edit_names')} item={dlg.g} gate onClose={() => setDlg(null)} busy={gateLight.isPending} error={gateLight.isError ? err(gateLight.error) : null}
         onSubmit={(f, reason) => gateLight.mutate({ code: dlg.g.code, ...f, reason }, done(t('wfe.saved')))} />}
+      {dlg?.kind === 'remove' && <FormDialog open onClose={() => setDlg(null)} testid="wfe-remove-dialog" title={t('wfe.remove_title', { kind: t(`wfe.kind_${dlg.what}`), code: dlg.code })} busy={removeItem.isPending} error={removeItem.isError ? err(removeItem.error) : null}
+        onSubmit={(reason) => removeItem.mutate({ kind: dlg.what, code: dlg.code, reason }, { onSuccess: (r) => { toast(`${t(`wfe.removed_${r.outcome}`)} ${r.why.map((w) => t(`wfe.why_${w}`)).join(' ')}`); setDlg(null); } })}>
+        <p className="text-sm text-mute">{t('wfe.remove_hint')}</p>
+      </FormDialog>}
+      {dlg?.kind === 'discard' && <FormDialog open onClose={() => setDlg(null)} testid="wfe-discard-dialog" title={t('wfe.discard_draft')} busy={discard.isPending} error={discard.isError ? err(discard.error) : null}
+        onSubmit={(reason) => discard.mutate({ reason }, { onSuccess: () => { toast(t('wfe.discarded')); setDlg(null); onGone(); } })}>
+        <p className="text-sm text-mute">{t('wfe.discard_hint')}</p>
+      </FormDialog>}
       {dlg?.kind === 'publish' && <PublishDialog version={v.version} onClose={() => setDlg(null)} busy={publish.isPending} error={publish.isError ? err(publish.error) : null}
         phrase={v.validation?.master_impact?.confirmation_phrase ?? null}
         onSubmit={(confirm, reason, master) => publish.mutate({ reason, confirm_text: confirm, ...(master ? { confirm_master_impact: master } : {}) }, done(t('wfe.published')))} />}

@@ -275,6 +275,26 @@ export const workflowEditorHandlers = [
     w.v.etag += 1;
     return HttpResponse.json(g, { headers: { ETag: `"${w.v.etag}"` } });
   }),
+  http.post(`${B}/workflow/versions/:version/remove`, async ({ params, request }) => {
+    const b = (await request.json()) as { kind?: 'task' | 'milestone' | 'gate'; code?: string; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const { v } = w;
+    const others = state.filter((x) => x !== v);
+    const used = b.kind === 'task' ? others.some((x) => x.tasks.some((k) => k.task_code === b.code)) : b.kind === 'milestone' ? others.some((x) => x.milestones.some((k) => k.code === b.code)) : others.some((x) => x.gates.some((k) => k.code === b.code));
+    const why = [...(used ? ['other_version'] : []), ...(v.status === 'published' ? ['published_version'] : [])];
+    if (b.kind === 'task') { const k = v.tasks.find((x) => x.task_code === b.code); if (!k) return problem(404, 'not_found', 'The item does not exist in this version.'); if (why.length) k.is_active = false; else { v.tasks = v.tasks.filter((x) => x !== k).map((x) => ({ ...x, predecessors: x.predecessors.filter((p) => p !== b.code) })); } }
+    else if (b.kind === 'milestone') { if (!v.milestones.some((x) => x.code === b.code)) return problem(404, 'not_found', 'The item does not exist in this version.'); if (v.tasks.some((x) => x.stage_code === b.code)) return fieldErr('/code', 'has_active_tasks'); if (why.length) v.milestones = v.milestones.map((x) => x.code === b.code ? { ...x, is_active: false } : x); else v.milestones = v.milestones.filter((x) => x.code !== b.code); }
+    else { if (!v.gates.some((x) => x.code === b.code)) return problem(404, 'not_found', 'The item does not exist in this version.'); v.gates = why.length ? v.gates.map((x) => x.code === b.code ? { ...x, is_active: false } : x) : v.gates.filter((x) => x.code !== b.code); }
+    v.etag += 1;
+    return HttpResponse.json({ outcome: why.length ? 'deactivated' : 'deleted', why, version: json(v) });
+  }),
+  http.post(`${B}/workflow/versions/:version/discard`, async ({ params, request }) => {
+    const b = (await request.json()) as { reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if (w.v.status !== 'draft') return problem(409, 'invalid_transition', 'Only a draft can be discarded.');
+    state = state.filter((x) => x !== w.v);
+    return HttpResponse.json({ version: w.v.version, discarded: true });
+  }),
   http.post(`${B}/workflow/versions/:version/publish`, async ({ params, request }) => {
     const b = (await request.json()) as { confirm_text?: string; reason?: string };
     const g = guard(); if (g) return g;

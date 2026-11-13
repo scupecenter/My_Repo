@@ -84,3 +84,7 @@ export const useRevertMigration = () => {
   });
 };
 export type { Wrap };
+
+export type RemoveResult = { outcome: 'deleted' | 'deactivated'; why: string[] };
+export const useRemoveItem = (v: number, etag: number) => useWrite<{ kind: 'task' | 'milestone' | 'gate'; code: string; reason: string }, RemoveResult>(v, etag, (body, e) => api.post(`${base(v)}/remove`, { body, version: e }));
+export const useDiscardDraft = (v: number, etag: number) => useWrite<{ reason: string }, unknown>(v, etag, (body, e) => api.post(`${base(v)}/discard`, { body, version: e }));
