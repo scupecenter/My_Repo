@@ -84,6 +84,9 @@ export function mapWfError(message: string): ProblemException | null {
     case 'vehicle_already_reserved':
       // 0076: the btree_gist exclusion of vehicle_reservations (or the check before it) refused an overlapping reservation
       return new ProblemException(409, 'vehicle_already_reserved', { detail: detail ?? 'The vehicle is already reserved for overlapping dates.' });
+    case 'override_not_revertible':
+      // 0088: the task date or the site no longer holds what the admin override set, or the override was reverted already
+      return new ProblemException(409, 'override_not_revertible', { detail: detail ?? 'This override can no longer be reverted.' });
     case 'note_required':
       return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     case 'mandatory_slots_missing':
@@ -325,6 +328,8 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/user_id', code: 'no_local_account', message: 'This user has no local sign-in.' }],
         });
       }
+      if (/this invitation is not pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This invitation is not pending any more.' });
+      if (/^(assignments|groups): |the manager must be an active user/i.test(msg.trim())) return problems.validation([{ path: '/' + (msg.trim().split(':')[0] ?? ''), code: 'invalid', message: msg.trim().replace(/^[a-z_]+: /, '').split('\n')[0] }]);
       if (/not found/i.test(msg)) return new ProblemException(404, 'not_found', { detail: 'The resource does not exist.' });
       if (/at least one active System Admin/i.test(msg)) return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       return new ProblemException(422, 'validation_failed', { detail: 'The request is not valid.' });
