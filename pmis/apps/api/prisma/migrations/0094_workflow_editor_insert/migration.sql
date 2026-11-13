@@ -384,21 +384,21 @@ DECLARE r text[] := ARRAY[]::text[]; tid uuid; sid uuid;
 BEGIN
   IF p_kind = 'task' THEN
     SELECT id INTO tid FROM public.task_definitions WHERE workflow_id = p_wf AND code = p_code;
-    IF EXISTS (SELECT 1 FROM public.task_instances WHERE task_def_id = tid) THEN r := r || 'site_tasks'; END IF;
-    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE task_def_id = tid) THEN r := r || 'matrix'; END IF;
-    IF EXISTS (SELECT 1 FROM public.sla_rules WHERE task_def_id = tid) OR EXISTS (SELECT 1 FROM public.sla_rule_set_items WHERE task_def_id = tid) THEN r := r || 'sla_rules'; END IF;
-    IF EXISTS (SELECT 1 FROM public.document_type_placements WHERE task_def_id = tid) THEN r := r || 'document_types'; END IF;
-    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+    IF EXISTS (SELECT 1 FROM public.task_instances WHERE task_def_id = tid) THEN r := array_append(r, 'site_tasks'); END IF;
+    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE task_def_id = tid) THEN r := array_append(r, 'matrix'); END IF;
+    IF EXISTS (SELECT 1 FROM public.sla_rules WHERE task_def_id = tid) OR EXISTS (SELECT 1 FROM public.sla_rule_set_items WHERE task_def_id = tid) THEN r := array_append(r, 'sla_rules'); END IF;
+    IF EXISTS (SELECT 1 FROM public.document_type_placements WHERE task_def_id = tid) THEN r := array_append(r, 'document_types'); END IF;
+    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := array_append(r, 'other_version'); END IF;
   ELSIF p_kind = 'milestone' THEN
     SELECT id INTO sid FROM public.stage_definitions WHERE workflow_id = p_wf AND code = p_code;
-    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE stage_id = sid) THEN r := r || 'has_tasks'; END IF;
-    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE stage_id = sid) THEN r := r || 'matrix'; END IF;
-    IF EXISTS (SELECT 1 FROM public.baseline_entries WHERE milestone_code = p_code) THEN r := r || 'baselines'; END IF;
-    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE workflow_id = p_wf AND (from_code = p_code OR to_code = p_code)) THEN r := r || 'gates'; END IF;
-    IF EXISTS (SELECT 1 FROM public.stage_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE stage_id = sid) THEN r := array_append(r, 'has_tasks'); END IF;
+    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE stage_id = sid) THEN r := array_append(r, 'matrix'); END IF;
+    IF EXISTS (SELECT 1 FROM public.baseline_entries WHERE milestone_code = p_code) THEN r := array_append(r, 'baselines'); END IF;
+    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE workflow_id = p_wf AND (from_code = p_code OR to_code = p_code)) THEN r := array_append(r, 'gates'); END IF;
+    IF EXISTS (SELECT 1 FROM public.stage_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := array_append(r, 'other_version'); END IF;
   ELSE
-    IF EXISTS (SELECT 1 FROM public.site_gate_state WHERE gate_code = p_code) OR EXISTS (SELECT 1 FROM public.site_gate_events WHERE gate_code = p_code) THEN r := r || 'gate_history'; END IF;
-    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE link_code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+    IF EXISTS (SELECT 1 FROM public.site_gate_state WHERE gate_code = p_code) OR EXISTS (SELECT 1 FROM public.site_gate_events WHERE gate_code = p_code) THEN r := array_append(r, 'gate_history'); END IF;
+    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE link_code = p_code AND workflow_id <> p_wf) THEN r := array_append(r, 'other_version'); END IF;
   END IF;
   RETURN r;
 END $$;
@@ -417,7 +417,7 @@ BEGIN
     PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The item does not exist in this version.'));
   END IF;
   refs := public.wfe_item_refs(p_kind, w.id, p_code);
-  IF w.status <> 'draft' THEN refs := refs || 'published_version'; END IF;
+  IF w.status <> 'draft' THEN refs := array_append(refs, 'published_version'); END IF;
   hard := cardinality(refs) = 0;
   IF p_kind = 'task' THEN
     SELECT id INTO tid FROM public.task_definitions WHERE workflow_id = w.id AND code = p_code;

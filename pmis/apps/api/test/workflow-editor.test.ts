@@ -36,7 +36,7 @@ let stage = '';
 let existing = '';
 
 const hdr = (t: string): Record<string, string> => ({ 'If-Match': t });
-const current = async (api: Api, v: number): Promise<{ body: { placements: Placement[]; version_etag: number; milestones: { code: string; name_en: string }[]; status: string }; tag: string }> => {
+const current = async (api: Api, v: number): Promise<{ body: { placements: Placement[]; version_etag: number; milestones: { code: string; name_en: string }[]; gates: { code: string }[]; status: string }; tag: string }> => {
   const r = await api.call('get', `${BASE}/${v}`);
   expect(r.status).toBe(200);
   return { body: r.body, tag: etag(r) };
@@ -467,8 +467,7 @@ describe('phase 2: remove (delete or deactivate) and discard, owner rule 2026-11
     const v = await current(admin.api, d3);
     const any = v.body.placements.find((p) => p.is_active && !v.body.placements.some((q) => q.is_active && q.predecessors.includes(p.task_code)))!;
     const r = await rm('task', any.task_code, v.tag);
-    expect(JSON.stringify(r.body)).toBeTruthy(); if (r.status !== 200) console.log('DBG1', JSON.stringify(r.body));
-    expect(r.status).toBe(200);
+        expect(r.status).toBe(200);
     expect(r.body.outcome).toBe('deactivated');
     expect(r.body.why).toContain('other_version');
     expect(r.body.version.placements.find((p: Placement) => p.task_code === any.task_code).is_active).toBe(false);
@@ -488,7 +487,6 @@ describe('phase 2: remove (delete or deactivate) and discard, owner rule 2026-11
     const v = await current(admin.api, d3);
     expect((await plain.api.call('post', `${BASE}/${d3}/discard`, { reason: REASON }, hdr(v.tag))).status).toBe(403);
     const r = await admin.api.call('post', `${BASE}/${d3}/discard`, { reason: REASON }, hdr(v.tag));
-    if (r.status !== 200) console.log('DBG2', JSON.stringify(r.body));
     expect(r.status).toBe(200);
     expect(r.body).toMatchObject({ version: d3, discarded: true });
     expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [d3])).rowCount).toBe(0);
