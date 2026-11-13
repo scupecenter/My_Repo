@@ -8407,7 +8407,8 @@ paths:
         **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return of a New sites batch is always answered at once.
         **Big register and stream batches (0.14.6):** an `approve`, a `review` or a `reject` of more rows than the threshold answers 202 after the checks (the grid right, the authority of the person on at least one row: 403 `not_eligible_holder`, the notes of a return: 422, the step-up of an approval: 401; nothing queued); the rows are decided in chunks (register 50, stream 25) with the same transitions, audit rows and notice as the 200 answer, and the rights are derived again for every chunk (a row the person may no longer decide is counted in `progress.failed`). A `discard` is always answered at once.
         Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
-      x-step-up: when an approval is final (L2 approve) or a self-approval (B5); not for a return or a discard
+        **Admin approve as is (0087, owner decision 2026-11-12):** `action=admin_approve` is a final approval of the whole batch (`scope=all` only, 422 otherwise) by a System Admin (403 `action_forbidden` for anyone else) that bypasses the check of the L2 holders. It needs a reason in `note` (at least 3 characters, 422) and a valid step-up (401 `step_up_required`). Every open row of a stream batch that has a task is approved with what it has: a row that lacks an actual date or another required value is approved too and flagged `incomplete` (its gaps stay visible in `site_data_gaps`). Each approved task is flagged `admin_override` and audited per row with the reason; KPIs treat it like any other override (flagged and excluded). The count of the flagged rows is `outcome.incomplete`, and `counts.admin_approved` / `counts.incomplete` of the batch. A batch with more rows than `imports.async_rows` is run in the background (202), the same way as the other decisions.
+      x-step-up: when an approval is final (L2 approve), a self-approval (B5) or an admin approve as is; not for a return or a discard
       x-db-path: imp_decide_batch
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -14589,6 +14590,7 @@ components:
         decided: { type: integer }
         approved: { type: integer }
         rejected: { type: integer }
+        incomplete: { type: integer, description: '0087: rows an admin approve as is approved although they lacked data (flagged `incomplete`).' }
         held:
           type: array
           items:
@@ -14621,11 +14623,12 @@ components:
         parts_total: { type: integer, description: '0.15.3, kind `upload`: the batches to stage (a stream of the Master sheet, a register sheet, or the one batch of another template).' }
         parts_done: { type: integer, description: '0.15.3, kind `upload`: the parts staged so far.' }
         chunks: { type: integer, description: '0.15.3, kind `upload`: the transactions done so far.' }
-        action: { type: [string, 'null'], enum: [approve, review, reject, null], description: '0.14.6: the decision of a `decide` run; null for a send.' }
+        action: { type: [string, 'null'], enum: [approve, review, reject, admin_approve, null], description: '0.14.6: the decision of a `decide` run (0087: `admin_approve` too); null for a send.' }
         batch_kind: { type: string, enum: [site, register, stream], description: '0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).' }
         decided: { type: integer, description: '0.14.6: rows decided (a review that passed a level counts too).' }
         held: { type: integer, description: '0.14.6: rows held `pending_previous_approval` (a send) or left by an approve-all because they have no record or task submission yet.' }
         saved: { type: integer, description: '0.14.6: rows saved by a Save Draft / Planning send (Q206).' }
+        incomplete: { type: integer, description: '0087: rows of an admin approve as is that were approved with missing data.' }
         state: { type: string, enum: [running, done, failed], description: '`failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.' }
         rows_total: { type: integer }
         rows_done: { type: integer }
@@ -14694,6 +14697,8 @@ components:
             rejected: { type: integer }
             held: { type: integer, description: Rows held `pending_previous_approval`. }
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
+            admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
+            incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
         upload: { $ref: '#/components/schemas/ImportUploadInfo' }
@@ -15014,7 +15019,7 @@ components:
       type: object
       required: [action, scope]
       properties:
-        action: { type: string, enum: [review, approve, reject, discard], description: 'The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note) or `discard` (a batch that was not sent).' }
+        action: { type: string, enum: [review, approve, reject, discard, admin_approve], description: 'The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note), `discard` (a batch that was not sent) or `admin_approve` (0087: System Admin, approves every open row as it is, flags the rows `admin_override` and the incomplete ones `incomplete`; `scope` must be `all`, `note` is the reason).' }
         scope: { type: string, enum: [all, rows], description: '`all` decides every undecided valid row at once; `rows` uses `rows[]`.' }
         rows:
           type: array
@@ -15025,7 +15030,7 @@ components:
               row_id: { type: string, format: uuid }
               decision: { type: string, enum: [approved, rejected] }
               note: { type: string, maxLength: 1000 }
-        note: { type: string, maxLength: 2000, description: 'Required when `action` is reject.' }
+        note: { type: string, maxLength: 2000, description: 'Required when `action` is reject; the reason (at least 3 characters) when `action` is admin_approve.' }
     # ---------------------------------------------------------- absences and reassignment
     Absence:
       type: object
