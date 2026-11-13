@@ -500,7 +500,7 @@ BEGIN
   PERFORM public.ao_require_stepup();
   IF o.entity = 'task' THEN
     t := public.wf_lock_task(o.task_id, NULL);
-    SELECT k INTO fld FROM jsonb_object_keys(o.before) k LIMIT 1;
+    SELECT jsonb_object_keys(o.before) INTO fld LIMIT 1;
     before_snap := public.wf_snap(o.task_id);
     UPDATE public.admin_overrides SET reverted_at = clock_timestamp(), reverted_by = actor, revert_reason = rs WHERE id = o.id;
     PERFORM public.ao_task_write(o.task_id, fld, nullif(o.before ->> fld, '')::date,
