@@ -109,11 +109,11 @@ Configuration owned by the System Admin (or a delegate)
     - whether a milestone counts in Project Status
   - **Structural changes** (add, remove or reorder a milestone or gate, or move tasks between stages) are published as a new version of the workflow definition, with a reason and step-up MFA.
     - New sites use the new version. For open sites the admin chooses, per site or in bulk, whether to migrate them; the migration preview shows which tasks move and which dates change.
-    - Sites never silently change version.
+    - Sites never silently change version. **Maximum flexibility (owner decision 2026-11-13):** from Settings the admin can add, edit, reorder and deactivate (never hard delete) any task, milestone and gate, move tasks between milestones, and edit every dependency link and gate condition; the structure of a draft is replaced with `PUT /workflow/versions/{version}`, and open sites are migrated (preview with a hash, then migrate) and can be reverted while nothing was approved on them since (migration 0094).
   - Every milestone and gate keeps a stable internal code, so renames never break history, KPIs or reports. Each one also carries its Master export column.
   - The screen warns when a change affects the Master-format export or the parallel-run comparison. During the parallel-run month the warning requires an explicit confirmation.
   - Project Status and the dashboard read the active workflow version per site.
-  - **Freeze during pilot and parallel run (decision B9):** structural changes are blocked from the pilot start to the end of the parallel-run month. Only a System Admin can lift the freeze, with a written reason and step-up MFA, and the lift is audited. Light changes, and new tasks inside an existing stage (B8), stay allowed.
+  - **Freeze during pilot and parallel run (decision B9):** structural changes are blocked from the pilot start to the end of the parallel-run month. Only a System Admin can lift the freeze, with a written reason and step-up MFA, and the lift is audited. Light changes, and new tasks inside an existing stage (B8), stay allowed. **Owner decision 2026-11-13: the pilot is complete and the freeze is lifted.** The setting `workflow.structural_freeze` stays `null` (no window), so nothing is frozen by default; the admin may set a window again later (`admin_set_structural_freeze`), and only the publish checks it.
 - **Roles are fully admin-defined.** The seeded roles are seed data only. The admin can create a new role with:
   - a name (EN/AR) and a description of its duties
   - a default permission profile

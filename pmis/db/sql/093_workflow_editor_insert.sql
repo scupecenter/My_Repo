@@ -1,4 +1,4 @@
--- 0094: workflow editor phase 2 (owner request 2026-11-13): insert a task between existing tasks of a stage with cascade rewiring, and edit the successors of a task.
+-- 0094: workflow editor phase 2 (owner requests 2026-11-13): insert a task between existing tasks with cascade rewiring, edit successors, structural edit of a draft (milestones, gates, task moves) and revert of a site migration.
 --
 -- WHY. Phase 1 (0090) creates a task with its predecessors and replaces the predecessors of one task. The owner's example is a new work step inside Civil Works,
 -- placed among the existing tasks: the tasks that follow it must wait for it, and the old direct link from its predecessor to them may go.
@@ -183,6 +183,195 @@ END $$;
 
 -- pmis_definer reads and moves the task instances of the open sites it adds the task to (wf_open_locked / wf_gate_hold are definer functions of their own)
 GRANT SELECT ON task_instances TO pmis_definer;
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- C. Structural edit of a draft (PUT /workflow/versions/{version}) and the revert of a site migration (owner decisions 2026-11-13)
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Maximum flexibility: milestones and gates are added, renamed, reordered and deactivated (never deleted: history), tasks move between milestones, gate conditions and
+-- SLA are edited, all in a draft that is published as a new version (reason, step-up and the typed confirmation of the publish stay). The list order is the order.
+-- A milestone or gate that is not in the list is deactivated. B9 (the freeze of 0090) stays a setting that is off until an admin sets a window; with no setting nothing
+-- is frozen, and the owner declared the pilot complete on 2026-11-13.
+GRANT INSERT ON stage_definitions, phase_gate_rules TO pmis_definer;
+
+CREATE OR REPLACE FUNCTION wfe_structure_snapshot(p_wf uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT jsonb_build_object(
+    'milestones', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', code, 'is_active', is_active, 'name_en', name_en, 'name_ar', name_ar, 'counts_in_project_status', counts_in_project_status) ORDER BY seq, code), '[]'::jsonb)
+                     FROM public.stage_definitions WHERE workflow_id = p_wf),
+    'gates', (SELECT coalesce(jsonb_agg(jsonb_build_object('code', link_code, 'is_active', is_active, 'from', from_code, 'to', to_code, 'name_en', name_en, 'name_ar', name_ar,
+                                                           'conditions', conditions, 'sla_min_wd', min_wd, 'sla_max_wd', max_wd) ORDER BY seq, link_code), '[]'::jsonb)
+                FROM public.phase_gate_rules WHERE workflow_id = p_wf),
+    'task_stage', (SELECT coalesce(jsonb_object_agg(td.code, st.code), '{}'::jsonb) FROM public.task_definitions td JOIN public.stage_definitions st ON st.id = td.stage_id WHERE td.workflow_id = p_wf))
+$$;
+
+CREATE OR REPLACE FUNCTION admin_wf_structure_replace(p_version integer, p_etag integer, p_structure jsonb, p_reason text, p_confirm text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE w public.workflow_definitions%ROWTYPE; ms jsonb; gs jsonb; mv jsonb; e jsonb; o integer; c text; ex public.stage_definitions%ROWTYPE; gx public.phase_gate_rules%ROWTYPE;
+  mcodes text[] := ARRAY[]::text[]; gcodes text[] := ARRAY[]::text[]; act boolean; before_ jsonb; after_ jsonb; errs jsonb; nm_en text; nm_ar text; fm text; tm text; mn integer; mx integer; cond jsonb;
+  tid uuid; sid uuid; act_by text;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'edit');
+  PERFORM public.calc_require_reason(p_reason);
+  w := public.wfe_lock(p_version, p_etag);
+  IF w.status <> 'draft' THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Structural changes are made in a draft version: copy the published version to a draft first.')); END IF;
+  IF jsonb_typeof(p_structure) <> 'object' OR jsonb_typeof(p_structure -> 'milestones') <> 'array' OR jsonb_typeof(p_structure -> 'gates') <> 'array' THEN
+    PERFORM public.wfe_err1('/milestones', 'required', 'Send the complete list of milestones and of gates.');
+  END IF;
+  IF jsonb_array_length(p_structure -> 'milestones') > 60 OR jsonb_array_length(p_structure -> 'gates') > 80 THEN PERFORM public.wfe_err1('/milestones', 'too_many_rows', 'Too many milestones or gates.'); END IF;
+  ms := p_structure -> 'milestones';
+  gs := p_structure -> 'gates';
+  before_ := public.wfe_structure_snapshot(w.id);
+  UPDATE public.stage_definitions SET seq = seq + 100000 WHERE workflow_id = w.id;
+
+  FOR e, o IN SELECT x, (n)::integer FROM jsonb_array_elements(ms) WITH ORDINALITY AS t(x, n) LOOP
+    c := e ->> 'code';
+    IF c IS NULL OR c !~ '^[A-Z][A-Z0-9_-]{0,19}$' THEN PERFORM public.wfe_err1('/milestones/' || (o - 1) || '/code', 'invalid', 'A code of 1 to 20 characters: capital letters, digits, - and _, starting with a letter.'); END IF;
+    IF c = ANY (mcodes) THEN PERFORM public.wfe_err1('/milestones/' || (o - 1) || '/code', 'duplicate', 'The milestone ' || c || ' is listed twice.'); END IF;
+    mcodes := mcodes || c;
+    act := coalesce((e ->> 'is_active')::boolean, true);
+    SELECT * INTO ex FROM public.stage_definitions WHERE workflow_id = w.id AND code = c;
+    nm_en := CASE WHEN e ? 'name_en' THEN btrim(e ->> 'name_en') WHEN FOUND THEN ex.name_en END;
+    nm_ar := CASE WHEN e ? 'name_ar' THEN nullif(btrim(coalesce(e ->> 'name_ar', '')), '') WHEN FOUND THEN ex.name_ar END;
+    IF char_length(coalesce(nm_en, '')) NOT BETWEEN 1 AND 200 THEN PERFORM public.wfe_err1('/milestones/' || (o - 1) || '/name_en', 'required', 'The English name is required (up to 200 characters).'); END IF;
+    IF nm_ar IS NOT NULL AND char_length(nm_ar) > 200 THEN PERFORM public.wfe_err1('/milestones/' || (o - 1) || '/name_ar', 'too_long', 'Up to 200 characters.'); END IF;
+    IF ex.id IS NOT NULL THEN
+      UPDATE public.stage_definitions SET seq = o, name_en = nm_en, milestone_name = nm_en, name_ar = nm_ar, is_active = act,
+             counts_in_project_status = coalesce((e ->> 'counts_in_project_status')::boolean, ex.counts_in_project_status) WHERE id = ex.id;
+    ELSE
+      INSERT INTO public.stage_definitions (workflow_id, code, seq, name_en, name_ar, milestone_name, counts_in_project_status, approval_levels, is_active)
+      VALUES (w.id, c, o, nm_en, nm_ar, nm_en, coalesce((e ->> 'counts_in_project_status')::boolean, true), 2, act);
+    END IF;
+  END LOOP;
+  IF cardinality(mcodes) = 0 THEN PERFORM public.wfe_err1('/milestones', 'required', 'A version needs at least one milestone.'); END IF;
+  SELECT string_agg(st.code, ', ' ORDER BY st.code) INTO c FROM public.stage_definitions st WHERE st.workflow_id = w.id AND NOT (st.code = ANY (mcodes));
+  IF c IS NOT NULL THEN PERFORM public.wfe_err1('/milestones', 'missing', 'List every milestone of the version (missing: ' || c || '). To remove one, send it with is_active false.'); END IF;
+
+  FOR mv IN SELECT x FROM jsonb_array_elements(coalesce(p_structure -> 'task_moves', '[]'::jsonb)) AS t(x) LOOP
+    PERFORM public.wfe_require('task_definitions', 'edit');
+    SELECT id INTO tid FROM public.task_definitions WHERE workflow_id = w.id AND code = mv ->> 'task_code';
+    IF tid IS NULL THEN PERFORM public.wfe_err1('/task_moves', 'unknown', 'The task ' || coalesce(mv ->> 'task_code', '?') || ' is not a task of this version.'); END IF;
+    SELECT id INTO sid FROM public.stage_definitions WHERE workflow_id = w.id AND code = mv ->> 'stage_code' AND is_active;
+    IF sid IS NULL THEN PERFORM public.wfe_err1('/task_moves', 'unknown_stage', 'The milestone ' || coalesce(mv ->> 'stage_code', '?') || ' does not exist or is inactive.'); END IF;
+    UPDATE public.task_definitions SET stage_id = sid, sort_order = coalesce((SELECT max(sort_order) FROM public.task_definitions WHERE stage_id = sid), 0) + 10,
+           reason = btrim(p_reason), changed_by = public.app_actor()
+     WHERE id = tid AND stage_id <> sid;
+  END LOOP;
+  SELECT string_agg(td.code, ', ' ORDER BY td.code) INTO c FROM public.task_definitions td JOIN public.stage_definitions st ON st.id = td.stage_id
+   WHERE st.workflow_id = w.id AND NOT st.is_active AND td.is_active;
+  IF c IS NOT NULL THEN PERFORM public.wfe_err1('/milestones', 'has_active_tasks', 'Active tasks (' || c || ') are in an inactive milestone: move them to another milestone first (task_moves) or deactivate them.'); END IF;
+
+  FOR e, o IN SELECT x, (n)::integer FROM jsonb_array_elements(gs) WITH ORDINALITY AS t(x, n) LOOP
+    c := e ->> 'code';
+    IF c IS NULL OR c !~ '^[A-Z][A-Z0-9_-]{0,19}$' THEN PERFORM public.wfe_err1('/gates/' || (o - 1) || '/code', 'invalid', 'A code of 1 to 20 characters: capital letters, digits, - and _, starting with a letter.'); END IF;
+    IF c = ANY (gcodes) THEN PERFORM public.wfe_err1('/gates/' || (o - 1) || '/code', 'duplicate', 'The gate ' || c || ' is listed twice.'); END IF;
+    gcodes := gcodes || c;
+    act := coalesce((e ->> 'is_active')::boolean, true);
+    SELECT * INTO gx FROM public.phase_gate_rules WHERE workflow_id = w.id AND link_code = c;
+    nm_en := CASE WHEN e ? 'name_en' THEN btrim(e ->> 'name_en') WHEN FOUND THEN gx.name_en END;
+    nm_ar := CASE WHEN e ? 'name_ar' THEN nullif(btrim(coalesce(e ->> 'name_ar', '')), '') WHEN FOUND THEN gx.name_ar END;
+    fm := CASE WHEN e ? 'from_milestone' THEN e ->> 'from_milestone' WHEN FOUND THEN gx.from_code END;
+    tm := CASE WHEN e ? 'to_milestone' THEN e ->> 'to_milestone' WHEN FOUND THEN gx.to_code END;
+    mn := CASE WHEN e ? 'sla_min_wd' THEN (e ->> 'sla_min_wd')::integer WHEN FOUND THEN gx.min_wd ELSE 0 END;
+    mx := CASE WHEN e ? 'sla_max_wd' THEN (e ->> 'sla_max_wd')::integer WHEN FOUND THEN gx.max_wd ELSE 0 END;
+    cond := CASE WHEN e ? 'conditions' THEN e -> 'conditions' WHEN FOUND THEN coalesce(gx.conditions, '[]'::jsonb) ELSE '[]'::jsonb END;
+    IF char_length(coalesce(nm_en, '')) NOT BETWEEN 1 AND 200 THEN PERFORM public.wfe_err1('/gates/' || (o - 1) || '/name_en', 'required', 'The English name is required (up to 200 characters).'); END IF;
+    IF nm_ar IS NOT NULL AND char_length(nm_ar) > 200 THEN PERFORM public.wfe_err1('/gates/' || (o - 1) || '/name_ar', 'too_long', 'Up to 200 characters.'); END IF;
+    IF fm IS NULL OR tm IS NULL OR fm = tm OR NOT (fm = ANY (mcodes)) OR NOT (tm = ANY (mcodes)) THEN
+      PERFORM public.wfe_err1('/gates/' || (o - 1) || '/from_milestone', 'invalid', 'A gate sits between two different milestones of the version.');
+    END IF;
+    IF act AND (NOT EXISTS (SELECT 1 FROM public.stage_definitions WHERE workflow_id = w.id AND code = fm AND is_active) OR NOT EXISTS (SELECT 1 FROM public.stage_definitions WHERE workflow_id = w.id AND code = tm AND is_active)) THEN
+      PERFORM public.wfe_err1('/gates/' || (o - 1) || '/from_milestone', 'inactive', 'An active gate needs two active milestones.');
+    END IF;
+    IF mn < 0 OR mx < mn THEN PERFORM public.wfe_err1('/gates/' || (o - 1) || '/sla_max_wd', 'invalid', 'The maximum working days cannot be below the minimum, and neither can be negative.'); END IF;
+    errs := public.wfe_gate_conditions_ok(cond);
+    IF jsonb_array_length(errs) > 0 THEN PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', errs)); END IF;
+    IF gx.id IS NOT NULL THEN
+      UPDATE public.phase_gate_rules SET seq = o, name_en = nm_en, name_ar = nm_ar, from_code = fm, to_code = tm, conditions = cond, min_wd = mn, max_wd = mx, is_active = act WHERE id = gx.id;
+    ELSE
+      INSERT INTO public.phase_gate_rules (workflow_id, link_code, seq, name_en, name_ar, from_code, to_code, conditions, min_wd, max_wd, is_active)
+      VALUES (w.id, c, o, nm_en, nm_ar, fm, tm, cond, mn, mx, act);
+    END IF;
+  END LOOP;
+  UPDATE public.phase_gate_rules SET is_active = false WHERE workflow_id = w.id AND NOT (link_code = ANY (gcodes)) AND is_active;
+
+  after_ := public.wfe_structure_snapshot(w.id);
+  IF after_ = before_ THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Nothing changes.')); END IF;
+  PERFORM public.wfe_need_master_confirm(p_confirm);
+  PERFORM public.wfe_bump(w.id);
+  PERFORM public.wfe_audit('workflow_structure_replace', 'workflow_definition', w.version::text, before_ || jsonb_build_object('version', w.version),
+    after_ || jsonb_build_object('version', w.version, 'status', w.status), p_reason);
+  RETURN public.wfe_version_json(w.id);
+END $$;
+
+-- A migration can be reverted while the site is still on the version it moved to, nothing moved it since, the migration retired no task (those became N/A and their
+-- previous state is not kept) and no task was approved on the site after the move.
+CREATE OR REPLACE FUNCTION wfe_migration_revertible(p_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+  SELECT m.reverted_at IS NULL AND s.workflow_version_id = m.to_version_id
+     AND NOT EXISTS (SELECT 1 FROM public.site_workflow_migrations m2 WHERE m2.site_id = m.site_id AND m2.migrated_at > m.migrated_at)
+     AND coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(m.summary -> 'tasks_retired') = 'array' THEN m.summary -> 'tasks_retired' END), 0) = 0
+     AND NOT EXISTS (SELECT 1 FROM public.task_instances ti WHERE ti.site_id = m.site_id AND ti.state = 'approved' AND ti.updated_at > m.migrated_at)
+    FROM public.site_workflow_migrations m JOIN public.sites s ON s.id = m.site_id WHERE m.id = p_id
+$$;
+
+CREATE OR REPLACE FUNCTION admin_wf_revert_migration(p_id uuid, p_reason text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE m public.site_workflow_migrations%ROWTYPE; rf int[]; fv integer; tv integer; sc text;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'administer');
+  PERFORM public.calc_require_reason(p_reason);
+  SELECT * INTO m FROM public.site_workflow_migrations WHERE id = p_id FOR UPDATE;
+  IF NOT FOUND THEN PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The migration does not exist.')); END IF;
+  rf := public.app_actor_region_filter('workflow_versions', 'administer');
+  IF rf IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.sites WHERE id = m.site_id AND region_id = ANY (rf)) THEN
+    RAISE EXCEPTION 'this site is outside your delegated regions' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  IF NOT public.wfe_migration_revertible(p_id) THEN
+    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'This migration cannot be reverted: it was reverted already, the site moved again, the migration retired tasks, or a task was approved on the site since.'));
+  END IF;
+  PERFORM public.admin_migrate_sites_to_workflow(ARRAY[m.site_id], m.from_version_id, p_reason);
+  UPDATE public.site_workflow_migrations SET reverted_at = now() WHERE id = p_id;
+  SELECT version INTO fv FROM public.workflow_definitions WHERE id = m.from_version_id;
+  SELECT version INTO tv FROM public.workflow_definitions WHERE id = m.to_version_id;
+  SELECT site_code INTO sc FROM public.sites WHERE id = m.site_id;
+  PERFORM public.wfe_audit('workflow_migration_revert', 'site', sc, jsonb_build_object('version', tv), jsonb_build_object('version', fv, 'migration_id', p_id), p_reason);
+  RETURN jsonb_build_object('id', p_id, 'site_id', m.site_id, 'site_code', sc, 'reverted_to_version', fv);
+END $$;
+
+CREATE OR REPLACE FUNCTION wf_site_migrations_json(p_site uuid, p_to_version integer, p_limit integer, p_offset integer) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE rf int[]; tot integer; items jsonb;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'administer');
+  rf := public.app_actor_region_filter('workflow_versions', 'administer');
+  SELECT count(*) INTO tot FROM public.site_workflow_migrations m JOIN public.sites s ON s.id = m.site_id JOIN public.workflow_definitions tv ON tv.id = m.to_version_id
+   WHERE (p_site IS NULL OR m.site_id = p_site) AND (p_to_version IS NULL OR tv.version = p_to_version) AND (rf IS NULL OR s.region_id = ANY (rf));
+  SELECT coalesce(jsonb_agg(x ORDER BY (x ->> 'migrated_at') DESC, x ->> 'id'), '[]'::jsonb) INTO items FROM (
+    SELECT jsonb_build_object('id', m.id, 'site_id', m.site_id, 'site_code', s.site_code, 'from_version', fv.version, 'to_version', tv.version, 'reason', m.reason,
+             'migrated_by', public.wfe_user_ref(m.migrated_by), 'migrated_at', m.migrated_at, 'date_changes', '[]'::jsonb, 'reverted_at', m.reverted_at,
+             'revertible', public.wfe_migration_revertible(m.id)) AS x
+      FROM public.site_workflow_migrations m JOIN public.sites s ON s.id = m.site_id
+      JOIN public.workflow_definitions fv ON fv.id = m.from_version_id JOIN public.workflow_definitions tv ON tv.id = m.to_version_id
+     WHERE (p_site IS NULL OR m.site_id = p_site) AND (p_to_version IS NULL OR tv.version = p_to_version) AND (rf IS NULL OR s.region_id = ANY (rf))
+     ORDER BY m.migrated_at DESC, m.id LIMIT greatest(1, least(coalesce(p_limit, 50), 200)) OFFSET greatest(0, coalesce(p_offset, 0))) q;
+  RETURN jsonb_build_object('items', items, 'total', tot);
+END $$;
+
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['wfe_structure_snapshot(uuid)', 'admin_wf_structure_replace(integer,integer,jsonb,text,text)', 'wfe_migration_revertible(uuid)', 'admin_wf_revert_migration(uuid,text)',
+                           'wf_site_migrations_json(uuid,integer,integer,integer)'] LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    FOREACH f IN ARRAY ARRAY['admin_wf_structure_replace(integer,integer,jsonb,text,text)', 'admin_wf_revert_migration(uuid,text)', 'wf_site_migrations_json(uuid,integer,integer,integer)'] LOOP
+      EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_app', f);
+    END LOOP;
+  END IF;
+END $$;
 
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('workflow_editor_insert_applied', 'workflow', NULL,

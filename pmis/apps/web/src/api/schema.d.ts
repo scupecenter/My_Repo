@@ -2720,7 +2720,9 @@ export interface paths {
         get: operations["getWorkflowVersion"];
         /**
          * Replace the structure of a draft (add, remove, reorder milestones and gates; move tasks)
-         * @description Only for `status = draft`. Codes of existing nodes are kept; new nodes get new codes that are never reused.
+         * @description Migration 0094 (owner decisions 2026-11-13). Only for `status = draft` (409 `invalid_transition` otherwise). Needs `workflow_versions.edit` for all regions (403), a reason, `If-Match`
+         *     and a step-up. Field errors are 422 on `/milestones/{i}/...`, `/gates/{i}/...` or `/task_moves` (`missing`, `has_active_tasks`, `duplicate`, `invalid`, `inactive`, `unknown`).
+         *     Codes are never reused. The structural freeze (B9) is off unless an admin set a window; the publish checks it.
          */
         put: operations["replaceWorkflowDraft"];
         post?: never;
@@ -2964,7 +2966,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Migrate the previewed sites (job, one transaction per site) */
+        /**
+         * Migrate the previewed sites to this published version (one transaction)
+         * @description Migration 0094 wires the doors of 0090. The preview hash must still match (422 `stale_preview`); `workflow_versions.administer` for all or the delegated regions; reason and step-up. Sites never move silently.
+         */
         post: operations["migrateSites"];
         delete?: never;
         options?: never;
@@ -9621,25 +9626,37 @@ export interface components {
             has_documents?: boolean;
             task_version?: number;
         };
+        /** @description The complete structure of a draft (migration 0094). The list order is the order. A milestone or gate that is not in its list is refused (milestones: 422 `missing`) or deactivated (gates); history is never deleted. */
         WorkflowStructure: {
+            /** @description Every milestone of the version, in the new order. A code that does not exist yet adds a milestone (name_en required). `is_active` false removes (deactivates) one. */
             milestones: {
-                /** @description Omit for a new milestone; a new code is assigned. */
-                code?: string;
-                name_en: string;
-                name_ar?: string;
-                master_export_column?: string | null;
+                code: string;
+                name_en?: string;
+                name_ar?: string | null;
+                /** @default true */
+                is_active: boolean;
                 counts_in_project_status?: boolean;
             }[];
+            /** @description The gates, in the new order; a new code adds one (name_en, from_milestone and to_milestone required); an existing gate that is omitted is deactivated. */
             gates: {
-                code?: string;
-                from_milestone: string;
-                to_milestone: string;
-                name_en: string;
-                name_ar?: string;
+                code: string;
+                from_milestone?: string;
+                to_milestone?: string;
+                name_en?: string;
+                name_ar?: string | null;
+                /** @default true */
+                is_active: boolean;
                 conditions?: components["schemas"]["GateCondition"][];
-                master_export_column?: string | null;
+                sla_min_wd?: number;
+                sla_max_wd?: number;
             }[];
-            placements: components["schemas"]["TaskPlacement"][];
+            /** @description Tasks that move to another milestone (placed last in it). */
+            task_moves?: {
+                task_code: string;
+                stage_code: string;
+            }[];
+            reason: components["schemas"]["Reason"];
+            confirm_master_impact?: string;
         };
         WorkflowVersion: components["schemas"]["WorkflowVersionSummary"] & {
             milestones: components["schemas"]["WorkflowMilestone"][];
@@ -20509,9 +20526,7 @@ export interface operations {
     migrateSites: {
         parameters: {
             query?: never;
-            header?: {
-                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-            };
+            header?: never;
             path: {
                 version: components["parameters"]["WorkflowVersionNo"];
             };
@@ -20528,19 +20543,25 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Job started. */
-            202: {
+            /** @description Migrated. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Job"];
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        sites_migrated: number;
+                        to_version: number;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSiteMigrations: {
@@ -20590,19 +20611,27 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Reverted. */
+            /** @description Reverted (the site is moved back to the previous version). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SiteMigration"];
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        site_id: string;
+                        site_code?: string;
+                        reverted_to_version: number;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listAuditLog: {

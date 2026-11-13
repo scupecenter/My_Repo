@@ -48,13 +48,25 @@ const insertPreviewBody = z.object({
 }).strict();
 const taskInsertBody = z.object({ ...insertFields, add_to_open_sites: z.boolean().optional(), reason, confirm_master_impact: confirmImpact }).strict();
 const successorsBody = z.object({ successors: z.array(code).max(100), reason }).strict();
-const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
-const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 const selection = z.object({
   site_ids: z.array(uuidSchema).max(1000).optional(),
   filter: z.object({ region_id: z.array(z.number().int()).optional(), from_version: z.number().int().optional(), overall_status: z.array(z.string()).optional() }).strict().optional(),
 }).strict();
 
+const structureBody = z.object({
+  milestones: z.array(z.object({ code, name_en: nameEn.optional(), name_ar: nameAr.optional(), is_active: z.boolean().optional(), counts_in_project_status: z.boolean().optional() }).strict()).max(60),
+  gates: z.array(z.object({
+    code, name_en: nameEn.optional(), name_ar: nameAr.optional(), from_milestone: code.optional(), to_milestone: code.optional(), is_active: z.boolean().optional(),
+    conditions: z.array(z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional() }).strict()).max(30).optional(),
+    sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
+  }).strict()).max(80),
+  task_moves: z.array(z.object({ task_code: code, stage_code: code }).strict()).max(500).optional(),
+  reason, confirm_master_impact: confirmImpact,
+}).strict();
+const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selection, reason, confirm_master_impact: confirmImpact }).strict();
+const revertBody = z.object({ reason }).strict();
+const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
+const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 type Json = Record<string, unknown>;
 
 /**
@@ -146,6 +158,31 @@ export class WorkflowEditorService {
     const b = parse(successorsBody, raw);
     const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_task_successors(${version}::int, ${etag}::int, ${task}::text, ${b.successors}::text[], ${b.reason}::text) AS r`);
+  }
+
+  /** The structural edit of a draft: the complete list of milestones and gates (the order is the list order), and tasks moved between milestones. */
+  async replaceStructure(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(structureBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    const { reason: why, confirm_master_impact: confirm, ...structure } = b;
+    return this.one(Prisma.sql`SELECT admin_wf_structure_replace(${version}::int, ${etag}::int, ${JSON.stringify(structure)}::jsonb, ${why}::text, ${confirm ?? null}::text) AS r`);
+  }
+
+  /** The move of the previewed sites: the hash of the preview must still match (422 stale_preview otherwise). One transaction. */
+  async migrate(auth: AuthContext, version: number, raw: unknown): Promise<Json> {
+    const b = parse(migrateBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_migrate_sites(admin_wf_migration_sites(${JSON.stringify(b.selection)}::jsonb, ${version}::int), ${version}::int, ${b.preview_hash}::text,
+      ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
+  }
+
+  async revertMigration(auth: AuthContext, id: string, raw: unknown): Promise<Json> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound('The migration does not exist.');
+    const b = parse(revertBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_revert_migration(${id}::uuid, ${b.reason}::text) AS r`);
   }
 
   async reorder(auth: AuthContext, version: number, stage: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

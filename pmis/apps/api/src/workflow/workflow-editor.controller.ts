@@ -33,6 +33,23 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.get(version));
   }
 
+  @Put('versions/:version')
+  async replaceStructure(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.replaceStructure(auth, version, ifMatch, body));
+  }
+
+  @Post('versions/:version/migrations')
+  @HttpCode(200)
+  migrate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.migrate(auth, version, body);
+  }
+
+  @Post('site-migrations/:id/revert')
+  @HttpCode(200)
+  revert(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Json> {
+    return this.editor.revertMigration(auth, id, body);
+  }
+
   @Post('versions/:version/publish')
   @HttpCode(200)
   async publish(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {

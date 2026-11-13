@@ -322,3 +322,100 @@ describe('migration preview and log', () => {
     expect((await plain.api.call('get', '/workflow/site-migrations')).status).toBe(403);
   });
 });
+
+describe('phase 2: structural edit of a draft, publish with the default settings, site migration and revert (migration 0094)', () => {
+  let d2 = 0;
+  let first = '';
+  let moved = '';
+  let siteId = '';
+  let migrationId = '';
+  const structure = (v: { milestones: { code: string; name_en: string; name_ar?: string | null; is_active: boolean }[]; gates: { code: string; from_milestone: string; to_milestone: string; name_en: string; is_active: boolean }[] }, over: Record<string, unknown> = {}): Record<string, unknown> => {
+    const ms = v.milestones.map((m) => ({ code: m.code, name_en: m.name_en, name_ar: m.name_ar ?? null, is_active: m.is_active }));
+    ms.splice(1, 0, { code: 'ZM1', name_en: 'Extra milestone', name_ar: 'معلم إضافي', is_active: true });
+    const gs = v.gates.map((g) => ({ code: g.code, from_milestone: g.from_milestone, to_milestone: g.to_milestone, name_en: g.name_en, is_active: g.is_active }));
+    gs.push({ code: 'ZG1', from_milestone: v.milestones[0]!.code, to_milestone: 'ZM1', name_en: 'Gate to the extra milestone', is_active: true, conditions: [{ type: 'task', ref: moved }], sla_min_wd: 1, sla_max_wd: 2 } as never);
+    return { milestones: ms, gates: gs, task_moves: [{ task_code: moved, stage_code: 'ZM1' }], reason: REASON, ...over };
+  };
+
+  it('has no structural freeze by default (the pilot is complete, owner decision 2026-11-13)', async () => {
+    const r = await db.query(`SELECT value, wf_freeze_state() ->> 'active' AS active FROM settings WHERE key = 'workflow.structural_freeze'`);
+    expect(r.rows[0].value).toBeNull();
+    expect(r.rows[0].active).toBe('false');
+  });
+
+  it('refuses a structural edit to a non-admin (403) and on a published version (409)', async () => {
+    const pub = await current(admin.api, draft);
+    const body = { milestones: pub.body.milestones.map((m) => ({ code: m.code })), gates: [], reason: REASON };
+    expect((await plain.api.call('put', `${BASE}/${draft}`, body, hdr(pub.tag))).status).toBe(403);
+    expect((await admin.api.call('put', `${BASE}/${draft}`, body, hdr(pub.tag))).status).toBe(409);
+    const created = await admin.api.call('post', BASE, { parent_version: draft, reason: REASON });
+    expect(created.status).toBe(201);
+    d2 = created.body.version;
+  });
+
+  it('adds a milestone and a gate with conditions, reorders, moves a task, and refuses bad structures as field errors', async () => {
+    const v = await current(admin.api, d2);
+    first = v.body.milestones[0]!.code;
+    moved = v.body.placements.find((p) => p.is_active && p.stage_code !== first && !v.body.placements.some((q) => q.is_active && q.predecessors.includes(p.task_code)))?.task_code
+      ?? v.body.placements.find((p) => p.is_active)!.task_code;
+    const full = v.body as unknown as Parameters<typeof structure>[0];
+    const missing = await admin.api.call('put', `${BASE}/${d2}`, { milestones: v.body.milestones.slice(1).map((m) => ({ code: m.code })), gates: [], reason: REASON }, hdr(v.tag));
+    expect(missing.status).toBe(422);
+    expect(missing.body.errors[0]).toMatchObject({ path: '/milestones', code: 'missing' });
+    const dead = await admin.api.call('put', `${BASE}/${d2}`, { milestones: v.body.milestones.map((m, i) => ({ code: m.code, is_active: i !== 0 })), gates: [], reason: REASON }, hdr(v.tag));
+    expect(dead.status).toBe(422);
+    expect(dead.body.errors[0].code).toBe('has_active_tasks');
+    const badGate = await admin.api.call('put', `${BASE}/${d2}`, structure(full, { gates: [{ code: 'ZG9', name_en: 'x', from_milestone: first, to_milestone: 'NOPE' }] }), hdr(v.tag));
+    expect(badGate.status).toBe(422);
+    expect(badGate.body.errors[0].path).toBe('/gates/0/from_milestone');
+    expect((await admin.api.call('put', `${BASE}/${d2}`, structure(full), hdr('"9999"'))).status).toBe(412);
+    expect((await noStep.api.call('put', `${BASE}/${d2}`, structure(full), hdr(v.tag))).status).toBe(401);
+    const ok = await admin.api.call('put', `${BASE}/${d2}`, structure(full), hdr(v.tag));
+    expect(ok.status).toBe(200);
+    expect(ok.body.milestones[1]).toMatchObject({ code: 'ZM1', name_en: 'Extra milestone', is_active: true });
+    expect(ok.body.milestones.map((m: { seq: number }) => m.seq)).toEqual(ok.body.milestones.map((_: unknown, i: number) => i + 1));
+    expect(ok.body.placements.find((p: Placement) => p.task_code === moved).stage_code).toBe('ZM1');
+    expect(ok.body.gates.find((g: { code: string }) => g.code === 'ZG1')).toMatchObject({ from_milestone: first, to_milestone: 'ZM1', sla_max_wd: 2, conditions: [{ type: 'task', ref: moved }] });
+    const audit = await db.query(`SELECT before, after FROM audit_log WHERE action = 'workflow_structure_replace' AND entity_id = $1`, [String(d2)]);
+    expect(audit.rows[0].after.task_stage[moved]).toBe('ZM1');
+    expect(audit.rows[0].before.task_stage[moved]).not.toBe('ZM1');
+  });
+
+  it('publishes the structural draft with the default settings (no freeze blocks it)', async () => {
+    const v = await current(admin.api, d2);
+    const r = await admin.api.call('post', `${BASE}/${d2}/publish`, { reason: REASON, confirm_text: `v${d2}` }, hdr(v.tag));
+    expect(r.status).toBe(200);
+    expect(r.body.status).toBe('published');
+  });
+
+  it('previews and migrates a site to the new version, lists the log, reverts it, and refuses a second revert', async () => {
+    siteId = (await makeSite(db, 5)).id;
+    expect((await plain.api.call('post', `${BASE}/${d2}/migrations`, { preview_hash: 'x'.repeat(10), selection: { site_ids: [siteId] }, reason: REASON })).status).toBe(403);
+    const pv = await admin.api.call('post', `${BASE}/${d2}/migration-preview`, { site_ids: [siteId] });
+    expect(pv.status).toBe(200);
+    expect(pv.body.sites).toHaveLength(1);
+    const stale = await admin.api.call('post', `${BASE}/${d2}/migrations`, { preview_hash: 'f'.repeat(64), selection: { site_ids: [siteId] }, reason: REASON });
+    expect(stale.status).toBe(409);
+    expect(stale.body.code).toBe('stale_preview');
+    expect((await noStep.api.call('post', `${BASE}/${d2}/migrations`, { preview_hash: pv.body.preview_hash, selection: { site_ids: [siteId] }, reason: REASON })).status).toBe(401);
+    const m = await admin.api.call('post', `${BASE}/${d2}/migrations`, { preview_hash: pv.body.preview_hash, selection: { site_ids: [siteId] }, reason: REASON });
+    expect(m.status).toBe(200);
+    expect(m.body).toMatchObject({ sites_migrated: 1, to_version: d2 });
+    const row = await db.query('SELECT wd.version FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id WHERE s.id = $1', [siteId]);
+    expect(row.rows[0].version).toBe(d2);
+    const log = await admin.api.call('get', `/workflow/site-migrations?site_id=${siteId}`);
+    expect(log.body.items[0]).toMatchObject({ to_version: d2, revertible: true, reverted_at: null });
+    migrationId = log.body.items[0].id;
+    expect((await plain.api.call('post', `/workflow/site-migrations/${migrationId}/revert`, { reason: REASON })).status).toBe(403);
+    expect((await noStep.api.call('post', `/workflow/site-migrations/${migrationId}/revert`, { reason: REASON })).status).toBe(401);
+    const rev = await admin.api.call('post', `/workflow/site-migrations/${migrationId}/revert`, { reason: REASON });
+    expect(rev.status).toBe(200);
+    expect(rev.body).toMatchObject({ site_id: siteId, reverted_to_version: 1 });
+    const back = await db.query('SELECT wd.version FROM sites s JOIN workflow_definitions wd ON wd.id = s.workflow_version_id WHERE s.id = $1', [siteId]);
+    expect(back.rows[0].version).toBe(1);
+    expect((await admin.api.call('post', `/workflow/site-migrations/${migrationId}/revert`, { reason: REASON })).status).toBe(409);
+    const after = await admin.api.call('get', `/workflow/site-migrations?site_id=${siteId}`);
+    expect(after.body.items[0]).toMatchObject({ revertible: false });
+    expect(after.body.items[0].reverted_at).not.toBeNull();
+  });
+});
