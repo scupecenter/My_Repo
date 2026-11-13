@@ -14,7 +14,8 @@ export type ErrorCode =
   | 'self_approval_forbidden' | 'document_rule_pending' | 'file_pending_scan'
   | 'list_not_configured'
   | 'email_not_verified'
-  | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing';
+  | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
+  | 'invitation_invalid';
 
 export interface FieldError {
   path: string;
@@ -60,6 +61,7 @@ const TITLES: Record<string, string> = {
   enrol_code_expired: 'Enrolment code expired',
   password_change_required: 'Password change required',
   weak_password: 'Password does not meet the policy',
+  invitation_invalid: 'This invitation link does not work',
   internal_error: 'Internal error',
   template_rejected: 'The file is not an approved template',
   file_too_large: 'The file is too large',

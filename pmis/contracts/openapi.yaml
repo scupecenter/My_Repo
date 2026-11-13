@@ -137,6 +137,8 @@ tags:
     description: The caller's profile, effective permissions and My Work.
   - name: users
     description: Registered employees and their status.
+  - name: invitations
+    description: "Public pages of an invitation link (no session): what the link shows and choosing a password."
   - name: assignments
     description: Many-to-many role assignments, by role or by person, in bulk (AU-10..AU-13).
   - name: roles
@@ -1442,6 +1444,193 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations:
+    get:
+      tags: [users]
+      operationId: listUserInvitations
+      summary: Invitations to join (pending, accepted, revoked, expired), newest first
+      description: |
+        Needs `create` on `users` (System Admin or a delegation, all regions). `status` is the effective one: a pending invitation past its time reads `expired`.
+        The link itself is never returned: it exists only in the mail.
+      x-db-path: inv_read
+      parameters:
+        - { name: q, in: query, description: 'Search name or email.', schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/UserInvitationStatus' } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Invitations.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/UserInvitation' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      operationId: createUserInvitation
+      summary: Invite a new person by email, with the role and properties chosen now
+      description: |
+        Needs `create` on `users` (all regions). The person gets a mail with a link (`{{app_url}}/invite/<token>`) that works once, for `invitations.expiry_hours`
+        hours (default 72). Opening it, they choose a password and the account is created with everything chosen here: role assignments (permission level, team,
+        regions, modules, profiles, validity), department, direct manager, groups and whether two-factor is enforced. Nothing exists until they accept.
+
+        **Nobody invites with wider rights than their own.** The same ceilings as assigning apply to the inviter, checked now and again at each resend:
+        `assignments.create` for any role row (no admin level, no privileged role, only the regions, modules, profiles and end date the inviter holds),
+        `users.edit` (all regions) for `manager_id` and `department_id`, `groups.edit` (all regions) for `group_ids` (never the admin group or a delegation target
+        for a delegate), `users.administer` for `require_two_factor`. Refused with 403 `action_forbidden`. An invitation that grants admin-level rights, a
+        privileged role or a privileged group (`elevated`) needs a fresh step-up (401 `step_up_required`) and only a System Admin may stand behind it.
+
+        Two-factor: an invitation never carries an enrolment code. When `require_two_factor` is true the account is created with two-factor on, enforced and
+        not enrolled, and an admin issues the one-time code afterwards (`POST /users/{user_id}/two-factor/enrol-code`).
+
+        Email, employee ID and phone must be unused by an account (409 `duplicate`, `errors[]` names the field); only one pending invitation per email.
+        At most 20 mails to addresses per person and hour (the mail service limit).
+      x-db-path: inv_create
+      x-step-up: when elevated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserInvitationCreate' }
+      responses:
+        '201':
+          description: Invited. The mail is queued in the same transaction.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations/{invitation_id}/resend:
+    post:
+      tags: [users]
+      operationId: resendUserInvitation
+      summary: Send an invitation again (a new link; the old one stops working)
+      description: |
+        For a pending invitation, or an expired one whose email and identifiers are still free (it becomes pending again). The expiry starts over. The rights are
+        checked again against the person who resends, so an invitation never outlives the rights behind it. Needs a fresh step-up when the invitation is `elevated`.
+        409 `invalid_transition` when it was accepted or revoked.
+      x-db-path: inv_resend
+      x-step-up: when elevated
+      parameters:
+        - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Sent again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations/{invitation_id}/revoke:
+    post:
+      tags: [users]
+      operationId: revokeUserInvitation
+      summary: Revoke a pending invitation; its link stops working at once
+      description: Needs `create` on `users` (all regions). 409 `invalid_transition` unless the invitation is pending.
+      x-db-path: inv_revoke
+      parameters:
+        - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /invitations/{token}:
+    get:
+      tags: [invitations]
+      operationId: getInvitationByToken
+      summary: What the accept page shows for an invitation link (public, no session)
+      description: |
+        Answers only the name, email, employee ID and phone the inviter entered, the expiry and the password rules; never the role, group or manager chosen.
+        An unknown, used, revoked, expired or malformed token all answer the same 404 `invitation_invalid` with the same text, so the answer never tells which
+        links existed. Rate limited per client address like sign-in (429 `rate_limited`, failures only).
+      security: []
+      x-db-path: inv_peek
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+      responses:
+        '200':
+          description: A valid invitation.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationPreview' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /invitations/{token}/accept:
+    post:
+      tags: [invitations]
+      operationId: acceptInvitation
+      summary: Choose a password and create the account (public, no session)
+      description: |
+        The password follows the password policy (422 `weak_password` with `errors[]`; the policy is checked only for a valid link). The account, its
+        sign-in, the assignments, department, manager, groups and the two-factor row are created in one step; a role, department, manager or group that is no
+        longer valid is skipped (never more rights than were chosen) and the audit row lists what was skipped. No session is created: the person signs in
+        afterwards, and when `two_factor_enrolment_pending` is true an admin hands them the enrolment code first.
+        The same uniform 404 `invitation_invalid` as `GET /invitations/{token}` for any link that does not work, including a second use of the same link;
+        409 `duplicate` when the email, employee ID or phone was taken meanwhile (the invitation is then closed). Rate limited like sign-in.
+      security: []
+      x-db-path: inv_accept
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, minLength: 1, maxLength: 128 }
+      responses:
+        '201':
+          description: Account created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationAccepted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /users/deleted:
     get:
       tags: [users]
@@ -12140,6 +12329,7 @@ components:
         - batch_processing
         - vehicle_already_reserved
         - upload_processing
+        - invitation_invalid
     PageEnvelope:
       type: object
       required: [items, page]
@@ -14440,6 +14630,89 @@ components:
       properties:
         user: { $ref: '#/components/schemas/User' }
         temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
+    UserInvitationStatus:
+      type: string
+      enum: [pending, accepted, revoked, expired]
+    UserInvitationAssignment:
+      type: object
+      additionalProperties: false
+      required: [role_id, permission_level]
+      description: One role row the account will hold, chosen at invite time. Same meaning as an assignment row.
+      properties:
+        role_id: { type: string, format: uuid }
+        permission_level: { $ref: '#/components/schemas/PermissionLevel' }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        all_regions: { type: boolean, default: false }
+        region_ids: { type: array, maxItems: 7, items: { $ref: '#/components/schemas/RegionId' }, description: 'Used when all_regions is false.' }
+        all_modules: { type: boolean, default: false }
+        module_keys: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ModuleKey' }, description: 'Used when all_modules is false.' }
+        profile_ids: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        valid_from: { type: [string, 'null'], format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time }
+    UserInvitationCreate:
+      type: object
+      additionalProperties: false
+      required: [email, display_name, reason]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$' }
+        assignments: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/UserInvitationAssignment' } }
+        department_id: { type: [string, 'null'], format: uuid }
+        manager_id: { type: [string, 'null'], format: uuid }
+        group_ids: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        require_two_factor: { type: boolean, default: false }
+        reason: { $ref: '#/components/schemas/Reason' }
+    UserInvitation:
+      type: object
+      required: [id, email, display_name, status, expires_at, created_at, invited_by, send_count, require_two_factor, elevated, assignments, groups]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        display_name: { type: string }
+        employee_id: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/UserInvitationStatus' }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        last_sent_at: { type: string, format: date-time }
+        send_count: { type: integer, minimum: 1 }
+        invited_by: { type: object, required: [id, name], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        reason: { type: string }
+        require_two_factor: { type: boolean }
+        elevated: { type: boolean, description: 'Grants admin-level rights, a privileged role or a privileged group: needs a System Admin and a fresh step-up.' }
+        department: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        manager: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        groups: { type: array, items: { type: object, required: [id, name], properties: { id: { type: string, format: uuid }, name: { type: string } } } }
+        assignments:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/UserInvitationAssignment'
+              - type: object
+                properties:
+                  role: { type: object, properties: { id: { type: string, format: uuid }, code: { type: string }, name_en: { type: string }, name_ar: { type: [string, 'null'] } } }
+        accepted_at: { type: [string, 'null'], format: date-time }
+        accepted_user_id: { type: [string, 'null'], format: uuid }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        revoke_reason: { type: [string, 'null'] }
+    InvitationPreview:
+      type: object
+      required: [display_name, email, expires_at, password_policy]
+      properties:
+        display_name: { type: string }
+        email: { type: string }
+        employee_id: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        expires_at: { type: string, format: date-time }
+        password_policy: { type: object, required: [min_length, max_length], properties: { min_length: { type: integer }, max_length: { type: integer } } }
+    InvitationAccepted:
+      type: object
+      required: [created, two_factor_enrolment_pending]
+      properties:
+        created: { type: boolean, const: true }
+        two_factor_enrolment_pending: { type: boolean, description: 'True when an admin must hand over the enrolment code before the first sign-in works.' }
     # ---------------------------------------------------------- staff registry
     StaffField:
       type: string
