@@ -2732,6 +2732,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a task, milestone or gate (deleted if no site data refers to it, otherwise deactivated)
+         * @description Migration 0094, owner rule 2026-11-13. In a draft, an item that no site data refers to is deleted for real (`outcome` = `deleted`). An item that is referenced
+         *     (`why` lists `site_tasks`, `matrix`, `sla_rules`, `document_types`, `baselines`, `gates`, `gate_history`, `other_version`, `has_tasks`) or that sits in a published version
+         *     (`published_version`) is deactivated instead (`outcome` = `deactivated`), so history and KPIs stay intact. A milestone with active tasks is refused (422 `has_active_tasks`).
+         *     Needs `workflow_versions.edit` for all regions, a reason, `If-Match` and a step-up.
+         */
+        post: operations["removeWorkflowItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard a draft that no site uses
+         * @description Migration 0094. Only a draft (409 `invalid_transition` otherwise; a published version is kept). Needs `workflow_versions.edit`, a reason, `If-Match` and a step-up.
+         */
+        post: operations["discardWorkflowDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/publish": {
         parameters: {
             query?: never;
@@ -20031,6 +20078,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    removeWorkflowItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "task" | "milestone" | "gate";
+                    code: string;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Removed or deactivated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        outcome: "deleted" | "deactivated";
+                        why: string[];
+                        version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    discardWorkflowDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Discarded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        discarded: boolean;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];

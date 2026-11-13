@@ -373,6 +373,120 @@ BEGIN
   END IF;
 END $$;
 
+-- Owner rule 2026-11-13 (flexibility with data safety): an item that site data never referenced is deleted for real (draft only); an item that is referenced (site tasks,
+-- matrix cells, SLA rules, baselines, gate history, or the same code in another version) is deactivated instead and the answer says why.
+GRANT DELETE ON workflow_definitions, stage_definitions, task_definitions, phase_gate_rules, matrix_cells, sla_rules, sla_rule_set_items, document_type_placements, scenario_task_rules TO pmis_definer;
+GRANT SELECT ON matrix_cells, sla_rules, sla_rule_set_items, document_type_placements, site_gate_state, site_gate_events TO pmis_definer;
+
+CREATE OR REPLACE FUNCTION wfe_item_refs(p_kind text, p_wf uuid, p_code text) RETURNS text[]
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE r text[] := ARRAY[]::text[]; tid uuid; sid uuid;
+BEGIN
+  IF p_kind = 'task' THEN
+    SELECT id INTO tid FROM public.task_definitions WHERE workflow_id = p_wf AND code = p_code;
+    IF EXISTS (SELECT 1 FROM public.task_instances WHERE task_def_id = tid) THEN r := r || 'site_tasks'; END IF;
+    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE task_def_id = tid) THEN r := r || 'matrix'; END IF;
+    IF EXISTS (SELECT 1 FROM public.sla_rules WHERE task_def_id = tid) OR EXISTS (SELECT 1 FROM public.sla_rule_set_items WHERE task_def_id = tid) THEN r := r || 'sla_rules'; END IF;
+    IF EXISTS (SELECT 1 FROM public.document_type_placements WHERE task_def_id = tid) THEN r := r || 'document_types'; END IF;
+    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+  ELSIF p_kind = 'milestone' THEN
+    SELECT id INTO sid FROM public.stage_definitions WHERE workflow_id = p_wf AND code = p_code;
+    IF EXISTS (SELECT 1 FROM public.task_definitions WHERE stage_id = sid) THEN r := r || 'has_tasks'; END IF;
+    IF EXISTS (SELECT 1 FROM public.matrix_cells WHERE stage_id = sid) THEN r := r || 'matrix'; END IF;
+    IF EXISTS (SELECT 1 FROM public.baseline_entries WHERE milestone_code = p_code) THEN r := r || 'baselines'; END IF;
+    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE workflow_id = p_wf AND (from_code = p_code OR to_code = p_code)) THEN r := r || 'gates'; END IF;
+    IF EXISTS (SELECT 1 FROM public.stage_definitions WHERE code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+  ELSE
+    IF EXISTS (SELECT 1 FROM public.site_gate_state WHERE gate_code = p_code) OR EXISTS (SELECT 1 FROM public.site_gate_events WHERE gate_code = p_code) THEN r := r || 'gate_history'; END IF;
+    IF EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE link_code = p_code AND workflow_id <> p_wf) THEN r := r || 'other_version'; END IF;
+  END IF;
+  RETURN r;
+END $$;
+
+CREATE OR REPLACE FUNCTION admin_wf_item_remove(p_version integer, p_etag integer, p_kind text, p_code text, p_reason text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE w public.workflow_definitions%ROWTYPE; refs text[]; hard boolean; tid uuid; sid uuid; act text;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'edit');
+  PERFORM public.calc_require_reason(p_reason);
+  IF p_kind NOT IN ('task', 'milestone', 'gate') THEN PERFORM public.wfe_err1('/kind', 'invalid', 'kind is task, milestone or gate.'); END IF;
+  w := public.wfe_lock(p_version, p_etag);
+  IF (p_kind = 'task' AND NOT EXISTS (SELECT 1 FROM public.task_definitions WHERE workflow_id = w.id AND code = p_code))
+     OR (p_kind = 'milestone' AND NOT EXISTS (SELECT 1 FROM public.stage_definitions WHERE workflow_id = w.id AND code = p_code))
+     OR (p_kind = 'gate' AND NOT EXISTS (SELECT 1 FROM public.phase_gate_rules WHERE workflow_id = w.id AND link_code = p_code)) THEN
+    PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'The item does not exist in this version.'));
+  END IF;
+  refs := public.wfe_item_refs(p_kind, w.id, p_code);
+  IF w.status <> 'draft' THEN refs := refs || 'published_version'; END IF;
+  hard := cardinality(refs) = 0;
+  IF p_kind = 'task' THEN
+    SELECT id INTO tid FROM public.task_definitions WHERE workflow_id = w.id AND code = p_code;
+    IF hard THEN
+      DELETE FROM public.task_predecessors WHERE task_def_id = tid OR predecessor_id = tid;
+      DELETE FROM public.task_definitions WHERE id = tid;
+    ELSE
+      UPDATE public.task_definitions SET is_active = false, reason = btrim(p_reason), changed_by = public.app_actor() WHERE id = tid;
+    END IF;
+  ELSIF p_kind = 'milestone' THEN
+    SELECT id INTO sid FROM public.stage_definitions WHERE workflow_id = w.id AND code = p_code;
+    IF hard THEN
+      DELETE FROM public.stage_definitions WHERE id = sid;
+    ELSE
+      IF EXISTS (SELECT 1 FROM public.task_definitions WHERE stage_id = sid AND is_active) THEN
+        PERFORM public.wfe_err1('/code', 'has_active_tasks', 'Move or deactivate the active tasks of this milestone first.');
+      END IF;
+      UPDATE public.stage_definitions SET is_active = false WHERE id = sid;
+      UPDATE public.phase_gate_rules SET is_active = false WHERE workflow_id = w.id AND (from_code = p_code OR to_code = p_code);
+    END IF;
+  ELSE
+    IF hard THEN DELETE FROM public.phase_gate_rules WHERE workflow_id = w.id AND link_code = p_code;
+    ELSE UPDATE public.phase_gate_rules SET is_active = false WHERE workflow_id = w.id AND link_code = p_code; END IF;
+  END IF;
+  act := CASE WHEN hard THEN 'deleted' ELSE 'deactivated' END;
+  PERFORM public.wfe_bump(w.id);
+  PERFORM public.wfe_audit('wf_item_' || act, 'workflow_' || p_kind, p_code, jsonb_build_object('version', w.version), jsonb_build_object('version', w.version, 'outcome', act, 'why', to_jsonb(refs)), p_reason);
+  RETURN jsonb_build_object('outcome', act, 'why', to_jsonb(refs), 'version', public.wfe_version_json(w.id));
+END $$;
+
+CREATE OR REPLACE FUNCTION admin_wf_discard_draft(p_version integer, p_etag integer, p_reason text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE w public.workflow_definitions%ROWTYPE; refs integer;
+BEGIN
+  PERFORM public.wfe_require('workflow_versions', 'edit');
+  PERFORM public.calc_require_reason(p_reason);
+  w := public.wfe_lock(p_version, p_etag);
+  IF w.status <> 'draft' THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Only a draft can be discarded; a published version is kept for history.')); END IF;
+  SELECT count(*) INTO refs FROM public.task_instances ti JOIN public.task_definitions td ON td.id = ti.task_def_id WHERE td.workflow_id = w.id;
+  IF refs > 0 THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Site tasks already use this draft.')); END IF;
+  DELETE FROM public.task_predecessors WHERE task_def_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id)
+                                           OR predecessor_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id);
+  DELETE FROM public.matrix_cells WHERE stage_id IN (SELECT id FROM public.stage_definitions WHERE workflow_id = w.id)
+                                     OR task_def_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id);
+  DELETE FROM public.sla_rules WHERE task_def_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id);
+  DELETE FROM public.sla_rule_set_items WHERE task_def_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id);
+  DELETE FROM public.document_type_placements WHERE task_def_id IN (SELECT id FROM public.task_definitions WHERE workflow_id = w.id);
+  DELETE FROM public.scenario_task_rules WHERE workflow_id = w.id;
+  DELETE FROM public.task_definitions WHERE workflow_id = w.id;
+  DELETE FROM public.phase_gate_rules WHERE workflow_id = w.id;
+  DELETE FROM public.stage_definitions WHERE workflow_id = w.id;
+  DELETE FROM public.workflow_definitions WHERE id = w.id;
+  PERFORM public.wfe_audit('workflow_draft_discard', 'workflow_definition', w.version::text, jsonb_build_object('version', w.version, 'status', 'draft'), jsonb_build_object('discarded', true), p_reason);
+  RETURN jsonb_build_object('version', w.version, 'discarded', true);
+END $$;
+
+DO $$
+DECLARE f text;
+BEGIN
+  FOREACH f IN ARRAY ARRAY['wfe_item_refs(text,uuid,text)', 'admin_wf_item_remove(integer,integer,text,text,text)', 'admin_wf_discard_draft(integer,integer,text)'] LOOP
+    EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
+    EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_definer', f);
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
+    GRANT EXECUTE ON FUNCTION admin_wf_item_remove(integer,integer,text,text,text), admin_wf_discard_draft(integer,integer,text) TO pmis_app;
+  END IF;
+END $$;
+
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('workflow_editor_insert_applied', 'workflow', NULL,
         jsonb_build_object('decision', 'owner request 2026-11-13: workflow editor phase 2', 'functions', 'admin_wf_task_insert, admin_wf_task_successors'),

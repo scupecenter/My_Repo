@@ -419,3 +419,79 @@ describe('phase 2: structural edit of a draft, publish with the default settings
     expect(after.body.items[0].reverted_at).not.toBeNull();
   });
 });
+
+describe('phase 2: remove (delete or deactivate) and discard, owner rule 2026-11-13', () => {
+  let d3 = 0;
+  let code1 = '';
+  const rm = (kind: string, code: string, t: string, who = admin) => who.api.call('post', `${BASE}/${d3}/remove`, { kind, code, reason: REASON }, hdr(t));
+
+  it('creates a draft from the newest published version', async () => {
+    const list = await admin.api.call('get', BASE);
+    const top = Math.max(...list.body.items.filter((x: { status: string }) => x.status === 'published').map((x: { version: number }) => x.version));
+    const r = await admin.api.call('post', BASE, { parent_version: top, reason: REASON });
+    expect(r.status).toBe(201);
+    d3 = r.body.version;
+  });
+
+  it('refuses removal to a non-admin (403), to a missing step-up (401) and to a missing If-Match (428)', async () => {
+    const v = await current(admin.api, d3);
+    expect((await rm('task', 'X', v.tag, plain)).status).toBe(403);
+    expect((await rm('task', 'X', v.tag, noStep)).status).toBe(401);
+    expect((await admin.api.call('post', `${BASE}/${d3}/remove`, { kind: 'task', code: 'X', reason: REASON })).status).toBe(428);
+  });
+
+  it('hard deletes a task and a milestone and a gate that site data never used', async () => {
+    let v = await current(admin.api, d3);
+    const st = v.body.milestones[0]!.code;
+    code1 = `D${Date.now().toString(36).slice(-5).toUpperCase()}`;
+    const full = { milestones: [...v.body.milestones.map((m) => ({ code: m.code })), { code: `${code1}M`, name_en: 'Temp milestone' }], gates: [...v.body.gates.map((g) => ({ code: g.code })), { code: `${code1}G`, name_en: 'Temp gate', from_milestone: st, to_milestone: `${code1}M` }], reason: REASON };
+    expect((await admin.api.call('put', `${BASE}/${d3}`, full, hdr(v.tag))).status).toBe(200);
+    v = await current(admin.api, d3);
+    expect((await admin.api.call('post', `${BASE}/${d3}/tasks`, { stage_code: `${code1}M`, code: `${code1}T`, name_en: 'Temp task', reason: REASON }, hdr(v.tag))).status).toBe(201);
+    v = await current(admin.api, d3);
+    const t = await rm('task', `${code1}T`, v.tag);
+    expect(t.status).toBe(200);
+    expect(t.body).toMatchObject({ outcome: 'deleted', why: [] });
+    expect((await db.query(`SELECT 1 FROM task_definitions WHERE code = $1`, [`${code1}T`])).rowCount).toBe(0);
+    v = await current(admin.api, d3);
+    const g = await rm('gate', `${code1}G`, v.tag);
+    expect(g.body.outcome).toBe('deleted');
+    v = await current(admin.api, d3);
+    const m = await rm('milestone', `${code1}M`, v.tag);
+    expect(m.body.outcome).toBe('deleted');
+    expect((await db.query(`SELECT 1 FROM stage_definitions WHERE code = $1`, [`${code1}M`])).rowCount).toBe(0);
+    expect((await rm('task', 'NOPE', (await current(admin.api, d3)).tag)).status).toBe(404);
+  });
+
+  it('deactivates instead when the item exists in another version, and says why', async () => {
+    const v = await current(admin.api, d3);
+    const any = v.body.placements.find((p) => p.is_active && !v.body.placements.some((q) => q.is_active && q.predecessors.includes(p.task_code)))!;
+    const r = await rm('task', any.task_code, v.tag);
+    expect(JSON.stringify(r.body)).toBeTruthy(); if (r.status !== 200) console.log('DBG1', JSON.stringify(r.body));
+    expect(r.status).toBe(200);
+    expect(r.body.outcome).toBe('deactivated');
+    expect(r.body.why).toContain('other_version');
+    expect(r.body.version.placements.find((p: Placement) => p.task_code === any.task_code).is_active).toBe(false);
+    const gate = v.body.gates[0]!;
+    const g = await rm('gate', gate.code, (await current(admin.api, d3)).tag);
+    expect(g.body.outcome).toBe('deactivated');
+  });
+
+  it('refuses a milestone that still has active tasks', async () => {
+    const v = await current(admin.api, d3);
+    const m = v.body.milestones.find((x) => v.body.placements.some((p) => p.stage_code === x.code && p.is_active))!;
+    const r = await rm('milestone', m.code, v.tag);
+    expect(r.status).toBe(422);
+  });
+
+  it('discards the draft, never a published version', async () => {
+    const v = await current(admin.api, d3);
+    expect((await plain.api.call('post', `${BASE}/${d3}/discard`, { reason: REASON }, hdr(v.tag))).status).toBe(403);
+    const r = await admin.api.call('post', `${BASE}/${d3}/discard`, { reason: REASON }, hdr(v.tag));
+    if (r.status !== 200) console.log('DBG2', JSON.stringify(r.body));
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ version: d3, discarded: true });
+    expect((await db.query(`SELECT 1 FROM workflow_definitions WHERE version = $1`, [d3])).rowCount).toBe(0);
+    expect((await admin.api.call('post', `${BASE}/1/discard`, { reason: REASON }, hdr((await current(admin.api, 1)).tag))).status).toBe(409);
+  });
+});

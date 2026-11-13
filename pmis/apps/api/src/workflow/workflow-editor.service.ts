@@ -65,6 +65,8 @@ const structureBody = z.object({
 }).strict();
 const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selection, reason, confirm_master_impact: confirmImpact }).strict();
 const revertBody = z.object({ reason }).strict();
+const removeBody = z.object({ kind: z.enum(['task', 'milestone', 'gate']), code, reason }).strict();
+const discardBody = z.object({ reason }).strict();
 const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
 const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 type Json = Record<string, unknown>;
@@ -122,6 +124,19 @@ export class WorkflowEditorService {
     return this.one(Prisma.sql`SELECT admin_wf_task_create(${version}::int, ${etag}::int, ${b.stage_code}::text, ${b.code}::text, ${b.name_en}::text, ${b.name_ar ?? null}::text,
       ${b.counts_toward_milestone ?? null}::boolean, ${b.has_documents ?? null}::boolean, ${b.after_task_code ?? null}::text, ${b.predecessors ?? []}::text[], ${b.reason}::text,
       ${b.confirm_master_impact ?? null}::text) AS r`);
+  }
+
+  /** Owner rule 2026-11-13: an item no site data refers to is deleted for real (draft only); a referenced one is deactivated and the answer says why. */
+  async removeItem(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(removeBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_item_remove(${version}::int, ${etag}::int, ${b.kind}::text, ${b.code}::text, ${b.reason}::text) AS r`);
+  }
+
+  async discardDraft(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(discardBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_discard_draft(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
   }
 
   async updateTask(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

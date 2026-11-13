@@ -38,6 +38,18 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.replaceStructure(auth, version, ifMatch, body));
   }
 
+  @Post('versions/:version/remove')
+  @HttpCode(200)
+  async removeItem(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.removeItem(auth, version, ifMatch, body);
+  }
+
+  @Post('versions/:version/discard')
+  @HttpCode(200)
+  async discardDraft(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.discardDraft(auth, version, ifMatch, body);
+  }
+
   @Post('versions/:version/migrations')
   @HttpCode(200)
   migrate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
