@@ -14,7 +14,7 @@ import { Actor, Site, actor, makeSite, makeTask, plainAdmin, setCell } from './w
 /**
  * Migration 0085 (owner request 2026-11-10): per-site workflow locks, the historical load without locks, the missing data of a historical load, and new sites
  * created "Open". Its own database (TEST_DATABASE_URL_WL; the seeded Document Library is off): the suite opens the historical-load waiver and reads the dashboard
- * count of the lock bypasses. Migration 0087 adds the direct approval of the historical load (admin override, no L2). Region 4 holds the tasks, region 5 is the "other" region; region 7 holds the Site creation cells.
+ * count of the lock bypasses. Migration 0092 adds the direct approval of the historical load (admin override, no L2). Region 4 holds the tasks, region 5 is the "other" region; region 7 holds the Site creation cells.
  */
 let app: NestExpressApplication;
 let db: PgClient;
@@ -291,7 +291,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     }
     // the full site: B4 submitted before B3, nothing held
     expect((await task(tasks[full.id]!.B4!)).state).toBe('in_approval');
-    expect((await q<{ f: boolean }>(db, 'SELECT historical_direct_approved AS f FROM task_instances WHERE id = $1', [tasks[full.id]!.B4]))[0]!.f).toBe(false);   // 0087: not without the option
+    expect((await q<{ f: boolean }>(db, 'SELECT historical_direct_approved AS f FROM task_instances WHERE id = $1', [tasks[full.id]!.B4]))[0]!.f).toBe(false);   // 0092: not without the option
     const batchId = applied.body.outcome.batches[0].id as string;
     const rows = (await t.admin.api.call('get', `/import-batches/${batchId}/rows?limit=200`)).body.items as { site_code: string; task_code: string; action: string; hold_reason: string | null; warnings: { code: string }[]; errors: { code: string }[] }[];
     // the sparse site: B4 saved (planned date) and not submitted
@@ -419,7 +419,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     expect(sites.status).toBe(200);
     expect(sites.body.items).toEqual([expect.objectContaining({ site_id: hist.id, workflow_locks: false })]);
   });
-  // ------------------------------------------------------------------ 0087: the historical load approved directly (owner decision 2026-11-12)
+  // ------------------------------------------------------------------ 0092: the historical load approved directly (owner decision 2026-11-12)
   const direct = async (id: string) => (await q<{ state: string; flag: boolean; batch: string | null; admin_override: boolean; approved_date: string | null; level: number; version: number }>(db,
     `SELECT state::text AS state, historical_direct_approved AS flag, historical_direct_batch_id::text AS batch, admin_override, approved_date::text AS approved_date,
        current_level AS level, version FROM task_instances WHERE id = $1`, [id]))[0]!;
@@ -433,7 +433,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     return { site, b4, ms2 };
   }
 
-  it('0087: approve directly: every submitted task of the load is approved at once (admin override, no L2), flagged, audited, and counted in progress', async () => {
+  it('0092: approve directly: every submitted task of the load is approved at once (admin override, no L2), flagged, audited, and counted in progress', async () => {
     const t = await team(['B3', 'B4', 'D5']);
     const a = await preCwSite('WLD');
     const sparse = await makeSite(db, R, { prefix: 'WLD' });
@@ -520,7 +520,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     expect(await audit('task_historical_direct_approval_cleared', a.b4)).toHaveLength(1);
   });
 
-  it('0087: approve directly in the background: a big apply (0086) and its batch sent in chunks (0075) approve every submitted row', async () => {
+  it('0092: approve directly in the background: a big apply (0086) and its batch sent in chunks (0075) approve every submitted row', async () => {
     const jobs = app.get(ImportJobsService);
     jobs.autoStart = false;
     await db.query(`UPDATE settings SET value = to_jsonb(2) WHERE key = 'imports.async_rows'`);
@@ -559,7 +559,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     }
   });
 
-  it('0087: approve directly is refused outside the historical load of a System Admin; without it nothing changes', async () => {
+  it('0092: approve directly is refused outside the historical load of a System Admin; without it nothing changes', async () => {
     const t = await team(['B3', 'B4']);
     const a = await preCwSite('WLR');
     expect((await openWaiver(t.admin)).status).toBe(200);

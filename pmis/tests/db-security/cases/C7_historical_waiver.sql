@@ -452,7 +452,7 @@ SELECT CASE
 -- @end
 
 -- @case HW-61
--- @title The new overloads of the staging and the apply keep owner pmis_definer and PUBLIC revoked; the application role holds the 9-argument staging and the 6-argument apply (0088: and the 7-argument apply)
+-- @title The new overloads of the staging and the apply keep owner pmis_definer and PUBLIC revoked; the application role holds the 9-argument staging and the 6-argument apply (0093: and the 7-argument apply)
 -- @category historical-waiver
 -- @expect output ok
 WITH f AS (

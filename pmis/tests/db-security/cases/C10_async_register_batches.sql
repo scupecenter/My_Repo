@@ -403,7 +403,7 @@ WHERE p.pronamespace = 'public'::regnamespace
 -- @end
 
 -- @case RB-62
--- @title The Master import apply keeps its two signatures and their grants of 0060 / 0073 (no new door); 0088 adds the 7-argument door with the register sheets
+-- @title The Master import apply keeps its two signatures and their grants of 0060 / 0073 (no new door); 0093 adds the 7-argument door with the register sheets
 -- @category async-register-batches
 -- @actor ALICE
 -- @region 1

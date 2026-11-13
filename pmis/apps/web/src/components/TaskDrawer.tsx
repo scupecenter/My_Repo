@@ -15,6 +15,7 @@ import { CommentsPanel } from './Comments';
 import { DelayPeriodsPanel } from './DelayPeriods';
 import { Holders } from './HolderChip';
 import { BlockedByPanel, TimeInStatePanel } from './InsightPanels';
+import { AdminTaskOverride } from './AdminTaskOverride';
 import { OverrideBadge } from './OverrideBadge';
 import { TaskRegisterFields } from './TaskRegisterFields';
 import { FieldHistory } from './logs/FieldHistory';
@@ -79,7 +80,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
       <header className="flex items-start gap-2 border-b border-line p-4">
         <div className="flex-1">
           <Dialog.Title className="font-bold"><span className="mono">{task.site_code}</span> · {task.task_code} {name}</Dialog.Title>
-          <Dialog.Description className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute"><span className="chip bg-card2" data-testid="drawer-state">{t(`taskState.${task.state}`)}</span>{task.historical_no_documents ? <OverrideBadge taskId={task.id} /> : task.historical_direct_approved ? <OverrideBadge taskId={task.id} direct /> : task.lock_bypassed ? <OverrideBadge taskId={task.id} bypass={task.lock_bypass_reason} /> : null}{t('drawer.level', { level: task.current_level ?? 1, total: task.levels_required ?? 3 })}</Dialog.Description>
+          <Dialog.Description className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute"><span className="chip bg-card2" data-testid="drawer-state">{t(`taskState.${task.state}`)}</span>{task.historical_no_documents ? <OverrideBadge taskId={task.id} /> : task.historical_direct_approved ? <OverrideBadge taskId={task.id} direct /> : task.lock_bypassed ? <OverrideBadge taskId={task.id} bypass={task.lock_bypass_reason} /> : task.admin_override ? <OverrideBadge taskId={task.id} admin /> : null}{t('drawer.level', { level: task.current_level ?? 1, total: task.levels_required ?? 3 })}</Dialog.Description>
         </div>
         <Link className="btn px-2 py-1 text-xs" data-testid="drawer-open-site" to={`/sites/${task.site_id}`}><ExternalLink size={12} />{t('drawer.open_site')}</Link>
         <Dialog.Close asChild><button className="btn px-2" aria-label={t('common.close')} data-testid="drawer-close"><X size={16} /></button></Dialog.Close>
@@ -135,6 +136,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         </section>
 
         <TaskRegisterFields fields={regFields} siteId={task.site_id} />
+        <AdminTaskOverride task={task} />
         </div>
 
         <section aria-label={t('grid.docs')} {...panelProps('documents', tab)}>

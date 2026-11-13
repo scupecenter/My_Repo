@@ -109,11 +109,16 @@ import { SiteLocksService } from './sites/site-locks.service';
 import { SiteDraftsController } from './sites/site-drafts.controller';
 import { SiteDraftsService } from './sites/site-drafts.service';
 import { UsersController } from './users/users.controller';
+import { InvitationsController, PublicInvitationsController } from './invitations/invitations.controller';
+import { InvitationsService } from './invitations/invitations.service';
 import { UsersRepo } from './users/users.repo';
 import { ApprovalsService } from './workflow/approvals.service';
+import { OverridesService } from './workflow/overrides.service';
 import { TaskDetailService } from './workflow/task-detail.service';
 import { TaskViewService } from './workflow/task-view.service';
 import { TasksController } from './workflow/tasks.controller';
+import { WorkflowEditorController, TaskDefinitionsController } from './workflow/workflow-editor.controller';
+import { WorkflowEditorService } from './workflow/workflow-editor.service';
 import { WorkflowService } from './workflow/workflow.service';
 import { UsersService } from './users/users.service';
 import { AuditLogController, LogsAdminController, SecurityLogController } from './logs/logs.controller';
@@ -134,9 +139,10 @@ import { ContractorsService } from './contractors/contractors.service';
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
+      InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, SiteDraftsController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
+      DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
       NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, NavLayoutController, HistoricalWaiverController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
@@ -149,9 +155,10 @@ export function appModuleFor(config: AppConfig) {
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
+      InvitationsService, // 0091
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
+      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)

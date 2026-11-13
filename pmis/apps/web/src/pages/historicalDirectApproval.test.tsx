@@ -15,7 +15,7 @@ import { renderApp, signIn } from '@/test/utils';
 import { ReconciliationPage } from './Reconciliation';
 
 /**
- * Contract 0.15.6 (owner decision 2026-11-12, "Direct approval"): the option "Approve directly (no L2) — admin override" of the historical load on the Master import
+ * Contract 0.15.11 (owner decision 2026-11-12, "Direct approval"): the option "Approve directly (no L2) — admin override" of the historical load on the Master import
  * apply dialog. Shown only when the historical option is on; it carries a warning; it sends `historical_load.approve_directly`. The task shows the badge.
  */
 const stepUpDone = () => api.post('/__mock/step-up');
@@ -23,7 +23,7 @@ const openIt = () => api.put<HistoricalWaiver>('/settings/historical-waiver', { 
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
 const page = () => renderApp(<Routes><Route path="/templates/master-import" element={<ReconciliationPage />} /></Routes>, { route: '/templates/master-import' });
 
-describe('the Master import apply dialog: approve directly (0.15.6)', () => {
+describe('the Master import apply dialog: approve directly (0.15.11)', () => {
   it('is shown only with the historical option on, warns, and sends approve_directly inside historical_load', async () => {
     await signIn('pm'); await stepUpDone();
     await openIt();

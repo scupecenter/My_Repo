@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { isPersonal, loadRegisterMaps, normaliseValue, parseDateText } from '../src/master-import/register-sheets';
 
-/** Migration 0088: the shipped register maps (one source of truth with tools/master-import) and the mechanical normalisation. No database. */
-describe('register sheets of the legacy Master (0088)', () => {
+/** Migration 0093: the shipped register maps (one source of truth with tools/master-import) and the mechanical normalisation. No database. */
+describe('register sheets of the legacy Master (0093)', () => {
   it('ships the eight register maps, with the personal columns marked', () => {
     const maps = loadRegisterMaps();
     expect(maps.map((m) => m.template_id).sort()).toEqual(['TPL-ACQ', 'TPL-ASB', 'TPL-GECOL', 'TPL-HLC', 'TPL-PO', 'TPL-PRM', 'TPL-RF', 'TPL-RSK']);

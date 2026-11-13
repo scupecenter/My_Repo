@@ -134,8 +134,8 @@ export const masterImportHandlers = [
     const r = st().runs.find((x) => x.id === params.id);
     if (!r) return problem(404, 'not_found', 'Not found');
     const body = await request.json() as { mode?: string; reason?: string; historical_load?: { reason?: string; approve_directly?: boolean; registers?: boolean }; approve_directly?: unknown; registers?: unknown };
-    // 0.15.6: approve_directly exists only inside historical_load (an unknown field elsewhere)
-    if (body.registers !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: registers' }] });   // 0.15.7: only inside historical_load
+    // 0.15.11: approve_directly exists only inside historical_load (an unknown field elsewhere)
+    if (body.registers !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: registers' }] });   // 0.15.11: only inside historical_load
     if (body.approve_directly !== undefined) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '', code: 'unrecognized_keys', message: 'Unrecognized key: approve_directly' }] });
     if (!body.reason || body.reason.trim().length < 3) return problem(422, 'validation_failed', 'Validation failed', { errors: [{ path: '/reason', code: 'required', message: 'A reason is required.' }] });
     if (r.status === 'applied') return problem(409, 'invalid_transition', 'Not possible now', { detail: 'This run was already applied.' });
@@ -151,14 +151,14 @@ export const masterImportHandlers = [
     }
     // 0.14.6: a staged batch with more rows than imports.async_rows (50) is sent in the background: 202 with the run's progress
     const rowsToSend = Number((r.summary as Record<string, unknown>).applicable ?? 0), big = rowsToSend > 50, draft = body.mode === 'draft';
-    const direct = !!body.historical_load?.approve_directly;   // 0.15.6: the submitted rows are approved at once (admin override, no L2)
+    const direct = !!body.historical_load?.approve_directly;   // 0.15.11: the submitted rows are approved at once (admin override, no L2)
     const outcome = { group_id: uid('group'), mode: draft ? 'draft' as const : 'submit' as const, queued: big ? 1 : 0, approve_directly: direct,
       batches: [{ id: uid('batch'), kind: 'stream', sheet: 'Master', ref: 'CW', rows: rowsToSend, template_id: 'TPL-SITE-CW', submitted: big || draft ? 0 : 1, saved: draft && !big ? 1 : 0, held: 0, failed: 0, errors: 0,
         approved: direct && !big && !draft ? 1 : 0,
         ...(big ? { queued: true, job_id: uid('job'), rows: rowsToSend } : {}) }] as Record<string, unknown>[], skipped: [] as Record<string, unknown>[],
       registers: false, register_notes: [] as Record<string, unknown>[] };
     if (body.historical_load?.registers && !draft) {
-      // 0.15.7: the register sheets of the same file, one register batch each; the sheets the file lacks are skipped with their reason
+      // 0.15.11: the register sheets of the same file, one register batch each; the sheets the file lacks are skipped with their reason
       outcome.registers = true;
       outcome.batches.push(
         { id: uid('batch'), kind: 'register', sheet: 'RF & Design', ref: 'rf_design', template_id: 'TPL-RF', rows: 3, submitted: 2, saved: 0, held: 0, failed: 0, errors: 1, skipped: 0, approved: direct ? 2 : 0 },

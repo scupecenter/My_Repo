@@ -1,4 +1,4 @@
--- 0087: the historical load of the Master, approved directly (owner decision 2026-11-12, "Direct approval"; CHANGELOG 129).
+-- 0092: the historical load of the Master, approved directly (owner decision 2026-11-12, "Direct approval"; CHANGELOG 134).
 --
 -- WHY. The owner loads the history of the real Site Master through "Master import and comparison" (mi_apply_run) and wants to see it in the system without any
 -- approval or gate holding it. The gates and locks are already open for a historical load (0085 / 0086: the sites of the file are opened), and the documents
@@ -26,7 +26,7 @@
 --      the eligibility of wf_complete are untouched; the direct approval is its own function, internal (no grant), reached only from imp_submit_stream_rows
 --      for a batch with the mark, which only mi_apply_run sets. pmis_app gets no new table right.
 --
--- Redefined from their latest definitions (bodies unchanged except where marked "0087"): mi_apply_run (0086), mi_apply_step (0086), imp_submit_stream_rows
+-- Redefined from their latest definitions (bodies unchanged except where marked "0092"): mi_apply_run (0086), mi_apply_step (0086), imp_submit_stream_rows
 -- (0085), imp_submit_stream_finish (0075), dash_build_tasks (0085), dash_core (0085). CREATE OR REPLACE keeps their owner (pmis_definer), search_path and grants.
 --
 -- Function rules: SECURITY DEFINER, search_path = pg_catalog, public, pg_temp, owner pmis_definer, EXECUTE revoked from PUBLIC. No new function is granted to
@@ -38,7 +38,7 @@
 ALTER TABLE import_batches
   ADD COLUMN historical_direct_approve boolean NOT NULL DEFAULT false,
   ADD CONSTRAINT import_batches_hda_check CHECK (NOT historical_direct_approve OR (historical_load AND source = 'master_import' AND stream_code IS NOT NULL));
-COMMENT ON COLUMN import_batches.historical_direct_approve IS '0087: a historical Master import batch whose submitted rows are approved at once (admin override, no L2). Written only by hda_mark_batches (mi_apply_run).';
+COMMENT ON COLUMN import_batches.historical_direct_approve IS '0092: a historical Master import batch whose submitted rows are approved at once (admin override, no L2). Written only by hda_mark_batches (mi_apply_run).';
 
 ALTER TABLE task_instances
   ADD COLUMN historical_direct_approved boolean NOT NULL DEFAULT false,
@@ -46,7 +46,7 @@ ALTER TABLE task_instances
   ADD COLUMN historical_direct_approved_at timestamptz,
   ADD CONSTRAINT task_instances_hda_check CHECK (NOT historical_direct_approved OR (historical_direct_batch_id IS NOT NULL AND historical_direct_approved_at IS NOT NULL AND state = 'approved'));
 CREATE INDEX task_instances_hda_idx ON task_instances (site_id) WHERE historical_direct_approved;
-COMMENT ON COLUMN task_instances.historical_direct_approved IS '0087: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge, an override in the SLA KPIs, counted in progress';
+COMMENT ON COLUMN task_instances.historical_direct_approved IS '0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge, an override in the SLA KPIs, counted in progress';
 
 ALTER TABLE mi_apply_jobs
   ADD COLUMN approve_directly boolean NOT NULL DEFAULT false,
@@ -103,19 +103,19 @@ BEGIN
   IF public.app_is_seeding() THEN RETURN NEW; END IF;
   IF TG_OP = 'INSERT' THEN
     IF NEW.historical_direct_approve THEN
-      RAISE EXCEPTION 'historical direct approval: a batch is never created marked (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+      RAISE EXCEPTION 'historical direct approval: a batch is never created marked (migration 0092)' USING ERRCODE = 'insufficient_privilege';
     END IF;
     RETURN NEW;
   END IF;
   IF OLD.historical_direct_approve THEN
     IF NOT NEW.historical_direct_approve THEN
-      RAISE EXCEPTION 'historical direct approval: the mark of a batch never changes (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+      RAISE EXCEPTION 'historical direct approval: the mark of a batch never changes (migration 0092)' USING ERRCODE = 'insufficient_privilege';
     END IF;
     RETURN NEW;
   END IF;
   IF NEW.historical_direct_approve AND NOT (current_user::text = 'pmis_definer' AND coalesce(current_setting('pmis.hda_mark', true), '') = NEW.id::text
                                             AND OLD.status = 'validated' AND public.hda_batch_ok(NEW)) THEN
-    RAISE EXCEPTION 'historical direct approval: a batch is marked only by the historical Master import of a System Admin (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'historical direct approval: a batch is marked only by the historical Master import of a System Admin (migration 0092)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
 END $$;
@@ -183,12 +183,12 @@ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'historical direct approval: the flag of a task is written only by GSDN Workspace (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'historical direct approval: the flag of a task is written only by GSDN Workspace (migration 0092)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF OLD.historical_direct_approved AND NEW.state IS DISTINCT FROM 'approved' THEN
     -- a reopening: the flag goes, the batch reference stays for the history; the next approval is a normal one
     IF (NEW.historical_direct_batch_id, NEW.historical_direct_approved_at) IS DISTINCT FROM (OLD.historical_direct_batch_id, OLD.historical_direct_approved_at) THEN
-      RAISE EXCEPTION 'historical direct approval: the batch of a flagged task never changes (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+      RAISE EXCEPTION 'historical direct approval: the batch of a flagged task never changes (migration 0092)' USING ERRCODE = 'insufficient_privilege';
     END IF;
     NEW.historical_direct_approved := false;
     INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id)
@@ -207,7 +207,7 @@ BEGIN
           AND NEW.historical_direct_approved AND NOT OLD.historical_direct_approved AND NEW.state = 'approved' AND OLD.state IN ('in_review', 'in_approval')
           AND EXISTS (SELECT 1 FROM public.import_batches b JOIN public.import_batch_rows r ON r.batch_id = b.id AND r.task_instance_id = NEW.id
                       WHERE b.id = NEW.historical_direct_batch_id AND b.historical_direct_approve AND public.hda_batch_ok(b))) THEN
-    RAISE EXCEPTION 'historical direct approval: the flag of a task is written only by GSDN Workspace (migration 0087)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'historical direct approval: the flag of a task is written only by GSDN Workspace (migration 0092)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
 END $$;
@@ -221,7 +221,7 @@ CREATE TRIGGER hda_guard_task_upd BEFORE UPDATE ON task_instances FOR EACH ROW
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 4. The redefined functions: the apply (request and background), the sender, the end of a send, the KPIs
 -- ---------------------------------------------------------------------------------------------------------------------
--- mi_apply_run (latest definition 0086, changes marked 0087: the option approve_directly, the mark of the staged batches, the approved rows of a batch)
+-- mi_apply_run (latest definition 0086, changes marked 0092: the option approve_directly, the mark of the staged batches, the approved rows of a batch)
 CREATE OR REPLACE FUNCTION public.mi_apply_run(p_run uuid, p_version integer, p_mode text, p_reason text, p_stepup boolean, p_historical jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -236,7 +236,7 @@ DECLARE
   su_until timestamptz;        -- 0075: when the verified step-up of this session ends (from the session row, never from the caller), for the audit rows of the run
   bg uuid := CASE WHEN coalesce(current_setting('pmis.mi_apply_job', true), '') ~ '^[0-9a-f-]{36}$' THEN current_setting('pmis.mi_apply_job', true)::uuid END;   -- 0086: the background run of this apply
   lim int; nsites int; jid uuid;   -- 0086
-  hda boolean := false;   -- 0087: the historical load is approved directly (admin override, no L2)
+  hda boolean := false;   -- 0092: the historical load is approved directly (admin override, no L2)
 BEGIN
   IF NOT public.mi_can_use() THEN
     PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'The legacy Master import is for a System Admin or a delegate of templates administer.'));
@@ -263,7 +263,7 @@ BEGIN
     END IF;
     PERFORM public.hw_mark_authorize(p_historical ->> 'reason');
     hw := jsonb_build_object('reason', btrim(p_historical ->> 'reason'));
-    hda := coalesce(p_historical -> 'approve_directly' = 'true'::jsonb, false);   -- 0087
+    hda := coalesce(p_historical -> 'approve_directly' = 'true'::jsonb, false);   -- 0092
   END IF;
   IF public.app_ctx_stepup() AND bg IS NULL THEN   -- 0075 (0086: in the background, the expiry recorded at the request)
     SELECT us.stepup_at + make_interval(secs => coalesce((SELECT CASE WHEN jsonb_typeof(st.value) = 'number' THEN (st.value #>> '{}')::int END
@@ -283,7 +283,7 @@ BEGIN
     SELECT count(DISTINCT upper(x.site_code)) INTO nsites FROM public.master_reconciliation_rows x WHERE x.run_id = p_run AND x.site_id IS NOT NULL;
     IF nsites > lim THEN
       INSERT INTO public.mi_apply_jobs (run_id, actor_id, mode, reason, hw_reason, stepup_verified, stepup_until, session_id, auth_method, mfa, request_id, sites_total,
-                                        approve_directly)   -- 0087
+                                        approve_directly)   -- 0092
       VALUES (p_run, actor, p_mode, left(btrim(p_reason), 2000), hw ->> 'reason', true, su_until,
               CASE WHEN public.app_ctx_get('session_id') ~ '^[0-9a-fA-F-]{36}$' THEN public.app_ctx_get('session_id')::uuid END,
               public.app_ctx_get('auth_method'), CASE public.app_ctx_get('mfa') WHEN 'true' THEN true WHEN 'false' THEN false END, left(public.app_ctx_get('request_id'), 64), nsites,
@@ -292,7 +292,7 @@ BEGIN
       UPDATE public.master_reconciliation_runs SET status = 'applying', version = version + 1 WHERE id = p_run;
       PERFORM public.log_audit_write('master_import.apply_queued', 'master_reconciliation_run', p_run::text, jsonb_build_object('status', 'previewed'),
         jsonb_build_object('status', 'applying', 'job_id', jid, 'mode', p_mode, 'sites', nsites, 'file_sha256', r.file_sha256, 'historical_load', hw IS NOT NULL,
-          'approve_directly', hda), btrim(p_reason));   -- 0087
+          'approve_directly', hda), btrim(p_reason));   -- 0092
       PERFORM public.log_system_write('info', 'master-import', 'legacy Master import: apply queued', jsonb_build_object('run_id', p_run, 'job_id', jid, 'mode', p_mode, 'sites', nsites), actor, NULL);
       RETURN jsonb_build_object('queued_apply', true, 'job_id', jid, 'mode', p_mode, 'sites', nsites, 'batches', '[]'::jsonb, 'queued', 0, 'approve_directly', hda);
     END IF;
@@ -327,7 +327,7 @@ BEGIN
   res := public.imp_stage_master_core('TPL-MASTER', tv.version, r.file_name, r.file_sha256,
     jsonb_build_array(jsonb_build_object('sheet', mpart ->> 'sheet', 'header_checksum', mpart ->> 'header_checksum', 'rows', v_rows)), p_mode, 'master_import', gid, hw);
   IF hda THEN
-    -- 0087: the batches just staged are marked for direct approval (a System Admin, the step-up, the open waiver, checked again on each batch); every
+    -- 0092: the batches just staged are marked for direct approval (a System Admin, the step-up, the open waiver, checked again on each batch); every
     -- submitted row of them is then approved at once by the sender, here or in the chunked background send (the mark is read from the batch row there)
     PERFORM public.hda_mark_batches(ARRAY(SELECT (x ->> 'id')::uuid FROM jsonb_array_elements(res -> 'batches') x), hw ->> 'reason');
   END IF;
@@ -345,19 +345,19 @@ BEGIN
     batches := batches || jsonb_build_array(b || jsonb_build_object('submitted', sent -> 'submitted', 'saved', sent -> 'saved', 'held', jsonb_array_length(coalesce(sent -> 'held', '[]'::jsonb)),
       'failed', jsonb_array_length(coalesce(sent -> 'failed', '[]'::jsonb)),
       'errors', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'error'),
-      'approved', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'update' AND x.decision = 'approved')));   -- 0087
+      'approved', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'update' AND x.decision = 'approved')));   -- 0092
   END LOOP;
-  v_outcome := jsonb_build_object('group_id', gid, 'mode', p_mode, 'batches', batches, 'skipped', res -> 'skipped', 'queued', queued, 'approve_directly', hda);   -- 0087
+  v_outcome := jsonb_build_object('group_id', gid, 'mode', p_mode, 'batches', batches, 'skipped', res -> 'skipped', 'queued', queued, 'approve_directly', hda);   -- 0092
   UPDATE public.master_reconciliation_runs SET status = 'applied', applied_by = actor, applied_at = now(), apply_reason = left(btrim(p_reason), 2000), apply_mode = p_mode,
     group_id = gid, outcome = v_outcome, version = version + 1 WHERE id = p_run;
   PERFORM public.log_audit_write('master_import.apply', 'master_reconciliation_run', p_run::text, jsonb_build_object('status', 'previewed'),
     jsonb_build_object('status', 'applied', 'outcome', v_outcome, 'file_sha256', r.file_sha256, 'historical_load', hw IS NOT NULL,
-      'approve_directly', hda), btrim(p_reason));   -- 0087
+      'approve_directly', hda), btrim(p_reason));   -- 0092
   PERFORM public.log_system_write('info', 'master-import', 'legacy Master import: applied', jsonb_build_object('run_id', p_run, 'group_id', gid, 'mode', p_mode, 'batches', jsonb_array_length(batches), 'queued', queued), actor, NULL);
   RETURN v_outcome;
 END $function$;
 
--- mi_apply_step (latest definition 0086, changes marked 0087: the direct-approval choice stored on the run)
+-- mi_apply_step (latest definition 0086, changes marked 0092: the direct-approval choice stored on the run)
 -- The background apply (granted): the same mi_apply_run, under the signed context of the person who asked for it. busy = another process holds it.
 CREATE OR REPLACE FUNCTION mi_apply_step(p_job uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -375,7 +375,7 @@ BEGIN
   PERFORM set_config('pmis.mi_apply_job', p_job::text, true);
   BEGIN
     res := public.mi_apply_run(j.run_id, NULL, j.mode, j.reason, j.stepup_verified,
-      CASE WHEN j.hw_reason IS NOT NULL THEN jsonb_build_object('reason', j.hw_reason, 'approve_directly', j.approve_directly) END);   -- 0087: the choice stored at the request
+      CASE WHEN j.hw_reason IS NOT NULL THEN jsonb_build_object('reason', j.hw_reason, 'approve_directly', j.approve_directly) END);   -- 0092: the choice stored at the request
   EXCEPTION WHEN others THEN
     PERFORM set_config('pmis.mi_apply_job', '', true);
     e := public.imp_wf_json(SQLERRM);
@@ -389,7 +389,7 @@ BEGIN
   RETURN jsonb_build_object('job_id', j.id, 'state', 'done', 'outcome', res);
 END $$;
 
--- imp_submit_stream_rows (latest definition 0085, changes marked 0087: a submitted row of a marked batch is approved directly)
+-- imp_submit_stream_rows (latest definition 0085, changes marked 0092: a submitted row of a marked batch is approved directly)
 CREATE OR REPLACE FUNCTION public.imp_submit_stream_rows(p_batch uuid, p_rows uuid[], p_stepup boolean, p_async boolean)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -448,14 +448,14 @@ BEGIN
         saved := saved + 1;
         CONTINUE;
       END IF;
-      -- 0087: the submit of a row approved directly right after sends no notice (no "task assigned" to L2, no "no holder" to the System Admins): see wf_notify
+      -- 0092: the submit of a row approved directly right after sends no notice (no "task assigned" to L2, no "no holder" to the System Admins): see wf_notify
       IF b.historical_direct_approve THEN PERFORM set_config('pmis.hda_quiet', t.id::text, true); END IF;
       IF b.historical_load THEN   -- 0073 (Q462): the mandatory-document check can be waived for this row (see hw_row_waiver)
         PERFORM public.wf_complete_hw(t.id, NULL, 'submit', NULL, p_stepup, r.id);
       ELSE
         PERFORM public.wf_submit(t.id, NULL, NULL, p_stepup);
       END IF;
-      IF b.historical_direct_approve THEN   -- 0087: a historical Master import batch marked for direct approval (read from the stored batch, never from the caller)
+      IF b.historical_direct_approve THEN   -- 0092: a historical Master import batch marked for direct approval (read from the stored batch, never from the caller)
         PERFORM public.hda_approve_task(t.id, b.id, r.id, p_stepup);
         PERFORM set_config('pmis.hda_quiet', '', true);
       END IF;
@@ -467,7 +467,7 @@ BEGIN
       submitted := submitted + 1;
     EXCEPTION WHEN others THEN
       PERFORM set_config('app.batch_row', '', true);
-      PERFORM set_config('pmis.hda_quiet', '', true);   -- 0087
+      PERFORM set_config('pmis.hda_quiet', '', true);   -- 0092
       IF SQLERRM LIKE 'wf:step_up_required%' THEN
         IF NOT coalesce(p_async, false) THEN RAISE; END IF;
         failed := failed || jsonb_build_array(jsonb_build_object('row_id', r.id, 'row_no', r.row_no, 'key', r.row_key, 'code', 'step_up_required',
@@ -489,7 +489,7 @@ BEGIN
   RETURN jsonb_build_object('submitted', submitted, 'saved', saved, 'processed', processed, 'held', held, 'failed', failed);
 END $function$;
 
--- imp_submit_stream_finish (latest definition 0075, changes marked 0087: a batch approved directly is closed, the audit row counts the direct approvals)
+-- imp_submit_stream_finish (latest definition 0075, changes marked 0092: a batch approved directly is closed, the audit row counts the direct approvals)
 CREATE OR REPLACE FUNCTION imp_submit_stream_finish(p_batch uuid, p_prev_status text, p_submitted integer, p_saved integer, p_held integer, p_failed integer) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE actor uuid := public.app_actor(); b public.import_batches%ROWTYPE; new_st text;
@@ -497,18 +497,18 @@ BEGIN
   SELECT * INTO b FROM public.import_batches WHERE id = p_batch;
   new_st := public.imp_stream_status_after_send(p_batch, p_prev_status, p_submitted);
   UPDATE public.import_batches SET status = new_st, version = version + 1, submitted_at = coalesce(submitted_at, now()), submitted_by = coalesce(submitted_by, actor),
-    closed_at = CASE WHEN new_st = 'applied' OR (new_st = 'approved' AND b.historical_direct_approve) THEN now() ELSE closed_at END,   -- 0087
+    closed_at = CASE WHEN new_st = 'applied' OR (new_st = 'approved' AND b.historical_direct_approve) THEN now() ELSE closed_at END,   -- 0092
     rows_error = (SELECT count(*) FROM public.import_batch_rows WHERE batch_id = p_batch AND action = 'error') WHERE id = p_batch;
   PERFORM public.log_audit_write('import_batch_submit', 'import_batch', p_batch::text, NULL,
     jsonb_build_object('mode', b.mode, 'submitted', p_submitted, 'saved', p_saved, 'held', p_held, 'failed', p_failed, 'status', new_st)
-      || CASE WHEN b.historical_direct_approve THEN jsonb_build_object('approved_directly',   -- 0087
+      || CASE WHEN b.historical_direct_approve THEN jsonb_build_object('approved_directly',   -- 0092
            (SELECT count(*) FROM public.task_instances t JOIN public.import_batch_rows x ON x.task_instance_id = t.id AND x.batch_id = p_batch
              WHERE t.historical_direct_batch_id = p_batch AND t.historical_direct_approved)) ELSE '{}'::jsonb END, NULL);
   RETURN new_st;
 END $$;
 
 
--- dash_build_tasks (latest definition 0085, changes marked 0087: a direct approval of the historical load is an override for the SLA / on-time figures)
+-- dash_build_tasks (latest definition 0085, changes marked 0092: a direct approval of the historical load is an override for the SLA / on-time figures)
 CREATE OR REPLACE FUNCTION public.dash_build_tasks(p_ref date, p_stream text, p_excl boolean)
  RETURNS void
  LANGUAGE plpgsql
@@ -547,7 +547,7 @@ BEGIN
   CREATE INDEX ON _dtask (phase, cls);
 END $function$;
 
--- dash_core (latest definition 0085, changes marked 0087: counted in override_flagged_count and in its own historical_direct_flagged_count)
+-- dash_core (latest definition 0085, changes marked 0092: counted in override_flagged_count and in its own historical_direct_flagged_count)
 CREATE OR REPLACE FUNCTION public.dash_core(p_ref date, p_scope integer[], p_region integer, p_cluster text, p_scenario text, p_stream text, p_excl boolean, p_ws uuid, p_sections text[], p_snap date, p_group text, p_issue_scope integer[], p_issues boolean, p_view text)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -596,11 +596,11 @@ BEGIN
   END IF;
 
   SELECT array_agg(DISTINCT wd.version ORDER BY wd.version) INTO wf_versions FROM _dsite s JOIN public.workflow_definitions wd ON wd.id = s.wf;
-  SELECT count(*) INTO flagged FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.admin_override OR t.historical_no_documents OR t.lock_bypassed OR t.historical_direct_approved;   -- 0085: a lock bypass too; 0087: a direct approval too
+  SELECT count(*) INTO flagged FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.admin_override OR t.historical_no_documents OR t.lock_bypassed OR t.historical_direct_approved;   -- 0085: a lock bypass too; 0092: a direct approval too
   SELECT count(*) INTO hist FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.historical_no_documents;   -- 0073 (Q462)
   out_ := jsonb_build_object('meta', jsonb_build_object('project_wide', wide, 'workflow_versions', coalesce(to_jsonb(wf_versions), '[]'::jsonb), 'override_flagged_count', flagged, 'historical_flagged_count', hist,
     'lock_bypass_flagged_count', (SELECT count(*) FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.lock_bypassed),
-    'historical_direct_flagged_count', (SELECT count(*) FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.historical_direct_approved),   -- 0087
+    'historical_direct_flagged_count', (SELECT count(*) FROM public.task_instances t JOIN _dsite s ON s.id = t.site_id AND NOT s.cancelled WHERE t.historical_direct_approved),   -- 0092
     'overrides_excluded', p_excl, 'weight_set_id', ws, 'blocked_gates_available', blk_ok));
 
   IF p_sections && ARRAY['headline'] THEN
@@ -654,7 +654,7 @@ BEGIN
 END $function$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- wf_notify (0015, changes marked 0087): no in-app notice for the task whose submit is followed at once by its direct approval
+-- wf_notify (0015, changes marked 0092): no in-app notice for the task whose submit is followed at once by its direct approval
 -- ---------------------------------------------------------------------------------------------------------------------
 -- WHY. A historical load of 469 sites submits thousands of tasks that are approved in the same transaction; each submit sent "task assigned" to the L2 holders, or
 -- "no holder" to every System Admin, about tasks that are already approved. The notice is skipped only for the task named by the sender's marker
@@ -666,7 +666,7 @@ BEGIN
   IF p_task IS NOT NULL AND coalesce(current_setting('pmis.hda_quiet', true), '') = p_task::text
      AND EXISTS (SELECT 1 FROM public.import_batch_rows r JOIN public.import_batches b ON b.id = r.batch_id
                  WHERE r.task_instance_id = p_task AND b.historical_direct_approve AND public.hda_batch_ok(b)) THEN
-    RETURN;   -- 0087
+    RETURN;   -- 0092
   END IF;
   INSERT INTO public.notifications (user_id, channel, kind, title, body, task_id, link) VALUES (p_user, 'in_app', p_kind, p_title, p_body, p_task, '/tasks/' || p_task::text);
 END $$;

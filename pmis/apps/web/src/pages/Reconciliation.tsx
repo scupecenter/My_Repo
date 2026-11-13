@@ -269,7 +269,7 @@ function RunDetail({ id }: { id: string }) {
   );
 }
 
-/** 0.15.7: the batches of the applied run (the Master sheet by stream, and each register sheet loaded), with their counts, and the sheets skipped. */
+/** 0.15.11: the batches of the applied run (the Master sheet by stream, and each register sheet loaded), with their counts, and the sheets skipped. */
 function RunOutcome({ o }: { o: MasterImportOutcome }) {
   const { t } = useTranslation();
   const batches = o.batches ?? [];
@@ -311,10 +311,10 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open; a draft has no document check
   const offer = useHistoricalOffer(mode === 'submit');
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
-  // 0.15.6 (owner decision 2026-11-12): approve the submitted tasks of the historical load directly, as an admin override (no L2); only with the historical option
+  // 0.15.11 (owner decision 2026-11-12): approve the submitted tasks of the historical load directly, as an admin override (no L2); only with the historical option
   const [directChoice, setDirect] = useState(false);
   const direct = !!offer && hist.on && directChoice;
-  // 0.15.7 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the same file; only with the historical option
+  // 0.15.11 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the same file; only with the historical option
   const [registersChoice, setRegisters] = useState(false);
   const registers = !!offer && hist.on && registersChoice;
   const [err, setErr] = useState<string | null>(null);

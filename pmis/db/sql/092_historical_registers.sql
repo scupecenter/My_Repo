@@ -1,8 +1,8 @@
--- 0088: the register sheets of the historical Master load, loaded from the same file and approved directly (owner decision 2026-11-12, "Everything from the
--- one file"; CHANGELOG 130).
+-- 0093: the register sheets of the historical Master load, loaded from the same file and approved directly (owner decision 2026-11-12, "Everything from the
+-- one file"; CHANGELOG 135).
 --
 -- WHY. The owner loads the real Site Master through "Master import and comparison" (mi_apply_run). Until now the apply entered only the typed task columns of
--- the Master sheet (0087 approves them directly, as an admin override). The same workbook also holds the register sheets: RF & Design, Acquisition, Permission
+-- the Master sheet (0092 approves them directly, as an admin override). The same workbook also holds the register sheets: RF & Design, Acquisition, Permission
 -- Log, PR-PO, GECOL, HLC, As-Built and Risk Register. The owner wants them in their registers from the same file, in the same apply, and, with the direct
 -- approval, approved at once so the registers show the data. The offline helper tools/master-import/fill-templates.py already maps each of these sheets onto
 -- the register template GSDN Workspace issues (TPL-RF ... TPL-RSK); its maps now ship with the API (apps/api/src/master-import/register-maps/, one source of
@@ -19,7 +19,7 @@
 --      historical (hw_mark_batch, now also for a register sheet of the Master import). A row that cannot be read is an error row of its batch; a sheet that
 --      cannot be staged is "skipped" with its reason; neither stops the apply. The batches are then sent like the others (imp_submit_batch, or in chunks with
 --      imp_async_start, 0075), after the stream batches.
---   3. With `approve_directly` (0087) the register batches are marked too (hda_mark_batches, hda_batch_ok now also for a register batch), and
+--   3. With `approve_directly` (0092) the register batches are marked too (hda_mark_batches, hda_batch_ok now also for a register batch), and
 --      imp_submit_register_rows approves each sent row of a marked batch at once (hda_approve_record): the data effects of the final approval of reg_complete
 --      (0019): the level actors, a register step "approve" with the note "historical load: approved directly (admin override)", the approved version in force,
 --      the typed table (reg_apply) and the register's own approval effects (the triggers on the approved state; reg_complete_task). The flag
@@ -31,14 +31,14 @@
 --      Advance request (fa_after): historical field work needs no vehicle or advance today. The other approval effects of these eight registers (the typed
 --      tables, the change-control feeds of RF & Design, Acquisition, As-Built and Risk Register, the HLC / C3 sync) run as in an L2 approval. No warehouse
 --      posting or generated form belongs to these registers.
---   5. Guards, as 0087: the record flag is written only by hda_approve_record (definer role, transaction marker pmis.hda_record, a row of a marked batch that may
+--   5. Guards, as 0092: the record flag is written only by hda_approve_record (definer role, transaction marker pmis.hda_record, a row of a marked batch that may
 --      still be approved directly, read from the stored rows) and clears (audited) if the record ever leaves the approved state. No security function is
 --      weakened: reg_require_actor, the grants and the eligibility of reg_complete are untouched; the direct approval is its own internal function, reached
 --      only from imp_submit_register_rows for a batch with the mark, which only mi_apply_run sets.
 --
--- Redefined from their latest definitions (changes marked "0088"): hw_guard_batch (0073), hw_mark_batch (0073), hda_batch_ok (0087), reg_link_task (0019),
--- reg_notify (0019), fa_after (0076), imp_submit_register_rows (0075), imp_submit_register_finish (0075), mi_apply_run (0087: now a wrapper of the new
--- signature), mi_apply_step (0087). CREATE OR REPLACE keeps their owner (pmis_definer), search_path and grants.
+-- Redefined from their latest definitions (changes marked "0093"): hw_guard_batch (0073), hw_mark_batch (0073), hda_batch_ok (0092), reg_link_task (0019),
+-- reg_notify (0019), fa_after (0076), imp_submit_register_rows (0075), imp_submit_register_finish (0075), mi_apply_run (0092: now a wrapper of the new
+-- signature), mi_apply_step (0092). CREATE OR REPLACE keeps their owner (pmis_definer), search_path and grants.
 --
 -- Function rules: SECURITY DEFINER, search_path = pg_catalog, public, pg_temp, owner pmis_definer, EXECUTE revoked from PUBLIC. pmis_app gets one new door,
 -- mi_apply_run(uuid, integer, text, text, boolean, jsonb, jsonb); the new internal functions are granted to nobody. No new table right (db/sql/app_grants.sql:
@@ -63,13 +63,13 @@ ALTER TABLE register_records
   ADD CONSTRAINT register_records_hda_check CHECK (NOT historical_direct_approved OR (historical_direct_batch_id IS NOT NULL AND historical_direct_approved_at IS NOT NULL
     AND state = 'approved'));
 CREATE INDEX register_records_hda_idx ON register_records (register_key) WHERE historical_direct_approved;
-COMMENT ON COLUMN register_records.historical_direct_approved IS '0088: approved directly by the historical Master import (a register sheet of the file; admin override, no L2): the "Admin override" badge';
+COMMENT ON COLUMN register_records.historical_direct_approved IS '0093: approved directly by the historical Master import (a register sheet of the file; admin override, no L2): the "Admin override" badge';
 
 ALTER TABLE mi_apply_jobs
   ADD COLUMN load_registers boolean NOT NULL DEFAULT false,
   ADD COLUMN registers jsonb,
   ADD CONSTRAINT mi_apply_jobs_hrg_check CHECK (NOT load_registers OR (hw_reason IS NOT NULL AND mode = 'submit'));
-COMMENT ON COLUMN mi_apply_jobs.registers IS '0088: the register sheets the API read from the run''s stored file, kept for the background apply and cleared when the run ends (definer-only table)';
+COMMENT ON COLUMN mi_apply_jobs.registers IS '0093: the register sheets the API read from the run''s stored file, kept for the background apply and cleared when the run ends (definer-only table)';
 
 DO $$
 BEGIN
@@ -90,9 +90,9 @@ CREATE TRIGGER hrg_jobs_clear BEFORE UPDATE ON mi_apply_jobs FOR EACH ROW WHEN (
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 2. The historical mark on a register batch of the Master import (hw_guard_batch, hw_mark_batch: latest 0073, changes marked 0088; hda_batch_ok: 0087)
+-- 2. The historical mark on a register batch of the Master import (hw_guard_batch, hw_mark_batch: latest 0073, changes marked 0093; hda_batch_ok: 0092)
 -- ---------------------------------------------------------------------------------------------------------------------
--- hw_guard_batch (latest 0073; 0088: a register batch of the Master import may carry the mark)
+-- hw_guard_batch (latest 0073; 0093: a register batch of the Master import may carry the mark)
 CREATE OR REPLACE FUNCTION hw_guard_batch() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
@@ -105,7 +105,7 @@ BEGIN
     RETURN NEW;
   END IF;
   IF NEW.historical_load THEN
-    IF (NEW.stream_code IS NULL AND NOT (NEW.register_key IS NOT NULL AND NEW.source = 'master_import'))   -- 0088: a register sheet of the Master import too
+    IF (NEW.stream_code IS NULL AND NOT (NEW.register_key IS NOT NULL AND NEW.source = 'master_import'))   -- 0093: a register sheet of the Master import too
        OR NEW.historical_marked_by IS DISTINCT FROM public.app_actor() OR NOT public.app_user_is_system_admin(NEW.historical_marked_by)
        OR NOT coalesce(public.app_ctx_stepup(), false) OR NOT public.hw_waiver_open_now() OR NEW.historical_cutoff IS DISTINCT FROM public.hw_waiver_cutoff() THEN
       RAISE EXCEPTION 'historical waiver: a batch is marked only by a System Admin with a step-up under the open waiver' USING ERRCODE = 'insufficient_privilege';
@@ -116,20 +116,20 @@ BEGIN
   RETURN NEW;
 END $$;
 
--- hw_mark_batch (latest 0073; 0088: also a register sheet staged by the Master import, mi_apply_run)
+-- hw_mark_batch (latest 0073; 0093: also a register sheet staged by the Master import, mi_apply_run)
 CREATE OR REPLACE FUNCTION hw_mark_batch(p_batch uuid, p_reason text, p_cutoff date) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE a uuid := public.app_actor(); rs text := btrim(p_reason);
 BEGIN
   UPDATE public.import_batches SET historical_load = true, historical_cutoff = p_cutoff, historical_reason = rs, historical_marked_by = a, historical_marked_at = now()
-    WHERE id = p_batch AND (stream_code IS NOT NULL OR (register_key IS NOT NULL AND source = 'master_import')) AND NOT historical_load;   -- 0088
+    WHERE id = p_batch AND (stream_code IS NOT NULL OR (register_key IS NOT NULL AND source = 'master_import')) AND NOT historical_load;   -- 0093
   IF NOT FOUND THEN RAISE EXCEPTION 'historical waiver: only a stream batch or a register sheet of the Master import is marked, once' USING ERRCODE = 'check_violation'; END IF;
   PERFORM public.log_audit_write('import_batch.historical_load', 'import_batch', p_batch::text, jsonb_build_object('historical_load', false),
     jsonb_build_object('historical_load', true, 'cutoff_date', p_cutoff, 'batch_id', p_batch,
       'rule', 'mandatory documents are skipped for rows whose actual date is on or before the cutoff date'), rs, NULL, NULL, NULL, true);
 END $$;
 
--- hda_batch_ok (latest 0087; 0088: a register batch of the Master import too)
+-- hda_batch_ok (latest 0092; 0093: a register batch of the Master import too)
 CREATE OR REPLACE FUNCTION hda_batch_ok(p_batch public.import_batches) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
   SELECT coalesce(p_batch.historical_load AND p_batch.source = 'master_import' AND (p_batch.stream_code IS NOT NULL OR p_batch.register_key IS NOT NULL) AND p_batch.mode = 'submit'
@@ -140,7 +140,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
 $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 3. A historical register row is never the source of a task (reg_link_task: latest 0019, changes marked 0088)
+-- 3. A historical register row is never the source of a task (reg_link_task: latest 0019, changes marked 0093)
 -- ---------------------------------------------------------------------------------------------------------------------
 -- WHY. The task dates of the historical load come from the Master sheet (the stream batches of the same run, sent first). A register record that also
 -- closed its source task (Q43: A3, B1, B2, B3, C1, C2, C4, D1) would approve a second time a task the Master sheet already entered, or, when the task is
@@ -158,14 +158,14 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_te
       AND b.historical_marked_at >= nullif((public.hw_waiver_cfg() ->> 'opened_at'), '')::timestamptz)
 $$;
 
--- reg_link_task (latest 0019; 0088 marked)
+-- reg_link_task (latest 0019; 0093 marked)
 CREATE OR REPLACE FUNCTION reg_link_task(p_record uuid) RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE r public.register_records%ROWTYPE; src record; t public.task_instances%ROWTYPE;
 BEGIN
   SELECT * INTO r FROM public.register_records WHERE id = p_record;
   IF r.site_id IS NULL THEN RETURN NULL; END IF;
-  IF public.hrg_row_historical() THEN   -- 0088: a row of a register sheet of the historical load: the register row only (audited when the register feeds a task)
+  IF public.hrg_row_historical() THEN   -- 0093: a row of a register sheet of the historical load: the register row only (audited when the register feeds a task)
     IF EXISTS (SELECT 1 FROM public.register_task_sources x WHERE x.register_key = r.register_key AND x.is_active) THEN
       PERFORM public.reg_audit('register_record_task_not_linked', p_record, NULL, jsonb_build_object('task_id', NULL, 'historical_load', true),
         'historical load: the task dates come from the Master sheet; the record is approved on the register row only');
@@ -262,11 +262,11 @@ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF public.app_is_seeding() THEN RETURN NEW; END IF;
-    RAISE EXCEPTION 'historical direct approval: the flag of a register record is written only by GSDN Workspace (migration 0088)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'historical direct approval: the flag of a register record is written only by GSDN Workspace (migration 0093)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   IF OLD.historical_direct_approved AND NEW.state IS DISTINCT FROM 'approved' THEN
     IF (NEW.historical_direct_batch_id, NEW.historical_direct_approved_at) IS DISTINCT FROM (OLD.historical_direct_batch_id, OLD.historical_direct_approved_at) THEN
-      RAISE EXCEPTION 'historical direct approval: the batch of a flagged record never changes (migration 0088)' USING ERRCODE = 'insufficient_privilege';
+      RAISE EXCEPTION 'historical direct approval: the batch of a flagged record never changes (migration 0093)' USING ERRCODE = 'insufficient_privilege';
     END IF;
     NEW.historical_direct_approved := false;
     INSERT INTO public.audit_log (action, entity_type, entity_id, site_id, region_id, before, after, reason, actor_id)
@@ -285,7 +285,7 @@ BEGIN
           AND NEW.historical_direct_approved AND NOT OLD.historical_direct_approved AND NEW.state = 'approved' AND OLD.state IN ('in_review', 'in_approval')
           AND EXISTS (SELECT 1 FROM public.import_batches b JOIN public.import_batch_rows x ON x.batch_id = b.id AND x.register_record_id = NEW.id
                       WHERE b.id = NEW.historical_direct_batch_id AND b.historical_direct_approve AND b.register_key = NEW.register_key AND public.hda_batch_ok(b))) THEN
-    RAISE EXCEPTION 'historical direct approval: the flag of a register record is written only by GSDN Workspace (migration 0088)' USING ERRCODE = 'insufficient_privilege';
+    RAISE EXCEPTION 'historical direct approval: the flag of a register record is written only by GSDN Workspace (migration 0093)' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;
 END $$;
@@ -296,7 +296,7 @@ CREATE TRIGGER hda_guard_record_upd BEFORE UPDATE ON register_records FOR EACH R
         OR NEW.historical_direct_approved_at IS DISTINCT FROM OLD.historical_direct_approved_at OR (OLD.historical_direct_approved AND NEW.state IS DISTINCT FROM OLD.state))
   EXECUTE FUNCTION hda_guard_record();
 
--- reg_notify (latest 0019, changes marked 0088): no in-app notice about the record whose submit is followed at once by its direct approval. The notice is skipped
+-- reg_notify (latest 0019, changes marked 0093): no in-app notice about the record whose submit is followed at once by its direct approval. The notice is skipped
 -- only for the record named by the sender's marker (imp_submit_register_rows) AND only while that record has a row in a batch marked for direct approval that
 -- may still be approved directly (hda_batch_ok): a marker set anywhere else never hides a notice.
 CREATE OR REPLACE FUNCTION reg_notify(p_user uuid, p_kind text, p_title text, p_body text, p_record uuid) RETURNS void
@@ -305,13 +305,13 @@ BEGIN
   IF p_record IS NOT NULL AND coalesce(current_setting('pmis.hda_quiet_record', true), '') = p_record::text
      AND EXISTS (SELECT 1 FROM public.import_batch_rows x JOIN public.import_batches b ON b.id = x.batch_id
                  WHERE x.register_record_id = p_record AND b.historical_direct_approve AND public.hda_batch_ok(b)) THEN
-    RETURN;   -- 0088
+    RETURN;   -- 0093
   END IF;
   INSERT INTO public.notifications (user_id, channel, kind, title, body, link)
   SELECT p_user, 'in_app', p_kind, p_title, p_body, '/registers/' || r.register_key || '/records/' || r.id::text FROM public.register_records r WHERE r.id = p_record;
 END $$;
 
--- fa_after (latest 0076, changes marked 0088): a Procurement record approved directly by the historical load opens no Car Dispatcher booking and no Financial
+-- fa_after (latest 0076, changes marked 0093): a Procurement record approved directly by the historical load opens no Car Dispatcher booking and no Financial
 -- Advance request (historical field work needs no vehicle or advance now); its Ready-to-mobilize state is still synchronised.
 CREATE OR REPLACE FUNCTION fa_after() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -319,7 +319,7 @@ BEGIN
   IF public.app_is_seeding() THEN RETURN NULL; END IF;
   IF NEW.register_key = 'procurement' THEN
     IF NEW.state = 'approved' AND public.fa_field_work(NEW.data) THEN
-      IF NOT NEW.historical_direct_approved THEN PERFORM public.fa_open_drafts(NEW.id); END IF;   -- 0088
+      IF NOT NEW.historical_direct_approved THEN PERFORM public.fa_open_drafts(NEW.id); END IF;   -- 0093
       PERFORM public.fleet_sync(NEW.entity_id);
     END IF;
   ELSIF NEW.state = 'voided' AND NEW.register_key = 'car_dispatcher' THEN
@@ -333,9 +333,9 @@ END $$;
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 5. The sender of a register batch (imp_submit_register_rows, imp_submit_register_finish: latest 0075, changes marked 0088)
+-- 5. The sender of a register batch (imp_submit_register_rows, imp_submit_register_finish: latest 0075, changes marked 0093)
 -- ---------------------------------------------------------------------------------------------------------------------
--- imp_submit_register_rows (latest 0075; 0088 marked: a sent row of a batch marked for direct approval is approved at once)
+-- imp_submit_register_rows (latest 0075; 0093 marked: a sent row of a batch marked for direct approval is approved at once)
 CREATE OR REPLACE FUNCTION imp_submit_register_rows(p_batch uuid, p_rows uuid[], p_stepup boolean, p_async boolean) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE
@@ -377,10 +377,10 @@ BEGIN
       END IF;
       SELECT version INTO rver FROM public.register_records WHERE id = rid;
       UPDATE public.import_batch_rows SET register_record_id = rid WHERE id = r.id;      -- the overload below checks that the row belongs to the record
-      -- 0088: the submit of a row approved directly right after sends no notice (no "waits for you" to L2, no "no holder" to the System Admins): see reg_notify
+      -- 0093: the submit of a row approved directly right after sends no notice (no "waits for you" to L2, no "no holder" to the System Admins): see reg_notify
       IF b.historical_direct_approve THEN PERFORM set_config('pmis.hda_quiet_record', rid::text, true); END IF;
       PERFORM public.reg_transition_record(rid, rver, 'submit', NULL, p_stepup, r.id);
-      IF b.historical_direct_approve THEN   -- 0088: a register sheet of the historical load marked for direct approval (read from the stored batch, never from the caller)
+      IF b.historical_direct_approve THEN   -- 0093: a register sheet of the historical load marked for direct approval (read from the stored batch, never from the caller)
         PERFORM public.hda_approve_record(rid, b.id, r.id, p_stepup);
         PERFORM set_config('pmis.hda_quiet_record', '', true);
       END IF;
@@ -390,7 +390,7 @@ BEGIN
         decided_by = CASE WHEN st = 'approved' THEN actor END, decided_at = CASE WHEN st = 'approved' THEN now() END WHERE id = r.id;
       submitted := submitted + 1;
     EXCEPTION WHEN others THEN
-      PERFORM set_config('pmis.hda_quiet_record', '', true);   -- 0088
+      PERFORM set_config('pmis.hda_quiet_record', '', true);   -- 0093
       PERFORM set_config('app.batch_row', '', true);
       IF SQLERRM LIKE 'wf:step_up_required%' THEN
         IF NOT coalesce(p_async, false) THEN RAISE; END IF;
@@ -416,7 +416,7 @@ BEGIN
   RETURN jsonb_build_object('submitted', submitted, 'processed', processed, 'held', held, 'failed', failed);
 END $$;
 
--- imp_submit_register_finish (latest 0075; 0088 marked: a batch approved directly is closed, the audit row counts the direct approvals)
+-- imp_submit_register_finish (latest 0075; 0093 marked: a batch approved directly is closed, the audit row counts the direct approvals)
 CREATE OR REPLACE FUNCTION imp_submit_register_finish(p_batch uuid, p_prev_status text, p_submitted integer, p_held integer, p_failed integer) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE actor uuid := public.app_actor(); new_st text; b public.import_batches%ROWTYPE;
@@ -424,11 +424,11 @@ BEGIN
   SELECT * INTO b FROM public.import_batches WHERE id = p_batch;
   new_st := CASE WHEN p_submitted > 0 OR p_prev_status <> 'validated' THEN public.imp_status_of_after(p_batch) ELSE p_prev_status END;
   UPDATE public.import_batches SET status = new_st, version = version + 1, submitted_at = coalesce(submitted_at, now()), submitted_by = coalesce(submitted_by, actor),
-    closed_at = CASE WHEN new_st = 'approved' AND b.historical_direct_approve THEN now() ELSE closed_at END,   -- 0088
+    closed_at = CASE WHEN new_st = 'approved' AND b.historical_direct_approve THEN now() ELSE closed_at END,   -- 0093
     rows_error = (SELECT count(*) FROM public.import_batch_rows WHERE batch_id = p_batch AND action = 'error') WHERE id = p_batch;
   PERFORM public.log_audit_write('import_batch_submit', 'import_batch', p_batch::text, NULL,
     jsonb_build_object('submitted', p_submitted, 'held', p_held, 'failed', p_failed, 'status', new_st)
-      || CASE WHEN b.historical_direct_approve THEN jsonb_build_object('approved_directly',   -- 0088
+      || CASE WHEN b.historical_direct_approve THEN jsonb_build_object('approved_directly',   -- 0093
            (SELECT count(*) FROM public.register_records x JOIN public.import_batch_rows y ON y.register_record_id = x.id AND y.batch_id = p_batch
              WHERE x.historical_direct_batch_id = p_batch AND x.historical_direct_approved)) ELSE '{}'::jsonb END, NULL);
   RETURN new_st;
@@ -526,10 +526,10 @@ END $$;
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- 7. The apply: mi_apply_run with the register sheets (new signature; the body is that of 0087, changes marked 0088), its old signature as a wrapper,
---    and mi_apply_step (latest 0087, changes marked 0088)
+-- 7. The apply: mi_apply_run with the register sheets (new signature; the body is that of 0092, changes marked 0093), its old signature as a wrapper,
+--    and mi_apply_step (latest 0092, changes marked 0093)
 -- ---------------------------------------------------------------------------------------------------------------------
--- mi_apply_run, new signature with p_registers (the body of 0087, changes marked 0088)
+-- mi_apply_run, new signature with p_registers (the body of 0092, changes marked 0093)
 CREATE OR REPLACE FUNCTION public.mi_apply_run(p_run uuid, p_version integer, p_mode text, p_reason text, p_stepup boolean, p_historical jsonb, p_registers jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -544,8 +544,8 @@ DECLARE
   su_until timestamptz;        -- 0075: when the verified step-up of this session ends (from the session row, never from the caller), for the audit rows of the run
   bg uuid := CASE WHEN coalesce(current_setting('pmis.mi_apply_job', true), '') ~ '^[0-9a-f-]{36}$' THEN current_setting('pmis.mi_apply_job', true)::uuid END;   -- 0086: the background run of this apply
   lim int; nsites int; jid uuid;   -- 0086
-  hda boolean := false;   -- 0087: the historical load is approved directly (admin override, no L2)
-  hrg boolean := false; regs jsonb; rres jsonb; rnotes jsonb := '[]'::jsonb;   -- 0088: the register sheets of the same file
+  hda boolean := false;   -- 0092: the historical load is approved directly (admin override, no L2)
+  hrg boolean := false; regs jsonb; rres jsonb; rnotes jsonb := '[]'::jsonb;   -- 0093: the register sheets of the same file
 BEGIN
   IF NOT public.mi_can_use() THEN
     PERFORM public.wf_err('action_forbidden', jsonb_build_object('detail', 'The legacy Master import is for a System Admin or a delegate of templates administer.'));
@@ -572,10 +572,10 @@ BEGIN
     END IF;
     PERFORM public.hw_mark_authorize(p_historical ->> 'reason');
     hw := jsonb_build_object('reason', btrim(p_historical ->> 'reason'));
-    hda := coalesce(p_historical -> 'approve_directly' = 'true'::jsonb, false);   -- 0087
-    hrg := coalesce(p_historical -> 'registers' = 'true'::jsonb, false);          -- 0088
+    hda := coalesce(p_historical -> 'approve_directly' = 'true'::jsonb, false);   -- 0092
+    hrg := coalesce(p_historical -> 'registers' = 'true'::jsonb, false);          -- 0093
   END IF;
-  -- 0088: the register sheets are read by the API from the file stored with this run (never sent by the caller of the endpoint); they come only with the
+  -- 0093: the register sheets are read by the API from the file stored with this run (never sent by the caller of the endpoint); they come only with the
   -- historical option, and they must be of this file (its SHA-256)
   IF (p_registers IS NOT NULL OR hrg) AND p_historical IS NULL THEN
     PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', jsonb_build_array(jsonb_build_object('path', '/historical_load/registers', 'code', 'invalid',
@@ -604,7 +604,7 @@ BEGIN
     SELECT count(DISTINCT upper(x.site_code)) INTO nsites FROM public.master_reconciliation_rows x WHERE x.run_id = p_run AND x.site_id IS NOT NULL;
     IF nsites > lim THEN
       INSERT INTO public.mi_apply_jobs (run_id, actor_id, mode, reason, hw_reason, stepup_verified, stepup_until, session_id, auth_method, mfa, request_id, sites_total,
-                                        approve_directly, load_registers, registers)   -- 0087, 0088
+                                        approve_directly, load_registers, registers)   -- 0092, 0093
       VALUES (p_run, actor, p_mode, left(btrim(p_reason), 2000), hw ->> 'reason', true, su_until,
               CASE WHEN public.app_ctx_get('session_id') ~ '^[0-9a-fA-F-]{36}$' THEN public.app_ctx_get('session_id')::uuid END,
               public.app_ctx_get('auth_method'), CASE public.app_ctx_get('mfa') WHEN 'true' THEN true WHEN 'false' THEN false END, left(public.app_ctx_get('request_id'), 64), nsites,
@@ -613,7 +613,7 @@ BEGIN
       UPDATE public.master_reconciliation_runs SET status = 'applying', version = version + 1 WHERE id = p_run;
       PERFORM public.log_audit_write('master_import.apply_queued', 'master_reconciliation_run', p_run::text, jsonb_build_object('status', 'previewed'),
         jsonb_build_object('status', 'applying', 'job_id', jid, 'mode', p_mode, 'sites', nsites, 'file_sha256', r.file_sha256, 'historical_load', hw IS NOT NULL,
-          'approve_directly', hda, 'registers', hrg), btrim(p_reason));   -- 0087, 0088
+          'approve_directly', hda, 'registers', hrg), btrim(p_reason));   -- 0092, 0093
       PERFORM public.log_system_write('info', 'master-import', 'legacy Master import: apply queued', jsonb_build_object('run_id', p_run, 'job_id', jid, 'mode', p_mode, 'sites', nsites), actor, NULL);
       RETURN jsonb_build_object('queued_apply', true, 'job_id', jid, 'mode', p_mode, 'sites', nsites, 'batches', '[]'::jsonb, 'queued', 0, 'approve_directly', hda, 'registers', hrg);
     END IF;
@@ -642,7 +642,7 @@ BEGIN
     CONTINUE WHEN cells = '{}'::jsonb AND pres = '[]'::jsonb;
     v_rows := v_rows || jsonb_build_array(jsonb_build_object('row_no', row_.row_no, 'site_code', row_.site_code, 'cells', cells, 'pre_errors', pres));
   END LOOP;
-  IF jsonb_array_length(v_rows) = 0 AND NOT (hrg AND jsonb_array_length(coalesce(regs -> 'parts', '[]'::jsonb)) > 0) THEN   -- 0088: a file of register sheets only
+  IF jsonb_array_length(v_rows) = 0 AND NOT (hrg AND jsonb_array_length(coalesce(regs -> 'parts', '[]'::jsonb)) > 0) THEN   -- 0093: a file of register sheets only
     PERFORM public.wf_err('validation_failed', jsonb_build_object('detail', 'No typed task column of this file belongs to a site of GSDN Workspace: nothing can be entered.'));
   END IF;
   IF jsonb_array_length(v_rows) > 0 THEN
@@ -652,14 +652,14 @@ BEGIN
     res := jsonb_build_object('group_id', gid, 'batches', '[]'::jsonb, 'skipped', '[]'::jsonb);
   END IF;
   IF hrg THEN
-    -- 0088: each register sheet becomes a register batch of the same group (source master_import, the historical mark), after the stream batches, so it is
+    -- 0093: each register sheet becomes a register batch of the same group (source master_import, the historical mark), after the stream batches, so it is
     -- sent after them; a sheet that cannot be staged is skipped with its reason, never the whole apply
     rres := public.hrg_stage_registers(regs, r, p_mode, gid, hw ->> 'reason');
     res := res || jsonb_build_object('batches', (res -> 'batches') || (rres -> 'batches'), 'skipped', coalesce(res -> 'skipped', '[]'::jsonb) || (rres -> 'skipped'));
     rnotes := rres -> 'notes';
   END IF;
   IF hda THEN
-    -- 0087: the batches just staged are marked for direct approval (a System Admin, the step-up, the open waiver, checked again on each batch); every
+    -- 0092: the batches just staged are marked for direct approval (a System Admin, the step-up, the open waiver, checked again on each batch); every
     -- submitted row of them is then approved at once by the sender, here or in the chunked background send (the mark is read from the batch row there)
     PERFORM public.hda_mark_batches(ARRAY(SELECT (x ->> 'id')::uuid FROM jsonb_array_elements(res -> 'batches') x), hw ->> 'reason');
   END IF;
@@ -671,29 +671,29 @@ BEGIN
       batches := batches || jsonb_build_array(b || jsonb_build_object('queued', true, 'job_id', q -> 'job' -> 'job_id', 'rows', q -> 'job' -> 'rows_total',
         'submitted', 0, 'saved', 0, 'held', 0, 'failed', 0, 'approved', 0,
         'errors', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'error'),
-        'skipped', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'unchanged')));   -- 0088
+        'skipped', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'unchanged')));   -- 0093
       CONTINUE;
     END IF;
     sent := public.imp_submit_batch((b ->> 'id')::uuid, NULL, p_stepup);
     batches := batches || jsonb_build_array(b || jsonb_build_object('submitted', sent -> 'submitted', 'saved', sent -> 'saved', 'held', jsonb_array_length(coalesce(sent -> 'held', '[]'::jsonb)),
       'failed', jsonb_array_length(coalesce(sent -> 'failed', '[]'::jsonb)),
       'errors', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'error'),
-      'approved', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action IN ('create', 'update') AND x.decision = 'approved'),   -- 0087, 0088
-      'rows', (SELECT x.rows_total FROM public.import_batches x WHERE x.id = (b ->> 'id')::uuid),   -- 0088: the rows of the batch, and the rows that changed nothing
+      'approved', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action IN ('create', 'update') AND x.decision = 'approved'),   -- 0092, 0093
+      'rows', (SELECT x.rows_total FROM public.import_batches x WHERE x.id = (b ->> 'id')::uuid),   -- 0093: the rows of the batch, and the rows that changed nothing
       'skipped', (SELECT count(*) FROM public.import_batch_rows x WHERE x.batch_id = (b ->> 'id')::uuid AND x.action = 'unchanged')));
   END LOOP;
-  v_outcome := jsonb_build_object('group_id', gid, 'mode', p_mode, 'batches', batches, 'skipped', res -> 'skipped', 'queued', queued, 'approve_directly', hda,   -- 0087
-    'registers', hrg, 'register_notes', rnotes);   -- 0088
+  v_outcome := jsonb_build_object('group_id', gid, 'mode', p_mode, 'batches', batches, 'skipped', res -> 'skipped', 'queued', queued, 'approve_directly', hda,   -- 0092
+    'registers', hrg, 'register_notes', rnotes);   -- 0093
   UPDATE public.master_reconciliation_runs SET status = 'applied', applied_by = actor, applied_at = now(), apply_reason = left(btrim(p_reason), 2000), apply_mode = p_mode,
     group_id = gid, outcome = v_outcome, version = version + 1 WHERE id = p_run;
   PERFORM public.log_audit_write('master_import.apply', 'master_reconciliation_run', p_run::text, jsonb_build_object('status', 'previewed'),
     jsonb_build_object('status', 'applied', 'outcome', v_outcome, 'file_sha256', r.file_sha256, 'historical_load', hw IS NOT NULL,
-      'approve_directly', hda, 'registers', hrg), btrim(p_reason));   -- 0087, 0088
+      'approve_directly', hda, 'registers', hrg), btrim(p_reason));   -- 0092, 0093
   PERFORM public.log_system_write('info', 'master-import', 'legacy Master import: applied', jsonb_build_object('run_id', p_run, 'group_id', gid, 'mode', p_mode, 'batches', jsonb_array_length(batches), 'queued', queued), actor, NULL);
   RETURN v_outcome;
 END $function$;
 
--- The signature of 0073 / 0087 (granted; the 5-argument wrapper of 0073 calls it): the same apply without register sheets.
+-- The signature of 0073 / 0092 (granted; the 5-argument wrapper of 0073 calls it): the same apply without register sheets.
 CREATE OR REPLACE FUNCTION public.mi_apply_run(p_run uuid, p_version integer, p_mode text, p_reason text, p_stepup boolean, p_historical jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -704,7 +704,7 @@ BEGIN
   RETURN public.mi_apply_run(p_run, p_version, p_mode, p_reason, p_stepup, p_historical, NULL::jsonb);
 END $function$;
 
--- mi_apply_step (latest 0087, changes marked 0088)
+-- mi_apply_step (latest 0092, changes marked 0093)
 CREATE OR REPLACE FUNCTION mi_apply_step(p_job uuid) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE actor uuid := public.app_actor(); j public.mi_apply_jobs%ROWTYPE; res jsonb; e jsonb;
@@ -722,7 +722,7 @@ BEGIN
   BEGIN
     res := public.mi_apply_run(j.run_id, NULL, j.mode, j.reason, j.stepup_verified,
       CASE WHEN j.hw_reason IS NOT NULL THEN jsonb_build_object('reason', j.hw_reason, 'approve_directly', j.approve_directly, 'registers', j.load_registers) END,
-      j.registers);   -- 0087, 0088: the choices and the register sheets stored at the request (the sheets read by the API from the run's file)
+      j.registers);   -- 0092, 0093: the choices and the register sheets stored at the request (the sheets read by the API from the run's file)
   EXCEPTION WHEN others THEN
     PERFORM set_config('pmis.mi_apply_job', '', true);
     e := public.imp_wf_json(SQLERRM);

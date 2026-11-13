@@ -11,7 +11,7 @@ import { SITE_APPROVE_GRANTS } from './tpl-stream-helpers';
 import { Actor, Site, actor, makeSite, makeTask, plainAdmin, setCell } from './wf-helpers';
 
 /**
- * Migration 0088 (owner decision 2026-11-12, "Everything from the one file"): the historical Master apply also loads the register sheets of the same file
+ * Migration 0093 (owner decision 2026-11-12, "Everything from the one file"): the historical Master apply also loads the register sheets of the same file
  * (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers; with approve_directly they are approved at once
  * (admin override, no L2). Its own database (TEST_DATABASE_URL_HREG; the seeded Document Library is off). Synthetic data only. Region 4.
  */
@@ -104,7 +104,7 @@ const RF_HEADERS = ['#', 'Site ID', 'Site Owner ID', 'Latitude', 'Tower Height (
 const ACQ_HEADERS = ['#', 'Site ID', 'Candidate', 'Selected', 'Owner / Landlord', 'Contact Person', 'Phone', 'E-mail', 'Negotiation Start Date', 'Remark'];
 const RSK_HEADERS = ['Risk ID', 'Risk Statement', 'Status', 'Target Date'];
 
-describe('0088: the register sheets of the historical Master load', () => {
+describe('0093: the register sheets of the historical Master load', () => {
   it('approve directly: the register rows are records approved at once (admin override, no L2), flagged, audited; personal columns are never read; an unknown site is an error row; a missing sheet is skipped', async () => {
     const t = await team();
     const a = await preCwSite('HRA');
@@ -134,7 +134,7 @@ describe('0088: the register sheets of the historical Master load', () => {
     expect(rf).toMatchObject({ kind: 'register', sheet: 'RF & Design', rows: 3, approved: 2, errors: 1, skipped: 0 });
     expect(batches.find((x) => x.ref === 'acquisition')).toMatchObject({ kind: 'register', rows: 1, approved: 1, errors: 0 });
     expect(batches.find((x) => x.ref === 'risks')).toMatchObject({ kind: 'register', rows: 1, approved: 1, errors: 0 });
-    // the stream batch of the Master sheet comes first and is approved directly as before (0087)
+    // the stream batch of the Master sheet comes first and is approved directly as before (0092)
     expect(batches[0]!.kind).toBe('stream');
     expect((await q<{ s: string }>(db, 'SELECT state::text AS s FROM task_instances WHERE id = $1', [a.b4]))[0]!.s).toBe('approved');
     // the sheets the file does not have are skipped with their reason

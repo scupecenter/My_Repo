@@ -48,7 +48,7 @@ TPL_VERSION = re.compile(r'^[0-9]{1,6}$')
 BLANK_TOKENS = {'n/a', 'na', 'pending', 'cancelled', 'canceled'}  # plan section 5.2 / G10
 PERSONAL_HEADER = re.compile(r'landlord|contact|phone|e-?mail', re.I)
 OPEN_ENDED = {'open-ended', 'open ended', 'openended'}
-# One source of truth (CHANGELOG 130): the maps ship with the API, which loads the same register sheets in "Master import and comparison" (migration 0088).
+# One source of truth (CHANGELOG 135): the maps ship with the API, which loads the same register sheets in "Master import and comparison" (migration 0093).
 DEFAULT_MAPS = Path(__file__).resolve().parent.parent.parent / 'apps' / 'api' / 'src' / 'master-import' / 'register-maps'
 MAX_ENTRIES = 1000
 MAX_UNCOMPRESSED = 200 * 1024 * 1024

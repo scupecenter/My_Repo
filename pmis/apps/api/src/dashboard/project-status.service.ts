@@ -94,7 +94,7 @@ export class ProjectStatusService {
         override_flagged_count: flagged,
         historical_flagged_count: Number(meta.historical_flagged_count ?? 0),
         lock_bypass_flagged_count: Number(meta.lock_bypass_flagged_count ?? 0),
-        historical_direct_flagged_count: Number(meta.historical_direct_flagged_count ?? 0),   // 0087
+        historical_direct_flagged_count: Number(meta.historical_direct_flagged_count ?? 0),   // 0092
         overrides_excluded: exclude,
         weight_set: weightSet,
       },

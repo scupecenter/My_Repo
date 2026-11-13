@@ -95,7 +95,7 @@ interface RecordRow {
   return_count: number;
   last_return_note: string | null;
   self_approval: boolean;
-  /** 0088: approved directly by the historical Master import (the Admin override badge) */
+  /** 0093: approved directly by the historical Master import (the Admin override badge) */
   historical_direct_approved: boolean;
   task_id: string | null;
   task_code: string | null;

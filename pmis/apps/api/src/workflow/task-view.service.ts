@@ -86,7 +86,7 @@ export interface TaskSummaryDto {
   lock_bypassed: boolean;
   /** 0085: the lock it bypassed: predecessor_open:<codes> or gate_closed:<gate>; null when not bypassed. */
   lock_bypass_reason: string | null;
-  /** 0087: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
+  /** 0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
   historical_direct_approved: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
   lock_reasons: { kind: string; ref_code: string | null; message: string; count: number | null }[];

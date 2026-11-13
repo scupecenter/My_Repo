@@ -1,5 +1,5 @@
--- The register sheets of the historical Master load (migration 0088, owner decision 2026-11-12 "Everything from the one file"; contract 0.15.7).
--- The direct-approval flag of a register record and the parsed register rows of a background apply are written only by the definer functions of 0088; the staging
+-- The register sheets of the historical Master load (migration 0093, owner decision 2026-11-12 "Everything from the one file"; contract 0.15.11).
+-- The direct-approval flag of a register record and the parsed register rows of a background apply are written only by the definer functions of 0093; the staging
 -- of the sheets, the direct approval and the helpers are internal; the only door is mi_apply_run(..., p_registers), which checks the run's file and the
 -- historical load. Alice: CW Team Lead in Tripoli, not a System Admin. ADMIN: the System Admin.
 

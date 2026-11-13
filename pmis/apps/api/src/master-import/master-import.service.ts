@@ -40,8 +40,8 @@ const MAX_ROWS = 5000;
 const applyBody = z.object({
   mode: z.enum(['submit', 'draft']), reason: z.string().trim().min(3).max(2000),
   // Q462 (0073): mark the batches "historical load: accept without documents" (a System Admin under the open waiver)
-  // 0087 (owner decision 2026-11-12, "Direct approval"): approve every submitted task of the load at once as an admin override (no L2); historical load only
-  // 0088 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the run's stored file; historical load only
+  // 0092 (owner decision 2026-11-12, "Direct approval"): approve every submitted task of the load at once as an admin override (no L2); historical load only
+  // 0093 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the run's stored file; historical load only
   historical_load: z.object({ reason: z.string().trim().min(3).max(2000), approve_directly: z.boolean().optional(), registers: z.boolean().optional() }).strict().optional(),
 }).strict().superRefine((b, ctx) => {
   if (b.historical_load?.approve_directly && b.mode !== 'submit') {
@@ -349,7 +349,7 @@ export class MasterImportService {
     }
     const stepOk = Boolean(await this.stepUp.validUntil(auth));
     const hl = body.historical_load;
-    // 0088: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
+    // 0093: the register sheets are read here, from the file stored with the run (never from the request); the database checks the file's SHA-256 again
     const registers = hl?.registers ? await this.readRegisters(auth, id, String(run.file_name), String(run.file_sha256)) : null;
     const hist = hl ? { reason: hl.reason, ...(hl.approve_directly ? { approve_directly: true } : {}), ...(hl.registers ? { registers: true } : {}) } : null;
     // 0075: a staged batch with more rows than imports.async_rows is sent in the background (its run is started here once the request commits)
@@ -369,7 +369,7 @@ export class MasterImportService {
   }
 
   /**
-   * 0088: the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register), mapped onto the
+   * 0093: the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register), mapped onto the
    * current register templates by the shipped maps (register-sheets.ts). The stored bytes must be the file of the run (SHA-256) and pass the same package guard
    * as at the upload. Personal columns are never read.
    */

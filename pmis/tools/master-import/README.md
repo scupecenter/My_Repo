@@ -47,7 +47,7 @@ A row is skipped when it has no Site ID, when the Site ID is not on the Master s
 
 ## Mapping files
 
-The mapping files live in `apps/api/src/master-import/register-maps/` (one source of truth, CHANGELOG 130): GSDN Workspace reads the same files when "Master import and comparison" loads the register sheets of the historical Master (`historical_load.registers`, migration 0088). This tool uses that folder by default (`--maps` overrides it).
+The mapping files live in `apps/api/src/master-import/register-maps/` (one source of truth, CHANGELOG 135): GSDN Workspace reads the same files when "Master import and comparison" loads the register sheets of the historical Master (`historical_load.registers`, migration 0093). This tool uses that folder by default (`--maps` overrides it).
 
 `register-maps/index.csv` names the Master sheet, header row, first data row and key of each register. `register-maps/<register>.csv` has one row per template column: `template_header` (as GSDN Workspace issues it), `master_header` (the header in the Master; `a|b` gives alternatives for renamed columns), `master_column` (the letter, documentation only), `transform` (`site_id`, `record_type_po_pr`, `open_ended_no`, or `const:<value>` for a fixed value such as the As-Built record type `te_part`), `personal`. A template column with an empty `master_header` has no source in the owner's file and stays blank. If GSDN Workspace re-issues a template with new headers, edit the matching row; the report lists every mapping row that matches nothing.
 
