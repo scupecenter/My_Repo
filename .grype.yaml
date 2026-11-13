@@ -1,0 +1,14 @@
+# grype configuration (read automatically from the repository root by the Security workflow).
+# Temporary accepted-risk exceptions, owner decision 2026-11-13. Review by 2026-12-13.
+# Both need a breaking major upgrade, tracked as a separate upgrade PR after the five admin features.
+ignore:
+  # zod < 4.6.6: memory exhaustion when validating oversized constrained collections.
+  # Fix needs zod 4 (breaking API). Request bodies are size-limited by the API.
+  - vulnerability: GHSA-mrhx-c7xc-m3w5
+    package:
+      name: zod
+  # deepmerge-ts < 8: stack exhaustion on recursive object graphs.
+  # Pulled in by the Prisma CLI config loader (build time, no user input). Fix needs prisma 7.
+  - vulnerability: GHSA-ggr8-5vv4-36mx
+    package:
+      name: deepmerge-ts
