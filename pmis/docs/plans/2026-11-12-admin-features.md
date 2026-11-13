@@ -85,7 +85,7 @@
 
 ## الحالة النهائية للجولة (2026-11-13)
 - الخصائص الخمس مدموجة في main: [#125](https://github.com/scupecenter/My_Repo/pull/125) و[#127](https://github.com/scupecenter/My_Repo/pull/127) و[#129](https://github.com/scupecenter/My_Repo/pull/129) و[#126](https://github.com/scupecenter/My_Repo/pull/126) و[#128](https://github.com/scupecenter/My_Repo/pull/128)، والفحص الأمني على GitHub [#130](https://github.com/scupecenter/My_Repo/pull/130). حُذفت فروعها كلها.
-- [#123](https://github.com/scupecenter/My_Repo/pull/123) (الاعتماد المباشر للتحميل التاريخي، قرار المالك 2026-11-12) يُبقى لأنه لا يتعارض مع الخاصية 1. يجري تحديثه على main وإعادة ترقيم ترحيلاته إلى 0092 و0093 والعقد إلى 0.15.11.
+- [#123](https://github.com/scupecenter/My_Repo/pull/123) (الاعتماد المباشر للتحميل التاريخي، قرار المالك 2026-11-12) يُبقى لأنه لا يتعارض مع الخاصية 1. ترحيلاته 0092 و0093 والعقد 0.15.11. **دُمج 2026-11-13** (dfac1fb). حُذفت النسخة المحلية؛ الفرع البعيد `claude/keen-ritchie-vlq9tu` يحذفه المالك من صفحة GitHub لأن الوكيل لا يملك صلاحية حذف فرع أنشأه حساب آخر.
 - بعد دمج [#123](https://github.com/scupecenter/My_Repo/pull/123) وهذا الملف يبقى main وحده.
 
 ## المتبقي (للجولة القادمة)
@@ -125,3 +125,13 @@
 - إعادة تسمية السجل نفسه، وإعادة تسمية القوائم وقيمها.
 - الفرع claude/register-columns-admin، الترحيل 0095، العقد 0.15.13، CHANGELOG 137.
 - الحالة: قيد التنفيذ.
+
+## حالة الطلبات (تحديث 2026-11-13)
+| الطلب | الموضوع | الحالة |
+|---|---|---|
+| [#123](https://github.com/scupecenter/My_Repo/pull/123) | الاعتماد المباشر للتحميل التاريخي وجداول السجلات | مدموج |
+| [#131](https://github.com/scupecenter/My_Repo/pull/131) | محرر سير العمل، المرحلة 2 | مسودة، قيد التنفيذ |
+| (يُفتح قريباً) | إدارة أعمدة السجلات، المرحلة 3 | قيد التنفيذ، الفرع `claude/register-columns-admin` |
+| [#124](https://github.com/scupecenter/My_Repo/pull/124) | ملف التقدم هذا | يُدمج أخيراً |
+
+للاستئناف من أي مكان: اقرأ هذا الملف وقسم «الاستئناف من أي مكان» أعلاه، ثم افتح كل طلب مفتوح واقرأ قائمة «## Progress» في وصفه.
