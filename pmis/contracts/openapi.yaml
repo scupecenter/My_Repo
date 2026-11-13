@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.5
+  version: 0.15.7
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.7 (2026-11-12): invite a new user by email (owner decision 2026-11-12, decision 5; migration 0091; CHANGELOG 133). Additive. `POST /users/invitations` (role assignments, department, manager, groups and two-factor chosen at invite time, within the inviter's own rights; step-up when the invitation is elevated), `GET /users/invitations`, `POST /users/invitations/{invitation_id}/resend` and `/revoke`; the public `GET /invitations/{token}` and `POST /invitations/{token}/accept` (no session, rate limited, every bad link the same 404). New `ErrorCode` `invitation_invalid`.
+    - 0.15.6 (2026-11-12): permanent delete of a soft-deleted user that frees the identifiers (owner decision 3 of 2026-11-12; migration 0089; CHANGELOG 131; amends decision B14 "never a hard delete"). Additive. (1) `POST /users/{user_id}/purge` (`purgeUser`): a System Admin (a delegate of `users.delete` gets 403 `action_forbidden`) turns an already soft-deleted account into a tombstone; needs `reason`, step-up and the typed confirmation `confirm_text` (the account's employee ID or e-mail; mismatch 422 `confirmation_mismatch`). The row, its id and its display name are kept, so all history, audit rows and task steps stay attributed; the e-mail (replaced by a placeholder), employee ID, phone and Entra link are released, so a new account with the same data can be created; credentials, 2FA and sessions end, group memberships are removed, assignments are ended, delegations revoked. 409 `invalid_transition` when the account is not soft-deleted yet or was already purged, 403 `self_beneficiary` for the caller's own row, 409 `last_admin` if no active System Admin would remain. A purged user is in no list and picker and answers 404 on every `/users/{user_id}` path; it cannot be restored. (2) `GET /users/deleted` leaves purged users out and `can_restore` / `restore_blocked_reason` are now computed against every other account (`email_in_use`, `employee_id_in_use`, `phone_in_use`).
     - 0.15.5 (2026-11-11): the apply of a big legacy Master runs in the background (owner report 2026-11-11: the historical apply of the 469 sites answered 504; migration 0086; CHANGELOG 128). Additive. `POST /master-import/runs/{run_id}/apply` of a file with more sites than `imports.async_rows` (default 50) makes every check of the request as before (right, version, status, mode and reason, step-up, the historical-load option and its waiver, a file applied once), then answers 202 with the run in the new status `applying` and `MasterImportRun.applying` (`MasterImportApplyProgress`: state, sites, start, end, error). The apply itself is the same, in one transaction of its own under the same person (all or nothing); the run then shows `applied` with its `outcome`, and its big batches are sent in the background as before (`progress`). A refusal in the background (the waiver closed meanwhile, an expired step-up) puts the run back to `previewed` with `applying.state` `failed` and its error: the file can be applied again. A second apply while it runs answers 409 `upload_processing`. Opening the sites of a historical load is also faster (one statement per site instead of one per task).
     - 0.15.4 (2026-11-10): historical data without locks, per-site workflow locks, the missing data of a historical load (owner requests 2026-11-10; technical decisions "Decided 2026-11-10: historical data without locks; per-site workflow locks" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0085; CHANGELOG 125). Additive. (1) `SiteListItem.workflow_locks` (true = the sequencing locks apply, as before; false = an "open" site: a task is not held by its predecessors or a closed gate, dates are entered in any order by hand, by a template and by the Master import; L1/L2, holders, rights, step-up, audit, field validation and the mandatory documents still apply; gates and milestones are still computed) and `SiteListItem.data_gaps` (the missing required values of the site); `GET /sites` filters `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`); `SiteDetail.workflow_locks_info` (who, when, why, `can_manage`) and `SiteDetail.data_gap_items`. (2) `PUT /sites/{site_id}/workflow-locks` and `POST /sites/workflow-locks` (a selection, or every site of a Master import run or of an import batch, with one reason): a System Admin or a holder of the delegable right `unlock` (`overrides.unlock` administer) for the region; a reason (422) and a step-up (401); 403 `action_forbidden` otherwise; audited per site (`site_workflow_locks_set`, before/after, flagged as an admin override when opening). Opening a site opens its locked tasks for entry; switching back to Locked re-locks the tasks that are still untouched and still held. (3) `TaskSummary.lock_bypassed` / `lock_bypass_reason`: a task approved on an open site while a predecessor or a gate would have held it; shown with the "Admin override" badge and treated as an override in the KPIs (`KpiMeta.lock_bypass_flagged_count`, included in `override_flagged_count`). (4) The historical-load option (0.14.3) of `POST /master-import/runs/{run_id}/apply` and of a stream template upload first sets the sites of the file to open (audited per site with the reason of the load), so no row is held for a predecessor or a gate; missing data is never an error: warnings `missing_actual_date` (the row is saved, not submitted), `missing_actual_start` (the task starts on its actual date), `missing_predecessor_date`, and a cell of an approved, N/A or absent task is not read (warning); invalid values stay errors of their own cell. (5) `GET /master-import/runs/{run_id}/sites` and `GET /import-batches/{batch_id}/sites` (`SiteImportStatus`): every site of the file with its status, warnings, errors and data gaps; `gaps=only`. (6) `SiteDraftInput.workflow_locks` (Locked by default, Open needs the right of (2) when L2 approves, 403 otherwise) and the New sites template column "Workflow Locks".
     - 0.15.3 (2026-11-09): big template uploads staged in the background (owner report 2026-11-09: a "Master (all sheets)" upload of about 469 sites, and the legacy Master preview, answered 500 after the 30 s request transaction; technical decision "Decided 2026-11-09: big template uploads staged in the background" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0083; CHANGELOG 122). Additive. (1) `POST /import-batches`: a file with more data rows (all its sheets) than 4 times the setting `imports.async_rows` (default 4 x 50 = 200) is staged in the background. Every check of the upload still runs in the request, in the same order and with the same answers (the right, the size, the package guard, `_tpl`, version, template, headers, and the checks the staging makes before its rows: the import right, the regions, the task of a per-task upload, the historical-load option); then the answer is **202** with the upload in status `parsing`: `id` (= `upload_id`; for TPL-MASTER also `group_id`), `progress` (`ImportBatchProgress` with `kind` = `upload`: `parts_total`, `parts_done`, `rows_total` = data rows of the file, `rows_done`, `percent`), `warnings`, `upload` (`ImportUploadInfo`). Each part (a stream batch of the Master sheet, a register sheet, the one batch of another template; a stream part 100 file rows at a time) is staged in a transaction of its own under the uploader's signed context, by the same database functions as the request, so the batches, rows, errors, warnings and audit rows are those the request would have produced. `GET /import-batches/{batch_id}` with the upload's id answers the upload while it is `parsing` (or `failed`, with `upload.error`), then the batch it produced (for TPL-MASTER the first part with `group_id`, `parts` and `warnings`, as the synchronous answer), with `upload_id`. `GET /import-batches` lists the caller's uploads in `parsing` first (unfiltered first page, or `status=parsing`). The same file of the same person while it is parsed answers 409 `upload_processing` (new `ErrorCode`, `upload_id`); a send of the upload id answers 409 `upload_processing`; `POST .../decisions` `discard` on the upload id stops it (the uploader only; the parts staged so far stay as batches). Only the uploader sees the upload; a run left behind by a restart is resumed by the API. Smaller files are staged in the request as before (202, status `validated`). (2) `POST /master-import/runs`: a Master with more data rows than 4 times `imports.async_rows` (default 200) answers **202** with the run in the new status `staging` and `MasterImportRun.staging` (`MasterImportStagingProgress`: rows done of rows total, percent); the identification and structure checks still answer 422 in the request; the rows are compared 100 at a time in the background, then the run is `previewed` with the same summary and differences; `failed` when the comparison could not end. `POST /master-import/runs/{run_id}/apply` of a `staging` run answers 409 `upload_processing`, of a `failed` run 409 `invalid_transition`. The same file of the same person while it is compared answers 409 `upload_processing` (`upload_id`, `run_id`). (3) Measured with 470 synthetic sites: the TPL-MASTER staging went from 98 s to 11 s and the Master import apply from 87 s to 6 s (the staging no longer grows a jsonb array row by row); the apply stays in the request.
@@ -1796,6 +1798,41 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/purge:
+    post:
+      tags: [users]
+      operationId: purgeUser
+      summary: Delete a soft-deleted user permanently; the identifiers are freed (0.15.6)
+      description: |
+        Owner decision 3 of 2026-11-12 (amends B14). System Admin only; the account must already be soft-deleted (`POST /users/{user_id}/delete`). The `users` row is never removed: it stays as a tombstone with its id and display name, so every past entry, audit row, comment and task step stays attributed to the person. The e-mail (a placeholder `purged-<id>@purged.invalid` stays), employee ID, phone and Entra link are released: a NEW account (`POST /users`) with the same data succeeds and the staff-registry employee ID can be linked to it. Local credentials, TOTP secrets and recovery codes are deleted, sessions end, pending e-mail and phone changes are cancelled, group memberships are removed, current and future role assignments are ended and delegations from or to the user are revoked. Open tasks stay with the tombstone exactly as after the soft delete (B14, B12b). Irreversible: a purged account cannot be restored (409 `invalid_transition`) and the released identifiers cannot be re-attached to it.
+        Needs a reason (3 to 500 characters), step-up and `confirm_text`: the account's employee ID or its e-mail, typed exactly (422 `confirmation_mismatch`, path `/confirm_text`). Audited as `user_purged` with before and after (masked e-mail and phone, employee ID, counts of what was removed).
+        Refused with 403 `action_forbidden` for a delegate, 403 `self_beneficiary` for the caller's own row, 404 for an unknown or already purged id, 409 `invalid_transition` when the user is not soft-deleted, 409 `last_admin` if it would leave no active System Admin.
+      x-step-up: true
+      x-db-path: idm_purge_user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, confirm_text]
+              additionalProperties: false
+              properties:
+                reason: { $ref: '#/components/schemas/DeleteReason' }
+                confirm_text: { $ref: '#/components/schemas/ConfirmText' }
+      responses:
+        '200':
+          description: Purged; the tombstone.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurgedUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/two-factor:
     put:
       tags: [users]
@@ -12824,8 +12861,27 @@ components:
         - type: object
           required: [deleted_at]
           properties:
-            can_restore: { type: boolean, description: 'false when the employee ID or the email is now owned by another account.' }
-            restore_blocked_reason: { type: [string, 'null'] }
+            can_restore: { type: boolean, description: 'false when the employee ID, the email or the phone is now owned by another account (computed against every other account, 0.15.6).' }
+            restore_blocked_reason: { type: [string, 'null'], enum: [email_in_use, employee_id_in_use, phone_in_use, null] }
+    PurgedUser:
+      type: object
+      description: 'The tombstone of a permanently deleted user (0.15.6). Only what history needs: the name stays, the identifiers are masked copies of what was released.'
+      required: [id, display_name, purged_at, identifiers]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        purged_at: { type: string, format: date-time }
+        purged_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        purge_reason: { type: [string, 'null'] }
+        deleted_at: { type: [string, 'null'], format: date-time, description: 'When the soft delete happened.' }
+        delete_reason: { type: [string, 'null'] }
+        identifiers:
+          type: object
+          description: 'Masked: e-mail as first letter plus domain, phone as its last two digits, the 4-digit employee ID as it was.'
+          properties:
+            email: { type: [string, 'null'] }
+            employee_id: { type: [string, 'null'] }
+            phone: { type: [string, 'null'] }
     UserDetail:
       allOf:
         - $ref: '#/components/schemas/User'

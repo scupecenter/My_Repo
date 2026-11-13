@@ -1067,7 +1067,7 @@ export interface paths {
         put?: never;
         /**
          * Choose a password and create the account (public, no session)
-         * @description The password follows the password policy (422 `validation_failed` with `errors[]`; the policy is checked only for a valid link). The account, its
+         * @description The password follows the password policy (422 `weak_password` with `errors[]`; the policy is checked only for a valid link). The account, its
          *     sign-in, the assignments, department, manager, groups and the two-factor row are created in one step; a role, department, manager or group that is no
          *     longer valid is skipped (never more rights than were chosen) and the audit row lists what was skipped. No session is created: the person signs in
          *     afterwards, and when `two_factor_enrolment_pending` is true an admin hands them the enrolment code first.
@@ -1180,6 +1180,28 @@ export interface paths {
          * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
          */
         post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a soft-deleted user permanently; the identifiers are freed (0.15.6)
+         * @description Owner decision 3 of 2026-11-12 (amends B14). System Admin only; the account must already be soft-deleted (`POST /users/{user_id}/delete`). The `users` row is never removed: it stays as a tombstone with its id and display name, so every past entry, audit row, comment and task step stays attributed to the person. The e-mail (a placeholder `purged-<id>@purged.invalid` stays), employee ID, phone and Entra link are released: a NEW account (`POST /users`) with the same data succeeds and the staff-registry employee ID can be linked to it. Local credentials, TOTP secrets and recovery codes are deleted, sessions end, pending e-mail and phone changes are cancelled, group memberships are removed, current and future role assignments are ended and delegations from or to the user are revoked. Open tasks stay with the tombstone exactly as after the soft delete (B14, B12b). Irreversible: a purged account cannot be restored (409 `invalid_transition`) and the released identifiers cannot be re-attached to it.
+         *     Needs a reason (3 to 500 characters), step-up and `confirm_text`: the account's employee ID or its e-mail, typed exactly (422 `confirmation_mismatch`, path `/confirm_text`). Audited as `user_purged` with before and after (masked e-mail and phone, employee ID, counts of what was removed).
+         *     Refused with 403 `action_forbidden` for a delegate, 403 `self_beneficiary` for the caller's own row, 404 for an unknown or already purged id, 409 `invalid_transition` when the user is not soft-deleted, 409 `last_admin` if it would leave no active System Admin.
+         */
+        post: operations["purgeUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7729,7 +7751,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "invitation_invalid";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -8233,9 +8255,32 @@ export interface components {
         UserAccountStatus: "active" | "deactivated" | "deleted";
         DeleteReason: string;
         DeletedUser: components["schemas"]["User"] & {
-            /** @description false when the employee ID or the email is now owned by another account. */
+            /** @description false when the employee ID, the email or the phone is now owned by another account (computed against every other account, 0.15.6). */
             can_restore?: boolean;
-            restore_blocked_reason?: string | null;
+            /** @enum {string|null} */
+            restore_blocked_reason?: "email_in_use" | "employee_id_in_use" | "phone_in_use" | null;
+        };
+        /** @description The tombstone of a permanently deleted user (0.15.6). Only what history needs: the name stays, the identifiers are masked copies of what was released. */
+        PurgedUser: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            /** Format: date-time */
+            purged_at: string;
+            purged_by?: components["schemas"]["UserRef"] | null;
+            purge_reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When the soft delete happened.
+             */
+            deleted_at?: string | null;
+            delete_reason?: string | null;
+            /** @description Masked: e-mail as first letter plus domain, phone as its last two digits, the 4-digit employee ID as it was. */
+            identifiers: {
+                email?: string | null;
+                employee_id?: string | null;
+                phone?: string | null;
+            };
         };
         UserDetail: components["schemas"]["User"] & {
             assignments?: components["schemas"]["Assignment"][];
@@ -16915,6 +16960,40 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    purgeUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["DeleteReason"];
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Purged; the tombstone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgedUser"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     setUserTwoFactor: {

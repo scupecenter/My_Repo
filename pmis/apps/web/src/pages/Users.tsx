@@ -1,10 +1,10 @@
-import { Check, Mail, RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX, X } from 'lucide-react';
+import { Check, Eraser, Mail, RotateCcw, ShieldOff, Trash2, UserPlus, UserRoundPlus, UserX, X } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useRoles, useUsers } from '@/api/admin';
 import { useMe } from '@/api/hooks';
-import { useDeactivateUser, useDeletedUsers, useDeleteUser, useRestoreUser } from '@/api/settings';
+import { useDeactivateUser, useDeletedUsers, useDeleteUser, usePurgeUser, useRestoreUser } from '@/api/settings';
 import type { DeletedUser, User } from '@/api/types';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
@@ -27,23 +27,35 @@ export function MfaBadge({ user }: { user: Pick<User, 'mfa_exempt' | 'employee_i
   return <span className="chip gap-1 bg-waitBg text-waitInk" data-testid={`mfa-badge-${user.employee_id}`} title={user.mfa_exempt_until ? t('mfa.until', { date: user.mfa_exempt_until.slice(0, 10) }) : t('mfa.until_revoked')}><ShieldOff size={12} />{t('mfa.badge')}</span>;
 }
 
-type Act = { kind: 'deactivate' | 'reactivate' | 'delete'; user: User } | { kind: 'restore'; deleted: DeletedUser };
+type Act = { kind: 'deactivate' | 'reactivate' | 'delete'; user: User } | { kind: 'restore'; deleted: DeletedUser } | { kind: 'purge'; deleted: DeletedUser };
 
 function ActDialog({ act, onClose }: { act: Act; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
-  const status = useDeactivateUser(), del = useDeleteUser(), restore = useRestoreUser();
-  const m = act.kind === 'delete' ? del : act.kind === 'restore' ? restore : status;
+  const status = useDeactivateUser(), del = useDeleteUser(), restore = useRestoreUser(), purge = usePurgeUser();
+  const [confirm, setConfirm] = useState('');
+  const m = act.kind === 'delete' ? del : act.kind === 'restore' ? restore : act.kind === 'purge' ? purge : status;
   const done = (k: string) => ({ onSuccess: () => { toast(t(`users.done_${k}`)); onClose(); } });
+  // Typed confirmation of a permanent delete (0.15.6): the employee ID or the e-mail of the account.
+  const expected = act.kind === 'purge' ? (act.deleted.employee_id ?? act.deleted.email) : '';
+  const matches = act.kind !== 'purge' || (confirm.trim() !== '' && (confirm.trim() === act.deleted.employee_id || confirm.trim().toLowerCase() === act.deleted.email?.toLowerCase()));
   return (
-    <FormDialog open onClose={onClose} testid="user-act-dialog" title={t(`users.${act.kind}_title`, { name: act.kind === 'restore' ? act.deleted.display_name : act.user.display_name })} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
-      submitLabel={t(`users.${act.kind}`)}
+    <FormDialog open onClose={onClose} testid="user-act-dialog" title={t(`users.${act.kind}_title`, { name: 'deleted' in act ? act.deleted.display_name : act.user.display_name })} busy={m.isPending} error={m.isError ? errText(m.error, t) : null}
+      submitLabel={t(`users.${act.kind}`)} disabled={!matches}
       onSubmit={(reason) => {
         if (act.kind === 'delete') del.mutate({ user: act.user, reason }, done('delete'));
         else if (act.kind === 'restore') restore.mutate({ user: act.deleted, reason }, done('restore'));
+        else if (act.kind === 'purge') purge.mutate({ user: act.deleted, reason, confirm_text: confirm.trim() }, done('purge'));
         else status.mutate({ user: act.user, status: act.kind === 'deactivate' ? 'disabled' : 'active', reason }, done(act.kind));
       }}>
-      {act.kind !== 'restore' && act.kind !== 'reactivate' && <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="user-act-note">{t('users.act_note')}</p>}
+      {!('deleted' in act) && act.kind !== 'reactivate' && <p className="rounded-md bg-card2 p-2 text-sm text-mute" data-testid="user-act-note">{t('users.act_note')}</p>}
+      {act.kind === 'purge' && (
+        <div className="space-y-2">
+          <p role="alert" className="rounded-md bg-lateBg p-2 text-sm text-lateInk" data-testid="user-purge-warning">{t('users.purge_warning')}</p>
+          <label htmlFor="user-purge-confirm" className="text-sm font-semibold">{t('users.purge_confirm_label', { value: expected })}</label>
+          <input id="user-purge-confirm" data-testid="user-purge-confirm" dir="ltr" autoComplete="off" className="input mono mt-1" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+        </div>
+      )}
     </FormDialog>
   );
 }
@@ -51,6 +63,7 @@ function ActDialog({ act, onClose }: { act: Act; onClose: () => void }) {
 function DeletedTab() {
   const { t } = useTranslation();
   const q = useDeletedUsers(true);
+  const me = useMe(true);
   const [act, setAct] = useState<Act | null>(null);
   const items = q.data ?? [];
   return (
@@ -65,8 +78,9 @@ function DeletedTab() {
               <td className="p-2">{d.deleted_by?.display_name}</td>
               <td className="mono p-2 text-xs">{d.deleted_at?.slice(0, 10)}</td>
               <td className="p-2 text-end">
-                <button className="btn" data-testid={`user-restore-${d.employee_id}`} disabled={d.can_restore === false} title={d.restore_blocked_reason ?? undefined} onClick={() => setAct({ kind: 'restore', deleted: d })}><RotateCcw size={14} />{t('users.restore')}</button>
-                {d.can_restore === false && <div className="mt-1 text-xs text-lateInk" data-testid={`restore-blocked-${d.employee_id}`}>{d.restore_blocked_reason}</div>}
+                <button className="btn" data-testid={`user-restore-${d.employee_id}`} disabled={d.can_restore === false} title={d.restore_blocked_reason ? t(`users.restore_blocked_${d.restore_blocked_reason}`, { defaultValue: d.restore_blocked_reason }) : undefined} onClick={() => setAct({ kind: 'restore', deleted: d })}><RotateCcw size={14} />{t('users.restore')}</button>
+                {isAdmin(me.data) && <button className="btn ms-2 text-lateInk" data-testid={`user-purge-${d.employee_id}`} onClick={() => setAct({ kind: 'purge', deleted: d })}><Eraser size={14} />{t('users.purge')}</button>}
+                {d.can_restore === false && <div className="mt-1 text-xs text-lateInk" data-testid={`restore-blocked-${d.employee_id}`}>{t(`users.restore_blocked_${d.restore_blocked_reason}`, { defaultValue: d.restore_blocked_reason ?? '' })}</div>}
               </td>
             </tr>
           ))}

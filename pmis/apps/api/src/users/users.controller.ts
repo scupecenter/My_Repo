@@ -4,7 +4,7 @@ import { Auth } from '../auth/decorators';
 import type { AuthContext } from '../auth/auth.types';
 import { etagHeader } from '../common/etag';
 import { TwoFactorChange, UserDetailDto, UsersService } from './users.service';
-import type { UserDto } from './users.repo';
+import type { PurgedUserDto, UserDto } from './users.repo';
 
 @Controller('users')
 export class UsersController {
@@ -36,6 +36,12 @@ export class UsersController {
     const d = await this.users.restore(auth, id, ifMatch, body);
     res.setHeader('ETag', etagHeader(d.version));
     return d;
+  }
+
+  @Post(':id/purge')
+  @HttpCode(200)
+  purge(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<PurgedUserDto> {
+    return this.users.purge(auth, id, body);
   }
 
   @Get('picker')
