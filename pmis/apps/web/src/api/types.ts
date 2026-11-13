@@ -84,6 +84,7 @@ export type PermissionProfile = S['PermissionProfile'];
 export type DelegationTargetKind = S['DelegationTargetKind'];
 export type ActOnBehalfRequest = S['ActOnBehalfRequest'];
 export type DeletedUser = S['DeletedUser'];
+export type PurgedUser = S['PurgedUser'];
 export type UserAccountStatus = S['UserAccountStatus'];
 export type Holiday = S['Holiday'];
 export type HolidayInput = S['HolidayInput'];

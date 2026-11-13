@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api, ApiError, downloadFile, type RequestOptions } from './client';
 import type {
-  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
+  ActiveSession, ActOnBehalfRequest, Calendar, CalendarConfirmation, MailNotificationKinds, ImportsSettings, NavLayoutSetting, NavLayoutT, ContractorRules, ContractorRulesInput, ContractorsCompletenessReport, TeamScopeMismatchReport, DeletedUser, PurgedUser, DlpSettings, DlpVersion, DlpVersionInput, Holiday, HolidayChangeResult, HolidayInput, HolidayPatch, HolidaySummary, IdleTaskAlertSetting, Job, LogIntegrity, LogRetention, LogRetentionInput,
   NotificationPolicy, NotificationPolicyInput, NotificationTypeDef, Page, ReassignmentAlert, SecurityLogEntry, SessionRevokeResult, SlaPublishPreview, SlaRuleSet, SlaRuleSetPublishResult, SlaRuleSetSummary, SlaTaskRule, StaffVisibility, StructuralFreeze,
   TaskDefinition, TeamScopeMatch, TeamScopeMatchInput, TransitionResultT, User, UserDetail, WeekendDaysResult, WeightSet, WeightSetCode, WeightSetInput, WeightSetPreview, WeightSetPublishResult, WorkflowVersion, WorkflowVersionSummary,
 } from './types';
@@ -267,6 +267,15 @@ export const useRestoreUser = () => {
   return useMutation<UserDetail, ApiError, { user: DeletedUser; reason: string }>({
     mutationFn: ({ user, reason }) => api.post(`/users/${user.id}/restore`, { version: user.version, body: { reason } }),
     onSettled: () => refresh(qc, 'users', 'users-deleted', 'alerts', 'site-tasks', 'approvals', 'matrix'),
+  });
+};
+
+/** 0.15.6: permanent delete of a soft-deleted user (System Admin, step-up, typed confirmation). */
+export const usePurgeUser = () => {
+  const qc = useQueryClient();
+  return useMutation<PurgedUser, ApiError, { user: DeletedUser; reason: string; confirm_text: string }>({
+    mutationFn: ({ user, reason, confirm_text }) => api.post(`/users/${user.id}/purge`, { body: { reason, confirm_text } }),
+    onSettled: () => refresh(qc, 'users', 'users-deleted', 'staff', 'audit'),
   });
 };
 

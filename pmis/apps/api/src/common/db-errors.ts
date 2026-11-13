@@ -189,6 +189,12 @@ export function mapDbError(e: unknown): ProblemException | null {
       return new ProblemException(403, 'action_forbidden', { detail: 'You are not allowed to do this.' });
     }
     case '23505': {
+      // 0089: restoring a deleted user whose e-mail, employee ID or phone now belongs to another account
+      const rb = /restore_blocked: the (e-mail|employee ID|phone)/.exec(msg);
+      if (rb) {
+        const field = rb[1] === 'e-mail' ? '/email' : rb[1] === 'phone' ? '/phone' : '/employee_id';
+        return new ProblemException(409, 'duplicate', { detail: `The ${rb[1]} now belongs to another account, so this account cannot be restored.`, errors: [{ path: field, code: 'duplicate', message: 'Already used by another account.' }] });
+      }
       const path = duplicateField(msg);
       const errors: FieldError[] = path ? [{ path, code: 'duplicate', message: path === '/code' ? 'This code is already in use.' : 'Already used by another account.' }] : [];
       return new ProblemException(409, 'duplicate', { detail: path === '/code' ? 'The code is already in use.' : 'The value is already used by another account.', errors });
@@ -249,6 +255,16 @@ export function mapDbError(e: unknown): ProblemException | null {
           detail: 'Nobody matches this audience.',
           errors: [{ path: '/audience', code: 'no_recipients', message: 'No active user matches this audience.' }],
         });
+      }
+      // 0089: permanent delete of a soft-deleted user
+      if (/confirmation_mismatch/i.test(msg)) {
+        return new ProblemException(422, 'confirmation_mismatch', {
+          detail: 'Type the employee ID or the e-mail of the account exactly to confirm.',
+          errors: [{ path: '/confirm_text', code: 'confirmation_mismatch', message: 'Does not match the account.' }],
+        });
+      }
+      if (/already purged|user is purged|user is not deleted: soft-delete/i.test(msg)) {
+        return new ProblemException(409, 'invalid_transition', { detail: /soft-delete/.test(msg) ? 'Only an account that is already deleted can be deleted permanently.' : 'The account was already deleted permanently.' });
       }
       if (/already deleted|is not deleted/i.test(msg)) {
         return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });

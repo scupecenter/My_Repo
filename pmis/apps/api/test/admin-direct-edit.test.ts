@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, etag, makeSite, makeTask, plainAdmin } from './wf-helpers';
 
 /**
- * Migration 0088 (owner decision 2026-11-12 (2), contract 0.15.6): a System Admin edits site data and task dates directly (reason + step-up, audit before and after,
+ * Migration 0088 (owner decision 2026-11-12 (2), contract 0.15.7): a System Admin edits site data and task dates directly (reason + step-up, audit before and after,
  * the "Admin override" flag, reversible); everybody else keeps the Change Control proposal. Region 6 holds the sites.
  */
 let app: NestExpressApplication;
