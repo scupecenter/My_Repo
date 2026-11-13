@@ -147,6 +147,16 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'A critical list of this register has no value yet.',
         extra: { lists: Array.isArray(extra.lists) ? extra.lists : [] },
       });
+    case 'freeze_active':
+      return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
+    case 'stale_preview':
+      return new ProblemException(409, 'stale_preview', { detail: detail ?? 'The preview is out of date. Preview again.' });
+    case 'workflow_invalid':
+      return new ProblemException(422, 'workflow_invalid', { detail: detail ?? 'The version cannot be published.', extra: { problems: Array.isArray(extra.problems) ? extra.problems : [] } });
+    case 'master_impact_unconfirmed':
+      return new ProblemException(422, 'master_impact_unconfirmed', {
+        detail: detail ?? 'Confirm the Master impact to continue.', extra: { confirmation_phrase: typeof extra.confirmation_phrase === 'string' ? extra.confirmation_phrase : 'master-impact' },
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',

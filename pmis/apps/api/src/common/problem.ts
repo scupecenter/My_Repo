@@ -15,7 +15,7 @@ export type ErrorCode =
   | 'list_not_configured' | 'confirmation_mismatch'
   | 'email_not_verified'
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
-  | 'invitation_invalid';
+  | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid';
 
 export interface FieldError {
   path: string;
@@ -78,6 +78,10 @@ const TITLES: Record<string, string> = {
   email_not_verified: 'The new email address is not confirmed',
   batch_processing: 'The batch is being processed',
   upload_processing: 'The file is being checked',
+  freeze_active: 'Structural changes are frozen',
+  workflow_invalid: 'The workflow version cannot be published',
+  master_impact_unconfirmed: 'Confirm the Master impact to continue',
+  stale_preview: 'The preview is out of date',
 };
 
 export const problemTitle = (code: string): string => TITLES[code] ?? code;

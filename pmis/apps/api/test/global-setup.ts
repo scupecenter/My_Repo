@@ -166,6 +166,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wlDb = await buildDatabase(adminUrl, wl, appPassword);
   process.env.TEST_DATABASE_URL_WL = wlDb.appUrl;
   process.env.TEST_SUPER_URL_WL = wlDb.superUrl;
+  // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
+  // so no other suite may share it.
+  const wfe = `${dbName}_wfe`;
+  const wfeDb = await buildDatabase(adminUrl, wfe, appPassword);
+  process.env.TEST_DATABASE_URL_WFE = wfeDb.appUrl;
+  process.env.TEST_SUPER_URL_WFE = wfeDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -208,6 +214,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.end();
   };
 }
