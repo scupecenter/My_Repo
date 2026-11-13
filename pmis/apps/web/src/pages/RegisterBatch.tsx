@@ -1,4 +1,4 @@
-import { ArrowRight, Check, Send, Trash2, Undo2 } from 'lucide-react';
+import { ArrowRight, Check, Send, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
@@ -6,11 +6,14 @@ import { useBatch, useBatches, useBatchRows, useDecideBatch, useParseJob, useReg
 import { batchPath, type ImportBatch, type ImportBatchOutcome, type ImportRow, type RegisterDefinition } from '@/api/types';
 import { batchTotals, BatchProgress } from '@/components/BatchProgress';
 import { useBatchValueFormat, type ShowValue } from '@/components/batchFormat';
+import { AdminApproveDialog } from '@/components/AdminApproveDialog';
 import { RejectDialog } from '@/components/RejectDialog';
 import { UploadStaging } from '@/components/UploadStaging';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { useToast } from '@/components/Toast';
 import { useVirtual } from '@/components/useVirtual';
+import { useMe } from '@/api/hooks';
+import { isAdmin } from '@/lib/perm';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { ImportSitesPanel } from '@/components/WorkflowLocks';
 
@@ -100,6 +103,8 @@ export function RegisterBatch() {
   const submit = useSubmitBatch(), decide = useDecideBatch();
   const [show, setShow] = useState<'all' | 'valid' | 'invalid' | 'held'>('all');
   const [returning, setReturning] = useState<'all' | string | null>(null);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const admin = isAdmin(useMe(true).data);
   const [outcome, setOutcome] = useState<(ImportBatchOutcome & { held: NonNullable<ImportBatchOutcome['held']>; failed: NonNullable<ImportBatchOutcome['failed']> }) | null>(null);
   const def = useRegisterDefs().data?.find((d) => d.register_key === key);
   const fail = (e: unknown) => { const m = registerErrorMessage(t, e); if (m) toast(m, 'err'); };
@@ -183,6 +188,7 @@ export function RegisterBatch() {
             <div className="mb-3 flex flex-wrap items-center gap-3 rounded-md bg-card2 p-3 text-sm">
               <span className="flex-1" data-testid="batch-approve-hint">{t('batch.approve_hint', { count: openN })}</span>
               {!!heldN && <button className="btn" data-testid="batch-resend" disabled={submit.isPending} onClick={() => send(b)}><Send size={16} />{t('batch.resend')}</button>}
+              {admin && stream && !siteBatch && <button className="btn" data-testid="batch-admin-approve" disabled={!openN || decide.isPending} onClick={() => setAdminOpen(true)}><ShieldCheck size={16} />{t('batch.admin_approve')}</button>}
               <button className="btn btn-danger" data-testid="batch-reject-all" disabled={decide.isPending || (!openN && !heldN)} onClick={() => setReturning('all')}><Undo2 size={16} />{t('batch.reject_all')}</button>
               <button className="btn btn-primary" data-testid="batch-approve-all" disabled={!openN || decide.isPending} onClick={() => act(b, { action: 'approve', scope: 'all' }, t('approvals.done'))}><Check size={16} />{t('batch.approve_all', { count: openN })}</button>
             </div>
@@ -196,6 +202,10 @@ export function RegisterBatch() {
           )}
           {/* 0.15.4 (migration 0085): the sites of a stream batch with their status and missing data */}
           {stream && b && <ImportSitesPanel source="batch" id={b.id} canManage />}
+          {outcome && !!outcome.incomplete && (
+            <p className="mb-3 rounded-md bg-waitBg p-3 text-sm text-waitInk" role="status" data-testid="batch-outcome-incomplete">{t('batch.admin_outcome', { approved: outcome.approved ?? 0, incomplete: outcome.incomplete })}</p>
+          )}
+          {!!b.counts.admin_approved && <span className="sr-only" data-testid="batch-admin-approved-count">{b.counts.admin_approved}</span>}
           {outcome && !!outcome.failed.length && (
             <div role="alert" className="mb-3 rounded-md bg-lateBg p-3 text-sm text-lateInk" data-testid="batch-outcome-failed">
               <p className="font-semibold">{t('batch.failed_title', { count: outcome.failed.length })}</p>
@@ -251,6 +261,8 @@ export function RegisterBatch() {
             </table>
             {rows.complete && !shown.length && <p className="p-4 text-center text-mute">{t('registers.empty')}</p>}
           </div>
+          <AdminApproveDialog open={adminOpen} count={openN} busy={decide.isPending} onClose={() => setAdminOpen(false)}
+            onSend={(note) => { setAdminOpen(false); act(b, { action: 'admin_approve', scope: 'all', note }, t('batch.admin_done')); }} />
           <RejectDialog open={returning !== null} title={returning === 'all' ? t('batch.reject_all_title') : t('batch.return_row_title')} onClose={() => setReturning(null)}
             onSend={(note) => {
               const target = returning; setReturning(null);

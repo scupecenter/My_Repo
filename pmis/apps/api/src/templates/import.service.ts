@@ -37,7 +37,7 @@ const uploadBody = z.object({
 }).passthrough();
 const decisionBody = z
   .object({
-    action: z.enum(['review', 'approve', 'reject', 'discard']),
+    action: z.enum(['review', 'approve', 'reject', 'discard', 'admin_approve']),
     scope: z.enum(['all', 'rows']),
     rows: z.array(z.object({ row_id: z.string().uuid(), decision: z.enum(['approved', 'rejected']), note: z.string().max(1000).optional() }).strict()).max(2000).optional(),
     note: z.string().max(2000).optional(),
@@ -70,7 +70,7 @@ interface BatchRow {
   historical_reason: string | null;
   historical_marked_by: string | null;
   historical_marked_at: Date | null;
-  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint;
+  c_create: bigint; c_update: bigint; c_unchanged: bigint; c_error: bigint; c_pending: bigint; c_approved: bigint; c_rejected: bigint; c_held: bigint; c_saved: bigint; c_admin_approved: bigint; c_incomplete: bigint;
   progress: Record<string, unknown> | null;
   ts: string;
 }
@@ -96,6 +96,7 @@ interface Outcome {
   decided?: number;
   approved?: number;
   rejected?: number;
+  incomplete?: number;
   held: { row_id: string; row_no: number; key: string | null; reason: string; record_id?: string | null }[];
   failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[];
 }
@@ -674,7 +675,7 @@ export class ImportService {
       SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
         b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
         b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
-        b.historical_marked_at, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved,
+        b.historical_marked_at, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved, a.c_admin_approved, a.c_incomplete,
         imp_batch_job_json(b.id) AS progress,
         to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
       FROM import_batches b
@@ -690,6 +691,9 @@ export class ImportService {
           count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending_previous_approval') AS c_held,
           count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'saved') AS c_saved
         FROM v_import_rows x WHERE x.batch_id = b.id) c
+      CROSS JOIN LATERAL (
+        SELECT count(*) FILTER (WHERE q.admin_approved) AS c_admin_approved, count(*) FILTER (WHERE q.admin_approved AND q.incomplete) AS c_incomplete
+        FROM import_batch_rows q WHERE q.batch_id = b.id) a
       WHERE ${where}
       ${tail}`;
   }
@@ -710,6 +714,7 @@ export class ImportService {
         counts: {
           create: Number(r.c_create), update: Number(r.c_update), unchanged: Number(r.c_unchanged), error: Number(r.c_error),
           pending: Number(r.c_pending), approved: Number(r.c_approved), rejected: Number(r.c_rejected), held: Number(r.c_held), saved: Number(r.c_saved),
+          admin_approved: Number(r.c_admin_approved), incomplete: Number(r.c_incomplete),
         },
         mode: r.mode,
         file_template_version: r.file_template_version,
@@ -911,6 +916,9 @@ export class ImportService {
     const version = parseIfMatch(ifMatch);
     const body = parse(decisionBody, rawBody);
     if (body.scope === 'rows' && !body.rows?.length) throw problems.validation([{ path: '/rows', code: 'required', message: 'Name the rows to decide.' }]);
+    if (body.action === 'admin_approve' && (body.scope !== 'all' || (body.note?.trim().length ?? 0) < 3)) {
+      throw new ProblemException(422, 'validation_failed', { detail: 'Approve as is covers the whole batch and needs a reason.', errors: [{ path: body.scope !== 'all' ? '/scope' : '/note', code: 'required', message: body.scope !== 'all' ? 'The scope is all.' : 'A reason of at least 3 characters is required.' }] });
+    }
     if (body.action === 'reject' && body.scope === 'all' && !body.note?.trim()) {
       throw new ProblemException(422, 'note_required', { detail: 'A return needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     }

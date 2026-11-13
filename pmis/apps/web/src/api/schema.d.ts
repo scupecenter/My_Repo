@@ -5571,6 +5571,7 @@ export interface paths {
          *     **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return of a New sites batch is always answered at once.
          *     **Big register and stream batches (0.14.6):** an `approve`, a `review` or a `reject` of more rows than the threshold answers 202 after the checks (the grid right, the authority of the person on at least one row: 403 `not_eligible_holder`, the notes of a return: 422, the step-up of an approval: 401; nothing queued); the rows are decided in chunks (register 50, stream 25) with the same transitions, audit rows and notice as the 200 answer, and the rights are derived again for every chunk (a row the person may no longer decide is counted in `progress.failed`). A `discard` is always answered at once.
          *     Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
+         *     **Admin approve as is (0087, owner decision 2026-11-12):** `action=admin_approve` is a final approval of the whole batch (`scope=all` only, 422 otherwise) by a System Admin (403 `action_forbidden` for anyone else) that bypasses the check of the L2 holders. It needs a reason in `note` (at least 3 characters, 422) and a valid step-up (401 `step_up_required`). Every open row of a stream batch that has a task is approved with what it has: a row that lacks an actual date or another required value is approved too and flagged `incomplete` (its gaps stay visible in `site_data_gaps`). Each approved task is flagged `admin_override` and audited per row with the reason; KPIs treat it like any other override (flagged and excluded). The count of the flagged rows is `outcome.incomplete`, and `counts.admin_approved` / `counts.incomplete` of the batch. A batch with more rows than `imports.async_rows` is run in the background (202), the same way as the other decisions.
          */
         post: operations["decideImportBatch"];
         delete?: never;
@@ -10517,6 +10518,8 @@ export interface components {
             decided?: number;
             approved?: number;
             rejected?: number;
+            /** @description 0087: rows an admin approve as is approved although they lacked data (flagged `incomplete`). */
+            incomplete?: number;
             held?: {
                 /** Format: uuid */
                 row_id: string;
@@ -10561,10 +10564,10 @@ export interface components {
             /** @description 0.15.3, kind `upload`: the transactions done so far. */
             chunks?: number;
             /**
-             * @description 0.14.6: the decision of a `decide` run; null for a send.
+             * @description 0.14.6: the decision of a `decide` run (0087: `admin_approve` too); null for a send.
              * @enum {string|null}
              */
-            action?: "approve" | "review" | "reject" | null;
+            action?: "approve" | "review" | "reject" | "admin_approve" | null;
             /**
              * @description 0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).
              * @enum {string}
@@ -10576,6 +10579,8 @@ export interface components {
             held?: number;
             /** @description 0.14.6: rows saved by a Save Draft / Planning send (Q206). */
             saved?: number;
+            /** @description 0087: rows of an admin approve as is that were approved with missing data. */
+            incomplete?: number;
             /**
              * @description `failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.
              * @enum {string}
@@ -10680,6 +10685,10 @@ export interface components {
                 held?: number;
                 /** @description Rows saved without submission (draft batch). */
                 saved?: number;
+                /** @description 0087: rows approved by a System Admin as is (flagged `admin_override`). */
+                admin_approved?: number;
+                /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
+                incomplete?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -11068,10 +11077,10 @@ export interface components {
         };
         ImportDecisionRequest: {
             /**
-             * @description The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note) or `discard` (a batch that was not sent).
+             * @description The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note), `discard` (a batch that was not sent) or `admin_approve` (0087: System Admin, approves every open row as it is, flags the rows `admin_override` and the incomplete ones `incomplete`; `scope` must be `all`, `note` is the reason).
              * @enum {string}
              */
-            action: "review" | "approve" | "reject" | "discard";
+            action: "review" | "approve" | "reject" | "discard" | "admin_approve";
             /**
              * @description `all` decides every undecided valid row at once; `rows` uses `rows[]`.
              * @enum {string}
@@ -11084,7 +11093,7 @@ export interface components {
                 decision: "approved" | "rejected";
                 note?: string;
             }[];
-            /** @description Required when `action` is reject. */
+            /** @description Required when `action` is reject; the reason (at least 3 characters) when `action` is admin_approve. */
             note?: string;
         };
         Absence: {

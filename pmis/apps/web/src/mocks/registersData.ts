@@ -192,7 +192,7 @@ export type MockBatchRow = {
   payload: Record<string, unknown>; site_index: number | null; errors: { column?: string; field?: string; code: string; message?: string }[];
   diff: Record<string, { old?: unknown; new?: unknown }>;
   /** The approved version an update is built on, the open version that holds a row, and the record created when the batch is sent. */
-  base_id?: string; hold_reason?: 'open_version' | 'open_submission' | 'predecessor_open'; hold_record_id?: string; record_id?: string; note?: string | null;
+  base_id?: string; hold_reason?: 'open_version' | 'open_submission' | 'predecessor_open'; hold_record_id?: string; record_id?: string; note?: string | null; admin_approved?: boolean; incomplete?: boolean;
   /** A stream batch row (contract 0.11.5): one per touched task; the file row is `row_no`. */
   task_code?: string; warnings?: { column?: string; field?: string; code: string; message?: string }[]; sheet?: string; source_ref?: string;
   /** A New sites batch row (contract 0.14.0): the site it created once L2 approved it. */
@@ -215,7 +215,7 @@ export type MockRun = {
   id: string; kind: 'submit' | 'decide'; state: 'running' | 'done' | 'failed'; rows: string[]; done: number; self: boolean;
   submitted: number; approved: number; failed: number; started_at: string; updated_at: string; finished_at: string | null;
   /** Contract 0.14.6: a register or a stream batch runs in the background too; the decision and the per-row choices of a `decide` run. */
-  batchKind?: 'site' | 'register' | 'stream'; action?: 'approve' | 'review' | 'reject' | null; note?: string | null;
+  batchKind?: 'site' | 'register' | 'stream'; action?: 'approve' | 'review' | 'reject' | 'admin_approve' | null; note?: string | null;
   choices?: Record<string, { decision: 'approved' | 'rejected'; note?: string }>; decided?: number; rejected?: number; held?: number;
 };
 
