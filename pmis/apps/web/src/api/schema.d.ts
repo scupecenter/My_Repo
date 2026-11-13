@@ -2613,6 +2613,92 @@ export interface paths {
         patch: operations["updateGateLight"];
         trace?: never;
     };
+    "/workflow/versions/{version}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a task inside a milestone of a draft (or of a published version, decision B8)
+         * @description Decision 4 of 2026-11-12 (migration 0090). Needs a System Admin or a delegate of `task_definitions.create` for all regions (403 otherwise), a reason and a step-up (401).
+         *     The code is never reused in the version (409 `duplicate`). On a published version a task that counts toward its milestone needs `confirm_master_impact` during the parallel run
+         *     (422 `master_impact_unconfirmed`) and answers the warning `counting_task_may_move_milestone`. Field errors (422 `validation_failed`, `errors[].path` `/code`, `/name_en`, `/stage_code`,
+         *     `/predecessors`, `/after_task_code`). The new task also gets its SLA rule, documents and matrix cells like any other (configured in their own screens).
+         */
+        post: operations["createTaskDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename EN/AR, counts toward the milestone, deactivate or reactivate, move to another milestone (draft only)
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. Only the keys sent change; nothing to change is 409 `invalid_transition`. A task is never deleted: it is
+         *     deactivated (422 `validation_failed` on `/is_active` while active tasks still wait for it, or for a milestone task of a published version). Moving to another milestone
+         *     (`stage_code`) is structural: 422 `validation_failed` on `/stage_code` for a published version.
+         */
+        patch: operations["updateTaskDefinition"];
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/predecessors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the predecessors of a task
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. A cycle is 422 `validation_failed` with `errors[0].path` `/predecessors` and `code` `cycle`; the other codes are
+         *     `self`, `duplicate`, `unknown` (not a task of this version) and `inactive`. The new predecessors apply to new site tasks.
+         */
+        put: operations["replaceTaskPredecessors"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/milestones/{code}/task-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder the tasks of one milestone
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. `task_codes` lists every task of the milestone (active and inactive) exactly once, else 422 `validation_failed` on `/task_codes`.
+         */
+        put: operations["reorderMilestoneTasks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/migration-preview": {
         parameters: {
             query?: never;
@@ -7601,7 +7687,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -9184,6 +9270,7 @@ export interface components {
             /** @enum {string} */
             formula_kind: "master" | "generic";
             counts_in_project_status: boolean;
+            is_active?: boolean;
             master_export_column?: string | null;
             custom?: components["schemas"]["CustomValues"];
         };
@@ -9214,6 +9301,13 @@ export interface components {
             sort_order: number;
             predecessors?: string[];
             counts_toward_milestone?: boolean;
+            /** @description Decision 4 (0090): read-only copy of the task name. */
+            name_en?: string;
+            name_ar?: string | null;
+            is_active?: boolean;
+            is_milestone_task?: boolean;
+            has_documents?: boolean;
+            task_version?: number;
         };
         WorkflowStructure: {
             milestones: {
@@ -9249,8 +9343,11 @@ export interface components {
                     confirmation_phrase?: string | null;
                 };
             };
-            /** @description Draft revision for If-Match. */
+            /** @description Revision of the version for If-Match (also the ETag header); every write bumps it. */
             version_etag?: number;
+            /** @description Decision 4 (0090): the caller may edit tasks, milestones and gates (System Admin or an all-regions delegate). */
+            can_edit?: boolean;
+            can_publish?: boolean;
         };
         /** @description Either explicit site ids or a filter. Only sites on another version are considered. */
         SiteSelection: {
@@ -19310,6 +19407,191 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    createTaskDefinition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Code of the milestone (stage) that receives the task. */
+                    stage_code: string;
+                    code: string;
+                    name_en: string;
+                    name_ar?: string | null;
+                    /** @default true */
+                    counts_toward_milestone?: boolean;
+                    /** @default true */
+                    has_documents?: boolean;
+                    /** @description Place it after this task of the same milestone (default: last). */
+                    after_task_code?: string | null;
+                    predecessors?: string[];
+                    reason: components["schemas"]["Reason"];
+                    confirm_master_impact?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        task_code: string;
+                        warnings: string[];
+                        version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    updateTaskDefinition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name_en?: string;
+                    name_ar?: string | null;
+                    counts_toward_milestone?: boolean;
+                    is_active?: boolean;
+                    stage_code?: string;
+                    reason: components["schemas"]["Reason"];
+                    confirm_master_impact?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    replaceTaskPredecessors: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    predecessors: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    reorderMilestoneTasks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                /** @description Stable milestone or gate code (for example MS4, G5). */
+                code: components["parameters"]["NodeCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    task_codes: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

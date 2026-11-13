@@ -41,6 +41,9 @@ ALTER TABLE workflow_definitions
 COMMENT ON COLUMN workflow_definitions.parent_version IS '0090: the version this draft was copied from (null for the seeded version)';
 COMMENT ON COLUMN workflow_definitions.light_revision IS '0090: number of light changes (names, gate conditions and SLA, counts in Project Status, custom fields) applied to the version';
 COMMENT ON COLUMN workflow_definitions.row_version IS '0090: the ETag of the version in the editor; bumped by every write to the version or its tasks, milestones and gates';
+-- admin_create_workflow_draft (0008) copies the matrix cells without updated_at, which has no default since 0001 (Prisma sets it): the copy of a version failed with a
+-- not-null violation. A default fixes the copy without touching the 0008 function.
+ALTER TABLE matrix_cells ALTER COLUMN updated_at SET DEFAULT now();
 
 CREATE TABLE site_workflow_migrations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
