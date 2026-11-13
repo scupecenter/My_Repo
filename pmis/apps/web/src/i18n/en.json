@@ -1356,7 +1356,8 @@
     "badge": "Admin override",
     "historical_title": "Accepted without its mandatory documents under the historical load. The flag clears by itself when the documents are uploaded.",
     "historical_note": "This task was accepted without its mandatory documents ({{docs}}) under the historical load (cutoff date {{cutoff}}). The flag clears when the documents are uploaded.",
-    "bypass_title": "Approved while the workflow locks of its site were off, before {{why}}. Treated as an admin override in the KPIs."
+    "bypass_title": "Approved while the workflow locks of its site were off, before {{why}}. Treated as an admin override in the KPIs.",
+    "admin_title": "Set by a System Admin (reversible). Left out of the SLA KPIs while overrides are excluded."
   },
   "badges": {
     "local": "Local sign-in",
@@ -4070,5 +4071,35 @@
     "field_open_opt": "Open",
     "field_hint": "Open: the tasks of the new site are not held by predecessors or gates. Needs a System Admin or the delegated right to unlock when the site is approved.",
     "historical_note": "The historical option also opens the workflow locks of every site of the file first (audited per site with this reason), so all historical data is accepted as it is. Missing values are warnings, not errors. Lock the sites again afterwards from the site page or SITE 360."
+  },
+  "adminOverride": {
+    "title": "Admin date override",
+    "edit_date": "Edit date",
+    "which": "Date",
+    "new_date": "New date",
+    "reason": "Reason (required)",
+    "note": "Applies at once, needs your password again, is audited and can be reverted. The task is flagged as an admin override and left out of SLA KPIs.",
+    "apply": "Apply",
+    "applied": "Date changed",
+    "revert": "Revert",
+    "reverted": "Override reverted",
+    "was_reverted": "Reverted",
+    "none": "(none)",
+    "field": {
+      "planned_date": "Planned date",
+      "actual_start": "Actual start",
+      "actual_date": "Actual date",
+      "baseline_date": "Baseline date"
+    }
+  },
+  "siteAdminEdit": {
+    "title": "Edit (admin)",
+    "open": "Edit (admin)",
+    "note": "System Admin only. Changes apply at once, need a reason and your password again, are audited with before and after, and can be reverted. The Site ID never changes.",
+    "scenario": "Scenario",
+    "apply": "Apply",
+    "applied": "Site updated",
+    "reverted": "Site edit reverted",
+    "badge_title": "This site has an active direct admin edit."
   }
 }

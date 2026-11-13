@@ -1769,6 +1769,31 @@ export interface paths {
         patch: operations["updateSite"];
         trace?: never;
     };
+    "/sites/{site_id}/admin-edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /** Direct admin edits of the site (0.15.7) */
+        get: operations["listSiteAdminEdits"];
+        put?: never;
+        /**
+         * Edit site data directly as a System Admin (reason and step-up, 0.15.7)
+         * @description System Admin only (403 `action_forbidden`, also for a delegate). Applies at once; audited with before and after and flagged as an admin override; reversible with
+         *     `POST /overrides/{override_id}/revert`. Field errors are 422 `validation_failed` with paths such as `/identity/name`, `/identity/site_code` (`immutable`), `/scenario`,
+         *     `/scope/<flag>`, `/custom/<code>`; a scope or scenario that conflicts answers `scope_scenario_conflict`. An edit that changes nothing is a no-op (no audit row).
+         */
+        post: operations["adminEditSite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/site-drafts": {
         parameters: {
             query?: never;
@@ -2339,7 +2364,7 @@ export interface paths {
         put?: never;
         /**
          * Revert an admin override
-         * @description 409 `override_not_revertible` if the task has moved on since.
+         * @description 409 `override_not_revertible` if the task (or, for a site edit, the site) has moved on since, or the override was reverted already. Works for task date overrides and direct site edits (0.15.7).
          */
         post: operations["revertOverride"];
         delete?: never;
@@ -8586,6 +8611,11 @@ export interface components {
             shifted_by_suspension?: boolean;
         };
         SiteDetail: components["schemas"]["SiteListItem"] & {
+            admin_edits?: components["schemas"]["SiteAdminEdits"];
+            /** @description 0.15.7: a direct admin edit of the site is in force (the "Admin override" badge). */
+            admin_override_active?: boolean;
+            /** @description 0.15.7: the caller is a System Admin. */
+            can_admin_edit?: boolean;
             owner_site_id?: string | null;
             sub_region?: string | null;
             latitude?: number | null;
@@ -8907,6 +8937,10 @@ export interface components {
             disabled_reason?: string | null;
         };
         TaskDetail: components["schemas"]["TaskSummary"] & {
+            /** @description 0.15.7: the admin date overrides of the task, newest first. */
+            overrides?: components["schemas"]["Override"][];
+            /** @description 0.15.6: the caller is a System Admin and the task is not N/A or skipped. */
+            can_override?: boolean;
             /** Format: date */
             baseline_date?: string | null;
             /** Format: date */
@@ -9029,8 +9063,19 @@ export interface components {
         Override: {
             /** Format: uuid */
             id: string;
+            /**
+             * @description 0.15.6: a task date override or a direct admin edit of a site.
+             * @enum {string}
+             */
+            entity: "task" | "site";
+            /**
+             * Format: uuid
+             * @description Null for a site edit.
+             */
+            task_id?: string | null;
             /** Format: uuid */
-            task_id: string;
+            site_id?: string;
+            /** @description `edit_date` for a task, `site_edit` for a site. */
             kind: string;
             reason: string;
             before?: {
@@ -9045,7 +9090,36 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             reverted_at?: string | null;
+            reverted_by?: components["schemas"]["UserRef"];
+            revert_reason?: string | null;
+            /** @description Not reverted yet and the field still holds what the override set. */
             revertible: boolean;
+        };
+        SiteAdminEditRequest: {
+            reason: string;
+            identity?: {
+                name?: string;
+                name_ar?: string | null;
+                latitude?: number | null;
+                /** @description With latitude; both null clears the coordinates. */
+                longitude?: number | null;
+                region_id?: number;
+                cluster_code?: string | null;
+                /** @description Always refused: field error `immutable`. */
+                site_code?: string;
+            };
+            /** @description New Build, Expansion, Hot Swap, Cold Swap or Relocation. */
+            scenario?: string;
+            /** @description Scope flag -> `yes` or `na`. */
+            scope?: {
+                [key: string]: "yes" | "na";
+            };
+            /** @description Field code -> value; null clears. */
+            custom?: components["schemas"]["CustomValues"];
+        };
+        SiteAdminEdits: {
+            active_count: number;
+            items: components["schemas"]["Override"][];
         };
         ApprovalItem: {
             task: components["schemas"]["TaskSummary"];
@@ -17809,6 +17883,66 @@ export interface operations {
         };
         responses: {
             /** @description The site after the change. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSiteAdminEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The 20 newest edits and how many are still in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAdminEdits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    adminEditSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteAdminEditRequest"];
+            };
+        };
+        responses: {
+            /** @description The site after the edit. */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];

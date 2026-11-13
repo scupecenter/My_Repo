@@ -7,12 +7,13 @@ import { z } from 'zod';
 import { checkIfMatch, contentVersion } from '../common/etag';
 import { mapDbError } from '../common/db-errors';
 import { parse, uuidSchema } from '../common/zod';
-import { problems } from '../common/problem';
+import { ProblemException, problems } from '../common/problem';
 import { oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
 import { HAS_COORDINATES } from '../dashboard/site-map.service';
 import { RegistersService } from '../registers/registers.service';
 import { TaskSummaryDto, TaskViewService, taskSelect } from '../workflow/task-view.service';
+import { OverrideJson, overrideDtos } from '../workflow/override-dto';
 
 /**
  * The stage that holds the TE PAC milestone in the default workflow (stable code, ADR 0010). The cluster progress line
@@ -36,6 +37,15 @@ const proposalSchema = z.object({
   identity: z.record(z.unknown()).refine((v) => Object.keys(v).length > 0, 'send at least one field').optional(),
   reason: z.string().trim().min(1).max(2000),
 }).strict().refine((b) => b.custom !== undefined || b.identity !== undefined, { message: 'send custom or identity', path: ['custom'] });
+
+/** Migration 0088 (owner decision 2026-11-12 (2)): the direct edit of a System Admin. The values are checked by the database, which answers the field errors; here only the shape is. */
+const adminEditSchema = z.object({
+  reason: z.string().trim().min(3).max(2000),
+  identity: z.record(z.unknown()).optional(),
+  scenario: z.string().optional(),
+  scope: z.record(z.unknown()).optional(),
+  custom: z.record(z.unknown()).optional(),
+}).strict().refine((b) => b.identity !== undefined || b.scenario !== undefined || b.scope !== undefined || b.custom !== undefined, { message: 'send at least one field', path: ['identity'] });
 
 interface SiteRow {
   id: string;
@@ -477,6 +487,10 @@ export class SitesService {
       version: siteVersion(site.updated_at),
     };
     if (Object.keys(custom).length > 0) detail.custom = custom;
+    const edits = await this.adminEdits(auth, id);
+    detail.admin_edits = edits;
+    detail.admin_override_active = edits.active_count > 0;
+    detail.can_admin_edit = (await this.db.tx.$queryRaw<{ a: boolean }[]>(Prisma.sql`SELECT coalesce(app_user_is_system_admin(${auth.user.id}::uuid), false) AS a`))[0]?.a === true;
     detail.custom_fields = await this.customFields(auth, site.region_id);
     return detail;
   }
@@ -513,6 +527,42 @@ export class SitesService {
       throw p;
     }
     return this.get(auth, id);
+  }
+
+  // ------------------------------------------------------------------ POST /sites/{id}/admin-edits (0088, site_admin_edit)
+  /** A System Admin edits identity, scenario, scope flags and custom fields at once: a reason, a step-up, the audit before and after, reversible (POST /overrides/{id}/revert). */
+  async adminEdit(auth: AuthContext, id: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    const body = parse(adminEditSchema, raw);
+    const site = await this.siteRow(regions, id);
+    if (!site) throw problems.notFound('The site does not exist or is not visible to you.');
+    const seen = await this.db.tx.$queryRaw<{ t: string }[]>(Prisma.sql`SELECT updated_at::text AS t FROM sites WHERE id = ${id}::uuid`);
+    checkIfMatch(ifMatch, siteVersion(site.updated_at));
+    const { reason, ...patch } = body;
+    await this.db.tx.$executeRaw`SAVEPOINT site_admin_edit`;
+    try {
+      await this.db.tx.$queryRaw(Prisma.sql`SELECT site_admin_edit(${id}::uuid, ${seen[0]?.t ?? null}::timestamptz, ${JSON.stringify(patch)}::jsonb, ${reason}::text)`);
+      await this.db.tx.$executeRaw`RELEASE SAVEPOINT site_admin_edit`;
+    } catch (e) {
+      if (e instanceof ProblemException) throw e;
+      const p = mapDbError(e);
+      if (!p) throw e;
+      await this.db.tx.$executeRaw`ROLLBACK TO SAVEPOINT site_admin_edit`;
+      if (p.code === 'step_up_required') {
+        throw new ProblemException(401, 'step_up_required', { detail: 'Confirm your password to continue.', step_up_method: auth.session.authMethod === 'local' ? 'password' : 'm365' });
+      }
+      throw p;
+    }
+    return this.get(auth, id);
+  }
+
+  /** GET /sites/{id}/admin-edits: the direct admin edits of the site (20 newest) and how many are in force. */
+  async adminEdits(auth: AuthContext, id: string): Promise<{ active_count: number; items: unknown[] }> {
+    const regions = await this.access.requireRegions('sites', 'view');
+    if (!(await this.siteRow(regions, id))) throw problems.notFound('The site does not exist or is not visible to you.');
+    const rows = await this.db.tx.$queryRaw<{ r: { active_count: number; items: OverrideJson[] } | null }[]>(Prisma.sql`SELECT site_admin_edits_json(${id}::uuid) AS r`);
+    const r = rows[0]?.r ?? { active_count: 0, items: [] };
+    return { active_count: Number(r.active_count), items: await overrideDtos(this.view, r.items) };
   }
 
   // ------------------------------------------------------------------ POST /sites/{id}/change-proposals (Q225, site_propose_change)
