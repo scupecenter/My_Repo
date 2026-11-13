@@ -18,7 +18,9 @@ const seed = (): Ver[] => [{
   tasks: [t('A1', 'MS1', 1, 'SAR', 'تقرير المسح'), t('A2', 'MS1', 2, 'TSSR', 'تقرير TSSR', ['A1']), t('A4', 'MS1', 3, 'LLD', 'التصميم المنخفض المستوى', ['A2']), t('B1', 'MS2', 1, 'PR email', 'بريد طلب الشراء'), t('B2', 'MS2', 2, 'PO email', 'بريد أمر الشراء', ['B1'])],
 }];
 let state = seed();
-export const resetWorkflowEditorMock = () => { state = seed(); };
+interface Mig { id: string; site_id: string; site_code: string; from_version: number; to_version: number; reason: string; migrated_at: string; reverted_at: string | null; revertible: boolean }
+let migrations: Mig[] = [];
+export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
 
@@ -98,6 +100,67 @@ export const workflowEditorHandlers = [
     const v = state.find((x) => x.version === Number(params.version));
     return v ? reply(v) : problem(404, 'not_found', 'The workflow version does not exist.');
   }),
+  http.put(`${B}/workflow/versions/:version`, async ({ params, request }) => {
+    const b = (await request.json()) as { milestones?: { code: string; name_en?: string; name_ar?: string | null; is_active?: boolean }[]; gates?: { code: string; name_en?: string; name_ar?: string | null; from_milestone?: string; to_milestone?: string; sla_min_wd?: number; sla_max_wd?: number; conditions?: unknown[] }[]; task_moves?: { task_code: string; stage_code: string }[]; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const v = w.v;
+    if (v.status !== 'draft') return problem(409, 'invalid_transition', 'Structural changes are made in a draft version.');
+    const ms = b.milestones ?? [];
+    if (v.milestones.some((m) => !ms.some((x) => x.code === m.code))) return fieldErr('/milestones', 'missing');
+    const next = ms.map((x, i) => {
+      const old = v.milestones.find((m) => m.code === x.code);
+      return { code: x.code, seq: i + 1, name_en: x.name_en ?? old?.name_en ?? x.code, name_ar: x.name_ar ?? old?.name_ar ?? null, is_active: x.is_active !== false, formula_kind: 'master' as const, counts_in_project_status: old?.counts_in_project_status ?? true };
+    });
+    for (const mv of b.task_moves ?? []) {
+      const x = v.tasks.find((k) => k.task_code === mv.task_code);
+      if (!x) return fieldErr('/task_moves', 'unknown');
+      if (!next.some((m) => m.code === mv.stage_code && m.is_active)) return fieldErr('/task_moves', 'unknown_stage');
+      x.stage_code = mv.stage_code;
+    }
+    if (v.tasks.some((x) => x.is_active && next.some((m) => m.code === x.stage_code && !m.is_active))) return fieldErr('/milestones', 'has_active_tasks');
+    v.milestones = next;
+    v.gates = (b.gates ?? []).map((g) => {
+      const old = v.gates.find((k) => k.code === g.code);
+      return { code: g.code, from_milestone: g.from_milestone ?? old?.from_milestone ?? '', to_milestone: g.to_milestone ?? old?.to_milestone ?? '', name_en: g.name_en ?? old?.name_en ?? g.code, name_ar: g.name_ar ?? old?.name_ar ?? null, conditions: g.conditions ?? old?.conditions ?? [], sla_min_wd: g.sla_min_wd ?? old?.sla_min_wd ?? 0, sla_max_wd: g.sla_max_wd ?? old?.sla_max_wd ?? 0 };
+    });
+    v.etag += 1;
+    return reply(v);
+  }),
+  http.post(`${B}/workflow/versions/:version/migration-preview`, async ({ params }) => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    const to = Number(params.version);
+    const sites = migrations.some((m) => !m.reverted_at && m.to_version === to) ? [] : [{ site_id: 'site-1', site_code: 'TRP-001', from_version: 1, migratable: true, tasks_kept: ['A1', 'A2'], tasks_moved: [], tasks_added: ['MID1'], tasks_retired: [], date_changes: [] }];
+    return HttpResponse.json({ preview_hash: `hash-${to}-${sites.length}`, to_version: to, master_impact: { affected_columns: [], parallel_run_active: false, confirmation_phrase: null }, sites });
+  }),
+  http.post(`${B}/workflow/versions/:version/migrations`, async ({ params, request }) => {
+    const b = (await request.json()) as { preview_hash?: string; reason?: string };
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    if (!reasonOk(b)) return fieldErr('/reason', 'required');
+    if (!stepUpValid()) return stepUp();
+    const to = Number(params.version);
+    if (b.preview_hash !== `hash-${to}-1`) return problem(409, 'stale_preview', 'The sites or the definition changed since the preview. Preview again.');
+    migrations.push({ id: `mig-${migrations.length + 1}`, site_id: 'site-1', site_code: 'TRP-001', from_version: 1, to_version: to, reason: b.reason!, migrated_at: new Date().toISOString(), reverted_at: null, revertible: true });
+    return HttpResponse.json({ id: `mig-${migrations.length}`, sites_migrated: 1, to_version: to });
+  }),
+  http.get(`${B}/workflow/site-migrations`, () => {
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    return HttpResponse.json({ items: migrations.map((m) => ({ ...m, revertible: m.revertible && !m.reverted_at })), page: { limit: 50, next_cursor: null, total: migrations.length } });
+  }),
+  http.post(`${B}/workflow/site-migrations/:id/revert`, async ({ params, request }) => {
+    const b = (await request.json()) as { reason?: string };
+    const g = guard(); if (g) return g;
+    if (!canEdit()) return problem(403, 'action_forbidden', 'You need administer on workflow versions.');
+    if (!reasonOk(b)) return fieldErr('/reason', 'required');
+    if (!stepUpValid()) return stepUp();
+    const m = migrations.find((x) => x.id === params.id);
+    if (!m) return problem(404, 'not_found', 'The migration does not exist.');
+    if (m.reverted_at) return problem(409, 'invalid_transition', 'This migration cannot be reverted.');
+    m.reverted_at = new Date().toISOString();
+    return HttpResponse.json({ id: m.id, site_id: m.site_id, site_code: m.site_code, reverted_to_version: m.from_version });
+  }),
   http.post(`${B}/workflow/versions/:version/tasks/insert-preview`, async ({ params, request }) => {
     const g = guard(); if (g) return g;
     if (!canEdit()) return problem(403, 'action_forbidden', 'You need create on task definitions.');
@@ -153,10 +216,15 @@ export const workflowEditorHandlers = [
     return HttpResponse.json({ task_code: b.code, warnings: [], version: json(v) }, { status: 201, headers: { ETag: `"${v.etag}"` } });
   }),
   http.patch(`${B}/workflow/versions/:version/tasks/:task`, async ({ params, request }) => {
-    const b = (await request.json()) as { name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; is_active?: boolean; reason?: string };
+    const b = (await request.json()) as { name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; is_active?: boolean; stage_code?: string; reason?: string };
     const w = write(params, request, b); if ('r' in w) return w.r;
     const x = w.v.tasks.find((k) => k.task_code === params.task);
     if (!x) return problem(404, 'not_found', 'The task does not exist in this version.');
+    if (b.stage_code !== undefined && b.stage_code !== x.stage_code) {
+      if (w.v.status !== 'draft') return fieldErr('/stage_code', 'structural');
+      if (!w.v.milestones.some((m) => m.code === b.stage_code)) return fieldErr('/stage_code', 'unknown');
+      x.stage_code = b.stage_code;
+    }
     if (b.is_active === false && w.v.tasks.some((k) => k.is_active && k.predecessors.includes(x.task_code))) return fieldErr('/is_active', 'has_dependents');
     Object.assign(x, { ...(b.name_en !== undefined ? { name_en: b.name_en } : {}), ...(b.name_ar !== undefined ? { name_ar: b.name_ar } : {}), ...(b.counts_toward_milestone !== undefined ? { counts_toward_milestone: b.counts_toward_milestone } : {}), ...(b.is_active !== undefined ? { is_active: b.is_active } : {}) });
     w.v.etag += 1;

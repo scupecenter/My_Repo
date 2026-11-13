@@ -3,16 +3,17 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import {
-  useCreateDraft, useCreateTask, useGateLight, useInsertTask, useMilestoneLight, usePreviewInsert, usePublish, useReorderTasks, useSetPredecessors, useSetSuccessors, useUpdateTask, useWorkflowVersion, useWorkflowVersions,
+  useCreateDraft, useCreateTask, useGateLight, useInsertTask, useReplaceStructure, type GateCondition, useMilestoneLight, usePreviewInsert, usePublish, useReorderTasks, useSetPredecessors, useSetSuccessors, useUpdateTask, useWorkflowVersion, useWorkflowVersions,
   type TaskPlacement, type WorkflowVersion,
 } from '@/api/workflowEditor';
 import { errText, FormDialog } from '@/components/FormDialog';
+import { ConditionsEditor, MigrationDialog, MigrationLog, StructureDialog } from './WorkflowStructure';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 
 type P = TaskPlacement & { name_en?: string; name_ar?: string | null; is_active?: boolean };
 type M = { code: string; name_en: string; name_ar?: string | null; is_active?: boolean; counts_in_project_status?: boolean };
-type G = { code: string; name_en: string; name_ar?: string | null; from_milestone: string; to_milestone: string; sla_min_wd?: number | null; sla_max_wd?: number | null };
+type G = { code: string; name_en: string; name_ar?: string | null; from_milestone: string; to_milestone: string; sla_min_wd?: number | null; sla_max_wd?: number | null; conditions?: GateCondition[] };
 
 /** The text of a failed write: a field error of the workflow editor first (cycle, self, unknown...), then the generic texts. */
 function useErr() {
@@ -67,6 +68,7 @@ export function Workflow() {
         </FormDialog>
       )}
       {open !== null && <Editor version={open} />}
+      <MigrationLog />
     </section>
   );
 }
@@ -79,7 +81,7 @@ function Editor({ version }: { version: number }) {
   return <VersionEditor v={q.data} key={`${q.data.version}-${q.data.version_etag}`} />;
 }
 
-type Dlg = null | { kind: 'create'; stage: string } | { kind: 'edit'; task: P } | { kind: 'preds'; task: P } | { kind: 'succs'; task: P } | { kind: 'insert'; stage: string } | { kind: 'milestone'; m: M } | { kind: 'gate'; g: G } | { kind: 'publish' };
+type Dlg = null | { kind: 'create'; stage: string } | { kind: 'edit'; task: P } | { kind: 'preds'; task: P } | { kind: 'succs'; task: P } | { kind: 'insert'; stage: string } | { kind: 'milestone'; m: M } | { kind: 'gate'; g: G } | { kind: 'publish' } | { kind: 'structure' } | { kind: 'migrate' };
 
 function VersionEditor({ v }: { v: WorkflowVersion }) {
   const { t, i18n } = useTranslation();
@@ -98,6 +100,8 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
   const setPreds = useSetPredecessors(v.version, etag);
   const setSuccs = useSetSuccessors(v.version, etag);
   const insertTask = useInsertTask(v.version, etag);
+  const replace = useReplaceStructure(v.version, etag);
+  const allVersions = useWorkflowVersions().data?.items ?? [];
   const reorder = useReorderTasks(v.version, etag);
   const msLight = useMilestoneLight(v.version, etag);
   const gateLight = useGateLight(v.version, etag);
@@ -114,6 +118,8 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
     <div className="space-y-3 border-t border-line pt-3" data-testid={`wfe-editor`} data-status={v.status}>
       <div className="flex flex-wrap items-center gap-2">
         <h3 className="font-bold">v{v.version} · {t(`wfe.status_${v.status}`)}</h3>
+        {isDraft && canEdit && <button className="btn" data-testid="wfe-structure" onClick={() => { replace.reset(); setDlg({ kind: 'structure' }); }}>{t('wfe.edit_structure')}</button>}
+        {!isDraft && v.can_publish && <button className="btn" data-testid="wfe-migrate" onClick={() => setDlg({ kind: 'migrate' })}>{t('wfe.migrate_sites')}</button>}
         {isDraft && v.can_publish && <button className="btn btn-accent" data-testid="wfe-publish" disabled={!v.validation?.valid} onClick={() => { publish.reset(); setDlg({ kind: 'publish' }); }}>{t('wfe.publish')}</button>}
       </div>
       {(v.validation?.problems?.length ?? 0) > 0 && <ul role="alert" className="list-disc ps-5 text-sm text-lateInk" data-testid="wfe-problems">{v.validation!.problems!.map((p) => <li key={p}>{p}</li>)}</ul>}
@@ -168,7 +174,8 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
       {dlg?.kind === 'create' && <TaskDialog title={t('wfe.add_task')} onClose={() => setDlg(null)} busy={createTask.isPending} error={createTask.isError ? err(createTask.error) : null} withCode
         onSubmit={(f, reason) => createTask.mutate({ stage_code: dlg.stage, code: f.code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: f.counts, reason }, done(t('wfe.saved')))} />}
       {dlg?.kind === 'edit' && <TaskDialog title={t('wfe.edit_task')} onClose={() => setDlg(null)} busy={updateTask.isPending} error={updateTask.isError ? err(updateTask.error) : null} initial={dlg.task} withActive
-        onSubmit={(f, reason) => updateTask.mutate({ code: dlg.task.task_code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: f.counts, is_active: f.active, reason }, done(t('wfe.saved')))} />}
+        stages={isDraft ? milestones.filter((m) => m.is_active !== false) : undefined}
+        onSubmit={(f, reason) => updateTask.mutate({ code: dlg.task.task_code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: f.counts, is_active: f.active, ...(f.stage && f.stage !== dlg.task.stage_code ? { stage_code: f.stage } : {}), reason }, done(t('wfe.saved')))} />}
       {dlg?.kind === 'preds' && <PredecessorDialog task={dlg.task} all={placements} onClose={() => setDlg(null)} busy={setPreds.isPending} error={setPreds.isError ? err(setPreds.error) : null}
         onSubmit={(list, reason) => setPreds.mutate({ code: dlg.task.task_code, predecessors: list, reason }, done(t('wfe.saved')))} />}
       {dlg?.kind === 'succs' && <PredecessorDialog task={dlg.task} all={placements} succ onClose={() => setDlg(null)} busy={setSuccs.isPending} error={setSuccs.isError ? err(setSuccs.error) : null}
@@ -176,6 +183,9 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
       {dlg?.kind === 'insert' && <InsertDialog version={v.version} stage={dlg.stage} all={placements} published={v.status === 'published'} onClose={() => setDlg(null)} busy={insertTask.isPending} error={insertTask.isError ? err(insertTask.error) : null}
         onSubmit={(f, reason) => insertTask.mutate({ stage_code: dlg.stage, code: f.code, name_en: f.name_en, name_ar: f.name_ar || null, counts_toward_milestone: f.counts, after_task_code: f.after || null,
           predecessors: f.preds, successors: f.succs, remove_direct_links: f.remove, add_to_open_sites: f.openSites, reason, ...(f.master ? { confirm_master_impact: f.master } : {}) }, done(t('wfe.saved')))} />}
+      {dlg?.kind === 'structure' && <StructureDialog v={v} onClose={() => setDlg(null)} busy={replace.isPending} error={replace.isError ? err(replace.error) : null}
+        onSubmit={(st, reason) => replace.mutate({ ...st, reason }, done(t('wfe.saved')))} />}
+      {dlg?.kind === 'migrate' && <MigrationDialog version={v.version} versions={allVersions} phrase={v.validation?.master_impact?.confirmation_phrase ?? null} onClose={() => setDlg(null)} />}
       {dlg?.kind === 'milestone' && <LightDialog title={t('wfe.edit_names')} item={dlg.m} onClose={() => setDlg(null)} busy={msLight.isPending} error={msLight.isError ? err(msLight.error) : null}
         onSubmit={(f, reason) => msLight.mutate({ code: dlg.m.code, ...f, reason }, done(t('wfe.saved')))} />}
       {dlg?.kind === 'gate' && <LightDialog title={t('wfe.edit_names')} item={dlg.g} gate onClose={() => setDlg(null)} busy={gateLight.isPending} error={gateLight.isError ? err(gateLight.error) : null}
@@ -187,9 +197,9 @@ function VersionEditor({ v }: { v: WorkflowVersion }) {
   );
 }
 
-function TaskDialog({ title, onClose, onSubmit, busy, error, initial, withCode, withActive }: {
-  title: string; onClose: () => void; busy: boolean; error: string | null; initial?: P; withCode?: boolean; withActive?: boolean;
-  onSubmit: (f: { code: string; name_en: string; name_ar: string; counts: boolean; active: boolean }, reason: string) => void;
+function TaskDialog({ title, onClose, onSubmit, busy, error, initial, withCode, withActive, stages }: {
+  title: string; onClose: () => void; busy: boolean; error: string | null; initial?: P; withCode?: boolean; withActive?: boolean; stages?: M[];
+  onSubmit: (f: { code: string; name_en: string; name_ar: string; counts: boolean; active: boolean; stage: string }, reason: string) => void;
 }) {
   const { t } = useTranslation();
   const [code, setCode] = useState('');
@@ -197,12 +207,14 @@ function TaskDialog({ title, onClose, onSubmit, busy, error, initial, withCode, 
   const [ar, setAr] = useState(initial?.name_ar ?? '');
   const [counts, setCounts] = useState(initial?.counts_toward_milestone ?? true);
   const [active, setActive] = useState(initial?.is_active ?? true);
+  const [stage, setStage] = useState(initial?.stage_code ?? '');
   return (
-    <FormDialog open onClose={onClose} testid="wfe-task-dialog" title={title} busy={busy} error={error} disabled={!en.trim() || (withCode && !code.trim())} onSubmit={(r) => onSubmit({ code: code.trim().toUpperCase(), name_en: en.trim(), name_ar: ar.trim(), counts, active }, r)}>
+    <FormDialog open onClose={onClose} testid="wfe-task-dialog" title={title} busy={busy} error={error} disabled={!en.trim() || (withCode && !code.trim())} onSubmit={(r) => onSubmit({ code: code.trim().toUpperCase(), name_en: en.trim(), name_ar: ar.trim(), counts, active, stage }, r)}>
       {withCode && <label className="block text-sm font-semibold">{t('wfe.code')}<input className="input mt-1 font-normal" dir="ltr" data-testid="wfe-code" value={code} onChange={(e) => setCode(e.target.value)} /></label>}
       <label className="block text-sm font-semibold">{t('wfe.name_en')}<input className="input mt-1 font-normal" dir="ltr" data-testid="wfe-name-en" value={en} onChange={(e) => setEn(e.target.value)} /></label>
       <label className="block text-sm font-semibold">{t('wfe.name_ar')}<input className="input mt-1 font-normal" dir="rtl" data-testid="wfe-name-ar" value={ar} onChange={(e) => setAr(e.target.value)} /></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={counts} onChange={(e) => setCounts(e.target.checked)} data-testid="wfe-counts" />{t('wfe.counts_hint')}</label>
+      {stages && <label className="block text-sm font-semibold">{t('wfe.move_to')}<select className="input mt-1 font-normal" data-testid="wfe-task-stage" value={stage} onChange={(e) => setStage(e.target.value)}>{stages.map((m) => <option key={m.code} value={m.code}>{m.code} {m.name_en}</option>)}</select></label>}
       {withActive && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} data-testid="wfe-active" />{t('wfe.active')}</label>}
     </FormDialog>
   );
@@ -349,7 +361,7 @@ function InsertDialog({ version, stage, all, published, onClose, onSubmit, busy,
 
 function LightDialog({ title, item, gate, onClose, onSubmit, busy, error }: {
   title: string; item: M | G; gate?: boolean; onClose: () => void; busy: boolean; error: string | null;
-  onSubmit: (f: { name_en: string; name_ar: string; sla_min_wd?: number; sla_max_wd?: number }, reason: string) => void;
+  onSubmit: (f: { name_en: string; name_ar: string; sla_min_wd?: number; sla_max_wd?: number; conditions?: GateCondition[] }, reason: string) => void;
 }) {
   const { t } = useTranslation();
   const [en, setEn] = useState(item.name_en);
@@ -357,9 +369,10 @@ function LightDialog({ title, item, gate, onClose, onSubmit, busy, error }: {
   const g = item as G;
   const [mn, setMn] = useState(String(g.sla_min_wd ?? ''));
   const [mx, setMx] = useState(String(g.sla_max_wd ?? ''));
+  const [conds, setConds] = useState<GateCondition[]>(g.conditions ?? []);
   return (
     <FormDialog open onClose={onClose} testid="wfe-light-dialog" title={`${title}: ${item.code}`} busy={busy} error={error} disabled={!en.trim()}
-      onSubmit={(r) => onSubmit({ name_en: en.trim(), name_ar: ar.trim(), ...(gate && mn !== '' ? { sla_min_wd: Number(mn) } : {}), ...(gate && mx !== '' ? { sla_max_wd: Number(mx) } : {}) }, r)}>
+      onSubmit={(r) => onSubmit({ name_en: en.trim(), name_ar: ar.trim(), ...(gate && mn !== '' ? { sla_min_wd: Number(mn) } : {}), ...(gate && mx !== '' ? { sla_max_wd: Number(mx) } : {}), ...(gate ? { conditions: conds.filter((c) => c.type === 'stop_work_blocks' || (c.ref ?? '').trim()) } : {}) }, r)}>
       <p className="text-sm text-mute">{t('wfe.light_hint')}</p>
       <label className="block text-sm font-semibold">{t('wfe.name_en')}<input className="input mt-1 font-normal" dir="ltr" data-testid="wfe-light-en" value={en} onChange={(e) => setEn(e.target.value)} /></label>
       <label className="block text-sm font-semibold">{t('wfe.name_ar')}<input className="input mt-1 font-normal" dir="rtl" data-testid="wfe-light-ar" value={ar} onChange={(e) => setAr(e.target.value)} /></label>
@@ -367,6 +380,7 @@ function LightDialog({ title, item, gate, onClose, onSubmit, busy, error }: {
         <label className="text-sm font-semibold">SLA min<input type="number" min={0} className="input mt-1 font-normal" dir="ltr" value={mn} onChange={(e) => setMn(e.target.value)} /></label>
         <label className="text-sm font-semibold">SLA max<input type="number" min={0} className="input mt-1 font-normal" dir="ltr" value={mx} onChange={(e) => setMx(e.target.value)} /></label>
       </div>}
+      {gate && <ConditionsEditor value={conds} onChange={setConds} prefix="wfe-light-gate" />}
     </FormDialog>
   );
 }

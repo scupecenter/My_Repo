@@ -28,8 +28,9 @@ function useWrite<I, O>(version: number, etag: number, run: (input: I, etag: num
 const base = (v: number) => `/workflow/versions/${v}`;
 
 export type TaskCreateInput = { stage_code: string; code: string; name_en: string; name_ar?: string | null; counts_toward_milestone?: boolean; after_task_code?: string | null; predecessors?: string[]; reason: string; confirm_master_impact?: string };
-export type TaskPatchInput = { name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; is_active?: boolean; reason: string; confirm_master_impact?: string };
-export type LightInput = { name_en?: string; name_ar?: string; reason: string; counts_in_project_status?: boolean; sla_min_wd?: number; sla_max_wd?: number; confirm_master_impact?: string };
+export type TaskPatchInput = { name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; is_active?: boolean; stage_code?: string; reason: string; confirm_master_impact?: string };
+export type GateCondition = { type: string; ref?: string; accept_na?: boolean };
+export type LightInput = { name_en?: string; name_ar?: string; reason: string; counts_in_project_status?: boolean; sla_min_wd?: number; sla_max_wd?: number; conditions?: GateCondition[]; confirm_master_impact?: string };
 
 export const useCreateDraft = () => {
   const qc = useQueryClient();
@@ -55,4 +56,31 @@ export const usePreviewInsert = (v: number) =>
   useMutation<TaskInsertPreview, ApiError, { stage_code: string; predecessors: string[]; successors: string[]; remove_direct_links: boolean; counts_toward_milestone: boolean }>({
     mutationFn: (body) => api.post(`${base(v)}/tasks/insert-preview`, { body }),
   });
+export type StructureInput = {
+  milestones: { code: string; name_en?: string; name_ar?: string | null; is_active?: boolean; counts_in_project_status?: boolean }[];
+  gates: { code: string; name_en?: string; name_ar?: string | null; from_milestone?: string; to_milestone?: string; is_active?: boolean; conditions?: GateCondition[]; sla_min_wd?: number; sla_max_wd?: number }[];
+  task_moves?: { task_code: string; stage_code: string }[]; reason: string; confirm_master_impact?: string;
+};
+export const useReplaceStructure = (v: number, etag: number) => useWrite<StructureInput, unknown>(v, etag, (body, e) => api.put(`${base(v)}`, { body, version: e }));
+
+export type MigrationPreview = S['MigrationPreview'];
+export type SiteMigration = S['SiteMigration'];
+type Selection = { site_ids?: string[]; filter?: { from_version?: number } };
+export const usePreviewMigration = (v: number) => useMutation<MigrationPreview, ApiError, Selection>({ mutationFn: (body) => api.post(`${base(v)}/migration-preview`, { body }) });
+export const useMigrateSites = (v: number) => {
+  const qc = useQueryClient();
+  return useMutation<{ sites_migrated: number; to_version: number }, ApiError, { preview_hash: string; selection: Selection; reason: string; confirm_master_impact?: string }>({
+    mutationFn: (body) => api.post(`${base(v)}/migrations`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['wf-migrations'] }); },
+  });
+};
+export const useSiteMigrations = (enabled: boolean) =>
+  useQuery({ queryKey: ['wf-migrations'], enabled, retry: false, queryFn: () => api.get<{ items: SiteMigration[] }>('/workflow/site-migrations', { query: { limit: 50 } }) });
+export const useRevertMigration = () => {
+  const qc = useQueryClient();
+  return useMutation<{ reverted_to_version: number }, ApiError, { id: string; reason: string }>({
+    mutationFn: ({ id, ...body }) => api.post(`/workflow/site-migrations/${id}/revert`, { body }),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-migrations'] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); },
+  });
+};
 export type { Wrap };

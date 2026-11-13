@@ -109,4 +109,52 @@ describe('Settings, Workflow', () => {
     await reasonAndSave(u, 'wfe-succ-dialog');
     await waitFor(() => expect(screen.getByTestId('wfe-preds-A2')).not.toHaveTextContent('MID1'));
   }, 60_000);
+
+  it('edits the structure of a draft (new milestone, gate condition, a task moved), publishes, migrates a site after the preview and reverts it', async () => {
+    await signIn('pm');
+    await stepUpDone();
+    const u = userEvent.setup();
+    page();
+    await u.click(await screen.findByTestId('wfe-new-draft'));
+    await reasonAndSave(u, 'wfe-draft-dialog');
+    await u.click(await screen.findByTestId('wfe-structure'));
+    await u.type(await screen.findByTestId('wfe-st-new-ms-code'), 'ZM1');
+    await u.type(screen.getByTestId('wfe-st-new-ms-name'), 'Extra milestone');
+    await u.click(screen.getByTestId('wfe-st-add-ms'));
+    expect(screen.getByTestId('wfe-st-ms-ZM1')).toBeInTheDocument();
+    await u.click(screen.getByTestId('wfe-st-gate-G1-add-condition'));
+    await u.type(screen.getByTestId('wfe-st-gate-G1-cref-0'), 'A4');
+    await reasonAndSave(u, 'wfe-structure-dialog');
+    const stage = await screen.findByTestId('wfe-stage-ZM1');
+    expect(stage).toHaveTextContent('Extra milestone');
+
+    // a task moves to the new milestone
+    await u.click(screen.getByTestId('wfe-edit-A4'));
+    await u.selectOptions(await screen.findByTestId('wfe-task-stage'), 'ZM1');
+    await reasonAndSave(u, 'wfe-task-dialog');
+    await waitFor(() => expect(within(screen.getByTestId('wfe-stage-ZM1')).getByTestId('wfe-task-A4')).toBeInTheDocument());
+
+    await u.click(screen.getByTestId('wfe-publish'));
+    await u.type(await screen.findByTestId('wfe-publish-dialog-reason'), REASON);
+    await u.type(screen.getByTestId('wfe-confirm'), 'v2');
+    await u.click(screen.getByTestId('wfe-publish-dialog-submit'));
+    await waitFor(() => expect(screen.getByTestId('wfe-version-2')).toHaveTextContent('Published'));
+
+    // migrate the open sites to v2
+    await u.click(await screen.findByTestId('wfe-migrate'));
+    await u.click(await screen.findByTestId('wfe-mig-preview'));
+    expect(await screen.findByTestId('wfe-mig-site-TRP-001')).toBeInTheDocument();
+    await u.type(screen.getByTestId('wfe-migrate-dialog-reason'), REASON);
+    expect(screen.getByTestId('wfe-migrate-dialog-submit')).toBeDisabled();
+    await u.type(screen.getByTestId('wfe-mig-confirm'), 'v2');
+    await u.click(screen.getByTestId('wfe-migrate-dialog-submit'));
+    const log = await screen.findByTestId('wfe-migrations');
+    expect(log).toHaveTextContent('TRP-001');
+
+    // and revert it
+    await u.click(within(log).getByRole('button', { name: 'Revert' }));
+    await reasonAndSave(u, 'wfe-revert-dialog');
+    await waitFor(() => expect(within(screen.getByTestId('wfe-migrations')).queryByRole('button', { name: 'Revert' })).toBeNull());
+    expect(screen.getByTestId('wfe-migrations')).toHaveTextContent('Reverted');
+  }, 90_000);
 });
