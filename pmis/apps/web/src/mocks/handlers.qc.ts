@@ -21,6 +21,9 @@ const isPm = () => viewer()?.key === 'pm';
 
 // ---------------------------------------------------------------- Q130: the site's custom fields
 const siteCustom = new Map<string, { custom: Record<string, unknown>; version: number }>();
+/** Contract 0.15.6: direct admin edits of a site (mock store; the real API audits them). */
+type MockEdit = { id: string; entity: 'site'; site_id: string; task_id: null; kind: 'site_edit'; reason: string; before: Record<string, unknown>; after: Record<string, unknown>; created_at: string; reverted_at: string | null; revertible: boolean; acted_by: { id: string; display_name: string } };
+export const siteAdminEdits: MockEdit[] = [];
 // contract 0.12.10 (Q225): near_airport changes the permits, so it is changed by a Change Control proposal, never by PATCH
 const SITE_FIELDS = [{ code: 'near_airport', label_en: 'Near an airport', label_ar: 'قريب من مطار', type: 'bool' as const, section: 'Site', required: false, requires_approval: true }];
 /** Change Control drafts opened by POST /sites/{id}/change-proposals (mock store). */
@@ -35,6 +38,9 @@ export function qcSiteDetail(d: SiteDetail): SiteDetail {
     ...d,
     version: c?.version ?? d.version,
     custom: c?.custom ?? {},
+    can_admin_edit: isPm(),
+    admin_edits: { active_count: siteAdminEdits.filter((e) => e.site_id === d.id && !e.reverted_at).length, items: siteAdminEdits.filter((e) => e.site_id === d.id) },
+    admin_override_active: siteAdminEdits.some((e) => e.site_id === d.id && !e.reverted_at),
     custom_fields: SITE_FIELDS.map((f) => ({ ...f, can_edit: !!viewer() && viewer()!.key !== 'viewer' })),
     counts: snags ? { ...d.counts, open_snags: snags.filter((s) => s.state !== 'closed' && s.state !== 'cancelled').length } : d.counts,
   } as SiteDetail;
@@ -149,6 +155,38 @@ export const qcHandlers = [
     return HttpResponse.json(qcSiteDetail(detail(siteIndex(id))), { headers: { ETag: `"${next.version}"` } });
   }),
 
+  // ---- Contract 0.15.6: the direct admin edit of a site and its revert (a System Admin only; reason and step-up).
+  http.post(`${B}/sites/:id/admin-edits`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    const id = params.id as string;
+    if (siteIndex(id) < 0) return problem(404, 'not_found', 'Site not found');
+    if (!isPm()) return problem(403, 'action_forbidden', 'Only a System Admin edits a site directly.');
+    if (!stepUpValid()) return stepUp();
+    const b = (await request.json().catch(() => ({}))) as { reason?: string; identity?: Record<string, unknown>; scenario?: string; custom?: Record<string, unknown> };
+    if (!b.reason || b.reason.trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    if (b.identity && 'site_code' in b.identity) return fields({ path: '/identity/site_code', code: 'immutable' });
+    const cur = siteCustom.get(id) ?? { custom: {}, version: 1 };
+    const before: Record<string, unknown> = {}, after: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(b.custom ?? {})) { before[`custom.${k}`] = cur.custom[k] ?? null; after[`custom.${k}`] = v; }
+    for (const [k, v] of Object.entries(b.identity ?? {})) { before[k] = null; after[k] = v; }
+    if (b.scenario) { before.scenario = null; after.scenario = b.scenario; }
+    siteCustom.set(id, { custom: { ...cur.custom, ...(b.custom ?? {}) }, version: cur.version + 1 });
+    const edit: MockEdit = { id: crypto.randomUUID(), entity: 'site', site_id: id, task_id: null, kind: 'site_edit', reason: b.reason.trim(), before, after, created_at: new Date().toISOString(), reverted_at: null, revertible: true, acted_by: { id: viewer()!.key, display_name: viewer()!.key } };
+    siteAdminEdits.push(edit);
+    return HttpResponse.json({ changed: true, override_id: edit.id, fields: Object.keys(after) });
+  }),
+  http.post(`${B}/overrides/:oid/revert`, async ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!isPm()) return problem(403, 'action_forbidden', 'Only a System Admin reverts an override.');
+    if (!stepUpValid()) return stepUp();
+    const e = siteAdminEdits.find((x) => x.id === params.oid);
+    if (!e) return problem(404, 'not_found', 'Override not found');
+    if (e.reverted_at) return problem(409, 'override_not_revertible', 'This override was reverted already.');
+    const b = (await request.json().catch(() => ({}))) as { reason?: string };
+    if (!b.reason || b.reason.trim().length < 3) return fields({ path: '/reason', code: 'required' });
+    e.reverted_at = new Date().toISOString(); e.revertible = false;
+    return HttpResponse.json(e);
+  }),
   // ---- Q225 (contract 0.12.10): one Change Control draft per field; the site keeps its value until L2 approves.
   // ---- Q473 (contract 0.14.1): the identity of the site (names, coordinates, region, cluster) is proposed the same way; region and cluster are for a System Admin.
   http.post(`${B}/sites/:id/change-proposals`, async ({ params, request }) => {
@@ -402,7 +440,7 @@ export const qcHandlers = [
 
 /** Test helper: an empty snag store and no edited site field. */
 export function resetQcMocks() {
-  SNAGS.clear(); siteCustom.clear(); recSlots.clear(); siteProposals.length = 0;
+  SNAGS.clear(); siteCustom.clear(); recSlots.clear(); siteProposals.length = 0; siteAdminEdits.length = 0;
   severities = { items: SEVERITIES_SEED.map((x) => ({ ...x })), version: 1 };
   qcSettings = { ...SETTINGS_SEED };
 }
