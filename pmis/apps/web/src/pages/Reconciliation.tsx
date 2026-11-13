@@ -7,7 +7,7 @@ import { ApiError } from '@/api/client';
 import type { ImportBatch } from '@/api/types';
 import {
   downloadOriginal, exportDiffs, useApplyRun, useMasterDiffs, useMasterRun, useMasterRuns, useResolveDiff, useUploadLegacyMaster,
-  type DiffFilters, type MasterImportDiff, type MasterImportRun, type MasterImportRunProgress,
+  type DiffFilters, type MasterImportDiff, type MasterImportOutcome, type MasterImportRun, type MasterImportRunProgress,
 } from '@/api/masterImport';
 import { useHistoricalOffer } from '@/api/historicalWaiver';
 import { BatchProgress } from '@/components/BatchProgress';
@@ -225,6 +225,7 @@ function RunDetail({ id }: { id: string }) {
       <RunStaging r={r} />
       <RunApplying r={r} />
       {r.progress && <RunProgress p={r.progress} />}
+      {r.outcome && <RunOutcome o={r.outcome} />}
 
       <div role="toolbar" className="flex flex-wrap items-center gap-2">
         <select className="input w-auto" aria-label={t('mi.col_kind')} data-testid="mi-filter-kind" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>
@@ -268,6 +269,39 @@ function RunDetail({ id }: { id: string }) {
   );
 }
 
+/** 0.15.11: the batches of the applied run (the Master sheet by stream, and each register sheet loaded), with their counts, and the sheets skipped. */
+function RunOutcome({ o }: { o: MasterImportOutcome }) {
+  const { t } = useTranslation();
+  const batches = o.batches ?? [];
+  const skipped = ((o.skipped ?? []) as { sheet?: string; ref?: string; reason?: string; detail?: string }[]).filter((s) => s.sheet !== 'Master');
+  if (!batches.length && !skipped.length) return null;
+  return (
+    <section className="card p-3 text-sm" aria-labelledby="mi-outcome-title" data-testid="mi-outcome">
+      <h3 id="mi-outcome-title" className="mb-2 font-semibold">{t('mi.outcome_title')}</h3>
+      <table className="w-full text-sm">
+        <thead className="text-mute"><tr>{['part', 'rows', 'approved', 'errors', 'skipped'].map((c) => <th key={c} className="p-1 text-start">{t(`mi.outcome_${c}`)}</th>)}</tr></thead>
+        <tbody>
+          {batches.map((b) => (
+            <tr key={b.id} className="border-t border-line" data-testid={`mi-outcome-${b.kind === 'register' ? b.ref : `stream-${b.ref}`}`}>
+              <td className="p-1">{b.kind === 'register' ? t('mi.outcome_register', { sheet: b.sheet ?? b.ref }) : t('mi.outcome_stream', { ref: b.ref })}
+                {b.queued && <span className="ms-1 chip">{t('mi.outcome_queued')}</span>}</td>
+              <td className="p-1">{b.rows ?? '—'}</td>
+              <td className="p-1">{b.approved ?? 0}</td>
+              <td className="p-1">{b.errors ?? 0}</td>
+              <td className="p-1">{b.skipped ?? 0}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {skipped.length > 0 && (
+        <ul className="mt-2 list-disc ps-5 text-mute" data-testid="mi-outcome-skipped">
+          {skipped.map((s, i) => <li key={i}>{t('mi.outcome_sheet_skipped', { sheet: s.sheet ?? s.ref ?? '', reason: s.detail ?? s.reason ?? '' })}</li>)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => void }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -277,9 +311,20 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
   // Q462 (0.14.3): "historical load: accept without documents", for a System Admin while the waiver is open; a draft has no document check
   const offer = useHistoricalOffer(mode === 'submit');
   const [hist, setHist] = useState<HistoricalChoice>(NO_HISTORICAL);
+  // 0.15.11 (owner decision 2026-11-12): approve the submitted tasks of the historical load directly, as an admin override (no L2); only with the historical option
+  const [directChoice, setDirect] = useState(false);
+  const direct = !!offer && hist.on && directChoice;
+  // 0.15.11 (owner decision 2026-11-12, "Everything from the one file"): also load the register sheets of the same file; only with the historical option
+  const [registersChoice, setRegisters] = useState(false);
+  const registers = !!offer && hist.on && registersChoice;
   const [err, setErr] = useState<string | null>(null);
-  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim() } } : {}) }, {
-    onSuccess: (r) => { toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing') : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 })); onClose(); },
+  const go = () => apply.mutate({ run, mode, reason, ...(offer && hist.on ? { historical_load: { reason: hist.reason.trim(), ...(direct ? { approve_directly: true } : {}), ...(registers ? { registers: true } : {}) } } : {}) }, {
+    onSuccess: (r) => {
+      const approved = (r.outcome?.batches ?? []).reduce((n, b) => n + (b.approved ?? 0), 0);
+      toast(r.status === 'applying' ? t('mi.applying_queued') : r.progress?.state === 'running' ? t('mi.applied_processing')
+        : r.outcome?.approve_directly ? t('mi.approved_directly_toast', { count: approved }) : t('mi.applied_toast', { count: r.outcome?.batches?.length ?? 0 }));
+      onClose();
+    },
     onError: (e) => setErr(e.problem.detail ?? registerErrorMessage(t, e)),
   });
   return (
@@ -296,6 +341,20 @@ function ApplyDialog({ run, onClose }: { run: MasterImportRun; onClose: () => vo
             ))}
           </fieldset>
           {offer && <HistoricalLoadOption waiver={offer} value={hist} onChange={setHist} testid="hl" />}
+          {offer && hist.on && (
+            <div className="space-y-1 rounded-md border border-line bg-waitBg p-3 text-sm" data-testid="mi-direct-option">
+              <label className="flex items-start gap-2">
+                <input type="checkbox" data-testid="mi-approve-directly" checked={directChoice} onChange={(e) => setDirect(e.target.checked)} />
+                <span className="font-semibold text-waitInk">{t('mi.approve_directly')}</span>
+              </label>
+              {directChoice && <p role="note" className="text-xs text-lateInk" data-testid="mi-approve-directly-warn">{t('mi.approve_directly_warn')}</p>}
+              <label className="flex items-start gap-2 pt-1">
+                <input type="checkbox" data-testid="mi-load-registers" checked={registersChoice} onChange={(e) => setRegisters(e.target.checked)} />
+                <span>{t('mi.load_registers')}</span>
+              </label>
+              {registersChoice && <p role="note" className="text-xs text-mute" data-testid="mi-load-registers-note">{t('mi.load_registers_note')}</p>}
+            </div>
+          )}
           <div>
             <label htmlFor="mi-reason" className="text-sm font-semibold">{t('mi.reason')}</label>
             <textarea id="mi-reason" className="input mt-1 w-full" data-testid="mi-apply-reason" value={reason} onChange={(e) => setReason(e.target.value)} />
