@@ -25,7 +25,7 @@ export function MfaBadge({ user }: { user: Pick<User, 'mfa_exempt' | 'employee_i
   return <span className="chip gap-1 bg-waitBg text-waitInk" data-testid={`mfa-badge-${user.employee_id}`} title={user.mfa_exempt_until ? t('mfa.until', { date: user.mfa_exempt_until.slice(0, 10) }) : t('mfa.until_revoked')}><ShieldOff size={12} />{t('mfa.badge')}</span>;
 }
 
-type Act = { kind: 'deactivate' | 'reactivate' | 'delete'; user: User } | { kind: 'restore' | 'purge'; deleted: DeletedUser };
+type Act = { kind: 'deactivate' | 'reactivate' | 'delete'; user: User } | { kind: 'restore'; deleted: DeletedUser } | { kind: 'purge'; deleted: DeletedUser };
 
 function ActDialog({ act, onClose }: { act: Act; onClose: () => void }) {
   const { t } = useTranslation();
@@ -61,7 +61,7 @@ function ActDialog({ act, onClose }: { act: Act; onClose: () => void }) {
 function DeletedTab() {
   const { t } = useTranslation();
   const q = useDeletedUsers(true);
-  const me = useMe();
+  const me = useMe(true);
   const [act, setAct] = useState<Act | null>(null);
   const items = q.data ?? [];
   return (
