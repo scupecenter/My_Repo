@@ -166,6 +166,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wlDb = await buildDatabase(adminUrl, wl, appPassword);
   process.env.TEST_DATABASE_URL_WL = wlDb.appUrl;
   process.env.TEST_SUPER_URL_WL = wlDb.superUrl;
+  // The historical-registers database (migration 0093): the suite opens the historical-load waiver, loads the register sheets of a synthetic Master and changes
+  // imports.async_rows to run the same apply in the background; it reads the register records it approves, which no other suite may meet.
+  const hreg = `${dbName}_hreg`;
+  const hregDb = await buildDatabase(adminUrl, hreg, appPassword);
+  process.env.TEST_DATABASE_URL_HREG = hregDb.appUrl;
+  process.env.TEST_SUPER_URL_HREG = hregDb.superUrl;
   // The workflow-editor database (migration 0090): the suite creates and publishes workflow versions (a new published version changes what every new site uses),
   // so no other suite may share it.
   const wfe = `${dbName}_wfe`;
@@ -214,6 +220,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${asy} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${bgu} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${hreg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.end();
   };

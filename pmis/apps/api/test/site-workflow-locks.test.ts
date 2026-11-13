@@ -14,7 +14,7 @@ import { Actor, Site, actor, makeSite, makeTask, plainAdmin, setCell } from './w
 /**
  * Migration 0085 (owner request 2026-11-10): per-site workflow locks, the historical load without locks, the missing data of a historical load, and new sites
  * created "Open". Its own database (TEST_DATABASE_URL_WL; the seeded Document Library is off): the suite opens the historical-load waiver and reads the dashboard
- * count of the lock bypasses. Region 4 holds the tasks, region 5 is the "other" region; region 7 holds the Site creation cells.
+ * count of the lock bypasses. Migration 0092 adds the direct approval of the historical load (admin override, no L2). Region 4 holds the tasks, region 5 is the "other" region; region 7 holds the Site creation cells.
  */
 let app: NestExpressApplication;
 let db: PgClient;
@@ -291,6 +291,7 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     }
     // the full site: B4 submitted before B3, nothing held
     expect((await task(tasks[full.id]!.B4!)).state).toBe('in_approval');
+    expect((await q<{ f: boolean }>(db, 'SELECT historical_direct_approved AS f FROM task_instances WHERE id = $1', [tasks[full.id]!.B4]))[0]!.f).toBe(false);   // 0092: not without the option
     const batchId = applied.body.outcome.batches[0].id as string;
     const rows = (await t.admin.api.call('get', `/import-batches/${batchId}/rows?limit=200`)).body.items as { site_code: string; task_code: string; action: string; hold_reason: string | null; warnings: { code: string }[]; errors: { code: string }[] }[];
     // the sparse site: B4 saved (planned date) and not submitted
@@ -417,6 +418,186 @@ describe('the historical load: no locks, missing data as warnings, every site wi
     const sites = await t.admin.api.call('get', `/import-batches/${hUp.body.id}/sites`);
     expect(sites.status).toBe(200);
     expect(sites.body.items).toEqual([expect.objectContaining({ site_id: hist.id, workflow_locks: false })]);
+  });
+  // ------------------------------------------------------------------ 0092: the historical load approved directly (owner decision 2026-11-12)
+  const direct = async (id: string) => (await q<{ state: string; flag: boolean; batch: string | null; admin_override: boolean; approved_date: string | null; level: number; version: number }>(db,
+    `SELECT state::text AS state, historical_direct_approved AS flag, historical_direct_batch_id::text AS batch, admin_override, approved_date::text AS approved_date,
+       current_level AS level, version FROM task_instances WHERE id = $1`, [id]))[0]!;
+  /** A site at PRE-CW: Site Release approved, B3 approved, B4 open (the Master enters its date), PRE-CW Completion locked behind them. */
+  async function preCwSite(prefix: string): Promise<{ site: Site; b4: string; ms2: string }> {
+    const site = await makeSite(db, R, { prefix });
+    await makeTask(db, site, 'MS1', 'approved', { actualDate: '2026-01-05' });
+    await makeTask(db, site, 'B3', 'approved', { actualDate: '2026-01-20' });
+    const b4 = await makeTask(db, site, 'B4', 'open');
+    const ms2 = await makeTask(db, site, 'MS2', 'locked');
+    return { site, b4, ms2 };
+  }
+
+  it('0092: approve directly: every submitted task of the load is approved at once (admin override, no L2), flagged, audited, and counted in progress', async () => {
+    const t = await team(['B3', 'B4', 'D5']);
+    const a = await preCwSite('WLD');
+    const sparse = await makeSite(db, R, { prefix: 'WLD' });
+    const sparseB4 = await makeTask(db, sparse, 'B4', 'open');
+    const prog = await makeSite(db, R, { prefix: 'WLD' });   // TE MOS (D5) is a weighted Project Status item (its own task)
+    await makeTask(db, prog, 'D4', 'approved', { actualDate: '2026-01-10' });
+    const progD5 = await makeTask(db, prog, 'D5', 'open');
+    expect((await openWaiver(t.admin)).status).toBe(200);
+    const ps0 = await t.admin.api.call('get', `/project-status?site_id=${prog.id}`);   // overrides excluded (the default)
+    expect(ps0.status, JSON.stringify(ps0.body)).toBe(200);
+    const run = await uploadMaster(t.admin.api, await masterFile([
+      { A: 1, B: a.site.code, AO: day('2026-02-10') },        // an actual date: submitted, then approved directly
+      { A: 2, B: sparse.code, AN: day('2026-03-01') },        // only a planned date: saved, not submitted, not approved
+      { A: 3, B: prog.code, CJ: day('2026-02-15') },          // TE MOS actual date
+    ]));
+    expect(run.status, JSON.stringify(run.body)).toBe(201);
+    const applied = await t.admin.api.call('post', `/master-import/runs/${run.body.id}/apply`,
+      { mode: 'submit', reason: 'Initial load', historical_load: { reason: REASON, approve_directly: true } }, { 'If-Match': `"${run.body.version}"` });
+    expect(applied.status, JSON.stringify(applied.body)).toBe(200);
+    expect(applied.body.outcome.approve_directly).toBe(true);
+    const outB = applied.body.outcome.batches as { id: string; ref: string; submitted: number; saved: number; approved: number }[];
+    expect(outB.reduce((n, b) => n + b.approved, 0)).toBe(2);
+    expect(outB.reduce((n, b) => n + b.saved, 0)).toBe(1);
+    const cwBatch = (await q<{ b: string }>(db, 'SELECT historical_direct_batch_id::text AS b FROM task_instances WHERE id = $1', [a.b4]))[0]!.b;
+
+    // B4 approved without L2: the approval effects of a final approval, the flag, not admin_override (which would hide it from Project Status)
+    const b4 = await direct(a.b4);
+    expect(b4).toMatchObject({ state: 'approved', flag: true, admin_override: false });
+    expect(outB.map((x) => x.id)).toContain(b4.batch);
+    expect(b4.approved_date).not.toBeNull();
+    const steps = await q<{ action: string; note: string | null; acted_by: string; after_state: string; stepup_verified: boolean; batch_row_id: string | null }>(db,
+      `SELECT action::text AS action, note, acted_by::text AS acted_by, after_state::text AS after_state, stepup_verified, batch_row_id::text AS batch_row_id
+       FROM workflow_steps WHERE task_id = $1 ORDER BY created_at`, [a.b4]);
+    expect(steps.map((s) => s.action)).toEqual(['start', 'submit', 'approve']);
+    expect(steps[2]).toMatchObject({ note: 'historical load: approved directly (admin override)', acted_by: t.admin.user.id, after_state: 'approved', stepup_verified: true });
+    expect(steps[2]!.batch_row_id).not.toBeNull();
+    const actors = await q<{ level: number; user_id: string; how: string }>(db, 'SELECT level, user_id::text AS user_id, how FROM task_level_actors WHERE task_id = $1 ORDER BY level', [a.b4]);
+    expect(actors.at(-1)).toMatchObject({ level: b4.level, user_id: t.admin.user.id, how: 'acted' });
+    const au = await audit('task_historical_direct_approval', a.b4);
+    expect(au).toHaveLength(1);
+    expect(au[0]).toMatchObject({ is_admin_override: true, reason: REASON, actor_id: t.admin.user.id,
+      before: { historical_direct_approved: false, state: 'in_approval' }, after: { historical_direct_approved: true, state: 'approved' } });
+    // no notice about a task that is already approved: no "task assigned" to L2, no "no holder" to the System Admins
+    expect((await q<{ n: number }>(db, 'SELECT count(*)::int AS n FROM notifications WHERE task_id = $1', [a.b4]))[0]!.n).toBe(0);
+    // the approver was never needed: nothing waits for L2
+    const inbox = await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM task_instances WHERE id = $1 AND state IN ('in_review', 'in_approval')`, [a.b4]);
+    expect(inbox[0]!.n).toBe(0);
+    // the successor and the milestone: PRE-CW Completion is calculated from B3 and B4 (no approval of its own)
+    const ms2 = await q<{ state: string; actual_date: string | null }>(db, 'SELECT state::text AS state, actual_date::text AS actual_date FROM task_instances WHERE id = $1', [a.ms2]);
+    expect(ms2[0]).toMatchObject({ state: 'approved', actual_date: '2026-02-10' });
+    expect(await audit('milestone_calculated', a.ms2)).toHaveLength(1);
+    // the row without an actual date stays saved
+    expect(['open', 'entry']).toContain((await direct(sparseB4)).state);
+    expect((await direct(sparseB4)).flag).toBe(false);
+
+    // the batch and its rows read approved
+    const batchId = cwBatch;
+    const batch = await t.admin.api.call('get', `/import-batches/${batchId}`);
+    expect(batch.body.status).toBe('approved');
+    const rows = (await t.admin.api.call('get', `/import-batches/${batchId}/rows?limit=200`)).body.items as { site_code: string; task_code: string; decision: string }[];
+    expect(rows.find((r) => r.site_code === a.site.code && r.task_code === 'B4')!.decision).toBe('approved');
+    expect(rows.find((r) => r.site_code === sparse.code && r.task_code === 'B4')!.decision).toBe('saved');
+    expect((await audit('import_batch.historical_direct_approval', batchId))[0]).toMatchObject({ is_admin_override: true, after: { historical_direct_approve: true } });
+
+    // the task shows the badge; the dashboard counts it as an override, and progress / site status count the task as done
+    const dto = await t.admin.api.call('get', `/tasks/${a.b4}`);
+    expect(dto.body).toMatchObject({ historical_direct_approved: true, admin_override: false });
+    const dash = await t.admin.api.call('get', '/dashboard');
+    expect(dash.status).toBe(200);
+    expect(dash.body.meta.historical_direct_flagged_count).toBeGreaterThanOrEqual(1);
+    expect(dash.body.meta.override_flagged_count).toBeGreaterThanOrEqual(dash.body.meta.historical_direct_flagged_count);
+    // Project Status leaves out only admin_override with the overrides excluded: the direct approval is not hidden, the site's progress does not drop
+    expect(await direct(progD5)).toMatchObject({ state: 'approved', flag: true });
+    const ps1 = await t.admin.api.call('get', `/project-status?site_id=${prog.id}`);
+    expect(ps1.body.meta.overrides_excluded).toBe(true);
+    expect(Number(ps1.body.progress_pct)).toBeGreaterThan(Number(ps0.body.progress_pct));
+    const st = await t.admin.api.call('get', `/master-import/runs/${run.body.id}/sites`);
+    const mine = (st.body.items as { site_code: string; done_tasks: number }[]).find((x) => x.site_code === a.site.code)!;
+    expect(Number(mine.done_tasks)).toBe(2);   // B3 and B4 (the tasks that count toward a milestone)
+
+    // reversible: a task that leaves the approved state loses the flag (audited); its next approval follows the two levels
+    await db.query(`UPDATE task_instances SET state = 'entry', current_level = 1 WHERE id = $1`, [a.b4]);
+    expect((await direct(a.b4)).flag).toBe(false);
+    expect(await audit('task_historical_direct_approval_cleared', a.b4)).toHaveLength(1);
+  });
+
+  it('0092: approve directly in the background: a big apply (0086) and its batch sent in chunks (0075) approve every submitted row', async () => {
+    const jobs = app.get(ImportJobsService);
+    jobs.autoStart = false;
+    await db.query(`UPDATE settings SET value = to_jsonb(2) WHERE key = 'imports.async_rows'`);
+    try {
+      const t = await team(['B3', 'B4']);
+      const sites = [await preCwSite('WLE'), await preCwSite('WLE'), await preCwSite('WLE')];
+      expect((await openWaiver(t.admin)).status).toBe(200);
+      const run = await uploadMaster(t.admin.api, await masterFile(sites.map((s, i) => ({ A: i + 1, B: s.site.code, AO: day('2026-02-11') }))));
+      expect(run.status, JSON.stringify(run.body)).toBe(201);
+      const queued = await t.admin.api.call('post', `/master-import/runs/${run.body.id}/apply`,
+        { mode: 'submit', reason: 'Initial load', historical_load: { reason: REASON, approve_directly: true } }, { 'If-Match': `"${run.body.version}"` });
+      expect(queued.status, JSON.stringify(queued.body)).toBe(202);
+      expect(queued.body).toMatchObject({ status: 'applying', applying: { state: 'running', sites_total: 3 } });
+      const stored = await q<{ approve_directly: boolean }>(db, 'SELECT approve_directly FROM mi_apply_jobs WHERE id = $1', [queued.body.applying.job_id]);
+      expect(stored[0]!.approve_directly).toBe(true);
+      await jobs.process((await jobs.pending(0)).find((x) => x.apply && x.job_id === queued.body.applying.job_id)!);
+      const done = await t.admin.api.call('get', `/master-import/runs/${run.body.id}`);
+      expect(done.body).toMatchObject({ status: 'applied', applying: { state: 'done' }, outcome: { approve_directly: true } });
+      const bq = done.body.outcome.batches[0] as { id: string; queued?: boolean };
+      expect(bq.queued).toBe(true);
+      const marked = await q<{ m: boolean }>(db, 'SELECT historical_direct_approve AS m FROM import_batches WHERE id = $1', [bq.id]);
+      expect(marked[0]!.m).toBe(true);
+      for (const s of sites) expect((await direct(s.b4)).state).toBe('open');   // nothing sent yet: the batch waits for its chunks
+      // the chunked send reads the choice from the batch row (two chunks of 2 and 1 rows)
+      await jobs.process((await jobs.pending(0)).find((x) => x.batch_id === bq.id)!);
+      for (const s of sites) {
+        expect(await direct(s.b4)).toMatchObject({ state: 'approved', flag: true, admin_override: false });
+        expect((await q<{ state: string }>(db, 'SELECT state::text AS state FROM task_instances WHERE id = $1', [s.ms2]))[0]!.state).toBe('approved');
+        expect(await audit('task_historical_direct_approval', s.b4)).toHaveLength(1);
+      }
+      const b = await t.admin.api.call('get', `/import-batches/${bq.id}`);
+      expect(b.body.status).toBe('approved');
+    } finally {
+      await db.query(`UPDATE settings SET value = to_jsonb(50) WHERE key = 'imports.async_rows'`);
+      jobs.autoStart = true;
+    }
+  });
+
+  it('0092: approve directly is refused outside the historical load of a System Admin; without it nothing changes', async () => {
+    const t = await team(['B3', 'B4']);
+    const a = await preCwSite('WLR');
+    expect((await openWaiver(t.admin)).status).toBe(200);
+    const run = await uploadMaster(t.admin.api, await masterFile([{ A: 1, B: a.site.code, AO: day('2026-02-12') }]));
+    expect(run.status, JSON.stringify(run.body)).toBe(201);
+    const url = `/master-import/runs/${run.body.id}/apply`;
+    const im = { 'If-Match': `"${run.body.version}"` };
+    // without the historical option (the field exists only inside historical_load), and in draft mode: 422
+    expect((await t.admin.api.call('post', url, { mode: 'submit', reason: 'Initial load', approve_directly: true }, im)).status).toBe(422);
+    const draft = await t.admin.api.call('post', url, { mode: 'draft', reason: 'Initial load', historical_load: { reason: REASON, approve_directly: true } }, im);
+    expect(draft.status, JSON.stringify(draft.body)).toBe(422);
+    // anybody but a System Admin: 403 (a delegate of the import cannot use the historical option)
+    const dg = await makeUser(db, { assigned: true });
+    await delegate(db, dg.id, [['templates', 'view'], ['templates', 'administer'], ['templates', 'import'], ['sites', 'view'], ['sites', 'edit']]);
+    const dgApi = await loggedIn(app, dg);
+    await dgApi.stepUp(dg.password);
+    const nonAdmin = await dgApi.call('post', url, { mode: 'submit', reason: 'Initial load', historical_load: { reason: REASON, approve_directly: true } }, im);
+    expect(nonAdmin.status, JSON.stringify(nonAdmin.body)).toBe(403);
+    expect(nonAdmin.body).toMatchObject({ code: 'action_forbidden' });
+    expect((await direct(a.b4)).state).toBe('open');
+    // the direct mark is written by no other path: a stream template upload with the historical option is never marked
+    const marked = await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM import_batches WHERE historical_direct_approve AND source <> 'master_import'`);
+    expect(marked[0]!.n).toBe(0);
+    // without approve_directly: the task waits for L2 as before, no flag
+    const plain = await t.admin.api.call('post', url, { mode: 'submit', reason: 'Initial load', historical_load: { reason: REASON } }, im);
+    expect(plain.status, JSON.stringify(plain.body)).toBe(200);
+    expect(plain.body.outcome.approve_directly).toBe(false);
+    expect(await direct(a.b4)).toMatchObject({ state: 'in_approval', flag: false });
+    expect(await audit('task_historical_direct_approval', a.b4)).toHaveLength(0);
+    // the quiet marker hides nothing for a task outside a batch marked for direct approval
+    await db.query('BEGIN');
+    try {
+      await db.query(`SELECT set_config('pmis.hda_quiet', $1, true)`, [a.b4]);
+      await db.query(`SELECT wf_notify($1::uuid, 'test', 'quiet check', NULL, $2::uuid)`, [t.admin.user.id, a.b4]);
+      expect((await q<{ n: number }>(db, `SELECT count(*)::int AS n FROM notifications WHERE task_id = $1 AND kind = 'test'`, [a.b4]))[0]!.n).toBe(1);
+    } finally {
+      await db.query('ROLLBACK');
+    }
   });
 });
 

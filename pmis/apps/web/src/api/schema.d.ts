@@ -5835,6 +5835,8 @@ export interface paths {
          *     **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
          *     **0.15.3:** a run still compared in the background (`staging`) answers 409 `upload_processing`; a run whose comparison failed (`failed`) answers 409 `invalid_transition`. Measured with 470 synthetic sites the staging of the apply now takes about 6 s (87 s before) and stays in the request.
          *     **0.15.5:** a file with more sites than `imports.async_rows` is applied in the background after the same checks: 202 with the run `applying` (see `applying`), then `applied` with its `outcome` (or `previewed` again with `applying.error` when the background apply was refused). A second apply meanwhile answers 409 `upload_processing`. Measured with 470 synthetic sites with every task, a historical apply: 405 s in the request before, 32 ms for the request and about 70 s in the background now.
+         *     **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
+         *     **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -9010,6 +9012,8 @@ export interface components {
             lock_bypassed?: boolean;
             /** @description 0.15.4: the lock it bypassed: `predecessor_open:<codes>` or `gate_closed:<gate>`. */
             lock_bypass_reason?: string | null;
+            /** @description 0.15.11: approved directly by the historical Master import (`historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; treated like an admin override in the SLA and on-time KPIs but counted in progress; cleared when the task leaves the approved state. */
+            historical_direct_approved?: boolean;
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
             holder_account_status?: components["schemas"]["UserAccountStatus"];
@@ -10996,7 +11000,14 @@ export interface components {
             batches?: {
                 /** Format: uuid */
                 id?: string;
-                /** @description The stream. */
+                /**
+                 * @description 0.15.11: a stream batch of the Master sheet, or a register batch of a register sheet.
+                 * @enum {string}
+                 */
+                kind?: "stream" | "register";
+                /** @description 0.15.11: the sheet of the file (Master, or the register sheet). */
+                sheet?: string;
+                /** @description The stream, or (0.15.11) the register key. */
                 ref?: string;
                 template_id?: string;
                 submitted?: number;
@@ -11014,6 +11025,23 @@ export interface components {
                 job_id?: string;
                 /** @description 0.14.6: the rows to send of a queued batch. */
                 rows?: number;
+                /** @description 0.15.11: the rows of the batch already approved (with `approve_directly`, every submitted row). A queued batch counts them in its `ImportBatch.progress`. */
+                approved?: number;
+                /** @description 0.15.11: rows that change nothing (the register or the task already holds these values). */
+                skipped?: number;
+            }[];
+            /** @description 0.15.11: the apply approved the submitted rows directly (historical load, admin override). */
+            approve_directly?: boolean;
+            /** @description 0.15.11: the register sheets of the file were loaded. */
+            registers?: boolean;
+            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`. */
+            register_notes?: {
+                sheet?: string;
+                ref?: string;
+                code?: string;
+                count?: number;
+                cells?: string[];
+                headers?: string[];
             }[];
             skipped?: {
                 [key: string]: unknown;
@@ -11060,6 +11088,16 @@ export interface components {
             /** @description Q462 (0.14.3): mark every batch of this apply "historical load: accept without documents". A System Admin only (403 `action_forbidden`), `mode` submit, a step-up, the waiver open (409 `invalid_transition`). For the rows whose actual date is on or before the cutoff date the mandatory-document check is skipped and the task is flagged; every other check runs. */
             historical_load?: {
                 reason: string;
+                /**
+                 * @description 0.15.11 (owner decision 2026-11-12): approve every submitted task of this load at once as an admin override, with no L2 step (a workflow step `approve` "historical load: approved directly (admin override)", the flag `TaskSummary.historical_direct_approved`, an audit row per task with `is_admin_override`). Only here, with `mode` submit (422 otherwise). Rows without an actual date stay saved; refused rows stay errors. 0.15.11: with `registers`, the register rows are approved at once too.
+                 * @default false
+                 */
+                approve_directly: boolean;
+                /**
+                 * @description 0.15.11 (owner decision 2026-11-12): also load the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers, as register batches of the same group. Personal columns (landlord, contact, phone, e-mail) are never read. Only here (422 otherwise).
+                 * @default false
+                 */
+                registers: boolean;
             };
         };
         MasterImportDiffResolve: {
@@ -11863,6 +11901,8 @@ export interface components {
             supersedes_id?: string | null;
             /** @description The approved version that is in force. */
             is_current?: boolean;
+            /** @description 0.15.11: approved directly by the historical Master import (a register sheet of the file, `historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; cleared if the record leaves the approved state. */
+            historical_direct_approved?: boolean;
             /** @description Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task's Matrix row, and the final approval fills the task's date and approves it. */
             task?: {
                 /** Format: uuid */
@@ -14256,6 +14296,8 @@ export interface components {
             historical_flagged_count?: number;
             /** @description 0.15.4: only the tasks flagged `lock_bypassed` (approved on an open site while a lock would have held them); also counted in `override_flagged_count`. */
             lock_bypass_flagged_count?: number;
+            /** @description 0.15.11: only the tasks flagged `historical_direct_approved` (approved directly by the historical Master import); also counted in `override_flagged_count`. */
+            historical_direct_flagged_count?: number;
             overrides_excluded?: boolean;
             weight_set?: components["schemas"]["WeightSetRef"];
         };

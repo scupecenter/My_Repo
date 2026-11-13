@@ -74,7 +74,7 @@ export function useUploadLegacyMaster() {
 /** Apply a previewed run (reason; the step-up dialog opens when the server asks). */
 export function useApplyRun() {
   const qc = useQueryClient();
-  return useMutation<MasterImportRun & { outcome?: MasterImportOutcome }, ApiError, { run: MasterImportRun; mode: 'submit' | 'draft'; reason: string; historical_load?: { reason: string } }>({
+  return useMutation<MasterImportRun & { outcome?: MasterImportOutcome }, ApiError, { run: MasterImportRun; mode: 'submit' | 'draft'; reason: string; historical_load?: { reason: string; approve_directly?: boolean; registers?: boolean } }>({
     mutationFn: ({ run, mode, reason, historical_load }) => api.post(`/master-import/runs/${run.id}/apply`, { version: run.version, body: { mode, reason, ...(historical_load ? { historical_load } : {}) } }),
     onSuccess: (r) => { qc.setQueryData(['master-run', r.id], r); void qc.invalidateQueries({ queryKey: ['master-runs'] }); void qc.invalidateQueries({ queryKey: ['import-batches'] }); },
   });

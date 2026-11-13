@@ -123,6 +123,7 @@ export class DashboardService {
         override_flagged_count: meta.override_flagged_count ?? 0,
         historical_flagged_count: meta.historical_flagged_count ?? 0,
         lock_bypass_flagged_count: meta.lock_bypass_flagged_count ?? 0,
+        historical_direct_flagged_count: meta.historical_direct_flagged_count ?? 0,   // 0092
         overrides_excluded: excl,
         ...(weightSet ? { weight_set: weightSet } : {}),
         project_wide: meta.project_wide === true,

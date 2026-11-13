@@ -86,6 +86,8 @@ export interface TaskSummaryDto {
   lock_bypassed: boolean;
   /** 0085: the lock it bypassed: predecessor_open:<codes> or gate_closed:<gate>; null when not bypassed. */
   lock_bypass_reason: string | null;
+  /** 0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
+  historical_direct_approved: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
   lock_reasons: { kind: string; ref_code: string | null; message: string; count: number | null }[];
   /** Only in the Site Register task grid: register-owned fields shown read-through, editable through the source register (spec 2.7). */
@@ -136,6 +138,7 @@ export interface TaskRow {
   historical_no_documents: boolean;
   lock_bypassed: boolean;
   lock_bypass_reason: string | null;
+  historical_direct_approved: boolean;
   historical_batch_id: string | null;
   historical_flagged_at: Date | null;
   historical_missing: string[] | null;
@@ -190,7 +193,7 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       r.end_ref AS sla_end_ref, r.pending_confirmation AS sla_pending, sla_task_measured(t.id) AS sla_measured,
       CASE WHEN r.id IS NULL OR t.sla_start_date IS NULL THEN NULL
            ELSE sla_tentative_holidays(r.calendar_id, t.sla_start_date, CASE WHEN t.state = 'approved' THEN t.sla_end_date ELSE t.due_date END)::text[] END AS sla_tentative,
-      t.return_count, t.last_return_note, t.admin_override, t.historical_no_documents, t.lock_bypassed, t.lock_bypass_reason, t.historical_batch_id::text AS historical_batch_id,
+      t.return_count, t.last_return_note, t.admin_override, t.historical_no_documents, t.lock_bypassed, t.lock_bypass_reason, t.historical_direct_approved, t.historical_batch_id::text AS historical_batch_id,
       t.historical_flagged_at, t.historical_missing, t.is_na, t.na_reason, t.version,
       t.ball_in_court_user_id::text AS pinned_user, t.external_party_id::text AS external_party_id, wd.version AS workflow_version,
       k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder,
@@ -320,6 +323,7 @@ export class TaskViewService {
         historical_no_documents: r.historical_no_documents,
         lock_bypassed: r.lock_bypassed === true,
         lock_bypass_reason: r.lock_bypass_reason ?? null,
+        historical_direct_approved: r.historical_direct_approved === true,
         lock_reasons: [],
         version: r.version,
       };

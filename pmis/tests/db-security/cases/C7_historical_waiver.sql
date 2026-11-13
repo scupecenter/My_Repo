@@ -452,7 +452,7 @@ SELECT CASE
 -- @end
 
 -- @case HW-61
--- @title The new overloads of the staging and the apply keep owner pmis_definer and PUBLIC revoked; the application role holds the 9-argument staging and the 6-argument apply
+-- @title The new overloads of the staging and the apply keep owner pmis_definer and PUBLIC revoked; the application role holds the 9-argument staging and the 6-argument apply (0093: and the 7-argument apply)
 -- @category historical-waiver
 -- @expect output ok
 WITH f AS (
@@ -465,9 +465,9 @@ WITH f AS (
 SELECT CASE
   WHEN EXISTS (SELECT 1 FROM f WHERE owner <> 'pmis_definer' OR NOT prosecdef OR pub) THEN 'shape'
   WHEN (SELECT count(*) FROM f WHERE proname = 'imp_stage_task_row') <> 2 OR (SELECT count(*) FROM f WHERE proname = 'imp_stage_stream_batch') <> 2
-       OR (SELECT count(*) FROM f WHERE proname = 'mi_apply_run') <> 2 OR (SELECT count(*) FROM f WHERE proname = 'imp_stage_master_core') <> 2 THEN 'overloads'
+       OR (SELECT count(*) FROM f WHERE proname = 'mi_apply_run') <> 3 OR (SELECT count(*) FROM f WHERE proname = 'imp_stage_master_core') <> 2 THEN 'overloads'
   WHEN EXISTS (SELECT 1 FROM f WHERE proname IN ('imp_stage_task_row', 'imp_stage_stream_batch', 'imp_stage_master_core', 'imp_submit_stream_batch', 'wf_complete') AND app) THEN 'internal granted'
-  WHEN (SELECT count(*) FROM f WHERE proname = 'mi_apply_run' AND app) <> 2 OR (SELECT count(*) FROM f WHERE proname = 'imp_stage_batch' AND app) <> 3 THEN 'doors'
+  WHEN (SELECT count(*) FROM f WHERE proname = 'mi_apply_run' AND app) <> 3 OR (SELECT count(*) FROM f WHERE proname = 'imp_stage_batch' AND app) <> 3 THEN 'doors'
   ELSE 'ok' END;
 -- @end
 
