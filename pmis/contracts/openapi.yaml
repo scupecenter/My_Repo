@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.5
+  version: 0.15.11
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,12 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RSK) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
+    - 0.15.10 (2026-11-13): the workflow editor (owner decision 4 of 2026-11-12; migration 0090; CHANGELOG 132). Additive. (1) New paths: `POST /workflow/versions/{version}/tasks` (`createTaskDefinition`), `PATCH /workflow/versions/{version}/tasks/{task_code}` (`updateTaskDefinition`: rename EN/AR, counts toward the milestone, deactivate, move in a draft), `PUT /workflow/versions/{version}/tasks/{task_code}/predecessors` (`replaceTaskPredecessors`, a cycle is 422 `validation_failed` on `/predecessors` with code `cycle`), `PUT /workflow/versions/{version}/milestones/{code}/task-order` (`reorderMilestoneTasks`). (2) The declared `/workflow/*` and `/settings/task-definitions` operations are implemented; every write needs System Admin or an all-regions delegate (403), a reason, `If-Match` with the `version_etag` (412/428) and a step-up (401); publish needs `confirm_text` equal to `v<version>` (422 `confirmation_mismatch`). (3) `WorkflowVersion` gains `can_edit` and `can_publish`, `TaskPlacement` gains `name_en`, `name_ar`, `is_active`, `is_milestone_task`, `has_documents`, `task_version`, `WorkflowMilestone.is_active`. (4) New `ErrorCode` values `workflow_invalid`, `master_impact_unconfirmed`, `stale_preview`. Not yet implemented: `PUT /workflow/versions/{version}` (replace structure), `POST .../migrations` and the revert of a site migration.
+    - 0.15.9 (2026-11-12): System Admin approve all as is for upload batches (owner decision 1 of 2026-11-12; migration 0087; CHANGELOG 129). Additive. `ImportDecisionRequest.action` gains `admin_approve` (`scope` all, `note` the reason of at least 3 characters) on `POST /import-batches/{batch_id}/decisions`: a final approval of every open row of a task-stream batch (also a Save Draft / Planning one) by a System Admin only (403 `action_forbidden`), with a step-up (401) and without the check of the L2 holders; a row that lacks an actual date, a document or another required value is approved too and flagged `incomplete`; every task is flagged `admin_override` (KPIs treat it as an override) and audited per row. New: `ImportBatchOutcome.incomplete`, `ImportBatch.counts.admin_approved` / `counts.incomplete`, `ImportBatchProgress.incomplete`, `action` `admin_approve` in the progress of a run.
+    - 0.15.8 (2026-11-13): invite a new user by email (owner decision 2026-11-12, decision 5; migration 0091; CHANGELOG 133). Additive. `POST /users/invitations` (role assignments, department, manager, groups and two-factor chosen at invite time, within the inviter's own rights; step-up when the invitation is elevated), `GET /users/invitations`, `POST /users/invitations/{invitation_id}/resend` and `/revoke`; the public `GET /invitations/{token}` and `POST /invitations/{token}/accept` (no session, rate limited, every bad link the same 404). New `ErrorCode` `invitation_invalid`.
+    - 0.15.7 (2026-11-12): direct admin edit of site data and of task dates (owner decision 2026-11-12 (2); migration 0088; CHANGELOG 130). Additive. (1) `POST /sites/{site_id}/admin-edits` (`adminEditSite`) and `GET /sites/{site_id}/admin-edits`: a System Admin (never a delegate, 403 `action_forbidden`) edits at once the English and Arabic names, the coordinates (a pair, or both null), the region and cluster, the delivery scenario, the six scope flags and any active custom field; the Site ID never changes (field error `immutable`). A reason (422) and a step-up (401) are required; the values are checked like a Change Control change (same field errors), the scope and scenario conflict rule and the applicability of the tasks run, the site is recalculated. One audit row (`site_admin_edit`, flagged as an admin override) holds the before and after of every field touched. Non-admins keep `POST /sites/{site_id}/change-proposals`. `SiteDetail.admin_edits` / `admin_override_active` (the "Admin override" badge) / `can_admin_edit`. (2) `POST /tasks/{task_id}/overrides` is implemented for `kind` = `edit_date` (any of the four date fields, an approved task included; the task is flagged `admin_override`, so the KPIs leave it out of SLA and on-time figures while `exclude_overrides` is on and count it in `override_flagged_count`; its SLA and the site are recalculated). The other kinds answer 422 with the field error `not_supported` on `/kind`. (3) `POST /overrides/{override_id}/revert` puts the old value back for a task date or a site edit while the field still holds what the override set (else 409 `override_not_revertible`). `Override` gains `entity`, `site_id`, `reverted_by`, `revert_reason` (`task_id` is null for a site edit). `TaskDetail.overrides` and `TaskDetail.can_override`.
+    - 0.15.6 (2026-11-12): permanent delete of a soft-deleted user that frees the identifiers (owner decision 3 of 2026-11-12; migration 0089; CHANGELOG 131; amends decision B14 "never a hard delete"). Additive. (1) `POST /users/{user_id}/purge` (`purgeUser`): a System Admin (a delegate of `users.delete` gets 403 `action_forbidden`) turns an already soft-deleted account into a tombstone; needs `reason`, step-up and the typed confirmation `confirm_text` (the account's employee ID or e-mail; mismatch 422 `confirmation_mismatch`). The row, its id and its display name are kept, so all history, audit rows and task steps stay attributed; the e-mail (replaced by a placeholder), employee ID, phone and Entra link are released, so a new account with the same data can be created; credentials, 2FA and sessions end, group memberships are removed, assignments are ended, delegations revoked. 409 `invalid_transition` when the account is not soft-deleted yet or was already purged, 403 `self_beneficiary` for the caller's own row, 409 `last_admin` if no active System Admin would remain. A purged user is in no list and picker and answers 404 on every `/users/{user_id}` path; it cannot be restored. (2) `GET /users/deleted` leaves purged users out and `can_restore` / `restore_blocked_reason` are now computed against every other account (`email_in_use`, `employee_id_in_use`, `phone_in_use`).
     - 0.15.5 (2026-11-11): the apply of a big legacy Master runs in the background (owner report 2026-11-11: the historical apply of the 469 sites answered 504; migration 0086; CHANGELOG 128). Additive. `POST /master-import/runs/{run_id}/apply` of a file with more sites than `imports.async_rows` (default 50) makes every check of the request as before (right, version, status, mode and reason, step-up, the historical-load option and its waiver, a file applied once), then answers 202 with the run in the new status `applying` and `MasterImportRun.applying` (`MasterImportApplyProgress`: state, sites, start, end, error). The apply itself is the same, in one transaction of its own under the same person (all or nothing); the run then shows `applied` with its `outcome`, and its big batches are sent in the background as before (`progress`). A refusal in the background (the waiver closed meanwhile, an expired step-up) puts the run back to `previewed` with `applying.state` `failed` and its error: the file can be applied again. A second apply while it runs answers 409 `upload_processing`. Opening the sites of a historical load is also faster (one statement per site instead of one per task).
     - 0.15.4 (2026-11-10): historical data without locks, per-site workflow locks, the missing data of a historical load (owner requests 2026-11-10; technical decisions "Decided 2026-11-10: historical data without locks; per-site workflow locks" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0085; CHANGELOG 125). Additive. (1) `SiteListItem.workflow_locks` (true = the sequencing locks apply, as before; false = an "open" site: a task is not held by its predecessors or a closed gate, dates are entered in any order by hand, by a template and by the Master import; L1/L2, holders, rights, step-up, audit, field validation and the mandatory documents still apply; gates and milestones are still computed) and `SiteListItem.data_gaps` (the missing required values of the site); `GET /sites` filters `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`); `SiteDetail.workflow_locks_info` (who, when, why, `can_manage`) and `SiteDetail.data_gap_items`. (2) `PUT /sites/{site_id}/workflow-locks` and `POST /sites/workflow-locks` (a selection, or every site of a Master import run or of an import batch, with one reason): a System Admin or a holder of the delegable right `unlock` (`overrides.unlock` administer) for the region; a reason (422) and a step-up (401); 403 `action_forbidden` otherwise; audited per site (`site_workflow_locks_set`, before/after, flagged as an admin override when opening). Opening a site opens its locked tasks for entry; switching back to Locked re-locks the tasks that are still untouched and still held. (3) `TaskSummary.lock_bypassed` / `lock_bypass_reason`: a task approved on an open site while a predecessor or a gate would have held it; shown with the "Admin override" badge and treated as an override in the KPIs (`KpiMeta.lock_bypass_flagged_count`, included in `override_flagged_count`). (4) The historical-load option (0.14.3) of `POST /master-import/runs/{run_id}/apply` and of a stream template upload first sets the sites of the file to open (audited per site with the reason of the load), so no row is held for a predecessor or a gate; missing data is never an error: warnings `missing_actual_date` (the row is saved, not submitted), `missing_actual_start` (the task starts on its actual date), `missing_predecessor_date`, and a cell of an approved, N/A or absent task is not read (warning); invalid values stay errors of their own cell. (5) `GET /master-import/runs/{run_id}/sites` and `GET /import-batches/{batch_id}/sites` (`SiteImportStatus`): every site of the file with its status, warnings, errors and data gaps; `gaps=only`. (6) `SiteDraftInput.workflow_locks` (Locked by default, Open needs the right of (2) when L2 approves, 403 otherwise) and the New sites template column "Workflow Locks".
     - 0.15.3 (2026-11-09): big template uploads staged in the background (owner report 2026-11-09: a "Master (all sheets)" upload of about 469 sites, and the legacy Master preview, answered 500 after the 30 s request transaction; technical decision "Decided 2026-11-09: big template uploads staged in the background" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0083; CHANGELOG 122). Additive. (1) `POST /import-batches`: a file with more data rows (all its sheets) than 4 times the setting `imports.async_rows` (default 4 x 50 = 200) is staged in the background. Every check of the upload still runs in the request, in the same order and with the same answers (the right, the size, the package guard, `_tpl`, version, template, headers, and the checks the staging makes before its rows: the import right, the regions, the task of a per-task upload, the historical-load option); then the answer is **202** with the upload in status `parsing`: `id` (= `upload_id`; for TPL-MASTER also `group_id`), `progress` (`ImportBatchProgress` with `kind` = `upload`: `parts_total`, `parts_done`, `rows_total` = data rows of the file, `rows_done`, `percent`), `warnings`, `upload` (`ImportUploadInfo`). Each part (a stream batch of the Master sheet, a register sheet, the one batch of another template; a stream part 100 file rows at a time) is staged in a transaction of its own under the uploader's signed context, by the same database functions as the request, so the batches, rows, errors, warnings and audit rows are those the request would have produced. `GET /import-batches/{batch_id}` with the upload's id answers the upload while it is `parsing` (or `failed`, with `upload.error`), then the batch it produced (for TPL-MASTER the first part with `group_id`, `parts` and `warnings`, as the synchronous answer), with `upload_id`. `GET /import-batches` lists the caller's uploads in `parsing` first (unfiltered first page, or `status=parsing`). The same file of the same person while it is parsed answers 409 `upload_processing` (new `ErrorCode`, `upload_id`); a send of the upload id answers 409 `upload_processing`; `POST .../decisions` `discard` on the upload id stops it (the uploader only; the parts staged so far stay as batches). Only the uploader sees the upload; a run left behind by a restart is resumed by the API. Smaller files are staged in the request as before (202, status `validated`). (2) `POST /master-import/runs`: a Master with more data rows than 4 times `imports.async_rows` (default 200) answers **202** with the run in the new status `staging` and `MasterImportRun.staging` (`MasterImportStagingProgress`: rows done of rows total, percent); the identification and structure checks still answer 422 in the request; the rows are compared 100 at a time in the background, then the run is `previewed` with the same summary and differences; `failed` when the comparison could not end. `POST /master-import/runs/{run_id}/apply` of a `staging` run answers 409 `upload_processing`, of a `failed` run 409 `invalid_transition`. The same file of the same person while it is compared answers 409 `upload_processing` (`upload_id`, `run_id`). (3) Measured with 470 synthetic sites: the TPL-MASTER staging went from 98 s to 11 s and the Master import apply from 87 s to 6 s (the staging no longer grows a jsonb array row by row); the apply stays in the request.
@@ -137,6 +143,8 @@ tags:
     description: The caller's profile, effective permissions and My Work.
   - name: users
     description: Registered employees and their status.
+  - name: invitations
+    description: "Public pages of an invitation link (no session): what the link shows and choosing a password."
   - name: assignments
     description: Many-to-many role assignments, by role or by person, in bulk (AU-10..AU-13).
   - name: roles
@@ -1442,6 +1450,193 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations:
+    get:
+      tags: [users]
+      operationId: listUserInvitations
+      summary: Invitations to join (pending, accepted, revoked, expired), newest first
+      description: |
+        Needs `create` on `users` (System Admin or a delegation, all regions). `status` is the effective one: a pending invitation past its time reads `expired`.
+        The link itself is never returned: it exists only in the mail.
+      x-db-path: inv_read
+      parameters:
+        - { name: q, in: query, description: 'Search name or email.', schema: { type: string } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/UserInvitationStatus' } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Invitations.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      items: { type: array, items: { $ref: '#/components/schemas/UserInvitation' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [users]
+      operationId: createUserInvitation
+      summary: Invite a new person by email, with the role and properties chosen now
+      description: |
+        Needs `create` on `users` (all regions). The person gets a mail with a link (`{{app_url}}/invite/<token>`) that works once, for `invitations.expiry_hours`
+        hours (default 72). Opening it, they choose a password and the account is created with everything chosen here: role assignments (permission level, team,
+        regions, modules, profiles, validity), department, direct manager, groups and whether two-factor is enforced. Nothing exists until they accept.
+
+        **Nobody invites with wider rights than their own.** The same ceilings as assigning apply to the inviter, checked now and again at each resend:
+        `assignments.create` for any role row (no admin level, no privileged role, only the regions, modules, profiles and end date the inviter holds),
+        `users.edit` (all regions) for `manager_id` and `department_id`, `groups.edit` (all regions) for `group_ids` (never the admin group or a delegation target
+        for a delegate), `users.administer` for `require_two_factor`. Refused with 403 `action_forbidden`. An invitation that grants admin-level rights, a
+        privileged role or a privileged group (`elevated`) needs a fresh step-up (401 `step_up_required`) and only a System Admin may stand behind it.
+
+        Two-factor: an invitation never carries an enrolment code. When `require_two_factor` is true the account is created with two-factor on, enforced and
+        not enrolled, and an admin issues the one-time code afterwards (`POST /users/{user_id}/two-factor/enrol-code`).
+
+        Email, employee ID and phone must be unused by an account (409 `duplicate`, `errors[]` names the field); only one pending invitation per email.
+        At most 20 mails to addresses per person and hour (the mail service limit).
+      x-db-path: inv_create
+      x-step-up: when elevated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserInvitationCreate' }
+      responses:
+        '201':
+          description: Invited. The mail is queued in the same transaction.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations/{invitation_id}/resend:
+    post:
+      tags: [users]
+      operationId: resendUserInvitation
+      summary: Send an invitation again (a new link; the old one stops working)
+      description: |
+        For a pending invitation, or an expired one whose email and identifiers are still free (it becomes pending again). The expiry starts over. The rights are
+        checked again against the person who resends, so an invitation never outlives the rights behind it. Needs a fresh step-up when the invitation is `elevated`.
+        409 `invalid_transition` when it was accepted or revoked.
+      x-db-path: inv_resend
+      x-step-up: when elevated
+      parameters:
+        - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Sent again.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /users/invitations/{invitation_id}/revoke:
+    post:
+      tags: [users]
+      operationId: revokeUserInvitation
+      summary: Revoke a pending invitation; its link stops working at once
+      description: Needs `create` on `users` (all regions). 409 `invalid_transition` unless the invitation is pending.
+      x-db-path: inv_revoke
+      parameters:
+        - { name: invitation_id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Revoked.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserInvitation' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /invitations/{token}:
+    get:
+      tags: [invitations]
+      operationId: getInvitationByToken
+      summary: What the accept page shows for an invitation link (public, no session)
+      description: |
+        Answers only the name, email, employee ID and phone the inviter entered, the expiry and the password rules; never the role, group or manager chosen.
+        An unknown, used, revoked, expired or malformed token all answer the same 404 `invitation_invalid` with the same text, so the answer never tells which
+        links existed. Rate limited per client address like sign-in (429 `rate_limited`, failures only).
+      security: []
+      x-db-path: inv_peek
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+      responses:
+        '200':
+          description: A valid invitation.
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationPreview' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /invitations/{token}/accept:
+    post:
+      tags: [invitations]
+      operationId: acceptInvitation
+      summary: Choose a password and create the account (public, no session)
+      description: |
+        The password follows the password policy (422 `weak_password` with `errors[]`; the policy is checked only for a valid link). The account, its
+        sign-in, the assignments, department, manager, groups and the two-factor row are created in one step; a role, department, manager or group that is no
+        longer valid is skipped (never more rights than were chosen) and the audit row lists what was skipped. No session is created: the person signs in
+        afterwards, and when `two_factor_enrolment_pending` is true an admin hands them the enrolment code first.
+        The same uniform 404 `invitation_invalid` as `GET /invitations/{token}` for any link that does not work, including a second use of the same link;
+        409 `duplicate` when the email, employee ID or phone was taken meanwhile (the invitation is then closed). Rate limited like sign-in.
+      security: []
+      x-db-path: inv_accept
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string, minLength: 1, maxLength: 200 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [password]
+              properties:
+                password: { type: string, format: password, minLength: 1, maxLength: 128 }
+      responses:
+        '201':
+          description: Account created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationAccepted' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /users/deleted:
     get:
       tags: [users]
@@ -1607,6 +1802,41 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /users/{user_id}/purge:
+    post:
+      tags: [users]
+      operationId: purgeUser
+      summary: Delete a soft-deleted user permanently; the identifiers are freed (0.15.6)
+      description: |
+        Owner decision 3 of 2026-11-12 (amends B14). System Admin only; the account must already be soft-deleted (`POST /users/{user_id}/delete`). The `users` row is never removed: it stays as a tombstone with its id and display name, so every past entry, audit row, comment and task step stays attributed to the person. The e-mail (a placeholder `purged-<id>@purged.invalid` stays), employee ID, phone and Entra link are released: a NEW account (`POST /users`) with the same data succeeds and the staff-registry employee ID can be linked to it. Local credentials, TOTP secrets and recovery codes are deleted, sessions end, pending e-mail and phone changes are cancelled, group memberships are removed, current and future role assignments are ended and delegations from or to the user are revoked. Open tasks stay with the tombstone exactly as after the soft delete (B14, B12b). Irreversible: a purged account cannot be restored (409 `invalid_transition`) and the released identifiers cannot be re-attached to it.
+        Needs a reason (3 to 500 characters), step-up and `confirm_text`: the account's employee ID or its e-mail, typed exactly (422 `confirmation_mismatch`, path `/confirm_text`). Audited as `user_purged` with before and after (masked e-mail and phone, employee ID, counts of what was removed).
+        Refused with 403 `action_forbidden` for a delegate, 403 `self_beneficiary` for the caller's own row, 404 for an unknown or already purged id, 409 `invalid_transition` when the user is not soft-deleted, 409 `last_admin` if it would leave no active System Admin.
+      x-step-up: true
+      x-db-path: idm_purge_user
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason, confirm_text]
+              additionalProperties: false
+              properties:
+                reason: { $ref: '#/components/schemas/DeleteReason' }
+                confirm_text: { $ref: '#/components/schemas/ConfirmText' }
+      responses:
+        '200':
+          description: Purged; the tombstone.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurgedUser' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /users/{user_id}/two-factor:
     put:
       tags: [users]
@@ -2760,6 +2990,52 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /sites/{site_id}/admin-edits:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: listSiteAdminEdits
+      summary: Direct admin edits of the site (0.15.7)
+      responses:
+        '200':
+          description: The 20 newest edits and how many are still in force.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteAdminEdits' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [sites]
+      operationId: adminEditSite
+      summary: Edit site data directly as a System Admin (reason and step-up, 0.15.7)
+      description: |
+        System Admin only (403 `action_forbidden`, also for a delegate). Applies at once; audited with before and after and flagged as an admin override; reversible with
+        `POST /overrides/{override_id}/revert`. Field errors are 422 `validation_failed` with paths such as `/identity/name`, `/identity/site_code` (`immutable`), `/scenario`,
+        `/scope/<flag>`, `/custom/<code>`; a scope or scenario that conflicts answers `scope_scenario_conflict`. An edit that changes nothing is a no-op (no audit row).
+      x-db-path: site_admin_edit
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteAdminEditRequest' }
+      responses:
+        '200':
+          description: The site after the edit.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /site-drafts:
     get:
       tags: [sites]
@@ -3600,7 +3876,7 @@ paths:
       tags: [tasks]
       operationId: revertOverride
       summary: Revert an admin override
-      description: 409 `override_not_revertible` if the task has moved on since.
+      description: 409 `override_not_revertible` if the task (or, for a site edit, the site) has moved on since, or the override was reverted already. Works for task date overrides and direct site edits (0.15.7).
       x-step-up: true
       parameters:
         - name: override_id
@@ -4122,6 +4398,182 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks:
+    post:
+      tags: [workflow]
+      operationId: createTaskDefinition
+      summary: Add a task inside a milestone of a draft (or of a published version, decision B8)
+      description: |
+        Decision 4 of 2026-11-12 (migration 0090). Needs a System Admin or a delegate of `task_definitions.create` for all regions (403 otherwise), a reason and a step-up (401).
+        The code is never reused in the version (409 `duplicate`). On a published version a task that counts toward its milestone needs `confirm_master_impact` during the parallel run
+        (422 `master_impact_unconfirmed`) and answers the warning `counting_task_may_move_milestone`. Field errors (422 `validation_failed`, `errors[].path` `/code`, `/name_en`, `/stage_code`,
+        `/predecessors`, `/after_task_code`). The new task also gets its SLA rule, documents and matrix cells like any other (configured in their own screens).
+      x-step-up: true
+      x-db-path: admin_wf_task_create (app_actor_is_admin('task_definitions', 'create'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code, code, name_en, reason]
+              properties:
+                stage_code: { type: string, description: 'Code of the milestone (stage) that receives the task.' }
+                code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean, default: true }
+                has_documents: { type: boolean, default: true }
+                after_task_code: { type: [string, 'null'], description: 'Place it after this task of the same milestone (default: last).' }
+                predecessors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task_code, warnings, version]
+                properties:
+                  task_code: { type: string }
+                  warnings: { type: array, items: { type: string } }
+                  version: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}:
+    patch:
+      tags: [workflow]
+      operationId: updateTaskDefinition
+      summary: Rename EN/AR, counts toward the milestone, deactivate or reactivate, move to another milestone (draft only)
+      description: |
+        Needs `task_definitions.edit` (all regions), a reason and a step-up. Only the keys sent change; nothing to change is 409 `invalid_transition`. A task is never deleted: it is
+        deactivated (422 `validation_failed` on `/is_active` while active tasks still wait for it, or for a milestone task of a published version). Moving to another milestone
+        (`stage_code`) is structural: 422 `validation_failed` on `/stage_code` for a published version.
+      x-step-up: true
+      x-db-path: admin_wf_task_update (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean }
+                is_active: { type: boolean }
+                stage_code: { type: string }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/predecessors:
+    put:
+      tags: [workflow]
+      operationId: replaceTaskPredecessors
+      summary: Replace the predecessors of a task
+      description: |
+        Needs `task_definitions.edit` (all regions), a reason and a step-up. A cycle is 422 `validation_failed` with `errors[0].path` `/predecessors` and `code` `cycle`; the other codes are
+        `self`, `duplicate`, `unknown` (not a task of this version) and `inactive`. The new predecessors apply to new site tasks.
+      x-step-up: true
+      x-db-path: admin_wf_task_predecessors (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predecessors, reason]
+              properties:
+                predecessors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/milestones/{code}/task-order:
+    put:
+      tags: [workflow]
+      operationId: reorderMilestoneTasks
+      summary: Reorder the tasks of one milestone
+      description: 'Needs `task_definitions.edit` (all regions), a reason and a step-up. `task_codes` lists every task of the milestone (active and inactive) exactly once, else 422 `validation_failed` on `/task_codes`.'
+      x-step-up: true
+      x-db-path: admin_wf_task_order (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/NodeCode'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_codes, reason]
+              properties:
+                task_codes: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
@@ -8407,7 +8859,8 @@ paths:
         **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return of a New sites batch is always answered at once.
         **Big register and stream batches (0.14.6):** an `approve`, a `review` or a `reject` of more rows than the threshold answers 202 after the checks (the grid right, the authority of the person on at least one row: 403 `not_eligible_holder`, the notes of a return: 422, the step-up of an approval: 401; nothing queued); the rows are decided in chunks (register 50, stream 25) with the same transitions, audit rows and notice as the 200 answer, and the rights are derived again for every chunk (a row the person may no longer decide is counted in `progress.failed`). A `discard` is always answered at once.
         Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
-      x-step-up: when an approval is final (L2 approve) or a self-approval (B5); not for a return or a discard
+        **Admin approve as is (0087, owner decision 2026-11-12):** `action=admin_approve` is a final approval of the whole batch (`scope=all` only, 422 otherwise) by a System Admin (403 `action_forbidden` for anyone else) that bypasses the check of the L2 holders. It needs a reason in `note` (at least 3 characters, 422) and a valid step-up (401 `step_up_required`). Every open row of a stream batch that has a task is approved with what it has: a row that lacks an actual date or another required value is approved too and flagged `incomplete` (its gaps stay visible in `site_data_gaps`). Each approved task is flagged `admin_override` and audited per row with the reason; KPIs treat it like any other override (flagged and excluded). The count of the flagged rows is `outcome.incomplete`, and `counts.admin_approved` / `counts.incomplete` of the batch. A batch with more rows than `imports.async_rows` is run in the background (202), the same way as the other decisions.
+      x-step-up: when an approval is final (L2 approve), a self-approval (B5) or an admin approve as is; not for a return or a discard
       x-db-path: imp_decide_batch
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -8666,6 +9119,8 @@ paths:
         **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
         **0.15.3:** a run still compared in the background (`staging`) answers 409 `upload_processing`; a run whose comparison failed (`failed`) answers 409 `invalid_transition`. Measured with 470 synthetic sites the staging of the apply now takes about 6 s (87 s before) and stays in the request.
         **0.15.5:** a file with more sites than `imports.async_rows` is applied in the background after the same checks: 202 with the run `applying` (see `applying`), then `applied` with its `outcome` (or `previewed` again with `applying.error` when the background apply was refused). A second apply meanwhile answers 409 `upload_processing`. Measured with 470 synthetic sites with every task, a historical apply: 405 s in the request before, 32 ms for the request and about 70 s in the background now.
+        **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
+        **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
       x-step-up: true
       x-db-path: mi_apply_run
       parameters:
@@ -12140,6 +12595,10 @@ components:
         - batch_processing
         - vehicle_already_reserved
         - upload_processing
+        - workflow_invalid
+        - master_impact_unconfirmed
+        - stale_preview
+        - invitation_invalid
     PageEnvelope:
       type: object
       required: [items, page]
@@ -12634,8 +13093,27 @@ components:
         - type: object
           required: [deleted_at]
           properties:
-            can_restore: { type: boolean, description: 'false when the employee ID or the email is now owned by another account.' }
-            restore_blocked_reason: { type: [string, 'null'] }
+            can_restore: { type: boolean, description: 'false when the employee ID, the email or the phone is now owned by another account (computed against every other account, 0.15.6).' }
+            restore_blocked_reason: { type: [string, 'null'], enum: [email_in_use, employee_id_in_use, phone_in_use, null] }
+    PurgedUser:
+      type: object
+      description: 'The tombstone of a permanently deleted user (0.15.6). Only what history needs: the name stays, the identifiers are masked copies of what was released.'
+      required: [id, display_name, purged_at, identifiers]
+      properties:
+        id: { type: string, format: uuid }
+        display_name: { type: string }
+        purged_at: { type: string, format: date-time }
+        purged_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        purge_reason: { type: [string, 'null'] }
+        deleted_at: { type: [string, 'null'], format: date-time, description: 'When the soft delete happened.' }
+        delete_reason: { type: [string, 'null'] }
+        identifiers:
+          type: object
+          description: 'Masked: e-mail as first letter plus domain, phone as its last two digits, the 4-digit employee ID as it was.'
+          properties:
+            email: { type: [string, 'null'] }
+            employee_id: { type: [string, 'null'] }
+            phone: { type: [string, 'null'] }
     UserDetail:
       allOf:
         - $ref: '#/components/schemas/User'
@@ -13106,6 +13584,9 @@ components:
         - type: object
           required: [pipeline, version]
           properties:
+            admin_edits: { $ref: '#/components/schemas/SiteAdminEdits' }
+            admin_override_active: { type: boolean, description: '0.15.7: a direct admin edit of the site is in force (the "Admin override" badge).' }
+            can_admin_edit: { type: boolean, description: '0.15.7: the caller is a System Admin.' }
             owner_site_id: { type: [string, 'null'] }
             sub_region: { type: [string, 'null'] }
             latitude: { type: [number, 'null'] }
@@ -13264,6 +13745,7 @@ components:
         historical_no_documents: { type: boolean, description: 'Q462 (0.14.3): the task was submitted without its mandatory documents under the historical-load waiver. Shown as the "Admin override" badge; cleared when the documents are uploaded. Treated like an admin override in the KPIs.' }
         lock_bypassed: { type: boolean, description: '0.15.4: approved on a site whose workflow locks were off while a predecessor or a gate would have held it. Shown as the "Admin override" badge; treated like an admin override in the KPIs; cleared when the task leaves the approved state.' }
         lock_bypass_reason: { type: [string, 'null'], description: '0.15.4: the lock it bypassed: `predecessor_open:<codes>` or `gate_closed:<gate>`.' }
+        historical_direct_approved: { type: boolean, description: '0.15.11: approved directly by the historical Master import (`historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; treated like an admin override in the SLA and on-time KPIs but counted in progress; cleared when the task leaves the approved state.' }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
         holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
         idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
@@ -13369,6 +13851,8 @@ components:
         - type: object
           required: [approval_path, slots, allowed_actions]
           properties:
+            overrides: { type: array, items: { $ref: '#/components/schemas/Override' }, description: '0.15.7: the admin date overrides of the task, newest first.' }
+            can_override: { type: boolean, description: '0.15.6: the caller is a System Admin and the task is not N/A or skipped.' }
             baseline_date: { type: [string, 'null'], format: date }
             planned_start: { type: [string, 'null'], format: date }
             actual_start: { type: [string, 'null'], format: date }
@@ -13466,11 +13950,13 @@ components:
         reassign_to_user_id: { type: string, format: uuid, description: 'For reassign.' }
     Override:
       type: object
-      required: [id, task_id, kind, reason, created_at, revertible]
+      required: [id, entity, kind, reason, created_at, revertible]
       properties:
         id: { type: string, format: uuid }
-        task_id: { type: string, format: uuid }
-        kind: { type: string }
+        entity: { type: string, enum: [task, site], description: '0.15.6: a task date override or a direct admin edit of a site.' }
+        task_id: { type: [string, 'null'], format: uuid, description: 'Null for a site edit.' }
+        site_id: { type: string, format: uuid }
+        kind: { type: string, description: '`edit_date` for a task, `site_edit` for a site.' }
         reason: { type: string }
         before: { type: object, additionalProperties: true }
         after: { type: object, additionalProperties: true }
@@ -13478,7 +13964,38 @@ components:
         on_behalf_of: { $ref: '#/components/schemas/UserRef' }
         created_at: { type: string, format: date-time }
         reverted_at: { type: [string, 'null'], format: date-time }
-        revertible: { type: boolean }
+        reverted_by: { $ref: '#/components/schemas/UserRef' }
+        revert_reason: { type: [string, 'null'] }
+        revertible: { type: boolean, description: 'Not reverted yet and the field still holds what the override set.' }
+    SiteAdminEditRequest:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 2000 }
+        identity:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            name_ar: { type: [string, 'null'] }
+            latitude: { type: [number, 'null'] }
+            longitude: { type: [number, 'null'], description: 'With latitude; both null clears the coordinates.' }
+            region_id: { type: integer }
+            cluster_code: { type: [string, 'null'] }
+            site_code: { type: string, description: 'Always refused: field error `immutable`.' }
+        scenario: { type: string, description: 'New Build, Expansion, Hot Swap, Cold Swap or Relocation.' }
+        scope:
+          type: object
+          description: 'Scope flag -> `yes` or `na`.'
+          additionalProperties: { type: string, enum: [yes, na] }
+        custom: { allOf: [{ $ref: '#/components/schemas/CustomValues' }], description: 'Field code -> value; null clears.' }
+    SiteAdminEdits:
+      type: object
+      required: [active_count, items]
+      properties:
+        active_count: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Override' } }
 
     # ---------------------------------------------------------- approvals
     ApprovalItem:
@@ -13638,6 +14155,7 @@ components:
         name_ar: { type: [string, 'null'] }
         formula_kind: { type: string, enum: [master, generic] }
         counts_in_project_status: { type: boolean }
+        is_active: { type: boolean }
         master_export_column: { type: [string, 'null'] }
         custom: { $ref: '#/components/schemas/CustomValues' }
     GateCondition:
@@ -13670,6 +14188,12 @@ components:
         sort_order: { type: integer }
         predecessors: { type: array, items: { type: string } }
         counts_toward_milestone: { type: boolean }
+        name_en: { type: string, description: 'Decision 4 (0090): read-only copy of the task name.' }
+        name_ar: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        is_milestone_task: { type: boolean }
+        has_documents: { type: boolean }
+        task_version: { type: integer }
     WorkflowStructure:
       type: object
       required: [milestones, gates, placements]
@@ -13720,7 +14244,9 @@ components:
                     affected_columns: { type: array, items: { type: string } }
                     parallel_run_active: { type: boolean }
                     confirmation_phrase: { type: [string, 'null'] }
-            version_etag: { type: integer, description: 'Draft revision for If-Match.' }
+            version_etag: { type: integer, description: 'Revision of the version for If-Match (also the ETag header); every write bumps it.' }
+            can_edit: { type: boolean, description: 'Decision 4 (0090): the caller may edit tasks, milestones and gates (System Admin or an all-regions delegate).' }
+            can_publish: { type: boolean }
     SiteSelection:
       type: object
       description: Either explicit site ids or a filter. Only sites on another version are considered.
@@ -14440,6 +14966,89 @@ components:
       properties:
         user: { $ref: '#/components/schemas/User' }
         temporary_password: { type: string, description: 'Shown once. Hand it to the user by a separate channel.' }
+    UserInvitationStatus:
+      type: string
+      enum: [pending, accepted, revoked, expired]
+    UserInvitationAssignment:
+      type: object
+      additionalProperties: false
+      required: [role_id, permission_level]
+      description: One role row the account will hold, chosen at invite time. Same meaning as an assignment row.
+      properties:
+        role_id: { type: string, format: uuid }
+        permission_level: { $ref: '#/components/schemas/PermissionLevel' }
+        team: { $ref: '#/components/schemas/TeamKind' }
+        all_regions: { type: boolean, default: false }
+        region_ids: { type: array, maxItems: 7, items: { $ref: '#/components/schemas/RegionId' }, description: 'Used when all_regions is false.' }
+        all_modules: { type: boolean, default: false }
+        module_keys: { type: array, maxItems: 100, items: { $ref: '#/components/schemas/ModuleKey' }, description: 'Used when all_modules is false.' }
+        profile_ids: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        valid_from: { type: [string, 'null'], format: date-time }
+        valid_to: { type: [string, 'null'], format: date-time }
+    UserInvitationCreate:
+      type: object
+      additionalProperties: false
+      required: [email, display_name, reason]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        display_name: { type: string, minLength: 1, maxLength: 200 }
+        employee_id: { type: [string, 'null'], pattern: '^[0-9]{4}$' }
+        phone: { type: [string, 'null'], pattern: '^\+[1-9][0-9]{7,14}$' }
+        assignments: { type: array, maxItems: 20, items: { $ref: '#/components/schemas/UserInvitationAssignment' } }
+        department_id: { type: [string, 'null'], format: uuid }
+        manager_id: { type: [string, 'null'], format: uuid }
+        group_ids: { type: array, maxItems: 50, items: { type: string, format: uuid } }
+        require_two_factor: { type: boolean, default: false }
+        reason: { $ref: '#/components/schemas/Reason' }
+    UserInvitation:
+      type: object
+      required: [id, email, display_name, status, expires_at, created_at, invited_by, send_count, require_two_factor, elevated, assignments, groups]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string }
+        display_name: { type: string }
+        employee_id: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/UserInvitationStatus' }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+        last_sent_at: { type: string, format: date-time }
+        send_count: { type: integer, minimum: 1 }
+        invited_by: { type: object, required: [id, name], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        reason: { type: string }
+        require_two_factor: { type: boolean }
+        elevated: { type: boolean, description: 'Grants admin-level rights, a privileged role or a privileged group: needs a System Admin and a fresh step-up.' }
+        department: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        manager: { type: [object, 'null'], properties: { id: { type: string, format: uuid }, name: { type: string } } }
+        groups: { type: array, items: { type: object, required: [id, name], properties: { id: { type: string, format: uuid }, name: { type: string } } } }
+        assignments:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/UserInvitationAssignment'
+              - type: object
+                properties:
+                  role: { type: object, properties: { id: { type: string, format: uuid }, code: { type: string }, name_en: { type: string }, name_ar: { type: [string, 'null'] } } }
+        accepted_at: { type: [string, 'null'], format: date-time }
+        accepted_user_id: { type: [string, 'null'], format: uuid }
+        revoked_at: { type: [string, 'null'], format: date-time }
+        revoke_reason: { type: [string, 'null'] }
+    InvitationPreview:
+      type: object
+      required: [display_name, email, expires_at, password_policy]
+      properties:
+        display_name: { type: string }
+        email: { type: string }
+        employee_id: { type: [string, 'null'] }
+        phone: { type: [string, 'null'] }
+        expires_at: { type: string, format: date-time }
+        password_policy: { type: object, required: [min_length, max_length], properties: { min_length: { type: integer }, max_length: { type: integer } } }
+    InvitationAccepted:
+      type: object
+      required: [created, two_factor_enrolment_pending]
+      properties:
+        created: { type: boolean, const: true }
+        two_factor_enrolment_pending: { type: boolean, description: 'True when an admin must hand over the enrolment code before the first sign-in works.' }
     # ---------------------------------------------------------- staff registry
     StaffField:
       type: string
@@ -14589,6 +15198,7 @@ components:
         decided: { type: integer }
         approved: { type: integer }
         rejected: { type: integer }
+        incomplete: { type: integer, description: '0087: rows an admin approve as is approved although they lacked data (flagged `incomplete`).' }
         held:
           type: array
           items:
@@ -14621,11 +15231,12 @@ components:
         parts_total: { type: integer, description: '0.15.3, kind `upload`: the batches to stage (a stream of the Master sheet, a register sheet, or the one batch of another template).' }
         parts_done: { type: integer, description: '0.15.3, kind `upload`: the parts staged so far.' }
         chunks: { type: integer, description: '0.15.3, kind `upload`: the transactions done so far.' }
-        action: { type: [string, 'null'], enum: [approve, review, reject, null], description: '0.14.6: the decision of a `decide` run; null for a send.' }
+        action: { type: [string, 'null'], enum: [approve, review, reject, admin_approve, null], description: '0.14.6: the decision of a `decide` run (0087: `admin_approve` too); null for a send.' }
         batch_kind: { type: string, enum: [site, register, stream], description: '0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).' }
         decided: { type: integer, description: '0.14.6: rows decided (a review that passed a level counts too).' }
         held: { type: integer, description: '0.14.6: rows held `pending_previous_approval` (a send) or left by an approve-all because they have no record or task submission yet.' }
         saved: { type: integer, description: '0.14.6: rows saved by a Save Draft / Planning send (Q206).' }
+        incomplete: { type: integer, description: '0087: rows of an admin approve as is that were approved with missing data.' }
         state: { type: string, enum: [running, done, failed], description: '`failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.' }
         rows_total: { type: integer }
         rows_done: { type: integer }
@@ -14694,6 +15305,8 @@ components:
             rejected: { type: integer }
             held: { type: integer, description: Rows held `pending_previous_approval`. }
             saved: { type: integer, description: 'Rows saved without submission (draft batch).' }
+            admin_approved: { type: integer, description: '0087: rows approved by a System Admin as is (flagged `admin_override`).' }
+            incomplete: { type: integer, description: '0087: of those, the rows approved with missing data (flagged `incomplete`).' }
         job_id: { type: [string, 'null'], description: 'Always null (a big upload reports its progress in `progress`, 0.15.3).' }
         upload_id: { type: string, format: uuid, description: '0.15.3: the upload staged in the background that produced this batch (or that this answer is, while `parsing`).' }
         upload: { $ref: '#/components/schemas/ImportUploadInfo' }
@@ -14842,7 +15455,9 @@ components:
             type: object
             properties:
               id: { type: string, format: uuid }
-              ref: { type: string, description: The stream. }
+              kind: { type: string, enum: [stream, register], description: '0.15.11: a stream batch of the Master sheet, or a register batch of a register sheet.' }
+              sheet: { type: string, description: '0.15.11: the sheet of the file (Master, or the register sheet).' }
+              ref: { type: string, description: 'The stream, or (0.15.11) the register key.' }
               template_id: { type: string }
               submitted: { type: integer }
               saved: { type: integer }
@@ -14852,6 +15467,22 @@ components:
               queued: { type: boolean, description: '0.14.6: the batch is sent in the background (its counts are in its `ImportBatch.progress`).' }
               job_id: { type: string, format: uuid, description: '0.14.6: the background run of a queued batch.' }
               rows: { type: integer, description: '0.14.6: the rows to send of a queued batch.' }
+              approved: { type: integer, description: '0.15.11: the rows of the batch already approved (with `approve_directly`, every submitted row). A queued batch counts them in its `ImportBatch.progress`.' }
+              skipped: { type: integer, description: '0.15.11: rows that change nothing (the register or the task already holds these values).' }
+        approve_directly: { type: boolean, description: '0.15.11: the apply approved the submitted rows directly (historical load, admin override).' }
+        registers: { type: boolean, description: '0.15.11: the register sheets of the file were loaded.' }
+        register_notes:
+          type: array
+          description: '0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`.'
+          items:
+            type: object
+            properties:
+              sheet: { type: string }
+              ref: { type: string }
+              code: { type: string }
+              count: { type: integer }
+              cells: { type: array, items: { type: string } }
+              headers: { type: array, items: { type: string } }
         skipped: { type: array, items: { type: object, additionalProperties: true } }
         queued: { type: integer, description: '0.14.6: how many batches are sent in the background.' }
     MasterImportDiff:
@@ -14891,6 +15522,14 @@ components:
           description: 'Q462 (0.14.3): mark every batch of this apply "historical load: accept without documents". A System Admin only (403 `action_forbidden`), `mode` submit, a step-up, the waiver open (409 `invalid_transition`). For the rows whose actual date is on or before the cutoff date the mandatory-document check is skipped and the task is flagged; every other check runs.'
           properties:
             reason: { type: string, minLength: 3, maxLength: 2000 }
+            approve_directly:
+              type: boolean
+              default: false
+              description: '0.15.11 (owner decision 2026-11-12): approve every submitted task of this load at once as an admin override, with no L2 step (a workflow step `approve` "historical load: approved directly (admin override)", the flag `TaskSummary.historical_direct_approved`, an audit row per task with `is_admin_override`). Only here, with `mode` submit (422 otherwise). Rows without an actual date stay saved; refused rows stay errors. 0.15.11: with `registers`, the register rows are approved at once too.'
+            registers:
+              type: boolean
+              default: false
+              description: '0.15.11 (owner decision 2026-11-12): also load the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers, as register batches of the same group. Personal columns (landlord, contact, phone, e-mail) are never read. Only here (422 otherwise).'
     MasterImportDiffResolve:
       type: object
       required: [resolution]
@@ -15014,7 +15653,7 @@ components:
       type: object
       required: [action, scope]
       properties:
-        action: { type: string, enum: [review, approve, reject, discard], description: 'The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note) or `discard` (a batch that was not sent).' }
+        action: { type: string, enum: [review, approve, reject, discard, admin_approve], description: 'The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note), `discard` (a batch that was not sent) or `admin_approve` (0087: System Admin, approves every open row as it is, flags the rows `admin_override` and the incomplete ones `incomplete`; `scope` must be `all`, `note` is the reason).' }
         scope: { type: string, enum: [all, rows], description: '`all` decides every undecided valid row at once; `rows` uses `rows[]`.' }
         rows:
           type: array
@@ -15025,7 +15664,7 @@ components:
               row_id: { type: string, format: uuid }
               decision: { type: string, enum: [approved, rejected] }
               note: { type: string, maxLength: 1000 }
-        note: { type: string, maxLength: 2000, description: 'Required when `action` is reject.' }
+        note: { type: string, maxLength: 2000, description: 'Required when `action` is reject; the reason (at least 3 characters) when `action` is admin_approve.' }
     # ---------------------------------------------------------- absences and reassignment
     Absence:
       type: object
@@ -15697,6 +16336,7 @@ components:
         version_no: { type: integer, minimum: 1, description: 'Business version of the logical record (1, 2, 3 ...). Not the ETag.' }
         supersedes_id: { type: [string, 'null'], format: uuid }
         is_current: { type: boolean, description: 'The approved version that is in force.' }
+        historical_direct_approved: { type: boolean, description: '0.15.11: approved directly by the historical Master import (a register sheet of the file, `historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; cleared if the record leaves the approved state.' }
         task:
           type: object
           description: 'Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task''s Matrix row, and the final approval fills the task''s date and approves it.'
@@ -17808,6 +18448,7 @@ components:
         override_flagged_count: { type: integer, description: 'Admin overrides flagged in, or excluded from, this KPI. 0.14.3: includes the tasks flagged `historical_no_documents`.' }
         historical_flagged_count: { type: integer, description: 'Q462 (0.14.3): only the tasks flagged `historical_no_documents` (accepted without documents under the historical-load waiver).' }
         lock_bypass_flagged_count: { type: integer, description: '0.15.4: only the tasks flagged `lock_bypassed` (approved on an open site while a lock would have held them); also counted in `override_flagged_count`.' }
+        historical_direct_flagged_count: { type: integer, description: '0.15.11: only the tasks flagged `historical_direct_approved` (approved directly by the historical Master import); also counted in `override_flagged_count`.' }
         overrides_excluded: { type: boolean }
         weight_set: { $ref: '#/components/schemas/WeightSetRef' }
     MilestonePipelineNode:

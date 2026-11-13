@@ -38,6 +38,18 @@ export interface UserDto extends UserRef {
   delete_reason: string | null;
 }
 
+export interface PurgedUserDto {
+  id: string;
+  display_name: string;
+  purged_at: Date;
+  purged_by: UserRef | null;
+  purge_reason: string | null;
+  deleted_at: Date | null;
+  delete_reason: string | null;
+  /** Masked copy of what was released: e-mail (first letter and domain), employee ID, phone (last two digits). */
+  identifiers: { email: string | null; employee_id: string | null; phone: string | null };
+}
+
 interface UserDbRow {
   id: string;
   email: string;
@@ -187,14 +199,46 @@ export interface UserFilter {
 export class UsersRepo {
   constructor(private readonly db: DbService) {}
 
+  /** A user by id. A permanently deleted user (migration 0089, a tombstone kept only for history) is never found: every admin action on it answers 404. */
   async find(id: string): Promise<UserDto | null> {
-    const rows = await this.db.tx.$queryRaw<UserDbRow[]>(Prisma.sql`SELECT ${USER_SELECT} ${USER_FROM} WHERE u.id = ${id}::uuid`);
+    const rows = await this.db.tx.$queryRaw<UserDbRow[]>(Prisma.sql`SELECT ${USER_SELECT} ${USER_FROM} WHERE u.id = ${id}::uuid AND u.purged_at IS NULL`);
     return rows[0] ? toUserDto(rows[0]) : null;
+  }
+
+  /** The tombstone of a permanently deleted user (0089): name and the masked identifiers only. */
+  async findPurged(id: string): Promise<PurgedUserDto | null> {
+    const rows = await this.db.tx.$queryRaw<{ id: string; display_name: string; purged_at: Date; purge_reason: string | null; purged_identifiers: Record<string, string | null> | null;
+      by_id: string | null; by_name: string | null; by_emp: string | null; deleted_at: Date | null; delete_reason: string | null }[]>(Prisma.sql`
+      SELECT u.id::text AS id, u.display_name, u.purged_at, u.purge_reason, u.purged_identifiers, u.deleted_at, u.delete_reason,
+             b.id::text AS by_id, b.display_name AS by_name, trim(b.employee_id) AS by_emp
+        FROM users u LEFT JOIN users b ON b.id = u.purged_by WHERE u.id = ${id}::uuid AND u.purged_at IS NOT NULL`);
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      id: r.id, display_name: r.display_name, purged_at: r.purged_at, purge_reason: r.purge_reason,
+      purged_by: r.by_id ? { id: r.by_id, display_name: r.by_name ?? '', employee_id: r.by_emp } : null,
+      deleted_at: r.deleted_at, delete_reason: r.delete_reason,
+      identifiers: { email: r.purged_identifiers?.email ?? null, employee_id: r.purged_identifiers?.employee_id ?? null, phone: r.purged_identifiers?.phone ?? null },
+    };
+  }
+
+  /** Why a soft-deleted user cannot be restored right now: another live account holds the e-mail, employee ID or phone (0089). null = restorable. */
+  async restoreBlockers(ids: string[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.db.tx.$queryRaw<{ id: string; reason: string }[]>(Prisma.sql`
+      SELECT u.id::text AS id, CASE
+          WHEN EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND lower(o.email) = lower(u.email)) THEN 'email_in_use'
+          WHEN u.employee_id IS NOT NULL AND EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND o.employee_id = u.employee_id) THEN 'employee_id_in_use'
+          WHEN u.phone IS NOT NULL AND EXISTS (SELECT 1 FROM users o WHERE o.id <> u.id AND o.phone = u.phone) THEN 'phone_in_use'
+        END AS reason
+        FROM users u WHERE u.id = ANY(${ids}::uuid[])`);
+    return new Map(rows.filter((r) => r.reason !== null).map((r) => [r.id, r.reason]));
   }
 
   async list(filter: UserFilter, limit: number, after: [string, string] | null, like: string | null): Promise<{ rows: UserDto[]; total: number }> {
     // Soft-deleted users (B14) are listed only by listDeleted.
-    const where: Prisma.Sql[] = [filter.deleted ? Prisma.sql`u.deleted_at IS NOT NULL` : Prisma.sql`u.deleted_at IS NULL`];
+    // Permanently deleted users (0089) are tombstones kept for history: they are listed nowhere.
+    const where: Prisma.Sql[] = [filter.deleted ? Prisma.sql`u.deleted_at IS NOT NULL AND u.purged_at IS NULL` : Prisma.sql`u.deleted_at IS NULL`];
     if (like) where.push(Prisma.sql`(u.display_name ILIKE ${like} OR u.email ILIKE ${like} OR u.employee_id ILIKE ${like} OR u.phone ILIKE ${like})`);
     if (filter.status) where.push(Prisma.sql`u.status = ${filter.status}::"UserStatus"`);
     if (filter.groupId) where.push(Prisma.sql`EXISTS (SELECT 1 FROM group_members gm WHERE gm.user_id = u.id AND gm.group_id = ${filter.groupId}::uuid)`);

@@ -84,6 +84,9 @@ export function mapWfError(message: string): ProblemException | null {
     case 'vehicle_already_reserved':
       // 0076: the btree_gist exclusion of vehicle_reservations (or the check before it) refused an overlapping reservation
       return new ProblemException(409, 'vehicle_already_reserved', { detail: detail ?? 'The vehicle is already reserved for overlapping dates.' });
+    case 'override_not_revertible':
+      // 0088: the task date or the site no longer holds what the admin override set, or the override was reverted already
+      return new ProblemException(409, 'override_not_revertible', { detail: detail ?? 'This override can no longer be reverted.' });
     case 'note_required':
       return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     case 'mandatory_slots_missing':
@@ -144,6 +147,16 @@ export function mapWfError(message: string): ProblemException | null {
         detail: detail ?? 'A critical list of this register has no value yet.',
         extra: { lists: Array.isArray(extra.lists) ? extra.lists : [] },
       });
+    case 'freeze_active':
+      return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
+    case 'stale_preview':
+      return new ProblemException(409, 'stale_preview', { detail: detail ?? 'The preview is out of date. Preview again.' });
+    case 'workflow_invalid':
+      return new ProblemException(422, 'workflow_invalid', { detail: detail ?? 'The version cannot be published.', extra: { problems: Array.isArray(extra.problems) ? extra.problems : [] } });
+    case 'master_impact_unconfirmed':
+      return new ProblemException(422, 'master_impact_unconfirmed', {
+        detail: detail ?? 'Confirm the Master impact to continue.', extra: { confirmation_phrase: typeof extra.confirmation_phrase === 'string' ? extra.confirmation_phrase : 'master-impact' },
+      });
     case 'validation_failed':
       return new ProblemException(422, 'validation_failed', {
         detail: detail ?? 'The request is not valid.',
@@ -186,6 +199,12 @@ export function mapDbError(e: unknown): ProblemException | null {
       return new ProblemException(403, 'action_forbidden', { detail: 'You are not allowed to do this.' });
     }
     case '23505': {
+      // 0089: restoring a deleted user whose e-mail, employee ID or phone now belongs to another account
+      const rb = /restore_blocked: the (e-mail|employee ID|phone)/.exec(msg);
+      if (rb) {
+        const field = rb[1] === 'e-mail' ? '/email' : rb[1] === 'phone' ? '/phone' : '/employee_id';
+        return new ProblemException(409, 'duplicate', { detail: `The ${rb[1]} now belongs to another account, so this account cannot be restored.`, errors: [{ path: field, code: 'duplicate', message: 'Already used by another account.' }] });
+      }
       const path = duplicateField(msg);
       const errors: FieldError[] = path ? [{ path, code: 'duplicate', message: path === '/code' ? 'This code is already in use.' : 'Already used by another account.' }] : [];
       return new ProblemException(409, 'duplicate', { detail: path === '/code' ? 'The code is already in use.' : 'The value is already used by another account.', errors });
@@ -247,6 +266,16 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/audience', code: 'no_recipients', message: 'No active user matches this audience.' }],
         });
       }
+      // 0089: permanent delete of a soft-deleted user
+      if (/confirmation_mismatch/i.test(msg)) {
+        return new ProblemException(422, 'confirmation_mismatch', {
+          detail: 'Type the employee ID or the e-mail of the account exactly to confirm.',
+          errors: [{ path: '/confirm_text', code: 'confirmation_mismatch', message: 'Does not match the account.' }],
+        });
+      }
+      if (/already purged|user is purged|user is not deleted: soft-delete/i.test(msg)) {
+        return new ProblemException(409, 'invalid_transition', { detail: /soft-delete/.test(msg) ? 'Only an account that is already deleted can be deleted permanently.' : 'The account was already deleted permanently.' });
+      }
       if (/already deleted|is not deleted/i.test(msg)) {
         return new ProblemException(409, 'invalid_transition', { detail: 'The user is already in that state.' });
       }
@@ -299,6 +328,8 @@ export function mapDbError(e: unknown): ProblemException | null {
           errors: [{ path: '/user_id', code: 'no_local_account', message: 'This user has no local sign-in.' }],
         });
       }
+      if (/this invitation is not pending/i.test(msg)) return new ProblemException(409, 'invalid_transition', { detail: 'This invitation is not pending any more.' });
+      if (/^(assignments|groups): |the manager must be an active user/i.test(msg.trim())) return problems.validation([{ path: '/' + (msg.trim().split(':')[0] ?? ''), code: 'invalid', message: msg.trim().replace(/^[a-z_]+: /, '').split('\n')[0] }]);
       if (/not found/i.test(msg)) return new ProblemException(404, 'not_found', { detail: 'The resource does not exist.' });
       if (/at least one active System Admin/i.test(msg)) return new ProblemException(409, 'last_admin', { detail: 'At least one active System Admin must remain.' });
       return new ProblemException(422, 'validation_failed', { detail: 'The request is not valid.' });

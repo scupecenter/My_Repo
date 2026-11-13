@@ -16,6 +16,7 @@ import { Workload } from '@/pages/Workload';
 import { Dashboard } from '@/pages/Dashboard';
 import { ManualItems } from '@/pages/ManualItems';
 import { ChangePassword } from '@/pages/ChangePassword';
+import { InviteAccept } from '@/pages/InviteAccept';
 import { EmployeeId } from '@/pages/EmployeeId';
 import { Login, USE_MOCKS } from '@/pages/Login';
 import { MockM365, MockStepUp, StepUpDone } from '@/pages/MockM365';
@@ -144,6 +145,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/invite/:token" element={<InviteAccept />} />
       <Route path="/step-up-done" element={<StepUpDone />} />
       {USE_MOCKS && <Route path="/mock-m365" element={<MockM365 />} />}
       {USE_MOCKS && <Route path="/mock-m365/step-up" element={<MockStepUp />} />}

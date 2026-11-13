@@ -367,6 +367,10 @@ model User {
   deleted_by           String?     @db.Uuid
   delete_reason        String?
   status_before_delete UserStatus?
+  purged_at            DateTime?   @db.Timestamptz(6)
+  purged_by            String?     @db.Uuid
+  purge_reason         String?
+  purged_identifiers   Json?
   display_name         String
   employee_id          String?     @unique @db.Char(4) // 4-digit, entered at first sign-in
   status               UserStatus  @default(pending_assignment)

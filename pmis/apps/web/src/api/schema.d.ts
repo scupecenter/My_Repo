@@ -953,6 +953,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Invitations to join (pending, accepted, revoked, expired), newest first
+         * @description Needs `create` on `users` (System Admin or a delegation, all regions). `status` is the effective one: a pending invitation past its time reads `expired`.
+         *     The link itself is never returned: it exists only in the mail.
+         */
+        get: operations["listUserInvitations"];
+        put?: never;
+        /**
+         * Invite a new person by email, with the role and properties chosen now
+         * @description Needs `create` on `users` (all regions). The person gets a mail with a link (`{{app_url}}/invite/<token>`) that works once, for `invitations.expiry_hours`
+         *     hours (default 72). Opening it, they choose a password and the account is created with everything chosen here: role assignments (permission level, team,
+         *     regions, modules, profiles, validity), department, direct manager, groups and whether two-factor is enforced. Nothing exists until they accept.
+         *
+         *     **Nobody invites with wider rights than their own.** The same ceilings as assigning apply to the inviter, checked now and again at each resend:
+         *     `assignments.create` for any role row (no admin level, no privileged role, only the regions, modules, profiles and end date the inviter holds),
+         *     `users.edit` (all regions) for `manager_id` and `department_id`, `groups.edit` (all regions) for `group_ids` (never the admin group or a delegation target
+         *     for a delegate), `users.administer` for `require_two_factor`. Refused with 403 `action_forbidden`. An invitation that grants admin-level rights, a
+         *     privileged role or a privileged group (`elevated`) needs a fresh step-up (401 `step_up_required`) and only a System Admin may stand behind it.
+         *
+         *     Two-factor: an invitation never carries an enrolment code. When `require_two_factor` is true the account is created with two-factor on, enforced and
+         *     not enrolled, and an admin issues the one-time code afterwards (`POST /users/{user_id}/two-factor/enrol-code`).
+         *
+         *     Email, employee ID and phone must be unused by an account (409 `duplicate`, `errors[]` names the field); only one pending invitation per email.
+         *     At most 20 mails to addresses per person and hour (the mail service limit).
+         */
+        post: operations["createUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/invitations/{invitation_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send an invitation again (a new link; the old one stops working)
+         * @description For a pending invitation, or an expired one whose email and identifiers are still free (it becomes pending again). The expiry starts over. The rights are
+         *     checked again against the person who resends, so an invitation never outlives the rights behind it. Needs a fresh step-up when the invitation is `elevated`.
+         *     409 `invalid_transition` when it was accepted or revoked.
+         */
+        post: operations["resendUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/invitations/{invitation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a pending invitation; its link stops working at once
+         * @description Needs `create` on `users` (all regions). 409 `invalid_transition` unless the invitation is pending.
+         */
+        post: operations["revokeUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the accept page shows for an invitation link (public, no session)
+         * @description Answers only the name, email, employee ID and phone the inviter entered, the expiry and the password rules; never the role, group or manager chosen.
+         *     An unknown, used, revoked, expired or malformed token all answer the same 404 `invitation_invalid` with the same text, so the answer never tells which
+         *     links existed. Rate limited per client address like sign-in (429 `rate_limited`, failures only).
+         */
+        get: operations["getInvitationByToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose a password and create the account (public, no session)
+         * @description The password follows the password policy (422 `weak_password` with `errors[]`; the policy is checked only for a valid link). The account, its
+         *     sign-in, the assignments, department, manager, groups and the two-factor row are created in one step; a role, department, manager or group that is no
+         *     longer valid is skipped (never more rights than were chosen) and the audit row lists what was skipped. No session is created: the person signs in
+         *     afterwards, and when `two_factor_enrolment_pending` is true an admin hands them the enrolment code first.
+         *     The same uniform 404 `invitation_invalid` as `GET /invitations/{token}` for any link that does not work, including a second use of the same link;
+         *     409 `duplicate` when the email, employee ID or phone was taken meanwhile (the invitation is then closed). Rate limited like sign-in.
+         */
+        post: operations["acceptInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/deleted": {
         parameters: {
             query?: never;
@@ -1052,6 +1180,28 @@ export interface paths {
          * @description Re-enables the account and its previous assignments (their validity dates still apply). Refused with 409 `duplicate` when the employee ID (staff registry row) or the email is now owned by another account; `errors[]` names the field and `GET /users/deleted` shows `can_restore` = false with `restore_blocked_reason`. Tasks that stayed on the person show `holder_account_status` = `active` again.
          */
         post: operations["restoreUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete a soft-deleted user permanently; the identifiers are freed (0.15.6)
+         * @description Owner decision 3 of 2026-11-12 (amends B14). System Admin only; the account must already be soft-deleted (`POST /users/{user_id}/delete`). The `users` row is never removed: it stays as a tombstone with its id and display name, so every past entry, audit row, comment and task step stays attributed to the person. The e-mail (a placeholder `purged-<id>@purged.invalid` stays), employee ID, phone and Entra link are released: a NEW account (`POST /users`) with the same data succeeds and the staff-registry employee ID can be linked to it. Local credentials, TOTP secrets and recovery codes are deleted, sessions end, pending e-mail and phone changes are cancelled, group memberships are removed, current and future role assignments are ended and delegations from or to the user are revoked. Open tasks stay with the tombstone exactly as after the soft delete (B14, B12b). Irreversible: a purged account cannot be restored (409 `invalid_transition`) and the released identifiers cannot be re-attached to it.
+         *     Needs a reason (3 to 500 characters), step-up and `confirm_text`: the account's employee ID or its e-mail, typed exactly (422 `confirmation_mismatch`, path `/confirm_text`). Audited as `user_purged` with before and after (masked e-mail and phone, employee ID, counts of what was removed).
+         *     Refused with 403 `action_forbidden` for a delegate, 403 `self_beneficiary` for the caller's own row, 404 for an unknown or already purged id, 409 `invalid_transition` when the user is not soft-deleted, 409 `last_admin` if it would leave no active System Admin.
+         */
+        post: operations["purgeUser"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1747,6 +1897,31 @@ export interface paths {
         patch: operations["updateSite"];
         trace?: never;
     };
+    "/sites/{site_id}/admin-edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        /** Direct admin edits of the site (0.15.7) */
+        get: operations["listSiteAdminEdits"];
+        put?: never;
+        /**
+         * Edit site data directly as a System Admin (reason and step-up, 0.15.7)
+         * @description System Admin only (403 `action_forbidden`, also for a delegate). Applies at once; audited with before and after and flagged as an admin override; reversible with
+         *     `POST /overrides/{override_id}/revert`. Field errors are 422 `validation_failed` with paths such as `/identity/name`, `/identity/site_code` (`immutable`), `/scenario`,
+         *     `/scope/<flag>`, `/custom/<code>`; a scope or scenario that conflicts answers `scope_scenario_conflict`. An edit that changes nothing is a no-op (no audit row).
+         */
+        post: operations["adminEditSite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/site-drafts": {
         parameters: {
             query?: never;
@@ -2317,7 +2492,7 @@ export interface paths {
         put?: never;
         /**
          * Revert an admin override
-         * @description 409 `override_not_revertible` if the task has moved on since.
+         * @description 409 `override_not_revertible` if the task (or, for a site edit, the site) has moved on since, or the override was reverted already. Works for task date overrides and direct site edits (0.15.7).
          */
         post: operations["revertOverride"];
         delete?: never;
@@ -2611,6 +2786,92 @@ export interface paths {
         head?: never;
         /** Light change to a gate (names, conditions, SLA, custom fields); applies to gates not yet open */
         patch: operations["updateGateLight"];
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add a task inside a milestone of a draft (or of a published version, decision B8)
+         * @description Decision 4 of 2026-11-12 (migration 0090). Needs a System Admin or a delegate of `task_definitions.create` for all regions (403 otherwise), a reason and a step-up (401).
+         *     The code is never reused in the version (409 `duplicate`). On a published version a task that counts toward its milestone needs `confirm_master_impact` during the parallel run
+         *     (422 `master_impact_unconfirmed`) and answers the warning `counting_task_may_move_milestone`. Field errors (422 `validation_failed`, `errors[].path` `/code`, `/name_en`, `/stage_code`,
+         *     `/predecessors`, `/after_task_code`). The new task also gets its SLA rule, documents and matrix cells like any other (configured in their own screens).
+         */
+        post: operations["createTaskDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename EN/AR, counts toward the milestone, deactivate or reactivate, move to another milestone (draft only)
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. Only the keys sent change; nothing to change is 409 `invalid_transition`. A task is never deleted: it is
+         *     deactivated (422 `validation_failed` on `/is_active` while active tasks still wait for it, or for a milestone task of a published version). Moving to another milestone
+         *     (`stage_code`) is structural: 422 `validation_failed` on `/stage_code` for a published version.
+         */
+        patch: operations["updateTaskDefinition"];
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/predecessors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the predecessors of a task
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. A cycle is 422 `validation_failed` with `errors[0].path` `/predecessors` and `code` `cycle`; the other codes are
+         *     `self`, `duplicate`, `unknown` (not a task of this version) and `inactive`. The new predecessors apply to new site tasks.
+         */
+        put: operations["replaceTaskPredecessors"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/milestones/{code}/task-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Reorder the tasks of one milestone
+         * @description Needs `task_definitions.edit` (all regions), a reason and a step-up. `task_codes` lists every task of the milestone (active and inactive) exactly once, else 422 `validation_failed` on `/task_codes`.
+         */
+        put: operations["reorderMilestoneTasks"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/workflow/versions/{version}/migration-preview": {
@@ -5396,6 +5657,7 @@ export interface paths {
          *     **Big New sites batches (0.14.4):** an `approve` of more rows than the setting `imports.async_rows` (default 50) answers 202 after the checks (grid right, L2 of the Matrix row in a region of the rows, the note of a return, the step-up: 401 and nothing queued); the batch is `processing` and the sites are created in chunks of 25 in the background, each committed on its own, with the same audit rows and notices as the 200 answer. Any decision or discard while it runs answers 409 `batch_processing`. A return of a New sites batch is always answered at once.
          *     **Big register and stream batches (0.14.6):** an `approve`, a `review` or a `reject` of more rows than the threshold answers 202 after the checks (the grid right, the authority of the person on at least one row: 403 `not_eligible_holder`, the notes of a return: 422, the step-up of an approval: 401; nothing queued); the rows are decided in chunks (register 50, stream 25) with the same transitions, audit rows and notice as the 200 answer, and the rights are derived again for every chunk (a row the person may no longer decide is counted in `progress.failed`). A `discard` is always answered at once.
          *     Rows held `pending_previous_approval` have no record yet: "approve all" does not touch them and lists them in `outcome.held`; a `reject` takes them back. A row that cannot be decided (not the holder of L2, the record is not at that level) is listed in `outcome.failed`; when no row could be decided because the caller is not allowed, the answer is 403.
+         *     **Admin approve as is (0087, owner decision 2026-11-12):** `action=admin_approve` is a final approval of the whole batch (`scope=all` only, 422 otherwise) by a System Admin (403 `action_forbidden` for anyone else) that bypasses the check of the L2 holders. It needs a reason in `note` (at least 3 characters, 422) and a valid step-up (401 `step_up_required`). Every open row of a stream batch that has a task is approved with what it has: a row that lacks an actual date or another required value is approved too and flagged `incomplete` (its gaps stay visible in `site_data_gaps`). Each approved task is flagged `admin_override` and audited per row with the reason; KPIs treat it like any other override (flagged and excluded). The count of the flagged rows is `outcome.incomplete`, and `counts.admin_approved` / `counts.incomplete` of the batch. A batch with more rows than `imports.async_rows` is run in the background (202), the same way as the other decisions.
          */
         post: operations["decideImportBatch"];
         delete?: never;
@@ -5573,6 +5835,8 @@ export interface paths {
          *     **Big applies (0.14.6):** the staging is done in the request; a staged batch with more rows to send than `imports.async_rows` (default 50) is sent in the background by the same admin (the checks of a send are made first; the step-up verified now counts for the whole run), and the answer is 202 with the run `applied`, the batch marked `queued` in `outcome.batches` and the run's `progress`. The batches are sent one after the other in chunks of 25 rows, each committed on its own; each batch shows `processing` until its run ends, then its usual status. As before, the Master import apply does not synchronise the conditional documents of the tasks. A smaller apply answers 200 as before.
          *     **0.15.3:** a run still compared in the background (`staging`) answers 409 `upload_processing`; a run whose comparison failed (`failed`) answers 409 `invalid_transition`. Measured with 470 synthetic sites the staging of the apply now takes about 6 s (87 s before) and stays in the request.
          *     **0.15.5:** a file with more sites than `imports.async_rows` is applied in the background after the same checks: 202 with the run `applying` (see `applying`), then `applied` with its `outcome` (or `previewed` again with `applying.error` when the background apply was refused). A second apply meanwhile answers 409 `upload_processing`. Measured with 470 synthetic sites with every task, a historical apply: 405 s in the request before, 32 ms for the request and about 70 s in the background now.
+         *     **0.15.11:** `historical_load.approve_directly` (owner decision 2026-11-12) approves every submitted task of the historical load at once as an admin override (no L2 step); the batches and their rows read approved; it applies the same way in the background and in a chunked send.
+         *     **0.15.11:** `historical_load.registers` (owner decision 2026-11-12) also loads the register sheets of the run's stored file (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) as register batches of the same group, after the Master batches; with `approve_directly` their rows are approved at once too. Personal columns are never read. 409 `invalid_transition` when the original file is not stored or does not match the run.
          */
         post: operations["applyMasterImportRun"];
         delete?: never;
@@ -7601,7 +7865,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "invitation_invalid";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -8105,9 +8369,32 @@ export interface components {
         UserAccountStatus: "active" | "deactivated" | "deleted";
         DeleteReason: string;
         DeletedUser: components["schemas"]["User"] & {
-            /** @description false when the employee ID or the email is now owned by another account. */
+            /** @description false when the employee ID, the email or the phone is now owned by another account (computed against every other account, 0.15.6). */
             can_restore?: boolean;
-            restore_blocked_reason?: string | null;
+            /** @enum {string|null} */
+            restore_blocked_reason?: "email_in_use" | "employee_id_in_use" | "phone_in_use" | null;
+        };
+        /** @description The tombstone of a permanently deleted user (0.15.6). Only what history needs: the name stays, the identifiers are masked copies of what was released. */
+        PurgedUser: {
+            /** Format: uuid */
+            id: string;
+            display_name: string;
+            /** Format: date-time */
+            purged_at: string;
+            purged_by?: components["schemas"]["UserRef"] | null;
+            purge_reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When the soft delete happened.
+             */
+            deleted_at?: string | null;
+            delete_reason?: string | null;
+            /** @description Masked: e-mail as first letter plus domain, phone as its last two digits, the 4-digit employee ID as it was. */
+            identifiers: {
+                email?: string | null;
+                employee_id?: string | null;
+                phone?: string | null;
+            };
         };
         UserDetail: components["schemas"]["User"] & {
             assignments?: components["schemas"]["Assignment"][];
@@ -8541,6 +8828,11 @@ export interface components {
             shifted_by_suspension?: boolean;
         };
         SiteDetail: components["schemas"]["SiteListItem"] & {
+            admin_edits?: components["schemas"]["SiteAdminEdits"];
+            /** @description 0.15.7: a direct admin edit of the site is in force (the "Admin override" badge). */
+            admin_override_active?: boolean;
+            /** @description 0.15.7: the caller is a System Admin. */
+            can_admin_edit?: boolean;
             owner_site_id?: string | null;
             sub_region?: string | null;
             latitude?: number | null;
@@ -8720,6 +9012,8 @@ export interface components {
             lock_bypassed?: boolean;
             /** @description 0.15.4: the lock it bypassed: `predecessor_open:<codes>` or `gate_closed:<gate>`. */
             lock_bypass_reason?: string | null;
+            /** @description 0.15.11: approved directly by the historical Master import (`historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; treated like an admin override in the SLA and on-time KPIs but counted in progress; cleared when the task leaves the approved state. */
+            historical_direct_approved?: boolean;
             /** @description The holder has an active absence ("absent" badge, B12b). */
             holder_absent?: boolean;
             holder_account_status?: components["schemas"]["UserAccountStatus"];
@@ -8862,6 +9156,10 @@ export interface components {
             disabled_reason?: string | null;
         };
         TaskDetail: components["schemas"]["TaskSummary"] & {
+            /** @description 0.15.7: the admin date overrides of the task, newest first. */
+            overrides?: components["schemas"]["Override"][];
+            /** @description 0.15.6: the caller is a System Admin and the task is not N/A or skipped. */
+            can_override?: boolean;
             /** Format: date */
             baseline_date?: string | null;
             /** Format: date */
@@ -8984,8 +9282,19 @@ export interface components {
         Override: {
             /** Format: uuid */
             id: string;
+            /**
+             * @description 0.15.6: a task date override or a direct admin edit of a site.
+             * @enum {string}
+             */
+            entity: "task" | "site";
+            /**
+             * Format: uuid
+             * @description Null for a site edit.
+             */
+            task_id?: string | null;
             /** Format: uuid */
-            task_id: string;
+            site_id?: string;
+            /** @description `edit_date` for a task, `site_edit` for a site. */
             kind: string;
             reason: string;
             before?: {
@@ -9000,7 +9309,36 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             reverted_at?: string | null;
+            reverted_by?: components["schemas"]["UserRef"];
+            revert_reason?: string | null;
+            /** @description Not reverted yet and the field still holds what the override set. */
             revertible: boolean;
+        };
+        SiteAdminEditRequest: {
+            reason: string;
+            identity?: {
+                name?: string;
+                name_ar?: string | null;
+                latitude?: number | null;
+                /** @description With latitude; both null clears the coordinates. */
+                longitude?: number | null;
+                region_id?: number;
+                cluster_code?: string | null;
+                /** @description Always refused: field error `immutable`. */
+                site_code?: string;
+            };
+            /** @description New Build, Expansion, Hot Swap, Cold Swap or Relocation. */
+            scenario?: string;
+            /** @description Scope flag -> `yes` or `na`. */
+            scope?: {
+                [key: string]: "yes" | "na";
+            };
+            /** @description Field code -> value; null clears. */
+            custom?: components["schemas"]["CustomValues"];
+        };
+        SiteAdminEdits: {
+            active_count: number;
+            items: components["schemas"]["Override"][];
         };
         ApprovalItem: {
             task: components["schemas"]["TaskSummary"];
@@ -9184,6 +9522,7 @@ export interface components {
             /** @enum {string} */
             formula_kind: "master" | "generic";
             counts_in_project_status: boolean;
+            is_active?: boolean;
             master_export_column?: string | null;
             custom?: components["schemas"]["CustomValues"];
         };
@@ -9214,6 +9553,13 @@ export interface components {
             sort_order: number;
             predecessors?: string[];
             counts_toward_milestone?: boolean;
+            /** @description Decision 4 (0090): read-only copy of the task name. */
+            name_en?: string;
+            name_ar?: string | null;
+            is_active?: boolean;
+            is_milestone_task?: boolean;
+            has_documents?: boolean;
+            task_version?: number;
         };
         WorkflowStructure: {
             milestones: {
@@ -9249,8 +9595,11 @@ export interface components {
                     confirmation_phrase?: string | null;
                 };
             };
-            /** @description Draft revision for If-Match. */
+            /** @description Revision of the version for If-Match (also the ETag header); every write bumps it. */
             version_etag?: number;
+            /** @description Decision 4 (0090): the caller may edit tasks, milestones and gates (System Admin or an all-regions delegate). */
+            can_edit?: boolean;
+            can_publish?: boolean;
         };
         /** @description Either explicit site ids or a filter. Only sites on another version are considered. */
         SiteSelection: {
@@ -10012,6 +10361,118 @@ export interface components {
             /** @description Shown once. Hand it to the user by a separate channel. */
             temporary_password: string;
         };
+        /** @enum {string} */
+        UserInvitationStatus: "pending" | "accepted" | "revoked" | "expired";
+        /** @description One role row the account will hold, chosen at invite time. Same meaning as an assignment row. */
+        UserInvitationAssignment: {
+            /** Format: uuid */
+            role_id: string;
+            permission_level: components["schemas"]["PermissionLevel"];
+            team?: components["schemas"]["TeamKind"];
+            /** @default false */
+            all_regions: boolean;
+            /** @description Used when all_regions is false. */
+            region_ids?: components["schemas"]["RegionId"][];
+            /** @default false */
+            all_modules: boolean;
+            /** @description Used when all_modules is false. */
+            module_keys?: components["schemas"]["ModuleKey"][];
+            profile_ids?: string[];
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_to?: string | null;
+        };
+        UserInvitationCreate: {
+            /** Format: email */
+            email: string;
+            display_name: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            assignments?: components["schemas"]["UserInvitationAssignment"][];
+            /** Format: uuid */
+            department_id?: string | null;
+            /** Format: uuid */
+            manager_id?: string | null;
+            group_ids?: string[];
+            /** @default false */
+            require_two_factor: boolean;
+            reason: components["schemas"]["Reason"];
+        };
+        UserInvitation: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            display_name: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            status: components["schemas"]["UserInvitationStatus"];
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_sent_at?: string;
+            send_count: number;
+            invited_by: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            reason?: string;
+            require_two_factor: boolean;
+            /** @description Grants admin-level rights, a privileged role or a privileged group: needs a System Admin and a fresh step-up. */
+            elevated: boolean;
+            department?: {
+                /** Format: uuid */
+                id?: string;
+                name?: string;
+            } | null;
+            manager?: {
+                /** Format: uuid */
+                id?: string;
+                name?: string;
+            } | null;
+            groups: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            assignments: (components["schemas"]["UserInvitationAssignment"] & {
+                role?: {
+                    /** Format: uuid */
+                    id?: string;
+                    code?: string;
+                    name_en?: string;
+                    name_ar?: string | null;
+                };
+            })[];
+            /** Format: date-time */
+            accepted_at?: string | null;
+            /** Format: uuid */
+            accepted_user_id?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            revoke_reason?: string | null;
+        };
+        InvitationPreview: {
+            display_name: string;
+            email: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            password_policy: {
+                min_length: number;
+                max_length: number;
+            };
+        };
+        InvitationAccepted: {
+            /** @constant */
+            created: true;
+            /** @description True when an admin must hand over the enrolment code before the first sign-in works. */
+            two_factor_enrolment_pending: boolean;
+        };
         /**
          * @description Personal-data fields that follow visibility settings.
          * @enum {string}
@@ -10158,6 +10619,8 @@ export interface components {
             decided?: number;
             approved?: number;
             rejected?: number;
+            /** @description 0087: rows an admin approve as is approved although they lacked data (flagged `incomplete`). */
+            incomplete?: number;
             held?: {
                 /** Format: uuid */
                 row_id: string;
@@ -10202,10 +10665,10 @@ export interface components {
             /** @description 0.15.3, kind `upload`: the transactions done so far. */
             chunks?: number;
             /**
-             * @description 0.14.6: the decision of a `decide` run; null for a send.
+             * @description 0.14.6: the decision of a `decide` run (0087: `admin_approve` too); null for a send.
              * @enum {string|null}
              */
-            action?: "approve" | "review" | "reject" | null;
+            action?: "approve" | "review" | "reject" | "admin_approve" | null;
             /**
              * @description 0.14.6: New sites, a register template, or a stream template (also the stream parts of TPL-MASTER and of the Master import apply).
              * @enum {string}
@@ -10217,6 +10680,8 @@ export interface components {
             held?: number;
             /** @description 0.14.6: rows saved by a Save Draft / Planning send (Q206). */
             saved?: number;
+            /** @description 0087: rows of an admin approve as is that were approved with missing data. */
+            incomplete?: number;
             /**
              * @description `failed`: the run was stopped (the person can no longer act, or a chunk failed three times); the rows done so far stay.
              * @enum {string}
@@ -10321,6 +10786,10 @@ export interface components {
                 held?: number;
                 /** @description Rows saved without submission (draft batch). */
                 saved?: number;
+                /** @description 0087: rows approved by a System Admin as is (flagged `admin_override`). */
+                admin_approved?: number;
+                /** @description 0087: of those, the rows approved with missing data (flagged `incomplete`). */
+                incomplete?: number;
             };
             /** @description Always null (a big upload reports its progress in `progress`, 0.15.3). */
             job_id?: string | null;
@@ -10531,7 +11000,14 @@ export interface components {
             batches?: {
                 /** Format: uuid */
                 id?: string;
-                /** @description The stream. */
+                /**
+                 * @description 0.15.11: a stream batch of the Master sheet, or a register batch of a register sheet.
+                 * @enum {string}
+                 */
+                kind?: "stream" | "register";
+                /** @description 0.15.11: the sheet of the file (Master, or the register sheet). */
+                sheet?: string;
+                /** @description The stream, or (0.15.11) the register key. */
                 ref?: string;
                 template_id?: string;
                 submitted?: number;
@@ -10549,6 +11025,23 @@ export interface components {
                 job_id?: string;
                 /** @description 0.14.6: the rows to send of a queued batch. */
                 rows?: number;
+                /** @description 0.15.11: the rows of the batch already approved (with `approve_directly`, every submitted row). A queued batch counts them in its `ImportBatch.progress`. */
+                approved?: number;
+                /** @description 0.15.11: rows that change nothing (the register or the task already holds these values). */
+                skipped?: number;
+            }[];
+            /** @description 0.15.11: the apply approved the submitted rows directly (historical load, admin override). */
+            approve_directly?: boolean;
+            /** @description 0.15.11: the register sheets of the file were loaded. */
+            registers?: boolean;
+            /** @description 0.15.11: notes on the reading of the register sheets (never blocking): counts, cell addresses and header names only, never a value. Codes: `date_day_first_assumed`, `not_normalised`, `outside_list`, `cell_error_blank`, `master_header_not_found`, `map_unknown_template_header`. */
+            register_notes?: {
+                sheet?: string;
+                ref?: string;
+                code?: string;
+                count?: number;
+                cells?: string[];
+                headers?: string[];
             }[];
             skipped?: {
                 [key: string]: unknown;
@@ -10595,6 +11088,16 @@ export interface components {
             /** @description Q462 (0.14.3): mark every batch of this apply "historical load: accept without documents". A System Admin only (403 `action_forbidden`), `mode` submit, a step-up, the waiver open (409 `invalid_transition`). For the rows whose actual date is on or before the cutoff date the mandatory-document check is skipped and the task is flagged; every other check runs. */
             historical_load?: {
                 reason: string;
+                /**
+                 * @description 0.15.11 (owner decision 2026-11-12): approve every submitted task of this load at once as an admin override, with no L2 step (a workflow step `approve` "historical load: approved directly (admin override)", the flag `TaskSummary.historical_direct_approved`, an audit row per task with `is_admin_override`). Only here, with `mode` submit (422 otherwise). Rows without an actual date stay saved; refused rows stay errors. 0.15.11: with `registers`, the register rows are approved at once too.
+                 * @default false
+                 */
+                approve_directly: boolean;
+                /**
+                 * @description 0.15.11 (owner decision 2026-11-12): also load the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register) into their registers, as register batches of the same group. Personal columns (landlord, contact, phone, e-mail) are never read. Only here (422 otherwise).
+                 * @default false
+                 */
+                registers: boolean;
             };
         };
         MasterImportDiffResolve: {
@@ -10709,10 +11212,10 @@ export interface components {
         };
         ImportDecisionRequest: {
             /**
-             * @description The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note) or `discard` (a batch that was not sent).
+             * @description The action of the caller on the batch: `approve` (L2), `review` (a legacy middle level), `reject` (return with a note), `discard` (a batch that was not sent) or `admin_approve` (0087: System Admin, approves every open row as it is, flags the rows `admin_override` and the incomplete ones `incomplete`; `scope` must be `all`, `note` is the reason).
              * @enum {string}
              */
-            action: "review" | "approve" | "reject" | "discard";
+            action: "review" | "approve" | "reject" | "discard" | "admin_approve";
             /**
              * @description `all` decides every undecided valid row at once; `rows` uses `rows[]`.
              * @enum {string}
@@ -10725,7 +11228,7 @@ export interface components {
                 decision: "approved" | "rejected";
                 note?: string;
             }[];
-            /** @description Required when `action` is reject. */
+            /** @description Required when `action` is reject; the reason (at least 3 characters) when `action` is admin_approve. */
             note?: string;
         };
         Absence: {
@@ -11398,6 +11901,8 @@ export interface components {
             supersedes_id?: string | null;
             /** @description The approved version that is in force. */
             is_current?: boolean;
+            /** @description 0.15.11: approved directly by the historical Master import (a register sheet of the file, `historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; cleared if the record leaves the approved state. */
+            historical_direct_approved?: boolean;
             /** @description Q43: the task this record is the source of (set at the first submission). Review and approval then follow the task's Matrix row, and the final approval fills the task's date and approves it. */
             task?: {
                 /** Format: uuid */
@@ -13791,6 +14296,8 @@ export interface components {
             historical_flagged_count?: number;
             /** @description 0.15.4: only the tasks flagged `lock_bypassed` (approved on an open site while a lock would have held them); also counted in `override_flagged_count`. */
             lock_bypass_flagged_count?: number;
+            /** @description 0.15.11: only the tasks flagged `historical_direct_approved` (approved directly by the historical Master import); also counted in `override_flagged_count`. */
+            historical_direct_flagged_count?: number;
             overrides_excluded?: boolean;
             weight_set?: components["schemas"]["WeightSetRef"];
         };
@@ -16296,6 +16803,189 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    listUserInvitations: {
+        parameters: {
+            query?: {
+                /** @description Search name or email. */
+                q?: string;
+                status?: components["schemas"]["UserInvitationStatus"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["UserInvitation"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserInvitationCreate"];
+            };
+        };
+        responses: {
+            /** @description Invited. The mail is queued in the same transaction. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    resendUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Sent again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getInvitationByToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A valid invitation. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreview"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    acceptInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Account created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAccepted"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
     listDeletedUsers: {
         parameters: {
             query?: {
@@ -16492,6 +17182,40 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    purgeUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                user_id: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["DeleteReason"];
+                    confirm_text: components["schemas"]["ConfirmText"];
+                };
+            };
+        };
+        responses: {
+            /** @description Purged; the tombstone. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurgedUser"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     setUserTwoFactor: {
@@ -17730,6 +18454,66 @@ export interface operations {
         };
         responses: {
             /** @description The site after the change. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteDetail"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    listSiteAdminEdits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The 20 newest edits and how many are still in force. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteAdminEdits"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    adminEditSite: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                site_id: components["parameters"]["SiteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteAdminEditRequest"];
+            };
+        };
+        responses: {
+            /** @description The site after the edit. */
             200: {
                 headers: {
                     ETag: components["headers"]["ETag"];
@@ -19310,6 +20094,191 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    createTaskDefinition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Code of the milestone (stage) that receives the task. */
+                    stage_code: string;
+                    code: string;
+                    name_en: string;
+                    name_ar?: string | null;
+                    /** @default true */
+                    counts_toward_milestone?: boolean;
+                    /** @default true */
+                    has_documents?: boolean;
+                    /** @description Place it after this task of the same milestone (default: last). */
+                    after_task_code?: string | null;
+                    predecessors?: string[];
+                    reason: components["schemas"]["Reason"];
+                    confirm_master_impact?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        task_code: string;
+                        warnings: string[];
+                        version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    updateTaskDefinition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name_en?: string;
+                    name_ar?: string | null;
+                    counts_toward_milestone?: boolean;
+                    is_active?: boolean;
+                    stage_code?: string;
+                    reason: components["schemas"]["Reason"];
+                    confirm_master_impact?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    replaceTaskPredecessors: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    predecessors: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    reorderMilestoneTasks: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                /** @description Stable milestone or gate code (for example MS4, G5). */
+                code: components["parameters"]["NodeCode"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    task_codes: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];

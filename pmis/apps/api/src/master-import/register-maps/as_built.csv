@@ -2,6 +2,7 @@
 # item-specific headers issued by GSDN Workspace: add rows here when they are filled. Patch Cord 1 and 2 are missing in the owner file.
 template_header,master_header,master_column,transform,personal,notes
 Site ID,Site ID,B,site_id,,key
+Record Type,,,const:te_part,,the TE configuration columns are the TE part of the As-Built record (te_part; the key is Site ID and Record Type)
 Configuration (WL/MW/IP/PWR),Configuration (WL/MW/IP/PWR)|Configuration,AJ,,,
 WL Vendor,WL Vendor,AK,,,
 WL Antenna Type,WL Antenna Type,,,,

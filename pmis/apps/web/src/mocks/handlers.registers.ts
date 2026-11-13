@@ -578,7 +578,7 @@ export const registerHandlers = [
     if (!b) return problem(404, 'not_found', 'Batch not found');
     if (b.run?.state === 'running') return processing(b);
     const bad = batchMatch(request, b); if (bad) return bad;
-    const body = (await request.json()) as { action: 'review' | 'approve' | 'reject' | 'discard'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
+    const body = (await request.json()) as { action: 'review' | 'approve' | 'reject' | 'discard' | 'admin_approve'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
     const v = viewer()!, me = v.employee_id ?? '9999';
     if (body.action === 'discard') {
       if (b.uploaded_by !== me && v.key !== 'pm') return problem(403, 'not_eligible_holder', 'Only the person who uploaded the file can discard it.');
@@ -586,6 +586,22 @@ export const registerHandlers = [
       b.rows.forEach((r) => { r.decision = 'rejected'; r.note = body.note ?? 'discarded'; });
       b.status = 'discarded'; b.note = body.note ?? null; b.version += 1; save();
       return HttpResponse.json({ ...toBatch(b), outcome: { decided: 0, approved: 0, rejected: 0, held: [], failed: [] } }, { headers: { ETag: `"${b.version}"` } });
+    }
+    if (body.action === 'admin_approve') {
+      // 0087: a System Admin approves every open row of a task-stream batch as it is (reason, step-up); a row without an actual date is approved and flagged incomplete
+      if (viewer()?.key !== 'pm') return problem(403, 'action_forbidden', 'Only a System Admin can approve a whole upload as it is.');
+      if (!stepUpValid()) return stepUp();
+      if (body.scope !== 'all') return problem(422, 'validation_failed', 'The scope is all.', { errors: [{ path: '/scope', code: 'required' }] });
+      if ((body.note?.trim().length ?? 0) < 3) return problem(422, 'validation_failed', 'A reason is required.', { errors: [{ path: '/note', code: 'required' }] });
+      if (!b.stream || b.entity === 'site') return problem(409, 'invalid_transition', 'Approve as is is for the batches of a task template.');
+      const out: Outcome = { decided: 0, approved: 0, rejected: 0, incomplete: 0, held: [], failed: [] };
+      for (const r of b.rows.filter((x) => x.action === 'update' && ['pending', 'pending_previous_approval'].includes(x.decision))) {
+        r.decision = 'approved'; r.hold_reason = undefined; r.note = body.note!.trim(); r.admin_approved = true;
+        r.incomplete = !r.diff?.['actual_date']?.new; if (r.incomplete) out.incomplete! += 1;
+        out.approved! += 1; out.decided! += 1;
+      }
+      b.version += 1; save();
+      return HttpResponse.json({ ...toBatch(b), outcome: out }, { headers: { ETag: `"${b.version}"` } });
     }
     if (b.status !== 'sent') return problem(409, 'invalid_transition', b.status === 'validated' ? 'The batch has not been sent into the flow yet.' : `The batch is ${statusOf(b)}.`);
     if (body.action === 'reject' && body.scope === 'all' && !body.note?.trim()) return problem(422, 'note_required', 'A return needs a note', { errors: [{ path: '/note', code: 'required' }] });
@@ -671,7 +687,7 @@ export const registerHandlers = [
 export const ASYNC_ROWS = 50;
 const CHUNK = 25;
 const CHUNK_OF: Record<string, number> = { site: 25, register: 50, stream: 25 };
-type DecideBody = { action: 'review' | 'approve' | 'reject' | 'discard'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
+type DecideBody = { action: 'review' | 'approve' | 'reject' | 'discard' | 'admin_approve'; scope: 'all' | 'rows'; rows?: { row_id: string; decision: 'approved' | 'rejected'; note?: string }[]; note?: string };
 /** A return needs a note on every row it returns (as the request of the API, which refuses it all before anything is queued). */
 const notesMissing = (body: DecideBody, rows: MockBatchRow[]) => rows.some((r) => {
   const one = body.scope === 'rows' ? body.rows?.find((x) => x.row_id === r.id) : undefined;
@@ -731,7 +747,7 @@ const progressOf = (run: MockRun | undefined): ImportBatch['progress'] => run ? 
   percent: run.rows.length ? Math.floor((100 * run.done) / run.rows.length) : 100, submitted: run.submitted, approved: run.approved, rejected: run.rejected ?? 0,
   decided: run.decided ?? 0, held: run.held ?? 0, saved: 0, failed: run.failed, started_at: run.started_at, updated_at: run.updated_at, finished_at: run.finished_at, error: null,
 } : null;
-type Outcome = { submitted?: number; decided?: number; approved?: number; rejected?: number; held: { row_id: string; row_no: number; key: string | null; reason: 'open_version' | 'open_submission' | 'predecessor_open'; record_id?: string | null }[]; failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[] };
+type Outcome = { submitted?: number; decided?: number; approved?: number; rejected?: number; incomplete?: number; held: { row_id: string; row_no: number; key: string | null; reason: 'open_version' | 'open_submission' | 'predecessor_open'; record_id?: string | null }[]; failed: { row_id: string; row_no: number; key: string | null; code: string; message?: string }[] };
 const batchMatch = (req: Request, b: MockBatch) => {
   const h = req.headers.get('If-Match');
   if (!h) return problem(428, 'precondition_required', 'If-Match is required');
@@ -854,7 +870,7 @@ function toBatch(b: MockBatch): ImportBatch {
   return {
     id: b.id, template_id: b.template_id, template_version: 1, source: b.group_id ? 'master_template' : 'template', file_name: b.file_name, status, current_level: b.status === 'validated' ? 1 : 2, levels_required: 2, register_key: b.register_key, note: b.note ?? null,
     ...(b.stream ? { stream: b.stream } : {}), ...(b.entity ? { entity: b.entity } : {}), ...(b.group_id ? { group_id: b.group_id, part_sheet: b.part_sheet ?? null } : {}),
-    counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval') },
+    counts: { create: n('create'), update: n('update'), unchanged: n('unchanged'), error: n('error'), pending: d('pending'), approved: d('approved'), rejected: d('rejected'), held: d('pending_previous_approval'), admin_approved: valid.filter((r) => r.admin_approved).length, incomplete: valid.filter((r) => r.admin_approved && r.incomplete).length },
     job_id: null, progress: progressOf(b.run), task_id: null, site_id: null, uploaded_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, uploaded_at: b.uploaded_at, version: b.version,
     historical_load: b.historical ? { cutoff_date: b.historical.cutoff_date, reason: b.historical.reason, marked_by: { id: uid(b.uploaded_by), display_name: b.uploaded_by }, marked_at: b.historical.marked_at } : null,
   };
