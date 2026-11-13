@@ -4125,6 +4125,182 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks:
+    post:
+      tags: [workflow]
+      operationId: createTaskDefinition
+      summary: Add a task inside a milestone of a draft (or of a published version, decision B8)
+      description: |
+        Decision 4 of 2026-11-12 (migration 0090). Needs a System Admin or a delegate of `task_definitions.create` for all regions (403 otherwise), a reason and a step-up (401).
+        The code is never reused in the version (409 `duplicate`). On a published version a task that counts toward its milestone needs `confirm_master_impact` during the parallel run
+        (422 `master_impact_unconfirmed`) and answers the warning `counting_task_may_move_milestone`. Field errors (422 `validation_failed`, `errors[].path` `/code`, `/name_en`, `/stage_code`,
+        `/predecessors`, `/after_task_code`). The new task also gets its SLA rule, documents and matrix cells like any other (configured in their own screens).
+      x-step-up: true
+      x-db-path: admin_wf_task_create (app_actor_is_admin('task_definitions', 'create'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code, code, name_en, reason]
+              properties:
+                stage_code: { type: string, description: 'Code of the milestone (stage) that receives the task.' }
+                code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean, default: true }
+                has_documents: { type: boolean, default: true }
+                after_task_code: { type: [string, 'null'], description: 'Place it after this task of the same milestone (default: last).' }
+                predecessors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task_code, warnings, version]
+                properties:
+                  task_code: { type: string }
+                  warnings: { type: array, items: { type: string } }
+                  version: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}:
+    patch:
+      tags: [workflow]
+      operationId: updateTaskDefinition
+      summary: Rename EN/AR, counts toward the milestone, deactivate or reactivate, move to another milestone (draft only)
+      description: |
+        Needs `task_definitions.edit` (all regions), a reason and a step-up. Only the keys sent change; nothing to change is 409 `invalid_transition`. A task is never deleted: it is
+        deactivated (422 `validation_failed` on `/is_active` while active tasks still wait for it, or for a milestone task of a published version). Moving to another milestone
+        (`stage_code`) is structural: 422 `validation_failed` on `/stage_code` for a published version.
+      x-step-up: true
+      x-db-path: admin_wf_task_update (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              minProperties: 2
+              properties:
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean }
+                is_active: { type: boolean }
+                stage_code: { type: string }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/predecessors:
+    put:
+      tags: [workflow]
+      operationId: replaceTaskPredecessors
+      summary: Replace the predecessors of a task
+      description: |
+        Needs `task_definitions.edit` (all regions), a reason and a step-up. A cycle is 422 `validation_failed` with `errors[0].path` `/predecessors` and `code` `cycle`; the other codes are
+        `self`, `duplicate`, `unknown` (not a task of this version) and `inactive`. The new predecessors apply to new site tasks.
+      x-step-up: true
+      x-db-path: admin_wf_task_predecessors (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [predecessors, reason]
+              properties:
+                predecessors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/milestones/{code}/task-order:
+    put:
+      tags: [workflow]
+      operationId: reorderMilestoneTasks
+      summary: Reorder the tasks of one milestone
+      description: 'Needs `task_definitions.edit` (all regions), a reason and a step-up. `task_codes` lists every task of the milestone (active and inactive) exactly once, else 422 `validation_failed` on `/task_codes`.'
+      x-step-up: true
+      x-db-path: admin_wf_task_order (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/NodeCode'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_codes, reason]
+              properties:
+                task_codes: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/migration-preview:
     post:
       tags: [workflow]
@@ -12140,6 +12316,9 @@ components:
         - batch_processing
         - vehicle_already_reserved
         - upload_processing
+        - workflow_invalid
+        - master_impact_unconfirmed
+        - stale_preview
     PageEnvelope:
       type: object
       required: [items, page]
@@ -13638,6 +13817,7 @@ components:
         name_ar: { type: [string, 'null'] }
         formula_kind: { type: string, enum: [master, generic] }
         counts_in_project_status: { type: boolean }
+        is_active: { type: boolean }
         master_export_column: { type: [string, 'null'] }
         custom: { $ref: '#/components/schemas/CustomValues' }
     GateCondition:
@@ -13670,6 +13850,12 @@ components:
         sort_order: { type: integer }
         predecessors: { type: array, items: { type: string } }
         counts_toward_milestone: { type: boolean }
+        name_en: { type: string, description: 'Decision 4 (0090): read-only copy of the task name.' }
+        name_ar: { type: [string, 'null'] }
+        is_active: { type: boolean }
+        is_milestone_task: { type: boolean }
+        has_documents: { type: boolean }
+        task_version: { type: integer }
     WorkflowStructure:
       type: object
       required: [milestones, gates, placements]
@@ -13720,7 +13906,9 @@ components:
                     affected_columns: { type: array, items: { type: string } }
                     parallel_run_active: { type: boolean }
                     confirmation_phrase: { type: [string, 'null'] }
-            version_etag: { type: integer, description: 'Draft revision for If-Match.' }
+            version_etag: { type: integer, description: 'Revision of the version for If-Match (also the ETag header); every write bumps it.' }
+            can_edit: { type: boolean, description: 'Decision 4 (0090): the caller may edit tasks, milestones and gates (System Admin or an all-regions delegate).' }
+            can_publish: { type: boolean }
     SiteSelection:
       type: object
       description: Either explicit site ids or a filter. Only sites on another version are considered.
