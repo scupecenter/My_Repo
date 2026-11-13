@@ -2,7 +2,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Api, startApp, superDbWfe } from './helpers';
-import { Actor, actor, etag, plainAdmin } from './wf-helpers';
+import { Actor, actor, etag, makeSite, plainAdmin } from './wf-helpers';
 
 /**
  * Migration 0090 (owner decision 4 of 2026-11-12): the workflow editor. Its own database (TEST_DATABASE_URL_WFE): the suite creates a draft, edits it and
@@ -31,7 +31,7 @@ const BASE = '/workflow/versions';
 interface Placement { task_code: string; stage_code: string; predecessors: string[]; name_en: string; is_active: boolean; counts_toward_milestone: boolean }
 
 let draft = 0;
-let tag = '';
+let tag = `P${Date.now().toString(36).slice(-4).toUpperCase()}`;
 let stage = '';
 let existing = '';
 
@@ -61,6 +61,79 @@ describe('reads', () => {
     expect(r.status).toBe(200);
     expect(r.body.items.length).toBeGreaterThan(20);
     expect(r.body.items.find((t: { code: string }) => t.code === existing)).toMatchObject({ stage_code: stage, is_active: true });
+  });
+});
+
+describe('phase 2: insert a task between existing tasks (migration 0094)', () => {
+  let pred = '';
+  let succ = '';
+  let sstage = '';
+  let code = '';
+  let site = '';
+  const body = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    stage_code: sstage, code, name_en: 'Extra step', name_ar: 'خطوة إضافية', counts_toward_milestone: false, predecessors: [pred], successors: [succ],
+    remove_direct_links: true, reason: REASON, ...over,
+  });
+
+  it('previews the affected chain (admin only) and refuses a cycle with a clear error', async () => {
+    const v1 = await current(admin.api, 1);
+    const s = v1.body.placements.find((x) => x.is_active && x.predecessors.length > 0 && v1.body.placements.some((y) => y.task_code === x.predecessors[0] && y.is_active))!;
+    succ = s.task_code;
+    pred = s.predecessors[0]!;
+    sstage = s.stage_code;
+    code = `${tag}I`;
+    const pv = await admin.api.call('post', `${BASE}/1/tasks/insert-preview`, { stage_code: sstage, predecessors: [pred], successors: [succ], remove_direct_links: true, counts_toward_milestone: false });
+    expect(pv.status).toBe(200);
+    expect(pv.body).toMatchObject({ valid: true, removed_link_count: 1, version_status: 'published' });
+    expect(pv.body.rewiring[0]).toMatchObject({ successor: succ, removed_links: [pred] });
+    expect(pv.body.rewiring[0].predecessors_after).not.toContain(pred);
+    expect((await plain.api.call('post', `${BASE}/1/tasks/insert-preview`, { stage_code: sstage })).status).toBe(403);
+    const cyc = await admin.api.call('post', `${BASE}/1/tasks/insert-preview`, { stage_code: sstage, predecessors: [succ], successors: [pred] });
+    expect(cyc.body.valid).toBe(false);
+    expect(cyc.body.errors[0]).toMatchObject({ path: '/successors', code: 'cycle' });
+    const refused = await admin.api.call('post', `${BASE}/1/tasks/insert`, body({ predecessors: [succ], successors: [pred] }), hdr((await current(admin.api, 1)).tag));
+    expect(refused.status).toBe(422);
+    expect(refused.body.errors[0]).toMatchObject({ path: '/successors', code: 'cycle' });
+  });
+
+  it('refuses the insert to a non-admin (403), without If-Match (428) and without step-up (401)', async () => {
+    const t = (await current(admin.api, 1)).tag;
+    expect((await plain.api.call('post', `${BASE}/1/tasks/insert`, body(), hdr(t))).status).toBe(403);
+    expect((await admin.api.call('post', `${BASE}/1/tasks/insert`, body())).status).toBe(428);
+    expect((await noStep.api.call('post', `${BASE}/1/tasks/insert`, body(), hdr(t))).status).toBe(401);
+  });
+
+  it('inserts between: the successor waits for the new task, the old direct link goes, the open sites get the task, and it is audited', async () => {
+    site = (await makeSite(db, 5)).id;
+    const r = await admin.api.call('post', `${BASE}/1/tasks/insert`, body({ add_to_open_sites: true }), hdr((await current(admin.api, 1)).tag));
+    expect(r.status).toBe(201);
+    expect(r.body.open_sites_added).toBeGreaterThanOrEqual(1);
+    expect(r.body.rewiring[0]).toMatchObject({ successor: succ, removed_links: [pred] });
+    const v = await current(admin.api, 1);
+    expect(v.body.placements.find((x) => x.task_code === code)).toMatchObject({ stage_code: sstage, predecessors: [pred], counts_toward_milestone: false });
+    const sp = v.body.placements.find((x) => x.task_code === succ)!.predecessors;
+    expect(sp).toContain(code);
+    expect(sp).not.toContain(pred);
+    const inst = await db.query('SELECT ti.state FROM task_instances ti JOIN task_definitions td ON td.id = ti.task_def_id WHERE ti.site_id = $1 AND td.code = $2', [site, code]);
+    expect(inst.rowCount).toBe(1);
+    const audit = await db.query(`SELECT after FROM audit_log WHERE action = 'workflow_task_insert' AND entity_id = $1`, [code]);
+    expect(audit.rows[0].after.rewiring[0]).toMatchObject({ successor: succ, removed_links: [pred] });
+  });
+
+  it('keeps the old link when asked, and edits successors (cycle refused)', async () => {
+    const code2 = `${tag}J`;
+    const t = (await current(admin.api, 1)).tag;
+    const r = await admin.api.call('post', `${BASE}/1/tasks/insert`, body({ code: code2, predecessors: [pred], successors: [], remove_direct_links: false }), hdr(t));
+    expect(r.status).toBe(201);
+    expect(r.body.open_sites_added).toBe(0);
+    const t2 = r.headers.etag as string;
+    const put = await admin.api.call('put', `${BASE}/1/tasks/${code2}/successors`, { successors: [succ], reason: REASON }, hdr(t2));
+    expect(put.status).toBe(200);
+    expect(put.body.placements.find((x: Placement) => x.task_code === succ).predecessors).toEqual(expect.arrayContaining([code, code2]));
+    const cyc = await admin.api.call('put', `${BASE}/1/tasks/${succ}/successors`, { successors: [code2], reason: REASON }, hdr(put.headers.etag as string));
+    expect(cyc.status).toBe(422);
+    expect(cyc.body.errors[0]).toMatchObject({ path: '/successors', code: 'cycle' });
+    expect((await plain.api.call('put', `${BASE}/1/tasks/${code2}/successors`, { successors: [], reason: REASON }, hdr(t2))).status).toBe(403);
   });
 });
 

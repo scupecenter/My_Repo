@@ -37,6 +37,17 @@ const taskPatchBody = z.object({
   name_en: z.string().trim().max(400).optional(), name_ar: z.string().trim().max(400).nullable().optional(), counts_toward_milestone: z.boolean().optional(),
   is_active: z.boolean().optional(), stage_code: code.optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
+const insertFields = {
+  stage_code: code, code: z.string().trim().max(40), name_en: z.string().trim().max(400), name_ar: z.string().trim().max(400).nullable().optional(),
+  counts_toward_milestone: z.boolean().optional(), has_documents: z.boolean().optional(), after_task_code: code.nullable().optional(),
+  predecessors: z.array(code).max(100).optional(), successors: z.array(code).max(100).optional(), remove_direct_links: z.boolean().optional(),
+};
+const insertPreviewBody = z.object({
+  stage_code: code, predecessors: z.array(code).max(100).optional(), successors: z.array(code).max(100).optional(), remove_direct_links: z.boolean().optional(),
+  counts_toward_milestone: z.boolean().optional(),
+}).strict();
+const taskInsertBody = z.object({ ...insertFields, add_to_open_sites: z.boolean().optional(), reason, confirm_master_impact: confirmImpact }).strict();
+const successorsBody = z.object({ successors: z.array(code).max(100), reason }).strict();
 const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
 const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 const selection = z.object({
@@ -112,6 +123,29 @@ export class WorkflowEditorService {
     const b = parse(predecessorsBody, raw);
     const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_task_predecessors(${version}::int, ${etag}::int, ${task}::text, ${b.predecessors}::text[], ${b.reason}::text) AS r`);
+  }
+
+  /** Phase 2 (migration 0094): the preview of the affected chain of an insert; nothing is written. */
+  async previewInsert(version: number, raw: unknown): Promise<Json> {
+    const b = parse(insertPreviewBody, raw);
+    await this.access.requireAdmin('task_definitions', 'create');
+    return this.one(Prisma.sql`SELECT admin_wf_task_insert_preview(${version}::int, ${b.stage_code}::text, ${b.predecessors ?? []}::text[], ${b.successors ?? []}::text[],
+      ${b.remove_direct_links ?? false}::boolean, ${b.counts_toward_milestone ?? true}::boolean) AS r`);
+  }
+
+  /** A new task between existing tasks, with the cascade rewiring and (optionally) the open sites, in one transaction. */
+  async insertTask(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(taskInsertBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'create', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_insert(${version}::int, ${etag}::int, ${b.stage_code}::text, ${b.code}::text, ${b.name_en}::text, ${b.name_ar ?? null}::text,
+      ${b.counts_toward_milestone ?? null}::boolean, ${b.has_documents ?? null}::boolean, ${b.after_task_code ?? null}::text, ${b.predecessors ?? []}::text[], ${b.successors ?? []}::text[],
+      ${b.remove_direct_links ?? false}::boolean, ${b.add_to_open_sites ?? false}::boolean, ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
+  }
+
+  async setSuccessors(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(successorsBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_successors(${version}::int, ${etag}::int, ${task}::text, ${b.successors}::text[], ${b.reason}::text) AS r`);
   }
 
   async reorder(auth: AuthContext, version: number, stage: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

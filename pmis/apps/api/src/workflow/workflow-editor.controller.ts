@@ -47,6 +47,25 @@ export class WorkflowEditorController {
     return r;
   }
 
+  @Post('versions/:version/tasks/insert-preview')
+  @HttpCode(200)
+  previewInsert(@Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.previewInsert(version, body);
+  }
+
+  @Post('versions/:version/tasks/insert')
+  @HttpCode(201)
+  async insertTask(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.editor.insertTask(auth, version, ifMatch, body);
+    this.tag(res, (r.version ?? {}) as Json);
+    return r;
+  }
+
+  @Put('versions/:version/tasks/:task/successors')
+  async setSuccessors(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setSuccessors(auth, version, task, ifMatch, body));
+  }
+
   @Patch('versions/:version/tasks/:task')
   async updateTask(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.updateTask(auth, version, task, ifMatch, body));
