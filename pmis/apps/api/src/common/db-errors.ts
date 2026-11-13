@@ -84,6 +84,9 @@ export function mapWfError(message: string): ProblemException | null {
     case 'vehicle_already_reserved':
       // 0076: the btree_gist exclusion of vehicle_reservations (or the check before it) refused an overlapping reservation
       return new ProblemException(409, 'vehicle_already_reserved', { detail: detail ?? 'The vehicle is already reserved for overlapping dates.' });
+    case 'override_not_revertible':
+      // 0088: the task date or the site no longer holds what the admin override set, or the override was reverted already
+      return new ProblemException(409, 'override_not_revertible', { detail: detail ?? 'This override can no longer be reverted.' });
     case 'note_required':
       return new ProblemException(422, 'note_required', { detail: 'A rejection needs a note.', errors: [{ path: '/note', code: 'required', message: 'A note is required.' }] });
     case 'mandatory_slots_missing':

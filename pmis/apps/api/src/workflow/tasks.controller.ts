@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { ApprovalsService } from './approvals.service';
+import { OverridesService } from './overrides.service';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TransitionAction, TransitionResultDto, WorkflowService } from './workflow.service';
 
@@ -13,6 +14,7 @@ export class TasksController {
     private readonly detail: TaskDetailService,
     private readonly workflow: WorkflowService,
     private readonly approvals: ApprovalsService,
+    private readonly overrides: OverridesService,
   ) {}
 
   @Get('tasks/:id')
@@ -35,6 +37,25 @@ export class TasksController {
   private tag(res: Response, r: TransitionResultDto): TransitionResultDto {
     res.setHeader('ETag', etagHeader(r.task.version));
     return r;
+  }
+
+  /** Owner decision 2026-11-12 (2), migration 0088: an admin override of a task (edit_date): a System Admin, a reason and a step-up. */
+  @Post('tasks/:id/overrides')
+  @HttpCode(201)
+  async createOverride(
+    @Auth() auth: AuthContext, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response,
+  ) {
+    const o = await this.overrides.create(auth, id, ifMatch, body);
+    const t = await this.detail.get(auth, id);
+    res.setHeader('ETag', etagHeader(t.version));
+    return o;
+  }
+
+  /** The revert of an admin override (a task date or a direct site edit). */
+  @Post('overrides/:override_id/revert')
+  @HttpCode(200)
+  revertOverride(@Auth() auth: AuthContext, @Param('override_id') id: string, @Body() body: unknown) {
+    return this.overrides.revert(auth, id, body);
   }
 
   @Post('tasks/:id/start')

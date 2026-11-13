@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.7
+  version: 0.15.8
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,7 +30,8 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.7 (2026-11-12): invite a new user by email (owner decision 2026-11-12, decision 5; migration 0091; CHANGELOG 133). Additive. `POST /users/invitations` (role assignments, department, manager, groups and two-factor chosen at invite time, within the inviter's own rights; step-up when the invitation is elevated), `GET /users/invitations`, `POST /users/invitations/{invitation_id}/resend` and `/revoke`; the public `GET /invitations/{token}` and `POST /invitations/{token}/accept` (no session, rate limited, every bad link the same 404). New `ErrorCode` `invitation_invalid`.
+    - 0.15.8 (2026-11-13): invite a new user by email (owner decision 2026-11-12, decision 5; migration 0091; CHANGELOG 133). Additive. `POST /users/invitations` (role assignments, department, manager, groups and two-factor chosen at invite time, within the inviter's own rights; step-up when the invitation is elevated), `GET /users/invitations`, `POST /users/invitations/{invitation_id}/resend` and `/revoke`; the public `GET /invitations/{token}` and `POST /invitations/{token}/accept` (no session, rate limited, every bad link the same 404). New `ErrorCode` `invitation_invalid`.
+    - 0.15.7 (2026-11-12): direct admin edit of site data and of task dates (owner decision 2026-11-12 (2); migration 0088; CHANGELOG 130). Additive. (1) `POST /sites/{site_id}/admin-edits` (`adminEditSite`) and `GET /sites/{site_id}/admin-edits`: a System Admin (never a delegate, 403 `action_forbidden`) edits at once the English and Arabic names, the coordinates (a pair, or both null), the region and cluster, the delivery scenario, the six scope flags and any active custom field; the Site ID never changes (field error `immutable`). A reason (422) and a step-up (401) are required; the values are checked like a Change Control change (same field errors), the scope and scenario conflict rule and the applicability of the tasks run, the site is recalculated. One audit row (`site_admin_edit`, flagged as an admin override) holds the before and after of every field touched. Non-admins keep `POST /sites/{site_id}/change-proposals`. `SiteDetail.admin_edits` / `admin_override_active` (the "Admin override" badge) / `can_admin_edit`. (2) `POST /tasks/{task_id}/overrides` is implemented for `kind` = `edit_date` (any of the four date fields, an approved task included; the task is flagged `admin_override`, so the KPIs leave it out of SLA and on-time figures while `exclude_overrides` is on and count it in `override_flagged_count`; its SLA and the site are recalculated). The other kinds answer 422 with the field error `not_supported` on `/kind`. (3) `POST /overrides/{override_id}/revert` puts the old value back for a task date or a site edit while the field still holds what the override set (else 409 `override_not_revertible`). `Override` gains `entity`, `site_id`, `reverted_by`, `revert_reason` (`task_id` is null for a site edit). `TaskDetail.overrides` and `TaskDetail.can_override`.
     - 0.15.6 (2026-11-12): permanent delete of a soft-deleted user that frees the identifiers (owner decision 3 of 2026-11-12; migration 0089; CHANGELOG 131; amends decision B14 "never a hard delete"). Additive. (1) `POST /users/{user_id}/purge` (`purgeUser`): a System Admin (a delegate of `users.delete` gets 403 `action_forbidden`) turns an already soft-deleted account into a tombstone; needs `reason`, step-up and the typed confirmation `confirm_text` (the account's employee ID or e-mail; mismatch 422 `confirmation_mismatch`). The row, its id and its display name are kept, so all history, audit rows and task steps stay attributed; the e-mail (replaced by a placeholder), employee ID, phone and Entra link are released, so a new account with the same data can be created; credentials, 2FA and sessions end, group memberships are removed, assignments are ended, delegations revoked. 409 `invalid_transition` when the account is not soft-deleted yet or was already purged, 403 `self_beneficiary` for the caller's own row, 409 `last_admin` if no active System Admin would remain. A purged user is in no list and picker and answers 404 on every `/users/{user_id}` path; it cannot be restored. (2) `GET /users/deleted` leaves purged users out and `can_restore` / `restore_blocked_reason` are now computed against every other account (`email_in_use`, `employee_id_in_use`, `phone_in_use`).
     - 0.15.5 (2026-11-11): the apply of a big legacy Master runs in the background (owner report 2026-11-11: the historical apply of the 469 sites answered 504; migration 0086; CHANGELOG 128). Additive. `POST /master-import/runs/{run_id}/apply` of a file with more sites than `imports.async_rows` (default 50) makes every check of the request as before (right, version, status, mode and reason, step-up, the historical-load option and its waiver, a file applied once), then answers 202 with the run in the new status `applying` and `MasterImportRun.applying` (`MasterImportApplyProgress`: state, sites, start, end, error). The apply itself is the same, in one transaction of its own under the same person (all or nothing); the run then shows `applied` with its `outcome`, and its big batches are sent in the background as before (`progress`). A refusal in the background (the waiver closed meanwhile, an expired step-up) puts the run back to `previewed` with `applying.state` `failed` and its error: the file can be applied again. A second apply while it runs answers 409 `upload_processing`. Opening the sites of a historical load is also faster (one statement per site instead of one per task).
     - 0.15.4 (2026-11-10): historical data without locks, per-site workflow locks, the missing data of a historical load (owner requests 2026-11-10; technical decisions "Decided 2026-11-10: historical data without locks; per-site workflow locks" in `docs/spec/technical-decisions-2026-11-04.md`; migration 0085; CHANGELOG 125). Additive. (1) `SiteListItem.workflow_locks` (true = the sequencing locks apply, as before; false = an "open" site: a task is not held by its predecessors or a closed gate, dates are entered in any order by hand, by a template and by the Master import; L1/L2, holders, rights, step-up, audit, field validation and the mandatory documents still apply; gates and milestones are still computed) and `SiteListItem.data_gaps` (the missing required values of the site); `GET /sites` filters `workflow_locks` (`locked`, `open`) and `data_gaps` (`with`, `without`); `SiteDetail.workflow_locks_info` (who, when, why, `can_manage`) and `SiteDetail.data_gap_items`. (2) `PUT /sites/{site_id}/workflow-locks` and `POST /sites/workflow-locks` (a selection, or every site of a Master import run or of an import batch, with one reason): a System Admin or a holder of the delegable right `unlock` (`overrides.unlock` administer) for the region; a reason (422) and a step-up (401); 403 `action_forbidden` otherwise; audited per site (`site_workflow_locks_set`, before/after, flagged as an admin override when opening). Opening a site opens its locked tasks for entry; switching back to Locked re-locks the tasks that are still untouched and still held. (3) `TaskSummary.lock_bypassed` / `lock_bypass_reason`: a task approved on an open site while a predecessor or a gate would have held it; shown with the "Admin override" badge and treated as an override in the KPIs (`KpiMeta.lock_bypass_flagged_count`, included in `override_flagged_count`). (4) The historical-load option (0.14.3) of `POST /master-import/runs/{run_id}/apply` and of a stream template upload first sets the sites of the file to open (audited per site with the reason of the load), so no row is held for a predecessor or a gate; missing data is never an error: warnings `missing_actual_date` (the row is saved, not submitted), `missing_actual_start` (the task starts on its actual date), `missing_predecessor_date`, and a cell of an approved, N/A or absent task is not read (warning); invalid values stay errors of their own cell. (5) `GET /master-import/runs/{run_id}/sites` and `GET /import-batches/{batch_id}/sites` (`SiteImportStatus`): every site of the file with its status, warnings, errors and data gaps; `gaps=only`. (6) `SiteDraftInput.workflow_locks` (Locked by default, Open needs the right of (2) when L2 approves, 403 otherwise) and the New sites template column "Workflow Locks".
@@ -2986,6 +2987,52 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /sites/{site_id}/admin-edits:
+    parameters:
+      - $ref: '#/components/parameters/SiteId'
+    get:
+      tags: [sites]
+      operationId: listSiteAdminEdits
+      summary: Direct admin edits of the site (0.15.7)
+      responses:
+        '200':
+          description: The 20 newest edits and how many are still in force.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteAdminEdits' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [sites]
+      operationId: adminEditSite
+      summary: Edit site data directly as a System Admin (reason and step-up, 0.15.7)
+      description: |
+        System Admin only (403 `action_forbidden`, also for a delegate). Applies at once; audited with before and after and flagged as an admin override; reversible with
+        `POST /overrides/{override_id}/revert`. Field errors are 422 `validation_failed` with paths such as `/identity/name`, `/identity/site_code` (`immutable`), `/scenario`,
+        `/scope/<flag>`, `/custom/<code>`; a scope or scenario that conflicts answers `scope_scenario_conflict`. An edit that changes nothing is a no-op (no audit row).
+      x-db-path: site_admin_edit
+      x-step-up: true
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteAdminEditRequest' }
+      responses:
+        '200':
+          description: The site after the edit.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /site-drafts:
     get:
       tags: [sites]
@@ -3826,7 +3873,7 @@ paths:
       tags: [tasks]
       operationId: revertOverride
       summary: Revert an admin override
-      description: 409 `override_not_revertible` if the task has moved on since.
+      description: 409 `override_not_revertible` if the task (or, for a site edit, the site) has moved on since, or the override was reverted already. Works for task date overrides and direct site edits (0.15.7).
       x-step-up: true
       parameters:
         - name: override_id
@@ -13352,6 +13399,9 @@ components:
         - type: object
           required: [pipeline, version]
           properties:
+            admin_edits: { $ref: '#/components/schemas/SiteAdminEdits' }
+            admin_override_active: { type: boolean, description: '0.15.7: a direct admin edit of the site is in force (the "Admin override" badge).' }
+            can_admin_edit: { type: boolean, description: '0.15.7: the caller is a System Admin.' }
             owner_site_id: { type: [string, 'null'] }
             sub_region: { type: [string, 'null'] }
             latitude: { type: [number, 'null'] }
@@ -13615,6 +13665,8 @@ components:
         - type: object
           required: [approval_path, slots, allowed_actions]
           properties:
+            overrides: { type: array, items: { $ref: '#/components/schemas/Override' }, description: '0.15.7: the admin date overrides of the task, newest first.' }
+            can_override: { type: boolean, description: '0.15.6: the caller is a System Admin and the task is not N/A or skipped.' }
             baseline_date: { type: [string, 'null'], format: date }
             planned_start: { type: [string, 'null'], format: date }
             actual_start: { type: [string, 'null'], format: date }
@@ -13712,11 +13764,13 @@ components:
         reassign_to_user_id: { type: string, format: uuid, description: 'For reassign.' }
     Override:
       type: object
-      required: [id, task_id, kind, reason, created_at, revertible]
+      required: [id, entity, kind, reason, created_at, revertible]
       properties:
         id: { type: string, format: uuid }
-        task_id: { type: string, format: uuid }
-        kind: { type: string }
+        entity: { type: string, enum: [task, site], description: '0.15.6: a task date override or a direct admin edit of a site.' }
+        task_id: { type: [string, 'null'], format: uuid, description: 'Null for a site edit.' }
+        site_id: { type: string, format: uuid }
+        kind: { type: string, description: '`edit_date` for a task, `site_edit` for a site.' }
         reason: { type: string }
         before: { type: object, additionalProperties: true }
         after: { type: object, additionalProperties: true }
@@ -13724,7 +13778,38 @@ components:
         on_behalf_of: { $ref: '#/components/schemas/UserRef' }
         created_at: { type: string, format: date-time }
         reverted_at: { type: [string, 'null'], format: date-time }
-        revertible: { type: boolean }
+        reverted_by: { $ref: '#/components/schemas/UserRef' }
+        revert_reason: { type: [string, 'null'] }
+        revertible: { type: boolean, description: 'Not reverted yet and the field still holds what the override set.' }
+    SiteAdminEditRequest:
+      type: object
+      required: [reason]
+      additionalProperties: false
+      properties:
+        reason: { type: string, minLength: 3, maxLength: 2000 }
+        identity:
+          type: object
+          additionalProperties: false
+          properties:
+            name: { type: string }
+            name_ar: { type: [string, 'null'] }
+            latitude: { type: [number, 'null'] }
+            longitude: { type: [number, 'null'], description: 'With latitude; both null clears the coordinates.' }
+            region_id: { type: integer }
+            cluster_code: { type: [string, 'null'] }
+            site_code: { type: string, description: 'Always refused: field error `immutable`.' }
+        scenario: { type: string, description: 'New Build, Expansion, Hot Swap, Cold Swap or Relocation.' }
+        scope:
+          type: object
+          description: 'Scope flag -> `yes` or `na`.'
+          additionalProperties: { type: string, enum: [yes, na] }
+        custom: { allOf: [{ $ref: '#/components/schemas/CustomValues' }], description: 'Field code -> value; null clears.' }
+    SiteAdminEdits:
+      type: object
+      required: [active_count, items]
+      properties:
+        active_count: { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Override' } }
 
     # ---------------------------------------------------------- approvals
     ApprovalItem:
