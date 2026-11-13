@@ -9,7 +9,7 @@
 --     dash_core read t.admin_override) and, when something is missing (actual start or date, mandatory documents, a document rule still pending), task_instances.incomplete
 --     = true with the codes in incomplete_reasons. The gaps stay visible: site_data_gaps lists them as `approved_incomplete`.
 --   - Audit: one row per task (task_admin_approved_as_is, is_admin_override, batch and batch row stamped) and one for the batch (import_batch_admin_approve).
---   - Not covered (409 invalid_transition): New sites batches, register batches, draft-mode batches. A row in error, an unchanged row, an approved task, a task with open
+--   - Not covered (409 invalid_transition): New sites batches, register batches. A row in error (an actual date missing in a Submit for Review file is one), an unchanged row, an approved task, a task with open
 --     snags and a date that is not valid are not approved: each is listed in `failed` with its reason.
 --   - A big batch runs in the background like any other decision: imp_async_start / imp_async_step / imp_async_close keep their names and signatures and route the
 --     job of this action to imp_admin_async_*; the others move to *_std (no grant for pmis_app).
@@ -223,13 +223,13 @@ BEGIN
   END IF;
 
   -- what is missing, recorded before anything changes
-  IF new_start IS NULL THEN reasons := reasons || 'missing_actual_start'; END IF;
-  IF new_date IS NULL THEN reasons := reasons || 'missing_actual_date'; END IF;
+  IF new_start IS NULL THEN reasons := reasons || 'missing_actual_start'::text; END IF;
+  IF new_date IS NULL THEN reasons := reasons || 'missing_actual_date'::text; END IF;
   miss := public.wf_missing_slots(p_task);
-  IF cardinality(miss) > 0 THEN reasons := reasons || 'missing_documents'; END IF;
+  IF cardinality(miss) > 0 THEN reasons := reasons || 'missing_documents'::text; END IF;
   SELECT coalesce(array_agg(DISTINCT dt.code ORDER BY dt.code), ARRAY[]::text[]) INTO pending
     FROM public.document_slots s JOIN public.document_types dt ON dt.id = s.doc_type_id WHERE s.task_id = p_task AND s.determination_pending AND NOT s.conditional_declared;
-  IF cardinality(pending) > 0 THEN reasons := reasons || 'document_rule_pending'; END IF;
+  IF cardinality(pending) > 0 THEN reasons := reasons || 'document_rule_pending'::text; END IF;
 
   before := public.wf_snap(p_task);
   n := public.wf_task_levels(p_task);
@@ -267,16 +267,13 @@ END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 5. The rows, the end, and the synchronous call of the batch
 -- ---------------------------------------------------------------------------------------------------------------------
--- The batch must be a stream batch (a task template), not a draft, and open (validated, in approval, partly approved). The System Admin and the step-up are checked first
+-- The batch must be a stream batch (a task template; a Save Draft / Planning batch too: its rows have no actual date, they are the incomplete ones), and open (validated, in approval, partly approved). The System Admin and the step-up are checked first
 -- (so a non-admin gets 403 whatever the batch shows), then the reason, then the batch.
 CREATE OR REPLACE FUNCTION imp_admin_approve_check(b public.import_batches, p_note text) RETURNS text
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 BEGIN
   IF b.stream_code IS NULL OR b.entity = 'site' THEN
     PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Approve as is is for the batches of a task template (a task stream). New sites and register batches keep their own approval.'));
-  END IF;
-  IF b.mode = 'draft' THEN
-    PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The batch was uploaded as a draft: send it first, or upload it again in the Submit for Review mode.'));
   END IF;
   IF b.status NOT IN ('validated', 'in_approval', 'partially_approved') THEN
     PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'The batch is ' || b.status || '.'));
@@ -301,7 +298,7 @@ BEGIN
       PERFORM set_config('app.batch_row', '', true);
       UPDATE public.import_batch_rows SET decision = 'approved', decided_by = actor, decided_at = now(), decision_note = p_reason, decided_role = 'approve', hold_reason = NULL,
         task_submitted_at = coalesce(task_submitted_at, now()), admin_approved = true, incomplete = (res ->> 'incomplete')::boolean,
-        incomplete_reasons = coalesce((SELECT array_agg(e) FROM jsonb_array_elements_text(res -> 'reasons') e), ARRAY[]::text[]) WHERE id = r.id;
+        incomplete_reasons = coalesce((SELECT array_agg(e.value) FROM jsonb_array_elements_text(res -> 'reasons') e), ARRAY[]::text[]) WHERE id = r.id;
       decided := decided + 1; approved := approved + 1;
       IF (res ->> 'incomplete')::boolean THEN incomplete := incomplete + 1; END IF;
     EXCEPTION WHEN others THEN

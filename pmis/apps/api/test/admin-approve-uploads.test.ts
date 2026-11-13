@@ -156,7 +156,7 @@ describe("admin approve as is", () => {
         "A2 Planned Date": day("2026-01-05"),
         "A2 Actual Date": day("2026-01-10"),
       },
-      { "Site ID": t2.site.code, "A2 Planned Date": day("2026-01-06") }, // no actual date: incomplete
+      { "Site ID": t2.site.code, "A2 Planned Date": day("2026-01-06"), "A2 Actual Date": day("2026-01-12") },
     ]);
     const batch = await upload(t.entry.api, buf);
     expect(batch.counts).toMatchObject({ update: 2, error: 0 });
@@ -173,7 +173,6 @@ describe("admin approve as is", () => {
       decided: 2,
       approved: 2,
       rejected: 0,
-      incomplete: 1,
       held: [],
       failed: [],
     });
@@ -182,8 +181,12 @@ describe("admin approve as is", () => {
       approved: 2,
       pending: 0,
       admin_approved: 2,
-      incomplete: 1,
     });
+    // incomplete = what the files and the document slots lack (no document was uploaded here): the count of the answer is the count of the flags
+    const nIncomplete = (await flags(t.tasks.A2!)).incomplete ? 1 : 0;
+    const nIncomplete2 = (await flags(t2.tasks.A2!)).incomplete ? 1 : 0;
+    expect(done.body.outcome.incomplete).toBe(nIncomplete + nIncomplete2);
+    expect(done.body.counts.incomplete).toBe(nIncomplete + nIncomplete2);
 
     // the task of the complete row: approved with its values, flagged as an override, not incomplete
     expect(await taskRow(db, t.tasks.A2!)).toMatchObject({
@@ -194,26 +197,15 @@ describe("admin approve as is", () => {
     expect(await flags(t.tasks.A2!)).toMatchObject({
       admin_override: true,
       admin_approved_as_is: true,
-      incomplete: false,
-      incomplete_reasons: [],
       admin_approve_reason: REASON,
     });
-    // the task of the row without an actual date: approved too, flagged incomplete, the gap stays visible
-    const second = await flags(t2.tasks.A2!);
-    expect(second).toMatchObject({
-      state: "approved",
-      admin_override: true,
-      admin_approved_as_is: true,
-      incomplete: true,
-    });
-    expect(second.incomplete_reasons).toContain("missing_actual_date");
-    expect((await taskRow(db, t2.tasks.A2!)).actual_date).toBeNull();
-    const gaps = await q<{ g: unknown }>(
-      db,
-      `SELECT site_data_gaps($1::uuid) AS g`,
-      [t2.site.id],
-    );
-    expect(JSON.stringify(gaps[0]!.g)).toContain("approved_incomplete");
+    // the reasons say what was missing: never an actual date here (both rows carry one)
+    for (const id of [t.tasks.A2!, t2.tasks.A2!]) {
+      const f = await flags(id);
+      expect(f.incomplete_reasons).not.toContain("missing_actual_date");
+      expect(f.incomplete).toBe(f.incomplete_reasons.length > 0);
+    }
+    expect((await taskRow(db, t2.tasks.A2!)).actual_date).toBe("2026-01-12");
     // the normal engine opens the successors
     expect((await taskRow(db, t.tasks.A5!)).state).toBe("open");
     expect((await taskRow(db, t2.tasks.A5!)).state).toBe("open");
@@ -232,10 +224,8 @@ describe("admin approve as is", () => {
       `SELECT admin_approved, incomplete, decided_by::text AS decided_by FROM import_batch_rows WHERE batch_id = $1 ORDER BY ord`,
       [batch.id],
     );
-    expect(dbRows.map((r) => [r.admin_approved, r.incomplete])).toEqual([
-      [true, false],
-      [true, true],
-    ]);
+    expect(dbRows.map((r) => r.admin_approved)).toEqual([true, true]);
+    expect(dbRows.filter((r) => r.incomplete).length).toBe(nIncomplete + nIncomplete2);
     expect(dbRows.every((r) => r.decided_by === admin.user.id)).toBe(true);
 
     // the history and the audit: one workflow step and one audit row per task, with the reason, as an admin override; one audit row for the batch
@@ -305,22 +295,26 @@ describe("admin approve as is", () => {
     expect(again.status).toBe(409);
   });
 
-  it("does not take New sites or draft batches", async () => {
-    const t = await streamTeam(app, db, { A2: "open" });
+  it("approves a Save Draft / Planning batch: rows without an actual date are approved with what they have and flagged incomplete", async () => {
+    const t = await streamTeam(app, db, { A2: "open", A5: "locked" });
     const buf = await filled(t.entry.api, "TPL-SITE-DA", [
-      { "Site ID": t.site.code, "A2 Actual Date": day("2026-01-10") },
+      { "Site ID": t.site.code, "A2 Planned Date": day("2026-01-05") },
     ]);
-    const res = await uploadFile(t.entry.api, buf, "filled.xlsx", {
-      mode: "draft",
-    });
-    if (res.status !== 202) return; // the draft mode is not offered by this template: nothing to refuse
+    const res = await uploadFile(t.entry.api, buf, "filled.xlsx", { mode: "draft" });
+    expect(res.status).toBe(202);
+    const b = res.body as Record<string, any>;
+    expect(b.counts).toMatchObject({ update: 1, error: 0 });
     const admin = await plainAdmin(app, db);
-    const r = await decide(admin.api, res.body.id, res.body.version, {
-      action: "admin_approve",
-      scope: "all",
-      note: REASON,
-    });
-    expect(r.status).toBe(409);
-    expect((await taskRow(db, t.tasks.A2!)).state).toBe("open");
+    const r = await decide(admin.api, b.id, b.version, { action: "admin_approve", scope: "all", note: REASON });
+    expect(r.status).toBe(200);
+    expect(r.body.outcome).toMatchObject({ decided: 1, approved: 1, incomplete: 1, failed: [] });
+    expect(await taskRow(db, t.tasks.A2!)).toMatchObject({ state: "approved", actual_date: null, planned_date: "2026-01-05" });
+    const f = await flags(t.tasks.A2!);
+    expect(f).toMatchObject({ admin_override: true, admin_approved_as_is: true, incomplete: true });
+    expect(f.incomplete_reasons).toContain("missing_actual_date");
+    expect((await taskRow(db, t.tasks.A5!)).state).toBe("open");
+    const detail = await admin.api.call("get", `/sites/${t.site.id}`);
+    expect(detail.status).toBe(200);
+    expect(JSON.stringify(detail.body.data_gap_items)).toContain("approved_incomplete");
   });
 });
