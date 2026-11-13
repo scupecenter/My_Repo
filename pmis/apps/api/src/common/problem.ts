@@ -15,7 +15,7 @@ export type ErrorCode =
   | 'list_not_configured' | 'confirmation_mismatch'
   | 'email_not_verified'
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
-  | 'freeze_active' | 'confirmation_mismatch' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview';
+  | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview';
 
 export interface FieldError {
   path: string;
@@ -77,7 +77,6 @@ const TITLES: Record<string, string> = {
   batch_processing: 'The batch is being processed',
   upload_processing: 'The file is being checked',
   freeze_active: 'Structural changes are frozen',
-  confirmation_mismatch: 'The typed confirmation does not match',
   workflow_invalid: 'The workflow version cannot be published',
   master_impact_unconfirmed: 'Confirm the Master impact to continue',
   stale_preview: 'The preview is out of date',
