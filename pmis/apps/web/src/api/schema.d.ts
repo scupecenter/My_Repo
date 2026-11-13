@@ -953,6 +953,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/users/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Invitations to join (pending, accepted, revoked, expired), newest first
+         * @description Needs `create` on `users` (System Admin or a delegation, all regions). `status` is the effective one: a pending invitation past its time reads `expired`.
+         *     The link itself is never returned: it exists only in the mail.
+         */
+        get: operations["listUserInvitations"];
+        put?: never;
+        /**
+         * Invite a new person by email, with the role and properties chosen now
+         * @description Needs `create` on `users` (all regions). The person gets a mail with a link (`{{app_url}}/invite/<token>`) that works once, for `invitations.expiry_hours`
+         *     hours (default 72). Opening it, they choose a password and the account is created with everything chosen here: role assignments (permission level, team,
+         *     regions, modules, profiles, validity), department, direct manager, groups and whether two-factor is enforced. Nothing exists until they accept.
+         *
+         *     **Nobody invites with wider rights than their own.** The same ceilings as assigning apply to the inviter, checked now and again at each resend:
+         *     `assignments.create` for any role row (no admin level, no privileged role, only the regions, modules, profiles and end date the inviter holds),
+         *     `users.edit` (all regions) for `manager_id` and `department_id`, `groups.edit` (all regions) for `group_ids` (never the admin group or a delegation target
+         *     for a delegate), `users.administer` for `require_two_factor`. Refused with 403 `action_forbidden`. An invitation that grants admin-level rights, a
+         *     privileged role or a privileged group (`elevated`) needs a fresh step-up (401 `step_up_required`) and only a System Admin may stand behind it.
+         *
+         *     Two-factor: an invitation never carries an enrolment code. When `require_two_factor` is true the account is created with two-factor on, enforced and
+         *     not enrolled, and an admin issues the one-time code afterwards (`POST /users/{user_id}/two-factor/enrol-code`).
+         *
+         *     Email, employee ID and phone must be unused by an account (409 `duplicate`, `errors[]` names the field); only one pending invitation per email.
+         *     At most 20 mails to addresses per person and hour (the mail service limit).
+         */
+        post: operations["createUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/invitations/{invitation_id}/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send an invitation again (a new link; the old one stops working)
+         * @description For a pending invitation, or an expired one whose email and identifiers are still free (it becomes pending again). The expiry starts over. The rights are
+         *     checked again against the person who resends, so an invitation never outlives the rights behind it. Needs a fresh step-up when the invitation is `elevated`.
+         *     409 `invalid_transition` when it was accepted or revoked.
+         */
+        post: operations["resendUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/invitations/{invitation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a pending invitation; its link stops working at once
+         * @description Needs `create` on `users` (all regions). 409 `invalid_transition` unless the invitation is pending.
+         */
+        post: operations["revokeUserInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the accept page shows for an invitation link (public, no session)
+         * @description Answers only the name, email, employee ID and phone the inviter entered, the expiry and the password rules; never the role, group or manager chosen.
+         *     An unknown, used, revoked, expired or malformed token all answer the same 404 `invitation_invalid` with the same text, so the answer never tells which
+         *     links existed. Rate limited per client address like sign-in (429 `rate_limited`, failures only).
+         */
+        get: operations["getInvitationByToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Choose a password and create the account (public, no session)
+         * @description The password follows the password policy (422 `weak_password` with `errors[]`; the policy is checked only for a valid link). The account, its
+         *     sign-in, the assignments, department, manager, groups and the two-factor row are created in one step; a role, department, manager or group that is no
+         *     longer valid is skipped (never more rights than were chosen) and the audit row lists what was skipped. No session is created: the person signs in
+         *     afterwards, and when `two_factor_enrolment_pending` is true an admin hands them the enrolment code first.
+         *     The same uniform 404 `invitation_invalid` as `GET /invitations/{token}` for any link that does not work, including a second use of the same link;
+         *     409 `duplicate` when the email, employee ID or phone was taken meanwhile (the invitation is then closed). Rate limited like sign-in.
+         */
+        post: operations["acceptInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/deleted": {
         parameters: {
             query?: never;
@@ -7648,7 +7776,7 @@ export interface components {
             conflicts?: components["schemas"]["ScopeConflict"][];
         };
         /** @enum {string} */
-        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing";
+        ErrorCode: "validation_failed" | "unauthenticated" | "mfa_required" | "step_up_required" | "pending_assignment" | "module_forbidden" | "action_forbidden" | "field_read_only" | "not_eligible_holder" | "self_beneficiary" | "delegate_forbidden" | "last_admin" | "not_found" | "already_claimed" | "already_assigned" | "invalid_transition" | "note_required" | "mandatory_slots_missing" | "mandatory_fields_missing" | "open_snags" | "empty_cell" | "override_not_revertible" | "workflow_invalid" | "master_impact_unconfirmed" | "stale_preview" | "migration_not_revertible" | "precondition_failed" | "precondition_required" | "file_too_large" | "file_rejected" | "template_rejected" | "duplicate" | "rate_limited" | "account_locked" | "freeze_active" | "insufficient_stock" | "item_in_use" | "role_in_use" | "export_expired" | "confirmation_mismatch" | "invalid_credentials" | "invalid_code" | "invalid_enrol_code" | "enrol_code_expired" | "password_change_required" | "weak_password" | "internal_error" | "team_scope_mismatch" | "two_factor_enforced" | "scope_scenario_conflict" | "too_many_rows" | "integrity_too_large" | "mail_not_configured" | "self_approval_forbidden" | "document_rule_pending" | "file_pending_scan" | "list_not_configured" | "email_not_verified" | "batch_processing" | "vehicle_already_reserved" | "upload_processing" | "invitation_invalid";
         PageEnvelope: {
             items: unknown[];
             page: components["schemas"]["PageInfo"];
@@ -10130,6 +10258,118 @@ export interface components {
             user: components["schemas"]["User"];
             /** @description Shown once. Hand it to the user by a separate channel. */
             temporary_password: string;
+        };
+        /** @enum {string} */
+        UserInvitationStatus: "pending" | "accepted" | "revoked" | "expired";
+        /** @description One role row the account will hold, chosen at invite time. Same meaning as an assignment row. */
+        UserInvitationAssignment: {
+            /** Format: uuid */
+            role_id: string;
+            permission_level: components["schemas"]["PermissionLevel"];
+            team?: components["schemas"]["TeamKind"];
+            /** @default false */
+            all_regions: boolean;
+            /** @description Used when all_regions is false. */
+            region_ids?: components["schemas"]["RegionId"][];
+            /** @default false */
+            all_modules: boolean;
+            /** @description Used when all_modules is false. */
+            module_keys?: components["schemas"]["ModuleKey"][];
+            profile_ids?: string[];
+            /** Format: date-time */
+            valid_from?: string | null;
+            /** Format: date-time */
+            valid_to?: string | null;
+        };
+        UserInvitationCreate: {
+            /** Format: email */
+            email: string;
+            display_name: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            assignments?: components["schemas"]["UserInvitationAssignment"][];
+            /** Format: uuid */
+            department_id?: string | null;
+            /** Format: uuid */
+            manager_id?: string | null;
+            group_ids?: string[];
+            /** @default false */
+            require_two_factor: boolean;
+            reason: components["schemas"]["Reason"];
+        };
+        UserInvitation: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            display_name: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            status: components["schemas"]["UserInvitationStatus"];
+            /** Format: date-time */
+            expires_at: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_sent_at?: string;
+            send_count: number;
+            invited_by: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            };
+            reason?: string;
+            require_two_factor: boolean;
+            /** @description Grants admin-level rights, a privileged role or a privileged group: needs a System Admin and a fresh step-up. */
+            elevated: boolean;
+            department?: {
+                /** Format: uuid */
+                id?: string;
+                name?: string;
+            } | null;
+            manager?: {
+                /** Format: uuid */
+                id?: string;
+                name?: string;
+            } | null;
+            groups: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            }[];
+            assignments: (components["schemas"]["UserInvitationAssignment"] & {
+                role?: {
+                    /** Format: uuid */
+                    id?: string;
+                    code?: string;
+                    name_en?: string;
+                    name_ar?: string | null;
+                };
+            })[];
+            /** Format: date-time */
+            accepted_at?: string | null;
+            /** Format: uuid */
+            accepted_user_id?: string | null;
+            /** Format: date-time */
+            revoked_at?: string | null;
+            revoke_reason?: string | null;
+        };
+        InvitationPreview: {
+            display_name: string;
+            email: string;
+            employee_id?: string | null;
+            phone?: string | null;
+            /** Format: date-time */
+            expires_at: string;
+            password_policy: {
+                min_length: number;
+                max_length: number;
+            };
+        };
+        InvitationAccepted: {
+            /** @constant */
+            created: true;
+            /** @description True when an admin must hand over the enrolment code before the first sign-in works. */
+            two_factor_enrolment_pending: boolean;
         };
         /**
          * @description Personal-data fields that follow visibility settings.
@@ -16413,6 +16653,189 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    listUserInvitations: {
+        parameters: {
+            query?: {
+                /** @description Search name or email. */
+                q?: string;
+                status?: components["schemas"]["UserInvitationStatus"];
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageEnvelope"] & {
+                        items?: components["schemas"]["UserInvitation"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    createUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserInvitationCreate"];
+            };
+        };
+        responses: {
+            /** @description Invited. The mail is queued in the same transaction. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    resendUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Sent again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revokeUserInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Revoked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserInvitation"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getInvitationByToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A valid invitation. */
+            200: {
+                headers: {
+                    "Cache-Control"?: "no-store";
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationPreview"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
+        };
+    };
+    acceptInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: password */
+                    password: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Account created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationAccepted"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     listDeletedUsers: {

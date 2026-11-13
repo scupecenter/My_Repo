@@ -109,6 +109,8 @@ import { SiteLocksService } from './sites/site-locks.service';
 import { SiteDraftsController } from './sites/site-drafts.controller';
 import { SiteDraftsService } from './sites/site-drafts.service';
 import { UsersController } from './users/users.controller';
+import { InvitationsController, PublicInvitationsController } from './invitations/invitations.controller';
+import { InvitationsService } from './invitations/invitations.service';
 import { UsersRepo } from './users/users.repo';
 import { ApprovalsService } from './workflow/approvals.service';
 import { OverridesService } from './workflow/overrides.service';
@@ -135,6 +137,7 @@ import { ContractorsService } from './contractors/contractors.service';
 export function appModuleFor(config: AppConfig) {
   @Module({
     controllers: [
+      InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, SiteDraftsController, TasksController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
@@ -150,6 +153,7 @@ export function appModuleFor(config: AppConfig) {
     providers: [
       { provide: APP_CONFIG, useValue: config },
       DbService, SyslogService, LogHmacService, TwoFactorService, PasswordService, RateLimiter, SessionService, UserStateService, StepUpService,
+      InvitationsService, // 0091
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
