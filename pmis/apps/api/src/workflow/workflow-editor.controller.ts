@@ -33,6 +33,35 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.get(version));
   }
 
+  @Put('versions/:version')
+  async replaceStructure(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.replaceStructure(auth, version, ifMatch, body));
+  }
+
+  @Post('versions/:version/remove')
+  @HttpCode(200)
+  async removeItem(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.removeItem(auth, version, ifMatch, body);
+  }
+
+  @Post('versions/:version/discard')
+  @HttpCode(200)
+  async discardDraft(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.discardDraft(auth, version, ifMatch, body);
+  }
+
+  @Post('versions/:version/migrations')
+  @HttpCode(200)
+  migrate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.migrate(auth, version, body);
+  }
+
+  @Post('site-migrations/:id/revert')
+  @HttpCode(200)
+  revert(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Json> {
+    return this.editor.revertMigration(auth, id, body);
+  }
+
   @Post('versions/:version/publish')
   @HttpCode(200)
   async publish(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
@@ -45,6 +74,25 @@ export class WorkflowEditorController {
     const r = await this.editor.createTask(auth, version, ifMatch, body);
     this.tag(res, (r.version ?? {}) as Json);
     return r;
+  }
+
+  @Post('versions/:version/tasks/insert-preview')
+  @HttpCode(200)
+  previewInsert(@Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.previewInsert(version, body);
+  }
+
+  @Post('versions/:version/tasks/insert')
+  @HttpCode(201)
+  async insertTask(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.editor.insertTask(auth, version, ifMatch, body);
+    this.tag(res, (r.version ?? {}) as Json);
+    return r;
+  }
+
+  @Put('versions/:version/tasks/:task/successors')
+  async setSuccessors(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setSuccessors(auth, version, task, ifMatch, body));
   }
 
   @Patch('versions/:version/tasks/:task')

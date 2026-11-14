@@ -2720,10 +2720,59 @@ export interface paths {
         get: operations["getWorkflowVersion"];
         /**
          * Replace the structure of a draft (add, remove, reorder milestones and gates; move tasks)
-         * @description Only for `status = draft`. Codes of existing nodes are kept; new nodes get new codes that are never reused.
+         * @description Migration 0094 (owner decisions 2026-11-13). Only for `status = draft` (409 `invalid_transition` otherwise). Needs `workflow_versions.edit` for all regions (403), a reason, `If-Match`
+         *     and a step-up. Field errors are 422 on `/milestones/{i}/...`, `/gates/{i}/...` or `/task_moves` (`missing`, `has_active_tasks`, `duplicate`, `invalid`, `inactive`, `unknown`).
+         *     Codes are never reused. The structural freeze (B9) is off unless an admin set a window; the publish checks it.
          */
         put: operations["replaceWorkflowDraft"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Remove a task, milestone or gate (deleted if no site data refers to it, otherwise deactivated)
+         * @description Migration 0094, owner rule 2026-11-13. In a draft, an item that no site data refers to is deleted for real (`outcome` = `deleted`). An item that is referenced
+         *     (`why` lists `site_tasks`, `matrix`, `sla_rules`, `document_types`, `baselines`, `gates`, `gate_history`, `other_version`, `has_tasks`) or that sits in a published version
+         *     (`published_version`) is deactivated instead (`outcome` = `deactivated`), so history and KPIs stay intact. A milestone with active tasks is refused (422 `has_active_tasks`).
+         *     Needs `workflow_versions.edit` for all regions, a reason, `If-Match` and a step-up.
+         */
+        post: operations["removeWorkflowItem"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard a draft that no site uses
+         * @description Migration 0094. Only a draft (409 `invalid_transition` otherwise; a published version is kept). Needs `workflow_versions.edit`, a reason, `If-Match` and a step-up.
+         */
+        post: operations["discardWorkflowDraft"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2854,6 +2903,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/tasks/insert-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview the chain affected by inserting a task between existing tasks (nothing is written)
+         * @description Migration 0094. Needs `task_definitions.create` for all regions (403). Answers the successors that would wait for the new task, the direct links that would be removed
+         *     (`remove_direct_links`), a cycle as `valid` false with `errors[0].code` `cycle` on `/successors`, the number of open sites that could receive the task, and the B8 warning.
+         */
+        post: operations["previewTaskInsert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/insert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Insert a task into a milestone among existing tasks, with cascade rewiring (decision B8; B9 does not block it)
+         * @description Migration 0094. Like `createTaskDefinition` plus `successors`: each chosen successor gets the new task added to its predecessors and, with `remove_direct_links`, loses its
+         *     direct link to the chosen predecessors. A cycle is 422 `validation_failed` on `/successors` (code `cycle`). With `add_to_open_sites` (published version only; needs
+         *     `task_definitions.edit`) the task is added to the open sites of the version (`admin_add_task_to_open_sites`) and released where everything before it is done; otherwise it
+         *     applies to new site tasks only. Needs a reason, `If-Match` and a step-up; audited with the rewiring.
+         */
+        post: operations["insertTaskDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/successors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the successors of a task (the tasks that wait for it)
+         * @description Migration 0094. Same rules as `replaceTaskPredecessors`, seen from the other end: errors are on `/successors` with the codes `cycle`, `self`, `duplicate`, `unknown`, `inactive`.
+         */
+        put: operations["replaceTaskSuccessors"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/milestones/{code}/task-order": {
         parameters: {
             query?: never;
@@ -2900,7 +3013,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Migrate the previewed sites (job, one transaction per site) */
+        /**
+         * Migrate the previewed sites to this published version (one transaction)
+         * @description Migration 0094 wires the doors of 0090. The preview hash must still match (422 `stale_preview`); `workflow_versions.administer` for all or the delegated regions; reason and step-up. Sites never move silently.
+         */
         post: operations["migrateSites"];
         delete?: never;
         options?: never;
@@ -9561,25 +9677,37 @@ export interface components {
             has_documents?: boolean;
             task_version?: number;
         };
+        /** @description The complete structure of a draft (migration 0094). The list order is the order. A milestone or gate that is not in its list is refused (milestones: 422 `missing`) or deactivated (gates); history is never deleted. */
         WorkflowStructure: {
+            /** @description Every milestone of the version, in the new order. A code that does not exist yet adds a milestone (name_en required). `is_active` false removes (deactivates) one. */
             milestones: {
-                /** @description Omit for a new milestone; a new code is assigned. */
-                code?: string;
-                name_en: string;
-                name_ar?: string;
-                master_export_column?: string | null;
+                code: string;
+                name_en?: string;
+                name_ar?: string | null;
+                /** @default true */
+                is_active: boolean;
                 counts_in_project_status?: boolean;
             }[];
+            /** @description The gates, in the new order; a new code adds one (name_en, from_milestone and to_milestone required); an existing gate that is omitted is deactivated. */
             gates: {
-                code?: string;
-                from_milestone: string;
-                to_milestone: string;
-                name_en: string;
-                name_ar?: string;
+                code: string;
+                from_milestone?: string;
+                to_milestone?: string;
+                name_en?: string;
+                name_ar?: string | null;
+                /** @default true */
+                is_active: boolean;
                 conditions?: components["schemas"]["GateCondition"][];
-                master_export_column?: string | null;
+                sla_min_wd?: number;
+                sla_max_wd?: number;
             }[];
-            placements: components["schemas"]["TaskPlacement"][];
+            /** @description Tasks that move to another milestone (placed last in it). */
+            task_moves?: {
+                task_code: string;
+                stage_code: string;
+            }[];
+            reason: components["schemas"]["Reason"];
+            confirm_master_impact?: string;
         };
         WorkflowVersion: components["schemas"]["WorkflowVersionSummary"] & {
             milestones: components["schemas"]["WorkflowMilestone"][];
@@ -9616,6 +9744,42 @@ export interface components {
             before: string | null;
             /** Format: date */
             after: string | null;
+        };
+        TaskInsertRewiring: {
+            successor: string;
+            name_en?: string;
+            name_ar?: string | null;
+            stage_code?: string;
+            predecessors_before: string[];
+            /** @description Direct links from the chosen predecessors that go (only with remove_direct_links). */
+            removed_links: string[];
+            /** @description Without the new task, which is added to every successor. */
+            predecessors_after: string[];
+        };
+        TaskInsertPreview: {
+            valid: boolean;
+            errors: {
+                path: string;
+                code: string;
+                message: string;
+            }[];
+            predecessors: string[];
+            successors: string[];
+            rewiring: components["schemas"]["TaskInsertRewiring"][];
+            removed_link_count: number;
+            warnings: string[];
+            version_status: string;
+            /** @description Open sites of the version that could receive the task (published versions only). */
+            open_sites: number;
+            master_confirmation_needed?: boolean;
+            confirmation_phrase?: string | null;
+        };
+        TaskInsertResult: {
+            task_code: string;
+            warnings: string[];
+            rewiring: components["schemas"]["TaskInsertRewiring"][];
+            open_sites_added: number;
+            version: components["schemas"]["WorkflowVersion"];
         };
         MigrationPreview: {
             preview_hash: string;
@@ -19967,6 +20131,93 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    removeWorkflowItem: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    kind: "task" | "milestone" | "gate";
+                    code: string;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Removed or deactivated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        outcome: "deleted" | "deactivated";
+                        why: string[];
+                        version: components["schemas"]["WorkflowVersion"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    discardWorkflowDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Discarded. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        version: number;
+                        discarded: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     publishWorkflowVersion: {
         parameters: {
             query?: never;
@@ -20242,6 +20493,140 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    previewTaskInsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    stage_code: string;
+                    predecessors?: string[];
+                    successors?: string[];
+                    /** @default false */
+                    remove_direct_links?: boolean;
+                    /** @default true */
+                    counts_toward_milestone?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The preview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskInsertPreview"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    insertTaskDefinition: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    stage_code: string;
+                    code: string;
+                    name_en: string;
+                    name_ar?: string | null;
+                    /** @default true */
+                    counts_toward_milestone?: boolean;
+                    /** @default true */
+                    has_documents?: boolean;
+                    after_task_code?: string | null;
+                    predecessors?: string[];
+                    successors?: string[];
+                    /** @default false */
+                    remove_direct_links?: boolean;
+                    /** @default false */
+                    add_to_open_sites?: boolean;
+                    reason: components["schemas"]["Reason"];
+                    confirm_master_impact?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Inserted. */
+            201: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskInsertResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    replaceTaskSuccessors: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    successors: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     reorderMilestoneTasks: {
         parameters: {
             query?: never;
@@ -20317,9 +20702,7 @@ export interface operations {
     migrateSites: {
         parameters: {
             query?: never;
-            header?: {
-                "Idempotency-Key"?: components["parameters"]["IdempotencyKey"];
-            };
+            header?: never;
             path: {
                 version: components["parameters"]["WorkflowVersionNo"];
             };
@@ -20336,19 +20719,25 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Job started. */
-            202: {
+            /** @description Migrated. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Job"];
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        sites_migrated: number;
+                        to_version: number;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listSiteMigrations: {
@@ -20398,19 +20787,27 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Reverted. */
+            /** @description Reverted (the site is moved back to the previous version). */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SiteMigration"];
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** Format: uuid */
+                        site_id: string;
+                        site_code?: string;
+                        reverted_to_version: number;
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listAuditLog: {

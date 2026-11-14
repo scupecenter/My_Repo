@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.11
+  version: 0.15.12
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
     - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RSK) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
     - 0.15.10 (2026-11-13): the workflow editor (owner decision 4 of 2026-11-12; migration 0090; CHANGELOG 132). Additive. (1) New paths: `POST /workflow/versions/{version}/tasks` (`createTaskDefinition`), `PATCH /workflow/versions/{version}/tasks/{task_code}` (`updateTaskDefinition`: rename EN/AR, counts toward the milestone, deactivate, move in a draft), `PUT /workflow/versions/{version}/tasks/{task_code}/predecessors` (`replaceTaskPredecessors`, a cycle is 422 `validation_failed` on `/predecessors` with code `cycle`), `PUT /workflow/versions/{version}/milestones/{code}/task-order` (`reorderMilestoneTasks`). (2) The declared `/workflow/*` and `/settings/task-definitions` operations are implemented; every write needs System Admin or an all-regions delegate (403), a reason, `If-Match` with the `version_etag` (412/428) and a step-up (401); publish needs `confirm_text` equal to `v<version>` (422 `confirmation_mismatch`). (3) `WorkflowVersion` gains `can_edit` and `can_publish`, `TaskPlacement` gains `name_en`, `name_ar`, `is_active`, `is_milestone_task`, `has_documents`, `task_version`, `WorkflowMilestone.is_active`. (4) New `ErrorCode` values `workflow_invalid`, `master_impact_unconfirmed`, `stale_preview`. Not yet implemented: `PUT /workflow/versions/{version}` (replace structure), `POST .../migrations` and the revert of a site migration.
     - 0.15.9 (2026-11-12): System Admin approve all as is for upload batches (owner decision 1 of 2026-11-12; migration 0087; CHANGELOG 129). Additive. `ImportDecisionRequest.action` gains `admin_approve` (`scope` all, `note` the reason of at least 3 characters) on `POST /import-batches/{batch_id}/decisions`: a final approval of every open row of a task-stream batch (also a Save Draft / Planning one) by a System Admin only (403 `action_forbidden`), with a step-up (401) and without the check of the L2 holders; a row that lacks an actual date, a document or another required value is approved too and flagged `incomplete`; every task is flagged `admin_override` (KPIs treat it as an override) and audited per row. New: `ImportBatchOutcome.incomplete`, `ImportBatch.counts.admin_approved` / `counts.incomplete`, `ImportBatchProgress.incomplete`, `action` `admin_approve` in the progress of a run.
@@ -4258,7 +4259,12 @@ paths:
       tags: [workflow]
       operationId: replaceWorkflowDraft
       summary: Replace the structure of a draft (add, remove, reorder milestones and gates; move tasks)
-      description: Only for `status = draft`. Codes of existing nodes are kept; new nodes get new codes that are never reused.
+      description: |
+        Migration 0094 (owner decisions 2026-11-13). Only for `status = draft` (409 `invalid_transition` otherwise). Needs `workflow_versions.edit` for all regions (403), a reason, `If-Match`
+        and a step-up. Field errors are 422 on `/milestones/{i}/...`, `/gates/{i}/...` or `/task_moves` (`missing`, `has_active_tasks`, `duplicate`, `invalid`, `inactive`, `unknown`).
+        Codes are never reused. The structural freeze (B9) is off unless an admin set a window; the publish checks it.
+      x-step-up: true
+      x-db-path: admin_wf_structure_replace (app_actor_is_admin('workflow_versions', 'edit'))
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -4274,6 +4280,91 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/remove:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    post:
+      tags: [workflow]
+      operationId: removeWorkflowItem
+      summary: Remove a task, milestone or gate (deleted if no site data refers to it, otherwise deactivated)
+      description: |
+        Migration 0094, owner rule 2026-11-13. In a draft, an item that no site data refers to is deleted for real (`outcome` = `deleted`). An item that is referenced
+        (`why` lists `site_tasks`, `matrix`, `sla_rules`, `document_types`, `baselines`, `gates`, `gate_history`, `other_version`, `has_tasks`) or that sits in a published version
+        (`published_version`) is deactivated instead (`outcome` = `deactivated`), so history and KPIs stay intact. A milestone with active tasks is refused (422 `has_active_tasks`).
+        Needs `workflow_versions.edit` for all regions, a reason, `If-Match` and a step-up.
+      x-step-up: true
+      x-db-path: admin_wf_item_remove (app_actor_is_admin('workflow_versions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, code, reason]
+              properties:
+                kind: { type: string, enum: [task, milestone, gate] }
+                code: { type: string }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Removed or deactivated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome, why, version]
+                properties:
+                  outcome: { type: string, enum: [deleted, deactivated] }
+                  why: { type: array, items: { type: string } }
+                  version: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/discard:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    post:
+      tags: [workflow]
+      operationId: discardWorkflowDraft
+      summary: Discard a draft that no site uses
+      description: 'Migration 0094. Only a draft (409 `invalid_transition` otherwise; a published version is kept). Needs `workflow_versions.edit`, a reason, `If-Match` and a step-up.'
+      x-step-up: true
+      x-db-path: admin_wf_discard_draft (app_actor_is_admin('workflow_versions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Discarded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, discarded]
+                properties:
+                  version: { type: integer }
+                  discarded: { type: boolean }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -4540,6 +4631,129 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/insert-preview:
+    post:
+      tags: [workflow]
+      operationId: previewTaskInsert
+      summary: Preview the chain affected by inserting a task between existing tasks (nothing is written)
+      description: |
+        Migration 0094. Needs `task_definitions.create` for all regions (403). Answers the successors that would wait for the new task, the direct links that would be removed
+        (`remove_direct_links`), a cycle as `valid` false with `errors[0].code` `cycle` on `/successors`, the number of open sites that could receive the task, and the B8 warning.
+      x-db-path: admin_wf_task_insert_preview
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code]
+              properties:
+                stage_code: { type: string }
+                predecessors: { type: array, items: { type: string } }
+                successors: { type: array, items: { type: string } }
+                remove_direct_links: { type: boolean, default: false }
+                counts_toward_milestone: { type: boolean, default: true }
+      responses:
+        '200':
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskInsertPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /workflow/versions/{version}/tasks/insert:
+    post:
+      tags: [workflow]
+      operationId: insertTaskDefinition
+      summary: Insert a task into a milestone among existing tasks, with cascade rewiring (decision B8; B9 does not block it)
+      description: |
+        Migration 0094. Like `createTaskDefinition` plus `successors`: each chosen successor gets the new task added to its predecessors and, with `remove_direct_links`, loses its
+        direct link to the chosen predecessors. A cycle is 422 `validation_failed` on `/successors` (code `cycle`). With `add_to_open_sites` (published version only; needs
+        `task_definitions.edit`) the task is added to the open sites of the version (`admin_add_task_to_open_sites`) and released where everything before it is done; otherwise it
+        applies to new site tasks only. Needs a reason, `If-Match` and a step-up; audited with the rewiring.
+      x-step-up: true
+      x-db-path: admin_wf_task_insert (app_actor_is_admin('task_definitions', 'create'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code, code, name_en, reason]
+              properties:
+                stage_code: { type: string }
+                code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean, default: true }
+                has_documents: { type: boolean, default: true }
+                after_task_code: { type: [string, 'null'] }
+                predecessors: { type: array, items: { type: string } }
+                successors: { type: array, items: { type: string } }
+                remove_direct_links: { type: boolean, default: false }
+                add_to_open_sites: { type: boolean, default: false }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '201':
+          description: Inserted.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskInsertResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/successors:
+    put:
+      tags: [workflow]
+      operationId: replaceTaskSuccessors
+      summary: Replace the successors of a task (the tasks that wait for it)
+      description: |
+        Migration 0094. Same rules as `replaceTaskPredecessors`, seen from the other end: errors are on `/successors` with the codes `cycle`, `self`, `duplicate`, `unknown`, `inactive`.
+      x-step-up: true
+      x-db-path: admin_wf_task_successors (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [successors, reason]
+              properties:
+                successors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/milestones/{code}/task-order:
     put:
       tags: [workflow]
@@ -4603,12 +4817,12 @@ paths:
     post:
       tags: [workflow]
       operationId: migrateSites
-      summary: Migrate the previewed sites (job, one transaction per site)
+      summary: Migrate the previewed sites to this published version (one transaction)
       x-step-up: true
-      x-db-path: admin_migrate_site_workflow (app_actor_is_admin('workflow.migrate'))
+      description: 'Migration 0094 wires the doors of 0090. The preview hash must still match (422 `stale_preview`); `workflow_versions.administer` for all or the delegated regions; reason and step-up. Sites never move silently.'
+      x-db-path: admin_wf_migrate_sites
       parameters:
         - $ref: '#/components/parameters/WorkflowVersionNo'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -4622,15 +4836,16 @@ paths:
                 reason: { $ref: '#/components/schemas/Reason' }
                 confirm_master_impact: { type: string }
       responses:
-        '202':
-          description: Job started.
+        '200':
+          description: Migrated.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Job' }
+              schema: { type: object, required: [sites_migrated, to_version], properties: { id: { type: string, format: uuid }, sites_migrated: { type: integer }, to_version: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /workflow/site-migrations:
     get:
       tags: [workflow]
@@ -4660,7 +4875,7 @@ paths:
       operationId: revertSiteMigration
       summary: Move a site back to its previous version (only if nothing was approved since)
       x-step-up: true
-      x-db-path: admin_migrate_site_workflow (revert)
+      x-db-path: admin_wf_revert_migration
       parameters:
         - name: migration_id
           in: path
@@ -4677,14 +4892,15 @@ paths:
                 reason: { $ref: '#/components/schemas/Reason' }
       responses:
         '200':
-          description: Reverted.
+          description: Reverted (the site is moved back to the previous version).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SiteMigration' }
+              schema: { type: object, required: [id, site_id, reverted_to_version], properties: { id: { type: string, format: uuid }, site_id: { type: string, format: uuid }, site_code: { type: string }, reverted_to_version: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ audit
   /audit-log:
@@ -14196,33 +14412,43 @@ components:
         task_version: { type: integer }
     WorkflowStructure:
       type: object
-      required: [milestones, gates, placements]
+      required: [milestones, gates, reason]
+      description: 'The complete structure of a draft (migration 0094). The list order is the order. A milestone or gate that is not in its list is refused (milestones: 422 `missing`) or deactivated (gates); history is never deleted.'
       properties:
         milestones:
           type: array
+          description: 'Every milestone of the version, in the new order. A code that does not exist yet adds a milestone (name_en required). `is_active` false removes (deactivates) one.'
           items:
             type: object
-            required: [name_en]
+            required: [code]
             properties:
-              code: { type: string, description: 'Omit for a new milestone; a new code is assigned.' }
-              name_en: { type: string }
-              name_ar: { type: string }
-              master_export_column: { type: [string, 'null'] }
+              code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+              name_en: { type: string, maxLength: 200 }
+              name_ar: { type: [string, 'null'], maxLength: 200 }
+              is_active: { type: boolean, default: true }
               counts_in_project_status: { type: boolean }
         gates:
           type: array
+          description: 'The gates, in the new order; a new code adds one (name_en, from_milestone and to_milestone required); an existing gate that is omitted is deactivated.'
           items:
             type: object
-            required: [from_milestone, to_milestone, name_en]
+            required: [code]
             properties:
-              code: { type: string }
+              code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
               from_milestone: { type: string }
               to_milestone: { type: string }
-              name_en: { type: string }
-              name_ar: { type: string }
+              name_en: { type: string, maxLength: 200 }
+              name_ar: { type: [string, 'null'], maxLength: 200 }
+              is_active: { type: boolean, default: true }
               conditions: { type: array, items: { $ref: '#/components/schemas/GateCondition' } }
-              master_export_column: { type: [string, 'null'] }
-        placements: { type: array, items: { $ref: '#/components/schemas/TaskPlacement' } }
+              sla_min_wd: { type: integer, minimum: 0 }
+              sla_max_wd: { type: integer, minimum: 0 }
+        task_moves:
+          type: array
+          description: 'Tasks that move to another milestone (placed last in it).'
+          items: { type: object, required: [task_code, stage_code], properties: { task_code: { type: string }, stage_code: { type: string } } }
+        reason: { $ref: '#/components/schemas/Reason' }
+        confirm_master_impact: { type: string }
     WorkflowVersion:
       allOf:
         - $ref: '#/components/schemas/WorkflowVersionSummary'
@@ -14265,6 +14491,41 @@ components:
         code: { type: string }
         before: { type: [string, 'null'], format: date }
         after: { type: [string, 'null'], format: date }
+    TaskInsertRewiring:
+      type: object
+      required: [successor, predecessors_before, removed_links, predecessors_after]
+      properties:
+        successor: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        stage_code: { type: string }
+        predecessors_before: { type: array, items: { type: string } }
+        removed_links: { type: array, items: { type: string }, description: 'Direct links from the chosen predecessors that go (only with remove_direct_links).' }
+        predecessors_after: { type: array, items: { type: string }, description: 'Without the new task, which is added to every successor.' }
+    TaskInsertPreview:
+      type: object
+      required: [valid, errors, predecessors, successors, rewiring, removed_link_count, warnings, version_status, open_sites]
+      properties:
+        valid: { type: boolean }
+        errors: { type: array, items: { type: object, required: [path, code, message], properties: { path: { type: string }, code: { type: string }, message: { type: string } } } }
+        predecessors: { type: array, items: { type: string } }
+        successors: { type: array, items: { type: string } }
+        rewiring: { type: array, items: { $ref: '#/components/schemas/TaskInsertRewiring' } }
+        removed_link_count: { type: integer }
+        warnings: { type: array, items: { type: string } }
+        version_status: { type: string }
+        open_sites: { type: integer, description: 'Open sites of the version that could receive the task (published versions only).' }
+        master_confirmation_needed: { type: boolean }
+        confirmation_phrase: { type: [string, 'null'] }
+    TaskInsertResult:
+      type: object
+      required: [task_code, warnings, rewiring, open_sites_added, version]
+      properties:
+        task_code: { type: string }
+        warnings: { type: array, items: { type: string } }
+        rewiring: { type: array, items: { $ref: '#/components/schemas/TaskInsertRewiring' } }
+        open_sites_added: { type: integer }
+        version: { $ref: '#/components/schemas/WorkflowVersion' }
     MigrationPreview:
       type: object
       required: [preview_hash, to_version, sites]
