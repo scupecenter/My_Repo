@@ -116,12 +116,59 @@ CREATE OR REPLACE FUNCTION rcol_err(p_path text, p_code text, p_msg text) RETURN
 LANGUAGE plpgsql IMMUTABLE SET search_path = pg_catalog, public AS $$
 BEGIN PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', public.reg_err_item(p_path, p_code, p_msg))); END $$;
 
--- The type of a column as the API names it (list_code with options.multiple is multi_list).
+-- The type of a column as the API names it. The storage types of the register engine stay (text, number, date, ...); the richer types are formats in options.
 CREATE OR REPLACE FUNCTION rcol_eff_type(p_type text, p_options jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
-  SELECT CASE WHEN p_type = 'list_code' THEN CASE WHEN coalesce((p_options ->> 'multiple')::boolean, false) THEN 'multi_list' ELSE 'list' END
-              WHEN p_type = 'external_team' THEN 'text' ELSE p_type END
+  SELECT CASE
+    WHEN p_type = 'number' AND jsonb_typeof(p_options) = 'object' AND p_options ? 'formula' THEN 'computed'
+    WHEN p_type = 'list_code' THEN CASE WHEN coalesce((p_options ->> 'multiple')::boolean, false) THEN 'multi_list' ELSE 'list' END
+    WHEN p_type = 'external_team' THEN 'external_party'
+    WHEN p_type = 'file' THEN 'document'
+    WHEN p_type = 'text' AND jsonb_typeof(p_options) = 'object' AND p_options ->> 'format' IN ('long_text', 'email', 'phone', 'link', 'datetime') THEN p_options ->> 'format'
+    WHEN p_type = 'number' AND jsonb_typeof(p_options) = 'object' AND p_options ->> 'format' IN ('currency', 'percentage') THEN p_options ->> 'format'
+    WHEN p_type = 'multi_site' AND jsonb_typeof(p_options) = 'object' AND p_options ->> 'format' = 'single' THEN 'site'
+    ELSE p_type END
 $$;
+
+-- The storage (field_type, options, list_catalogue) of an API type.
+CREATE OR REPLACE FUNCTION rcol_storage(p_type text, p_catalogue text, p_columns jsonb, p_formula jsonb, OUT o_type text, OUT o_options jsonb, OUT o_catalogue text)
+LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $$
+BEGIN
+  o_options := NULL; o_catalogue := NULL;
+  CASE p_type
+    WHEN 'text' THEN o_type := 'text';
+    WHEN 'long_text', 'email', 'phone', 'link', 'datetime' THEN o_type := 'text'; o_options := jsonb_build_object('format', p_type);
+    WHEN 'number' THEN o_type := 'number';
+    WHEN 'currency', 'percentage' THEN o_type := 'number'; o_options := jsonb_build_object('format', p_type);
+    WHEN 'computed' THEN o_type := 'number'; o_options := jsonb_build_object('formula', p_formula);
+    WHEN 'date', 'yes_no', 'user', 'multi_user', 'warehouse_item', 'multi_site' THEN o_type := p_type;
+    WHEN 'list' THEN o_type := 'list'; o_catalogue := p_catalogue; o_options := public.list_active_codes(p_catalogue);
+    WHEN 'multi_list' THEN o_type := 'list_code'; o_catalogue := p_catalogue; o_options := '{"multiple": true}'::jsonb;
+    WHEN 'site' THEN o_type := 'multi_site'; o_options := '{"format": "single"}'::jsonb;
+    WHEN 'external_party' THEN o_type := 'external_team';
+    WHEN 'document' THEN o_type := 'file';
+    WHEN 'child_list' THEN o_type := 'child_list'; o_options := jsonb_build_object('columns', p_columns);
+  END CASE;
+END $$;
+
+-- The check of a format on one cleaned value. NULL = fine.
+CREATE OR REPLACE FUNCTION rcol_format_error(p_fmt text, v jsonb) RETURNS text
+LANGUAGE plpgsql IMMUTABLE SET search_path = pg_catalog, public AS $$
+DECLARE t text := btrim(v #>> '{}'); ts timestamp;
+BEGIN
+  CASE p_fmt
+    WHEN 'email' THEN IF jsonb_typeof(v) <> 'string' OR t !~* '^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$' THEN RETURN 'An e-mail address.'; END IF;
+    WHEN 'phone' THEN IF jsonb_typeof(v) <> 'string' OR t !~ '^\+?[0-9 ()-]{6,20}$' THEN RETURN 'A phone number (digits, spaces, + ( ) -).'; END IF;
+    WHEN 'link' THEN IF jsonb_typeof(v) <> 'string' OR t !~* '^https?://[^[:space:]]{3,}$' THEN RETURN 'A link starting with http:// or https://.'; END IF;
+    WHEN 'datetime' THEN
+      IF jsonb_typeof(v) <> 'string' OR t !~ '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2})?$' THEN RETURN 'A date and time as YYYY-MM-DD HH:MM.'; END IF;
+      BEGIN ts := t::timestamp; EXCEPTION WHEN others THEN RETURN 'Not a calendar date and time.'; END;
+    WHEN 'percentage' THEN IF jsonb_typeof(v) <> 'number' OR (v #>> '{}')::numeric NOT BETWEEN 0 AND 100 THEN RETURN 'A percentage from 0 to 100.'; END IF;
+    WHEN 'single_site' THEN IF jsonb_typeof(v) = 'array' AND jsonb_array_length(v) > 1 THEN RETURN 'One site only.'; END IF;
+    ELSE NULL;
+  END CASE;
+  RETURN NULL;
+END $$;
 
 CREATE OR REPLACE FUNCTION rcol_json(f public.register_fields) RETURNS jsonb
 LANGUAGE sql STABLE SET search_path = pg_catalog, public AS $$
@@ -142,26 +189,34 @@ $$;
 -- One value of a column converted to another type. Returns {"v": value} or {"e": message}.
 CREATE OR REPLACE FUNCTION rcol_convert(v jsonb, p_to text, p_catalogue text) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
-DECLARE t text; parts text[]; x text; picked text; out jsonb := '[]'::jsonb; r jsonb;
+DECLARE t text; parts text[]; x text; picked text; out jsonb := '[]'::jsonb; r jsonb; u uuid; msg text; fmt text;
 BEGIN
   t := btrim(v #>> '{}');
   CASE p_to
-    WHEN 'text' THEN
+    WHEN 'text', 'long_text', 'email', 'phone', 'link', 'datetime' THEN
       IF jsonb_typeof(v) = 'string' THEN
         IF char_length(t) > 2000 THEN RETURN jsonb_build_object('e', 'Longer than 2000 characters.'); END IF;
-        RETURN jsonb_build_object('v', to_jsonb(t));
-      ELSIF jsonb_typeof(v) = 'number' THEN RETURN jsonb_build_object('v', to_jsonb(v #>> '{}'));
-      ELSIF jsonb_typeof(v) = 'boolean' THEN RETURN jsonb_build_object('v', to_jsonb(CASE WHEN (v #>> '{}')::boolean THEN 'Yes' ELSE 'No' END));
+        r := jsonb_build_object('v', to_jsonb(t));
+      ELSIF jsonb_typeof(v) = 'number' THEN r := jsonb_build_object('v', to_jsonb(v #>> '{}'));
+      ELSIF jsonb_typeof(v) = 'boolean' THEN r := jsonb_build_object('v', to_jsonb(CASE WHEN (v #>> '{}')::boolean THEN 'Yes' ELSE 'No' END));
       ELSIF jsonb_typeof(v) = 'array' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v) e WHERE jsonb_typeof(e) NOT IN ('string', 'number')) THEN
-        RETURN jsonb_build_object('v', to_jsonb(array_to_string(ARRAY(SELECT e #>> '{}' FROM jsonb_array_elements(v) e), '; ')));
+        r := jsonb_build_object('v', to_jsonb(array_to_string(ARRAY(SELECT e #>> '{}' FROM jsonb_array_elements(v) e), '; ')));
+      ELSE RETURN jsonb_build_object('e', 'This value has no text form.');
       END IF;
-      RETURN jsonb_build_object('e', 'This value has no text form.');
-    WHEN 'number' THEN
+      msg := public.rcol_format_error(p_to, r -> 'v');
+      IF msg IS NOT NULL THEN RETURN jsonb_build_object('e', msg); END IF;
+      RETURN r;
+    WHEN 'number', 'currency', 'percentage' THEN
       IF jsonb_typeof(v) NOT IN ('string', 'number') THEN RETURN jsonb_build_object('e', 'Not a number.'); END IF;
-      RETURN public.reg_clean_cell(jsonb_build_object('type', 'number'), to_jsonb(t));
+      r := public.reg_clean_cell(jsonb_build_object('type', 'number'), to_jsonb(t));
+      IF r ? 'v' THEN
+        msg := public.rcol_format_error(p_to, r -> 'v');
+        IF msg IS NOT NULL THEN RETURN jsonb_build_object('e', msg); END IF;
+      END IF;
+      RETURN r;
     WHEN 'date' THEN
       IF jsonb_typeof(v) <> 'string' THEN RETURN jsonb_build_object('e', 'Not a date.'); END IF;
-      RETURN public.reg_clean_cell(jsonb_build_object('type', 'date'), to_jsonb(t));
+      RETURN public.reg_clean_cell(jsonb_build_object('type', 'date'), to_jsonb(left(t, 10)));
     WHEN 'yes_no' THEN
       IF jsonb_typeof(v) = 'boolean' THEN RETURN jsonb_build_object('v', v); END IF;
       IF lower(t) IN ('yes', 'y', 'true', '1', 'نعم') THEN RETURN jsonb_build_object('v', true); END IF;
@@ -183,9 +238,38 @@ BEGIN
       END LOOP;
       RETURN jsonb_build_object('v', out);
     WHEN 'user' THEN
+      IF jsonb_typeof(v) = 'array' AND jsonb_array_length(v) = 1 THEN v := v -> 0; t := btrim(v #>> '{}'); END IF;
       IF jsonb_typeof(v) <> 'string' THEN RETURN jsonb_build_object('e', 'Not a user.'); END IF;
-      r := public.reg_clean_cell(jsonb_build_object('type', 'user'), to_jsonb(t));
-      RETURN r;
+      RETURN public.reg_clean_cell(jsonb_build_object('type', 'user'), to_jsonb(t));
+    WHEN 'multi_user' THEN
+      parts := public.reg_split_values(v);
+      IF parts IS NULL THEN RETURN jsonb_build_object('e', 'Not a list of people.'); END IF;
+      FOREACH x IN ARRAY parts LOOP
+        u := public.reg_pick_user(x);
+        IF u IS NULL THEN RETURN jsonb_build_object('e', 'Unknown user: "' || left(x, 60) || '".'); END IF;
+        IF NOT out ? u::text THEN out := out || to_jsonb(u::text); END IF;
+      END LOOP;
+      RETURN jsonb_build_object('v', out);
+    WHEN 'site', 'multi_site' THEN
+      parts := public.reg_split_values(v);
+      IF parts IS NULL THEN RETURN jsonb_build_object('e', 'Not a site.'); END IF;
+      FOREACH x IN ARRAY parts LOOP
+        u := public.reg_pick_site(x);
+        IF u IS NULL THEN RETURN jsonb_build_object('e', 'Unknown site, or a site outside your regions: "' || left(x, 60) || '".'); END IF;
+        IF NOT out ? u::text THEN out := out || to_jsonb(u::text); END IF;
+      END LOOP;
+      IF p_to = 'site' AND jsonb_array_length(out) > 1 THEN RETURN jsonb_build_object('e', 'More than one site.'); END IF;
+      RETURN jsonb_build_object('v', out);
+    WHEN 'external_party' THEN
+      IF jsonb_typeof(v) <> 'string' OR t !~* '^[0-9a-f-]{36}$' OR NOT EXISTS (SELECT 1 FROM public.external_teams e WHERE e.id = t::uuid AND e.is_active) THEN
+        RETURN jsonb_build_object('e', 'Not an active external party.');
+      END IF;
+      RETURN jsonb_build_object('v', to_jsonb(lower(t)));
+    WHEN 'warehouse_item' THEN
+      SELECT w.id INTO u FROM public.warehouse_items w WHERE jsonb_typeof(v) = 'string'
+        AND (CASE WHEN t ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN w.id = t::uuid ELSE upper(w.item_code) = upper(t) END) LIMIT 1;
+      IF u IS NULL THEN RETURN jsonb_build_object('e', 'No Warehouse item has this id or code.'); END IF;
+      RETURN jsonb_build_object('v', to_jsonb(u::text));
     ELSE
       RETURN jsonb_build_object('e', 'This type cannot be reached from the current one: clear the values first.');
   END CASE;
@@ -228,6 +312,22 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.register_definitions WHERE register_key = p_register) THEN
     PERFORM public.wf_err('not_found', jsonb_build_object('detail', 'This register does not exist.'));
   END IF;
+END $$;
+
+-- The formula of a computed column: {"op": sum|diff|product|ratio|days_between, "a": code, "b": code} over two other columns of the register.
+CREATE OR REPLACE FUNCTION rcol_check_formula(p_register text, p_formula jsonb) RETURNS void
+LANGUAGE plpgsql STABLE SET search_path = pg_catalog, public AS $$
+DECLARE k text;
+BEGIN
+  IF p_formula IS NULL OR jsonb_typeof(p_formula) <> 'object' OR coalesce(p_formula ->> 'op', '') NOT IN ('sum', 'diff', 'product', 'ratio', 'days_between') THEN
+    PERFORM public.rcol_err('/formula', 'invalid', 'A formula needs op (sum, diff, product, ratio or days_between), a and b.');
+  END IF;
+  FOREACH k IN ARRAY ARRAY['a', 'b'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM public.register_fields x WHERE x.register_key = p_register AND x.code = p_formula ->> k AND x.is_active AND NOT x.derived
+                   AND x.field_type = CASE WHEN p_formula ->> 'op' = 'days_between' THEN 'date' ELSE 'number' END) THEN
+      PERFORM public.rcol_err('/formula/' || k, 'invalid', CASE WHEN p_formula ->> 'op' = 'days_between' THEN 'A date column of this register.' ELSE 'A number column of this register (not computed).' END);
+    END IF;
+  END LOOP;
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -283,20 +383,20 @@ LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public,
 DECLARE
   f public.register_fields%ROWTYPE; old_f public.register_fields%ROWTYPE; k text; errs jsonb := '[]'::jsonb;
   to_t text; from_t text; new_type text; new_opts jsonb; new_cat text; conv jsonb; u jsonb; sys_keys text[] := ARRAY['label_en', 'label_ar', 'section', 'sort_order', 'in_list', 'in_filter', 'in_template', 'in_export'];
-  converted int := 0; missing int := NULL; match_key boolean; changed_type boolean;
+  converted int := 0; missing int := NULL; match_key boolean; changed_type boolean; st record; dcode text; dres jsonb; fm jsonb;
 BEGIN
   PERFORM public.calc_require_admin('fields', true);
   PERFORM public.calc_require_reason(p_reason);
   PERFORM public.rcol_need_register(p_register);
   IF p_patch IS NULL OR jsonb_typeof(p_patch) <> 'object' THEN p_patch := '{}'::jsonb; END IF;
   FOR k IN SELECT jsonb_object_keys(p_patch) LOOP
-    IF k NOT IN ('label_en', 'label_ar', 'field_type', 'required', 'list_catalogue', 'section', 'sort_order', 'in_list', 'in_filter', 'in_template', 'in_export', 'is_active', 'columns') THEN
+    IF k NOT IN ('label_en', 'label_ar', 'field_type', 'required', 'list_catalogue', 'section', 'sort_order', 'in_list', 'in_filter', 'in_template', 'in_export', 'is_active', 'columns', 'formula') THEN
       errs := errs || public.reg_err_item('/' || k, 'unknown_field', 'This key cannot be set.');
     END IF;
   END LOOP;
   IF p_patch ? 'label_en' AND char_length(btrim(coalesce(p_patch ->> 'label_en', ''))) NOT BETWEEN 1 AND 200 THEN errs := errs || public.reg_err_item('/label_en', 'invalid', 'A label of 1 to 200 characters.'); END IF;
   IF p_patch ? 'label_ar' AND p_patch ->> 'label_ar' IS NOT NULL AND char_length(btrim(p_patch ->> 'label_ar')) > 200 THEN errs := errs || public.reg_err_item('/label_ar', 'invalid', 'Up to 200 characters.'); END IF;
-  IF p_patch ? 'field_type' AND coalesce(p_patch ->> 'field_type', '') NOT IN ('text', 'number', 'date', 'list', 'multi_list', 'yes_no', 'user', 'multi_user', 'multi_site', 'file', 'child_list', 'warehouse_item') THEN
+  IF p_patch ? 'field_type' AND coalesce(p_patch ->> 'field_type', '') NOT IN ('text', 'long_text', 'email', 'phone', 'link', 'datetime', 'number', 'currency', 'percentage', 'date', 'yes_no', 'list', 'multi_list', 'user', 'multi_user', 'site', 'multi_site', 'external_party', 'warehouse_item', 'document', 'child_list', 'computed') THEN
     errs := errs || public.reg_err_item('/field_type', 'invalid', 'Not a column type.');
   END IF;
   IF p_patch ? 'sort_order' AND (jsonb_typeof(p_patch -> 'sort_order') <> 'number' OR (p_patch ->> 'sort_order')::numeric NOT BETWEEN 0 AND 100000) THEN errs := errs || public.reg_err_item('/sort_order', 'invalid', 'A whole number from 0 to 100000.'); END IF;
@@ -324,15 +424,23 @@ BEGIN
     to_t := p_patch ->> 'field_type';
     IF to_t IN ('list', 'multi_list') AND p_patch ->> 'list_catalogue' IS NULL THEN PERFORM public.rcol_err('/list_catalogue', 'required', 'A list column needs a list.'); END IF;
     IF to_t = 'child_list' AND NOT (p_patch ? 'columns') THEN PERFORM public.rcol_err('/columns', 'required', 'A child list needs its columns.'); END IF;
-    new_type := CASE WHEN to_t = 'multi_list' THEN 'list_code' ELSE to_t END;
-    new_opts := CASE WHEN to_t = 'multi_list' THEN '{"multiple": true}'::jsonb WHEN to_t = 'list' THEN public.list_active_codes(p_patch ->> 'list_catalogue')
-                     WHEN to_t = 'child_list' THEN jsonb_build_object('columns', p_patch -> 'columns') END;
-    INSERT INTO public.register_fields (register_key, code, label_en, label_ar, field_type, required, options, in_list, section, sort_order, is_active, list_catalogue,
+    IF to_t = 'computed' THEN PERFORM public.rcol_check_formula(p_register, p_patch -> 'formula'); END IF;
+    SELECT * INTO st FROM public.rcol_storage(to_t, p_patch ->> 'list_catalogue', p_patch -> 'columns', p_patch -> 'formula');
+    new_type := st.o_type; new_opts := st.o_options;
+    IF to_t = 'document' THEN
+      -- the Document Library slot of the column: one document type placed on this register, published at once (mandatory only when the column is required)
+      dcode := 'RC_' || upper(left(regexp_replace(p_register || '_' || p_code, '[^a-zA-Z0-9]', '_', 'g'), 24)) || '_' || upper(substr(md5(p_register || ':' || p_code), 1, 3));
+      dres := public.admin_save_document_type(NULL, jsonb_build_object('code', dcode, 'name_en', rpad(btrim(p_patch ->> 'label_en'), 2, ' '), 'name_ar', nullif(btrim(coalesce(p_patch ->> 'label_ar', '')), ''),
+                'mandatory', coalesce((p_patch ->> 'required')::boolean, false), 'placements', jsonb_build_array(jsonb_build_object('target', 'register', 'ref', p_register))), p_reason, NULL);
+      PERFORM public.admin_publish_document_type((dres ->> 'id')::uuid, NULL, 'new_only', current_date, p_reason);
+      new_opts := jsonb_build_object('doc_type_code', dcode);
+    END IF;
+    INSERT INTO public.register_fields (register_key, code, label_en, label_ar, field_type, required, options, in_list, section, sort_order, is_active, list_catalogue, derived,
                                         in_filter, in_template, in_export)
     VALUES (p_register, p_code, btrim(p_patch ->> 'label_en'), nullif(btrim(coalesce(p_patch ->> 'label_ar', '')), ''), new_type, coalesce((p_patch ->> 'required')::boolean, false), new_opts,
             coalesce((p_patch ->> 'in_list')::boolean, false), p_patch ->> 'section',
             coalesce((p_patch ->> 'sort_order')::int, (SELECT coalesce(max(x.sort_order), 0) + 10 FROM public.register_fields x WHERE x.register_key = p_register)), true,
-            CASE WHEN to_t IN ('list', 'multi_list') THEN p_patch ->> 'list_catalogue' END,
+            st.o_catalogue, to_t = 'computed',
             coalesce((p_patch ->> 'in_filter')::boolean, false), coalesce((p_patch ->> 'in_template')::boolean, true), coalesce((p_patch ->> 'in_export')::boolean, true))
     RETURNING * INTO f;
     PERFORM public.log_audit_write('register_field_create', 'register_field', p_register || ':' || p_code, NULL, public.rcol_json(f), p_reason);
@@ -372,12 +480,20 @@ BEGIN
   END IF;
 
   from_t := public.rcol_eff_type(old_f.field_type, old_f.options);
+  IF p_patch ? 'formula' THEN
+    IF from_t <> 'computed' THEN PERFORM public.rcol_err('/formula', 'invalid', 'Only a computed column has a formula.'); END IF;
+    PERFORM public.rcol_check_formula(p_register, p_patch -> 'formula');
+    f.options := jsonb_build_object('formula', p_patch -> 'formula');
+  END IF;
   to_t := coalesce(p_patch ->> 'field_type', from_t);
   new_cat := CASE WHEN p_patch ? 'list_catalogue' THEN p_patch ->> 'list_catalogue' ELSE old_f.list_catalogue END;
   changed_type := to_t <> from_t OR (to_t IN ('list', 'multi_list') AND new_cat IS DISTINCT FROM old_f.list_catalogue);
   IF changed_type THEN
     IF to_t IN ('list', 'multi_list') AND new_cat IS NULL THEN PERFORM public.rcol_err('/list_catalogue', 'required', 'A list column needs a list.'); END IF;
     IF to_t = 'child_list' AND NOT (p_patch ? 'columns') THEN PERFORM public.rcol_err('/columns', 'required', 'A child list needs its columns.'); END IF;
+    IF to_t IN ('computed', 'document', 'child_list') OR from_t IN ('computed', 'document', 'child_list') THEN
+      PERFORM public.rcol_err('/field_type', 'not_convertible', 'A computed, document or child list column keeps its type: add a new column instead.');
+    END IF;
     u := public.reg_field_usage(p_register, p_code);
     IF (u ->> 'records_with_value')::int > 0 THEN
       conv := public.rcol_conversion(p_register, p_code, to_t, new_cat, false);
@@ -390,10 +506,8 @@ BEGIN
       conv := public.rcol_conversion(p_register, p_code, to_t, new_cat, true);
       converted := (conv ->> 'rewritten')::int;
     END IF;
-    f.field_type := CASE WHEN to_t = 'multi_list' THEN 'list_code' ELSE to_t END;
-    f.list_catalogue := CASE WHEN to_t IN ('list', 'multi_list') THEN new_cat END;
-    f.options := CASE WHEN to_t = 'multi_list' THEN '{"multiple": true}'::jsonb WHEN to_t = 'list' THEN public.list_active_codes(new_cat)
-                      WHEN to_t = 'child_list' THEN jsonb_build_object('columns', p_patch -> 'columns') END;
+    SELECT * INTO st FROM public.rcol_storage(to_t, new_cat, p_patch -> 'columns', NULL);
+    f.field_type := st.o_type; f.list_catalogue := st.o_catalogue; f.options := st.o_options;
   END IF;
 
   UPDATE public.register_fields x SET label_en = f.label_en, label_ar = f.label_ar, field_type = f.field_type, required = f.required, options = f.options, list_catalogue = f.list_catalogue,
@@ -542,13 +656,131 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------------------------------------------------------
+-- 6b. The richer types: format checks on every entry, computed values, the data_type of a template column
+-- ---------------------------------------------------------------------------------------------------------------------
+ALTER FUNCTION reg_clean_data(text, jsonb) RENAME TO reg_clean_data_base;
+CREATE OR REPLACE FUNCTION reg_clean_data(p_key text, p_patch jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE out jsonb; f record; msg text; errs jsonb := '[]'::jsonb;
+BEGIN
+  out := public.reg_clean_data_base(p_key, p_patch);
+  FOR f IN SELECT x.code, CASE WHEN x.field_type = 'multi_site' THEN 'single_site' ELSE x.options ->> 'format' END AS fmt
+           FROM public.register_fields x
+           WHERE x.register_key = p_key AND x.is_active AND jsonb_typeof(x.options) = 'object' AND x.options ->> 'format' IS NOT NULL AND out ? x.code LOOP
+    IF f.fmt = 'single' THEN f.fmt := 'single_site'; END IF;
+    IF public.rcol_present(out -> f.code) THEN
+      msg := public.rcol_format_error(f.fmt, out -> f.code);
+      IF msg IS NOT NULL THEN errs := errs || public.reg_err_item('/data/' || f.code, 'invalid_format', msg); END IF;
+    END IF;
+  END LOOP;
+  IF jsonb_array_length(errs) > 0 THEN PERFORM public.wf_err('validation_failed', jsonb_build_object('errors', errs)); END IF;
+  RETURN out;
+END $$;
+ALTER FUNCTION reg_clean_data_base(text, jsonb) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION reg_clean_data_base(text, jsonb) FROM PUBLIC;
+
+-- Computed columns: filled before every insert and every change of the data of a record. Records saved before the column existed get the value at their next save.
+CREATE OR REPLACE FUNCTION reg_computed_apply() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE f record; fm jsonb; a numeric; b numeric; res numeric;
+BEGIN
+  FOR f IN SELECT x.code, x.options -> 'formula' AS fm FROM public.register_fields x
+           WHERE x.register_key = NEW.register_key AND x.is_active AND x.derived AND x.field_type = 'number' AND jsonb_typeof(x.options) = 'object' AND x.options ? 'formula' LOOP
+    fm := f.fm; res := NULL;
+    BEGIN
+      IF fm ->> 'op' = 'days_between' THEN
+        res := (NEW.data ->> (fm ->> 'b'))::date - (NEW.data ->> (fm ->> 'a'))::date;
+      ELSE
+        a := (NEW.data ->> (fm ->> 'a'))::numeric; b := (NEW.data ->> (fm ->> 'b'))::numeric;
+        res := CASE fm ->> 'op' WHEN 'sum' THEN a + b WHEN 'diff' THEN a - b WHEN 'product' THEN a * b WHEN 'ratio' THEN CASE WHEN b = 0 THEN NULL ELSE round(a / b, 4) END END;
+      END IF;
+    EXCEPTION WHEN others THEN res := NULL;
+    END;
+    NEW.data := CASE WHEN res IS NULL THEN NEW.data - f.code ELSE jsonb_set(NEW.data, ARRAY[f.code], to_jsonb(res)) END;
+  END LOOP;
+  RETURN NEW;
+END $$;
+ALTER FUNCTION reg_computed_apply() OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION reg_computed_apply() FROM PUBLIC;
+CREATE TRIGGER register_records_computed BEFORE INSERT OR UPDATE OF data ON register_records FOR EACH ROW EXECUTE FUNCTION reg_computed_apply();
+
+-- A template column carries the API type of a field, so an older file is judged by what a column means (a text turned into an e-mail is a type change).
+ALTER FUNCTION tpl_columns(text) RENAME TO tpl_columns_core;
+CREATE OR REPLACE FUNCTION tpl_columns(p_register text) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+  SELECT coalesce(jsonb_agg(CASE WHEN t.e ->> 'kind' = 'field'
+      THEN t.e || jsonb_build_object('data_type', (SELECT public.rcol_eff_type(f.field_type, f.options) FROM public.register_fields f WHERE f.register_key = p_register AND f.code = t.e ->> 'code'))
+      ELSE t.e END ORDER BY t.o), '[]'::jsonb)
+  FROM jsonb_array_elements(public.tpl_columns_core(p_register)) WITH ORDINALITY AS t(e, o)
+$$;
+ALTER FUNCTION tpl_columns_core(text) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION tpl_columns_core(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tpl_columns_core(text) TO pmis_definer;
+ALTER FUNCTION tpl_columns(text) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION tpl_columns(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tpl_columns(text) TO pmis_definer, pmis_app;
+
+CREATE OR REPLACE FUNCTION tpl_version_cols(p_kind text, p_columns jsonb) RETURNS TABLE (key text, header text, input boolean, sig jsonb)
+LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
+  WITH c AS (
+    SELECT NULL::text AS part, NULL::text AS sheet, x AS col FROM jsonb_array_elements(CASE WHEN p_kind = 'master' THEN '[]'::jsonb ELSE coalesce(p_columns, '[]'::jsonb) END) x
+    UNION ALL
+    SELECT pt ->> 'part', pt ->> 'sheet', x FROM jsonb_array_elements(CASE WHEN p_kind = 'master' THEN coalesce(p_columns, '[]'::jsonb) ELSE '[]'::jsonb END) pt
+      CROSS JOIN LATERAL jsonb_array_elements(coalesce(pt -> 'columns', '[]'::jsonb)) x
+  )
+  SELECT coalesce(c.part || '/', '') || (c.col ->> 'code'), c.col ->> 'header',
+         (c.col ->> 'kind') IN ('site', 'record_type', 'field', 'custom', 'record_id', 'task') AND NOT coalesce((c.col ->> 'derived')::boolean, false),
+         jsonb_strip_nulls(jsonb_build_object('header', c.col ->> 'header', 'type', c.col ->> 'type', 'kind', c.col ->> 'kind', 'required', coalesce((c.col ->> 'required')::boolean, false),
+           'options', CASE WHEN c.col ->> 'type' = 'list' THEN c.col -> 'options' END, 'task', c.col ->> 'task', 'field', c.col ->> 'field', 'sheet', c.sheet,
+           'candidates', c.col -> 'candidates', 'data_type', c.col ->> 'data_type'))
+  FROM c
+$$;
+
+-- Owner decision 2026-11-14 (tolerant upload): a file of an older version of a REGISTER template is accepted when it can be matched by the column codes. A removed
+-- column is ignored (with a warning), a new column stays empty, a rename, a change of the required flag or of the list values never matters; only a change of the
+-- meaning of a column (its type) refuses the file. Stream and Master templates keep the D112 rule.
+CREATE OR REPLACE FUNCTION tpl_version_compat(p_template text, p_version int) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+DECLARE d public.template_definitions%ROWTYPE; o public.template_versions%ROWTYPE; c public.template_versions%ROWTYPE; inp jsonb; oth jsonb; removed jsonb; added jsonb; renamed jsonb;
+BEGIN
+  SELECT * INTO d FROM public.template_definitions WHERE template_id = p_template;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO o FROM public.template_versions WHERE template_def_id = d.id AND version = p_version;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO c FROM public.template_versions WHERE template_def_id = d.id AND is_current;
+  WITH a AS (SELECT * FROM public.tpl_version_cols(d.kind, o.columns)), b AS (SELECT * FROM public.tpl_version_cols(d.kind, c.columns)),
+  ch AS (
+    SELECT coalesce(a.key, b.key) AS key, coalesce(b.header, a.header) AS header, a.header AS old_header, b.header AS new_header,
+      CASE WHEN a.key IS NULL THEN 'added' WHEN b.key IS NULL THEN 'removed'
+           WHEN a.input AND NOT b.input THEN 'no_longer_typed' WHEN b.input AND NOT a.input THEN 'now_typed'
+           WHEN a.sig ->> 'type' IS DISTINCT FROM b.sig ->> 'type' OR (a.sig ? 'data_type' AND b.sig ? 'data_type' AND a.sig ->> 'data_type' IS DISTINCT FROM b.sig ->> 'data_type') THEN 'type_changed'
+           WHEN a.sig ->> 'header' IS DISTINCT FROM b.sig ->> 'header' THEN 'renamed' ELSE 'changed' END AS change,
+      coalesce(a.input, false) OR coalesce(b.input, false) AS input
+    FROM a FULL JOIN b ON b.key = a.key
+    WHERE a.key IS NULL OR b.key IS NULL OR a.input IS DISTINCT FROM b.input OR a.sig IS DISTINCT FROM b.sig
+  )
+  SELECT coalesce(jsonb_agg(jsonb_build_object('key', ch.key, 'header', ch.header, 'change', ch.change) ORDER BY ch.key)
+                  FILTER (WHERE ch.input AND (d.kind <> 'register' OR ch.change = 'type_changed')), '[]'::jsonb),
+         coalesce(jsonb_agg(jsonb_build_object('key', ch.key, 'header', ch.header, 'change', ch.change) ORDER BY ch.key)
+                  FILTER (WHERE NOT (ch.input AND (d.kind <> 'register' OR ch.change = 'type_changed'))), '[]'::jsonb),
+         coalesce(jsonb_agg(jsonb_build_object('key', ch.key, 'header', coalesce(ch.old_header, ch.header)) ORDER BY ch.key) FILTER (WHERE ch.input AND ch.change IN ('removed', 'no_longer_typed')), '[]'::jsonb),
+         coalesce(jsonb_agg(jsonb_build_object('key', ch.key, 'header', ch.header) ORDER BY ch.key) FILTER (WHERE ch.input AND ch.change IN ('added', 'now_typed')), '[]'::jsonb),
+         coalesce(jsonb_agg(jsonb_build_object('key', ch.key, 'from', ch.old_header, 'to', ch.new_header) ORDER BY ch.key) FILTER (WHERE ch.change = 'renamed'), '[]'::jsonb)
+    INTO inp, oth, removed, added, renamed FROM ch;
+  RETURN jsonb_build_object('template_id', p_template, 'kind', d.kind, 'from_version', p_version, 'to_version', c.version, 'is_current', o.is_current,
+    'compatible', jsonb_array_length(inp) = 0, 'input_changes', inp, 'other_changes', oth,
+    'removed_columns', CASE WHEN d.kind = 'register' THEN removed ELSE '[]'::jsonb END, 'added_columns', CASE WHEN d.kind = 'register' THEN added ELSE '[]'::jsonb END,
+    'renamed_columns', renamed);
+END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
 -- 7. Ownership and rights
 -- ---------------------------------------------------------------------------------------------------------------------
 DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY[
-    'rcol_present(jsonb)', 'rcol_err(text,text,text)', 'rcol_eff_type(text,jsonb)', 'rcol_json(register_fields)', 'reg_field_usage(text,text)', 'rcol_convert(jsonb,text,text)',
+    'rcol_present(jsonb)', 'rcol_err(text,text,text)', 'rcol_eff_type(text,jsonb)', 'rcol_storage(text,text,jsonb,jsonb)', 'rcol_format_error(text,jsonb)', 'rcol_check_formula(text,jsonb)', 'reg_clean_data(text,jsonb)', 'tpl_version_cols(text,jsonb)', 'tpl_version_compat(text,int)', 'rcol_json(register_fields)', 'reg_field_usage(text,text)', 'rcol_convert(jsonb,text,text)',
     'rcol_conversion(text,text,text,text,boolean)', 'rcol_lock(text,text)', 'rcol_need_register(text)', 'reg_fields_admin_json(text)', 'admin_reg_field_impact(text,text,jsonb)',
     'admin_reg_field_save(text,text,boolean,jsonb,text,integer,boolean)', 'admin_reg_field_delete(text,text,text,integer)', 'admin_reg_fields_order(text,text[],text)',
     'admin_reg_section_save(text,uuid,jsonb,text,integer)', 'admin_reg_section_delete(text,uuid,text)', 'admin_reg_definition_rename(text,jsonb,text,integer)'
