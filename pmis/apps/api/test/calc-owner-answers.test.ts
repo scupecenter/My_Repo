@@ -1,6 +1,6 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Client as PgClient } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { dbDate, newSite, open, q, taskRow, wd } from './calc-helpers';
 import { loadConfig } from '../src/config/config';
 import { JobsService } from '../src/jobs/jobs.service';
@@ -328,7 +328,20 @@ describe('Q82: the SLA clock closes at the actual date; a negative duration is a
 
 describe('Q84: the daily job applies due SLA versions and reminds the System Admins of tentative holidays 14 days ahead', () => {
   const jobs = () => app.get(JobsService);
+  // The seed already holds real holidays (db/seed/holidays-*.csv); one of them can fall exactly on today + offset, depending on the
+  // day the suite runs, and (calendar_id, date) is unique. A seed row on a date the test needs is set aside and put back afterwards.
+  const setAside: Array<Record<string, unknown>> = [];
+  const restoreSeedHolidays = async (): Promise<void> => {
+    for (const h of setAside.splice(0)) {
+      await db.query(
+        `INSERT INTO holidays (calendar_id, date, name, name_ar, kind, tentative, note) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (calendar_id, date) DO NOTHING`,
+        [h.calendar_id, h.date, h.name, h.name_ar, h.kind, h.tentative, h.note]);
+    }
+  };
   const addHoliday = async (name: string, offsetDays: number, over: { tentative?: boolean; confirmed?: boolean } = {}): Promise<string> => {
+    const taken = await db.query(
+      `DELETE FROM holidays WHERE calendar_id = cal_default() AND date = cal_today() + $1::int RETURNING calendar_id, date::text AS date, name, name_ar, kind, tentative, note`, [offsetDays]);
+    setAside.push(...taken.rows);
     const r = await db.query(
       `INSERT INTO holidays (calendar_id, date, name, kind, tentative, confirmed_at) VALUES (cal_default(), cal_today() + $2::int, $1, 'religious', $3, $4) RETURNING date::text AS d`,
       [name, offsetDays, over.tentative ?? true, over.confirmed ? new Date() : null]);
@@ -346,6 +359,8 @@ describe('Q84: the daily job applies due SLA versions and reminds the System Adm
     expect(loadConfig({ ...env, NODE_ENV: 'test', JOBS_ENABLED: 'true' }).jobsEnabled).toBe(true);
     expect(() => loadConfig({ ...env, JOBS_ENABLED: 'maybe' })).toThrow(/JOBS_ENABLED/);
   });
+
+  afterEach(restoreSeedHolidays);
 
   it('reminds every System Admin once for a tentative holiday within 14 days, and not for the others; a second run the same day adds nothing', async () => {
     const soon = await addHoliday('Tentative feast (test, soon)', 5);
