@@ -178,6 +178,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wfeDb = await buildDatabase(adminUrl, wfe, appPassword);
   process.env.TEST_DATABASE_URL_WFE = wfeDb.appUrl;
   process.env.TEST_SUPER_URL_WFE = wfeDb.superUrl;
+  // The workflow-gaps database (migration 0096): the suite sets and lifts the structural freeze, drafts and publishes versions, and sets date_field gate conditions.
+  const wfg = `${dbName}_wfg`;
+  const wfgDb = await buildDatabase(adminUrl, wfg, appPassword);
+  process.env.TEST_DATABASE_URL_WFG = wfgDb.appUrl;
+  process.env.TEST_SUPER_URL_WFG = wfgDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -222,6 +227,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${wl} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${hreg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.end();
   };
 }
