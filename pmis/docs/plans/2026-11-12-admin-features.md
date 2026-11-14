@@ -130,7 +130,7 @@
 | الطلب | الموضوع | الحالة |
 |---|---|---|
 | [#123](https://github.com/scupecenter/My_Repo/pull/123) | الاعتماد المباشر للتحميل التاريخي وجداول السجلات | مدموج |
-| [#131](https://github.com/scupecenter/My_Repo/pull/131) | محرر سير العمل، المرحلة 2 | جاهز للدمج (2026-11-14، الفحوص كلها ناجحة) |
+| [#131](https://github.com/scupecenter/My_Repo/pull/131) | محرر سير العمل، المرحلة 2 | مدموج 2026-11-14 (4e4aa39)، وحُذف فرعه |
 | [#132](https://github.com/scupecenter/My_Repo/pull/132) | إدارة أعمدة السجلات، المرحلة 3 | مسودة، متوقف حتى تجدد الحصة |
 | [#124](https://github.com/scupecenter/My_Repo/pull/124) | ملف التقدم هذا | يُدمج أخيراً |
 
