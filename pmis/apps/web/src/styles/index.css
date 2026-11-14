@@ -56,3 +56,15 @@
 .mr i{width:9px;height:9px;border-radius:50%;background:var(--pipe);border:1.5px solid var(--lock);display:inline-block}
 .mr i.done{background:var(--done);border-color:var(--done)}.mr i.current{background:var(--openBg);border-color:var(--open)}.mr i.late{background:var(--lateBg);border-color:var(--late)}.mr i.na{opacity:.35}
 @media (prefers-reduced-motion:reduce){.pipe-line i,.st .node{transition:none}}
+
+/* shared grid look (Sites and register lists): colours are mixes of existing tokens, so light and dark both follow the theme.
+   Every layer is opaque, so frozen (sticky) columns never show scrolled cells through. */
+.gx{--gx-head:color-mix(in oklab,var(--accent) 8%,var(--card2));--gx-zebra:color-mix(in oklab,var(--ink) 3.5%,var(--card));--gx-hover:color-mix(in oklab,var(--accent) 11%,var(--card));--gx-pick:var(--accentSoft)}
+.gx-head{background:var(--gx-head);color:var(--ink);box-shadow:0 1px 0 var(--line)}
+.gx-row{background:var(--card);transition:background-color .12s}
+.gx-row[data-zebra='1']{background:var(--gx-zebra)}
+.gx-row:hover{background:var(--gx-hover)}
+.gx-row[data-picked],.gx-row[data-picked]:hover{background:var(--gx-pick)}
+.gx-frozen-end{border-inline-end:1px solid var(--line)}
+.gx .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 10px;font-size:var(--text-sm);line-height:1.35;border:1px solid color-mix(in oklab,currentColor 20%,transparent)}
+@media (prefers-reduced-motion:reduce){.gx-row{transition:none}}

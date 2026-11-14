@@ -14,7 +14,9 @@ import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { SavedViews } from '@/components/SavedViews';
 import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
-import { ActiveChips, BulkBar, ColumnMenu, Empty, HeaderRow, pin, QuickFilter, SelectBox, tracks, totalWidth, Trunc, useTablePrefs } from '@/components/TableKit';
+import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, QuickFilter, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { Tip } from '@/components/Tip';
+import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
 import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
@@ -24,14 +26,16 @@ import { useVirtual } from '@/components/useVirtual';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
 const ROWS = { comfortable: 52, compact: 38 } as const;
-const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
-const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
+const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
+const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
 const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
 const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
 // ExportColumnCode values (stable codes of the `sites` part).
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
+// Extra pixels of a status chip (its own padding and border) when columns are sized to content.
+const CHIP_PX = 24;
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
@@ -135,24 +139,45 @@ export function Sites() {
     ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
   ];
 
+  // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
+  const fitText = (id: string, s: SiteListItem): FitSample | null => {
+    const st = statusOf(s.streams, stream);
+    switch (id) {
+      case 'code': return s.site_code;
+      case 'name': return s.name_ar ? `${s.name}  ${s.name_ar}` : s.name;
+      case 'region': return rname(s.region_id);
+      case 'scenario': return s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : null;
+      case 'status': return [t(`status.${s.overall_status}`), CHIP_PX];
+      case 'stream_status': return [t(`streamState.${st?.state ?? 'na'}`), CHIP_PX];
+      case 'stage': return stageName(st?.current_stage);
+      case 'progress': return st ? `${st.done_tasks}/${st.total_tasks}` : null;
+      case 'milestone': return st?.milestone_date ?? null;
+      case 'locks': return [t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked'), CHIP_PX];
+      case 'gaps': return s.data_gaps ? [String(s.data_gaps), CHIP_PX] : null;
+      case 'late': { const n = real ? st?.late_count : s.late_task_count; return n ? [String(n), CHIP_PX] : null; }
+      default: return null;
+    }
+  };
+  useAutoFit(tbl, label, items, fitText, i18n.language);
+
   const cell = (id: string, s: SiteListItem) => {
     const st = statusOf(s.streams, stream);
     switch (id) {
       case 'code': return <b className="mono">{s.site_code}</b>;
-      case 'name': return <span className="flex min-w-0 items-baseline gap-2"><Trunc text={s.name} />{s.name_ar && <span dir="rtl" lang="ar" className="truncate text-xs text-mute" data-testid={`site-name-ar-${s.site_code}`}>{s.name_ar}</span>}</span>;
+      case 'name': return <span className="flex min-w-0 items-baseline gap-2"><Trunc text={s.name} />{s.name_ar && <Tip text={s.name_ar}><span dir="rtl" lang="ar" className="truncate text-xs text-mute" data-testid={`site-name-ar-${s.site_code}`}>{s.name_ar}</span></Tip>}</span>;
       case 'region': return <Trunc text={rname(s.region_id)} />;
-      case 'stream_status': return <span className={`chip ${STREAM_TONE[st?.state ?? 'na']}`} data-testid={`stream-state-${s.site_code}`}>{t(`streamState.${st?.state ?? 'na'}`)}</span>;
+      case 'stream_status': return <StatusChip tone={STREAM_TONE[st?.state ?? 'na']} testid={`stream-state-${s.site_code}`} text={t(`streamState.${st?.state ?? 'na'}`)}>{t(`streamState.${st?.state ?? 'na'}`)}</StatusChip>;
       case 'stage': return <span data-testid={`stream-stage-${s.site_code}`}><Trunc text={stageName(st?.current_stage)} /></span>;
       case 'progress': return <span className="mono" data-testid={`stream-progress-${s.site_code}`}>{st ? `${st.done_tasks}/${st.total_tasks}` : <Empty />}</span>;
       case 'milestone': return <span className="mono" data-testid={`stream-ms-${s.site_code}`}>{st?.milestone_date ?? <Empty />}</span>;
       case 'scenario': return s.delivery_scenario ? <Trunc text={t(`scenario.${s.delivery_scenario}`)} /> : <Empty />;
-      case 'status': return <span className={`chip ${TONE[s.overall_status]}`}>{t(`status.${s.overall_status}`)}</span>;
+      case 'status': return <StatusChip tone={TONE[s.overall_status]} text={t(`status.${s.overall_status}`)}>{t(`status.${s.overall_status}`)}</StatusChip>;
       case 'pipeline': return <MiniRail rail={s.rail} />;
-      case 'locks': return <span className={`chip ${s.workflow_locks === false ? 'bg-waitBg text-waitInk' : 'bg-lockBg text-lockInk'}`} data-testid={`site-locks-${s.site_code}`}>{t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}</span>;
-      case 'gaps': return s.data_gaps ? <span className="chip bg-lateBg text-lateInk" data-testid={`site-gaps-${s.site_code}`}>{s.data_gaps}</span> : <Empty />;
+      case 'locks': return <StatusChip tone={s.workflow_locks === false ? 'bg-waitBg text-waitInk' : 'bg-lockBg text-lockInk'} testid={`site-locks-${s.site_code}`} text={t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}>{t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}</StatusChip>;
+      case 'gaps': return s.data_gaps ? <StatusChip tone="bg-lateBg text-lateInk" testid={`site-gaps-${s.site_code}`}>{s.data_gaps}</StatusChip> : <Empty />;
       default: { // late
         const n = real ? st?.late_count : s.late_task_count;
-        return n ? <span className="chip bg-lateBg text-lateInk" data-testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</span> : <Empty />;
+        return n ? <StatusChip tone="bg-lateBg text-lateInk" testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</StatusChip> : <Empty />;
       }
     }
   };
@@ -191,6 +216,7 @@ export function Sites() {
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
         </button>
+        <DensityToggle api={tbl} />
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
         <MoreMenu items={[
@@ -205,19 +231,21 @@ export function Sites() {
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
       ) : (
-        <div className="card overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
+        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
             <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
               {items.slice(v.start, v.end).map((s, k) => {
                 const st = statusOf(s.streams, stream);
                 const na = real && st?.state === 'na', on = picked.has(s.site_code), cur = sel === s.site_code;
+                const g = gxRow(v.start + k, { picked: on, current: cur, muted: na });
                 return (
-                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} className={`absolute inset-x-0 border-b border-line text-sm ${on ? 'bg-accentSoft' : 'bg-card hover:bg-hover'} ${cur ? 'ring-2 ring-inset ring-accent' : ''} ${na ? 'opacity-60' : ''}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
-                    <span className="absolute inset-y-0 start-0 z-20 flex w-9 items-center justify-center"><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span>
+                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                    {/* the checkbox cell is frozen with the identity columns; it has no height of its own, so the link below fills the row */}
+                    <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span></div>
                     <Link to={linkTo(s)} data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} onClick={() => setParams({ sel: s.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
                       <span aria-hidden />
-                      {cols.map((c) => { const p = pin(c, true); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
+                      {cols.map((c) => { const p = pin(c, true, cols); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
                     </Link>
                   </div>
                 );

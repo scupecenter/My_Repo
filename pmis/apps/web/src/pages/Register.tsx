@@ -13,8 +13,8 @@ import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
 import { useToast } from '@/components/Toast';
 import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
-import { ActiveChips, BulkBar, ColumnMenu, Empty, HeaderRow, pin, rowPad, SelectBox, totalWidth, tracks, Trunc, useTablePrefs } from '@/components/TableKit';
-import type { ColDef } from '@/lib/tablePrefs';
+import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, rowPad, SelectBox, StatusChip, totalWidth, tracks, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import type { ColDef, FitSample } from '@/lib/tablePrefs';
 import { EmptyState, ErrorState, LoadingSkeleton, NoResults } from '@/components/States';
 import { registerErrorMessage } from '@/lib/registerErrors';
 import { isLive, OWNER_NOTE } from '@/lib/registerForms';
@@ -56,7 +56,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const total = list.data?.pages[0]?.page.total ?? items.length;
   // The catalogue only lists fields the caller may see, so a permission-hidden field never becomes a column (plan G1).
   const fieldCols = def.fields.filter((x) => x.in_list);
-  const defs: ColDef[] = [{ id: 'site', w: 100, min: 70, pinned: true }, { id: 'region', w: 110, min: 70 }, { id: 'type', w: 80, min: 60 }, ...fieldCols.map((c, i) => ({ id: `f:${c.code}`, w: 150, min: 70, off: i >= 4 })), { id: 'state', w: 130, min: 90 }, { id: 'ball', w: 180, min: 90 }];
+  const defs: ColDef[] = [{ id: 'site', w: 100, min: 70, pinned: true }, { id: 'region', w: 110, min: 70, max: 240 }, { id: 'type', w: 80, min: 60 }, ...fieldCols.map((c, i) => ({ id: `f:${c.code}`, w: 150, min: 70, max: 320, off: i >= 4 })), { id: 'state', w: 130, min: 90 }, { id: 'ball', w: 180, min: 90, max: 320 }];
   const tbl = useTablePrefs(`register-${key}`, defs);
 
   // contract 0.7.0: every register has its own approved template (Template.register_key)
@@ -77,13 +77,25 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     ...(f.state ? [{ key: 'state', label: t('table.filter_state', { v: t(`regState.${f.state}`) }), onRemove: () => set('state')('') }] : []),
     ...(f.record_type ? [{ key: 'record_type', label: t('table.filter_type', { v: f.record_type.toUpperCase() }), onRemove: () => set('record_type')('') }] : []),
   ];
+  // The text each cell shows, for sizing the columns to their content (null = not measurable here, e.g. the people chips of the ball column).
+  const fitText = (id: string, r: (typeof items)[number]): FitSample | null => {
+    if (id.startsWith('f:')) { const c = fieldCols.find((x) => `f:${x.code}` === id); const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : ''; return txt === ', ' ? null : txt; }
+    switch (id) {
+      case 'site': return r.site_code ?? null;
+      case 'region': return rname(r.region_id as number | null);
+      case 'type': return r.record_type ? r.record_type.toUpperCase() : null;
+      case 'state': return [t(`regState.${r.state}`), 24];
+      default: return null;
+    }
+  };
+  useAutoFit(tbl, label, items, fitText, i18n.language);
   const cell = (id: string, r: (typeof items)[number]) => {
     if (id.startsWith('f:')) { const c = fieldCols.find((x) => `f:${x.code}` === id); const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : '—'; return txt === '—' ? <Empty /> : <Trunc text={txt} />; }
     switch (id) {
       case 'site': return <b className="mono">{r.site_code ?? '—'}</b>;
       case 'region': return <Trunc text={rname(r.region_id as number | null)} />;
       case 'type': return r.record_type ? <span>{r.record_type.toUpperCase()}</span> : <Empty />;
-      case 'state': return <span className={`chip ${STATE_TONE[r.state]}`} data-testid={`reg-state-${r.id}`}>{t(`regState.${r.state}`)}</span>;
+      case 'state': return <StatusChip tone={STATE_TONE[r.state]} testid={`reg-state-${r.id}`} text={t(`regState.${r.state}`)}>{t(`regState.${r.state}`)}</StatusChip>;
       default: return r.ball_in_court && (r.state === 'in_review' || r.state === 'in_approval') ? <Holders holders={r.ball_in_court.holders} /> : <Empty />;
     }
   };
@@ -112,6 +124,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         count={<span className="text-sm text-mute" data-testid="register-count">{t('sites.count', { count: total })}</span>}
         primary={<button className="btn btn-primary" data-testid="register-new" onClick={() => setRecord('new')}><Plus size={16} />{t('registers.new')}</button>}
         tools={<>
+        <DensityToggle api={tbl} />
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="register-export" source={key} filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={['site_code', 'region', 'record_type', 'state', ...tbl.cols.filter((c) => c.id.startsWith('f:')).map((c) => c.id.slice(2))]} />
         <MoreMenu items={[
@@ -129,18 +142,19 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
       {key === 'hlc' && <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />}
       <ActiveChips chips={chips} onClear={clearAll} />
-      <div className="card overflow-hidden" data-density={tbl.density}>
+      <div className="card gx overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">
           <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
           <div data-testid="register-list" role="list" style={{ minWidth: W }}>
-            {items.map((r) => {
+            {items.map((r, i) => {
               const tmp = r.id.startsWith('tmp-'), on = picked.has(r.id), cur = recordId === r.id;
+              const g = gxRow(i, { picked: on, current: cur, muted: tmp });
               return (
-                <div key={r.id} role="listitem" tabIndex={0} aria-selected={on || cur} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); if (!tmp) setRecord(r.id); } }} data-testid={`reg-row-${r.id}`} data-state={r.state} data-current={cur || undefined} onClick={() => !tmp && setRecord(r.id)}
+                <div key={r.id} role="listitem" tabIndex={0} aria-selected={on || cur} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); if (!tmp) setRecord(r.id); } }} data-testid={`reg-row-${r.id}`} data-state={r.state} data-current={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} onClick={() => !tmp && setRecord(r.id)}
                   style={{ gridTemplateColumns: tracks(tbl.cols, true) }}
-                  className={`grid w-full cursor-pointer items-center border-b border-line text-start text-sm ${rowPad(tbl.density)} ${on ? 'bg-accentSoft' : 'bg-card hover:bg-hover'} ${cur ? 'ring-2 ring-inset ring-accent' : ''} ${tmp ? 'opacity-60' : ''}`}>
+                  className={`grid w-full cursor-pointer items-center border-b border-line text-start text-sm ${rowPad(tbl.density)} ${g.className}`}>
                   <div className="sticky start-0 z-10 flex justify-center bg-inherit">{!tmp && <SelectBox checked={on} onChange={() => flip(r.id)} label={t('table.select_row', { code: r.site_code ?? r.id })} testid={`reg-select-${r.id}`} />}</div>
-                  {tbl.cols.map((c) => { const p = pin(c, true); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, r)}</div>; })}
+                  {tbl.cols.map((c) => { const p = pin(c, true, tbl.cols); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, r)}</div>; })}
                 </div>
               );
             })}
