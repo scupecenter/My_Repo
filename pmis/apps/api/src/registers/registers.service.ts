@@ -71,6 +71,8 @@ const convertSchema = z
   })
   .strict();
 const reasonSchema = z.object({ reason: z.string().trim().min(1).max(2000), confirm_text: z.string().optional() }).passthrough();
+/** 0103 (0.15.22): a lock reason is at least 3 characters (the table checks the same). */
+const lockReasonSchema = z.object({ reason: z.string().trim().min(3).max(2000) }).passthrough();
 const cancelSnagSchema = z.object({ reason: z.string().trim().min(3).max(1000) }).strict();
 
 interface RecordRow {
@@ -116,6 +118,7 @@ interface RecordRow {
   entry_holder: boolean;
   pin_holds: boolean | null;
   has_open: boolean;
+  locked: boolean;
   warnings: unknown[] | null;
   purchase_requests: Record<string, unknown> | null;
   total: bigint | null;
@@ -270,6 +273,7 @@ export class RegistersService {
     const { rows, cats } = await this.fieldRows(key);
     let permitTypes: string[] | null = null;
     const out: unknown[] = [];
+    const lockedCols = new Set((await this.db.tx.$queryRaw<{ field_code: string }[]>(Prisma.sql`SELECT field_code FROM register_column_locks WHERE register_key = ${key} AND unlocked_at IS NULL`)).map((x) => x.field_code));
     for (const f of rows) {
       let options: { value: string; label_en: string; label_ar?: string | null }[] | undefined;
       const cat = f.list_catalogue ? cats.get(f.list_catalogue) : undefined;
@@ -291,6 +295,7 @@ export class RegistersService {
         type: f.field_type === 'external_team' ? 'text' : f.field_type === 'list_code' ? (multiple ? 'multi_list' : 'list') : f.field_type,
         required: f.required,
         read_only: f.derived,
+        locked: lockedCols.has(f.code),
         in_list: f.in_list,
         is_custom: false,
         ...(f.section ? { section: f.section } : {}),
@@ -334,6 +339,7 @@ export class RegistersService {
         reg_warnings(r.id) AS warnings,
         CASE WHEN r.register_key = 'hlc' THEN hlc_pr_view(r.id) END AS purchase_requests,
         EXISTS (SELECT 1 FROM register_records o WHERE o.entity_id = r.entity_id AND o.state IN ('entry', 'in_review', 'in_approval')) AS has_open,
+        EXISTS (SELECT 1 FROM register_record_locks rl WHERE rl.record_id = r.id AND rl.unlocked_at IS NULL) AS locked,
         ${Prisma.raw(TS_TEXT('r.created_at'))} AS ts
       FROM register_records r
       LEFT JOIN sites s ON s.id = r.site_id
@@ -587,7 +593,9 @@ export class RegistersService {
       // Q267: a System Admin cancels an approved Quality snag record entered by mistake (its QC snag is cancelled with it; a closed QC snag is history)
       if (auth.state.isAdmin && r.register_key === 'quality' && r.record_type === 'snag' && r.state === 'approved' && r.is_current && !r.has_open
         && qcSnags.get(r.entity_id)?.status !== 'closed') actions.push('cancel_snag');
-      dto.allowed_actions = actions;
+      // 0103 (0.15.22): a locked record is read-only for everyone but a System Admin (the database decides again)
+      dto.locked = r.locked === true;
+      dto.allowed_actions = dto.locked && !auth.state.isAdmin ? actions.filter((a) => !['edit', 'submit', 'void', 'new_version'].includes(a)) : actions;
       out.push(dto);
     }
     await this.attachRefs(out);
@@ -771,6 +779,25 @@ export class RegistersService {
     await this.stepUp.require(auth);
     await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_void_record(${id}::uuid, ${version}::int, ${body.reason}::text)) v`);
     return this.get(auth, key, id);
+  }
+
+  /** 0103 (0.15.22): lock or unlock one record. The administer grant and the record version are checked by the database; step-up here. The version is not changed. */
+  async setRecordLock(auth: AuthContext, key: string, id: string, ifMatch: string | undefined, rawBody: unknown, locked: boolean): Promise<Record<string, unknown>> {
+    const version = parseIfMatch(ifMatch);
+    const body = parse(lockReasonSchema, rawBody ?? {});
+    await this.rowFor(auth, key, id);
+    await this.stepUp.require(auth);
+    await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_record_lock_set(${id}::uuid, ${version}::int, ${locked}::boolean, ${body.reason}::text)) v`);
+    return this.get(auth, key, id);
+  }
+
+  /** 0103 (0.15.22): lock or unlock one column of a register for every record (administer in every region, checked by the database). */
+  async setColumnLock(auth: AuthContext, key: string, code: string, rawBody: unknown, locked: boolean): Promise<Record<string, unknown>> {
+    const body = parse(lockReasonSchema, rawBody ?? {});
+    await this.definition(key);
+    await this.stepUp.require(auth);
+    await this.call<boolean>(auth, Prisma.sql`SELECT true AS r FROM (SELECT reg_column_lock_set(${key}::text, ${code}::text, ${locked}::boolean, ${body.reason}::text)) v`);
+    return { register_key: key, field_code: code, locked };
   }
 
   /**

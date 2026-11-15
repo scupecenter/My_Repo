@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.23
+  version: 0.15.25
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.25 (2026-11-15): register locks (F16; migration 0103 `register_locks`; CHANGELOG 147). Additive. A System Admin or a holder of the administer grant locks or unlocks one record (`POST` and `DELETE` on `/registers/{register_key}/records/{record_id}/lock`) and one column for every record (`POST` and `DELETE` on `/registers/{register_key}/columns/{field_code}/lock`). A locked record refuses changes for everyone except a System Admin; a locked column refuses a changed value. A reason and step-up are required, and every lock change is audited.
     - 0.15.23 (2026-11-15): dropdown lists (F17, owner request 2026-11-15 for maximum flexibility; migration 0102, mirror `db/sql/101_dropdown_lists.sql`; CHANGELOG 148). Additive, one change of behaviour. (1) A list has a value type (`value_type`: text, number, date, person, site or vendor; a number or a date is checked at creation, a person, a site or a vendor must be a real user, site or external party; the type cannot change while the list has values, 422 `value_type_locked`), `multi_select`, and an optional `parent_catalogue` (a dependent list: each value names a `parent_code`, the active value of the parent list; a cycle is 422; the parent cannot change while the list has values, 422 `parent_locked`). (2) A value has `colour` (`#RRGGBB`), `is_default` (one active default per list), `parent_code`, and `deactivate_reason` with `deactivated_at`. A value used by a dependent value or the default cannot be deactivated (422 `has_dependents` or `is_default`). `ListCatalogue.dependent_lists` names the lists that depend on it and `used_by` names the fields that read it. (3) New path `DELETE /list-catalogues/{catalogue_code}/values/{value_id}` (`deleteListValue`): a hard delete with a `reason` query parameter; If-Match is optional; allowed only when the value is unused (not in a register record, a child-list column, a dependent value or the default); otherwise 422 `in_use` (or `is_default`). Audited with before and the reason.
     - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
@@ -9072,6 +9073,137 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterRecord
+      summary: Lock a record (read-only except for a System Admin) (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+        `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+        (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterRecord
+      summary: Unlock a record (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+        `register_record_unlock` with before and after.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/columns/{field_code}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {name: field_code, in: path, required: true, schema: {type: string}, description: 'The column code (register_fields.code).'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterColumn
+      summary: Lock a column for every record of the register (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+        (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterColumn
+      summary: Unlock a column (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: false}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/quality/records/{record_id}/cancel-snag:
     parameters:
     - {$ref: '#/components/parameters/RegisterRecordId'}
@@ -17303,6 +17435,7 @@ components:
         label_en: { type: string }
         label_ar: { type: [string, 'null'] }
         type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file, multi_user, multi_site, child_list, warehouse_item] }
+        locked: { type: boolean, description: 'Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes.' }
         required: { type: boolean }
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         list: { $ref: '#/components/schemas/ListRef' }
@@ -17587,6 +17720,7 @@ components:
         site_code: { type: [string, 'null'] }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
         state: { $ref: '#/components/schemas/RegisterRecordState' }
+        locked: { type: boolean, description: 'Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version.' }
         current_level: { type: integer }
         levels_required: { type: integer }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }

@@ -258,3 +258,29 @@ export function useDecideBatch() {
     onSettled: (_d, _e, v) => settleBatch(qc, v.batch.id),
   });
 }
+
+/** 0103 (contract 0.15.22): lock (true) or unlock (false) one record. Read-only for everyone but a System Admin while locked; a reason and step-up. */
+export function useRecordLock(key: string) {
+  const qc = useQueryClient();
+  return useMutation<RegisterRecord, ApiError, { record: RegisterRecord; locked: boolean; reason: string }>({
+    mutationFn: ({ record, locked, reason }) => (locked
+      ? api.post(`/registers/${key}/records/${record.id}/lock`, { version: record.version, body: { reason } })
+      : api.del(`/registers/${key}/records/${record.id}/lock`, { version: record.version, body: { reason } })),
+    onSuccess: (r) => qc.setQueryData(['register-record', key, r.id], r),
+    onSettled: (_d, _e, v) => settle(qc, key, v.record.id),
+  });
+}
+
+/** 0103 (contract 0.15.22): lock (true) or unlock (false) one column for every record of the register. */
+export function useColumnLock(key: string) {
+  const qc = useQueryClient();
+  return useMutation<unknown, ApiError, { code: string; locked: boolean; reason: string }>({
+    mutationFn: ({ code, locked, reason }) => (locked
+      ? api.post(`/registers/${key}/columns/${code}/lock`, { body: { reason } })
+      : api.del(`/registers/${key}/columns/${code}/lock`, { body: { reason } })),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['register-records', key] });
+      void qc.invalidateQueries({ queryKey: ['register-defs'] });
+    },
+  });
+}

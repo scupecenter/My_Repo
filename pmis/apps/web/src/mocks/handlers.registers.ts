@@ -99,6 +99,30 @@ function ball(r: MockRecord): BallInCourt {
   return { level, level_kind: level === 1 ? 'entry' : level >= L ? 'approve' : 'review', holders, rule: 'any_one', ...(r.claimed_by ? { claimed_by: r.claimed_by } : {}) };
 }
 
+/** 0103 (0.15.22): lock or unlock one record. The `pm` account stands in for the administer grant and the System Admin. */
+async function setRecordLock(params: { key?: unknown; id?: unknown }, request: Request, locked: boolean): Promise<Response> {
+  const g = guard(); if (g) return g;
+  const r = R().records.find((x) => x.id === params.id && x.register_key === params.key);
+  if (!r) return problem(404, 'not_found', 'Record not found');
+  if (viewer()?.key !== 'pm') return problem(403, 'action_forbidden', 'You need administer on this register.');
+  const body = (await request.json().catch(() => ({}))) as { reason?: string };
+  if ((body.reason ?? '').trim().length < 3) return invalid([{ path: '/reason', code: 'required' }]);
+  if (!stepUpValid()) return stepUp();
+  if (Boolean(r.locked) === locked) return problem(409, 'invalid_transition', locked ? 'This record is already locked.' : 'This record is not locked.');
+  r.locked = locked; touch(r); save();
+  return tag(r);
+}
+
+/** 0103 (0.15.22): lock or unlock one column for every record. */
+async function setColumnLock(params: { key?: unknown; code?: unknown }, request: Request, locked: boolean): Promise<Response> {
+  const g = guard(); if (g) return g;
+  if (viewer()?.key !== 'pm') return problem(403, 'action_forbidden', 'You need administer in every region.');
+  const body = (await request.json().catch(() => ({}))) as { reason?: string };
+  if ((body.reason ?? '').trim().length < 3) return invalid([{ path: '/reason', code: 'required' }]);
+  if (!stepUpValid()) return stepUp();
+  return HttpResponse.json({ register_key: params.key, field_code: params.code, locked });
+}
+
 function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   const out: NonNullable<RegisterRecord['allowed_actions']> = [];
   const L = r.levels_required ?? levelsOf(r.register_key), row = rk(r);
@@ -111,6 +135,8 @@ function actions(r: MockRecord): RegisterRecord['allowed_actions'] {
   if (viewer()?.key === 'pm' && r.register_key === 'quality' && r.record_type === 'snag' && isCurrent(r) && !hasOpenVersion(r)) out.push('cancel_snag');
   // Q221: a permit draft whose holder no longer holds L1 of its stream row is handed over (contract 0.12.2)
   if (r.register_key === 'permits_hse' && r.state === 'entry' && !r.transferred && !canAt(row, 1, L) && r.created_by === viewer()?.employee_id) out.push('transfer');
+  // 0103 (0.15.22): a locked record is read-only for everyone but a System Admin (the `pm` account in the mock)
+  if (r.locked && viewer()?.key !== 'pm') return out.filter((a) => a !== 'edit' && a !== 'submit' && a !== 'void' && a !== 'new_version');
   return out;
 }
 
@@ -123,7 +149,7 @@ const hasOpenVersion = (r: MockRecord) => versionsOf(r).some((x) => ['entry', 'i
 export function toRecord(r: MockRecord): RegisterRecord {
   const m = r.site_index !== null ? siteMeta(r.site_index) : null;
   return {
-    id: r.id, register_key: r.register_key, record_type: r.record_type, site_id: m?.id ?? null, site_code: m?.code ?? null, region_id: (m?.region_id ?? null) as never, state: r.state,
+    id: r.id, register_key: r.register_key, record_type: r.record_type, site_id: m?.id ?? null, site_code: m?.code ?? null, region_id: (m?.region_id ?? null) as never, state: r.state, locked: r.locked === true,
     current_level: r.state === 'entry' ? 1 : r.current_level, levels_required: r.levels_required ?? levelsOf(r.register_key), ball_in_court: ball(r), data: r.data, return_count: r.return_count, last_return_note: r.last_return_note,
     allowed_actions: actions(r), created_by: { id: uid(r.created_by), display_name: r.created_by }, created_at: r.created_at, updated_at: r.updated_at, version: r.version,
     entity_id: r.entity_id, version_no: r.version_no, supersedes_id: r.supersedes_id ?? null, is_current: isCurrent(r), source: r.source ?? 'manual', ...(r.task ? { task: r.task } : {}),
@@ -287,6 +313,11 @@ export const registerHandlers = [
     return tag(r);
   }),
 
+  // 0103 (contract 0.15.22): lock and unlock a record and a column
+  http.post(`${B}/registers/:key/records/:id/lock`, ({ params, request }) => setRecordLock(params, request, true)),
+  http.delete(`${B}/registers/:key/records/:id/lock`, ({ params, request }) => setRecordLock(params, request, false)),
+  http.post(`${B}/registers/:key/columns/:code/lock`, ({ params, request }) => setColumnLock(params, request, true)),
+  http.delete(`${B}/registers/:key/columns/:code/lock`, ({ params, request }) => setColumnLock(params, request, false)),
   ...(['submit', 'review', 'approve', 'reject', 'void'] as const).map((op) =>
     http.post(`${B}/registers/:key/records/:id/${op}`, async ({ params, request }) => {
       const g = guard(); if (g) return g;
