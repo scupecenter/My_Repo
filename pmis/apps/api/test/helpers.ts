@@ -95,6 +95,13 @@ export async function superDbWfe(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the register-columns database (migration 0095; see global-setup). */
+export async function superDbRcols(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RCOLS });
+  await c.connect();
+  return c;
+}
+
 export async function superDbHw(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HW });
   await c.connect();
