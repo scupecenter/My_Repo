@@ -5018,6 +5018,7 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/sla-weight:
     get:
+      operationId: getWorkflowSlaWeight
       tags: [workflow]
       summary: SLA rule and weight of every task of a workflow version
       description: 'Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.'
@@ -5029,6 +5030,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
   /workflow/versions/{version}/weight-totals:
     get:
+      operationId: getWorkflowWeightTotals
       tags: [workflow]
       summary: Weight group totals of a workflow version (live check)
       description: Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
@@ -5040,6 +5042,7 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
   /workflow/versions/{version}/tasks/{task_code}/sla-rule:
     put:
+      operationId: putTaskSlaRule
       tags: [workflow]
       summary: Save the base SLA rule of a task (versioned)
       description: Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
@@ -5078,6 +5081,7 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove:
     post:
+      operationId: removeTaskSlaRule
       tags: [workflow]
       summary: Delete an SLA rule no task uses, or deactivate it
       description: Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
@@ -5101,6 +5105,7 @@ paths:
         '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/tasks/{task_code}/weight:
     put:
+      operationId: putTaskWeight
       tags: [workflow]
       summary: Counts in project weight, weight value and weight group of a task (draft)
       description: Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.

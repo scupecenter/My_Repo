@@ -3128,27 +3128,7 @@ export interface paths {
          * SLA rule and weight of every task of a workflow version
          * @description Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.
          */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    version: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The items, sorted by task code */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                404: components["responses"]["NotFound"];
-            };
-        };
+        get: operations["getWorkflowSlaWeight"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3168,36 +3148,7 @@ export interface paths {
          * Weight group totals of a workflow version (live check)
          * @description Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
          */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    version: number;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description The totals */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": {
-                            items?: {
-                                group?: string;
-                                total?: number;
-                                tasks?: number;
-                                ok?: boolean;
-                            }[];
-                        };
-                    };
-                };
-                404: components["responses"]["NotFound"];
-            };
-        };
+        get: operations["getWorkflowWeightTotals"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3218,53 +3169,7 @@ export interface paths {
          * Save the base SLA rule of a task (versioned)
          * @description Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
          */
-        put: {
-            parameters: {
-                query?: never;
-                header: {
-                    "If-Match": string;
-                };
-                path: {
-                    version: number;
-                    task_code: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        min_working_days: number;
-                        max_working_days: number;
-                        /** @description PRED (previous task done), OPEN (record created) or G<n> (gate passed) */
-                        start_event: string;
-                        /** @enum {string} */
-                        unit?: "working" | "calendar";
-                        calendar_code?: string;
-                        warning_pct?: number | null;
-                        breach_owner_role?: string | null;
-                        escalation_role?: string | null;
-                        pause_on_client_wait?: boolean;
-                        reason: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description The saved rule, the weight totals and the version */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-                409: components["responses"]["Conflict"];
-                412: components["responses"]["PreconditionFailed"];
-                422: components["responses"]["Unprocessable"];
-                428: components["responses"]["PreconditionRequired"];
-            };
-        };
+        put: operations["putTaskSlaRule"];
         post?: never;
         delete?: never;
         options?: never;
@@ -3285,41 +3190,7 @@ export interface paths {
          * Delete an SLA rule no task uses, or deactivate it
          * @description Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
          */
-        post: {
-            parameters: {
-                query?: never;
-                header: {
-                    "If-Match": string;
-                };
-                path: {
-                    version: number;
-                    task_code: string;
-                    rule_id: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        reason: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description outcome deleted or deactivated, with why */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-                412: components["responses"]["PreconditionFailed"];
-                428: components["responses"]["PreconditionRequired"];
-            };
-        };
+        post: operations["removeTaskSlaRule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3338,45 +3209,7 @@ export interface paths {
          * Counts in project weight, weight value and weight group of a task (draft)
          * @description Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
          */
-        put: {
-            parameters: {
-                query?: never;
-                header: {
-                    "If-Match": string;
-                };
-                path: {
-                    version: number;
-                    task_code: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        counts_in_weight: boolean;
-                        weight_value?: number;
-                        weight_group?: string | null;
-                        reason: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description The version and the weight totals */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
-                401: components["responses"]["Unauthorized"];
-                403: components["responses"]["Forbidden"];
-                404: components["responses"]["NotFound"];
-                409: components["responses"]["Conflict"];
-                412: components["responses"]["PreconditionFailed"];
-                422: components["responses"]["Unprocessable"];
-                428: components["responses"]["PreconditionRequired"];
-            };
-        };
+        put: operations["putTaskWeight"];
         post?: never;
         delete?: never;
         options?: never;
@@ -21941,6 +21774,178 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TaskInsertResult"];
                 };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getWorkflowSlaWeight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items, sorted by task code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getWorkflowWeightTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            group?: string;
+                            total?: number;
+                            tasks?: number;
+                            ok?: boolean;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putTaskSlaRule: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    min_working_days: number;
+                    max_working_days: number;
+                    /** @description PRED (previous task done), OPEN (record created) or G<n> (gate passed) */
+                    start_event: string;
+                    /** @enum {string} */
+                    unit?: "working" | "calendar";
+                    calendar_code?: string;
+                    warning_pct?: number | null;
+                    breach_owner_role?: string | null;
+                    escalation_role?: string | null;
+                    pause_on_client_wait?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The saved rule, the weight totals and the version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    removeTaskSlaRule: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description outcome deleted or deactivated, with why */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    putTaskWeight: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    counts_in_weight: boolean;
+                    weight_value?: number;
+                    weight_group?: string | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The version and the weight totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
