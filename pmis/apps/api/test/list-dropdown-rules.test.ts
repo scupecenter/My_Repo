@@ -27,6 +27,18 @@ afterAll(async () => {
   await app.close();
 });
 
+
+// PATCH routes need If-Match: the version of the catalogue, or of the value when the path names a value.
+const patch = async (path: string, body: Record<string, unknown>) => {
+  const m = /^\/list-catalogues\/([^/]+)(?:\/values\/([^/?]+))?$/.exec(path)!;
+  const got = (await admin.api.call("get", `/list-catalogues/${m[1]}`)).body as {
+    version: number;
+    values: { id: string; version: number }[];
+  };
+  const version = m[2] ? got.values.find((v) => v.id === m[2])!.version : got.version;
+  return admin.api.call("patch", path, body, { "If-Match": `"${version}"` });
+};
+
 const createList = (c: string, extra: Record<string, unknown> = {}) =>
   admin.api.call("post", "/list-catalogues", {
     code: c,
@@ -80,9 +92,7 @@ describe("dropdown lists (migration 0102)", () => {
     // the parent value is deactivated: a new value cannot use it, and the list shows the dependent list of its parent
     expect(
       (
-        await admin.api.call(
-          "patch",
-          `/list-catalogues/${P}/values/${(await listOf(P)).values.find((x) => x.code === "South")!.id}`,
+        await patch(`/list-catalogues/${P}/values/${(await listOf(P)).values.find((x) => x.code === "South")!.id}`,
           { is_active: false, reason: "Retired region" },
         )
       ).status,
@@ -102,9 +112,7 @@ describe("dropdown lists (migration 0102)", () => {
     await addValue(C, "Crew1", { parent_code: "Acme" });
     const acme = (await listOf(P)).values.find((x) => x.code === "Acme")!;
 
-    const refused = await admin.api.call(
-      "patch",
-      `/list-catalogues/${P}/values/${acme.id}`,
+    const refused = await patch(`/list-catalogues/${P}/values/${acme.id}`,
       { is_active: false, reason: "Try with children" },
     );
     expect(refused.status).toBe(422);
@@ -112,20 +120,14 @@ describe("dropdown lists (migration 0102)", () => {
     const crew = (await listOf(C)).values.find((x) => x.code === "Crew1")!;
     expect(
       (
-        await admin.api.call(
-          "patch",
-          `/list-catalogues/${C}/values/${crew.id}`,
+        await patch(`/list-catalogues/${C}/values/${crew.id}`,
           { is_active: false, reason: "Crew disbanded" },
         )
       ).status,
     ).toBe(200);
-    const after =
-      (await listOf(C)).values.find((x) => x.code === "Crew1") ?? null;
-    const row = (
-      await admin.api.call("get", `/list-catalogues/${C}?include_inactive=true`)
-    ).body.values.find((x: { code: string }) => x.code === "Crew1");
-    expect(after).toBeNull();
-    expect(row.deactivate_reason).toBe("Crew disbanded");
+    const row = (await listOf(C)).values.find((x) => x.code === "Crew1");
+    expect(row?.is_active).toBe(false);
+    expect(row?.deactivate_reason).toBe("Crew disbanded");
   });
 
   it("the default value is one per list, active, and cannot be deleted or deactivated while it is the default", async () => {
@@ -139,18 +141,14 @@ describe("dropdown lists (migration 0102)", () => {
 
     expect(
       (
-        await admin.api.call(
-          "patch",
-          `/list-catalogues/${L}/values/${high.id}`,
+        await patch(`/list-catalogues/${L}/values/${high.id}`,
           { is_default: true, reason: "Default priority" },
         )
       ).status,
     ).toBe(200);
     expect(
       (
-        await admin.api.call(
-          "patch",
-          `/list-catalogues/${L}/values/${low.id}`,
+        await patch(`/list-catalogues/${L}/values/${low.id}`,
           { is_default: true, reason: "Default priority" },
         )
       ).status,
@@ -162,9 +160,7 @@ describe("dropdown lists (migration 0102)", () => {
 
     expect(
       (
-        await admin.api.call(
-          "patch",
-          `/list-catalogues/${L}/values/${low.id}`,
+        await patch(`/list-catalogues/${L}/values/${low.id}`,
           { is_active: false, reason: "Retire low" },
         )
       ).status,
@@ -219,7 +215,7 @@ describe("dropdown lists (migration 0102)", () => {
     expect((await addValue(S, "NO-SUCH-SITE-9999")).status).toBe(422);
     expect(
       (
-        await admin.api.call("patch", `/list-catalogues/${N}`, {
+        await patch(`/list-catalogues/${N}`, {
           value_type: "text",
           reason: "Type change with values",
         })
@@ -233,7 +229,7 @@ describe("dropdown lists (migration 0102)", () => {
     await createList(A);
     await createList(B, { parent_catalogue: A });
     expect((await addValue(A, "Red", { colour: "red" })).status).toBe(422);
-    const loop = await admin.api.call("patch", `/list-catalogues/${A}`, {
+    const loop = await patch(`/list-catalogues/${A}`, {
       parent_catalogue: B,
       reason: "Make a loop",
     });
