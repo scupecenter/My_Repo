@@ -22,12 +22,12 @@ export function Act({ onClick, label, icon, testid, disabled, why, accent }: { o
 }
 
 function Handle({ id, disabled, label, children, active, onClick, testid, className = '' }: { id: string; disabled?: boolean; label: string; children: React.ReactNode; active?: boolean; onClick: () => void; testid: string; className?: string }) {
-  const s = useSortable({ id, disabled });
+  const { setNodeRef, transform, transition, isDragging, isOver, attributes, listeners } = useSortable({ id, disabled });
   return (
-    <li ref={s.setNodeRef} style={{ transform: CSS.Transform.toString(s.transform), transition: s.transition, opacity: s.isDragging ? 0.5 : 1 }}
-      className={`rounded border p-2 ${active ? 'border-link bg-card' : 'border-line'} ${s.isOver && !s.isDragging ? 'ring-2 ring-link' : ''} ${className}`} data-testid={testid} data-active={active ? 'true' : 'false'}>
+    <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition: transition, opacity: isDragging ? 0.5 : 1 }}
+      className={`rounded border p-2 ${active ? 'border-link bg-card' : 'border-line'} ${isOver && !isDragging ? 'ring-2 ring-link' : ''} ${className}`} data-testid={testid} data-active={active ? 'true' : 'false'}>
       <div className="flex items-start gap-1">
-        <button type="button" className="mt-0.5 cursor-grab touch-none text-mute disabled:cursor-not-allowed disabled:opacity-40" aria-label={label} disabled={disabled} {...s.attributes} {...s.listeners}><GripVertical size={16} aria-hidden /></button>
+        <button type="button" className="mt-0.5 cursor-grab touch-none text-mute disabled:cursor-not-allowed disabled:opacity-40" aria-label={label} disabled={disabled} {...attributes} {...listeners}><GripVertical size={16} aria-hidden /></button>
         <div className="min-w-0 flex-1" onClick={onClick}>{children}</div>
       </div>
     </li>
