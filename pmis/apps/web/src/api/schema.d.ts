@@ -8319,6 +8319,19 @@ export interface components {
                 values: {
                     [key: string]: string | null;
                 };
+                /** @description Task-backed columns only (0.15.21 item 3), keyed by ord. Edit a cell with PATCH /tasks/{task_id} (If-Match the version; body planned_date, actual_date or actual_start, or values with the key). A locked or N/A task, or a task that is not the only source of its column, is read-only (editable false). */
+                cells: {
+                    [key: string]: {
+                        /** Format: uuid */
+                        task_id: string;
+                        version: number;
+                        editable: boolean;
+                        /** @enum {string} */
+                        field?: "planned_date" | "actual_date" | "actual_start";
+                        /** @description The key of the task values map (a typed field). */
+                        values?: string;
+                    };
+                };
             }[];
         };
         UserPickerItem: {

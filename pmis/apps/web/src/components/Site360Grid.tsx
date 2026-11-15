@@ -10,6 +10,25 @@ export interface Site360GridRow {
   row_no?: number;
   /** The Master value of each column, keyed by the column order (ord); null when the column has no value. */
   values?: Record<string, string | null>;
+  /** Inline edit targets of the task-backed columns, keyed by ord (contract 0.15.21, item 3). */
+  cells?: Record<string, Site360CellTarget>;
+}
+
+/** The task behind a task-backed cell: the save goes to PATCH /tasks/{task_id} with the version (If-Match). */
+export interface Site360CellTarget {
+  task_id: string;
+  version: number;
+  editable: boolean;
+  field?: "planned_date" | "actual_date" | "actual_start";
+  values?: string;
+}
+
+/** A value typed into a cell: the target and the new value (an empty text clears the value). */
+export interface Site360CellEdit {
+  row: Site360GridRow;
+  ord: number;
+  target: Site360CellTarget;
+  value: string;
 }
 
 /** Status columns drawn as pills (Progress: Current Milestone is text, Overall Status is one of five values). */
@@ -53,6 +72,7 @@ export function Site360Grid({
   total,
   filtered,
   testid = "site360-grid",
+  onEditCell,
 }: {
   menu: Site360MenuItem;
   rows: Site360GridRow[];
@@ -61,9 +81,12 @@ export function Site360Grid({
   /** Sites that match the filters (the footer's N). */
   filtered?: number;
   testid?: string;
+  /** Saves an inline edit of a task-backed cell; read-only cells never call it. */
+  onEditCell?: (edit: Site360CellEdit) => void;
 }) {
   const { i18n, t } = useTranslation();
   const ar = i18n.language === "ar";
+  const [editing, setEditing] = useState<{ row: string; ord: number; draft: string } | null>(null);
   const [frozen, setFrozen] = useState<number[]>(() =>
     Array.from(new Set([...menu.frozen_ords, ...PINNED])),
   );
@@ -260,10 +283,25 @@ export function Site360Grid({
                 {visibleOrds.map((ord) => {
                   const c = byOrd.get(ord)!;
                   const num = ord === 1;
+                  const target = row.cells?.[String(ord)];
+                  const isEditing = editing?.row === row.id && editing.ord === ord;
+                  const commit = () => {
+                    if (!editing || !target || !onEditCell) return;
+                    const draft = editing.draft;
+                    setEditing(null);
+                    if (draft !== (value(ord, index, row) ?? "")) onEditCell({ row, ord, target, value: draft });
+                  };
                   return (
                     <td
                       key={ord}
                       data-ord={ord}
+                      data-editable={target?.editable ? "true" : undefined}
+                      data-testid={target ? `${testid}-cell-${row.site_code}-${ord}` : undefined}
+                      onDoubleClick={
+                        target?.editable && onEditCell && !isEditing
+                          ? () => setEditing({ row: row.id, ord, draft: value(ord, index, row) ?? "" })
+                          : undefined
+                      }
                       className={`h-7 border border-line px-2 py-0 align-middle ${num ? "text-end tabular-nums text-mute" : ""} ${c.is_phase_gate ? "bg-sideOn/40" : "bg-card"}`}
                       style={{
                         ...stickyStyle(ord),
@@ -272,7 +310,24 @@ export function Site360Grid({
                           : {}),
                       }}
                     >
-                      {renderCell(ord, value(ord, index, row))}
+                      {isEditing && target ? (
+                        <input
+                          autoFocus
+                          type={target.field ? "date" : "text"}
+                          aria-label={c.header}
+                          data-testid={`${testid}-input-${row.site_code}-${ord}`}
+                          className="h-6 w-full bg-transparent text-xs outline-none"
+                          value={editing.draft}
+                          onChange={(e) => setEditing({ ...editing, draft: e.target.value })}
+                          onBlur={commit}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commit();
+                            if (e.key === "Escape") setEditing(null);
+                          }}
+                        />
+                      ) : (
+                        renderCell(ord, value(ord, index, row))
+                      )}
                     </td>
                   );
                 })}

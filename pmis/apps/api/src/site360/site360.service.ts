@@ -136,6 +136,34 @@ export class Site360Service {
         values.get(v.site_id)![String(v.ord)] = hidden ? null : v.value;
       }
     }
+    // inline edit targets (F15 item 3): the open task behind a task-backed column, read-only when the task is locked or has no single owner
+    const cells = new Map<string, Record<string, EditCell>>();
+    if (page.length) {
+      const tasks = await this.db.tx.$queryRaw<
+        { site_id: string; ord: number; task_id: string; version: number; state: string; locked: boolean; field_key: string; n: number }[]
+      >(Prisma.sql`
+        SELECT x.site_id, x.ord, x.task_id, x.version, x.state, x.locked, x.field_key, x.n FROM (
+          SELECT ti.site_id::text AS site_id, mc.ord, ti.id::text AS task_id, ti.version, ti.state::text AS state,
+                 (ti.lock_reason IS NOT NULL OR ti.is_na) AS locked, tf.field_key,
+                 count(*) OVER (PARTITION BY ti.site_id, mc.ord) AS n
+          FROM task_instances ti
+          JOIN sites s ON s.id = ti.site_id
+          JOIN task_definitions td ON td.id = ti.task_def_id AND td.workflow_id = s.workflow_version_id
+          JOIN template_task_fields tf ON tf.task_code = td.code AND tf.is_active AND tf.master_col IS NOT NULL
+            AND (tf.field_key IN ('planned_date', 'actual_date', 'actual_start') OR tf.field_key LIKE 'v:%')
+            AND (tf.scenarios IS NULL OR s.delivery_scenario::text = ANY (tf.scenarios))
+          JOIN master_columns mc ON mc.letter = tf.master_col
+          WHERE s.id = ANY(${page.map((r) => r.id)}::uuid[]) AND mc.ord = ANY(${menuOrds}::int[])
+        ) x WHERE x.n = 1`);
+      for (const t of tasks) {
+        const editable = !t.locked && EDITABLE_STATES.has(t.state);
+        const field = t.field_key.startsWith('v:') ? { values: t.field_key.slice(2) } : { field: t.field_key };
+        const cell: EditCell = { task_id: t.task_id, version: t.version, editable, ...field };
+        const byOrd = cells.get(t.site_id) ?? {};
+        byOrd[String(t.ord)] = cell;
+        cells.set(t.site_id, byOrd);
+      }
+    }
     const c = counts[0] ?? { total: 0, filtered: 0 };
     return {
       menu: menuItem,
@@ -147,10 +175,22 @@ export class Site360Service {
         const v = values.get(r.id) ?? {};
         const row_values: Record<string, string | null> = {};
         for (const ord of menuOrds) row_values[String(ord)] = v[String(ord)] ?? null;
-        return { site_id: r.id, site_code: r.site_code, row_no: offset + i + 1, values: row_values };
+        return { site_id: r.id, site_code: r.site_code, row_no: offset + i + 1, values: row_values, cells: cells.get(r.id) ?? {} };
       }),
     };
   }
+}
+
+/** Task states in which the L1 holder may still change the entry values (the task screen's own rule is checked again on save). */
+const EDITABLE_STATES = new Set(['open', 'entry', 'rejected']);
+
+/** Inline edit target of one cell: the task, its If-Match version and the field (a date field, or a key of the task values). */
+interface EditCell {
+  task_id: string;
+  version: number;
+  editable: boolean;
+  field?: string;
+  values?: string;
 }
 
 const SITE360_MENU_KEYS = ['master', 'design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;

@@ -54,6 +54,26 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     expect(Object.keys(row.values)).toHaveLength(res.body.menu.columns.length);
   });
 
+  it('gives the inline edit target of a task-backed cell: the task, its version and whether it is editable (locked = read-only)', async () => {
+    const open = await site(1);
+    const openTask = await makeTask(db, open, dateMap.task_code, 'open', { actualDate: '2026-03-11' });
+    const locked = await site(1);
+    await makeTask(db, locked, dateMap.task_code, 'locked');
+    const a = await actor(app, db, { regions: [1] });
+    const res = await a.api.call('get', `/site360/master/rows?site_code=${open.code},${locked.code}`);
+    expect(res.status).toBe(200);
+    const byCode = new Map<string, { cells: Record<string, { task_id: string; version: number; editable: boolean; field?: string }> }>(
+      res.body.rows.map((r: { site_code: string; cells: unknown }) => [r.site_code, r as never]),
+    );
+    const cell = byCode.get(open.code)!.cells[String(dateMap.ord)]!;
+    expect(cell.task_id).toBe(openTask);
+    expect(cell.version).toEqual(expect.any(Number));
+    expect(cell.editable).toBe(true);
+    expect(cell.field).toBe('actual_date');
+    expect(byCode.get(locked.code)!.cells[String(dateMap.ord)]!.editable).toBe(false);
+    expect(byCode.get(open.code)!.cells['2']).toBeUndefined();
+  });
+
   it('keeps the menu columns: a menu lists its own columns, the identity and the status columns only', async () => {
     const a = await actor(app, db, { regions: [1] });
     const res = await a.api.call('get', `/site360/design_acq/rows?site_code=${mine()}`);

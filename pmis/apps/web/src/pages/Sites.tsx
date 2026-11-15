@@ -1,6 +1,7 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
+import { errText } from '@/components/FormDialog';
 import { Site360Grid } from '@/components/Site360Grid';
-import { useSite360RowsPaged, useSite360Sections } from '@/api/site360';
+import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -64,13 +65,15 @@ export function Sites() {
   const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
   // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
-  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, {
+  const gridQuery = {
     site_code: sp.get('site_code') || undefined,
     region_id: sp.get('region_id') || undefined,
     scenario: sp.get('scenario') || undefined,
     overall_status: sp.get('overall_status') || undefined,
     sort: 'site_code',
-  });
+  };
+  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, gridQuery);
+  const saveCell = useSaveSite360Cell(menu ? section : undefined, gridQuery);
   const gridPages = gridRowsQ.data?.pages ?? [];
   const gridTotal = gridPages[0]?.total;
   const gridFiltered = gridPages[0]?.filtered;
@@ -265,7 +268,8 @@ export function Sites() {
             <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('site360.site_ids_placeholder')} aria-label={t('site360.site_ids')} data-testid="site360-site-ids" />
             <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
           </div>
-          <Site360Grid menu={menu} testid="site360-grid" total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values }))} />
+          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
+          <Site360Grid menu={menu} testid="site360-grid" total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells }))} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
         </div>
       ) : (

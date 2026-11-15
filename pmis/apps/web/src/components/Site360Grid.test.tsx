@@ -1,5 +1,5 @@
 import { fireEvent, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { renderApp } from "@/test/utils";
 import type { Site360MenuItem } from "@/api/site360";
 import { Site360Grid } from "./Site360Grid";
@@ -197,5 +197,31 @@ describe("SITE 360 grid", () => {
     renderApp(<Site360Grid menu={withStatus} rows={valued} total={9} filtered={1} />);
     expect(screen.getByTestId("site360-grid-status").textContent).toBe("on hold");
     expect(screen.getByTestId("site360-grid-totals").textContent).toContain("1 of 9 sites");
+  });
+
+  it("edits a task-backed cell on double-click and saves on Enter; a read-only cell does not open", () => {
+    const onEditCell = vi.fn();
+    const rows = [
+      {
+        id: "c",
+        site_code: "S-003",
+        values: { "3": "2026-03-10", "4": "Synthetic site three" },
+        cells: {
+          "3": { task_id: "t-1", version: 2, editable: true, field: "actual_date" as const },
+          "4": { task_id: "t-1", version: 2, editable: false },
+        },
+      },
+    ];
+    renderApp(<Site360Grid menu={cw} rows={rows} onEditCell={onEditCell} />);
+    fireEvent.doubleClick(screen.getByTestId("site360-grid-cell-S-003-3"));
+    const input = screen.getByTestId("site360-grid-input-S-003-3") as HTMLInputElement;
+    expect(input.type).toBe("date");
+    fireEvent.change(input, { target: { value: "2026-04-01" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onEditCell).toHaveBeenCalledWith(
+      expect.objectContaining({ ord: 3, value: "2026-04-01", target: expect.objectContaining({ task_id: "t-1", version: 2 }) }),
+    );
+    fireEvent.doubleClick(screen.getByTestId("site360-grid-cell-S-003-4"));
+    expect(screen.queryByTestId("site360-grid-input-S-003-4")).toBeNull();
   });
 });
