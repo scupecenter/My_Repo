@@ -14,7 +14,7 @@ import { RegisterColumns } from './settings/RegisterColumns';
  */
 const stepUpDone = () => api.post('/__mock/step-up');
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
-const page = () => renderApp(<Routes><Route path="/admin/settings/register-columns" element={<RegisterColumns />} /></Routes>, { route: '/admin/settings/register-columns?register=gecol' });
+const page = () => renderApp(<Routes><Route path="/admin/settings/registers/columns" element={<RegisterColumns />} /></Routes>, { route: '/admin/settings/registers/columns?register=gecol' });
 const screenOf = () => api.get<RegisterColumnsScreen>('/registers/gecol/fields');
 
 beforeEach(() => resetRegisterColumns());

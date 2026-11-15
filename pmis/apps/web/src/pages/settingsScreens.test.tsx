@@ -94,9 +94,9 @@ describe('Q440: confirm the official calendar (Settings, Work calendar)', () => 
 describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
   it('is a System Admin tab: the checklist lists the kinds of the code and marks the six go-live kinds as recommended', async () => {
     await signIn('pm');
-    settings('mail-kinds');
+    settings('documents/mail');
     expect(await screen.findByTestId('page-mail-kinds')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-mail-kinds')).toHaveTextContent('Mail kinds');
+    expect(screen.getByTestId('settings-section-documents-mail')).toHaveTextContent('Mail kinds');
     const six = ['task_assigned', 'register_assigned', 'snag_review', 'task_rejected', 'register_rejected', 'snag_rejected'];
     for (const k of six) expect(screen.getByTestId(`mail-kind-recommended-${k}`)).toHaveTextContent('Recommended');
     expect(screen.queryByTestId('mail-kind-recommended-mention')).toBeNull();
@@ -108,7 +108,7 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
   it('selects the six recommended kinds, saves with a reason and a step-up, and the checklist keeps them', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    settings('mail-kinds');
+    settings('documents/mail');
     await u.click(await screen.findByTestId('mail-kinds-recommended'));
     expect(screen.getByTestId('mail-kind-task_assigned')).toBeChecked();
     expect(screen.getByTestId('mail-kinds-save')).toBeEnabled();
@@ -147,14 +147,14 @@ describe('Q441: the mail notification kinds (Settings, Mail kinds)', () => {
     settings('calendar');
     expect(await screen.findByTestId('page-settings')).toBeInTheDocument();
     expect(screen.getByTestId('settings-tab-calendar')).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId('settings-tab-mail-kinds')).toBeNull());
+    await waitFor(() => expect(screen.queryByTestId('settings-section-documents-mail')).toBeNull());
   });
 
   it('is in Arabic when the locale is Arabic', async () => {
     await signIn('pm');
-    settings('mail-kinds', { locale: 'ar' });
+    settings('documents/mail', { locale: 'ar' });
     expect(await screen.findByTestId('page-mail-kinds')).toHaveTextContent('أنواع الإشعارات المرسلة بالبريد');
     expect(screen.getByTestId('mail-kind-recommended-task_assigned')).toHaveTextContent('موصى به');
-    expect(screen.getByTestId('settings-tab-mail-kinds')).toHaveTextContent('أنواع البريد');
+    expect(screen.getByTestId('settings-section-documents-mail')).toHaveTextContent('أنواع البريد');
   });
 });
