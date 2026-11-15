@@ -6,7 +6,7 @@ import { useWorkflowVersions } from "@/api/workflowEditor";
 import type { WorkflowVersion } from "@/api/types";
 import { errText } from "@/components/FormDialog";
 
-/** F14: standalone SLA admin page. Lists the SLA rules of the current rule set, filters them, and bulk-edits the selected tasks.
+/** F14: bulk SLA admin, a section of the Settings > SLA rules tab (owner rule: no setting twice). Lists the SLA rules of the current rule set, filters them, and bulk-edits the selected tasks.
  *  Writes go to the DRAFT workflow version through the editor door (one PUT per task, each with the version ETag in If-Match). */
 type RuleRow = {
   id: string;
@@ -26,7 +26,7 @@ type RuleRow = {
   open_task_count: number;
 };
 
-export function SlaRuleAdmin() {
+export function SlaBulkAdmin() {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const rules = useQuery({

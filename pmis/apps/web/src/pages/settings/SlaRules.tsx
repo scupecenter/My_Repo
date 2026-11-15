@@ -23,6 +23,7 @@ import { useToast } from "@/components/Toast";
 import { fieldErrors } from "@/lib/fields";
 import { tripoliToday } from "@/lib/today";
 import { FieldErr } from "./Calendar";
+import { SlaBulkAdmin } from "./SlaRuleAdmin";
 
 const SCENARIOS: DeliveryScenario[] = [
   "new_build",
@@ -678,6 +679,7 @@ export function SlaRules() {
   const id = sel ?? draft?.id ?? active?.id;
   return (
     <div className="space-y-4" data-testid="page-sla">
+      <SlaBulkAdmin />
       <section className="card space-y-2 p-4">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="me-auto font-bold">{t("slaSet.title")}</h2>

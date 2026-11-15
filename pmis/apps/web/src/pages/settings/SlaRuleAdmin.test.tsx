@@ -7,9 +7,9 @@ import { renderApp, signIn } from '@/test/utils';
 import { SettingsRoutes } from './Settings';
 
 /** Settings, SLA admin: lists the rules, filters them, and keeps bulk edit disabled until a draft exists and rows are picked. */
-const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/sla-admin' });
+const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/sla' });
 
-describe('Settings, SLA admin', () => {
+describe('Settings, SLA rules bulk admin', () => {
   beforeEach(() => resetWorkflowEditorMock());
 
   it('lists the rules, narrows them by task code, and says that a draft is needed before bulk edit', async () => {

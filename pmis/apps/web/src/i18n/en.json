@@ -925,8 +925,7 @@
     "tab_mail-kinds": "Mail kinds",
     "tab_historical-waiver": "Historical load",
     "tab_imports": "Imports",
-    "tab_workflow": "Workflow",
-    "tab_sla_admin": "SLA admin"
+    "tab_workflow": "Workflow"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",

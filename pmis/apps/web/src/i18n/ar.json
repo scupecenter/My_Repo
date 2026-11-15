@@ -925,8 +925,7 @@
     "tab_mail-kinds": "أنواع البريد",
     "tab_historical-waiver": "التحميل التاريخي",
     "tab_imports": "الاستيراد",
-    "tab_workflow": "سير العمل",
-    "tab_sla_admin": "إدارة SLA"
+    "tab_workflow": "سير العمل"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
