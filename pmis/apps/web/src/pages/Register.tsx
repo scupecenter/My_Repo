@@ -1,4 +1,4 @@
-import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
+import { ArrowRightLeft, Columns3, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import type { RegisterDefinition } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { Holders } from '@/components/HolderChip';
+import { useGridColumnMenu } from '@/components/GridColumnAdmin';
 import { HlcLegacyDialog } from '@/components/P4cPanels';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
@@ -58,6 +59,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const fieldCols = def.fields.filter((x) => x.in_list);
   const defs: ColDef[] = [{ id: 'site', w: 100, min: 70, pinned: true }, { id: 'region', w: 110, min: 70 }, { id: 'type', w: 80, min: 60 }, ...fieldCols.map((c, i) => ({ id: `f:${c.code}`, w: 150, min: 70, off: i >= 4 })), { id: 'state', w: 130, min: 90 }, { id: 'ball', w: 180, min: 90 }];
   const tbl = useTablePrefs(`register-${key}`, defs);
+  const grid = useGridColumnMenu(key, tbl);   // header menu: hide and personal order for all, add, rename, delete and global order for the admin
 
   // contract 0.7.0: every register has its own approved template (Template.register_key)
   const tpl = templates.data?.find((x) => x.register_key === key);
@@ -122,16 +124,21 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ...(key === 'as_built' ? [{ id: 'items', label: t('asb.items_link'), icon: <Ruler size={16} />, testid: 'register-asbuilt-items', onSelect: () => nav('/as-built/items') }] : []),
           ...(key === 'hlc' ? [{ id: 'hlc-legacy', label: t('p4c.legacy_menu'), icon: <ArrowRightLeft size={16} />, testid: 'register-hlc-legacy', onSelect: () => setLegacy(true) }] : []),
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
+          ...(grid.admin ? [
+            { id: 'col-add', label: t('regcols.add'), icon: <Plus size={16} />, testid: 'register-column-add', onSelect: grid.openAdd },
+            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/register-columns?register=${key}`) },
+          ] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />
         </>} />
       {tpl && <TemplateUploadDialog open={uploading} onClose={() => setUploading(false)} templateId={tpl.template_id} templateName={`${name} · v${tpl.current_version}`}
         onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
+      {grid.dialogs}
       {key === 'hlc' && <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />}
       <ActiveChips chips={chips} onClear={clearAll} />
       <div className="card overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">
-          <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
+          <HeaderRow api={tbl} label={label} colMenu={grid.colMenu} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
           <div data-testid="register-list" role="list" style={{ minWidth: W }}>
             {items.map((r) => {
               const tmp = r.id.startsWith('tmp-'), on = picked.has(r.id), cur = recordId === r.id;

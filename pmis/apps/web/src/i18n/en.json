@@ -1840,6 +1840,11 @@
     "upload_processing": "This file is already being checked. Wait until it ends, then open its batches."
   },
   "batch": {
+    "older_title": "This file was made from version {{file}} of the template (the current one is {{current}}). It is read by its column codes.",
+    "older_removed": "Ignored, no longer in the register ({{count}}): {{list}}",
+    "older_added": "New columns, left empty ({{count}}): {{list}}",
+    "older_renamed": "Renamed ({{count}}): {{list}}",
+    "older_note": "Check this summary, then send the batch. A column whose type changed would have refused the file.",
     "title": "Upload review: {{name}}",
     "parsing": "Checking the file…",
     "valid": "{{count}} valid",

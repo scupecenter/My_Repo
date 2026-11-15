@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useColumnImpact, useDeleteColumn, useDeleteSection, useRegisterColumns, useRenameRegister, useReorderColumns, useSaveSection, useUpdateColumn } from '@/api/registerColumns';
 import { useRegisterDefs } from '@/api/registers';
@@ -18,7 +19,9 @@ export function RegisterColumns() {
   const lang = i18n.language;
   const toast = useToast();
   const defs = useRegisterDefs();
-  const [key, setKey] = useState('gecol');
+  const [sp, setSp] = useSearchParams();
+  const key = sp.get('register') || 'gecol';
+  const setKey = (k: string) => setSp({ register: k }, { replace: true });
   const scr = useRegisterColumns(key);
   const [dlg, setDlg] = useState<Dlg | null>(null);
   const [err, setErr] = useState<string | null>(null);
