@@ -2117,6 +2117,7 @@
     "columns": "Columns",
     "more": "More",
     "resize": "Resize column {{col}}",
+    "fit_hint": "Double-click the edge to fit the column to its content",
     "move_earlier": "Move {{col}} earlier",
     "move_later": "Move {{col}} later",
     "narrower": "Narrower: {{col}}",
