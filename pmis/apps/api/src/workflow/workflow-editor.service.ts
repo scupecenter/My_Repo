@@ -14,6 +14,15 @@ import { DbService } from '../db/db.service';
 const condition = z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional(), offset_wd: z.number().int().min(-365).max(365).optional() }).strict();
 const reason = z.string().trim().min(3).max(1000);
 const closingBody = z.object({ closing: z.boolean(), reason }).strict();
+const slaRuleBody = z.object({
+  min_working_days: z.number().int().min(0).max(365), max_working_days: z.number().int().min(0).max(365), start_event: z.string().trim().min(1).max(60),
+  unit: z.enum(['working', 'calendar']).default('working'), calendar_code: z.string().trim().min(1).max(60).default('default'),
+  warning_pct: z.number().int().min(0).max(100).nullable().optional(), breach_owner_role: z.string().trim().max(60).nullable().optional(),
+  escalation_role: z.string().trim().max(60).nullable().optional(), pause_on_client_wait: z.boolean().default(false), reason,
+}).strict();
+const weightBody = z.object({
+  counts_in_weight: z.boolean(), weight_value: z.number().min(0).max(100).optional(), weight_group: z.string().trim().max(20).nullable().optional(), reason,
+}).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -233,6 +242,36 @@ export class WorkflowEditorService {
   }
 
   /** Typed confirmation (CLAUDE.md): `v<version>`. Checked before the step-up so a typo costs no password prompt. */
+  /** Migration 0099: the weight totals of a version (per group, over the active tasks that count). */
+  async weightTotals(version: number): Promise<Json> {
+    const r = await this.one(Prisma.sql`SELECT jsonb_build_object('items', wf_weight_totals(w.id)) AS r FROM workflow_definitions w WHERE w.version = ${version}::int`);
+    if (Object.keys(r).length === 0) throw problems.notFound('The workflow version does not exist.');
+    return r;
+  }
+
+  /** Migration 0099: the base SLA rule of a task, saved as a new effective-dated version (the open one ends the day before). Draft or published version. */
+  async saveSlaRule(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(slaRuleBody, raw);
+    const etag = await this.gate(auth, 'sla_rules', 'edit', ifMatch);
+    const { reason: why, ...payload } = b;
+    return this.one(Prisma.sql`SELECT admin_sla_rule_save(${version}::int, ${etag}::int, ${task}::text, ${JSON.stringify(payload)}::jsonb, ${why}::text) AS r`);
+  }
+
+  /** Migration 0099: an unused rule is deleted; a used one is deactivated and the answer says why. */
+  async removeSlaRule(auth: AuthContext, version: number, task: string, rule: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(discardBody, raw);
+    const etag = await this.gate(auth, 'sla_rules', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_sla_rule_remove(${version}::int, ${etag}::int, ${task}::text, ${rule}::uuid, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0099: counts in project weight, the percent and the weight group of a task (draft only; the draft shows the totals, publishing blocks them). */
+  async setWeight(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(weightBody, raw);
+    const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_weight(${version}::int, ${etag}::int, ${task}::text, ${b.counts_in_weight}::boolean, ${b.weight_value ?? 0}::numeric,
+      ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
+  }
+
   async publish(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(publishBody, raw);
     await this.access.requireAdmin('workflow_versions', 'administer');
@@ -240,6 +279,12 @@ export class WorkflowEditorService {
       throw new ProblemException(422, 'confirmation_mismatch', { detail: `Type v${version} to confirm.`, errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
     }
     const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    // Migration 0099 (owner 2026-11-15): a weight group must total 100 before the version is published.
+    const totals = await this.weightTotals(version);
+    const open = ((totals.items as { group: string; total: string; ok: boolean }[] | undefined) ?? []).filter((g) => !g.ok);
+    if (open.length > 0) {
+      throw new ProblemException(409, 'invalid_transition', { detail: 'Every weight group must total 100 before publishing.', errors: open.map((g) => ({ path: `/weight_groups/${g.group}`, code: 'not_100', message: `${g.group} totals ${g.total}.` })) });
+    }
     return this.one(Prisma.sql`SELECT admin_wf_publish(${version}::int, ${etag}::int, ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
   }
 
