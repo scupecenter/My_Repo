@@ -1687,6 +1687,10 @@
     "grid": "Grid"
   },
   "registers": {
+    "tab_asb_cw": "BOQ CW (civil works)",
+    "tab_asb_te": "BOQ TE (equipment)",
+    "tab_dis_cw": "Dismantle CW",
+    "tab_dis_te": "Dismantle TE",
     "new": "New record",
     "new_hint": "A new draft. Fill the sections, save it, then submit it for review.",
     "choose": "Choose…",

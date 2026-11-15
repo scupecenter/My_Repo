@@ -2,10 +2,11 @@ import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, type RecordFilters } from '@/api/registers';
+import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, useUpdateRecord, type RecordFilters } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { RegisterDefinition } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
+import { GridCellEditor, INLINE_TYPES } from '@/components/GridCellEditor';
 import { RegisterGrid } from '@/components/RegisterGrid';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
@@ -51,7 +52,14 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const setView = (v: ViewMode) => setParams({ view: v === 'grid' ? 'grid' : '' });
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
-  const list = useRegisterRecords(key, f);
+  // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
+  const tabDefs = key === 'as_built'
+    ? [{ value: 'cw_part', label: t('registers.tab_asb_cw') }, { value: 'te_part', label: t('registers.tab_asb_te') }]
+    : key === 'dismantle' ? [{ value: 'cw', label: t('registers.tab_dis_cw') }, { value: 'te', label: t('registers.tab_dis_te') }] : [];
+  const tab = f.record_type || tabDefs[0]?.value || '';
+  const list = useRegisterRecords(key, { ...f, record_type: tab });
+  const save = useUpdateRecord(key);
+  const [editing, setEditing] = useState<{ id: string; col: string } | null>(null);
   const templates = useTemplates();
   const [uploading, setUploading] = useState(false);
   const [legacy, setLegacy] = useState(false);   // 0063 (Q139): the one-time migration of the legacy HLC requests
@@ -71,6 +79,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
   const down = (prefill: boolean) => tpl && downloadTemplate(tpl.template_id, { prefill, regionId: f.region_id || undefined }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
+  const inlineField = (cid: string) => (cid.startsWith('f:') ? fieldCols.find((x) => `f:${x.code}` === cid) : undefined);
   const label = (id: string) => { const fc = fieldCols.find((c) => `f:${c.code}` === id); return fc ? fieldLabel(fc, i18n.language) : t({ site: 'sites.code', region: 'sites.region', type: 'registers.record_type', state: 'registers.state', ball: 'grid.ball' }[id] ?? id); };
   const W = totalWidth(tbl.cols, true);
   const real = items.filter((r) => !r.id.startsWith('tmp-'));
@@ -109,6 +118,14 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     <div data-testid={`page-register-${key}`}>
       <PageHeader title={name} />
       {OWNER_NOTE[key] && <p className="mb-3 text-mute" data-testid="register-owner-note">{t(OWNER_NOTE[key])}</p>}
+      {tabDefs.length > 0 && (
+        <div className="mb-3 flex gap-1" role="group" aria-label={name} data-testid="register-tabs">
+          {tabDefs.map((x) => (
+            <button key={x.value} type="button" className={`btn ${tab === x.value ? 'btn-accent' : ''}`} aria-pressed={tab === x.value}
+              data-testid={`register-tab-${x.value}`} onClick={() => set('record_type')(x.value)}>{x.label}</button>
+          ))}
+        </div>
+      )}
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
         {viewsReady && <Suspense fallback={null}><SavedViews screen={`register-${key}`} value={f} empty={VIEW_EMPTY} table={tbl}
@@ -151,7 +168,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {view === 'grid' && (
         <RegisterGrid testid="register-grid" rows={real} columns={[{ id: 'site', label: label('site') }, { id: 'region', label: label('region') }, { id: 'type', label: label('type') },
           ...fieldCols.map((c) => ({ id: `f:${c.code}`, label: label(`f:${c.code}`) })), { id: 'state', label: label('state') }, { id: 'ball', label: label('ball') }]}
-          cell={cell} onOpen={setRecord} />
+          cell={cell} onOpen={setRecord}
+          canEdit={(cid, r) => { const fc = inlineField(cid); return !!fc && INLINE_TYPES.includes(fc.type) && !fc.read_only && !!r.allowed_actions?.includes('edit'); }}
+          editing={editing} onStartEdit={(id, col) => setEditing({ id, col })}
+          renderEditor={(cid, r) => {
+            const fc = inlineField(cid);
+            if (!fc) return null;
+            return <GridCellEditor key={`${r.id}-${cid}`} field={fc} value={r.data[fc.code]} onClose={() => setEditing(null)}
+              onSave={(v) => save.mutate({ record: r, patch: { data: { [fc.code]: v } } }, { onError: (e) => toast(registerErrorMessage(t, e), 'err') })} />;
+          }} />
       )}
       {view === 'vertical' && <>
       <div className="card gx overflow-hidden" data-density={tbl.density}>
