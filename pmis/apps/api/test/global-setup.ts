@@ -183,6 +183,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wfgDb = await buildDatabase(adminUrl, wfg, appPassword);
   process.env.TEST_DATABASE_URL_WFG = wfgDb.appUrl;
   process.env.TEST_SUPER_URL_WFG = wfgDb.superUrl;
+  // The register-columns database (migration 0095): the suite adds, converts and deletes register columns, which issues new register template versions.
+  const rcols = `${dbName}_rcols`;
+  const rcolsDb = await buildDatabase(adminUrl, rcols, appPassword);
+  process.env.TEST_DATABASE_URL_RCOLS = rcolsDb.appUrl;
+  process.env.TEST_SUPER_URL_RCOLS = rcolsDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -228,6 +233,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${hreg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
     await a.end();
   };
 }
