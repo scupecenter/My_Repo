@@ -43,6 +43,21 @@ export const useDashboard = (q: DashboardQuery) =>
 /** Downloads exactly the view on screen (`GET /dashboard/export`, needs the export right; the server audits it). Excel by default (Q127), CSV as an option. */
 export const downloadDashboard = (q: DashboardQuery, format: ExportFormat = 'xlsx') => downloadFile('/dashboard/export', { ...clean(q), format });
 
+// ---------------------------------------------------------------- 0.15.16: the F13 sections (risk matrix, data quality, swap and relocation, decisions)
+export type DashboardExtras = S['DashboardExtras'];
+export type DashboardRiskItem = S['DashboardRiskItem'];
+/** Read only. The same region, cluster and scenario filters as the dashboard; the sections are not dated. */
+export const useDashboardExtras = (q: DashboardQuery, enabled = true) => {
+  const query = clean({ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario });
+  return useQuery({
+    queryKey: ['dashboard-extras', query],
+    staleTime: 30_000,
+    enabled,
+    placeholderData: keepPreviousData,
+    queryFn: () => api.get<DashboardExtras>('/dashboard/extras', { query }),
+  });
+};
+
 // ---------------------------------------------------------------- 0.14.5: the site map (OV-12, SC-10)
 export type SiteMap = S['SiteMap'];
 export type SiteMapItem = S['SiteMapItem'];
