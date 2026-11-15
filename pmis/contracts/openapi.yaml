@@ -8123,7 +8123,7 @@ paths:
       operationId: getSite360Sections
       summary: The SITE 360 menus and the Master columns of each (0.15.21, F15)
       description: |
-        0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (Site ID and Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
+        0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
       responses:
         '200':
           description: The menus.
@@ -13032,7 +13032,7 @@ components:
           items: { $ref: '#/components/schemas/Site360Band' }
         frozen_ords:
           type: array
-          description: The identity columns frozen by default (Site ID = 2, Site Name = 4).
+          description: The identity columns frozen by default (# to Site Name, ords 1 to 4).
           items: { type: integer, minimum: 1, maximum: 187 }
     Site360Sections:
       type: object

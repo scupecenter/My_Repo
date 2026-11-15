@@ -22,18 +22,18 @@ export const SITE360_MENUS = [
 ] as const;
 export type Site360Menu = (typeof SITE360_MENUS)[number]['key'];
 
-/** Identity columns that every menu shows and freezes by default: Site ID (B = 2) and Site Name (D = 4). */
-export const SITE360_IDENTITY_ORDS = [2, 4] as const;
+/** Identity columns that every menu shows and freezes by default: # (A = 1) to Site Name (D = 4). */
+export const SITE360_IDENTITY_ORDS = [1, 2, 3, 4] as const;
 export const SITE360_PHASE_GATE = 'Phase Gate';
 
 /** Default section ranges by Master order (A = 1). Mirrors migration 0101; the migration is the seed. */
 export const SITE360_DEFAULT_RANGES: ReadonlyArray<readonly [number, number, Site360Section]> = [
-  [1, 23, 'design_acq'],
-  [24, 26, 'cw'],
-  [27, 32, 'sow'],
-  [33, 79, 'cw'],
-  [80, 150, 'te'],
-  [151, 156, 'hoto'],
+  [1, 22, 'design_acq'],
+  [23, 23, 'cw'],
+  [24, 32, 'sow'],
+  [33, 77, 'cw'],
+  [78, 143, 'te'],
+  [144, 156, 'hoto'],
   [157, 169, 'om'],
   [170, 179, 'dismantle'],
   [180, 187, 'status'],

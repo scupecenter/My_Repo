@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildBands,
@@ -19,7 +20,7 @@ function masterColumns(): Site360ColumnRow[] {
   const band = (o: number): string => {
     if (o === 1) return '#';
     if (o <= 22) return 'RF & DESIGN';
-    if (o === 23 || o === 50 || o === 79 || o === 100 || o === 121 || o === 143 || o === 150 || o === 156) return 'Phase Gate';
+    if (o === 23 || o === 50 || o === 69 || o === 79 || o === 100 || o === 121 || o === 143 || o === 150 || o === 156) return 'Phase Gate';
     if (o <= 49) return 'PRE-CW';
     if (o <= 78) return 'ACTUAL CW';
     if (o <= 99) return 'TE INSTALLATION';
@@ -70,7 +71,7 @@ describe('SITE 360 default sections', () => {
   });
 
   it('matches the ranges seeded by migration 0101', () => {
-    const sql = readFileSync(new URL('../prisma/migrations/0101_site360_sections/migration.sql', import.meta.url), 'utf8');
+    const sql = readFileSync(join(__dirname, '..', 'prisma', 'migrations', '0101_site360_sections', 'migration.sql'), 'utf8');
     const seeded = [...sql.matchAll(/WHEN ord BETWEEN (\d+) AND (\d+) THEN '(\w+)'/g)].map((m) => [Number(m[1]), Number(m[2]), m[3]]);
     expect(seeded).toEqual(SITE360_DEFAULT_RANGES.map(([a, b, s]) => [a, b, s]));
   });
@@ -95,27 +96,27 @@ describe('SITE 360 menu columns', () => {
     expect(buildSite360(cols).map((m) => m.key)).toEqual(SITE360_MENUS.map((m) => m.key));
   });
 
-  it('gives the CW menu CW columns only, with the SOW columns left to their own menu', () => {
+  it('gives the CW menu W and AG:BY, with the SOW columns X:AF left to their own menu', () => {
     const ords = menuColumns('cw', cols).map((c) => c.ord);
-    expect(ords).toEqual(expect.arrayContaining([24, 25, 26, 33, 79]));
-    for (const o of [27, 28, 32]) expect(ords).not.toContain(o);
-    for (const o of [80, 150]) expect(ords).not.toContain(o);
+    expect(ords).toEqual(expect.arrayContaining([23, 33, 50, 77]));
+    for (const o of [24, 28, 32]) expect(ords).not.toContain(o);
+    for (const o of [78, 150]) expect(ords).not.toContain(o);
   });
 
   it('shows the status columns and the identity columns in every menu', () => {
     for (const m of SITE360_MENUS) {
       const ords = menuColumns(m.key, cols).map((c) => c.ord);
-      for (const o of [2, 4, 180, 187]) expect(ords).toContain(o);
+      for (const o of [1, 2, 4, 180, 187]) expect(ords).toContain(o);
     }
   });
 
-  it('freezes Site ID and Site Name by default in every menu', () => {
-    for (const m of buildSite360(cols)) expect(m.frozen_ords).toEqual([2, 4]);
+  it('freezes # to Site Name by default in every menu', () => {
+    for (const m of buildSite360(cols)) expect(m.frozen_ords).toEqual([1, 2, 3, 4]);
   });
 
-  it('gives the SOW menu its own columns', () => {
+  it('gives the SOW menu X to AF', () => {
     const sow = buildMenu('sow', cols);
-    expect(sow.columns.filter((c) => c.section === 'sow').map((c) => c.letter)).toEqual(['AA', 'AB', 'AC', 'AD', 'AE', 'AF']);
+    expect(sow.columns.filter((c) => c.section === 'sow').map((c) => c.letter)).toEqual(['X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF']);
   });
 });
 
@@ -141,7 +142,7 @@ describe('SITE 360 grid header', () => {
   });
 
   it('flags the Phase Gate columns of a menu', () => {
-    const m = buildMenu('design_acq', masterColumns());
+    const m = buildMenu('cw', masterColumns());
     expect(m.columns.find((c) => c.letter === 'W')!.is_phase_gate).toBe(true);
     expect(m.columns.find((c) => c.letter === 'X')).toBeUndefined();
   });

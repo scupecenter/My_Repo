@@ -1,19 +1,18 @@
 -- Mirror of apps/api/prisma/migrations/0101_site360_sections/migration.sql (0101 -> 100).
 -- 0101 (F15, 2026-11-15): SITE 360 menus. Each Master column belongs to one menu section (column metadata).
--- Menus: design_acq (Design & Acquisition, A to W), sow (new, AA to AF), cw (Civil Works, X to Z and AG to CA),
--- te (Installation TE, CB to ET), hoto (Handover & Closure, EU to EZ), om (O&M, FA to FM), dismantle (FN to FW),
--- status (FX to GE, shown in every menu). The menu lists its section plus the status columns; Master shows all.
--- Deviation (flagged in the PR): O&M and HOTO do not overlap; one section per column.
-
+-- Ranges (owner plan 2026-11-15, Master order A = 1): design_acq = A:V (identity, coordinates, tower, RF, acquisition, Site Release);
+-- cw = W (Phase Gate) and AG:BY (CW procurement through CW PAC, GECOL, HLC, Site RFI); sow = X:AF (Project Phase to TE SOW);
+-- te = BZ:EM (TE access through TE PAC); hoto = EN:EZ (cluster optimization, launch, HOTO); om = FA:FM (DLP/FAC, final closure);
+-- dismantle = FN:FW (CW and TE bands); status = FX:GE (every menu). One section per column: no overlap between HOTO and O&M.
 ALTER TABLE master_columns ADD COLUMN IF NOT EXISTS site360_section text;
 
 UPDATE master_columns SET site360_section = CASE
-  WHEN ord BETWEEN 1 AND 23 THEN 'design_acq'
-  WHEN ord BETWEEN 24 AND 26 THEN 'cw'
-  WHEN ord BETWEEN 27 AND 32 THEN 'sow'
-  WHEN ord BETWEEN 33 AND 79 THEN 'cw'
-  WHEN ord BETWEEN 80 AND 150 THEN 'te'
-  WHEN ord BETWEEN 151 AND 156 THEN 'hoto'
+  WHEN ord BETWEEN 1 AND 22 THEN 'design_acq'
+  WHEN ord BETWEEN 23 AND 23 THEN 'cw'
+  WHEN ord BETWEEN 24 AND 32 THEN 'sow'
+  WHEN ord BETWEEN 33 AND 77 THEN 'cw'
+  WHEN ord BETWEEN 78 AND 143 THEN 'te'
+  WHEN ord BETWEEN 144 AND 156 THEN 'hoto'
   WHEN ord BETWEEN 157 AND 169 THEN 'om'
   WHEN ord BETWEEN 170 AND 179 THEN 'dismantle'
   WHEN ord BETWEEN 180 AND 187 THEN 'status'
