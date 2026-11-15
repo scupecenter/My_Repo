@@ -204,3 +204,19 @@
 ## المرحلة 5 (طلب المالك 2026-11-15): SITE 360 والماستر وSLA والوزن في المحرر والقوائم المنسدلة
 
 الخطة: `2026-11-15-site360-sla-weight-plan.md` (F14 إلى F18، مع جدول أرقام CHANGELOG والعقد الثابتة لكل طلب).
+
+## الحالة (تحديث 2026-11-15 مساءً)
+
+مدموج في main: #132، #133، #134، #135، #136، #137، #138، #139.
+
+| الطلب | الفرع | الحالة |
+|---|---|---|
+| [#144](https://github.com/scupecenter/My_Repo/pull/144) F19 تبويبات الإعدادات | claude/f19-settings-tabs | جاهز، ينتظر CI |
+| [#143](https://github.com/scupecenter/My_Repo/pull/143) F17 القوائم المنسدلة DDL | claude/f17-dropdown-lists | جاهز، ينتظر CI |
+| [#142](https://github.com/scupecenter/My_Repo/pull/142) F16 السجلات والقفل | claude/f16-registers-grid | يحتاج دمج main |
+| [#140](https://github.com/scupecenter/My_Repo/pull/140) F14 SLA والوزن | claude/f14-sla-weight | يحتاج دمج main وإعادة ترقيم الترحيل إلى 0109/0110 |
+| [#141](https://github.com/scupecenter/My_Repo/pull/141) F15 SITE 360 | claude/f15-site360 | قيد العمل: أعمدة Project Status المحسوبة (0107)، فلتر المقاول، التحكم بالأعمدة، شريط الأدوات |
+| F20 لوحة المتابعة | claude/f20-dashboard | قيد العمل (0108، العقد 0.15.24، CHANGELOG 150) |
+| إصلاح اختبار templates-streams المتقطع | claude/fix-templates-streams-test | قيد العمل |
+
+للاستئناف من أي مكان: اقرأ `2026-11-15-site360-sla-weight-plan.md` (الخطة، جدول أرقام الترحيل، قاعدة مكان الإعدادات)، ثم قائمة «## Progress» في وصف كل طلب. كل العمل الملتزم به مرفوع؛ الفروع قيد العمل قد تحمل تعديلات محلية لم تُلتزم بعد.
