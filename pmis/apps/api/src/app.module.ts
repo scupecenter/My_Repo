@@ -7,6 +7,8 @@ import { AssignmentsController } from './assignments/assignments.controller';
 import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
+import { SearchController } from './search/search.controller';
+import { SearchService } from './search/search.service';
 import { AsBuiltItemsService } from './warehouse/as-built-items.service';
 import { AsBuiltItemsController, NumberSequencesController, WarehouseController } from './warehouse/warehouse.controller';
 import { WarehouseService } from './warehouse/warehouse.service';
@@ -158,6 +160,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportController, TemplateMappingController,
       ContractorsController,
       SavedViewsController,
+      SearchController, // 0.15.17 (F4)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -175,6 +178,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportService, MappingService,
       ContractorsService,
       SavedViewsService,
+      SearchService, // 0.15.17 (F4)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -1796,6 +1796,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Global search across sites, registers, documents, meetings, people and contractors (0.15.19, F4)
+         * @description Ctrl+K and the top-bar search. Each group is limited to what the caller may read: `sites` needs `view` on `sites` in the site's region; `registers` needs `view` on the register's module in the record's region; `documents` need `view` on `sites` in the site's region; `meetings` need `view` on `meetings` (a global meeting, or one of the caller's regions); `contractors` need `view` on `contractors`; `people` need `view` on `admin.users`. A group the caller cannot read is absent (no 403). Matching ignores case, the Arabic letter forms (alef, taa marbuta, yaa and alef maqsura), tashkeel, tatweel, Arabic-Indic digits and Latin diacritics. Read only: an item carries the route to open, and nothing changes.
+         */
+        get: operations["globalSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/site-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Many Site IDs at once, found and not found (0.15.19, F4)
+         * @description The paste of a list of Site IDs (new lines, commas or spaces) in Ctrl+K. Matching ignores case and surrounding spaces. Only sites the caller may read (`view` on `sites`, in their regions) are found; any other ID, including one that exists but is out of reach, is listed in `not_found`, so the answer never shows whether a site exists elsewhere. Read only. Duplicates in the input are answered once.
+         */
+        post: operations["lookupSiteIds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites": {
         parameters: {
             query?: never;
@@ -8286,6 +8326,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors";
+        SearchHit: {
+            id: string;
+            /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
+            title: string;
+            subtitle: string | null;
+            region_id: number | null;
+            /** @description The app route to open (a relative path). */
+            href: string;
+            match_ranges: number[][];
+        };
+        SearchGroup: {
+            type: components["schemas"]["SearchType"];
+            /** @description Visible matches in the group (every match, not only those returned). */
+            total: number;
+            /** @description True when more matches exist than the items returned. */
+            truncated: boolean;
+            items: components["schemas"]["SearchHit"][];
+        };
+        SearchResponse: {
+            q: string;
+            groups: components["schemas"]["SearchGroup"][];
+        };
+        SiteIdLookupInput: {
+            ids: string[];
+        };
+        SiteIdLookupResult: {
+            found: {
+                id: string;
+                site_code: string;
+                name: string;
+                region_id: number;
+                href: string;
+            }[];
+            not_found: string[];
+        };
         UserPickerItem: {
             /** Format: uuid */
             id: string;
@@ -19101,11 +19178,68 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    globalSearch: {
+        parameters: {
+            query: {
+                /** @description Text to find, 2 to 100 characters. */
+                q: string;
+                /** @description Groups to search (default: all six). */
+                types?: components["schemas"]["SearchType"][];
+                /** @description Items per group (1 to 10). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups in the order of `types`, each with its visible total. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    lookupSiteIds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteIdLookupInput"];
+            };
+        };
+        responses: {
+            /** @description The sites found (with the route to open) and the IDs not found, in input order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteIdLookupResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSites: {
         parameters: {
             query?: {
                 /** @description Site code, owner ID or name. */
                 q?: string;
+                /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
+                site_codes?: string;
                 region_id?: components["schemas"]["RegionId"][];
                 /** @description Current milestone/stage code (stable code, ADR 0010). */
                 stage_code?: string;

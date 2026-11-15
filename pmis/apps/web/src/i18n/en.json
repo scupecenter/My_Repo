@@ -96,8 +96,24 @@
   },
   "palette": {
     "title": "Go to",
-    "placeholder": "Type a page name",
-    "empty": "No match"
+    "placeholder": "Search sites, records, documents, people, or type a page name. Paste Site IDs to check a list",
+    "empty": "No match",
+    "searching": "Searching...",
+    "error": "Search failed. Try again.",
+    "nav": "Pages",
+    "group": {
+      "sites": "Sites",
+      "registers": "Register records",
+      "documents": "Documents",
+      "meetings": "Meetings",
+      "people": "People",
+      "contractors": "Contractors"
+    },
+    "site_list": "Site ID in list",
+    "site_list_found": "{{count}} found",
+    "site_list_open": "Open these sites",
+    "not_found": "Not found ({{count}}):",
+    "too_many": "Only the first {{max}} IDs are checked"
   },
   "login": {
     "title": "Sign in to GSDN Workspace",

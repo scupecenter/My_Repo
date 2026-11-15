@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.18
+  version: 0.15.19
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
     - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
     - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
@@ -140,6 +141,8 @@ tags:
     description: "Threads between an employee and their direct manager; a System Admin may write to anyone (ADR 0013)."
   - name: announcements
     description: "Announcements to everyone or to chosen users, groups, roles and departments, answered agree or disagree (ADR 0013)."
+  - name: search
+    description: "Global search and the Site ID list lookup (plan F4, 0.15.19): read only, visibility applied by the server."
   - name: departments
     description: "Admin-managed list of departments (ADR 0013)."
   - name: auth
@@ -2816,6 +2819,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ------------------------------------------------------------------ sites
+  /search:
+    get:
+      tags: [search]
+      operationId: globalSearch
+      summary: Global search across sites, registers, documents, meetings, people and contractors (0.15.19, F4)
+      description: |
+        Ctrl+K and the top-bar search. Each group is limited to what the caller may read: `sites` needs `view` on `sites` in the site's region; `registers` needs `view` on the register's module in the record's region; `documents` need `view` on `sites` in the site's region; `meetings` need `view` on `meetings` (a global meeting, or one of the caller's regions); `contractors` need `view` on `contractors`; `people` need `view` on `admin.users`. A group the caller cannot read is absent (no 403). Matching ignores case, the Arabic letter forms (alef, taa marbuta, yaa and alef maqsura), tashkeel, tatweel, Arabic-Indic digits and Latin diacritics. Read only: an item carries the route to open, and nothing changes.
+      parameters:
+        - { name: q, in: query, required: true, description: 'Text to find, 2 to 100 characters.', schema: { type: string, minLength: 2, maxLength: 100 } }
+        - name: types
+          in: query
+          description: 'Groups to search (default: all six).'
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/SearchType' } }
+        - { name: limit, in: query, description: 'Items per group (1 to 10).', schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+      responses:
+        '200':
+          description: Groups in the order of `types`, each with its visible total.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /search/site-ids:
+    post:
+      tags: [search]
+      operationId: lookupSiteIds
+      summary: Many Site IDs at once, found and not found (0.15.19, F4)
+      description: |
+        The paste of a list of Site IDs (new lines, commas or spaces) in Ctrl+K. Matching ignores case and surrounding spaces. Only sites the caller may read (`view` on `sites`, in their regions) are found; any other ID, including one that exists but is out of reach, is listed in `not_found`, so the answer never shows whether a site exists elsewhere. Read only. Duplicates in the input are answered once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteIdLookupInput' }
+      responses:
+        '200':
+          description: The sites found (with the route to open) and the IDs not found, in input order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteIdLookupResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /sites:
     get:
       tags: [sites]
@@ -2826,6 +2873,7 @@ paths:
         Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
         - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
+        - { name: site_codes, in: query, description: '0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found).', schema: { type: string, maxLength: 8000 } }
         - name: region_id
           in: query
           style: form
@@ -13375,6 +13423,62 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    SearchType:
+      type: string
+      enum: [sites, registers, documents, meetings, people, contractors]
+    SearchHit:
+      type: object
+      additionalProperties: false
+      required: [id, title, subtitle, region_id, href, match_ranges]
+      properties:
+        id: { type: string }
+        title: { type: string, description: 'Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text.' }
+        subtitle: { type: [string, 'null'] }
+        region_id: { type: [integer, 'null'] }
+        href: { type: string, description: 'The app route to open (a relative path).' }
+        match_ranges:
+          type: array
+          items: { type: array, minItems: 2, maxItems: 2, items: { type: integer, minimum: 0 } }
+    SearchGroup:
+      type: object
+      additionalProperties: false
+      required: [type, total, truncated, items]
+      properties:
+        type: { $ref: '#/components/schemas/SearchType' }
+        total: { type: integer, minimum: 0, description: 'Visible matches in the group (every match, not only those returned).' }
+        truncated: { type: boolean, description: 'True when more matches exist than the items returned.' }
+        items: { type: array, items: { $ref: '#/components/schemas/SearchHit' } }
+    SearchResponse:
+      type: object
+      additionalProperties: false
+      required: [q, groups]
+      properties:
+        q: { type: string }
+        groups: { type: array, items: { $ref: '#/components/schemas/SearchGroup' } }
+    SiteIdLookupInput:
+      type: object
+      additionalProperties: false
+      required: [ids]
+      properties:
+        ids: { type: array, minItems: 1, maxItems: 500, items: { type: string, minLength: 1, maxLength: 40 } }
+    SiteIdLookupResult:
+      type: object
+      additionalProperties: false
+      required: [found, not_found]
+      properties:
+        found:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, site_code, name, region_id, href]
+            properties:
+              id: { type: string }
+              site_code: { type: string }
+              name: { type: string }
+              region_id: { type: integer }
+              href: { type: string }
+        not_found: { type: array, items: { type: string } }
     UserPickerItem:
       type: object
       additionalProperties: false
