@@ -15,7 +15,7 @@ Every Site 360 list and register gets the same toolbar: Grid (Excel-like) / Vert
 - Same section: "Counts in project weight" yes/no, weight value, weight group (CW, TE, HOTO...), and a live check that the weights of the group still total 100%.
 - A standalone SLA admin page lists all SLA rules with the same fields, for bulk review and edit.
 - Other places that get the same SLA and weight options: register steps (Car Dispatcher, Financial Advances and any register placed in a workflow), milestones, gates, document types with due dates, inspection templates, generated forms, and breach notifications in subscriptions.
-- CHANGELOG 144, contract 0.15.19, migrations 0099 (and 0100 if needed).
+- CHANGELOG 145, contract 0.15.20, migrations 0099 (and 0100 if needed).
 
 ## F15 Site 360 restructure and Master view (branch from main)
 
@@ -38,7 +38,7 @@ The grid matches the Master sheet look: phase band row, group row, field row, Ph
 
 This replaces the SITE 360 navigation of 2026-11-05 in `CLAUDE.md`; F15 updates that rule and adds a decision entry to `CHANGELOG.md`.
 
-CHANGELOG 145, contract 0.15.20, migration 0101 (section metadata).
+CHANGELOG 146, contract 0.15.21, migration 0101 (section metadata).
 
 ## F16 Registers & Logs in Grid / Vertical, As-Built and Dismantle split (branch from main)
 
@@ -46,7 +46,7 @@ CHANGELOG 145, contract 0.15.20, migration 0101 (section metadata).
 - As-Built opens with two tabs: CW BOQ (31 civil items) and TE BOQ (equipment configuration), as in the As-Built sheet.
 - Dismantle shows CW and TE as two tabs (two bands in Grid).
 - Car Dispatcher and Financial Advances can be placed in the workflow with dependencies on tasks and milestones; this uses the #134/F14 editor (register steps), no new engine.
-- CHANGELOG 146, contract 0.15.21.
+- CHANGELOG 147, contract 0.15.22.
 
 ## F17 Dropdown lists (branch from claude/register-columns-admin, #132)
 
@@ -54,7 +54,7 @@ CHANGELOG 145, contract 0.15.20, migration 0101 (section metadata).
 - Value types: text, date, number, person (staff registry), site, contractor/vendor.
 - Dependent lists (Region to Sub Region, Vendor to Team), default value, multi-select.
 - Bind a list to any column from the column dialog or from the list page ("where used").
-- CHANGELOG 147, contract 0.15.22, migration 0102.
+- CHANGELOG 148, contract 0.15.23, migration 0102.
 
 ## F18 Excel-style working features (suggested, built into the F15/F16 grid)
 
@@ -74,14 +74,14 @@ From how the team used the Master sheet:
 
 | PR | CHANGELOG | Contract |
 |---|---|---|
-| #134 workflow editor | 140 | 0.15.15 |
-| #132 register columns | 137 | 0.15.13 |
-| #137 F1 transitions | 141 | 0.15.16 |
-| #138 F6 dashboard | 142 | 0.15.17 |
-| #139 F4 search | 143 | 0.15.18 |
-| F14 | 144 | 0.15.19 |
-| F15 | 145 | 0.15.20 |
-| F16 | 146 | 0.15.21 |
-| F17 | 147 | 0.15.22 |
+| #132 register columns | 140 | 0.15.15 |
+| #134 workflow editor | 141 | 0.15.16 |
+| #137 F1 transitions | 142 | 0.15.17 |
+| #138 F6 dashboard | 143 | 0.15.18 |
+| #139 F4 search | 144 | 0.15.19 |
+| F14 | 145 | 0.15.20 |
+| F15 | 146 | 0.15.21 |
+| F16 | 147 | 0.15.22 |
+| F17 | 148 | 0.15.23 |
 
 If a PR merges out of this order, only the contract version is renumbered at merge time.
