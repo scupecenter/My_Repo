@@ -7496,8 +7496,8 @@ export interface paths {
         /**
          * The F13 sections of the dashboard in one read (0.15.16)
          * @description The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
-         *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The same region and cluster filters as `GET /dashboard`
-         *     (`region_id`, `cluster_code`, `scenario`, `stream`); the figures are current (no reference date).
+         *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
+         *     `stream` is accepted and ignored. The figures are current (no reference date).
          *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
          *     may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
          *     filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
