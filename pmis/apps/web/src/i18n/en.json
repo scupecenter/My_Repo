@@ -924,6 +924,7 @@
     "tab_documents": "Document Library",
     "tab_team-scope": "Team / scope match",
     "tab_register-columns": "Register columns",
+    "tab_dashboard": "Dashboard",
     "tab_lists": "Lists",
     "tab_contractor-rules": "Contractor rules",
     "tab_gecol-order": "GECOL order warnings",
@@ -3897,6 +3898,30 @@
       "snag_raised": "A snag was raised",
       "team_safety_cert": "A team safety certificate expires"
     }
+  },
+  "dashSettings": {
+    "title": "Dashboard",
+    "note": "Global settings of the dashboard: targets, KPI thresholds, and the cards each tab shows and their order. Every save needs a reason, is audited and is versioned. Each user's own layout and saved filters stay in the browser.",
+    "targets": "Targets",
+    "sites_per_batch": "Target sites per batch (empty = no target)",
+    "monthly_on_air": "Monthly On-Air target, in sites (empty = no target)",
+    "thresholds": "KPI thresholds",
+    "thresholds_note": "Green and amber for each KPI, in the KPI's unit. For a higher-is-better KPI, green starts at its green value and amber at its amber value; for a lower-is-better KPI, green is at or below its green value and amber at or below its amber value; anything worse is red.",
+    "kpi": "KPI",
+    "direction": "Direction",
+    "green": "Green",
+    "amber": "Amber",
+    "unit_pct": "%",
+    "unit_days": "days",
+    "unit_count": "count",
+    "dir_higher": "higher is better",
+    "dir_lower": "lower is better",
+    "tab_pmo": "PMO and management",
+    "tab_cw": "CW follow-up",
+    "tab_te": "TE follow-up",
+    "move_up": "Move {{name}} up",
+    "move_down": "Move {{name}} down",
+    "invalid": "Every KPI needs a green and an amber value, and green must be better than amber for that KPI's direction."
   },
   "gecolOrder": {
     "title": "GECOL order warnings",

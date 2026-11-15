@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.18
+  version: 0.15.24
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.24 (2026-11-15): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16).
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
     - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
     - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
@@ -8204,6 +8205,60 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard:
+    get:
+      tags: [settings]
+      operationId: getDashboardSettings
+      summary: The dashboard settings, targets, KPI thresholds and cards per tab (0.15.24)
+      description: |
+        0.15.24 (F20, owner decisions 2026-11-15). Global settings of the dashboard, kept in the settings table as `dashboard.settings`. `targets`:
+        sites per batch and the monthly On-Air target (null = no target). `thresholds`: green and amber for each KPI of `catalogue.kpis`. `tabs`: for each tab
+        (PMO, CW, TE) the card codes in display order and the codes it hides; a card in `catalogue.cards` that no list names is shown at the end. The per-user
+        layout and the saved filter sets stay in the browser. The health index bands stay in `dashboard.health_bands` (no duplicate setting).
+        Reads need `dashboard.view` (403 `module_forbidden` otherwise), so every dashboard reader gets the thresholds.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setDashboardSettings
+      summary: Save the dashboard settings (reason, If-Match, audited, versioned)
+      description: |
+        0.15.24. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole setting.
+        Field errors (422 `validation_failed`): `unknown_key`, `unknown_kpi` (a threshold for a code the catalogue does not hold), `missing_kpi` (a catalogue KPI without a threshold),
+        `invalid_order` (green is worse than amber for the KPI's direction), `invalid`, `unknown_card` (in an order or hidden list), `duplicate` (a card listed twice in one tab), `too_many`.
+        Each save writes one audit row with before and after values and the reason.
+      x-db-path: admin_save_dashboard_settings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DashboardSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardSettings'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -17740,6 +17795,79 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    DashboardTabLayout:
+      type: object
+      required: [order, hidden]
+      additionalProperties: false
+      properties:
+        order: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes in display order.' }
+        hidden: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes this tab does not show.' }
+    DashboardSettingsInput:
+      type: object
+      required: [targets, thresholds, tabs]
+      additionalProperties: false
+      properties:
+        targets:
+          type: object
+          required: [sites_per_batch, monthly_on_air]
+          additionalProperties: false
+          properties:
+            sites_per_batch: { type: [integer, 'null'], minimum: 0, maximum: 100000, description: 'Target sites per batch; null = no target.' }
+            monthly_on_air: { type: [integer, 'null'], minimum: 0, maximum: 100000, description: 'Monthly On-Air target in sites; null = no target.' }
+        thresholds:
+          type: object
+          description: 'One entry per KPI code of the catalogue (every KPI is required). green and amber are in the unit of the KPI; for a higher-is-better KPI green >= amber, for a lower-is-better KPI green <= amber.'
+          additionalProperties:
+            type: object
+            required: [green, amber]
+            additionalProperties: false
+            properties:
+              green: { type: number }
+              amber: { type: number }
+        tabs:
+          type: object
+          required: [pmo, cw, te]
+          additionalProperties: false
+          properties:
+            pmo: { $ref: '#/components/schemas/DashboardTabLayout' }
+            cw: { $ref: '#/components/schemas/DashboardTabLayout' }
+            te: { $ref: '#/components/schemas/DashboardTabLayout' }
+    DashboardSettings:
+      description: '0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order.'
+      allOf:
+      - $ref: '#/components/schemas/DashboardSettingsInput'
+      - type: object
+        required: [version, catalogue]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+          catalogue:
+            type: object
+            required: [kpis, cards]
+            properties:
+              kpis:
+                type: array
+                items:
+                  type: object
+                  required: [code, label_en, label_ar, unit, direction, default_green, default_amber]
+                  properties:
+                    code: { type: string }
+                    label_en: { type: string }
+                    label_ar: { type: string }
+                    unit: { type: string, enum: [pct, days, count] }
+                    direction: { type: string, enum: [higher, lower] }
+                    default_green: { type: number }
+                    default_amber: { type: number }
+              cards:
+                type: array
+                items:
+                  type: object
+                  required: [code, label_en, label_ar]
+                  properties:
+                    code: { type: string }
+                    label_en: { type: string }
+                    label_ar: { type: string }
     GecolOrderWarningsInput:
       type: object
       required: [enabled, chains, billing_after]

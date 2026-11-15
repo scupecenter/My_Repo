@@ -18,8 +18,9 @@ import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { Workflow } from './Workflow';
+import { DashboardSettings } from './DashboardSettings';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow', 'register-columns'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow', 'register-columns', 'dashboard'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -60,6 +61,7 @@ export function SettingsRoutes() {
         <Route path="imports" element={<Imports />} />
         <Route path="workflow" element={<Workflow />} />
         <Route path="register-columns" element={<RegisterColumns />} />
+        <Route path="dashboard" element={<DashboardSettings />} />
       </Route>
     </Routes>
   );

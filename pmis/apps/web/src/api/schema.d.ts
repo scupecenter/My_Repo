@@ -5177,6 +5177,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dashboard settings, targets, KPI thresholds and cards per tab (0.15.24)
+         * @description 0.15.24 (F20, owner decisions 2026-11-15). Global settings of the dashboard, kept in the settings table as `dashboard.settings`. `targets`:
+         *     sites per batch and the monthly On-Air target (null = no target). `thresholds`: green and amber for each KPI of `catalogue.kpis`. `tabs`: for each tab
+         *     (PMO, CW, TE) the card codes in display order and the codes it hides; a card in `catalogue.cards` that no list names is shown at the end. The per-user
+         *     layout and the saved filter sets stay in the browser. The health index bands stay in `dashboard.health_bands` (no duplicate setting).
+         *     Reads need `dashboard.view` (403 `module_forbidden` otherwise), so every dashboard reader gets the thresholds.
+         */
+        get: operations["getDashboardSettings"];
+        /**
+         * Save the dashboard settings (reason, If-Match, audited, versioned)
+         * @description 0.15.24. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole setting.
+         *     Field errors (422 `validation_failed`): `unknown_key`, `unknown_kpi` (a threshold for a code the catalogue does not hold), `missing_kpi` (a catalogue KPI without a threshold),
+         *     `invalid_order` (green is worse than amber for the KPI's direction), `invalid`, `unknown_card` (in an order or hidden list), `duplicate` (a card listed twice in one tab), `too_many`.
+         *     Each save writes one audit row with before and after values and the reason.
+         */
+        put: operations["setDashboardSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/mail-notification-kinds": {
         parameters: {
             query?: never;
@@ -12885,6 +12916,57 @@ export interface components {
             /** Format: date-time */
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
+        };
+        DashboardTabLayout: {
+            /** @description Card codes in display order. */
+            order: string[];
+            /** @description Card codes this tab does not show. */
+            hidden: string[];
+        };
+        DashboardSettingsInput: {
+            targets: {
+                /** @description Target sites per batch; null = no target. */
+                sites_per_batch: number | null;
+                /** @description Monthly On-Air target in sites; null = no target. */
+                monthly_on_air: number | null;
+            };
+            /** @description One entry per KPI code of the catalogue (every KPI is required). green and amber are in the unit of the KPI; for a higher-is-better KPI green >= amber, for a lower-is-better KPI green <= amber. */
+            thresholds: {
+                [key: string]: {
+                    green: number;
+                    amber: number;
+                };
+            };
+            tabs: {
+                pmo: components["schemas"]["DashboardTabLayout"];
+                cw: components["schemas"]["DashboardTabLayout"];
+                te: components["schemas"]["DashboardTabLayout"];
+            };
+        };
+        /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
+        DashboardSettings: components["schemas"]["DashboardSettingsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            catalogue: {
+                kpis: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                    /** @enum {string} */
+                    unit: "pct" | "days" | "count";
+                    /** @enum {string} */
+                    direction: "higher" | "lower";
+                    default_green: number;
+                    default_amber: number;
+                }[];
+                cards: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                }[];
+            };
         };
         GecolOrderWarningsInput: {
             enabled: boolean;
@@ -25380,6 +25462,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDashboardSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDashboardSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DashboardSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSettings"];
                 };
             };
             401: components["responses"]["Unauthorized"];

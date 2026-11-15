@@ -1,5 +1,5 @@
 import { Download, PencilLine, Printer, RotateCcw } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode, Fragment } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -14,6 +14,8 @@ import { EmptyState } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { streamName } from '@/lib/streams';
 import { tripoliToday } from '@/lib/today';
+import { orderedVisible, type TabLayout } from './dashboardLayout';
+import { useDashboardSettings } from '@/api/dashboardSettings';
 import { DASH_TABS, readRemembered, resolveTab, tabView, teamTabs, writeRemembered, type DashTab } from './dashboardTabs';
 
 type DashMilestone = Dash['pipeline']['nodes'][number];
@@ -191,6 +193,7 @@ export function Dashboard() {
   const userId = me.data?.user?.id;
   // F6: the tab (PMO, CW, TE) is the view filter; an explicit ?tab= wins, then the team, then the last tab used
   const tab: DashTab = resolveTab(sp.get('tab'), readRemembered(userId), teamTabs((me.data?.assignments ?? []).map((a) => a.team)));
+  const dashSettings = useDashboardSettings();
   const q: DashboardQuery = { ref_date: sp.get('ref_date') ?? '', region_id: sp.get('region_id') ?? '', cluster_code: sp.get('cluster_code') ?? '', scenario: sp.get('scenario') ?? '', stream: sp.get('stream') ?? '', view: tab === 'pmo' ? (sp.get('view') ?? '') : tabView(tab) };
   const refDate = q.ref_date || today;
   const dash = useDashboard(q);
@@ -426,12 +429,18 @@ export function Dashboard() {
 
       {!d ? <p className="text-mute" role="status" data-testid="dash-loading">{t('common.loading')}</p> : (
         <>
+          {orderBlocks(dashSettings.data?.tabs[tab], {
+          site_map: (<>
           {/* OV-12 (first card, owner request 2026-11-06): the sites on the map (contract 0.14.5); the dashboard filters above narrow it too */}
           <SiteMap testid="dash-site-map" height={520} outer={{ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, stream: q.stream === 'DISMANTLE' ? '' : q.stream }} />
+          </>),
 
+          f13: (<>
           {/* F13 (contract 0.15.16): risk matrix, data quality, swap and relocation, decisions; A4 landscape when printed */}
           <F13Panel ex={extras.data} sitesLink={sites} />
+          </>),
 
+          headline: (<>
           {/* headline */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <section className="card p-4 xl:col-span-2" data-testid="dash-kpi-progress" aria-label={t('dash.kpi.progress')}>
@@ -482,7 +491,9 @@ export function Dashboard() {
                 <div>{t('dash.kpi.fac_te')}: <b data-testid="dash-fac-te">{fc?.pending_te_fac.count ?? 0}</b> {fc?.pending_te_fac.oldest_age_days != null && <>({t('dash.kpi.oldest', { n: fc.pending_te_fac.oldest_age_days })})</>} · {t('dash.kpi.not_due', { n: fc?.pending_te_fac.not_due ?? 0 })}</div>
               </div>} />
           </div>
+          </>),
 
+          pipeline: (<>
           {/* pipeline */}
           <Card title={t('dash.pipeline.title')} testid="dash-pipeline" aside={
             <span className="flex flex-wrap items-center gap-2 text-sm text-mute">
@@ -518,7 +529,9 @@ export function Dashboard() {
                 }} />
             )}
           </Card>
+          </>),
 
+          health_ps: (<>
           {/* health + activities */}
           <div className="grid gap-3 lg:grid-cols-2">
             <Card title={t('dash.health.title')} testid="dash-health">
@@ -552,7 +565,9 @@ export function Dashboard() {
               </ul>
             </Card>
           </div>
+          </>),
 
+          streams: (<>
           {/* streams */}
           <Card title={t('dash.streams.title')} testid="dash-streams" aside={<span className="text-sm text-mute">{t('dash.streams.hint')}</span>}>
             <EChart build={streamBars} height={44 + (d.streams.items.length * 40)} label={t('dash.streams.chart', { list: d.streams.items.map((s) => `${streamName(t, i18n.language, s)}: ${s.counts.done ?? 0}/${s.counts.in_progress ?? 0}/${(s.counts.not_due ?? 0) + (s.counts.not_started ?? 0)}`).join('; ') })} testid="dash-streams-chart" />
@@ -589,7 +604,9 @@ export function Dashboard() {
               </details>
             )}
           </Card>
+          </>),
 
+          sla: (<>
           {/* SLA */}
           <div className="grid gap-3 lg:grid-cols-2">
             <Card title={t('dash.sla.title')} testid="dash-sla" aside={<Link className="text-sm text-link hover:underline" to={sites({ bucket: 'late' })} data-testid="dash-sla-late-link">{t('dash.sla.open_late', { n: d.sla.totals.open_late })}</Link>}>
@@ -615,7 +632,9 @@ export function Dashboard() {
               )}
             </Card>
           </div>
+          </>),
 
+          gates_issues_delay: (<>
           {/* gates, issues, delay */}
           <div className="grid gap-3 lg:grid-cols-3">
             <Card title={t('dash.gates.title')} testid="dash-gates" aside={<span className="chip border border-line tnum" data-testid="dash-gates-total">{d.gates.blocked_total ?? '–'}</span>}>
@@ -663,7 +682,9 @@ export function Dashboard() {
               )}
             </Card>
           </div>
+          </>),
 
+          regions: (<>
           {/* regions */}
           <Card title={t('dash.regions.title')} testid="dash-regions">
             <div className="overflow-x-auto">
@@ -684,10 +705,17 @@ export function Dashboard() {
               </table>
             </div>
           </Card>
+          </>),
+          })}
         </>
       )}
     </div>
   );
+}
+
+/** F20: the dashboard blocks of one tab in the order and visibility of the saved settings (a block the layout hides is not rendered). */
+function orderBlocks(layout: TabLayout | undefined, blocks: Record<string, ReactNode>): ReactNode[] {
+  return orderedVisible(layout, Object.keys(blocks)).map((code) => <Fragment key={code}>{blocks[code]}</Fragment>);
 }
 
 type DashStream = NonNullable<Dash['streams']['items'][number]['counts']>;
