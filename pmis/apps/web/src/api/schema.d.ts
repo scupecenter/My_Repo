@@ -6727,7 +6727,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Hard delete of a value that is not used (F17)
+         * @description Allowed only when the value is unused, that is not in a register record, a child-list column, a dependent value of a child list and not the default value. The `reason` is a query parameter. If-Match is optional. Audited with the before state and the reason.
+         */
+        delete: operations["deleteListValue"];
         options?: never;
         head?: never;
         /**
@@ -12316,6 +12320,10 @@ export interface components {
             groups: string[];
             sort_order: number;
             is_active: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
+            deactivate_reason?: string | null;
             version: number;
         };
         ListCatalogue: {
@@ -12331,6 +12339,11 @@ export interface components {
              */
             status: "pending" | "confirmed";
             allow_other: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
+            dependent_lists?: string[];
             is_active: boolean;
             /** @description ETag (If-Match). */
             version: number;
@@ -12349,6 +12362,10 @@ export interface components {
             description?: string | null;
             critical?: boolean;
             allow_other?: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
             reason: string;
         };
         ListCataloguePatch: {
@@ -12359,6 +12376,10 @@ export interface components {
             /** @enum {string} */
             status?: "pending" | "confirmed";
             allow_other?: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
             is_active?: boolean;
             reason: string;
         };
@@ -12370,6 +12391,9 @@ export interface components {
             groups?: string[];
             sort_order?: number;
             is_active?: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
             reason: string;
         };
         ListValuePatch: {
@@ -12379,6 +12403,9 @@ export interface components {
             groups?: string[];
             sort_order?: number;
             is_active?: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
             reason: string;
         };
         LegacyConversionProposal: {
@@ -28128,6 +28155,40 @@ export interface operations {
             201: {
                 headers: {
                     ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteListValue: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted; the list with its values. */
+            200: {
+                headers: {
                     [name: string]: unknown;
                 };
                 content: {
