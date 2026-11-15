@@ -2,6 +2,16 @@
   "app": {
     "name": "GSDN Workspace"
   },
+  "site360": {
+    "layout": "SITE 360 layout",
+    "menus": "SITE 360 menus",
+    "gate": "gate",
+    "freeze": "Freeze or unfreeze this column",
+    "rows": "Rows: {{count}}",
+    "of": "{{count}} of {{total}} sites",
+    "grid": "Grid",
+    "vertical": "Vertical"
+  },
   "nav": {
     "group_work": "Work",
     "group_data": "Data entry",
@@ -1320,7 +1330,12 @@
     "resend_note": "A new link is sent and the old one stops working. The rights are checked again against you.",
     "done_resend": "Invitation sent again.",
     "done_revoke": "Invitation revoked.",
-    "status": { "pending": "Pending", "accepted": "Accepted", "revoked": "Revoked", "expired": "Expired" },
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
     "title": "Welcome, {{name}}",
     "intro": "Choose a password to create your GSDN Workspace account.",
     "policy": "At least {{min}} characters, at most {{max}}.",

@@ -1,4 +1,6 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
+import { Site360Grid } from '@/components/Site360Grid';
+import { useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +57,11 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
+  // SITE 360 menus (F15): ?section= picks a menu; ?layout=vertical shows the list, the default is the Grid.
+  const section = sp.get('section') ?? '';
+  const layout = sp.get('layout') === 'vertical' ? 'vertical' : 'grid';
+  const site360Q = useSite360Sections();
+  const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
@@ -184,13 +191,17 @@ export function Sites() {
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={(canCreate || newTpl) && (
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{menu && (
+        <span className="inline-flex gap-1" role="group" aria-label={t('site360.layout')} data-testid="site360-layout">
+          <button type="button" aria-pressed={layout === 'grid'} data-testid="site360-layout-grid" onClick={() => setParams({ layout: 'grid' })} className={`btn px-2 py-1 text-xs ${layout === 'grid' ? 'btn-primary' : ''}`}>{t('site360.grid')}</button>
+          <button type="button" aria-pressed={layout === 'vertical'} data-testid="site360-layout-vertical" onClick={() => setParams({ layout: 'vertical' })} className={`btn px-2 py-1 text-xs ${layout === 'vertical' ? 'btn-primary' : ''}`}>{t('site360.vertical')}</button>
+        </span>)}{(canCreate || newTpl) && (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
           {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
           {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
             onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
-        </span>)} />
+        </span>)}</>} />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
         <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket }} empty={VIEW_EMPTY} table={tbl}
@@ -230,6 +241,8 @@ export function Sites() {
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
+      ) : menu && layout === 'grid' ? (
+        <Site360Grid menu={menu} testid="site360-grid" rows={items.map((x) => ({ id: x.id, site_code: x.site_code, name: (i18n.language === 'ar' && x.name_ar) || x.name }))} />
       ) : (
         <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
