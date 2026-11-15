@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.16
+  version: 0.15.17
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
     - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.13 (2026-11-14): the admin manages the columns of every register (owner request 2026-11-13 and the flexibility follow-up; migration 0095; CHANGELOG 137). Additive. New paths under `/registers/{register_key}`: `GET /fields` (`getRegisterColumns`, the screen: register, sections and every column with usage), `POST /fields` (`createRegisterColumn`), `PATCH /fields/{code}` (`updateRegisterColumn`: rename EN/AR, required as a flag, section, order, visibility in list, filter, template and export, deactivate and reactivate, change of type with the conversion preview), `DELETE /fields/{code}` (`deleteRegisterColumn`: a hard delete when no record of the register ever held a value, otherwise a deactivation with the reason), `GET /fields/{code}/impact` (`getRegisterColumnImpact`: usage, delete mode and the type-conversion preview), `PUT /fields-order` (`reorderRegisterColumns`), `POST /sections`, `PATCH` and `DELETE /sections/{section_id}` (add, rename, reorder, delete when empty), `PATCH /registers/{register_key}` (`renameRegister`, EN and AR). Types of a column: short and long text, number, currency, percentage, date, date and time, yes/no, list, multi list, user, multi user, site, sites, external party, warehouse item, e-mail, phone, link, document (creates its Document Library slot), computed (read-only, from two columns), child list. A list column picks a catalogue or creates one with its values in the same call (`new_list`). Protected columns (`is_system`, with `system_reason`) can be renamed, reordered, moved between sections and shown or hidden, but their deletion, deactivation, type change and requirement answer 409 `system_field`. A type change needs a step-up; it answers 409 `conversion_blocked` (with the failing values) or 409 `conversion_unconfirmed` (every value converts: repeat with `confirm_conversion`). Needs `fields.edit` for all regions (System Admin or a delegate), a reason, optional `If-Match`; a delete, a type change and a deactivation also need a step-up. Every change issues the new register template version (`field_set_version`). Tolerant upload (owner decision 2026-11-14): a file of an older version of a register template is accepted when its columns can be matched by code; a removed column is ignored with a warning, a new column stays empty, and only a change of the type of a column refuses it (`outdated_version`); `ImportBatch.older_template` is the summary shown before the confirm. Version 0.15.12 is the workflow editor phase 2.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
@@ -11868,6 +11869,42 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /registers/{register_key}/records/{record_id}/time-in-state:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [insights]
+      operationId: getRegisterRecordTimeInState
+      summary: How long a register record has sat in its current state (0.15.17, F1)
+      description: Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+      responses:
+        '200':
+          description: Current state and transitions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecordTimeInState'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reports/state-durations:
+    get:
+      tags: [insights]
+      operationId: getStateDurationsReport
+      summary: Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+      description: Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+      parameters:
+      - {name: entity_type, in: query, required: true, schema: {type: string, enum: [task, register_record]}}
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StateDurationsReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /tasks/{task_id}/blocked-by:
     parameters:
     - {$ref: '#/components/parameters/TaskId'}
@@ -19301,6 +19338,43 @@ components:
       type: string
       enum: [entry, review, approve]
       description: 'The level a task sits at.'
+    StatusTransition:
+      type: object
+      required: [from_state, to_state, at, level, admin_override]
+      properties:
+        from_state: {type: [string, 'null']}
+        to_state: {type: string}
+        at: {type: string, format: date-time}
+        actor: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        level: {type: string, enum: [L1, L2]}
+        admin_override: {type: boolean}
+    RecordTimeInState:
+      type: object
+      required: [record_id, register_key, current_state, since, working_days_in_state, transitions]
+      properties:
+        record_id: {type: string, format: uuid}
+        register_key: {type: string}
+        current_state: {type: string}
+        since: {type: [string, 'null'], format: date-time, description: 'At the last recorded transition into the current state.'}
+        working_days_in_state: {type: [integer, 'null']}
+        transitions: {type: array, items: {$ref: '#/components/schemas/StatusTransition'}}
+    StateDurationsReport:
+      type: object
+      required: [entity_type, items]
+      properties:
+        entity_type: {type: string, enum: [task, register_record]}
+        items:
+          type: array
+          items:
+            type: object
+            required: [region_id, group_key, state, count, median_working_days, p85_working_days]
+            properties:
+              region_id: {type: [integer, 'null']}
+              group_key: {type: [string, 'null'], description: 'The stage code of a task, the register key of a record.'}
+              state: {type: string}
+              count: {type: integer}
+              median_working_days: {type: number}
+              p85_working_days: {type: number}
     TaskTimeInState:
       type: object
       required: [task_id, current_state, items, segments]

@@ -7444,6 +7444,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How long a register record has sat in its current state (0.15.17, F1)
+         * @description Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+         */
+        get: operations["getRegisterRecordTimeInState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/state-durations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+         * @description Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+         */
+        get: operations["getStateDurationsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/blocked-by": {
         parameters: {
             query?: never;
@@ -14747,6 +14792,42 @@ export interface components {
          * @enum {string}
          */
         InStateKind: "entry" | "review" | "approve";
+        StatusTransition: {
+            from_state: string | null;
+            to_state: string;
+            /** Format: date-time */
+            at: string;
+            actor?: components["schemas"]["UserRef"] | null;
+            /** @enum {string} */
+            level: "L1" | "L2";
+            admin_override: boolean;
+        };
+        RecordTimeInState: {
+            /** Format: uuid */
+            record_id: string;
+            register_key: string;
+            current_state: string;
+            /**
+             * Format: date-time
+             * @description At the last recorded transition into the current state.
+             */
+            since: string | null;
+            working_days_in_state: number | null;
+            transitions: components["schemas"]["StatusTransition"][];
+        };
+        StateDurationsReport: {
+            /** @enum {string} */
+            entity_type: "task" | "register_record";
+            items: {
+                region_id: number | null;
+                /** @description The stage code of a task, the register key of a record. */
+                group_key: string | null;
+                state: string;
+                count: number;
+                median_working_days: number;
+                p85_working_days: number;
+            }[];
+        };
         TaskTimeInState: {
             /** Format: uuid */
             task_id: string;
@@ -29619,6 +29700,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getRegisterRecordTimeInState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current state and transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTimeInState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStateDurationsReport: {
+        parameters: {
+            query: {
+                entity_type: "task" | "register_record";
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateDurationsReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getTaskBlockedBy: {
