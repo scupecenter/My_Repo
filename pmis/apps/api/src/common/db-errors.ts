@@ -69,6 +69,9 @@ export function mapWfError(message: string): ProblemException | null {
       return new ProblemException(409, 'already_claimed', { detail: 'Another holder has claimed this level.', extra: { claimed_by: { id: extra.claimed_by } } });
     case 'invalid_transition':
       return new ProblemException(409, 'invalid_transition', { detail: detail ?? 'This is not possible in the current state.' });
+    case 'register_locked':
+      // 0103 (0.15.22): a locked register record or column: only a System Admin changes it until it is unlocked
+      return new ProblemException(403, 'register_locked', { detail: detail ?? 'This is locked: only a System Admin can change it.', extra: typeof extra.field === 'string' ? { field: extra.field } : undefined });
     case 'batch_processing':
       // 0074: a big New sites batch is being sent or approved in the background; a second send, a decision or a discard waits for its end
       return new ProblemException(409, 'batch_processing', {

@@ -174,6 +174,8 @@ export type MockRecord = {
   id: string; register_key: RegisterKey; record_type: string | null; site_index: number | null; state: 'entry' | 'in_review' | 'in_approval' | 'approved' | 'voided';
   current_level: number; levels_required?: number; data: Record<string, unknown>; version: number; return_count: number; last_return_note: string | null;
   created_by: string; created_at: string; updated_at: string; steps: RegisterRecordStep[]; claimed_by?: UserRef;
+  /** 0103 (0.15.22): locked records are read-only except for a System Admin. */
+  locked?: boolean;
   /** The logical record (every version shares it) and this version's number; a new version supersedes the one before. */
   entity_id: string; version_no: number; supersedes_id?: string | null;
   /** Q43: the task this record is the source of, set at the first submission (or by the seed for an approved one). */
