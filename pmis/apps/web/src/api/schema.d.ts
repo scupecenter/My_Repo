@@ -4704,7 +4704,7 @@ export interface paths {
         get: operations["getStructuralFreeze"];
         /**
          * Set the freeze window (pilot start to end of the parallel-run month)
-         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.14).
+         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.15).
          */
         put: operations["setStructuralFreeze"];
         post?: never;
@@ -9671,7 +9671,7 @@ export interface components {
             /** @description For permits, an approved N/A satisfies (D36). For `date_field` and a task date, a task that is N/A or skipped satisfies. */
             accept_na?: boolean;
             /**
-             * @description `date_field` only (0.15.14, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
+             * @description `date_field` only (0.15.15, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
              *     `site.rf_survey_date`, `site.acquisition_date` or `site.custom.<code>` (a date custom field). A date that is not set holds the gate (`condition_not_met`); the gate date is the later of its
              *     other conditions and this date plus the offset.
              */

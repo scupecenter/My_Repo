@@ -7,7 +7,7 @@ import { StructuralFreezeService } from './structural-freeze.service';
 
 type Json = Record<string, unknown>;
 
-/** Contract `settings`: GET and PUT /settings/structural-freeze and POST /settings/structural-freeze/lift (decision B9, 0090; the API was missing until 0.15.14). */
+/** Contract `settings`: GET and PUT /settings/structural-freeze and POST /settings/structural-freeze/lift (decision B9, 0090; the API was missing until 0.15.15). */
 @Controller('settings/structural-freeze')
 export class StructuralFreezeController {
   constructor(private readonly svc: StructuralFreezeService) {}

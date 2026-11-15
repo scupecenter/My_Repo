@@ -110,7 +110,7 @@ export const useLiftFreeze = () => {
     mutationFn: ({ version, ...body }) => api.post('/settings/structural-freeze/lift', { version, body }), onSettled: () => refresh(qc, 'freeze'),
   });
 };
-/** Set the window of the structural freeze; after a lift this locks again (0.15.14). */
+/** Set the window of the structural freeze; after a lift this locks again (0.15.15). */
 export const useSetFreeze = () => {
   const qc = useQueryClient();
   return useMutation<StructuralFreeze, ApiError, { version: number; starts_on: string; ends_on: string; reason: string }>({

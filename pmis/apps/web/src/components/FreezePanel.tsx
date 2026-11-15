@@ -9,7 +9,7 @@ import { useToast } from './Toast';
 export const FREEZE_CONFIRM = 'structural-freeze';
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-/** Whether the structural freeze is on: the editor disables its structural actions and says why (decision B9, contract 0.15.14). */
+/** Whether the structural freeze is on: the editor disables its structural actions and says why (decision B9, contract 0.15.15). */
 export function useFrozen(): { frozen: boolean; until: string | null } {
   const f = useFreeze().data;
   return { frozen: f?.active === true, until: f?.ends_on ?? null };
