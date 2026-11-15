@@ -76,6 +76,33 @@ From how the team used the Master sheet:
 - **Local settings stay inside their module** (a toolbar "settings" button or panel on that page): per-view items such as saved views, frozen columns, column width and order for the user, a register's own record options. They never duplicate a global setting; when a local screen needs a global one, it links to the Settings tab.
 - No setting exists in two places. A new feature first checks for an existing Settings tab and extends it.
 
+## F19 Settings tabs regrouped (owner decision 2026-11-15)
+
+One-word tab names, related items grouped, no duplicates (18 tabs become 11):
+
+| Tab | Contains |
+|---|---|
+| Calendar | Work calendar (holidays, weekend) |
+| Workflow | Workflow editor, structural freeze, idle-task alert |
+| SLA | SLA rules with bulk edit, DLP months |
+| Weights | Weight sets |
+| Registers | Register columns, contractor rules, GECOL order warnings, team/scope match |
+| DDL | Lists (dropdown values, types, dependent lists, import) |
+| Site360 | Column-to-menu mapping |
+| Documents | Document Library, mail kinds |
+| Data | Imports, historical load |
+| Alerts | Notification policy |
+| Security | Staff field visibility, log retention |
+
+Old routes redirect to the new tab and section. CHANGELOG 149, no contract change.
+
+## F20 Dashboard follow-up (after #138)
+
+- The dashboard reads from the same sources as SITE 360 and the registers (site360_master_values view, task steps, register records); no own copy, so every edit anywhere shows on the dashboard.
+- New edit options on the dashboard: admin-set targets (sites per batch, monthly On-Air target), KPI thresholds (green/amber/red), which cards each tab shows and their order, saved filter sets; global ones in Settings, per-user layout local.
+- New counters: SLA breaches and at-risk (warning %) per stage; weighted progress vs plan (from F14 weights); sites per SITE 360 menu stage; locked rows/sites count; data quality (empty mandatory cells per menu); advances open after work closed and vehicle-ready rate (Car Dispatcher, Financial Advances); dismantle CW/TE pending; As-Built submitted vs PAC; time-in-state median/P85 (F1); stale tasks (idle N days).
+- CHANGELOG 150, contract next free number at build time.
+
 ## Merge order and fixed numbers
 
 | PR | CHANGELOG | Contract |
