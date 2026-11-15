@@ -1,16 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { z } from 'zod';
-import { AccessService } from '../access/access.service';
-import { mapDbError } from '../common/db-errors';
-import { parseIfMatch } from '../common/etag';
-import { ProblemException, problems } from '../common/problem';
-import { boolParam, Query } from '../common/query';
-import { parse, uuidSchema } from '../common/zod';
-import { DbService } from '../db/db.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
+import { AccessService } from "../access/access.service";
+import { mapDbError } from "../common/db-errors";
+import { parseIfMatch } from "../common/etag";
+import { ProblemException, problems } from "../common/problem";
+import { boolParam, Query } from "../common/query";
+import { parse, uuidSchema } from "../common/zod";
+import { DbService } from "../db/db.service";
 
 const CODE = /^[A-Z][A-Za-z0-9]{1,40}$/;
 const reason = z.string().trim().min(3).max(1000);
+const CODE_OR_NULL = z.string().regex(CODE).nullable();
 const text = (max: number) => z.string().trim().min(1).max(max);
 const catalogueCreate = z
   .object({
@@ -20,6 +21,11 @@ const catalogueCreate = z
     description: z.string().trim().max(1000).nullable().optional(),
     critical: z.boolean().optional(),
     allow_other: z.boolean().optional(),
+    value_type: z
+      .enum(["text", "number", "date", "person", "site", "vendor"])
+      .optional(),
+    multi_select: z.boolean().optional(),
+    parent_catalogue: CODE_OR_NULL.optional(),
     reason,
   })
   .strict();
@@ -29,27 +35,50 @@ const cataloguePatch = z
     name_ar: text(200).nullable().optional(),
     description: z.string().trim().max(1000).nullable().optional(),
     critical: z.boolean().optional(),
-    status: z.enum(['pending', 'confirmed']).optional(),
+    status: z.enum(["pending", "confirmed"]).optional(),
     allow_other: z.boolean().optional(),
     is_active: z.boolean().optional(),
+    value_type: z
+      .enum(["text", "number", "date", "person", "site", "vendor"])
+      .optional(),
+    multi_select: z.boolean().optional(),
+    parent_catalogue: CODE_OR_NULL.optional(),
     reason,
   })
   .strict()
-  .refine((b) => Object.keys(b).length >= 2, { message: 'Change at least one field.', path: [] });
+  .refine((b) => Object.keys(b).length >= 2, {
+    message: "Change at least one field.",
+    path: [],
+  });
 const valueFields = {
   label_en: text(200).optional(),
   label_ar: text(200).nullable().optional(),
   aliases: z.array(text(80)).max(20).optional(),
-  groups: z.array(z.string().regex(/^[A-Za-z][A-Za-z0-9_ -]{0,30}$/)).max(10).optional(),
+  groups: z
+    .array(z.string().regex(/^[A-Za-z][A-Za-z0-9_ -]{0,30}$/))
+    .max(10)
+    .optional(),
   sort_order: z.number().int().min(0).max(100000).optional(),
   is_active: z.boolean().optional(),
+  colour: z
+    .string()
+    .regex(/^#[0-9A-Fa-f]{6}$/)
+    .nullable()
+    .optional(),
+  is_default: z.boolean().optional(),
+  parent_code: z.string().min(1).max(80).nullable().optional(),
   reason,
 };
-const valueCreate = z.object({ code: z.string().min(1).max(80), ...valueFields }).strict();
+const valueCreate = z
+  .object({ code: z.string().min(1).max(80), ...valueFields })
+  .strict();
 const valuePatch = z
   .object(valueFields)
   .strict()
-  .refine((b) => Object.keys(b).length >= 2, { message: 'Change at least one field.', path: [] });
+  .refine((b) => Object.keys(b).length >= 2, {
+    message: "Change at least one field.",
+    path: [],
+  });
 
 interface CatalogueRow {
   code: string;
@@ -61,6 +90,9 @@ interface CatalogueRow {
   allow_other: boolean;
   is_active: boolean;
   version: number;
+  value_type: string;
+  multi_select: boolean;
+  parent_catalogue: string | null;
 }
 interface ValueRow {
   catalogue_code: string;
@@ -73,6 +105,11 @@ interface ValueRow {
   sort_order: number;
   is_active: boolean;
   version: number;
+  colour: string | null;
+  is_default: boolean;
+  parent_code: string | null;
+  deactivate_reason: string | null;
+  deactivated_at: Date | null;
 }
 
 /**
@@ -86,39 +123,84 @@ export class ListCataloguesService {
     private readonly access: AccessService,
   ) {}
 
-  private async rows(code: string | null, inactive: boolean): Promise<Record<string, unknown>[]> {
+  private async rows(
+    code: string | null,
+    inactive: boolean,
+  ): Promise<Record<string, unknown>[]> {
     const cats = await this.db.tx.$queryRaw<CatalogueRow[]>(Prisma.sql`
-      SELECT code, name_en, name_ar, description, critical, status, allow_other, is_active, version FROM list_catalogues
+      SELECT code, name_en, name_ar, description, critical, status, allow_other, is_active, version, value_type, multi_select, parent_catalogue FROM list_catalogues
       WHERE ${code === null ? Prisma.sql`true` : Prisma.sql`code = ${code}`} ${inactive ? Prisma.empty : Prisma.sql`AND is_active`}
       ORDER BY code COLLATE "C"`);
     if (cats.length === 0) return [];
     const codes = cats.map((c) => c.code);
     const values = await this.db.tx.$queryRaw<ValueRow[]>(Prisma.sql`
-      SELECT catalogue_code, id::text AS id, code, label_en, label_ar, aliases, groups, sort_order, is_active, version FROM list_values
-      WHERE catalogue_code = ANY(${codes}::text[]) ${inactive ? Prisma.empty : Prisma.sql`AND is_active`}
-      ORDER BY catalogue_code, sort_order, code COLLATE "C"`);
-    const used = await this.db.tx.$queryRaw<{ catalogue: string; register_key: string; field_code: string; col: string | null }[]>(Prisma.sql`
+      SELECT v.catalogue_code, v.id::text AS id, v.code, v.label_en, v.label_ar, v.aliases, v.groups, v.sort_order, v.is_active, v.version,
+        v.colour, v.is_default, p.code AS parent_code, v.deactivate_reason, v.deactivated_at
+      FROM list_values v LEFT JOIN list_values p ON p.id = v.parent_value_id
+      WHERE v.catalogue_code = ANY(${codes}::text[]) ${inactive ? Prisma.empty : Prisma.sql`AND v.is_active`}
+      ORDER BY v.catalogue_code, v.sort_order, v.code COLLATE "C"`);
+    const used = await this.db.tx.$queryRaw<
+      {
+        catalogue: string;
+        register_key: string;
+        field_code: string;
+        col: string | null;
+      }[]
+    >(Prisma.sql`
       SELECT f.list_catalogue AS catalogue, f.register_key, f.code AS field_code, NULL::text AS col FROM register_fields f
       WHERE f.is_active AND f.list_catalogue = ANY(${codes}::text[])
       UNION ALL
       SELECT c ->> 'list_catalogue', f.register_key, f.code, c ->> 'code' FROM register_fields f, jsonb_array_elements(coalesce(f.options -> 'columns', '[]'::jsonb)) c
       WHERE f.is_active AND f.field_type = 'child_list' AND c ->> 'list_catalogue' = ANY(${codes}::text[])
       ORDER BY 2, 3`);
+    const deps = await this.db.tx.$queryRaw<
+      { code: string; parent: string }[]
+    >(Prisma.sql`
+      SELECT code, parent_catalogue AS parent FROM list_catalogues
+      WHERE parent_catalogue = ANY(${codes}::text[]) AND is_active`);
     return cats.map((c) => ({
       ...c,
-      values: values.filter((v) => v.catalogue_code === c.code).map((v) => ({ id: v.id, code: v.code, label_en: v.label_en, label_ar: v.label_ar, aliases: v.aliases, groups: v.groups, sort_order: v.sort_order, is_active: v.is_active, version: v.version })),
-      used_by: used.filter((u) => u.catalogue === c.code).map((u) => ({ register_key: u.register_key, field_code: u.field_code, ...(u.col ? { column: u.col } : {}) })),
+      values: values
+        .filter((v) => v.catalogue_code === c.code)
+        .map((v) => ({
+          id: v.id,
+          code: v.code,
+          label_en: v.label_en,
+          label_ar: v.label_ar,
+          aliases: v.aliases,
+          groups: v.groups,
+          sort_order: v.sort_order,
+          is_active: v.is_active,
+          version: v.version,
+          colour: v.colour,
+          is_default: v.is_default,
+          parent_code: v.parent_code,
+          deactivate_reason: v.deactivate_reason,
+          deactivated_at: v.deactivated_at,
+        })),
+      dependent_lists: deps
+        .filter((d) => d.parent === c.code)
+        .map((d) => d.code),
+      used_by: used
+        .filter((u) => u.catalogue === c.code)
+        .map((u) => ({
+          register_key: u.register_key,
+          field_code: u.field_code,
+          ...(u.col ? { column: u.col } : {}),
+        })),
     }));
   }
 
   async list(q: Query): Promise<{ items: Record<string, unknown>[] }> {
-    return { items: await this.rows(null, boolParam(q, 'include_inactive') === true) };
+    return {
+      items: await this.rows(null, boolParam(q, "include_inactive") === true),
+    };
   }
 
   async get(code: string): Promise<Record<string, unknown>> {
-    if (!CODE.test(code)) throw problems.notFound('The list does not exist.');
+    if (!CODE.test(code)) throw problems.notFound("The list does not exist.");
     const [row] = await this.rows(code, true);
-    if (!row) throw problems.notFound('The list does not exist.');
+    if (!row) throw problems.notFound("The list does not exist.");
     return row;
   }
 
@@ -137,36 +219,73 @@ export class ListCataloguesService {
   }
 
   async create(raw: unknown): Promise<Record<string, unknown>> {
-    await this.access.requireAdmin('fields', 'edit');
+    await this.access.requireAdmin("fields", "edit");
     const { code, reason: why, ...b } = parse(catalogueCreate, raw);
-    await this.call(Prisma.sql`SELECT admin_save_list_catalogue(${code}::text, true, ${JSON.stringify(b)}::jsonb, ${why}::text, NULL::int)`);
+    await this.call(
+      Prisma.sql`SELECT admin_save_list_catalogue(${code}::text, true, ${JSON.stringify(b)}::jsonb, ${why}::text, NULL::int)`,
+    );
     return this.get(code);
   }
 
-  async update(code: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+  async update(
+    code: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
-    await this.access.requireAdmin('fields', 'edit');
+    await this.access.requireAdmin("fields", "edit");
     await this.get(code);
     const { reason: why, ...b } = parse(cataloguePatch, raw);
-    await this.call(Prisma.sql`SELECT admin_save_list_catalogue(${code}::text, false, ${JSON.stringify(b)}::jsonb, ${why}::text, ${version}::int)`);
+    await this.call(
+      Prisma.sql`SELECT admin_save_list_catalogue(${code}::text, false, ${JSON.stringify(b)}::jsonb, ${why}::text, ${version}::int)`,
+    );
     return this.get(code);
+  }
+
+  /** Hard delete of a value, only when it is unused and not the default (admin_delete_list_value; the trigger repeats the rule). */
+  async deleteValue(
+    code: string,
+    rawId: string,
+    ifMatch: string | undefined,
+    rawReason: unknown,
+  ): Promise<Record<string, unknown>> {
+    const version = ifMatch === undefined ? null : parseIfMatch(ifMatch);
+    await this.access.requireAdmin("fields", "edit");
+    await this.get(code);
+    if (!uuidSchema.safeParse(rawId).success)
+      throw problems.notFound("The value does not exist in this list.");
+    const why = parse(reason, rawReason);
+    await this.call(
+      Prisma.sql`SELECT admin_delete_list_value(${code}::text, ${rawId}::uuid, ${why}::text, ${version}::int)`,
+    );
+    return { deleted: true };
   }
 
   async addValue(code: string, raw: unknown): Promise<Record<string, unknown>> {
-    await this.access.requireAdmin('fields', 'edit');
+    await this.access.requireAdmin("fields", "edit");
     await this.get(code);
     const { reason: why, ...b } = parse(valueCreate, raw);
-    await this.call(Prisma.sql`SELECT admin_save_list_value(${code}::text, NULL::uuid, ${JSON.stringify(b)}::jsonb, ${why}::text, NULL::int)`);
+    await this.call(
+      Prisma.sql`SELECT admin_save_list_value(${code}::text, NULL::uuid, ${JSON.stringify(b)}::jsonb, ${why}::text, NULL::int)`,
+    );
     return this.get(code);
   }
 
-  async updateValue(code: string, rawId: string, ifMatch: string | undefined, raw: unknown): Promise<Record<string, unknown>> {
+  async updateValue(
+    code: string,
+    rawId: string,
+    ifMatch: string | undefined,
+    raw: unknown,
+  ): Promise<Record<string, unknown>> {
     const version = parseIfMatch(ifMatch);
-    await this.access.requireAdmin('fields', 'edit');
+    await this.access.requireAdmin("fields", "edit");
     await this.get(code);
-    if (!uuidSchema.safeParse(rawId).success) throw problems.notFound('The value does not exist in this list.');
+    if (!uuidSchema.safeParse(rawId).success)
+      throw problems.notFound("The value does not exist in this list.");
     const { reason: why, ...b } = parse(valuePatch, raw);
-    await this.call(Prisma.sql`SELECT admin_save_list_value(${code}::text, ${rawId}::uuid, ${JSON.stringify(b)}::jsonb, ${why}::text, ${version}::int)`);
+    await this.call(
+      Prisma.sql`SELECT admin_save_list_value(${code}::text, ${rawId}::uuid, ${JSON.stringify(b)}::jsonb, ${why}::text, ${version}::int)`,
+    );
     return this.get(code);
   }
 }
