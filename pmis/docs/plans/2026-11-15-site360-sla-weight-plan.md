@@ -113,9 +113,15 @@ Old routes redirect to the new tab and section. CHANGELOG 149, no contract chang
 | 0103 | F16 register locks |
 | 0104, 0106, 0107 | F15 rows view and sources, calc columns |
 | 0108 | F20 dashboard |
+| 0111, 0112 | F15 calc columns (AL, BX; procurement scopes, AH, AI, gate readiness) |
 | 0109, 0110 | F14 SLA and weight (renumbered from 0099 and 0100, which clashed with #139) |
 
-Next free: 0111.
+Next free: 0113.
+
+## Owner decisions 2026-11-15 (late)
+
+- Procurement gets two more scopes: Tower Erection and Site Adaption (needed for PR Status and PO/WO Status as in the Master).
+- Gate readiness is complete when the milestone before the gate is complete.
 
 ## Merge order and fixed numbers
 
