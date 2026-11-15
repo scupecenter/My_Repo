@@ -354,7 +354,11 @@ describe('Financial Advances', () => {
     expect(seen.body.data.requested_amount).toBeUndefined();
     expect(seen.body.data.approved_amount).toBeUndefined();
     const search = await c.viewerFin.api.call('get', `${recPath('financial_advances')}?q=${AMOUNT}`);
-    expect(search.body.items).toHaveLength(0);
+    // The search matches the digits anywhere in the masked record text, opaque IDs included, so a 4-digit amount can hit an unrelated
+    // record by chance. What must hold: this advance is never returned for its amount, and no hit exposes an amount field.
+    const hits = JSON.stringify(search.body.items);
+    expect(hits).not.toContain(ap.id);
+    expect(hits).not.toMatch(/"(requested|approved|disbursed)_amount"/);
     const own = await c.fin.entry.api.call('get', `${recPath('financial_advances')}?q=${AMOUNT}`);
     expect((own.body.items as unknown[]).length).toBeGreaterThan(0);
     const cells = async (api: Actor['api']): Promise<string[]> => {
