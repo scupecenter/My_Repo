@@ -139,7 +139,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
           ...(grid.admin ? [
             { id: 'col-add', label: t('regcols.add'), icon: <Plus size={16} />, testid: 'register-column-add', onSelect: grid.openAdd },
-            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/register-columns?register=${key}`) },
+            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/registers/columns?register=${key}`) },
           ] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />

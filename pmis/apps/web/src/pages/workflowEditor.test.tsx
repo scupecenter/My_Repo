@@ -9,7 +9,7 @@ import { SettingsRoutes } from './settings/Settings';
 
 /** Decision 4 of 2026-11-12: Settings, Workflow. Draft, add a task, change predecessors (a cycle is shown), light edit, publish with the typed confirmation. */
 const stepUpDone = () => api.post('/__mock/step-up');
-const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/workflow' });
+const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/workflow/editor' });
 const REASON = 'The owner asked for it';
 const reasonAndSave = async (u: ReturnType<typeof userEvent.setup>, dlg: string) => {
   await u.type(await screen.findByTestId(`${dlg}-reason`), REASON);
