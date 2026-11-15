@@ -90,6 +90,11 @@ export class WorkflowEditorController {
     return r;
   }
 
+  @Put('versions/:version/tasks/:task/closing')
+  async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));
+  }
+
   @Put('versions/:version/tasks/:task/successors')
   async setSuccessors(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setSuccessors(auth, version, task, ifMatch, body));
