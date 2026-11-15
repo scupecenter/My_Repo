@@ -10,7 +10,11 @@
     "rows": "Rows: {{count}}",
     "of": "{{count}} of {{total}} sites",
     "grid": "Grid",
-    "vertical": "Vertical"
+    "vertical": "Vertical",
+    "more": "Load more sites",
+    "site_ids": "Site IDs to find",
+    "site_ids_placeholder": "Paste Site IDs, one per line or comma separated",
+    "site_ids_apply": "Apply"
   },
   "nav": {
     "group_work": "Work",
@@ -939,7 +943,8 @@
     "tab_mail-kinds": "Mail kinds",
     "tab_historical-waiver": "Historical load",
     "tab_imports": "Imports",
-    "tab_workflow": "Workflow"
+    "tab_workflow": "Workflow",
+    "tab_site360-columns": "SITE 360 columns"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -4465,5 +4470,17 @@
       "blocked": "Blocked",
       "not_applicable": "Not applicable"
     }
+  },
+  "site360cols": {
+    "title": "SITE 360 columns",
+    "hint": "Each Master column belongs to one or more SITE 360 menus. Status columns are in every menu and cannot change.",
+    "edit": "Edit menus",
+    "reason_title": "Change the SITE 360 menus of {{column}}",
+    "saved": "Menus saved",
+    "status_fixed": "Status (every menu)",
+    "none": "No menu",
+    "col": "Column",
+    "header": "Header",
+    "menus": "SITE 360 menus"
   }
 }

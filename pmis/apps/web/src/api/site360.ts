@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/api/client';
 import type { components } from '@/api/schema';
 
@@ -34,3 +34,31 @@ export const useSite360Rows = (menu: string | undefined, query: Site360RowsQuery
     enabled: !!menu,
     queryFn: () => api.get<Site360Rows>(`/site360/${menu}/rows`, { query: { ...query } }),
   });
+
+/** The SITE 360 menus a Master column may be in (the status columns are in every menu and cannot change). */
+export const SITE360_MOVABLE_MENUS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
+
+/** Replaces the menus of one Master column (`PATCH /site360/columns/{ord}/sections`): System Admin, a reason, step-up. */
+export const useSetSite360ColumnSections = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { ord: number; sections: string[]; reason: string }) =>
+      api.patch<unknown>(`/site360/columns/${v.ord}/sections`, { body: { sections: v.sections, reason: v.reason } }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['site360-sections'] });
+      void qc.invalidateQueries({ queryKey: ['site360-rows'] });
+    },
+  });
+};
+
+/** The rows of a menu, page after page (200 at a time, the API maximum): each page is one query on the set-based view. */
+export const useSite360RowsPaged = (menu: string | undefined, query: Omit<Site360RowsQuery, 'offset'>) => {
+  const limit = 200;
+  return useInfiniteQuery({
+    queryKey: ['site360-rows-paged', menu, query],
+    enabled: !!menu,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => api.get<Site360Rows>(`/site360/${menu}/rows`, { query: { ...query, offset: pageParam, limit } }),
+    getNextPageParam: (last) => (last.offset + last.limit < last.filtered ? last.offset + last.limit : undefined),
+  });
+};

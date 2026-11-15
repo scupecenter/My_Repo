@@ -1,6 +1,6 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { Site360Grid } from '@/components/Site360Grid';
-import { useSite360Rows, useSite360Sections } from '@/api/site360';
+import { useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -63,13 +63,23 @@ export function Sites() {
   const site360Q = useSite360Sections();
   const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
   // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
-  const gridRowsQ = useSite360Rows(menu ? section : undefined, {
+  // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
+  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, {
+    site_code: sp.get('site_code') || undefined,
     region_id: sp.get('region_id') || undefined,
     scenario: sp.get('scenario') || undefined,
     overall_status: sp.get('overall_status') || undefined,
     sort: 'site_code',
-    limit: 200,
   });
+  const gridPages = gridRowsQ.data?.pages ?? [];
+  const gridTotal = gridPages[0]?.total;
+  const gridFiltered = gridPages[0]?.filtered;
+  const gridRows = gridPages.flatMap((p) => p.rows);
+  const [siteIdsDraft, setSiteIdsDraft] = useState(() => (sp.get('site_code') ?? '').split(',').join('\n'));
+  const applySiteIds = () => {
+    const codes = siteIdsDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+    setSp((prev) => { const n = new URLSearchParams(prev); if (codes.length) n.set('site_code', codes.join(',')); else n.delete('site_code'); return n; }, { replace: true });
+  };
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
@@ -250,7 +260,14 @@ export function Sites() {
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
       ) : menu && layout === 'grid' ? (
-        <Site360Grid menu={menu} testid="site360-grid" total={gridRowsQ.data?.total} filtered={gridRowsQ.data?.filtered} rows={(gridRowsQ.data?.rows ?? []).map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values }))} />
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-start gap-2">
+            <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('site360.site_ids_placeholder')} aria-label={t('site360.site_ids')} data-testid="site360-site-ids" />
+            <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
+          </div>
+          <Site360Grid menu={menu} testid="site360-grid" total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values }))} />
+          {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+        </div>
       ) : (
         <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
