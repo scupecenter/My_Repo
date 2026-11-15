@@ -622,6 +622,18 @@ export const settingsHandlers = [
 
   // ------------------------------------------------------------------ freeze
   http.get(`${B}/settings/structural-freeze`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().freeze, tag(C().freeze.version)); }),
+  http.put(`${B}/settings/structural-freeze`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const f = C().freeze, p = ver(request, f.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const b = await body<{ starts_on?: string; ends_on?: string; reason?: string }>(request);
+    const r = reasonErr(b.reason); if (r) return r;
+    if (!b.starts_on) return fields({ path: '/starts_on', code: 'required' });
+    if (!b.ends_on || b.ends_on < b.starts_on) return fields({ path: '/ends_on', code: 'before_start' });
+    Object.assign(f, { active: true, starts_on: b.starts_on, ends_on: b.ends_on, lifted: false, lifted_at: null, lifted_by: null, lift_reason: null, version: f.version + 1 }); save();
+    return HttpResponse.json(f, tag(f.version));
+  }),
   http.post(`${B}/settings/structural-freeze/lift`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
