@@ -3,7 +3,7 @@ import type { Client as PgClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { DocsGridService } from '../src/documents/grid.service';
 import { startApp, superDbDocs, type Api } from './helpers';
-import { plainAdmin } from './wf-helpers';
+import { makeSite, plainAdmin } from './wf-helpers';
 
 /** Documents hub (0097): the grid's cell rules, the grid endpoint, the saved columns, and the Library delete rule for a type with no file. Runs on the fifth database. */
 const col = (over: Partial<Parameters<typeof DocsGridService.cellOf>[0]['column']> = {}) => ({
@@ -83,5 +83,27 @@ describe('the grid endpoint', () => {
     const d = await admin.call('post', `/document-library/${c.body.id}/delete`, { reason: 'test cleanup' });
     expect(d.status).toBe(200);
     expect(d.body.mode).toBe('deleted');
+  });
+});
+
+describe('site overrides and the move door', () => {
+  it('marks a document not required for one site, shows it in the grid, and reverts it', async () => {
+    const site = await makeSite(db, 5, { prefix: 'DH' });
+    const made = await admin.call('post', `/sites/${site.id}/document-overrides`, { doc_code: 'A2', reason: 'Not needed here' });
+    expect(made.status).toBe(201);
+    const grid = await admin.call('get', `/documents/grid?site_code=${site.code}&doc_code=A2`);
+    expect(grid.body.rows[0].cells.A2.status).toBe('not_required');
+    expect(grid.body.rows[0].cells.A2.reason).toBe('Not needed here');
+    const again = await admin.call('post', `/sites/${site.id}/document-overrides`, { doc_code: 'A2', reason: 'Again' });
+    expect(again.status).toBe(409);
+    const back = await admin.call('post', `/document-overrides/${made.body.id}/revert`, { reason: 'Needed after all' });
+    expect(back.status).toBe(200);
+    const after = await admin.call('get', `/documents/grid?site_code=${site.code}&doc_code=A2`);
+    expect(after.body.rows[0].cells.A2.status).not.toBe('not_required');
+  });
+
+  it('answers 404 when moving a file that does not exist', async () => {
+    const r = await admin.call('post', '/files/90000000-0000-4000-8000-000000000099/move', { target_slot_id: '90000000-0000-4000-8000-000000000098', reason: 'test move' });
+    expect(r.status).toBe(404);
   });
 });
