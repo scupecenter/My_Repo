@@ -212,6 +212,25 @@ describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECO
     expect(miss.body.filtered).toBe(0);
   });
 
+  it('reads the CW Access Date (AL) from the earliest approved Access - CW permit, and the HLC Fiber Status (BX) from the HLC record (0111)', async () => {
+    const s = await site(1);
+    await db.query(`UPDATE sites SET scope_hlc_fiber = 'yes' WHERE id = $1`, [s.id]);
+    await db.query(`INSERT INTO permit_records (site_id, region_id, permit_type, status, valid_from, valid_to, has_expiry) VALUES ($1, 1, 'Access - CW', 'Approved', DATE '2026-03-01', DATE '2027-12-31', true), ($1, 1, 'Access - CW', 'Approved', DATE '2026-02-01', DATE '2027-12-31', true), ($1, 1, 'Access - CW', 'Applied', DATE '2025-12-01', NULL, true)`, [s.id]);
+    await db.query(`INSERT INTO hlc_records (site_id, region_id, installation_date) VALUES ($1, 1, DATE '2026-04-10')`, [s.id]);
+    const hlcSite = await site(1);
+    await db.query(`UPDATE sites SET scope_hlc_fiber = 'na' WHERE id = $1`, [hlcSite.id]);
+    const permMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'permits_hse'`)).rows[0].module_key as string;
+    const hlcMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'hlc'`)).rows[0].module_key as string;
+    const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], [permMod, 'view'], [hlcMod, 'view']] });
+    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code},${hlcSite.code}`);
+    expect(res.status).toBe(200);
+    const byCode = new Map<string, Record<string, string | null>>(res.body.rows.map((r: { site_code: string; values: Record<string, string | null> }) => [r.site_code, r.values]));
+    expect(byCode.get(s.code)!['38']).toBe('2026-02-01');
+    expect(byCode.get(s.code)!['76']).toBe('Done');
+    expect(byCode.get(hlcSite.code)!['76']).toBe('N/A');
+    expect(byCode.get(hlcSite.code)!['38']).toBeNull();
+  });
+
   it('hides the procurement and GECOL values, and the contractor filter, from a user without their module view', async () => {
     const s = await site(1);
     const name = `${PREFIX}-HID-${randomBytes(2).toString('hex')}`;
