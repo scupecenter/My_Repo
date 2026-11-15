@@ -109,6 +109,13 @@ export async function superDbRcols(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the template-streams database (see global-setup). */
+export async function superDbTplst(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_TPLST });
+  await c.connect();
+  return c;
+}
+
 export async function superDbHw(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_HW });
   await c.connect();
