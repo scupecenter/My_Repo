@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { DashboardService } from './dashboard.service';
+import { DashboardExtrasService } from './dashboard-extras.service';
 import { ProjectStatusService } from './project-status.service';
 import { SiteMapService } from './site-map.service';
 
@@ -13,11 +14,19 @@ export class DashboardController {
     private readonly dash: DashboardService,
     private readonly ps: ProjectStatusService,
     private readonly map: SiteMapService,
+    private readonly extras: DashboardExtrasService,
   ) {}
 
   @Get('dashboard')
   get(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
     return this.dash.get(auth, q);
+  }
+
+  /** F13 (contract 0.15.16): the risk matrix, data quality, swap and relocation and decisions, limited to the caller's regions and modules. */
+  @Get('dashboard/extras')
+  @Header('Cache-Control', 'no-store')
+  dashboardExtras(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.extras.get(auth, q);
   }
 
   /** OV-12 / SC-10 (contract 0.14.5): the sites of the dashboard map, limited to dashboard.view ∩ sites.view regions. */

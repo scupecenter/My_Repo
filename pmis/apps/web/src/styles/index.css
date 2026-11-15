@@ -68,3 +68,10 @@
 .gx-frozen-end{border-inline-end:1px solid var(--line)}
 .gx .chip{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:2px 10px;font-size:var(--text-sm);line-height:1.35;border:1px solid color-mix(in oklab,currentColor 20%,transparent)}
 @media (prefers-reduced-motion:reduce){.gx-row{transition:none}}
+
+/* F6/F13 (owner decisions 2026-11-15): the dashboard sheet prints on A4 landscape */
+@page { size: A4 landscape; margin: 10mm; }
+@media print {
+  body { background: #fff !important; }
+  [data-testid="page-dashboard"] { font-size: 10pt; }
+}

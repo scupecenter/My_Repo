@@ -31,6 +31,8 @@ info:
 
     ## Versions
     - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
+    - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
+    - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
     - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.13 (2026-11-14): the admin manages the columns of every register (owner request 2026-11-13 and the flexibility follow-up; migration 0095; CHANGELOG 137). Additive. New paths under `/registers/{register_key}`: `GET /fields` (`getRegisterColumns`, the screen: register, sections and every column with usage), `POST /fields` (`createRegisterColumn`), `PATCH /fields/{code}` (`updateRegisterColumn`: rename EN/AR, required as a flag, section, order, visibility in list, filter, template and export, deactivate and reactivate, change of type with the conversion preview), `DELETE /fields/{code}` (`deleteRegisterColumn`: a hard delete when no record of the register ever held a value, otherwise a deactivation with the reason), `GET /fields/{code}/impact` (`getRegisterColumnImpact`: usage, delete mode and the type-conversion preview), `PUT /fields-order` (`reorderRegisterColumns`), `POST /sections`, `PATCH` and `DELETE /sections/{section_id}` (add, rename, reorder, delete when empty), `PATCH /registers/{register_key}` (`renameRegister`, EN and AR). Types of a column: short and long text, number, currency, percentage, date, date and time, yes/no, list, multi list, user, multi user, site, sites, external party, warehouse item, e-mail, phone, link, document (creates its Document Library slot), computed (read-only, from two columns), child list. A list column picks a catalogue or creates one with its values in the same call (`new_list`). Protected columns (`is_system`, with `system_reason`) can be renamed, reordered, moved between sections and shown or hidden, but their deletion, deactivation, type change and requirement answer 409 `system_field`. A type change needs a step-up; it answers 409 `conversion_blocked` (with the failing values) or 409 `conversion_unconfirmed` (every value converts: repeat with `confirm_conversion`). Needs `fields.edit` for all regions (System Admin or a delegate), a reason, optional `If-Match`; a delete, a type change and a deactivation also need a step-up. Every change issues the new register template version (`field_set_version`). Tolerant upload (owner decision 2026-11-14): a file of an older version of a register template is accepted when its columns can be matched by code; a removed column is ignored with a warning, a new column stays empty, and only a change of the type of a column refuses it (`outdated_version`); `ImportBatch.older_template` is the summary shown before the confirm. Version 0.15.12 is the workflow editor phase 2.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
@@ -11916,6 +11918,42 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /registers/{register_key}/records/{record_id}/time-in-state:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [insights]
+      operationId: getRegisterRecordTimeInState
+      summary: How long a register record has sat in its current state (0.15.17, F1)
+      description: Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+      responses:
+        '200':
+          description: Current state and transitions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecordTimeInState'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reports/state-durations:
+    get:
+      tags: [insights]
+      operationId: getStateDurationsReport
+      summary: Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+      description: Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+      parameters:
+      - {name: entity_type, in: query, required: true, schema: {type: string, enum: [task, register_record]}}
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StateDurationsReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /tasks/{task_id}/blocked-by:
     parameters:
     - {$ref: '#/components/parameters/TaskId'}
@@ -12386,6 +12424,45 @@ paths:
               schema: {$ref: '#/components/schemas/SiteMap'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/extras:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardExtras
+      summary: The F13 sections of the dashboard in one read (0.15.18)
+      description: |
+        The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+        quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
+        `stream` is accepted and ignored. The figures are current (no reference date).
+        **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
+        may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
+        filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
+        **Bands (default of the owner, 2026-11-15, a setting for the administrator).** A risk score is probability times impact, each from 1 to 5. Low 1 to 4, medium 5 to 9, high 10 to 16,
+        critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
+        **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
+        **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: cluster_code
+        in: query
+        schema: {type: string, minLength: 1, maxLength: 40}
+      - name: scenario
+        in: query
+        schema: {$ref: '#/components/schemas/DeliveryScenario'}
+      - name: stream
+        in: query
+        schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
+        description: Accepted as in `GET /dashboard`; the sections do not depend on it.
+      responses:
+        '200':
+          description: The sections.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardExtras'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/export:
     get:
       tags: [dashboard]
@@ -19405,6 +19482,43 @@ components:
       type: string
       enum: [entry, review, approve]
       description: 'The level a task sits at.'
+    StatusTransition:
+      type: object
+      required: [from_state, to_state, at, level, admin_override]
+      properties:
+        from_state: {type: [string, 'null']}
+        to_state: {type: string}
+        at: {type: string, format: date-time}
+        actor: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        level: {type: string, enum: [L1, L2]}
+        admin_override: {type: boolean}
+    RecordTimeInState:
+      type: object
+      required: [record_id, register_key, current_state, since, working_days_in_state, transitions]
+      properties:
+        record_id: {type: string, format: uuid}
+        register_key: {type: string}
+        current_state: {type: string}
+        since: {type: [string, 'null'], format: date-time, description: 'At the last recorded transition into the current state.'}
+        working_days_in_state: {type: [integer, 'null']}
+        transitions: {type: array, items: {$ref: '#/components/schemas/StatusTransition'}}
+    StateDurationsReport:
+      type: object
+      required: [entity_type, items]
+      properties:
+        entity_type: {type: string, enum: [task, register_record]}
+        items:
+          type: array
+          items:
+            type: object
+            required: [region_id, group_key, state, count, median_working_days, p85_working_days]
+            properties:
+              region_id: {type: [integer, 'null']}
+              group_key: {type: [string, 'null'], description: 'The stage code of a task, the register key of a record.'}
+              state: {type: string}
+              count: {type: integer}
+              median_working_days: {type: number}
+              p85_working_days: {type: number}
     TaskTimeInState:
       type: object
       required: [task_id, current_state, items, segments]
@@ -20432,6 +20546,125 @@ components:
         progress_pct: {type: number}
         health_score: {type: [number, 'null']}
         by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
+    DashboardExtras:
+      type: object
+      description: '0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15).'
+      required: [as_of, scope_regions, risk_matrix, data_quality, swap_relocation, decisions]
+      properties:
+        as_of: {type: string, format: date-time}
+        scope_regions:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/RegionId'}
+          description: The regions the figures cover (null = every region).
+        risk_matrix: {$ref: '#/components/schemas/DashboardRiskMatrix'}
+        data_quality: {$ref: '#/components/schemas/DashboardDataQuality'}
+        swap_relocation: {$ref: '#/components/schemas/DashboardSwapRelocation'}
+        decisions: {$ref: '#/components/schemas/DashboardDecisions'}
+    DashboardRiskMatrix:
+      type: object
+      required: [available, open_total, cells, bands, top_open_risks]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the risk register; the other fields are then null.}
+        open_total: {type: [integer, 'null']}
+        invalid_total: {type: [integer, 'null'], description: Open risks whose probability or impact is outside 1 to 5 (left out of the cells).}
+        cells:
+          type: [array, 'null']
+          description: The 25 cells, probability 1 to 5 by impact 1 to 5.
+          items: {$ref: '#/components/schemas/DashboardRiskCell'}
+        bands:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/DashboardRiskBand'}
+        top_open_risks:
+          type: [array, 'null']
+          maxItems: 10
+          description: The open risks of the highest score first (ties by code).
+          items: {$ref: '#/components/schemas/DashboardRiskItem'}
+    DashboardRiskCell:
+      type: object
+      required: [probability, impact, score, band, count]
+      properties:
+        probability: {type: integer, minimum: 1, maximum: 5}
+        impact: {type: integer, minimum: 1, maximum: 5}
+        score: {type: integer}
+        band: {type: string, enum: [low, medium, high, critical]}
+        count: {type: integer}
+    DashboardRiskBand:
+      type: object
+      required: [band, min, max, count]
+      properties:
+        band: {type: string, enum: [low, medium, high, critical]}
+        min: {type: integer}
+        max: {type: integer}
+        count: {type: integer}
+    DashboardRiskItem:
+      type: object
+      required: [risk_code, statement, probability, impact, score, band, status, is_global]
+      properties:
+        risk_code: {type: string}
+        statement: {type: string}
+        probability: {type: integer}
+        impact: {type: integer}
+        score: {type: integer}
+        band: {type: string, enum: [low, medium, high, critical]}
+        status: {type: string, enum: [open, in_progress]}
+        risk_owner: {type: [string, 'null']}
+        region_id: {type: [integer, 'null']}
+        is_global: {type: boolean}
+    DashboardDataQuality:
+      type: object
+      required: [available, sites_checked, sites_with_gaps, gaps_total, by_kind]
+      properties:
+        available: {type: boolean}
+        sites_checked: {type: [integer, 'null']}
+        sites_with_gaps: {type: [integer, 'null']}
+        gaps_total: {type: [integer, 'null']}
+        by_kind:
+          type: [array, 'null']
+          items:
+            type: object
+            required: [kind, field, count]
+            properties:
+              kind: {type: string, enum: [missing_actual_date, missing_field]}
+              field: {type: [string, 'null']}
+              count: {type: integer}
+    DashboardSwapRelocation:
+      type: object
+      required: [available, rows, unscenarioed]
+      properties:
+        available: {type: boolean}
+        unscenarioed: {type: [integer, 'null'], description: Active sites with no delivery scenario yet.}
+        rows:
+          type: [array, 'null']
+          description: One row per delivery scenario, in the order of the list (new build, expansion, hot swap, cold swap, relocation).
+          items:
+            type: object
+            required: [scenario, sites_total, by_overall_status]
+            properties:
+              scenario: {$ref: '#/components/schemas/DeliveryScenario'}
+              sites_total: {type: integer}
+              by_overall_status:
+                type: object
+                additionalProperties: {type: integer}
+                description: Keys not_started, in_progress, on_hold, completed and cancelled.
+    DashboardDecisions:
+      type: object
+      required: [available, items]
+      properties:
+        available: {type: boolean}
+        items:
+          type: [array, 'null']
+          maxItems: 10
+          items:
+            type: object
+            required: [tag, risk_code, statement, score, band, risk_owner, region_id]
+            properties:
+              tag: {type: string, enum: [act_now, watch]}
+              risk_code: {type: string}
+              statement: {type: string}
+              score: {type: integer}
+              band: {type: string, enum: [low, medium, high, critical]}
+              risk_owner: {type: [string, 'null']}
+              region_id: {type: [integer, 'null']}
     SiteMapItem:
       type: object
       description: '0.14.5: one site of the dashboard map (OV-12).'
