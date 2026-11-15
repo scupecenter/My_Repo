@@ -225,6 +225,9 @@
 
 تحديث 2026-11-15 مساءً: دُمج #143 و#146 و#142 (فحوص main خضراء على 908dc03، وحُذف الفرع والشجرة). [#140](https://github.com/scupecenter/My_Repo/pull/140) جاهز على 7f9dce0: دُمج فيه main، وأُضيف operationId لعملياته الخمس. [#141](https://github.com/scupecenter/My_Repo/pull/141) اكتمل فيه البندان 4 و5 وCHANGELOG 146 (be3ab20)، وبقي فيه: وصف الطلب، ودمج main بعد #140، ونقل DateMin وDateMax إلى إعدادات الحساب. [#145](https://github.com/scupecenter/My_Repo/pull/145) دُمج فيه main (2f87c4d)، وبقيت سبعة عدادات من عشرة فارغة القيمة (null، مُدرجة في pending_kpis). الترتيب التالي للدمج: #140، ثم #141، ثم #145، ثم #124.
 
+تحديث لاحق 2026-11-15: دُمج #140 (main على 29031ec، وحُذف الفرع والشجرة). دُمج main في #141 (6fa4daf)، وحُدّث وصفه، ووُضع جاهزاً، وفحوصه تعمل. قرارا المالك: (1) تُنفَّذ العدادات السبعة الباقية في #145 قبل دمجه: vehicle_ready، وadvances_open_after_close، وdismantle_pending، وas_built_submitted، وtime_in_state_p85، وstale_tasks، وon_air_vs_target، ومعها عدّ المواقع حسب قائمة SITE 360. (2) تأكدت قيمة جاهزية البوابة: تاريخ المرحلة السابقة بعد اعتمادها.
+الخطوة التالية في الجلسة القادمة: إذا نجحت فحوص #141 فأعطه للمالك. ثم أكمل العدادات السبعة في #145 داخل الشجرة /home/claude/wt/f20-dashboard، وادمج فيه main بعد #141، وأعطه للمالك. ثم ادمج main في #124 وأعطه للمالك أخيراً.
+
 السجل القديم (قبل التحديث): مدموج حتى #144. المفتوح بالترتيب المقترح للدمج:
 1. [#143](https://github.com/scupecenter/My_Repo/pull/143) F17 DDL: مكتمل، ينتظر CI على dc89347.
 2. [#146](https://github.com/scupecenter/My_Repo/pull/146) إصلاح الاختبار المتقطع templates-streams: مكتمل، ينتظر CI.
