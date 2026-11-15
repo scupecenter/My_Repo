@@ -48,6 +48,8 @@ import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { DocumentsController, LibraryController } from './documents/documents.controller';
+import { DocumentsGridController } from './documents/grid.controller';
+import { DocsGridService } from './documents/grid.service';
 import { DocumentsService } from './documents/documents.service';
 import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
@@ -145,7 +147,7 @@ export function appModuleFor(config: AppConfig) {
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
       DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
       DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, NavLayoutController, HistoricalWaiverController, StructuralFreezeController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
@@ -161,7 +163,7 @@ export function appModuleFor(config: AppConfig) {
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
       DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, StructuralFreezeService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
