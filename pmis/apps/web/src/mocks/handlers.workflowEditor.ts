@@ -185,6 +185,16 @@ export const workflowEditorHandlers = [
     v.etag += 1;
     return HttpResponse.json({ task_code: b.code, warnings: pl.warnings, rewiring: pl.rewiring, open_sites_added: b.add_to_open_sites && v.status === 'published' ? 12 : 0, version: json(v) }, { status: 201, headers: { ETag: `"${v.etag}"` } });
   }),
+  http.put(`${B}/workflow/versions/:version/tasks/:task/closing`, async ({ params, request }) => {
+    const b = (await request.json()) as { closing?: boolean; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if (w.v.status !== 'draft') return fieldErr('/closing', 'draft_only');
+    const x = w.v.tasks.find((k) => k.task_code === params.task);
+    if (!x) return problem(404, 'not_found', 'The task does not exist in this version.');
+    for (const k of w.v.tasks) if (k.stage_code === x.stage_code) k.is_milestone_task = b.closing === true && k.task_code === x.task_code;
+    w.v.etag += 1;
+    return reply(w.v);
+  }),
   http.put(`${B}/workflow/versions/:version/tasks/:task/successors`, async ({ params, request }) => {
     const b = (await request.json()) as { successors?: string[]; reason?: string };
     const w = write(params, request, b); if ('r' in w) return w.r;
@@ -264,7 +274,7 @@ export const workflowEditorHandlers = [
     return HttpResponse.json(m, { headers: { ETag: `"${w.v.etag}"` } });
   }),
   http.patch(`${B}/workflow/versions/:version/gates/:code`, async ({ params, request }) => {
-    const b = (await request.json()) as { name_en?: string; name_ar?: string; sla_min_wd?: number; sla_max_wd?: number; reason?: string };
+    const b = (await request.json()) as { name_en?: string; name_ar?: string; sla_min_wd?: number; sla_max_wd?: number; conditions?: { type: string; ref?: string; accept_na?: boolean; offset_wd?: number }[]; reason?: string };
     const w = write(params, request, b); if ('r' in w) return w.r;
     const g = w.v.gates.find((k) => k.code === params.code);
     if (!g) return problem(404, 'not_found', 'The gate does not exist in this version.');
@@ -272,6 +282,7 @@ export const workflowEditorHandlers = [
     if (b.name_ar !== undefined) g.name_ar = b.name_ar || null;
     if (b.sla_min_wd !== undefined) g.sla_min_wd = b.sla_min_wd;
     if (b.sla_max_wd !== undefined) g.sla_max_wd = b.sla_max_wd;
+    if (b.conditions !== undefined) (g as { conditions: unknown }).conditions = b.conditions;
     w.v.etag += 1;
     return HttpResponse.json(g, { headers: { ETag: `"${w.v.etag}"` } });
   }),

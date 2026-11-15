@@ -29,7 +29,7 @@ const base = (v: number) => `/workflow/versions/${v}`;
 
 export type TaskCreateInput = { stage_code: string; code: string; name_en: string; name_ar?: string | null; counts_toward_milestone?: boolean; after_task_code?: string | null; predecessors?: string[]; reason: string; confirm_master_impact?: string };
 export type TaskPatchInput = { name_en?: string; name_ar?: string | null; counts_toward_milestone?: boolean; is_active?: boolean; stage_code?: string; reason: string; confirm_master_impact?: string };
-export type GateCondition = { type: string; ref?: string; accept_na?: boolean };
+export type GateCondition = { type: string; ref?: string; accept_na?: boolean; offset_wd?: number };
 export type LightInput = { name_en?: string; name_ar?: string; reason: string; counts_in_project_status?: boolean; sla_min_wd?: number; sla_max_wd?: number; conditions?: GateCondition[]; confirm_master_impact?: string };
 
 export const useCreateDraft = () => {
@@ -46,6 +46,8 @@ export const useReorderTasks = (v: number, etag: number) => useWrite<{ stage: st
 export const useMilestoneLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/milestones/${code}`, { body, version: e }));
 export const useGateLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/gates/${code}`, { body, version: e }));
 export const usePublish = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string; confirm_master_impact?: string }, WorkflowVersion>(v, etag, (body, e) => api.post(`${base(v)}/publish`, { body, version: e }));
+/** 0.15.16 (migration 0096): the task that closes its milestone, chosen in a draft. */
+export const useSetClosing = (v: number, etag: number) => useWrite<{ code: string; closing: boolean; reason: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/closing`, { body, version: e }));
 export type InsertInput = TaskCreateInput & { successors?: string[]; remove_direct_links?: boolean; add_to_open_sites?: boolean };
 export type TaskInsertPreview = S['TaskInsertPreview'];
 export type TaskInsertResult = S['TaskInsertResult'];
@@ -88,3 +90,29 @@ export type { Wrap };
 export type RemoveResult = { outcome: 'deleted' | 'deactivated'; why: string[] };
 export const useRemoveItem = (v: number, etag: number) => useWrite<{ kind: 'task' | 'milestone' | 'gate'; code: string; reason: string }, RemoveResult>(v, etag, (body, e) => api.post(`${base(v)}/remove`, { body, version: e }));
 export const useDiscardDraft = (v: number, etag: number) => useWrite<{ reason: string }, unknown>(v, etag, (body, e) => api.post(`${base(v)}/discard`, { body, version: e }));
+
+/** The SLA (target and limit in working days) of each task in force today, read-only here: the SLA rules are a versioned set with its own publishing (Settings, SLA). */
+export type TaskSla = { min: number; max: number };
+export const useTaskSla = () =>
+  useQuery({
+    queryKey: ['wf-task-sla'], retry: false, staleTime: 60_000,
+    queryFn: () => api.get<{ items: { task_code: string; min_working_days: number; max_working_days: number; scenario?: string | null; region_id?: number | null }[] }>('/settings/sla-rules', { query: { limit: 200 } })
+      .then((r) => { const m = new Map<string, TaskSla>(); for (const x of r.items) if (!x.scenario && !x.region_id && !m.has(x.task_code)) m.set(x.task_code, { min: x.min_working_days, max: x.max_working_days }); return m; }),
+  });
+
+/** Bulk edit of tasks (the table view): one write after the other, each with the ETag the previous answer returned, one reason; stops at the first refusal. */
+export function useBulkTaskPatch(version: number, etag: number) {
+  const qc = useQueryClient();
+  return useMutation<{ done: number }, ApiError, { codes: string[]; patch: Omit<TaskPatchInput, 'reason'>; reason: string }>({
+    mutationFn: async ({ codes, patch, reason }) => {
+      let tag = etag, done = 0;
+      for (const code of codes) {
+        const r = await api.patch<{ version_etag?: number }>(`${base(version)}/tasks/${code}`, { body: { ...patch, reason }, version: tag });
+        if (typeof r.version_etag === 'number') tag = r.version_etag;
+        done += 1;
+      }
+      return { done };
+    },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); },
+  });
+}

@@ -1,40 +1,16 @@
-import { Lock, Unlock } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDlp, useFreeze, useIdle, useLiftFreeze, usePublishDlp, useSetIdle } from '@/api/settings';
+import { useDlp, useIdle, usePublishDlp, useSetIdle } from '@/api/settings';
+import { FreezeCard } from '@/components/FreezePanel';
 import { errText, FormDialog } from '@/components/FormDialog';
 import { useToast } from '@/components/Toast';
 import { fieldErrors } from '@/lib/fields';
 import { FieldErr } from './Calendar';
 
-export const FREEZE_CONFIRM = 'structural-freeze';
+export { FREEZE_CONFIRM } from '@/components/FreezePanel';
 
 export function Freeze() {
-  const { t } = useTranslation();
-  const toast = useToast();
-  const q = useFreeze(), lift = useLiftFreeze();
-  const [open, setOpen] = useState(false);
-  const [typed, setTyped] = useState('');
-  const f = q.data;
-  const errs = fieldErrors(lift.error);
-  return (
-    <section className="card space-y-3 p-4" data-testid="page-freeze">
-      <h2 className="flex items-center gap-2 font-bold">{f?.active ? <Lock size={16} /> : <Unlock size={16} />}{t('rules.freeze')}</h2>
-      <p data-testid="freeze-status" className="text-sm">{f?.lifted ? t('rules.freeze_lifted') : f?.active ? t('rules.freeze_active') : t('rules.freeze_inactive')}</p>
-      {f?.starts_on && <p className="mono text-xs text-mute">{f.starts_on} → {f.ends_on}</p>}
-      {f?.lifted && <p className="text-sm text-mute">{t('rules.lift_reason', { reason: f.lift_reason })}</p>}
-      <p className="text-xs text-mute">{t('rules.freeze_note')}</p>
-      {f && !f.lifted && <button className="btn btn-accent" data-testid="freeze-lift" onClick={() => { setTyped(''); setOpen(true); }}>{t('rules.lift')}</button>}
-      {open && f && (
-        <FormDialog open onClose={() => setOpen(false)} testid="freeze-dialog" title={t('rules.lift')} disabled={typed !== FREEZE_CONFIRM} busy={lift.isPending} error={lift.isError && !errs['/confirm_text'] ? errText(lift.error, t) : null}
-          onSubmit={(reason) => lift.mutate({ version: f.version, reason, confirm_text: typed }, { onSuccess: () => { toast(t('settings.audited')); setOpen(false); } })}>
-          <label className="block text-sm font-semibold">{t('rules.type_to_confirm', { text: FREEZE_CONFIRM })}
-            <input className="input mono mt-1 font-normal" dir="ltr" data-testid="freeze-confirm" autoComplete="off" value={typed} onChange={(e) => setTyped(e.target.value)} /></label>
-          <FieldErr errs={errs} path="/confirm_text" />
-        </FormDialog>
-      )}
-    </section>
-  );
+  return <FreezeCard />;
 }
 
 export function Dlp() {

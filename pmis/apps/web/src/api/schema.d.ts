@@ -3077,6 +3077,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/tasks/{task_code}/closing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose (or clear) the task that closes its milestone
+         * @description Migration 0096. Draft versions only (a published version answers 409 `invalid_transition`). A milestone has one closing task: choosing one clears the previous one. Needs `task_definitions.edit`
+         *     (all regions), a reason, a step-up and `If-Match`. Answers 409 `freeze_active` during the structural freeze, 409 `invalid_transition` when nothing changes, 422 `inactive` for an inactive task.
+         */
+        put: operations["setTaskClosing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/successors": {
         parameters: {
             query?: never;
@@ -4813,7 +4834,7 @@ export interface paths {
         get: operations["getStructuralFreeze"];
         /**
          * Set the freeze window (pilot start to end of the parallel-run month)
-         * @description While active, adding, removing or reordering a milestone or gate and moving tasks between stages answer 409 `freeze_active`. Light changes and new tasks inside an existing stage stay allowed.
+         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.16).
          */
         put: operations["setStructuralFreeze"];
         post?: never;
@@ -9995,8 +10016,14 @@ export interface components {
             type: "milestone" | "task" | "permit" | "date_field" | "stop_work_blocks";
             /** @description Milestone code, task code, permit type, or date field key. */
             ref?: string;
-            /** @description For permits, an approved N/A satisfies (D36). */
+            /** @description For permits, an approved N/A satisfies (D36). For `date_field` and a task date, a task that is N/A or skipped satisfies. */
             accept_na?: boolean;
+            /**
+             * @description `date_field` only (0.15.16, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
+             *     `site.rf_survey_date`, `site.acquisition_date` or `site.custom.<code>` (a date custom field). A date that is not set holds the gate (`condition_not_met`); the gate date is the later of its
+             *     other conditions and this date plus the offset.
+             */
+            offset_wd?: number;
         };
         WorkflowGate: {
             code: string;
@@ -21349,6 +21376,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskInsertResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setTaskClosing: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    closing: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
                 };
             };
             401: components["responses"]["Unauthorized"];
