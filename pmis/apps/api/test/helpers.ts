@@ -95,6 +95,13 @@ export async function superDbWfe(): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the workflow-gaps database (migration 0096; see global-setup). */
+export async function superDbWfg(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFG });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the register-columns database (migration 0095; see global-setup). */
 export async function superDbRcols(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RCOLS });

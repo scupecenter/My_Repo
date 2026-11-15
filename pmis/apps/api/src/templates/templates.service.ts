@@ -143,6 +143,8 @@ export class TemplatesService {
       if (regs !== null && regs.length === 0) return false;
       return (await this.access.hasGrant(auth, 'templates', 'import')) || (await this.access.hasGrant(auth, 'templates', 'download_documents'));
     }
+    // 0105 (F17): the values of a list, only for those who may edit the lists (fields)
+    if (t.kind === 'list_values') return this.access.hasGrant(auth, 'fields', 'edit');
     return false;
   }
 
@@ -183,6 +185,7 @@ export class TemplatesService {
     if (!t || !t.is_active) throw problems.notFound('This template does not exist.');
     if (t.kind === 'stream' || t.kind === 'master') return this.downloadSite(auth, t, q);
     if (t.kind === 'sites') return this.downloadNewSites(auth, t);
+    if (t.kind === 'list_values') return this.downloadListValues(auth, t);
     if (t.kind !== 'register' || !t.register_key || !t.module_key) throw problems.notFound('This template cannot be downloaded yet.');
     const regs = await this.access.requireRegions(t.module_key, 'view');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
@@ -238,6 +241,17 @@ export class TemplatesService {
     const me = await this.db.tx.$queryRaw<{ employee_id: string | null }[]>(Prisma.sql`SELECT employee_id FROM users WHERE id = ${auth.user.id}::uuid`);
     const issuedAt = new Date();
     const buffer = await this.build(t, t.columns, [], { prefill: false, employeeId: me[0]?.employee_id?.trim() ?? null, issuedAt });
+    await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
+        ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
+    return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
+  }
+
+  /** 0105 (F17): the approved template of a list's values. One row per value; the import reads it back (list-catalogues service). */
+  private async downloadListValues(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
+    await this.access.requireAdmin('fields', 'edit');
+    if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
+    const issuedAt = new Date();
+    const buffer = await this.build(t, t.columns, [], { prefill: false, employeeId: null, issuedAt });
     await this.db.tx.$queryRaw(Prisma.sql`SELECT log_audit_write('template_download', 'template', ${t.template_id}::text, NULL,
         ${JSON.stringify({ version: t.current_version, prefill: false, rows: 0, kind: t.kind })}::jsonb, NULL)`);
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };

@@ -115,6 +115,22 @@ export const listHandlers = [
     return HttpResponse.json(c);
   }),
 
+  // contract 0.15.23 (F17): a hard delete only of an unused value; the reason is a query parameter, If-Match is optional
+  http.delete(`${B}/list-catalogues/:code/values/:id`, ({ params, request }) => {
+    const g = guard(); if (g) return g;
+    if (!isAdmin()) return problem(403, 'action_forbidden', 'You are not allowed to do this.');
+    const url = new URL(request.url);
+    if ((url.searchParams.get('reason') ?? '').trim().length < 3) return invalid('/reason', 'required');
+    const c = L().find((x) => x.code === params.code);
+    const v = c?.values.find((x) => x.id === params.id);
+    if (!c || !v) return problem(404, 'not_found', 'The value does not exist in this list.');
+    if (c.code === 'Severity') return invalid('/', 'mirrored_list');
+    if (v.is_default) return problem(422, 'is_default', 'The default value cannot be deleted.');
+    if (c.used_by.length) return problem(422, 'in_use', 'The value is in use and cannot be deleted.');
+    c.values = c.values.filter((x) => x !== v); c.version += 1; save();
+    return HttpResponse.json(c, { headers: { ETag: `"${c.version}"` } });
+  }),
+
   // Q111: the proposal from the old text and the reviewed conversion (once per meeting)
   http.get(`${B}/registers/:key/records/:id/legacy-conversion`, ({ params }) => {
     const g = guard(); if (g) return g;

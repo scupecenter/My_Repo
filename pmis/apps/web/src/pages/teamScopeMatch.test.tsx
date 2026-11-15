@@ -11,7 +11,7 @@ import { ContractorsReports } from './ContractorsReports';
 import { SettingsRoutes } from './settings/Settings';
 
 /** Settings, team / scope match of Procurement (contract 0.9.1, Q97; 0.12.9, P4b: Q143, Q144, Q145, Q147, D145b). */
-const settings = (route = '/admin/settings/team-scope', opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route, ...opts });
+const settings = (route = '/admin/settings/registers/team-scope', opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route, ...opts });
 const reports = (opts = {}) => renderApp(<Routes><Route path="/reports/contractors" element={<ContractorsReports />} /></Routes>, { route: '/reports/contractors', ...opts });
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
 const cell = (scope: string, spec: string) => screen.getByTestId(`tsm-cell-${scope}-${spec}`) as HTMLInputElement;
@@ -22,7 +22,7 @@ describe('team / scope match (Q97, Q143, Q144)', () => {
     await signIn('pm');
     settings();
     expect(await screen.findByTestId('tsm-grid')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-team-scope')).toHaveTextContent('Team / scope match');
+    expect(screen.getByTestId('settings-section-registers-team-scope')).toHaveTextContent('Team / scope match');
     expect(screen.getByTestId('tsm-col-TOWER_RT')).toHaveTextContent('Tower RT');
     expect(group('CW', 'CW').checked).toBe(true);
     expect(cell('CW', 'TOWER_RT')).toBeChecked();                 // through the group
@@ -77,7 +77,7 @@ describe('team / scope match (Q97, Q143, Q144)', () => {
 
   it('is in Arabic when the locale is Arabic, with the Arabic labels of the catalogue', async () => {
     await signIn('pm');
-    settings('/admin/settings/team-scope', { locale: 'ar' });
+    settings('/admin/settings/registers/team-scope', { locale: 'ar' });
     expect(await screen.findByText('مطابقة الفريق والنطاق (المشتريات)')).toBeInTheDocument();
     expect(screen.getByTestId('tsm-save')).toHaveTextContent('حفظ الجدول');
     expect(screen.getByTestId('tsm-col-TOWER_RT')).toHaveTextContent('برج سطح');
@@ -132,7 +132,7 @@ describe('contractor rules (D145b, Q147)', () => {
   it('saves the certificate lead time with a reason and no step-up; changing the CW Delivery Model scopes asks for the step-up', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    const view = settings('/admin/settings/contractor-rules');
+    const view = settings('/admin/settings/registers/contractors');
     const lead = await screen.findByTestId('cr-lead');
     expect(lead).toHaveValue(30);
     expect(await screen.findByTestId('cr-scope-CW')).toBeChecked();
@@ -155,7 +155,7 @@ describe('contractor rules (D145b, Q147)', () => {
 
   it('is in Arabic', async () => {
     await signIn('pm');
-    settings('/admin/settings/contractor-rules', { locale: 'ar' });
+    settings('/admin/settings/registers/contractors', { locale: 'ar' });
     expect(await screen.findByText('قواعد المقاولين', { selector: 'h2' })).toBeInTheDocument();
     expect(screen.getByText('تنبيه شهادة السلامة (أيام قبل الانتهاء)', { exact: false })).toBeInTheDocument();
   });
