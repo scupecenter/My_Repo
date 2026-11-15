@@ -91,6 +91,11 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const isoToDate = (s: string): Date => new Date(`${s}T00:00:00.000Z`);
 
+export interface TplCompat {
+  compatible: boolean; to_version?: number; input_changes: { key: string; header: string | null; change: string }[]; other_changes: unknown[];
+  removed_columns?: { key: string; header: string | null }[]; added_columns?: { key: string; header: string | null }[]; renamed_columns?: { key: string; from: string | null; to: string | null }[];
+}
+
 @Injectable()
 export class TemplatesService {
   constructor(
@@ -117,9 +122,8 @@ export class TemplatesService {
   }
 
   /** D112: the column-level diff between an issued version and the current one (null when the version was never issued). */
-  async compat(templateId: string, version: number): Promise<{ compatible: boolean; input_changes: { key: string; header: string | null; change: string }[]; other_changes: unknown[] } | null> {
-    const rows = await this.db.tx.$queryRaw<{ r: { compatible: boolean; input_changes: { key: string; header: string | null; change: string }[]; other_changes: unknown[] } | null }[]>(
-      Prisma.sql`SELECT tpl_version_compat(${templateId}::text, ${version}::int) AS r`);
+  async compat(templateId: string, version: number): Promise<TplCompat | null> {
+    const rows = await this.db.tx.$queryRaw<{ r: TplCompat | null }[]>(Prisma.sql`SELECT tpl_version_compat(${templateId}::text, ${version}::int) AS r`);
     return rows[0]?.r ?? null;
   }
 

@@ -312,13 +312,13 @@ describe("Q281: a Cancelled site is left out of the TE dispatch list but stays o
   };
 
   it("the list and its need_status filter leave the cancelled site out; the site's own dispatch page still answers", async () => {
-    const live = await teSite("QZL", "in_progress");
-    const gone = await teSite("QZC", "cancelled");
-    const ok = await codes(`region_id=${R}&q=QZ&limit=200`);
+    const live = await teSite("QZ", "in_progress");
+    const gone = await teSite("QZ", "cancelled");
+    const ok = await codes(`region_id=${R}&q=QZ-&limit=200`);
     expect(ok).toContain(live.code);
     expect(ok).not.toContain(gone.code);
     const ns = (await t.entry.api.call("get", `/warehouse/dispatch-status/${live.id}`)).body.need_status;
-    expect(await codes(`region_id=${R}&q=QZ&need_status=${ns}&limit=200`)).toEqual([live.code]);
+    expect(await codes(`region_id=${R}&q=QZ-&need_status=${ns}&limit=200`)).toEqual([live.code]);
     expect(await codes(`region_id=${R}&q=${gone.code}&limit=200`)).toEqual([]);
     expect(await codes(`q=${gone.code}&need_status=${ns}`)).toEqual([]);
     // its own page is unchanged

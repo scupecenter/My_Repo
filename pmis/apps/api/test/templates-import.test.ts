@@ -269,7 +269,7 @@ describe('upload: rejections are logged and make no batch', () => {
     expect((await uploadFile(t.review.api, dl.buffer)).status).toBe(403);
   });
 
-  it('rejects a file of an older version with the current version in the message, and the System Log keeps it', async () => {
+  it('reads a file of an older version by its column codes (a new column is no reason to refuse it), and a new download carries the new version', async () => {
     const admin = await plainAdmin(app, db);
     const before = await admin.api.call('get', '/templates');
     const mtg = before.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG');
@@ -282,11 +282,9 @@ describe('upload: rejections are logged and make no batch', () => {
       const after = await admin.api.call('get', '/templates');
       expect(after.body.items.find((i: { template_id: string }) => i.template_id === 'TPL-MTG').current_version).toBe(v0 + 1);
       const res = await uploadFile(admin.api, dl.buffer);
+      // 0095 (owner decision 2026-11-14): the older file is no longer refused for a new column; it is read by its column codes, and it only has no rows
       expect(res.status).toBe(422);
-      expect(res.body).toMatchObject({ code: 'template_rejected', reason: 'outdated_version' });
-      expect(res.body.detail).toContain(`version ${v0} of TPL-MTG`);
-      expect(res.body.detail).toContain(`current version is ${v0 + 1}`);
-      expect((await logRows('outdated_version'))[0]!.context).toMatchObject({ template_id: 'TPL-MTG', version: v0, current_version: v0 + 1 });
+      expect(res.body).toMatchObject({ code: 'validation_failed' });
       // the new download carries the new column and the new version; the old version is retired
       const fresh = await downloadTemplate(admin.api, 'TPL-MTG');
       const wb = await load(fresh.buffer);

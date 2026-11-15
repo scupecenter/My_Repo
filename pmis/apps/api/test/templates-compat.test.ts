@@ -53,28 +53,22 @@ describe('older template versions (D112)', () => {
     }
   });
 
-  it('refuses a file of an older version when a typed column changed, names the column, and the System Log keeps the refusal', async () => {
+  it('accepts a file of an older version when a typed column was added to a register (0095, tolerant upload), with the summary for the confirm step', async () => {
     const admin = await plainAdmin(app, db);
     const v0 = await version();
     const dl = await downloadTemplate(admin.api, 'TPL-MTG');
     const code = `typed_probe_${Date.now()}`;
     await db.query(`INSERT INTO register_fields (register_key, code, label_en, field_type, required, derived, sort_order) VALUES ('meetings', $1, 'Typed probe', 'text', false, false, 991)`, [code]);
     try {
-      const buf = await fillTemplate(dl.buffer, [{ Date: day('2026-01-13'), Title: `Refused meeting ${Date.now()}` }]);
+      const buf = await fillTemplate(dl.buffer, [{ Date: day('2026-01-13'), Title: `Tolerated meeting ${Date.now()}` }]);
       const res = await uploadFile(admin.api, buf);
-      expect(res.status).toBe(422);
-      expect(res.body).toMatchObject({ code: 'template_rejected', reason: 'outdated_version' });
-      expect(res.body.detail).toContain(`version ${v0} of TPL-MTG`);
-      expect(res.body.detail).toContain('Typed probe (added)');
-      const log = await q<{ context: Record<string, any> }>(db, `SELECT context FROM system_log WHERE source = 'template-check' AND context ->> 'reason' = 'outdated_version' AND user_id = $1 ORDER BY id DESC LIMIT 1`, [admin.user.id]);
-      expect(log[0]!.context.input_changes).toEqual([expect.objectContaining({ key: code, change: 'added' })]);
-      // the database refuses it too, whatever the API sends
+      expect([200, 201, 202]).toContain(res.status);
+      expect(res.body.older_template.added_columns.map((c: { key: string }) => c.key)).toContain(code);
       const db2 = await q<{ c: Record<string, unknown> }>(db, `SELECT tpl_version_compat('TPL-MTG', $1) AS c`, [v0]);
-      expect(db2[0]!.c).toMatchObject({ compatible: false });
+      expect(db2[0]!.c).toMatchObject({ compatible: true, input_changes: [] });
     } finally {
       await db.query(`DELETE FROM register_fields WHERE register_key = 'meetings' AND code = $1`, [code]);
     }
-    // the typed column is gone again: the same columns as the file's version, so the old file is accepted again
     expect((await q<{ c: Record<string, unknown> }>(db, `SELECT tpl_version_compat('TPL-MTG', $1) AS c`, [v0]))[0]!.c).toMatchObject({ compatible: true });
   });
 
