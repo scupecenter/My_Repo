@@ -1,4 +1,4 @@
--- F1 (contract 0.15.15, CHANGELOG 139): approved status transitions of tasks and register records, and the time they spend in each state.
+-- F1 (contract 0.15.17, CHANGELOG 139): approved status transitions of tasks and register records, and the time they spend in each state.
 --
 -- The table is read-only for the application. Rows come from two places:
 --   1. a trigger on the approval doors' own step ledgers (workflow_steps for tasks, register_steps for records): every step that changes the
