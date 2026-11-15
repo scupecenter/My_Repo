@@ -89,6 +89,13 @@ interface RuleRow {
   set_version: number | null;
   end_event: string | null;
   pending_confirmation: boolean;
+  unit: string;
+  warning_pct: number | null;
+  breach_owner_role: string | null;
+  escalation_role: string | null;
+  pause_on_client_wait: boolean;
+  is_active: boolean;
+  inactive_reason: string | null;
 }
 
 const ref = (id: string | null, name: string | null, emp: string | null): UserRef | undefined =>
@@ -130,7 +137,8 @@ export class SlaService {
         r.scenario::text AS scenario, r.region_id, c.code AS calendar_code, r.effective_from::text AS effective_from, r.effective_to::text AS effective_to,
         r.reason, r.changed_by::text AS changed_by, u.display_name AS cb_name, u.employee_id AS cb_emp, r.changed_at,
         (SELECT count(*) FROM task_instances t WHERE t.sla_rule_id = r.id AND t.state IN ('open', 'entry', 'in_review', 'in_approval', 'rejected', 'suspended')) AS open_task_count,
-        rs.version AS set_version, r.end_ref AS end_event, r.pending_confirmation
+        rs.version AS set_version, r.end_ref AS end_event, r.pending_confirmation,
+        r.unit, r.warning_pct, r.breach_owner_role, r.escalation_role, r.pause_on_client_wait, r.is_active, r.inactive_reason
       FROM sla_rules r JOIN task_definitions td ON td.id = r.task_def_id JOIN work_calendars c ON c.id = r.calendar_id
       LEFT JOIN users u ON u.id = r.changed_by LEFT JOIN sla_rule_sets rs ON rs.id = r.rule_set_id
       WHERE td.workflow_id = sla_workflow()
@@ -147,6 +155,8 @@ export class SlaService {
         reason: r.reason, changed_by: ref(r.changed_by, r.cb_name, r.cb_emp), changed_at: r.changed_at, open_task_count: Number(r.open_task_count),
         ...(r.set_version !== null ? { set_version: r.set_version } : {}),
         end_event: r.end_event, pending_confirmation: r.pending_confirmation,
+        unit: r.unit, warning_pct: r.warning_pct, breach_owner_role: r.breach_owner_role, escalation_role: r.escalation_role,
+        pause_on_client_wait: r.pause_on_client_wait, is_active: r.is_active, inactive_reason: r.inactive_reason,
       })),
       page: { limit, next_cursor: rows.length > limit && last ? encodeCursor([last.task_code, last.id]) : null },
     };

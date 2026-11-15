@@ -5,6 +5,7 @@ import { DocumentLibrary } from './DocumentLibrary';
 import { Notifications } from './Notifications';
 import { Retention } from './Retention';
 import { Dlp, Freeze, Idle } from './Rules';
+import { SlaRuleAdmin } from './SlaRuleAdmin';
 import { SlaRules } from './SlaRules';
 import { WeightSets } from './WeightSets';
 import { StaffVisibility } from './StaffVisibility';
@@ -18,7 +19,7 @@ import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { Workflow } from './Workflow';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'sla-admin', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -42,6 +43,7 @@ export function SettingsRoutes() {
         <Route index element={<Navigate to="calendar" replace />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="sla" element={<SlaRules />} />
+        <Route path="sla-admin" element={<SlaRuleAdmin />} />
         <Route path="weights" element={<WeightSets />} />
         <Route path="freeze" element={<Freeze />} />
         <Route path="dlp" element={<Dlp />} />

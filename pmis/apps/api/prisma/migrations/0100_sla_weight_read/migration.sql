@@ -23,3 +23,25 @@ GRANT EXECUTE ON FUNCTION wf_sla_weight_items(integer) TO pmis_definer;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN GRANT EXECUTE ON FUNCTION wf_sla_weight_items(integer) TO pmis_app; END IF;
 END $$;
+
+-- 2. Database guard on publishing (F14, owner request 2026-11-15): a draft cannot become published while a weight group does not total 100.
+-- The API answers 409 first; this trigger holds the same rule for every path that publishes (admin_wf_publish included).
+CREATE OR REPLACE FUNCTION wf_weight_publish_guard() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+DECLARE bad text;
+BEGIN
+  IF NEW.status = 'published' AND OLD.status = 'draft' THEN
+    SELECT string_agg(x ->> 'group' || ' totals ' || (x ->> 'total'), ', ' ORDER BY x ->> 'group') INTO bad
+      FROM jsonb_array_elements(public.wf_weight_totals(NEW.id)) AS x WHERE NOT (x ->> 'ok')::boolean;
+    IF bad IS NOT NULL THEN
+      RAISE EXCEPTION 'weight groups must total 100 before publishing: %', bad USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS workflow_weight_publish_guard ON workflow_definitions;
+CREATE TRIGGER workflow_weight_publish_guard BEFORE UPDATE OF status ON workflow_definitions
+  FOR EACH ROW EXECUTE FUNCTION wf_weight_publish_guard();
+
+ALTER FUNCTION wf_weight_publish_guard() OWNER TO pmis_definer;

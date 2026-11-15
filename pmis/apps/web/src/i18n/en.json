@@ -925,7 +925,8 @@
     "tab_mail-kinds": "Mail kinds",
     "tab_historical-waiver": "Historical load",
     "tab_imports": "Imports",
-    "tab_workflow": "Workflow"
+    "tab_workflow": "Workflow",
+    "tab_sla_admin": "SLA admin"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -3331,6 +3332,30 @@
     "ev_date_moved": "date moved",
     "shifted": "moved by a suspension",
     "no_events": "No gate change recorded yet."
+  },
+  "sla_admin": {
+    "title": "SLA rules",
+    "filter_task": "Task code",
+    "all": "All",
+    "keep": "Keep",
+    "select": "Select",
+    "col_task": "Task",
+    "col_min": "Min (working days)",
+    "col_max": "Max (working days)",
+    "col_unit": "Unit",
+    "col_start": "Start event",
+    "col_calendar": "Calendar",
+    "col_warning": "Warning %",
+    "col_owner": "Breach owner",
+    "col_escalation": "Escalation",
+    "col_pause": "Pause on client wait",
+    "col_open": "Open tasks",
+    "bulk_title": "Bulk edit ({{n}} selected)",
+    "reason": "Reason (min 3 characters)",
+    "apply": "Apply to selected",
+    "bulk_done": "Saved {{n}} task rules on the draft.",
+    "bulk_failed": "Saved {{n}} of {{total}} before an error:",
+    "no_draft": "Open a draft in Settings > Workflow first. SLA rules are saved on a draft."
   },
   "sla": {
     "tentative_date": "Tentative date",
