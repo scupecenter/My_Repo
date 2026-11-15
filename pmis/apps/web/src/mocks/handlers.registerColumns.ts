@@ -11,7 +11,7 @@ import { guard, problem, stepUp } from "./handlers";
 import { REGISTER_DEFS } from "./registersData";
 
 /**
- * Contract 0.15.13: the columns, sections and name of a register, as admin_reg_field_save, admin_reg_field_delete, admin_reg_fields_order, admin_reg_section_save
+ * Contract 0.15.15: the columns, sections and name of a register, as admin_reg_field_save, admin_reg_field_delete, admin_reg_fields_order, admin_reg_section_save
  * and admin_reg_definition_rename of migration 0095 decide them. Synthetic: the columns start from the mock catalogue; one is protected (`is_system`) and one
  * "holds values", so the deactivation and the protected paths can be shown. Only the System Admin (account `pm`) writes; a reason is needed; a delete, a type
  * change and a deactivation need the step-up.

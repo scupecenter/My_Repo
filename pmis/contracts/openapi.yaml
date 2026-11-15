@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.13
+  version: 0.15.15
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -3976,6 +3976,251 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /documents/grid:
+    get:
+      tags: [documents]
+      operationId: getDocumentsGrid
+      summary: Excel-like grid, sites in rows and document types in columns, one status per cell (0097)
+      description: |
+        Region scope applies (a site outside the caller's regions is not listed) and so does the register scope of each document type. Needs `view` on the Documents screen.
+        Columns are the active document types that have a placement (task, QC or register), grouped by stage, register or QC. Each cell has one status: missing, pending (uploaded or in review), approved, expired (approved, past its expiry date), rejected, not_required (a site override, or a slot marked not required), generatable (a generated form that can be issued now; generation itself is not in this version), blocked (a generated form that cannot be issued yet, with `reason`) or not_applicable (the type does not apply to the site).
+        `site_code` takes many Site IDs at once, separated by commas, spaces or new lines (at most 500). `status`, `uploaded_from` and `uploaded_to` keep a row when at least one of its cells has that status or a current file uploaded in the range; the server reads ahead until the page is full. `download_allowed` says whether the caller may download the files of the row.
+      parameters:
+        - { name: site_code, in: query, schema: { type: string, maxLength: 6000 }, description: 'Site IDs, separated by commas, spaces or new lines.' }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: stage_code, in: query, schema: { type: string } }
+        - name: doc_code
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [missing, pending, approved, expired, rejected, not_required, generatable, blocked, not_applicable] } }
+        - { name: uploaded_from, in: query, schema: { type: string, format: date } }
+        - { name: uploaded_to, in: query, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Grid page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [columns, rows, page]
+                properties:
+                  columns:
+                    type: array
+                    items:
+                      type: object
+                      required: [doc_code, name_en, group_key, group_label]
+                      properties:
+                        doc_code: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        kind: { type: string }
+                        generated: { type: boolean, description: 'True for a generated form (status generatable or blocked only; issuing is not in this version).' }
+                        group_key: { type: string, description: 'stage:<code>, register:<key> or qc.' }
+                        group_label: { type: string }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [site_id, site_code, region_id, download_allowed, cells]
+                      properties:
+                        site_id: { type: string, format: uuid }
+                        site_code: { type: string }
+                        site_name: { type: [string, 'null'] }
+                        region_id: { type: integer }
+                        download_allowed: { type: boolean }
+                        cells:
+                          type: object
+                          description: Keyed by doc_code.
+                          additionalProperties:
+                            type: object
+                            required: [status, slots, files]
+                            properties:
+                              status: { type: string, enum: [missing, pending, approved, expired, rejected, not_required, generatable, blocked, not_applicable] }
+                              reason: { type: [string, 'null'], description: 'Why the cell is blocked or not required.' }
+                              slots: { type: integer }
+                              files: { type: integer, description: 'Current files.' }
+                  page: { $ref: '#/components/schemas/PageInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /documents/grid/view:
+    get:
+      tags: [documents]
+      operationId: getDocumentsGridView
+      summary: The caller's saved grid columns
+      responses:
+        '200':
+          description: Saved columns (empty list when none saved).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [columns]
+                properties:
+                  columns: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [documents]
+      operationId: saveDocumentsGridView
+      summary: Save the caller's grid columns (personal, never shared)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [columns]
+              additionalProperties: false
+              properties:
+                columns: { type: array, maxItems: 300, items: { type: string, maxLength: 40 } }
+      responses:
+        '204': { description: Saved. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/document-overrides:
+    parameters:
+    - { name: site_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: createSiteDocumentOverride
+      summary: Mark a document not required for one site (0097)
+      description: Needs `sites.edit` for the site's region. Open slots of that type on the site become not_required, as a placement change does. Audited with the reason.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_code, reason]
+              additionalProperties: false
+              properties:
+                doc_code: { type: string, maxLength: 31 }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '201':
+          description: Override created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slots_changed: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /document-overrides/{override_id}/revert:
+    parameters:
+    - { name: override_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: revertSiteDocumentOverride
+      summary: End a not-required override (0097)
+      description: The slots go back to missing, or to uploaded when a current file exists. Audited with the reason.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Reverted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slots_changed: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /files/{file_id}/move:
+    parameters:
+    - { name: file_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: moveDocumentFile
+      summary: Move a misplaced file (all its versions) to another slot of the same site (0097)
+      description: Needs `sites.edit` for the site's region. Refused for approved files and slots, for another site, and for a format the target document does not accept. Both slots are recomputed. Audited with before and after.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_slot_id, reason]
+              additionalProperties: false
+              properties:
+                target_slot_id: { type: string, format: uuid }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Moved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id: { type: string, format: uuid }
+                  source_slot_id: { type: string, format: uuid }
+                  target_slot_id: { type: string, format: uuid }
+                  versions_moved: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /document-library/{doc_type_id}/delete:
+    parameters:
+    - {$ref: '#/components/parameters/DocTypeId'}
+    post:
+      tags: [document-library]
+      operationId: deleteDocumentType
+      summary: System Admin. Hard delete when no file was ever uploaded, otherwise deactivation (0097)
+      description: |
+        A type with no file and no blank form is deleted with its placements, versions, drafts and empty slots. A type with any file (or blank form) is deactivated with the reason and kept. Needs System Admin and step-up. Audited with before and after.
+        This amends the rule "documents are deactivated, never deleted" for types that never held a file.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode: { type: string, enum: [deleted, deactivated] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /exports/zip:
     post:
       tags: [documents]

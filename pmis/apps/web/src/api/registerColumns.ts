@@ -3,7 +3,7 @@ import { api, type ApiError } from './client';
 import type { RegisterColumnCreate, RegisterColumnImpact, RegisterColumnPatch, RegisterColumnResult, RegisterColumnsScreen, RegisterColumnType } from './types';
 
 /**
- * Contract 0.15.13: the admin manages the columns, sections and the name of a register. Every call is a `fields.edit` door with a reason; a delete, a type
+ * Contract 0.15.15: the admin manages the columns, sections and the name of a register. Every call is a `fields.edit` door with a reason; a delete, a type
  * change and a deactivation also pass the step-up (the client resumes the request after it). A change issues the new template version, so the register
  * catalogue, the register templates and the open drawers are refreshed together.
  */
