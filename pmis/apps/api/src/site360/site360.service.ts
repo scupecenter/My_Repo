@@ -103,6 +103,15 @@ export class Site360Service {
     if (models.length) filters.push(Prisma.sql`s.cw_delivery_model = ANY(${models}::text[])`);
     const statuses = csvParam(q, 'status', 5);
     if (statuses.length) filters.push(Prisma.sql`s.overall_status::text = ANY(${statuses}::text[])`);
+    // contractor (AJ, the Contractor Name of the first active CW order, a procurement value): a caller without the procurement view matches nothing
+    const contractors = csvParam(q, 'contractor', 50);
+    if (contractors.length) {
+      const mod = await this.db.tx.$queryRaw<{ module_key: string }[]>(Prisma.sql`SELECT module_key FROM register_definitions WHERE register_key = 'procurement'`);
+      const canSee = mod[0] ? await this.access.hasGrant(auth, mod[0].module_key, 'view') : false;
+      filters.push(canSee
+        ? Prisma.sql`EXISTS (SELECT 1 FROM site360_master_values cv WHERE cv.site_id = s.id AND cv.ord = 36 AND cv.value = ANY(${contractors}::text[]))`
+        : Prisma.sql`FALSE`);
+    }
     const milestones = csvParam(q, 'milestone', 50);
     if (milestones.length) filters.push(Prisma.sql`s.current_milestone = ANY(${milestones}::text[])`);
     const all = filters.length ? Prisma.sql`${base} AND ${Prisma.join(filters, ' AND ')}` : base;

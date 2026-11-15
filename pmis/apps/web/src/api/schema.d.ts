@@ -5158,7 +5158,7 @@ export interface paths {
         };
         /**
          * The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
-         * @description 0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter is not in this version. `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+         * @description 0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
          */
         get: operations["getSite360Rows"];
         put?: never;
@@ -25247,6 +25247,8 @@ export interface operations {
                 status?: string;
                 /** @description Current milestone, comma-separated. */
                 milestone?: string;
+                /** @description Contractor Name (Master AJ) of the first active CW procurement order, comma-separated. A caller without the procurement view matches no site. */
+                contractor?: string;
                 /** @description site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu. */
                 sort?: string;
                 dir?: "asc" | "desc";

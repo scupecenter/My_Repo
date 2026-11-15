@@ -186,3 +186,42 @@ describe('performance: one page of 1000 sites stays under 2 seconds', () => {
     expect(sortedMs).toBeLessThan(2000);
   });
 });
+
+describe('GET /site360/{menu}/rows: the calc columns of the procurement and GECOL registers (0107)', () => {
+  it('reads the contractor of the first active CW order (AJ, AK) and the GECOL status (BW), and filters by contractor', async () => {
+    const s = await site(1);
+    const name = `${PREFIX}-CON-${randomBytes(2).toString('hex')}`;
+    const party = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [name])).rows[0].id as string;
+    const team = (await db.query(`INSERT INTO external_teams (party_id, name) VALUES ($1, $2) RETURNING id`, [party, `${name} team`])).rows[0].id as string;
+    const other = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [`${name}-X`])).rows[0].id as string;
+    // a cancelled order that is earlier does not count; the active one is the contractor
+    await db.query(`INSERT INTO procurement_records (site_id, region_id, scope, order_status, party_id, po_wo_date) VALUES ($1, 1, 'CW', 'cancelled by owner', $2, DATE '2026-01-05')`, [s.id, other]);
+    await db.query(`INSERT INTO procurement_records (site_id, region_id, scope, order_status, party_id, team_id, po_wo_date) VALUES ($1, 1, 'CW', 'issued', $2, $3, DATE '2026-02-05')`, [s.id, party, team]);
+    await db.query(`INSERT INTO gecol_records (site_id, region_id, status) VALUES ($1, 1, 'energised')`, [s.id]);
+    const mod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'procurement'`)).rows[0].module_key as string;
+    const gecolMod = (await db.query(`SELECT module_key FROM register_definitions WHERE register_key = 'gecol'`)).rows[0].module_key as string;
+    const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], [mod, 'view'], [gecolMod, 'view']] });
+    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    expect(res.status).toBe(200);
+    expect(res.body.rows[0].values['36']).toBe(name);
+    expect(res.body.rows[0].values['37']).toBe(`${name} team`);
+    expect(res.body.rows[0].values['75']).toBe('energised');
+    const hit = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
+    expect(hit.body.filtered).toBe(1);
+    const miss = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(`${name}-X`)}`);
+    expect(miss.body.filtered).toBe(0);
+  });
+
+  it('hides the procurement and GECOL values, and the contractor filter, from a user without their module view', async () => {
+    const s = await site(1);
+    const name = `${PREFIX}-HID-${randomBytes(2).toString('hex')}`;
+    const party = (await db.query(`INSERT INTO external_parties (name, type, is_active) VALUES ($1, 'cw_contractor', true) RETURNING id`, [name])).rows[0].id as string;
+    await db.query(`INSERT INTO procurement_records (site_id, region_id, scope, order_status, party_id) VALUES ($1, 1, 'CW', 'issued', $2)`, [s.id, party]);
+    const a = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
+    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    expect(res.body.rows[0].values['36']).toBeNull();
+    const hit = await a.api.call('get', `/site360/master/rows?site_code=${s.code}&contractor=${encodeURIComponent(name)}`);
+    expect(hit.body.filtered).toBe(0);
+  });
+});
+
