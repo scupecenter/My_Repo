@@ -223,7 +223,9 @@
 
 ## دليل الجلسة القادمة (حُفظ 2026-11-15 قبل نفاد الحد الأسبوعي)
 
-مدموج: حتى #144. المفتوح بالترتيب المقترح للدمج:
+تحديث 2026-11-15 مساءً: دُمج #143 و#146 و#142 (فحوص main خضراء على 908dc03، وحُذف الفرع والشجرة). [#140](https://github.com/scupecenter/My_Repo/pull/140) جاهز على 7f9dce0: دُمج فيه main، وأُضيف operationId لعملياته الخمس. [#141](https://github.com/scupecenter/My_Repo/pull/141) اكتمل فيه البندان 4 و5 وCHANGELOG 146 (be3ab20)، وبقي فيه: وصف الطلب، ودمج main بعد #140، ونقل DateMin وDateMax إلى إعدادات الحساب. [#145](https://github.com/scupecenter/My_Repo/pull/145) دُمج فيه main (2f87c4d)، وبقيت سبعة عدادات من عشرة فارغة القيمة (null، مُدرجة في pending_kpis). الترتيب التالي للدمج: #140، ثم #141، ثم #145، ثم #124.
+
+السجل القديم (قبل التحديث): مدموج حتى #144. المفتوح بالترتيب المقترح للدمج:
 1. [#143](https://github.com/scupecenter/My_Repo/pull/143) F17 DDL: مكتمل، ينتظر CI على dc89347.
 2. [#146](https://github.com/scupecenter/My_Repo/pull/146) إصلاح الاختبار المتقطع templates-streams: مكتمل، ينتظر CI.
 3. [#142](https://github.com/scupecenter/My_Repo/pull/142) F16 السجلات والقفل (ترحيل 0103): مكتمل تقريباً؛ يحتاج دمج main ثم CI.
