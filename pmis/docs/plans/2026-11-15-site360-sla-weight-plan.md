@@ -70,6 +70,12 @@ From how the team used the Master sheet:
 9. Download the current view to Excel with the same headers, colours and frozen panes.
 10. Selection totals (count, sum, min, max) in the status bar.
 
+## Settings placement rule (owner decision 2026-11-15)
+
+- **Global settings live in one place: Administration > Settings**, as tabs. Anything that applies across the system goes there: work calendar, SLA rules (with the F14 bulk SLA admin inside the existing "SLA rules" tab, not a new tab), weight sets, lists (F17 extends the existing "Lists" tab), register columns, SITE 360 column-to-menu mapping (F15, new tab "SITE 360 columns"), workflow, document library, notification policy and the rest.
+- **Local settings stay inside their module** (a toolbar "settings" button or panel on that page): per-view items such as saved views, frozen columns, column width and order for the user, a register's own record options. They never duplicate a global setting; when a local screen needs a global one, it links to the Settings tab.
+- No setting exists in two places. A new feature first checks for an existing Settings tab and extends it.
+
 ## Merge order and fixed numbers
 
 | PR | CHANGELOG | Contract |
