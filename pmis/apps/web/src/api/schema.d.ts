@@ -7486,6 +7486,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard/extras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The F13 sections of the dashboard in one read (0.15.16)
+         * @description The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+         *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The same region and cluster filters as `GET /dashboard`
+         *     (`region_id`, `cluster_code`, `scenario`, `stream`); the figures are current (no reference date).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
+         *     may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
+         *     filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
+         *     **Bands (default of the owner, 2026-11-15, a setting for the administrator).** A risk score is probability times impact, each from 1 to 5. Low 1 to 4, medium 5 to 9, high 10 to 16,
+         *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
+         *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
+         *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+         */
+        get: operations["getDashboardExtras"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/dashboard/export": {
         parameters: {
             query?: never;
@@ -15292,6 +15321,98 @@ export interface components {
             by_milestone?: {
                 [key: string]: number;
             };
+        };
+        /** @description 0.15.16: the F13 sections of the dashboard (owner decisions 2026-11-15). */
+        DashboardExtras: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions the figures cover (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            risk_matrix: components["schemas"]["DashboardRiskMatrix"];
+            data_quality: components["schemas"]["DashboardDataQuality"];
+            swap_relocation: components["schemas"]["DashboardSwapRelocation"];
+            decisions: components["schemas"]["DashboardDecisions"];
+        };
+        DashboardRiskMatrix: {
+            /** @description False when the caller may not see the risk register; the other fields are then null. */
+            available: boolean;
+            open_total: number | null;
+            /** @description Open risks whose probability or impact is outside 1 to 5 (left out of the cells). */
+            invalid_total?: number | null;
+            /** @description The 25 cells, probability 1 to 5 by impact 1 to 5. */
+            cells: components["schemas"]["DashboardRiskCell"][] | null;
+            bands: components["schemas"]["DashboardRiskBand"][] | null;
+            /** @description The open risks of the highest score first (ties by code). */
+            top_open_risks: components["schemas"]["DashboardRiskItem"][] | null;
+        };
+        DashboardRiskCell: {
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            count: number;
+        };
+        DashboardRiskBand: {
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            min: number;
+            max: number;
+            count: number;
+        };
+        DashboardRiskItem: {
+            risk_code: string;
+            statement: string;
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            /** @enum {string} */
+            status: "open" | "in_progress";
+            risk_owner?: string | null;
+            region_id?: number | null;
+            is_global: boolean;
+        };
+        DashboardDataQuality: {
+            available: boolean;
+            sites_checked: number | null;
+            sites_with_gaps: number | null;
+            gaps_total: number | null;
+            by_kind: {
+                /** @enum {string} */
+                kind: "missing_actual_date" | "missing_field";
+                field: string | null;
+                count: number;
+            }[] | null;
+        };
+        DashboardSwapRelocation: {
+            available: boolean;
+            /** @description Active sites with no delivery scenario yet. */
+            unscenarioed: number | null;
+            /** @description One row per delivery scenario, in the order of the list (new build, expansion, hot swap, cold swap, relocation). */
+            rows: {
+                scenario: components["schemas"]["DeliveryScenario"];
+                sites_total: number;
+                /** @description Keys not_started, in_progress, on_hold, completed and cancelled. */
+                by_overall_status: {
+                    [key: string]: number;
+                };
+            }[] | null;
+        };
+        DashboardDecisions: {
+            available: boolean;
+            items: {
+                /** @enum {string} */
+                tag: "act_now" | "watch";
+                risk_code: string;
+                statement: string;
+                score: number;
+                /** @enum {string} */
+                band: "low" | "medium" | "high" | "critical";
+                risk_owner: string | null;
+                region_id: number | null;
+            }[] | null;
         };
         /** @description 0.14.5: one site of the dashboard map (OV-12). */
         SiteMapItem: {
@@ -28984,6 +29105,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboardExtras: {
+        parameters: {
+            query?: {
+                region_id?: components["schemas"]["RegionId"];
+                cluster_code?: string;
+                scenario?: components["schemas"]["DeliveryScenario"];
+                /** @description Accepted as in `GET /dashboard`; the sections do not depend on it. */
+                stream?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardExtras"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     exportDashboard: {
