@@ -11,7 +11,9 @@ import { boolParam, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 
+const condition = z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional(), offset_wd: z.number().int().min(-365).max(365).optional() }).strict();
 const reason = z.string().trim().min(3).max(1000);
+const closingBody = z.object({ closing: z.boolean(), reason }).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -24,7 +26,7 @@ const milestoneBody = z.object({
   custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
 const gateBody = z.object({
-  name_en: nameEn.optional(), name_ar: nameAr.optional(), conditions: z.array(z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional() }).strict()).max(30).optional(),
+  name_en: nameEn.optional(), name_ar: nameAr.optional(), conditions: z.array(condition).max(30).optional(),
   sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
   custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
@@ -57,7 +59,7 @@ const structureBody = z.object({
   milestones: z.array(z.object({ code, name_en: nameEn.optional(), name_ar: nameAr.optional(), is_active: z.boolean().optional(), counts_in_project_status: z.boolean().optional() }).strict()).max(60),
   gates: z.array(z.object({
     code, name_en: nameEn.optional(), name_ar: nameAr.optional(), from_milestone: code.optional(), to_milestone: code.optional(), is_active: z.boolean().optional(),
-    conditions: z.array(z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional() }).strict()).max(30).optional(),
+    conditions: z.array(condition).max(30).optional(),
     sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
   }).strict()).max(80),
   task_moves: z.array(z.object({ task_code: code, stage_code: code }).strict()).max(500).optional(),
@@ -144,6 +146,13 @@ export class WorkflowEditorService {
     const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
     const { reason: why, confirm_master_impact: confirm, ...patch } = b;
     return this.one(Prisma.sql`SELECT admin_wf_task_update(${version}::int, ${etag}::int, ${task}::text, ${JSON.stringify(patch)}::jsonb, ${why}::text, ${confirm ?? null}::text) AS r`);
+  }
+
+  /** Migration 0096: the task that closes its milestone (one per milestone) is chosen in a draft; the structural freeze stops it. */
+  async setClosing(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(closingBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_closing(${version}::int, ${etag}::int, ${task}::text, ${b.closing}::boolean, ${b.reason}::text) AS r`);
   }
 
   async setPredecessors(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {

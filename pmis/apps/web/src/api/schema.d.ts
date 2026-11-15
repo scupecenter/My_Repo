@@ -3077,6 +3077,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/tasks/{task_code}/closing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Choose (or clear) the task that closes its milestone
+         * @description Migration 0096. Draft versions only (a published version answers 409 `invalid_transition`). A milestone has one closing task: choosing one clears the previous one. Needs `task_definitions.edit`
+         *     (all regions), a reason, a step-up and `If-Match`. Answers 409 `freeze_active` during the structural freeze, 409 `invalid_transition` when nothing changes, 422 `inactive` for an inactive task.
+         */
+        put: operations["setTaskClosing"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/successors": {
         parameters: {
             query?: never;
@@ -4813,7 +4834,7 @@ export interface paths {
         get: operations["getStructuralFreeze"];
         /**
          * Set the freeze window (pilot start to end of the parallel-run month)
-         * @description While active, adding, removing or reordering a milestone or gate and moving tasks between stages answer 409 `freeze_active`. Light changes and new tasks inside an existing stage stay allowed.
+         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.16).
          */
         put: operations["setStructuralFreeze"];
         post?: never;
@@ -7423,6 +7444,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How long a register record has sat in its current state (0.15.17, F1)
+         * @description Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+         */
+        get: operations["getRegisterRecordTimeInState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/state-durations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+         * @description Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+         */
+        get: operations["getStateDurationsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/blocked-by": {
         parameters: {
             query?: never;
@@ -9962,8 +10028,14 @@ export interface components {
             type: "milestone" | "task" | "permit" | "date_field" | "stop_work_blocks";
             /** @description Milestone code, task code, permit type, or date field key. */
             ref?: string;
-            /** @description For permits, an approved N/A satisfies (D36). */
+            /** @description For permits, an approved N/A satisfies (D36). For `date_field` and a task date, a task that is N/A or skipped satisfies. */
             accept_na?: boolean;
+            /**
+             * @description `date_field` only (0.15.16, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
+             *     `site.rf_survey_date`, `site.acquisition_date` or `site.custom.<code>` (a date custom field). A date that is not set holds the gate (`condition_not_met`); the gate date is the later of its
+             *     other conditions and this date plus the offset.
+             */
+            offset_wd?: number;
         };
         WorkflowGate: {
             code: string;
@@ -14749,6 +14821,42 @@ export interface components {
          * @enum {string}
          */
         InStateKind: "entry" | "review" | "approve";
+        StatusTransition: {
+            from_state: string | null;
+            to_state: string;
+            /** Format: date-time */
+            at: string;
+            actor?: components["schemas"]["UserRef"] | null;
+            /** @enum {string} */
+            level: "L1" | "L2";
+            admin_override: boolean;
+        };
+        RecordTimeInState: {
+            /** Format: uuid */
+            record_id: string;
+            register_key: string;
+            current_state: string;
+            /**
+             * Format: date-time
+             * @description At the last recorded transition into the current state.
+             */
+            since: string | null;
+            working_days_in_state: number | null;
+            transitions: components["schemas"]["StatusTransition"][];
+        };
+        StateDurationsReport: {
+            /** @enum {string} */
+            entity_type: "task" | "register_record";
+            items: {
+                region_id: number | null;
+                /** @description The stage code of a task, the register key of a record. */
+                group_key: string | null;
+                state: string;
+                count: number;
+                median_working_days: number;
+                p85_working_days: number;
+            }[];
+        };
         TaskTimeInState: {
             /** Format: uuid */
             task_id: string;
@@ -21404,6 +21512,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskInsertResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    setTaskClosing: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                version: components["parameters"]["WorkflowVersionNo"];
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    closing: boolean;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowVersion"];
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -29672,6 +29821,60 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getRegisterRecordTimeInState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current state and transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTimeInState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStateDurationsReport: {
+        parameters: {
+            query: {
+                entity_type: "task" | "register_record";
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateDurationsReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     getTaskBlockedBy: {
