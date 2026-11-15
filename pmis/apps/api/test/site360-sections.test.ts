@@ -6,7 +6,7 @@ import {
   buildMenu,
   buildSite360,
   colLetterToOrd,
-  defaultSectionByOrd,
+  defaultSectionsByOrd,
   menuColumns,
   SITE360_MENUS,
   SITE360_DEFAULT_RANGES,
@@ -16,7 +16,7 @@ import {
 
 // The Master layout as the migration seeds it: 187 columns, bands from the Master sheet row 1.
 function masterColumns(): Site360ColumnRow[] {
-  const sec = defaultSectionByOrd();
+  const sec = defaultSectionsByOrd();
   const band = (o: number): string => {
     if (o === 1) return '#';
     if (o <= 22) return 'RF & DESIGN';
@@ -45,17 +45,17 @@ function masterColumns(): Site360ColumnRow[] {
       group_top: band(o),
       group_mid: o <= 2 ? 'Identification' : o === 4 ? 'Identification' : `group ${Math.ceil(o / 10)}`,
       header: `field ${o}`,
-      section: sec.get(o)!,
+      sections: sec.get(o)!,
     });
   }
   return out;
 }
 
 describe('SITE 360 default sections', () => {
-  it('gives every Master column exactly one section', () => {
-    const m = defaultSectionByOrd();
+  it('gives every Master column its default menu', () => {
+    const m = defaultSectionsByOrd();
     expect(m.size).toBe(187);
-    for (let o = 1; o <= 187; o++) expect(m.has(o)).toBe(true);
+    for (let o = 1; o <= 187; o++) expect(m.get(o)).toHaveLength(1);
   });
 
   it('keeps the ranges contiguous and without overlap', () => {
@@ -116,17 +116,17 @@ describe('SITE 360 menu columns', () => {
 
   it('gives the SOW menu X to AF', () => {
     const sow = buildMenu('sow', cols);
-    expect(sow.columns.filter((c) => c.section === 'sow').map((c) => c.letter)).toEqual(['X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF']);
+    expect(sow.columns.filter((c) => c.sections.includes('sow')).map((c) => c.letter)).toEqual(['X', 'Y', 'Z', 'AA', 'AB', 'AC', 'AD', 'AE', 'AF']);
   });
 });
 
 describe('SITE 360 grid header', () => {
   it('builds phase band, group and field, merging runs of the same band and group', () => {
     const cols: Site360ColumnRow[] = [
-      { ord: 1, letter: 'A', group_top: 'PRE-CW', group_mid: 'G1', header: 'a', section: 'cw' },
-      { ord: 2, letter: 'B', group_top: 'PRE-CW', group_mid: 'G1', header: 'b', section: 'cw' },
-      { ord: 3, letter: 'C', group_top: 'PRE-CW', group_mid: 'G2', header: 'c', section: 'cw' },
-      { ord: 4, letter: 'D', group_top: 'Phase Gate', group_mid: 'Readiness', header: 'd', section: 'cw' },
+      { ord: 1, letter: 'A', group_top: 'PRE-CW', group_mid: 'G1', header: 'a', sections: ['cw'] },
+      { ord: 2, letter: 'B', group_top: 'PRE-CW', group_mid: 'G1', header: 'b', sections: ['cw'] },
+      { ord: 3, letter: 'C', group_top: 'PRE-CW', group_mid: 'G2', header: 'c', sections: ['cw'] },
+      { ord: 4, letter: 'D', group_top: 'Phase Gate', group_mid: 'Readiness', header: 'd', sections: ['cw'] },
     ];
     const bands = buildBands(cols);
     expect(bands).toHaveLength(2);
@@ -148,9 +148,18 @@ describe('SITE 360 grid header', () => {
   });
 
   it('builds an empty header for a menu with no section columns but keeps the status band', () => {
-    const cols = masterColumns().map((c) => ({ ...c, section: 'design_acq' as Site360Section }));
+    const cols = masterColumns().map((c) => ({ ...c, sections: ['design_acq'] as Site360Section[] }));
     const dismantle = buildMenu('dismantle', cols);
-    expect(dismantle.columns.every((c) => c.section === 'design_acq' || c.section === 'status' || c.ord === 2 || c.ord === 4)).toBe(true);
+    expect(dismantle.columns.every((c) => c.sections.includes('design_acq') || c.sections.includes('status') || c.ord <= 4)).toBe(true);
     expect(dismantle.bands.length).toBeGreaterThan(0);
+  });
+});
+
+describe('SITE 360 column in several menus', () => {
+  it('shows a column with HOTO and O&M in both menus', () => {
+    const cols = masterColumns().map((c) => (c.ord === 150 ? { ...c, sections: ['hoto', 'om'] as Site360Section[] } : c));
+    expect(menuColumns('hoto', cols).map((c) => c.ord)).toContain(150);
+    expect(menuColumns('om', cols).map((c) => c.ord)).toContain(150);
+    expect(menuColumns('cw', cols).map((c) => c.ord)).not.toContain(150);
   });
 });

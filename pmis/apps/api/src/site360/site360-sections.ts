@@ -1,13 +1,13 @@
 /**
- * SITE 360 menus (F15, contract 0.15.21, migration 0101). Pure functions: the menu of a Master column and the 3-level
- * grid header (phase band, group, field). The database holds the section of each column (master_columns.site360_section);
- * the defaults below are the same ranges as the migration and are checked by the unit tests.
+ * SITE 360 menus (F15, contract 0.15.21, migration 0101). Pure functions: the menus of a Master column and the 3-level
+ * grid header (phase band, group, field). A column may belong to several menus (owner decision 2026-11-15): the database
+ * holds the set (master_columns.site360_sections), the defaults below are the same ranges as the migration.
  */
 
 export const SITE360_SECTIONS = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om', 'status'] as const;
 export type Site360Section = (typeof SITE360_SECTIONS)[number];
 
-/** The movable menus (a column can be moved to these; status is fixed). */
+/** The menus a column can be added to or removed from. status is fixed: it is in every menu. */
 export const SITE360_MOVABLE = ['design_acq', 'sow', 'cw', 'te', 'hoto', 'dismantle', 'om'] as const;
 
 export const SITE360_MENUS = [
@@ -26,7 +26,7 @@ export type Site360Menu = (typeof SITE360_MENUS)[number]['key'];
 export const SITE360_IDENTITY_ORDS = [1, 2, 3, 4] as const;
 export const SITE360_PHASE_GATE = 'Phase Gate';
 
-/** Default section ranges by Master order (A = 1). Mirrors migration 0101; the migration is the seed. */
+/** Default menus by Master order (A = 1). Mirrors migration 0101, which is the seed. */
 export const SITE360_DEFAULT_RANGES: ReadonlyArray<readonly [number, number, Site360Section]> = [
   [1, 22, 'design_acq'],
   [23, 23, 'cw'],
@@ -45,7 +45,8 @@ export interface Site360ColumnRow {
   group_top: string | null;
   group_mid: string | null;
   header: string;
-  section: Site360Section;
+  /** The menus of the column (a set; status means every menu). */
+  sections: Site360Section[];
 }
 
 export interface Site360Band {
@@ -74,19 +75,19 @@ export function colLetterToOrd(letter: string): number {
   return n;
 }
 
-/** Expands SITE360_DEFAULT_RANGES into one section per Master order 1..187. */
-export function defaultSectionByOrd(): Map<number, Site360Section> {
-  const m = new Map<number, Site360Section>();
-  for (const [from, to, s] of SITE360_DEFAULT_RANGES) for (let o = from; o <= to; o++) m.set(o, s);
+/** The default menus of each Master order 1..187 (one menu per column from the ranges). */
+export function defaultSectionsByOrd(): Map<number, Site360Section[]> {
+  const m = new Map<number, Site360Section[]>();
+  for (const [from, to, s] of SITE360_DEFAULT_RANGES) for (let o = from; o <= to; o++) m.set(o, [s]);
   return m;
 }
 
-/** The columns of one menu in Master order: Master lists all; a menu lists its section, the identity and the status columns. */
+/** The columns of one menu in Master order: Master lists all; a menu lists the columns that carry it, the status columns and the identity. */
 export function menuColumns<T extends Site360ColumnRow>(menu: Site360Menu, columns: readonly T[]): T[] {
   const sorted = [...columns].sort((a, b) => a.ord - b.ord);
   if (menu === 'master') return sorted;
   return sorted.filter(
-    (c) => c.section === menu || c.section === 'status' || (SITE360_IDENTITY_ORDS as readonly number[]).includes(c.ord),
+    (c) => c.sections.includes(menu) || c.sections.includes('status') || (SITE360_IDENTITY_ORDS as readonly number[]).includes(c.ord),
   );
 }
 

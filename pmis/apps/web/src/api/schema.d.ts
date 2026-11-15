@@ -5149,7 +5149,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/site360/columns/{ord}/section": {
+    "/site360/columns/{ord}/sections": {
         parameters: {
             query?: never;
             header?: never;
@@ -5163,10 +5163,10 @@ export interface paths {
         options?: never;
         head?: never;
         /**
-         * Move one Master column to another SITE 360 menu (0.15.21, F15)
-         * @description 0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may move a column. The step-up is required and the reason is mandatory. The status columns cannot be moved (422 `validation_failed`, `/section`). Audited with the section before and after.
+         * Replace the SITE 360 menus of one Master column (0.15.21, F15)
+         * @description 0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may change the menus of a column. The body replaces the whole set; a column may be in several menus. The step-up is required and the reason is mandatory. The status columns are in every menu and cannot be changed (422 `validation_failed`, `/sections`). Audited with the menus before and after.
          */
-        patch: operations["moveSite360Column"];
+        patch: operations["setSite360ColumnSections"];
         trace?: never;
     };
     "/settings/gecol-order-warnings": {
@@ -8092,7 +8092,8 @@ export interface components {
             group_mid: string | null;
             /** @description The field (row 3 of the Master sheet). */
             header: string;
-            section: components["schemas"]["Site360Section"];
+            /** @description The SITE 360 menus of the column (a set). `status` means every menu. */
+            sections: components["schemas"]["Site360Section"][];
             /** @description True for a Phase Gate column (highlighted in the grid). */
             is_phase_gate: boolean;
         };
@@ -8120,9 +8121,8 @@ export interface components {
             /** @description True for a System Admin. */
             can_move: boolean;
         };
-        Site360ColumnMoveRequest: {
-            /** @enum {string} */
-            section: "design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om";
+        Site360ColumnSectionsRequest: {
+            sections: ("design_acq" | "sow" | "cw" | "te" | "hoto" | "dismantle" | "om")[];
             reason: string;
         };
         UserPickerItem: {
@@ -24868,7 +24868,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    moveSite360Column: {
+    setSite360ColumnSections: {
         parameters: {
             query?: never;
             header?: never;
@@ -24880,11 +24880,11 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Site360ColumnMoveRequest"];
+                "application/json": components["schemas"]["Site360ColumnSectionsRequest"];
             };
         };
         responses: {
-            /** @description The column, moved; the menus are read again with `GET /site360/sections`. */
+            /** @description The column with its new menus; the menus are read again with `GET /site360/sections`. */
             200: {
                 headers: {
                     [name: string]: unknown;

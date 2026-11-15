@@ -3,7 +3,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { Site360Service } from './site360.service';
 
-/** SITE 360 menus and the menu of each Master column (contract tag `sites`, 0.15.21, F15). */
+/** SITE 360 menus and the menus of each Master column (contract tag `sites`, 0.15.21, F15). */
 @Controller('site360')
 export class Site360Controller {
   constructor(private readonly svc: Site360Service) {}
@@ -13,9 +13,9 @@ export class Site360Controller {
     return this.svc.sections();
   }
 
-  @Patch('columns/:ord/section')
+  @Patch('columns/:ord/sections')
   @HttpCode(200)
-  move(@Auth() auth: AuthContext, @Param('ord') ord: string, @Body() body: unknown) {
-    return this.svc.move(auth, ord, body);
+  setSections(@Auth() auth: AuthContext, @Param('ord') ord: string, @Body() body: unknown) {
+    return this.svc.setSections(auth, ord, body);
   }
 }
