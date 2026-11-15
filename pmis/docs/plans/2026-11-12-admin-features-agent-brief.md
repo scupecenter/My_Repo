@@ -41,7 +41,7 @@ Additions (restart, 2026-11-12):
 ## Commit procedure (security gate, approved by the user on 2026-11-13)
 A PreToolUse hook blocks any Bash command whose text contains the words "git" followed by "commit" until a security scan passes. The user approved this configuration for all five worktrees: full scan, pre-commit mode, report high and above, telemetry NOT sent. Before EACH commit:
 1. Stage your files (never pmis/apps/*/node_modules).
-2. Run `pmis/tools/precommit-scan/quick.sh <your worktree path>` (owner decision 2026-11-13: quick secrets check of STAGED changes, under a second; the full scan now runs on GitHub, PR #130 workflow "Security"). PASS = go on; FAIL = fix the secret first (synthetic values in apps/api/test/*.ts are allowlisted). Do NOT run /tmp/opsera/scan.sh any more.
+2. (Owner decision 2026-11-14) No local scan: security scanning runs only on GitHub (workflow "Security": gitleaks, semgrep, grype, checkov). Skip quick.sh; just make sure you commit synthetic data only.
 3. No critical/high NEW findings: run `touch /tmp/.opsera-pre-commit-scan-passed` as its own Bash call, then the commit as the NEXT Bash call (each commit consumes the flag). If there ARE critical/high NEW findings, fix them in code first; never commit around them.
 Known pre-existing findings (synthetic values in apps/api/test/*.ts and tools/capacity-sizer) are not yours.
 Commit in a few larger steps, not many tiny ones. Do not put the words git+commit inside other commands (heredocs, echo), the hook matches the text.
@@ -59,3 +59,9 @@ Commit in a few larger steps, not many tiny ones. Do not put the words git+commi
 
 ## Progress file
 The orchestrator keeps pmis/docs/plans/2026-11-12-admin-features.md (done / in progress / planned). Do not edit it. Your final report must state clearly what is done and what remains.
+
+## Owner decision 2026-11-15: run on GitHub whatever can run there (save tokens)
+- Do NOT run the full API or web test suites locally. Locally run only: typecheck, lint, and the specific test files you changed or added.
+- Push, then let GitHub CI (API, Web with Playwright, Security) run the full suites. Read results with `gh api repos/scupecenter/My_Repo/commits/<sha>/check-runs` and failing lines with `gh api repos/scupecenter/My_Repo/actions/jobs/<id>/logs | grep -E " FAIL |error TS|  error "`.
+- Known failures on main that are not yours: calc-owner-answers Q84, user-invitations accept, assignments-fleet Q512, site-creation P1 (fixed in the date-tests PR).
+- Keep outputs short: pipe long commands through tail/grep.
