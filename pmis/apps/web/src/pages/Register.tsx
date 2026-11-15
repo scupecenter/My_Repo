@@ -6,7 +6,9 @@ import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, ty
 import { useRegions } from '@/api/sites';
 import type { RegisterDefinition } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
+import { RegisterGrid } from '@/components/RegisterGrid';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
+import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { Holders } from '@/components/HolderChip';
 import { HlcLegacyDialog } from '@/components/P4cPanels';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
@@ -44,6 +46,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof RecordFilters) => (v: string) => setParams({ [k]: v });
   const clearAll = () => setParams(Object.fromEntries(RF_KEYS.map((k) => [k, ''])));
+  // F16: the view is kept in the URL (view=grid; vertical is the default and leaves no parameter), so Back and shared links restore it.
+  const view: ViewMode = sp.get('view') === 'grid' ? 'grid' : 'vertical';
+  const setView = (v: ViewMode) => setParams({ view: v === 'grid' ? 'grid' : '' });
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   const list = useRegisterRecords(key, f);
@@ -124,8 +129,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         count={<span className="text-sm text-mute" data-testid="register-count">{t('sites.count', { count: total })}</span>}
         primary={<button className="btn btn-primary" data-testid="register-new" onClick={() => setRecord('new')}><Plus size={16} />{t('registers.new')}</button>}
         tools={<>
-        <DensityToggle api={tbl} />
-        <ColumnMenu api={tbl} label={label} />
+        <ViewModeToggle value={view} onChange={setView} testid="register-view" />
+        {view === 'vertical' && <DensityToggle api={tbl} />}
+        {view === 'vertical' && <ColumnMenu api={tbl} label={label} />}
         <ExportViewButton testid="register-export" source={key} filters={Object.fromEntries(Object.entries(f).filter(([, x]) => x))} columns={['site_code', 'region', 'record_type', 'state', ...tbl.cols.filter((c) => c.id.startsWith('f:')).map((c) => c.id.slice(2))]} />
         <MoreMenu items={[
           { id: 'tpl-down', label: t('registers.template_download'), icon: <FileDown size={16} />, testid: 'register-template-download', disabled: !tpl, onSelect: () => void down(false) },
@@ -142,6 +148,12 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
       {key === 'hlc' && <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />}
       <ActiveChips chips={chips} onClear={clearAll} />
+      {view === 'grid' && (
+        <RegisterGrid testid="register-grid" rows={real} columns={[{ id: 'site', label: label('site') }, { id: 'region', label: label('region') }, { id: 'type', label: label('type') },
+          ...fieldCols.map((c) => ({ id: `f:${c.code}`, label: label(`f:${c.code}`) })), { id: 'state', label: label('state') }, { id: 'ball', label: label('ball') }]}
+          cell={cell} onOpen={setRecord} />
+      )}
+      {view === 'vertical' && <>
       <div className="card gx overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">
           <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
@@ -168,6 +180,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         {picked.size === 1 && <button type="button" className="btn" data-testid="register-bulk-open" onClick={() => setRecord([...picked][0])}>{t('table.open_selected')}</button>}
         <button type="button" className="btn" data-testid="register-bulk-copy" onClick={() => { void navigator.clipboard?.writeText(real.filter((r) => picked.has(r.id)).map((r) => r.site_code ?? r.id).join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
+      </>}
       {list.hasNextPage && <button className="btn mt-3" data-testid="register-more" disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}><Download size={16} />{t('registers.more')}</button>}
       <RegisterDrawer def={def} recordId={recordId} nav={real.map((r) => r.id)} onClose={() => setRecord(null)} onOpen={setRecord} />
     </div>

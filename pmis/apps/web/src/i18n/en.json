@@ -1320,7 +1320,12 @@
     "resend_note": "A new link is sent and the old one stops working. The rights are checked again against you.",
     "done_resend": "Invitation sent again.",
     "done_revoke": "Invitation revoked.",
-    "status": { "pending": "Pending", "accepted": "Accepted", "revoked": "Revoked", "expired": "Expired" },
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
     "title": "Welcome, {{name}}",
     "intro": "Choose a password to create your GSDN Workspace account.",
     "policy": "At least {{min}} characters, at most {{max}}.",
@@ -1675,6 +1680,11 @@
     "topped_up": "Top-up draft created",
     "balance": "Balance",
     "hidden": "hidden"
+  },
+  "viewMode": {
+    "label": "View",
+    "vertical": "Vertical",
+    "grid": "Grid"
   },
   "registers": {
     "new": "New record",
