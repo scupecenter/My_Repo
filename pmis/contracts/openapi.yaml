@@ -4718,6 +4718,17 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/sla-weight:
+    get:
+      tags: [workflow]
+      summary: SLA rule and weight of every task of a workflow version
+      description: 'Migration 0100. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.'
+      x-db-path: wf_sla_weight_items
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'The items, sorted by task code' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /workflow/versions/{version}/weight-totals:
     get:
       tags: [workflow]
@@ -15805,7 +15816,7 @@ components:
         applied_at: { type: [string, 'null'], format: date-time }
         apply_reason: { type: [string, 'null'] }
         apply_mode: { type: [string, 'null'], enum: [submit, draft, null] }
-        group_id: { type: [string, 'null'], format: uuid, description: The import batches the apply created (`GET /import-batches?group_id=`). }
+        group_id: { type: [string, 'null'], format: uuid, description: 'The import batches the apply created (GET /import-batches?group_id=).' }
         outcome: { oneOf: [{ $ref: '#/components/schemas/MasterImportOutcome' }, { type: 'null' }] }
         has_file: { type: boolean, description: The original file is stored. }
         progress: { oneOf: [{ $ref: '#/components/schemas/MasterImportRunProgress' }, { type: 'null' }], description: '0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied).' }

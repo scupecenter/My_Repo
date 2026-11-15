@@ -20,7 +20,9 @@ const seed = (): Ver[] => [{
 let state = seed();
 interface Mig { id: string; site_id: string; site_code: string; from_version: number; to_version: number; reason: string; migrated_at: string; reverted_at: string | null; revertible: boolean }
 let migrations: Mig[] = [];
-export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; };
+type SlaWeightMock = { counts: boolean; value: number; group: string | null; sla: Record<string, unknown> | null };
+const slaW = new Map<string, SlaWeightMock>();
+export const resetWorkflowEditorMock = () => { state = seed(); migrations = []; slaW.clear(); };
 /** Until someone drafts a version, the reads fall through to the settings mock that the matrix and the rules screens already use. */
 const untouched = () => state.length === 1 && state[0]!.etag === 1;
 
@@ -184,6 +186,50 @@ export const workflowEditorHandlers = [
     }
     v.etag += 1;
     return HttpResponse.json({ task_code: b.code, warnings: pl.warnings, rewiring: pl.rewiring, open_sites_added: b.add_to_open_sites && v.status === 'published' ? 12 : 0, version: json(v) }, { status: 201, headers: { ETag: `"${v.etag}"` } });
+  }),
+  // F14 (migration 0099/0100, contract 0.15.20): SLA rule and weight of a task; the mock keeps them per task code.
+  http.get(`${B}/workflow/versions/:version/sla-weight`, ({ params }) => {
+    const v = state.find((x) => x.version === Number(params.version));
+    if (!v) return problem(404, 'not_found', 'The workflow version does not exist.');
+    return HttpResponse.json({ items: v.tasks.map((k) => ({ task_code: k.task_code, counts_in_weight: slaW.get(k.task_code)?.counts ?? false, weight_value: slaW.get(k.task_code)?.value ?? 0, weight_group: slaW.get(k.task_code)?.group ?? null, sla: slaW.get(k.task_code)?.sla ?? null })) });
+  }),
+  http.get(`${B}/workflow/versions/:version/weight-totals`, ({ params }) => {
+    const v = state.find((x) => x.version === Number(params.version));
+    if (!v) return problem(404, 'not_found', 'The workflow version does not exist.');
+    const sums = new Map<string, { total: number; tasks: number }>();
+    for (const k of v.tasks) {
+      const w = slaW.get(k.task_code);
+      if (!w?.counts || !w.group || k.is_active === false) continue;
+      const cur = sums.get(w.group) ?? { total: 0, tasks: 0 };
+      sums.set(w.group, { total: cur.total + w.value, tasks: cur.tasks + 1 });
+    }
+    return HttpResponse.json({ items: [...sums].map(([group, x]) => ({ group, total: x.total, tasks: x.tasks, ok: x.total === 100 })) });
+  }),
+  http.put(`${B}/workflow/versions/:version/tasks/:task/sla-rule`, async ({ params, request }) => {
+    const b = (await request.json()) as { min_working_days?: number; max_working_days?: number; start_event?: string; unit?: string; calendar_code?: string; warning_pct?: number | null; breach_owner_role?: string | null; escalation_role?: string | null; pause_on_client_wait?: boolean; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if ((b.min_working_days ?? 0) > (b.max_working_days ?? 0)) return fieldErr('/max_working_days', 'invalid');
+    const prev = slaW.get(params.task as string) ?? { counts: false, value: 0, group: null, sla: null };
+    slaW.set(params.task as string, { ...prev, sla: { id: `mock-${params.task}`, min_working_days: b.min_working_days ?? 0, max_working_days: b.max_working_days ?? 0, start_event: b.start_event ?? 'PRED', unit: (b.unit ?? 'working') as 'working' | 'calendar', calendar_code: b.calendar_code ?? 'default', warning_pct: b.warning_pct ?? null, breach_owner_role: b.breach_owner_role ?? null, escalation_role: b.escalation_role ?? null, pause_on_client_wait: b.pause_on_client_wait ?? false } });
+    w.v.etag += 1;
+    return HttpResponse.json({ ok: true, version: json(w.v) }, { headers: { ETag: `"${w.v.etag}"` } });
+  }),
+  http.post(`${B}/workflow/versions/:version/tasks/:task/sla-rules/:rule/remove`, async ({ params, request }) => {
+    const b = (await request.json()) as { reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    const prev = slaW.get(params.task as string);
+    if (prev?.sla) slaW.set(params.task as string, { ...prev, sla: null });
+    w.v.etag += 1;
+    return HttpResponse.json({ outcome: 'deleted', tasks_using_rule: 0, why: null, version: json(w.v) }, { headers: { ETag: `"${w.v.etag}"` } });
+  }),
+  http.put(`${B}/workflow/versions/:version/tasks/:task/weight`, async ({ params, request }) => {
+    const b = (await request.json()) as { counts_in_weight?: boolean; weight_value?: number; weight_group?: string | null; reason?: string };
+    const w = write(params, request, b); if ('r' in w) return w.r;
+    if (w.v.status !== 'draft') return fieldErr('/weight', 'draft_only');
+    const prev = slaW.get(params.task as string) ?? { counts: false, value: 0, group: null, sla: null };
+    slaW.set(params.task as string, { ...prev, counts: b.counts_in_weight === true, value: b.counts_in_weight ? (b.weight_value ?? 0) : 0, group: b.counts_in_weight ? (b.weight_group ?? null) : null });
+    w.v.etag += 1;
+    return HttpResponse.json({ version: json(w.v) }, { headers: { ETag: `"${w.v.etag}"` } });
   }),
   http.put(`${B}/workflow/versions/:version/tasks/:task/closing`, async ({ params, request }) => {
     const b = (await request.json()) as { closing?: boolean; reason?: string };

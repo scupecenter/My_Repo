@@ -90,6 +90,12 @@ export class WorkflowEditorController {
     return r;
   }
 
+  /** Migration 0100: the SLA rule and the weight of each task of a version. */
+  @Get('versions/:version/sla-weight')
+  slaWeightItems(@Param('version', ParseIntPipe) version: number): Promise<Json> {
+    return this.editor.slaWeightItems(version);
+  }
+
   /** Migration 0099: the weight totals of a version (live check in the editor). */
   @Get('versions/:version/weight-totals')
   weightTotals(@Param('version', ParseIntPipe) version: number): Promise<Json> {

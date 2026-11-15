@@ -183,6 +183,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wfgDb = await buildDatabase(adminUrl, wfg, appPassword);
   process.env.TEST_DATABASE_URL_WFG = wfgDb.appUrl;
   process.env.TEST_SUPER_URL_WFG = wfgDb.superUrl;
+  // The SLA and weight database (F14, migrations 0099 and 0100): the suite saves SLA rules and weights, drafts and publish-checks a version.
+  const slaDb_ = `${dbName}_sla`;
+  const slaDb = await buildDatabase(adminUrl, slaDb_, appPassword);
+  process.env.TEST_DATABASE_URL_SLA = slaDb.appUrl;
+  process.env.TEST_SUPER_URL_SLA = slaDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;

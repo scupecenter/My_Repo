@@ -242,6 +242,11 @@ export class WorkflowEditorService {
   }
 
   /** Typed confirmation (CLAUDE.md): `v<version>`. Checked before the step-up so a typo costs no password prompt. */
+  /** Migration 0100: the weight and the base SLA rule of every task of a version (the editor's detail panel reads it, drafts included). */
+  async slaWeightItems(version: number): Promise<Json> {
+    return this.one(Prisma.sql`SELECT jsonb_build_object('items', wf_sla_weight_items(${version}::int)) AS r`);
+  }
+
   /** Migration 0099: the weight totals of a version (per group, over the active tasks that count). */
   async weightTotals(version: number): Promise<Json> {
     const r = await this.one(Prisma.sql`SELECT jsonb_build_object('items', wf_weight_totals(w.id)) AS r FROM workflow_definitions w WHERE w.version = ${version}::int`);

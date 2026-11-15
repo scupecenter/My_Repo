@@ -96,6 +96,13 @@ export async function superDbWfe(): Promise<PgClient> {
 }
 
 /** Superuser connection to the workflow-gaps database (migration 0096; see global-setup). */
+/** F14 (migrations 0099 and 0100): the SLA and weight suite's own database. */
+export async function superDbSla(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_SLA });
+  await c.connect();
+  return c;
+}
+
 export async function superDbWfg(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFG });
   await c.connect();
