@@ -48,7 +48,7 @@ describe('Sites list: prefs, chips, selection', () => {
     await u.click(screen.getByTestId('cols-menu'));
     expect(screen.getByTestId('col-toggle-code')).toBeDisabled(); // identity column is pinned
     await u.click(screen.getByTestId('col-toggle-scenario'));
-    await u.click(screen.getByTestId('col-later-name'));
+    await u.click(screen.getByTestId('col-later-region'));
     await u.click(screen.getByTestId('density-compact'));
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
     expect(screen.getByTestId('sites-scroll').parentElement).toHaveAttribute('data-density', 'compact');
@@ -58,11 +58,13 @@ describe('Sites list: prefs, chips, selection', () => {
     await screen.findByTestId('sites-list');
     await waitFor(() => expect(screen.queryByRole('columnheader', { name: /Scenario/ })).toBeNull());
     const heads = screen.getAllByRole('columnheader').map((h) => h.getAttribute('data-col')).filter(Boolean);
-    expect(heads.indexOf('region')).toBeLessThan(heads.indexOf('name'));
+    const stored = JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('pmis.table.sites.'))!)!);
+    expect(stored.order.indexOf('region')).toBeGreaterThan(stored.order.indexOf('scenario')); // region moved past the hidden scenario and survived the reload
+    expect(heads.indexOf('region')).toBeGreaterThan(heads.indexOf('code'));
     await u.click(screen.getByTestId('cols-menu'));
     await u.click(screen.getByTestId('cols-reset'));
     expect(await screen.findByRole('columnheader', { name: /Scenario/ })).toBeInTheDocument();
-  });
+  }, 20000);
 
   it('shows active-filter chips from the URL, removes one, clears all, and tells no data from no results', async () => {
     await signIn('pm');

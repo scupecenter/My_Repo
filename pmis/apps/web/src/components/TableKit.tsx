@@ -4,11 +4,14 @@ import {
   ArrowRight,
   Columns3,
   Minus,
+  Rows3,
+  Rows4,
   Plus,
   RotateCcw,
   X,
 } from "lucide-react";
 import {
+  useEffect,
   useMemo,
   useState,
   type CSSProperties,
@@ -20,8 +23,11 @@ import { useSession } from "@/api/hooks";
 import {
   defaultHidden,
   dropCol,
+  fitWidth,
+  type FitSample,
   loadPrefs,
   moveCol,
+  pinOffsets,
   reconcile,
   resizeCol,
   storePrefs,
@@ -43,6 +49,9 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   const base = useMemo(() => loadPrefs(screen, user, defs), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
   const [own, setOwn] = useState<{ sig: string; p: Prefs } | null>(null);
   const prefs = own?.sig === sig ? own.p : base;
+  // Auto-fit widths (measured from the header and the loaded rows). They only fill in where the user has not dragged a width, and are never stored.
+  const [auto, setAutoRaw] = useState<{ sig: string; m: Record<string, number> }>({ sig, m: {} });
+  const autoNow = auto.sig === sig ? auto.m : NO_AUTO;
   const set = (fn: (p: Prefs) => Prefs) => {
     const n = reconcile(fn(prefs), defs);
     setOwn({ sig, p: n });
@@ -51,8 +60,19 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   return {
     prefs,
     defs,
-    cols: visibleCols(prefs, defs),
+    cols: visibleCols(prefs, defs, autoNow),
     density: prefs.density,
+    /** Raises the auto width of the given columns (never lowers it, so rows loading later do not make the grid jump). */
+    setAuto: (m: Record<string, number>) =>
+      setAutoRaw((a) => {
+        const cur = a.sig === sig ? a.m : {};
+        const next = { ...cur };
+        let changed = a.sig !== sig;
+        for (const [id, px] of Object.entries(m)) if (!(next[id] >= px)) { next[id] = px; changed = true; }
+        return changed ? { sig, m: next } : a;
+      }),
+    /** Back to the auto width of one column (double click on its edge). */
+    autoSize: (id: string) => set((p) => ({ ...p, width: Object.fromEntries(Object.entries(p.width).filter(([k]) => k !== id)) })),
     menuCols: prefs.order
       .map((id) => defs.find((d) => d.id === id))
       .filter((d): d is ColDef => !!d && !d.forbidden),
@@ -74,22 +94,113 @@ export function useTablePrefs(screen: string, defs: ColDef[]) {
   };
 }
 export type TableApi = ReturnType<typeof useTablePrefs>;
+const NO_AUTO: Record<string, number> = {};
+
+type Measure = (text: string) => number;
+let measureCache: Measure | null = null;
+/** Pixel width of a text in the grid font. Uses a canvas when there is one (not in jsdom); otherwise an estimate of 7.6px a character. */
+export function textMeasure(): Measure {
+  if (measureCache) return measureCache;
+  const estimate: Measure = (t) => t.length * 7.6;
+  try {
+    if (typeof document === "undefined" || /jsdom/i.test(navigator.userAgent)) return estimate;
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return estimate;
+    const cs = getComputedStyle(document.body);
+    ctx.font = `600 ${cs.fontSize || "14px"} ${cs.fontFamily || "sans-serif"}`;
+    return (measureCache = (t) => ctx.measureText(t).width);
+  } catch {
+    return estimate;
+  }
+}
+
+/**
+ * Sizes the columns of a grid to their content: header text and a sample of the loaded rows, inside each column's min and max.
+ * `text` returns the text a cell shows (or [text, extraPx] for a chip), or null for cells that cannot be measured (a chart, a rail); a column with no measurable cell keeps its default width.
+ * Widths the user dragged are stored and always win over these.
+ */
+export function useAutoFit<R>(
+  api: TableApi,
+  label: (id: string) => string,
+  rows: R[],
+  text: (id: string, row: R) => FitSample | null | undefined,
+  lang: string,
+) {
+  const [fontTick, setFontTick] = useState(0);
+  useEffect(() => {
+    let live = true;
+    // Cairo loads after the first paint: measure again once the fonts are ready
+    void (document as Document & { fonts?: { ready: Promise<unknown> } }).fonts?.ready.then(() => { if (live) { measureCache = null; setFontTick((n) => n + 1); } });
+    return () => { live = false; };
+  }, []);
+  const ids = api.cols.map((c) => c.id).join(",");
+  const { setAuto } = api;
+  useEffect(() => {
+    if (!rows.length) return;
+    const measure = textMeasure();
+    const out: Record<string, number> = {};
+    for (const c of api.cols) {
+      const samples: FitSample[] = [];
+      for (const r of rows.slice(0, 120)) { const t = text(c.id, r); if (t !== null && t !== undefined && t !== "") samples.push(t); }
+      if (samples.length) out[c.id] = fitWidth(c, label(c.id), samples, measure);
+    }
+    setAuto(out);
+  }, [rows.length, ids, lang, fontTick]); // eslint-disable-line react-hooks/exhaustive-deps
+}
 
 export const tracks = (cols: { px: number }[], sel: boolean) =>
   `${sel ? `${SEL_W}px ` : ""}${cols.map((c) => `${c.px}px`).join(" ")}`;
 export const totalWidth = (cols: { px: number }[], sel: boolean) =>
   cols.reduce((n, c) => n + c.px, sel ? SEL_W : 0);
-/** Pinned identity column: sticky at the inline start, so it stays in view when the table scrolls sideways (RTL too). */
+/** Frozen columns (identity columns): sticky at the inline start, one after the other, so they stay in view when the table scrolls sideways (RTL too). Pass `cols` so the second frozen column sits after the first; the last one gets the edge line. */
 export const pin = (
-  c: { pinned?: boolean },
+  c: { id?: string; pinned?: boolean },
   sel: boolean,
-): { className: string; style?: CSSProperties } =>
-  c.pinned
-    ? {
-        className: "sticky z-10 bg-inherit",
-        style: { insetInlineStart: sel ? SEL_W : 0 },
-      }
-    : { className: "" };
+  cols?: { id: string; px: number; pinned?: boolean }[],
+): { className: string; style?: CSSProperties } => {
+  if (!c.pinned) return { className: "" };
+  const base = sel ? SEL_W : 0;
+  const frozen = cols?.filter((x) => x.pinned) ?? [];
+  const at = cols && c.id !== undefined ? pinOffsets(cols, base)[c.id] : undefined;
+  const last = !frozen.length || frozen[frozen.length - 1].id === c.id;
+  return {
+    className: `sticky z-10 bg-inherit${last ? " gx-frozen-end" : ""}`,
+    style: { insetInlineStart: at ?? base },
+  };
+};
+
+/** Row look shared by every grid: zebra (by position in the list), hover and picked come from the `.gx-row` styles in index.css. */
+export const gxRow = (
+  i: number,
+  o: { picked?: boolean; current?: boolean; muted?: boolean } = {},
+) => ({
+  className: `gx-row${o.current ? " ring-2 ring-inset ring-accent" : ""}${o.muted ? " opacity-60" : ""}`,
+  "data-zebra": i % 2 ? "1" : "0",
+  "data-picked": o.picked ? "" : undefined,
+});
+
+/** Status chip: readable size and tone, never wraps, and shows its full text in a tooltip when the column is narrower than the text. */
+export function StatusChip({
+  tone,
+  children,
+  testid,
+  text,
+  stateAttr,
+}: {
+  tone: string;
+  children: ReactNode;
+  testid?: string;
+  text?: string;
+  stateAttr?: string;
+}) {
+  return (
+    <Tip text={text}>
+      <span className={`chip ${tone}`} data-testid={testid} data-value={stateAttr}>
+        {children}
+      </span>
+    </Tip>
+  );
+}
 
 export function SelectBox({
   checked,
@@ -160,7 +271,7 @@ export function HeaderRow({
     <div
       role="row"
       data-testid={testid}
-      className="sticky top-0 z-20 grid items-center border-b border-line bg-card2 text-sm font-semibold text-mute"
+      className="gx-head sticky top-0 z-20 grid items-center border-b border-line text-sm font-semibold"
       style={{
         gridTemplateColumns: tracks(api.cols, sel),
         minWidth: totalWidth(api.cols, sel),
@@ -170,13 +281,13 @@ export function HeaderRow({
       {select && (
         <div
           role="columnheader"
-          className="sticky start-0 z-10 flex justify-center bg-card2"
+          className="sticky start-0 z-10 flex justify-center bg-inherit"
         >
           <SelectBox {...select} />
         </div>
       )}
       {api.cols.map((c) => {
-        const p = pin(c, sel);
+        const p = pin(c, sel, api.cols);
         return (
           <div
             key={c.id}
@@ -205,10 +316,10 @@ export function HeaderRow({
               setDrag(null);
               setOver(null);
             }}
-            className={`relative truncate px-2 py-2 ${over === c.id ? "bg-accentSoft" : "bg-card2"} ${p.className}`}
+            className={`relative truncate px-2 py-2 ${over === c.id ? "bg-accentSoft" : "bg-inherit"} ${p.className}`}
             style={p.style}
           >
-            {label(c.id)}
+            <Trunc text={label(c.id)} />
             <span
               role="separator"
               aria-orientation="vertical"
@@ -218,6 +329,8 @@ export function HeaderRow({
               data-testid={`col-resize-${c.id}`}
               className="absolute inset-y-0 end-0 w-1.5 cursor-col-resize hover:bg-accent focus-visible:bg-accent"
               onPointerDown={(e) => start(e, c.id, c.px)}
+              onDoubleClick={() => api.autoSize(c.id)}
+              title={t("table.fit_hint")}
               onKeyDown={(e) => {
                 // keyboard alternative to the drag; the arrow that grows the column follows the reading direction
                 const flip = document.documentElement.dir === "rtl" ? -1 : 1;
@@ -235,6 +348,27 @@ export function HeaderRow({
         );
       })}
     </div>
+  );
+}
+
+/** One-click density switch for the toolbar (comfortable / compact), remembered per user and screen with the other column prefs. */
+export function DensityToggle({ api }: { api: TableApi }) {
+  const { t } = useTranslation();
+  const compact = api.density === "compact";
+  const next = compact ? "comfortable" : "compact";
+  return (
+    <Tip text={t(`table.${next}`)}>
+      <button
+        type="button"
+        className="btn"
+        data-testid="density-toggle"
+        aria-pressed={compact}
+        aria-label={t("table.density")}
+        onClick={() => api.setDensity(next)}
+      >
+        {compact ? <Rows4 size={16} /> : <Rows3 size={16} />}
+      </button>
+    </Tip>
   );
 }
 
