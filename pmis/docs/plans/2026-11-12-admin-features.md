@@ -200,3 +200,7 @@
 - خطة بناء المزايا بعد البحث المتقدم: `pmis/docs/plans/2026-11-14-features-build-plan.md` (F1 إلى F12، طلب لكل بند، الأول فالأول).
 - الطلبات المفتوحة: [#132](https://github.com/scupecenter/My_Repo/pull/132) أعمدة السجلات، [#133](https://github.com/scupecenter/My_Repo/pull/133) قسم المستندات، [#134](https://github.com/scupecenter/My_Repo/pull/134) محرر سير العمل بالأعمدة الثلاثة، [#135](https://github.com/scupecenter/My_Repo/pull/135) الجدول الموحد (جاهز للمراجعة)، وإصلاح اختبارات التاريخ (الفرع `claude/fix-date-tests`).
 - قاعدة العمل: لا يبدأ بند جديد من الخطة إلا بعد أن يجهز أحد الطلبات المفتوحة، لتجنب تراكم العمل.
+
+## المرحلة 5 (طلب المالك 2026-11-15): SITE 360 والماستر وSLA والوزن في المحرر والقوائم المنسدلة
+
+الخطة: `2026-11-15-site360-sla-weight-plan.md` (F14 إلى F18، مع جدول أرقام CHANGELOG والعقد الثابتة لكل طلب).
