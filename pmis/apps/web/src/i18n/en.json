@@ -14,7 +14,20 @@
     "more": "Load more sites",
     "site_ids": "Site IDs to find",
     "site_ids_placeholder": "Paste Site IDs, one per line or comma separated",
-    "site_ids_apply": "Apply"
+    "site_ids_apply": "Apply",
+    "menu": "Column menu",
+    "sort_asc": "Sort A to Z",
+    "sort_desc": "Sort Z to A",
+    "sort_clear": "Clear sort",
+    "filter": "Filter by value",
+    "filter_search": "Search values",
+    "blanks": "(Blanks)",
+    "all": "Select all",
+    "none_value": "Clear all",
+    "hide": "Hide column",
+    "show_hidden": "{{count}} hidden column(s): show all",
+    "resize": "Drag to resize; double-click to fit the text",
+    "selection": "{{count}} cells selected, {{numbers}} numeric, sum {{sum}}"
   },
   "nav": {
     "group_work": "Work",

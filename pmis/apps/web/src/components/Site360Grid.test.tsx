@@ -224,4 +224,54 @@ describe("SITE 360 grid", () => {
     fireEvent.doubleClick(screen.getByTestId("site360-grid-cell-S-003-4"));
     expect(screen.queryByTestId("site360-grid-input-S-003-4")).toBeNull();
   });
+
+  it("sorts and filters from the header menu, and hides a column until it is shown again", () => {
+    const rows = [
+      { id: "a", site_code: "S-A", values: { "3": "2026-03-10", "4": "Synthetic A" } },
+      { id: "b", site_code: "S-B", values: { "3": "2026-01-02", "4": "Synthetic B" } },
+      { id: "c", site_code: "S-C", values: { "3": null, "4": "Synthetic C" } },
+    ];
+    renderApp(<Site360Grid menu={cw} rows={rows} />);
+    const order = () =>
+      Array.from(document.querySelectorAll("tbody tr")).map((tr) => tr.getAttribute("data-testid"));
+    fireEvent.click(screen.getByTestId("site360-grid-menu-C"));
+    fireEvent.click(screen.getByTestId("site360-grid-sort-asc-C"));
+    expect(order()).toEqual(["site360-grid-row-S-B", "site360-grid-row-S-A", "site360-grid-row-S-C"]);
+    fireEvent.click(screen.getByTestId("site360-grid-menu-C"));
+    // the checklist is sorted: blank, 2026-01-02, 2026-03-10; untick 2026-01-02 (index 1)
+    fireEvent.click(screen.getAllByTestId("site360-grid-filter-value-C")[1]!);
+    expect(order()).toEqual(["site360-grid-row-S-A", "site360-grid-row-S-C"]);
+    fireEvent.click(screen.getByTestId("site360-grid-hide-C"));
+    expect(screen.queryByTestId("site360-grid-field-C")).toBeNull();
+    fireEvent.click(screen.getByTestId("site360-grid-show-hidden"));
+    expect(screen.getByTestId("site360-grid-field-C")).toBeInTheDocument();
+  });
+
+  it("selects a rectangle of cells and sums its numbers in the footer", () => {
+    const rows = [
+      { id: "a", site_code: "S-A", values: { "3": "1,200", "4": "Synthetic A" } },
+      { id: "b", site_code: "S-B", values: { "3": "300", "4": "Synthetic B" } },
+    ];
+    renderApp(<Site360Grid menu={cw} rows={rows} />);
+    const cell = (site: string, ord: number) =>
+      document.querySelector(`tbody tr[data-testid="site360-grid-row-${site}"] td[data-ord="${ord}"]`)!;
+    fireEvent.mouseDown(cell("S-A", 3), { button: 0 });
+    fireEvent.mouseDown(cell("S-B", 3), { button: 0, shiftKey: true });
+    expect(cell("S-B", 3).getAttribute("data-selected")).toBe("true");
+    expect(screen.getByTestId("site360-grid-selection").textContent).toContain("2 cells selected, 2 numeric");
+    expect(screen.getByTestId("site360-grid-selection").textContent).toContain("1,500");
+  });
+
+  it("resizes a column by dragging its edge and fits it to the text on double-click", () => {
+    renderApp(<Site360Grid menu={cw} rows={[{ id: "a", site_code: "S-A", values: { "3": "x" } }]} />);
+    const handle = screen.getByTestId("site360-grid-resize-C");
+    fireEvent.pointerDown(handle, { clientX: 100 });
+    fireEvent.pointerMove(window, { clientX: 160 });
+    fireEvent.pointerUp(window);
+    expect(screen.getByTestId("site360-grid-field-C").style.width).toBe("180px");
+    fireEvent.doubleClick(handle);
+    expect(screen.getByTestId("site360-grid-field-C").style.width).toBe(
+      `${Math.max(40, "Site Owner ID".length * 7 + 24)}px`,
+    );
+  });
 });
