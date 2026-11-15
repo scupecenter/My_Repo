@@ -63,6 +63,72 @@ function Kpi({ title, value, sub, to, testid, tone }: { title: string; value: Re
 const BAND_CELL: Record<string, string> = { low: 'bg-doneBg text-doneInk', medium: 'bg-waitBg text-waitInk', high: 'bg-lateBg text-lateInk', critical: 'bg-lateBg text-lateInk font-bold' };
 
 /** F13 (owner decisions 2026-11-15): the sections added to the dashboard. Read only; each figure links to the grid it counts. */
+/** F20 (contract 0.15.24): the counters, coloured by the saved KPI thresholds (dashboard settings). */
+const COUNTER_TONE: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk', none: 'text-mute' };
+
+function CountersPanel({ ex }: { ex: DashboardExtras | undefined }) {
+  const { t, i18n } = useTranslation();
+  if (!ex) return <p className="text-mute" role="status" data-testid="dash-counters-loading">{t('common.loading')}</p>;
+  const c = ex.counters;
+  if (!c.available) {
+    return (
+      <Card title={t('dash.counters.title')} testid="dash-counters" className="print:break-inside-avoid">
+        <p className="text-mute">{t('dash.counters.unavailable')}</p>
+      </Card>
+    );
+  }
+  const kpis = c.kpis ?? [];
+  const stages = c.sla_by_stage ?? [];
+  const totals = c.sla_totals;
+  const stageName = (s: { stage_name: string; stage_name_ar: string }) => (i18n.language.startsWith('ar') ? s.stage_name_ar : s.stage_name);
+  const unitText = (k: { unit: string; value: number | null }) => (k.value === null ? t('dash.counters.pending') : k.unit === 'pct' ? `${k.value}%` : k.unit === 'days' ? `${k.value} ${t('dash.counters.days')}` : `${k.value}`);
+  return (
+    <Card title={t('dash.counters.title')} testid="dash-counters" className="xl:col-span-2 print:break-inside-avoid">
+      <p className="mb-3 text-sm text-mute">{t('dash.counters.hint')}</p>
+      <ul className="grid gap-2 md:grid-cols-3" data-testid="dash-counter-kpis">
+        {kpis.map((k) => (
+          <li key={k.code} className={`rounded p-2 ${COUNTER_TONE[k.colour] ?? COUNTER_TONE.none}`} data-testid={`dash-counter-${k.code}`} data-colour={k.colour}>
+            <div className="text-xs">{t(`dash.counters.kpi.${k.code}`)}</div>
+            <div className="text-xl font-bold">{unitText(k)}</div>
+            <div className="text-xs">{t('dash.counters.thresholds', { green: k.green, amber: k.amber, colour: t(`dash.counters.colour.${k.colour}`) })}</div>
+          </li>
+        ))}
+      </ul>
+      {totals && (
+        <p className="mt-3 text-sm" data-testid="dash-counters-totals">{t('dash.counters.totals', { open: totals.open_tasks, breach: totals.breach, at_risk: totals.at_risk })}</p>
+      )}
+      {stages.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm" data-testid="dash-counters-stages">
+            <caption className="sr-only">{t('dash.counters.stage_caption')}</caption>
+            <thead>
+              <tr className="text-mute">
+                <th scope="col" className="text-start font-normal">{t('dash.counters.stage')}</th>
+                <th scope="col" className="font-normal">{t('dash.counters.open')}</th>
+                <th scope="col" className="font-normal">{t('dash.counters.breach')}</th>
+                <th scope="col" className="font-normal">{t('dash.counters.at_risk')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stages.map((s) => (
+                <tr key={s.stage_code} data-testid={`dash-counter-stage-${s.stage_code}`}>
+                  <th scope="row" className="text-start font-normal">{stageName(s)}</th>
+                  <td className="text-center">{s.open_tasks}</td>
+                  <td className={`text-center ${s.breach > 0 ? COUNTER_TONE.red : ''}`}>{s.breach}</td>
+                  <td className="text-center">{s.at_risk}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {c.pending_kpis && c.pending_kpis.length > 0 && (
+        <p className="mt-3 text-xs text-mute" data-testid="dash-counters-pending">{t('dash.counters.pending_note', { n: c.pending_kpis.length })}</p>
+      )}
+    </Card>
+  );
+}
+
 function F13Panel({ ex, sitesLink }: { ex: DashboardExtras | undefined; sitesLink: (extra?: Record<string, string>) => string }) {
   const { t } = useTranslation();
   if (!ex) return <p className="text-mute" role="status" data-testid="dash-f13-loading">{t('common.loading')}</p>;
@@ -684,6 +750,7 @@ export function Dashboard() {
           </div>
           </>),
 
+          counters: (<CountersPanel ex={extras.data} />),
           regions: (<>
           {/* regions */}
           <Card title={t('dash.regions.title')} testid="dash-regions">

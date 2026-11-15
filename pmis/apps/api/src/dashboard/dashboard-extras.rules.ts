@@ -143,3 +143,29 @@ export function aggregateGaps(reports: SiteGapReport[]): {
     by_kind,
   };
 }
+
+/** F20: the colour of a KPI against its thresholds. A higher-is-better KPI is green from `green` and amber from `amber`; a lower-is-better KPI is green at or below `green` and amber at or below `amber`. No value gives `none`. */
+export type KpiColour = "green" | "amber" | "red" | "none";
+export function kpiColour(
+  value: number | null,
+  green: number,
+  amber: number,
+  direction: "higher" | "lower",
+): KpiColour {
+  if (value === null || !Number.isFinite(value)) return "none";
+  if (direction === "higher") {
+    if (value >= green) return "green";
+    if (value >= amber) return "amber";
+    return "red";
+  }
+  if (value <= green) return "green";
+  if (value <= amber) return "amber";
+  return "red";
+}
+
+/** F20: a share in percent from a count and a base, rounded to one decimal; null when the base is zero. */
+export function sharePct(part: number, base: number): number | null {
+  if (!base) return null;
+  return Math.round((part / base) * 1000) / 10;
+}
+

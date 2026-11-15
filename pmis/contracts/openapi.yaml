@@ -12447,6 +12447,7 @@ paths:
         critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
         **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
         **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+        **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no source yet is listed in `pending_kpis` and has a null value. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
       parameters:
       - name: region_id
         in: query
@@ -20573,7 +20574,7 @@ components:
     DashboardExtras:
       type: object
       description: '0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15).'
-      required: [as_of, scope_regions, risk_matrix, data_quality, swap_relocation, decisions]
+      required: [as_of, scope_regions, risk_matrix, data_quality, swap_relocation, decisions, counters]
       properties:
         as_of: {type: string, format: date-time}
         scope_regions:
@@ -20584,6 +20585,55 @@ components:
         data_quality: {$ref: '#/components/schemas/DashboardDataQuality'}
         swap_relocation: {$ref: '#/components/schemas/DashboardSwapRelocation'}
         decisions: {$ref: '#/components/schemas/DashboardDecisions'}
+        counters: {$ref: '#/components/schemas/DashboardCounters'}
+    DashboardCounters:
+      type: object
+      description: '0.15.24: the counters of the dashboard (F20). Each KPI is coloured by the saved thresholds (dashboard settings).'
+      required: [available, kpis, pending_kpis, sla_totals, sla_by_stage, sites_total]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the sites; the other fields are then null.}
+        kpis:
+          type: [array, 'null']
+          description: Every KPI of the dashboard catalogue, in catalogue order. A KPI with no source yet has a null value and is listed in pending_kpis.
+          items: {$ref: '#/components/schemas/DashboardKpi'}
+        pending_kpis:
+          type: [array, 'null']
+          items: {type: string}
+        sla_totals:
+          type: [object, 'null']
+          required: [open_tasks, breach, at_risk]
+          properties:
+            open_tasks: {type: integer}
+            breach: {type: integer, description: Open tasks past the SLA maximum (colour red).}
+            at_risk: {type: integer, description: Open tasks past the warning share (colour amber).}
+        sla_by_stage:
+          type: [array, 'null']
+          description: The open tasks of the caller's sites by stage, in stage order.
+          items: {$ref: '#/components/schemas/DashboardSlaStage'}
+        sites_total: {type: [integer, 'null'], description: Active sites in scope (cancelled sites left out).}
+    DashboardKpi:
+      type: object
+      required: [code, unit, direction, value, green, amber, colour]
+      properties:
+        code: {type: string}
+        unit: {type: string, enum: [pct, days, count]}
+        direction: {type: string, enum: [higher, lower]}
+        value: {type: [number, 'null']}
+        green: {type: number}
+        amber: {type: number}
+        colour: {type: string, enum: [green, amber, red, none], description: none when the value is null.}
+    DashboardSlaStage:
+      type: object
+      required: [stage_code, stage_name, stage_name_ar, open_tasks, breach, at_risk, breach_pct, at_risk_pct]
+      properties:
+        stage_code: {type: string}
+        stage_name: {type: string}
+        stage_name_ar: {type: string}
+        open_tasks: {type: integer}
+        breach: {type: integer}
+        at_risk: {type: integer}
+        breach_pct: {type: [number, 'null']}
+        at_risk_pct: {type: [number, 'null']}
     DashboardRiskMatrix:
       type: object
       required: [available, open_total, cells, bands, top_open_risks]

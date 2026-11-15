@@ -7888,6 +7888,7 @@ export interface paths {
          *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
          *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
          *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no source yet is listed in `pending_kpis` and has a null value. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
         put?: never;
@@ -15957,6 +15958,51 @@ export interface components {
             data_quality: components["schemas"]["DashboardDataQuality"];
             swap_relocation: components["schemas"]["DashboardSwapRelocation"];
             decisions: components["schemas"]["DashboardDecisions"];
+            counters: components["schemas"]["DashboardCounters"];
+        };
+        /** @description 0.15.24: the counters of the dashboard (F20). Each KPI is coloured by the saved thresholds (dashboard settings). */
+        DashboardCounters: {
+            /** @description False when the caller may not see the sites; the other fields are then null. */
+            available: boolean;
+            /** @description Every KPI of the dashboard catalogue, in catalogue order. A KPI with no source yet has a null value and is listed in pending_kpis. */
+            kpis: components["schemas"]["DashboardKpi"][] | null;
+            pending_kpis: string[] | null;
+            sla_totals: {
+                open_tasks: number;
+                /** @description Open tasks past the SLA maximum (colour red). */
+                breach: number;
+                /** @description Open tasks past the warning share (colour amber). */
+                at_risk: number;
+            } | null;
+            /** @description The open tasks of the caller's sites by stage, in stage order. */
+            sla_by_stage: components["schemas"]["DashboardSlaStage"][] | null;
+            /** @description Active sites in scope (cancelled sites left out). */
+            sites_total: number | null;
+        };
+        DashboardKpi: {
+            code: string;
+            /** @enum {string} */
+            unit: "pct" | "days" | "count";
+            /** @enum {string} */
+            direction: "higher" | "lower";
+            value: number | null;
+            green: number;
+            amber: number;
+            /**
+             * @description none when the value is null.
+             * @enum {string}
+             */
+            colour: "green" | "amber" | "red" | "none";
+        };
+        DashboardSlaStage: {
+            stage_code: string;
+            stage_name: string;
+            stage_name_ar: string;
+            open_tasks: number;
+            breach: number;
+            at_risk: number;
+            breach_pct: number | null;
+            at_risk_pct: number | null;
         };
         DashboardRiskMatrix: {
             /** @description False when the caller may not see the risk register; the other fields are then null. */

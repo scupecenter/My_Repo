@@ -36,6 +36,7 @@ LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path = pg_catalog, public AS 
       {"code":"streams","label_en":"Streams","label_ar":"المسارات"},
       {"code":"sla","label_en":"SLA per stage and top late tasks","label_ar":"SLA لكل مرحلة وأهم المهام المتأخرة"},
       {"code":"gates_issues_delay","label_en":"Blocked gates, issues and delay attribution","label_ar":"البوابات المعطلة والقضايا وتوزيع التأخير"},
+      {"code":"counters","label_en":"Counters: SLA breaches and at risk, data quality, KPI colours","label_ar":"العدادات: خروقات SLA والمعرضة للخطر وجودة البيانات وألوان المؤشرات"},
       {"code":"regions","label_en":"Regions","label_ar":"المناطق"}
     ]'::jsonb
   )

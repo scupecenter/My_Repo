@@ -1327,7 +1327,12 @@
     "resend_note": "A new link is sent and the old one stops working. The rights are checked again against you.",
     "done_resend": "Invitation sent again.",
     "done_revoke": "Invitation revoked.",
-    "status": { "pending": "Pending", "accepted": "Accepted", "revoked": "Revoked", "expired": "Expired" },
+    "status": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "revoked": "Revoked",
+      "expired": "Expired"
+    },
     "title": "Welcome, {{name}}",
     "intro": "Choose a password to create your GSDN Workspace account.",
     "policy": "At least {{min}} characters, at most {{max}}.",
@@ -2723,7 +2728,40 @@
       "xlsx": "Excel (.xlsx)",
       "csv": "CSV"
     },
-    "manual_link": "Manual items"
+    "manual_link": "Manual items",
+    "counters": {
+      "title": "Counters",
+      "hint": "SLA and data quality of the caller's sites. Colours follow the thresholds set in Settings > Dashboard.",
+      "unavailable": "You cannot see the sites, so the counters are not shown.",
+      "pending": "Not yet available",
+      "pending_note": "{{n}} KPI(s) have no source yet and are not shown as figures.",
+      "days": "days",
+      "totals": "Open tasks: {{open}}. Past the maximum: {{breach}}. At risk: {{at_risk}}.",
+      "thresholds": "Green {{green}}, amber {{amber}}. Colour: {{colour}}.",
+      "stage": "Stage",
+      "stage_caption": "Open SLA breaches and at-risk tasks by stage",
+      "open": "Open",
+      "breach": "Breach",
+      "at_risk": "At risk",
+      "colour": {
+        "green": "green",
+        "amber": "amber",
+        "red": "red",
+        "none": "no figure"
+      },
+      "kpi": {
+        "sla_breach": "SLA breaches (open tasks past the maximum)",
+        "sla_at_risk": "SLA at risk (past the warning share)",
+        "data_quality_gap": "Empty mandatory cells (sites with a gap)",
+        "vehicle_ready": "Vehicle-ready rate of assignments",
+        "advances_open_after_close": "Advances open after the work closed",
+        "dismantle_pending": "Dismantle CW and TE pending",
+        "as_built_submitted": "As-Built submitted against PAC",
+        "time_in_state_p85": "Time in state, 85th percentile",
+        "stale_tasks": "Stale tasks (idle for N working days)",
+        "on_air_vs_target": "On-Air against the monthly target"
+      }
+    }
   },
   "docs": {
     "err": {

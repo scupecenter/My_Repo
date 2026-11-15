@@ -7,6 +7,8 @@ import { DbService } from "../db/db.service";
 import { SCENARIOS, dashboardParams } from "./dashboard.service";
 import {
   aggregateGaps,
+  kpiColour,
+  sharePct,
   buildRiskMatrix,
   decisionTag,
   riskBand,
@@ -23,6 +25,11 @@ const OVERALL = [
   "completed",
   "cancelled",
 ] as const;
+
+interface DashSettingsCfg {
+  thresholds: Record<string, { green: number; amber: number }>;
+  catalogue: { kpis: { code: string; unit: string; direction: "higher" | "lower"; default_green: number; default_amber: number }[] };
+}
 
 interface RiskRow {
   risk_code: string;
@@ -75,6 +82,7 @@ export class DashboardExtrasService {
       : null;
     const dq = sitesOk ? await this.dataQuality(siteWhere) : null;
     const swap = sitesOk ? await this.swapRelocation(siteWhere) : null;
+    const counters = sitesOk ? await this.counters(siteWhere, dq) : null;
 
     return {
       as_of: new Date().toISOString(),
@@ -99,6 +107,7 @@ export class DashboardExtrasService {
         unscenarioed: null,
         rows: null,
       },
+      counters: counters ?? { available: false, kpis: null, pending_kpis: null, sla_totals: null, sla_by_stage: null, sites_total: null },
       decisions: risk
         ? { available: true, items: risk.decisions }
         : { available: false, items: null },
@@ -164,6 +173,63 @@ export class DashboardExtrasService {
         top_open_risks: sorted.slice(0, 10),
       },
       decisions,
+    };
+  }
+
+  /**
+   * F20 (contract 0.15.24): the dashboard counters and the KPI colours. SLA breaches and at-risk come from sla_status of the open tasks of the caller's sites
+   * (red = past the maximum, amber = past the minimum); data quality from the data quality section of this read. Thresholds are the saved dashboard settings.
+   * A KPI with no source yet answers a null value (listed in pending_kpis), so it is never shown as a figure.
+   */
+  private async counters(siteWhere: Prisma.Sql, dq: { sites_checked: number; sites_with_gaps: number } | null) {
+    const cfg = (await this.db.tx.$queryRaw<{ j: DashSettingsCfg }[]>`SELECT dashboard_settings_json() AS j`)[0]!.j;
+    const slaRows = await this.db.tx.$queryRaw<{ stage_code: string; stage_name: string; stage_name_ar: string; open_tasks: bigint; breach: bigint; at_risk: bigint }[]>(Prisma.sql`
+      SELECT sd.code AS stage_code, sd.name_en AS stage_name, sd.name_ar AS stage_name_ar,
+             count(*) AS open_tasks,
+             count(*) FILTER (WHERE x.colour = 'red') AS breach,
+             count(*) FILTER (WHERE x.colour = 'amber') AS at_risk
+      FROM (
+        SELECT td.stage_id, (sla_status(ti.id)).colour AS colour
+        FROM task_instances ti
+        JOIN sites s ON s.id = ti.site_id
+        LEFT JOIN clusters c ON c.id = s.cluster_id
+        JOIN task_definitions td ON td.id = ti.task_def_id
+        WHERE ti.state::text IN ('open', 'entry', 'in_review', 'in_approval', 'rejected')
+          AND s.is_active AND s.overall_status <> 'cancelled' ${siteWhere}
+      ) x
+      JOIN stage_definitions sd ON sd.id = x.stage_id
+      GROUP BY sd.seq, sd.code, sd.name_en, sd.name_ar
+      ORDER BY sd.seq`);
+    const siteRows = await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
+      SELECT count(*) AS n
+      FROM sites s LEFT JOIN clusters c ON c.id = s.cluster_id
+      WHERE s.is_active AND s.overall_status <> 'cancelled' ${siteWhere}`);
+    const sla_by_stage = slaRows.map((r) => {
+      const open = Number(r.open_tasks), breach = Number(r.breach), atRisk = Number(r.at_risk);
+      return { stage_code: r.stage_code, stage_name: r.stage_name, stage_name_ar: r.stage_name_ar, open_tasks: open, breach, at_risk: atRisk,
+        breach_pct: sharePct(breach, open), at_risk_pct: sharePct(atRisk, open) };
+    });
+    const openTotal = sla_by_stage.reduce((a, r) => a + r.open_tasks, 0);
+    const breachTotal = sla_by_stage.reduce((a, r) => a + r.breach, 0);
+    const atRiskTotal = sla_by_stage.reduce((a, r) => a + r.at_risk, 0);
+    const values: Record<string, number | null> = {
+      sla_breach: sharePct(breachTotal, openTotal),
+      sla_at_risk: sharePct(atRiskTotal, openTotal),
+      data_quality_gap: dq ? sharePct(dq.sites_with_gaps, dq.sites_checked) : null,
+    };
+    const kpis = cfg.catalogue.kpis.map((k) => {
+      const th = cfg.thresholds[k.code] ?? { green: k.default_green, amber: k.default_amber };
+      const value = values[k.code] ?? null;
+      return { code: k.code, unit: k.unit, direction: k.direction, value, green: th.green, amber: th.amber,
+        colour: kpiColour(value, th.green, th.amber, k.direction) };
+    });
+    return {
+      available: true,
+      kpis,
+      pending_kpis: kpis.filter((k) => k.value === null).map((k) => k.code),
+      sla_totals: { open_tasks: openTotal, breach: breachTotal, at_risk: atRiskTotal },
+      sla_by_stage,
+      sites_total: Number(siteRows[0]?.n ?? 0),
     };
   }
 
