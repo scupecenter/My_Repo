@@ -21,7 +21,7 @@ import { SettingsRoutes } from './settings/Settings';
 
 /** Contract 0.14.3 (Q462): the one-time historical-load document waiver. The settings screen, the option of the batch screens (a System Admin only, while it is open) and the badge. */
 const stepUpDone = () => api.post('/__mock/step-up');
-const settings = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/historical-waiver', ...opts });
+const settings = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/data/historical', ...opts });
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
 const openIt = (cutoff = '2026-02-28') => api.put<HistoricalWaiver>('/settings/historical-waiver', { body: { open: true, cutoff_date: cutoff, reason: 'One-time load of the Master' } });
 const stream = (cb: (b: ImportBatch) => void = () => undefined) =>
@@ -90,8 +90,8 @@ describe('Settings, historical load', () => {
   });
 
   it('has its tab and every new text in English and Arabic', () => {
-    expect((en.settings as Record<string, string>)['tab_historical-waiver']).toBeTruthy();
-    expect((ar.settings as Record<string, string>)['tab_historical-waiver']).toBeTruthy();
+    expect((en.settings as Record<string, string>)['section_data_historical']).toBeTruthy();
+    expect((ar.settings as Record<string, string>)['section_data_historical']).toBeTruthy();
     for (const ns of ['hw', 'override'] as const) {
       expect(Object.keys((ar as unknown as Record<string, Record<string, string>>)[ns]).sort()).toEqual(Object.keys((en as unknown as Record<string, Record<string, string>>)[ns]).sort());
     }

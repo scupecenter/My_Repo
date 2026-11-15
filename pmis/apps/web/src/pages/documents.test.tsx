@@ -124,7 +124,7 @@ describe('Settings: Document Library', () => {
   it('lists the library, saves a draft, publishes it for new tasks only and shows the version', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<SettingsAt />, { route: '/admin/settings/documents' });
+    renderApp(<SettingsAt />, { route: '/admin/settings/documents/library' });
     const row = await screen.findByTestId('lib-row-A2');
     expect(row).toHaveTextContent('v1');
     expect(await screen.findByTestId('lib-review-D16_PAC')).toBeInTheDocument();
@@ -159,7 +159,7 @@ describe('Settings: Document Library', () => {
 
   it('is for administrators only', async () => {
     await signIn('engineer');
-    renderApp(<SettingsAt />, { route: '/admin/settings/documents' });
+    renderApp(<SettingsAt />, { route: '/admin/settings/documents/library' });
     expect(await screen.findByTestId('lib-error')).toBeInTheDocument();
   });
 });

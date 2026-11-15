@@ -11,7 +11,7 @@ import { RegisterPage } from './Register';
 import { SettingsRoutes } from './settings/Settings';
 
 /** Contract 0.12.5 (work package P5, migration 0057): the list catalogue (Q104), the new field types and Meetings (Q12, Q111). */
-const settings = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/lists', ...opts });
+const settings = (opts = {}) => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/ddl', ...opts });
 const register = (q = '') => renderApp(<Routes><Route path="/registers/:key" element={<RegisterPage />} /></Routes>, { route: `/registers/meetings${q}` });
 const errCode = async (p: Promise<unknown>) => p.then(() => null, (e: ApiError) => `${e.status}:${e.code}`);
 
@@ -21,7 +21,7 @@ describe('Settings, lists (Q104)', () => {
     const u = userEvent.setup();
     settings();
     expect(await screen.findByTestId('lists-row-TeamSpecialization')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-tab-lists')).toHaveTextContent('Lists');
+    expect(screen.getByTestId('settings-tab-ddl')).toHaveTextContent('DDL');
     expect(screen.getByTestId('lists-status-TeamSpecialization')).toHaveTextContent('Confirmed');
     expect(screen.getByTestId('lists-critical-TeamSpecialization')).toBeInTheDocument();
     expect(screen.getByTestId('lists-status-RiskStatus')).toHaveTextContent('Pending review');
@@ -64,7 +64,7 @@ describe('Settings, lists (Q104)', () => {
     await signIn('pm');
     settings({ locale: 'ar' });
     expect(await screen.findByTestId('lists-status-TeamSpecialization')).toHaveTextContent('معتمدة');
-    expect(screen.getByTestId('settings-tab-lists')).toHaveTextContent('القوائم');
+    expect(screen.getByTestId('settings-tab-ddl')).toHaveTextContent('DDL');
     expect(screen.getByTestId('lists-new')).toHaveTextContent('قائمة جديدة');
   });
 });
