@@ -430,7 +430,7 @@ BEGIN
     IF to_t = 'document' THEN
       -- the Document Library slot of the column: one document type placed on this register, published at once (mandatory only when the column is required)
       dcode := 'RC_' || upper(left(regexp_replace(p_register || '_' || p_code, '[^a-zA-Z0-9]', '_', 'g'), 24)) || '_' || upper(substr(md5(p_register || ':' || p_code), 1, 3));
-      dres := public.admin_save_document_type(NULL, jsonb_build_object('code', dcode, 'name_en', rpad(btrim(p_patch ->> 'label_en'), 2, ' '), 'name_ar', nullif(btrim(coalesce(p_patch ->> 'label_ar', '')), ''),
+      dres := public.admin_save_document_type(NULL, jsonb_build_object('code', dcode, 'name_en', (CASE WHEN length(btrim(p_patch ->> 'label_en')) >= 2 THEN btrim(p_patch ->> 'label_en') ELSE btrim(p_patch ->> 'label_en') || ' (document)' END), 'name_ar', nullif(btrim(coalesce(p_patch ->> 'label_ar', '')), ''),
                 'mandatory', coalesce((p_patch ->> 'required')::boolean, false), 'placements', jsonb_build_array(jsonb_build_object('target', 'register', 'ref', p_register))), p_reason, NULL);
       PERFORM public.admin_publish_document_type((dres ->> 'id')::uuid, NULL, 'new_only', current_date, p_reason);
       new_opts := jsonb_build_object('doc_type_code', dcode);
@@ -719,6 +719,24 @@ GRANT EXECUTE ON FUNCTION tpl_columns_core(text) TO pmis_definer;
 ALTER FUNCTION tpl_columns(text) OWNER TO pmis_definer;
 REVOKE ALL ON FUNCTION tpl_columns(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION tpl_columns(text) TO pmis_definer, pmis_app;
+
+-- The field hash also follows the meaning of a column that carries a format (a text turned into an e-mail issues a new template version). A register without
+-- such a column keeps the hash it had, so this migration issues no version by itself.
+ALTER FUNCTION tpl_field_hash(jsonb) RENAME TO tpl_field_hash_core;
+CREATE OR REPLACE FUNCTION tpl_field_hash(p_cols jsonb) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
+  SELECT CASE WHEN x.extra IS NULL THEN public.tpl_field_hash_core(p_cols)
+    ELSE encode(sha256(convert_to(public.tpl_field_hash_core(p_cols) || E'\x1e' || x.extra::text, 'UTF8')), 'hex') END
+  FROM (SELECT jsonb_agg(jsonb_build_array(c ->> 'code', c ->> 'data_type') ORDER BY ord) AS extra
+        FROM jsonb_array_elements(p_cols) WITH ORDINALITY AS t(c, ord)
+        WHERE c ->> 'kind' = 'field' AND c ->> 'data_type' IN ('long_text', 'datetime', 'email', 'phone', 'link', 'currency', 'percentage', 'computed', 'document')) x
+$$;
+ALTER FUNCTION tpl_field_hash_core(jsonb) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION tpl_field_hash_core(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tpl_field_hash_core(jsonb) TO pmis_definer, pmis_app;
+ALTER FUNCTION tpl_field_hash(jsonb) OWNER TO pmis_definer;
+REVOKE ALL ON FUNCTION tpl_field_hash(jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION tpl_field_hash(jsonb) TO pmis_definer, pmis_app;
 
 CREATE OR REPLACE FUNCTION tpl_version_cols(p_kind text, p_columns jsonb) RETURNS TABLE (key text, header text, input boolean, sig jsonb)
 LANGUAGE sql IMMUTABLE SET search_path = pg_catalog, public AS $$
