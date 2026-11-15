@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.14
+  version: 0.15.22
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -8667,6 +8667,137 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterRecord
+      summary: Lock a record (read-only except for a System Admin) (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+        `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+        (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterRecord
+      summary: Unlock a record (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+        `register_record_unlock` with before and after.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/columns/{field_code}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {name: field_code, in: path, required: true, schema: {type: string}, description: 'The column code (register_fields.code).'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterColumn
+      summary: Lock a column for every record of the register (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+        (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterColumn
+      summary: Unlock a column (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: false}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/quality/records/{record_id}/cancel-snag:
     parameters:
     - {$ref: '#/components/parameters/RegisterRecordId'}
@@ -16564,6 +16695,7 @@ components:
         label_en: { type: string }
         label_ar: { type: [string, 'null'] }
         type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file, multi_user, multi_site, child_list, warehouse_item] }
+        locked: { type: boolean, description: 'Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes.' }
         required: { type: boolean }
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         list: { $ref: '#/components/schemas/ListRef' }
@@ -16828,6 +16960,7 @@ components:
         site_code: { type: [string, 'null'] }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
         state: { $ref: '#/components/schemas/RegisterRecordState' }
+        locked: { type: boolean, description: 'Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version.' }
         current_level: { type: integer }
         levels_required: { type: integer }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }

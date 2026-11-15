@@ -5483,6 +5483,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a record (read-only except for a System Admin) (0.15.22)
+         * @description 0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+         *     `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+         *     (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+         */
+        post: operations["lockRegisterRecord"];
+        /**
+         * Unlock a record (0.15.22)
+         * @description 0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+         *     `register_record_unlock` with before and after.
+         */
+        delete: operations["unlockRegisterRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/columns/{field_code}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a column for every record of the register (0.15.22)
+         * @description 0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+         *     (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+         */
+        post: operations["lockRegisterColumn"];
+        /**
+         * Unlock a column (0.15.22)
+         * @description 0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+         */
+        delete: operations["unlockRegisterColumn"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/registers/quality/records/{record_id}/cancel-snag": {
         parameters: {
             query?: never;
@@ -11930,6 +11992,8 @@ export interface components {
             label_ar?: string | null;
             /** @enum {string} */
             type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file" | "multi_user" | "multi_site" | "child_list" | "warehouse_item";
+            /** @description Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes. */
+            locked?: boolean;
             required?: boolean;
             /** @description Field-level rule for the caller. */
             read_only?: boolean;
@@ -12171,6 +12235,8 @@ export interface components {
             site_code?: string | null;
             region_id?: components["schemas"]["RegionId"] | null;
             state: components["schemas"]["RegisterRecordState"];
+            /** @description Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version. */
+            locked?: boolean;
             current_level?: number;
             levels_required?: number;
             ball_in_court?: components["schemas"]["BallInCourt"];
@@ -25410,6 +25476,163 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    unlockRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: components["schemas"]["RegisterKey"];
+                        field_code: string;
+                        /** @constant */
+                        locked: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unlockRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: components["schemas"]["RegisterKey"];
+                        field_code: string;
+                        /** @constant */
+                        locked: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     cancelQualitySnagRecord: {

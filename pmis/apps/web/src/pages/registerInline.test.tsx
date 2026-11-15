@@ -12,12 +12,13 @@ const Routed = () => (
 );
 
 describe('As-Built and Dismantle tabs (F16)', () => {
-  it('As-Built opens on CW BOQ and switches to TE BOQ', async () => {
+  it('As-Built opens on All and switches to CW BOQ and TE BOQ', async () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/registers/as_built' });
-    const cw = await screen.findByTestId('register-tab-cw_part');
-    expect(cw).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByTestId('register-tab-all')).toHaveAttribute('aria-pressed', 'true');
     const u = userEvent.setup();
+    await u.click(screen.getByTestId('register-tab-cw_part'));
+    expect(screen.getByTestId('register-tab-cw_part')).toHaveAttribute('aria-pressed', 'true');
     await u.click(screen.getByTestId('register-tab-te_part'));
     expect(screen.getByTestId('register-tab-te_part')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('register-tab-cw_part')).toHaveAttribute('aria-pressed', 'false');
@@ -26,7 +27,7 @@ describe('As-Built and Dismantle tabs (F16)', () => {
   it('Dismantle splits CW and TE by part', async () => {
     await signIn('pm');
     renderApp(<Routed />, { route: '/registers/dismantle' });
-    expect(await screen.findByTestId('register-tab-cw')).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByTestId('register-tab-all')).toHaveAttribute('aria-pressed', 'true');
     const u = userEvent.setup();
     await u.click(screen.getByTestId('register-tab-te'));
     await waitFor(() => expect(screen.getByTestId('register-tab-te')).toHaveAttribute('aria-pressed', 'true'));

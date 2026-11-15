@@ -28,16 +28,18 @@ export function RegisterGrid({ columns, rows, cell, onOpen, canEdit, editing, on
         <caption className="sr-only">{t('viewMode.grid')}</caption>
         <thead className="sticky top-0 z-10 bg-card">
           <tr>
+            <th scope="col" data-col="#" className="whitespace-nowrap border-b border-line px-2 py-2 text-end font-semibold">#</th>
             {columns.map((c, i) => (
               <th key={c.id} scope="col" data-col={c.id} className={`whitespace-nowrap border-b border-line px-2 py-2 text-start font-semibold ${i === 0 ? 'sticky start-0 bg-card' : ''}`}>{c.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {rows.map((r, idx) => (
             <tr key={r.id} data-testid={`reg-grid-row-${r.id}`} data-state={r.state} tabIndex={0} className="cursor-pointer border-b border-line hover:bg-hover focus-visible:bg-hover"
               onClick={() => onOpen(r.id)}
               onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); onOpen(r.id); } }}>
+              <td data-testid="reg-grid-no" className="px-2 py-2 text-end tabular-nums text-mute">{idx + 1}</td>
               {columns.map((c, i) => {
                 const on = editing?.id === r.id && editing.col === c.id;
                 const editable = !!onStartEdit && !on && !!canEdit?.(c.id, r);

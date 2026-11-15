@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
@@ -94,6 +94,31 @@ export class RegistersController {
   @HttpCode(200)
   async void(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     return this.tag(res, await this.registers.void(auth, key, id, ifMatch, body));
+  }
+
+  // 0103 (contract 0.15.22): lock and unlock a record (read-only for everyone but a System Admin), and a column for every record
+  @Post(':key/records/:id/lock')
+  @HttpCode(200)
+  async lockRecord(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.registers.setRecordLock(auth, key, id, ifMatch, body, true));
+  }
+
+  @Delete(':key/records/:id/lock')
+  @HttpCode(200)
+  async unlockRecord(@Auth() auth: AuthContext, @Param('key') key: string, @Param('id') id: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response) {
+    return this.tag(res, await this.registers.setRecordLock(auth, key, id, ifMatch, body, false));
+  }
+
+  @Post(':key/columns/:field/lock')
+  @HttpCode(200)
+  async lockColumn(@Auth() auth: AuthContext, @Param('key') key: string, @Param('field') field: string, @Body() body: unknown) {
+    return this.registers.setColumnLock(auth, key, field, body, true);
+  }
+
+  @Delete(':key/columns/:field/lock')
+  @HttpCode(200)
+  async unlockColumn(@Auth() auth: AuthContext, @Param('key') key: string, @Param('field') field: string, @Body() body: unknown) {
+    return this.registers.setColumnLock(auth, key, field, body, false);
   }
 
   // Q267 (contract 0.13.2): a System Admin cancels an approved Quality snag record entered by mistake

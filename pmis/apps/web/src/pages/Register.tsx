@@ -1,13 +1,14 @@
-import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Plus, RotateCcw, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
+import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Lock, Plus, RotateCcw, Unlock, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { downloadTemplate, useRegisterDefs, useRegisterRecords, useTemplates, useUpdateRecord, type RecordFilters } from '@/api/registers';
+import { downloadTemplate, useColumnLock, useRecordLock, useRecordOp, useRegisterDefs, useRegisterRecords, useTemplates, useUpdateRecord, type RecordFilters } from '@/api/registers';
 import { useRegions } from '@/api/sites';
-import type { RegisterDefinition } from '@/api/types';
+import type { RegisterDefinition, RegisterRecord } from '@/api/types';
 import { ExportViewButton } from '@/components/ExportDialog';
 import { GridCellEditor, INLINE_TYPES } from '@/components/GridCellEditor';
 import { RegisterGrid } from '@/components/RegisterGrid';
+import { RejectDialog } from '@/components/RejectDialog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { Holders } from '@/components/HolderChip';
@@ -53,10 +54,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const regions = useRegions();
   // F16: As-Built splits CW BOQ / TE BOQ and Dismantle splits CW / TE by record_type (the server filter); the first tab is the default.
+  // The first tab (All, value '') is the default: every row of the register, as the Excel master shows it.
   const tabDefs = key === 'as_built'
-    ? [{ value: 'cw_part', label: t('registers.tab_asb_cw') }, { value: 'te_part', label: t('registers.tab_asb_te') }]
-    : key === 'dismantle' ? [{ value: 'cw', label: t('registers.tab_dis_cw') }, { value: 'te', label: t('registers.tab_dis_te') }] : [];
-  const tab = f.record_type || tabDefs[0]?.value || '';
+    ? [{ value: '', label: t('registers.tab_all') }, { value: 'cw_part', label: t('registers.tab_asb_cw') }, { value: 'te_part', label: t('registers.tab_asb_te') }]
+    : key === 'dismantle' ? [{ value: '', label: t('registers.tab_all') }, { value: 'cw', label: t('registers.tab_dis_cw') }, { value: 'te', label: t('registers.tab_dis_te') }] : [];
+  const tab = f.record_type;
   const list = useRegisterRecords(key, { ...f, record_type: tab });
   const save = useUpdateRecord(key);
   const [editing, setEditing] = useState<{ id: string; col: string } | null>(null);
@@ -85,6 +87,37 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const real = items.filter((r) => !r.id.startsWith('tmp-'));
   const flip = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const allPicked = real.length > 0 && real.every((r) => picked.has(r.id));
+  // 0103 (0.15.22): lock, unlock and void. Lock and void take a reason; the database decides every row. A row that is not eligible or is refused is named, never skipped silently.
+  const lockRec = useRecordLock(key);
+  const lockCol = useColumnLock(key);
+  const voidRec = useRecordOp(key);
+  const [bulk, setBulk] = useState<null | 'lock' | 'unlock' | 'void'>(null);
+  const [colDlg, setColDlg] = useState<null | { code: string; locked: boolean }>(null);
+  const [colPick, setColPick] = useState('');
+  const colLabel = (code: string) => { const x = def.fields.find((c) => c.code === code); return x ? fieldLabel(x, i18n.language) : code; };
+  const runBulk = async (kind: 'lock' | 'unlock' | 'void', reason: string) => {
+    const rows = real.filter((r) => picked.has(r.id));
+    const eligible = (r: RegisterRecord) => (kind === 'void' ? !!r.allowed_actions?.includes('void') : (kind === 'lock') !== !!r.locked);
+    let done = 0;
+    const notDone: string[] = [];
+    for (const r of rows) {
+      if (!eligible(r)) { notDone.push(r.site_code ?? r.id.slice(0, 8)); continue; }
+      try {
+        if (kind === 'void') await voidRec.mutateAsync({ record: r, op: 'void', note: reason });
+        else await lockRec.mutateAsync({ record: r, locked: kind === 'lock', reason });
+        done += 1;
+      } catch {
+        notDone.push(r.site_code ?? r.id.slice(0, 8));
+      }
+    }
+    toast(t('registers.bulk_result', { done, refused: notDone.length }));
+    if (notDone.length) toast(t('registers.bulk_refused', { list: notDone.join(', ') }), 'err');
+    setBulk(null);
+  };
+  const colLock = (code: string, locked: boolean, reason: string) => lockCol.mutate({ code, locked, reason }, {
+    onSuccess: () => toast(t(locked ? 'registers.column_locked_ok' : 'registers.column_unlocked_ok')),
+    onError: (e) => toast(registerErrorMessage(t, e), 'err'),
+  });
   const chips = [
     ...(f.q ? [{ key: 'q', label: t('table.filter_q', { v: f.q }), onRemove: () => set('q')('') }] : []),
     ...(f.region_id ? [{ key: 'region_id', label: t('table.filter_region', { v: rname(Number(f.region_id)) }), onRemove: () => set('region_id')('') }] : []),
@@ -118,11 +151,25 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     <div data-testid={`page-register-${key}`}>
       <PageHeader title={name} />
       {OWNER_NOTE[key] && <p className="mb-3 text-mute" data-testid="register-owner-note">{t(OWNER_NOTE[key])}</p>}
+      <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="register-column-locks">
+        <select className="input w-auto" aria-label={t('registers.column_lock_select')} data-testid="register-column-lock-select" value={colPick} onChange={(e) => setColPick(e.target.value)}>
+          <option value="">{t('registers.column_lock_select')}</option>
+          {def.fields.filter((x) => !x.read_only && !x.locked).map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
+        </select>
+        <button type="button" className="btn" disabled={!colPick} data-testid="register-column-lock" onClick={() => setColDlg({ code: colPick, locked: true })}><Lock size={16} />{t('registers.column_lock')}</button>
+        {def.fields.filter((x) => x.locked).map((x) => (
+          <button key={x.code} type="button" className="btn" data-testid={`register-column-unlock-${x.code}`} onClick={() => setColDlg({ code: x.code, locked: false })}>
+            <Unlock size={16} />{t('registers.column_unlock', { field: fieldLabel(x, i18n.language) })}
+          </button>
+        ))}
+      </div>
+      <RejectDialog open={colDlg !== null} title={colDlg ? t(colDlg.locked ? 'registers.column_title_lock' : 'registers.column_title_unlock', { field: colLabel(colDlg.code) }) : ''}
+        onClose={() => setColDlg(null)} onSend={(reason) => { if (colDlg) colLock(colDlg.code, colDlg.locked, reason); setColDlg(null); setColPick(''); }} />
       {tabDefs.length > 0 && (
         <div className="mb-3 flex gap-1" role="group" aria-label={name} data-testid="register-tabs">
           {tabDefs.map((x) => (
             <button key={x.value} type="button" className={`btn ${tab === x.value ? 'btn-accent' : ''}`} aria-pressed={tab === x.value}
-              data-testid={`register-tab-${x.value}`} onClick={() => set('record_type')(x.value)}>{x.label}</button>
+              data-testid={`register-tab-${x.value || 'all'}`} onClick={() => set('record_type')(x.value)}>{x.label}</button>
           ))}
         </div>
       )}
@@ -169,7 +216,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         <RegisterGrid testid="register-grid" rows={real} columns={[{ id: 'site', label: label('site') }, { id: 'region', label: label('region') }, { id: 'type', label: label('type') },
           ...fieldCols.map((c) => ({ id: `f:${c.code}`, label: label(`f:${c.code}`) })), { id: 'state', label: label('state') }, { id: 'ball', label: label('ball') }]}
           cell={cell} onOpen={setRecord}
-          canEdit={(cid, r) => { const fc = inlineField(cid); return !!fc && INLINE_TYPES.includes(fc.type) && !fc.read_only && !!r.allowed_actions?.includes('edit'); }}
+          canEdit={(cid, r) => { const fc = inlineField(cid); return !!fc && INLINE_TYPES.includes(fc.type) && !fc.read_only && !fc.locked && !r.locked && !!r.allowed_actions?.includes('edit'); }}
           editing={editing} onStartEdit={(id, col) => setEditing({ id, col })}
           renderEditor={(cid, r) => {
             const fc = inlineField(cid);
@@ -187,7 +234,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               const tmp = r.id.startsWith('tmp-'), on = picked.has(r.id), cur = recordId === r.id;
               const g = gxRow(i, { picked: on, current: cur, muted: tmp });
               return (
-                <div key={r.id} role="listitem" tabIndex={0} aria-selected={on || cur} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); if (!tmp) setRecord(r.id); } }} data-testid={`reg-row-${r.id}`} data-state={r.state} data-current={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} onClick={() => !tmp && setRecord(r.id)}
+                <div key={r.id} role="listitem" tabIndex={0} aria-selected={on || cur} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); if (!tmp) setRecord(r.id); } }} data-testid={`reg-row-${r.id}`} data-state={r.state} data-locked={r.locked || undefined} data-current={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} onClick={() => !tmp && setRecord(r.id)}
                   style={{ gridTemplateColumns: tracks(tbl.cols, true) }}
                   className={`grid w-full cursor-pointer items-center border-b border-line text-start text-sm ${rowPad(tbl.density)} ${g.className}`}>
                   <div className="sticky start-0 z-10 flex justify-center bg-inherit">{!tmp && <SelectBox checked={on} onChange={() => flip(r.id)} label={t('table.select_row', { code: r.site_code ?? r.id })} testid={`reg-select-${r.id}`} />}</div>
@@ -202,10 +249,15 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
         </div>
       </div>
       <BulkBar testid="register-bulk" count={picked.size} loaded={real.length} total={total} onClear={() => setPicked(new Set())}>
+        <button type="button" className="btn" data-testid="register-bulk-lock" onClick={() => setBulk('lock')}><Lock size={16} />{t('registers.lock_selected')}</button>
+        <button type="button" className="btn" data-testid="register-bulk-unlock" onClick={() => setBulk('unlock')}><Unlock size={16} />{t('registers.unlock_selected')}</button>
+        <button type="button" className="btn" data-testid="register-bulk-void" onClick={() => setBulk('void')}>{t('registers.void_selected')}</button>
         {picked.size === 1 && <button type="button" className="btn" data-testid="register-bulk-open" onClick={() => setRecord([...picked][0])}>{t('table.open_selected')}</button>}
         <button type="button" className="btn" data-testid="register-bulk-copy" onClick={() => { void navigator.clipboard?.writeText(real.filter((r) => picked.has(r.id)).map((r) => r.site_code ?? r.id).join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
+      <RejectDialog open={bulk !== null} title={bulk ? t(`registers.bulk_title_${bulk}`, { count: picked.size }) : ''} onClose={() => setBulk(null)} onSend={(reason) => { if (bulk) void runBulk(bulk, reason); }} />
       </>}
+      <p className="mt-2 text-sm text-mute" data-testid="register-footer-count">{t('registers.count_of', { shown: real.length, total })}</p>
       {list.hasNextPage && <button className="btn mt-3" data-testid="register-more" disabled={list.isFetchingNextPage} onClick={() => void list.fetchNextPage()}><Download size={16} />{t('registers.more')}</button>}
       <RegisterDrawer def={def} recordId={recordId} nav={real.map((r) => r.id)} onClose={() => setRecord(null)} onOpen={setRecord} />
     </div>

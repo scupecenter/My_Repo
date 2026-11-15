@@ -15,7 +15,7 @@ export type ErrorCode =
   | 'list_not_configured' | 'confirmation_mismatch'
   | 'email_not_verified'
   | 'batch_processing' | 'vehicle_already_reserved' | 'upload_processing'
-  | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid';
+  | 'freeze_active' | 'workflow_invalid' | 'master_impact_unconfirmed' | 'stale_preview' | 'invitation_invalid' | 'register_locked';
 
 export interface FieldError {
   path: string;
@@ -64,6 +64,7 @@ const TITLES: Record<string, string> = {
   password_change_required: 'Password change required',
   weak_password: 'Password does not meet the policy',
   invitation_invalid: 'This invitation link does not work',
+  register_locked: 'This register entry is locked',
   internal_error: 'Internal error',
   template_rejected: 'The file is not an approved template',
   file_too_large: 'The file is too large',
