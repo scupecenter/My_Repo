@@ -113,6 +113,22 @@ describe('GET /site360/{menu}/rows: the page and its values', () => {
     expect(res.body.rows).toEqual([]);
   });
 
+  it('fills the issue columns (GA:GE) from the open issue of the site', async () => {
+    const s = await site(1);
+    await db.query(`INSERT INTO issues (site_id, region_id, title, detail, raised_date, status) VALUES ($1, 1, 'Access road blocked', 'Gate closed', DATE '2026-04-02', 'open')`, [s.id]);
+    const a = await actor(app, db, { regions: [1], grants: [['sites', 'view'], ['issues', 'view']] });
+    const res = await a.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    expect(res.status).toBe(200);
+    const values = res.body.rows[0].values;
+    expect(values['183']).toBe('Access road blocked');
+    const hidden = await actor(app, db, { regions: [1], grants: [['sites', 'view']] });
+    const none = await hidden.api.call('get', `/site360/master/rows?site_code=${s.code}`);
+    expect(none.body.rows[0].values['183']).toBeNull();
+    expect(values['185']).toBe('2026-04-02');
+    expect(values['186']).toBe('open');
+    expect(values['187']).toBe('Gate closed');
+  });
+
   it('answers 422 for an unknown menu, sort or a page size over 200', async () => {
     const a = await actor(app, db, { regions: [1] });
     expect((await a.api.call('get', '/site360/nope/rows')).status).toBe(422);

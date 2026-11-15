@@ -1,6 +1,6 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { Site360Grid } from '@/components/Site360Grid';
-import { useSite360Sections } from '@/api/site360';
+import { useSite360Rows, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -62,6 +62,14 @@ export function Sites() {
   const layout = sp.get('layout') === 'vertical' ? 'vertical' : 'grid';
   const site360Q = useSite360Sections();
   const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
+  // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
+  const gridRowsQ = useSite360Rows(menu ? section : undefined, {
+    region_id: sp.get('region_id') || undefined,
+    scenario: sp.get('scenario') || undefined,
+    overall_status: sp.get('overall_status') || undefined,
+    sort: 'site_code',
+    limit: 200,
+  });
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
@@ -242,7 +250,7 @@ export function Sites() {
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
       ) : menu && layout === 'grid' ? (
-        <Site360Grid menu={menu} testid="site360-grid" rows={items.map((x) => ({ id: x.id, site_code: x.site_code, name: (i18n.language === 'ar' && x.name_ar) || x.name }))} />
+        <Site360Grid menu={menu} testid="site360-grid" total={gridRowsQ.data?.total} filtered={gridRowsQ.data?.filtered} rows={(gridRowsQ.data?.rows ?? []).map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values }))} />
       ) : (
         <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>

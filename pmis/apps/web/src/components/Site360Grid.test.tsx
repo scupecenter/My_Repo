@@ -181,4 +181,21 @@ describe("SITE 360 grid", () => {
       "Synthetic site one",
     );
   });
+
+  it("draws the Master values, the status pill and the filtered count of the footer", () => {
+    const valued = [
+      { id: "c", site_code: "S-003", row_no: 7, values: { "1": "7", "2": "S-003", "4": "Synthetic site three", "5": "Zawia", "182": "on_hold" } },
+    ];
+    const withStatus: Site360MenuItem = {
+      ...cw,
+      columns: [
+        ...cw.columns,
+        { ord: 182, letter: "FZ", group_top: "Progress", group_mid: null, header: "Overall Status", sections: ["status"], is_phase_gate: false },
+      ],
+      bands: [...cw.bands, { name: "Progress", is_phase_gate: false, groups: [{ name: null, ords: [182] }] }],
+    };
+    renderApp(<Site360Grid menu={withStatus} rows={valued} total={9} filtered={1} />);
+    expect(screen.getByTestId("site360-grid-status").textContent).toBe("on hold");
+    expect(screen.getByTestId("site360-grid-totals").textContent).toContain("1 of 9 sites");
+  });
 });

@@ -5,8 +5,34 @@ import type { Site360MenuItem } from "@/api/site360";
 export interface Site360GridRow {
   id: string;
   site_code: string;
-  name: string;
+  name?: string;
+  /** The running number of the row in view (the # column); the index + 1 when not sent. */
+  row_no?: number;
+  /** The Master value of each column, keyed by the column order (ord); null when the column has no value. */
+  values?: Record<string, string | null>;
 }
+
+/** Status columns drawn as pills (Progress: Current Milestone is text, Overall Status is one of five values). */
+const STATUS_ORD = 182;
+const STATUS_TONE: Record<string, string> = {
+  not_started: "bg-hover text-mute",
+  in_progress: "bg-sideOn text-accentText",
+  on_hold: "bg-hover text-mute",
+  completed: "text-done",
+  cancelled: "bg-hover text-mute line-through",
+};
+/** Identity columns that must not be empty: an empty one is tinted. */
+const MANDATORY = [2, 4];
+/** A tint per phase band: the same band always gets the same colour; the group row is the lighter tint of it. */
+const BAND_HUES = [210, 150, 35, 280, 190, 0, 95];
+function bandHue(name: string | null): number {
+  if (!name) return 0;
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return BAND_HUES[h % BAND_HUES.length]!;
+}
+const bandTint = (name: string | null, group: boolean) =>
+  `hsl(${bandHue(name)} ${group ? 55 : 60}% ${group ? 94 : 86}%)`;
 
 const W_FROZEN = 120;
 const W_FIELD = 150;
@@ -25,11 +51,15 @@ export function Site360Grid({
   menu,
   rows,
   total,
+  filtered,
   testid = "site360-grid",
 }: {
   menu: Site360MenuItem;
   rows: Site360GridRow[];
+  /** Sites the caller may see (the footer's M). */
   total?: number;
+  /** Sites that match the filters (the footer's N). */
+  filtered?: number;
   testid?: string;
 }) {
   const { i18n, t } = useTranslation();
@@ -92,17 +122,33 @@ export function Site360Grid({
         }
       : undefined;
 
+  /** The text of a cell: # is the running row number, Site ID and Site Name are the identity, the rest are the Master values. */
   const value = (ord: number, index: number, row: Site360GridRow): string => {
-    if (ord === 1) return String(index + 1);
+    if (ord === 1) return String(row.row_no ?? index + 1);
     if (ord === 2) return row.site_code;
-    if (ord === 4) return row.name;
-    return "";
+    if (ord === 4) return row.name ?? row.values?.["4"] ?? "";
+    return row.values?.[String(ord)] ?? "";
   };
 
   const bandCols = (i: number) => menu.bands[i]!.groups.flatMap((g) => g.ords);
   const visibleOrds = menu.bands.flatMap((b, i) =>
     collapsed.includes(i) ? [] : bandCols(i),
   );
+
+  const renderCell = (ord: number, text: string) => {
+    if (text === "") return <span className="text-mute">-</span>;
+    if (ord === STATUS_ORD) {
+      return (
+        <span
+          data-testid={`${testid}-status`}
+          className={`rounded px-1.5 py-px text-[11px] font-medium ${STATUS_TONE[text] ?? "bg-hover text-mute"}`}
+        >
+          {text.replace(/_/g, " ")}
+        </span>
+      );
+    }
+    return text;
+  };
 
   return (
     <div
@@ -128,7 +174,8 @@ export function Site360Grid({
                     scope="colgroup"
                     data-testid={`${testid}-band-${i}`}
                     data-gate={band.is_phase_gate ? "true" : "false"}
-                    className={`sticky top-0 z-[3] border border-line px-2 py-0.5 text-start text-xs font-semibold ${band.is_phase_gate ? "bg-sideOn text-accentText" : "bg-hover text-mute"}`}
+                    style={band.is_phase_gate ? undefined : { background: bandTint(band.name, false) }}
+                    className={`sticky top-0 z-[3] border border-line px-2 py-0.5 text-start text-xs font-semibold ${band.is_phase_gate ? "bg-sideOn text-accentText" : "text-ink"}`}
                   >
                     <button
                       type="button"
@@ -156,7 +203,8 @@ export function Site360Grid({
                       <th
                         key={`g-${i}-${gi}`}
                         colSpan={g.ords.length}
-                        className={`sticky top-[26px] z-[3] border border-line px-2 py-0.5 text-start text-xs ${band.is_phase_gate ? "bg-sideOn" : "bg-card"}`}
+                        style={band.is_phase_gate ? undefined : { background: bandTint(band.name, true) }}
+                        className={`sticky top-[26px] z-[3] border border-line px-2 py-0.5 text-start text-xs ${band.is_phase_gate ? "bg-sideOn" : ""}`}
                       >
                         {g.name ?? ""}
                       </th>
@@ -217,11 +265,14 @@ export function Site360Grid({
                       key={ord}
                       data-ord={ord}
                       className={`h-7 border border-line px-2 py-0 align-middle ${num ? "text-end tabular-nums text-mute" : ""} ${c.is_phase_gate ? "bg-sideOn/40" : "bg-card"}`}
-                      style={{ ...stickyStyle(ord) }}
+                      style={{
+                        ...stickyStyle(ord),
+                        ...(MANDATORY.includes(ord) && !value(ord, index, row)
+                          ? { background: "rgba(220, 38, 38, 0.08)" }
+                          : {}),
+                      }}
                     >
-                      {value(ord, index, row) || (
-                        <span className="text-mute">-</span>
-                      )}
+                      {renderCell(ord, value(ord, index, row))}
                     </td>
                   );
                 })}
@@ -238,8 +289,8 @@ export function Site360Grid({
                 >
                   {i === 0
                     ? t("site360.of", {
-                        count: rows.length,
-                        total: total ?? rows.length,
+                        count: filtered ?? rows.length,
+                        total: total ?? filtered ?? rows.length,
                       })
                     : ""}
                 </td>

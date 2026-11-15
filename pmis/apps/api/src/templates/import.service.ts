@@ -17,7 +17,7 @@ import { DbService } from '../db/db.service';
 import { TaskViewService, UserRefDto } from '../workflow/task-view.service';
 import { DocumentsService } from '../documents/documents.service';
 import { ImportJobsService } from './import-jobs.service';
-import { DATA_SHEET, LISTS_SHEET, MASTER_INFO_PREFILLED, STREAM_INFO_PREFILLED, TPL_SHEET, TemplatesService, TplColumn, TplPart } from './templates.service';
+import { DATA_SHEET, LISTS_SHEET, MASTER_INFO_PREFILLED, STREAM_INFO_PREFILLED, TPL_SHEET, TemplatesService, TplColumn, TplCompat, TplPart } from './templates.service';
 import { UploadedFile, importMaxRows } from './upload.interceptor';
 import { explainUnreadable, guardXlsx, normalizeSpreadsheetPrefixes } from './xlsx-guard';
 
@@ -217,6 +217,7 @@ export class ImportService {
     if (!current || !current.is_active) return this.reject(auth, requestId, 'template_unknown_or_inactive', `The template ${templateId} does not exist or is no longer in use.`, ctx);
     const issued = await this.templates.version(templateId, version);
     if (!issued) return this.reject(auth, requestId, 'tpl_invalid', `This file names version ${version} of ${templateId}, which was never issued.`, ctx);
+    let older: TplCompat | null = null;
     if (!issued.is_current) {
       // D112: an older version is accepted when only non-input columns changed since; any change of a typed column refuses it with the list
       const compat = await this.templates.compat(templateId, version);
@@ -226,6 +227,7 @@ export class ImportService {
           `This file was made from version ${version} of ${templateId}; the current version is ${current.current_version}${changed ? `, and typed columns changed between them: ${changed}${(compat?.input_changes.length ?? 0) > 8 ? ' ...' : ''}` : ''}. Download the template again.`,
           { ...ctx, current_version: current.current_version, input_changes: compat?.input_changes ?? [] });
       }
+      older = compat;
     }
     // 3. the template the user selected
     if (body.template_id && body.template_id !== templateId) {
@@ -265,6 +267,8 @@ export class ImportService {
     });
     if (tooMany) return this.reject(auth, requestId, 'size_or_rows_exceeded', `The file has more than ${max} rows. Split it.`, { ...ctx, max_rows: max });
     if (rows.length === 0) throw problems.validation([{ path: '/file', code: 'empty', message: 'The file has no data rows.' }]);
+    // a column removed since the file was made is ignored (the summary of the batch says so); a new column stays empty
+    for (const r of older?.removed_columns ?? []) for (const x of rows) { delete (x as ParsedRow).data?.[r.key]; delete (x as ParsedRow).custom?.[r.key]; }
     if (current.kind !== 'stream') await this.resolveMembers(rows as ParsedRow[], cols);
 
     // 0083: a file with more data rows than imports.async_rows is staged in the background (the checks above and those of the staging before its rows run now)
@@ -698,9 +702,18 @@ export class ImportService {
       ${tail}`;
   }
 
+  /** The summary of an older file (owner decision 2026-11-14): what was removed (ignored), what is new (empty) and what was renamed since the file was made. */
+  private async olderTemplate(r: BatchRow): Promise<Record<string, unknown> | null> {
+    if (r.file_template_version === null || r.file_template_version === undefined || r.file_template_version === r.template_version) return null;
+    const c = await this.templates.compat(r.template_id, r.file_template_version);
+    if (!c) return null;
+    return { file_version: r.file_template_version, current_version: r.template_version, removed_columns: c.removed_columns ?? [], added_columns: c.added_columns ?? [], renamed_columns: c.renamed_columns ?? [] };
+  }
+
   private async dtos(rows: BatchRow[]): Promise<Record<string, unknown>[]> {
+    const olders = await Promise.all(rows.map((r) => this.olderTemplate(r)));
     const refs = await this.view.userRefs([...new Set([...rows.map((r) => r.uploaded_by), ...rows.flatMap((r) => (r.historical_marked_by ? [r.historical_marked_by] : []))])]);
-    return rows.map((r) => {
+    return rows.map((r, idx) => {
       const status = r.status;
       const dto: Record<string, unknown> = {
         id: r.id,
@@ -718,6 +731,7 @@ export class ImportService {
         },
         mode: r.mode,
         file_template_version: r.file_template_version,
+        older_template: olders[idx] ?? null,
         historical_load: r.historical_load
           ? { cutoff_date: r.historical_cutoff, reason: r.historical_reason, marked_by: r.historical_marked_by ? (refs.get(r.historical_marked_by) ?? { id: r.historical_marked_by }) : null, marked_at: r.historical_marked_at }
           : null,

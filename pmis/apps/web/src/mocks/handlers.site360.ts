@@ -46,7 +46,44 @@ function menu(key: string, name_en: string, name_ar: string) {
   };
 }
 
+/** Three synthetic sites in the shape of GET /site360/{menu}/rows: the values are keyed by the menu's column order. */
+const SITES = [
+  { id: 'a0000000-0000-4000-8000-000000000001', code: 'S360-001', name: 'Synthetic site one', region: 'Tripoli', milestone: 'Site Release', status: 'in_progress', phase: 'Phase 1', model: 'outsourced' },
+  { id: 'a0000000-0000-4000-8000-000000000002', code: 'S360-002', name: 'Synthetic site two', region: 'Middle', milestone: 'CW Completion', status: 'on_hold', phase: 'Phase 2', model: 'internal' },
+  { id: 'a0000000-0000-4000-8000-000000000003', code: 'S360-003', name: '', region: 'Zawia', milestone: null, status: 'completed', phase: 'Phase 2', model: 'outsourced' },
+];
+
+function rowsFor(key: string, offset: number, limit: number) {
+  const cols = COLS.filter((c) => key === 'master' || c.sections.includes(key) || c.sections.includes('status') || IDENT.includes(c.ord));
+  const page = SITES.slice(offset, offset + limit);
+  const values = (site: (typeof SITES)[number]) => {
+    const v: Record<string, string | null> = {};
+    for (const c of cols) v[String(c.ord)] = null;
+    v['5'] = site.region;
+    v['24'] = site.phase;
+    v['33'] = site.model;
+    v['180'] = site.milestone;
+    v['182'] = site.status;
+    v['78'] = '2026-03-10';
+    return v;
+  };
+  return {
+    total: SITES.length,
+    filtered: SITES.length,
+    offset,
+    limit,
+    rows: page.map((site, i) => ({ site_id: site.id, site_code: site.code, row_no: offset + i + 1, values: values(site) })),
+    menu: { key, name_en: key, name_ar: key, columns: cols.map((c) => ({ ...c, is_phase_gate: c.group_top === 'Phase Gate' })), bands: menu(key, key, key).bands, frozen_ords: IDENT },
+  };
+}
+
 export const site360Handlers = [
   http.get(`${API_BASE}/site360/sections`, () =>
     HttpResponse.json({ items: MENUS.map(([k, en, ar]) => menu(k, en, ar)), can_move: false })),
+  http.get(`${API_BASE}/site360/:menu/rows`, ({ params, request }) => {
+    const url = new URL(request.url);
+    const offset = Number(url.searchParams.get('offset') ?? 0);
+    const limit = Number(url.searchParams.get('limit') ?? 50);
+    return HttpResponse.json(rowsFor(String(params.menu), offset, limit));
+  }),
 ];

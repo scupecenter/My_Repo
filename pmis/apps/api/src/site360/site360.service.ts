@@ -119,11 +119,22 @@ export class Site360Service {
     const values = new Map<string, Record<string, string | null>>();
     if (page.length) {
       const ids = page.map((r) => r.id);
-      const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null }[]>(Prisma.sql`
-        SELECT v.site_id::text AS site_id, v.ord, v.value FROM site360_master_values v
+      const vals = await this.db.tx.$queryRaw<{ site_id: string; ord: number; value: string | null; register_key: string | null }[]>(Prisma.sql`
+        SELECT v.site_id::text AS site_id, v.ord, v.value, v.register_key FROM site360_master_values v
         WHERE v.site_id = ANY(${ids}::uuid[]) AND v.ord = ANY(${menuOrds}::int[])`);
+      // a register-owned value is shown only to a user who may view that register (its module, B3), as the Master export does
+      const keys = [...new Set(vals.map((v) => v.register_key).filter((k): k is string => k !== null))];
+      const visible = new Map<string, boolean>();
+      if (keys.length) {
+        const modules = await this.db.tx.$queryRaw<{ register_key: string; module_key: string }[]>(Prisma.sql`
+          SELECT register_key, module_key FROM register_definitions WHERE register_key = ANY(${keys}::text[])`);
+        for (const m of modules) visible.set(m.register_key, await this.access.hasGrant(auth, m.module_key, 'view'));
+      }
       for (const id of ids) values.set(id, {});
-      for (const v of vals) values.get(v.site_id)![String(v.ord)] = v.value;
+      for (const v of vals) {
+        const hidden = v.register_key !== null && visible.get(v.register_key) !== true;
+        values.get(v.site_id)![String(v.ord)] = hidden ? null : v.value;
+      }
     }
     const c = counts[0] ?? { total: 0, filtered: 0 };
     return {
