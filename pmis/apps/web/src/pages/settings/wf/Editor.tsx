@@ -3,7 +3,7 @@ import { ArrowLeft, Eye, LayoutList, Lock, Table2, Trash2, Upload } from 'lucide
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  useBulkTaskPatch, useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useReplaceStructure, useSetClosing, useSetPredecessors, useTaskSla, useUpdateTask, useWorkflowVersion, useWorkflowVersions,
+  useBulkTaskPatch, useCreateTask, useDiscardDraft, useGateLight, useInsertTask, useMilestoneLight, usePublish, useRemoveItem, useReorderTasks, useReplaceStructure, useSetClosing, useSetPredecessors, useSlaWeight, useTaskSla, useUpdateTask, useWeightTotals, useWorkflowVersion, useWorkflowVersions,
   type StructureInput, type WorkflowVersion,
 } from '@/api/workflowEditor';
 import { FreezeCard, useFrozen } from '@/components/FreezePanel';
@@ -65,6 +65,8 @@ export function Editor({ v, onGone }: { v: WorkflowVersion; onGone: () => void }
   const allVersions = useWorkflowVersions().data?.items ?? [];
   const parent = useWorkflowVersion(isDraft ? v.parent_version ?? null : null).data;
   const sla = useTaskSla().data ?? new Map<string, { min: number; max: number }>();
+  const slaWeightByCode = new Map((useSlaWeight(v.version).data?.items ?? []).map((x) => [x.task_code, x] as const));
+  const weightTotals = useWeightTotals(v.version).data?.items ?? [];
   const busy = [createTask, updateTask, setPreds, setClosing, insertTask, replace, reorder, msLight, gateLight, publish, removeItem, discard, bulk].some((m) => m.isPending);
   const can: Can = { edit, struct, why, busy };
 
@@ -156,7 +158,7 @@ export function Editor({ v, onGone }: { v: WorkflowVersion; onGone: () => void }
               </div>
             </div>
             <div className={`${step === 2 ? '' : 'hidden'} md:col-span-3 md:block rounded border border-line p-3`}>
-              <DetailPanel sel={sel} placements={placements} milestones={milestones} gates={gates} nm={nm} can={can} sla={sla}
+              <DetailPanel sel={sel} placements={placements} milestones={milestones} gates={gates} nm={nm} can={can} sla={sla} wf={{ version: v.version, etag, byCode: slaWeightByCode, totals: weightTotals }}
                 onPreds={(p) => open({ k: 'preds', p }, setPreds)} onGate={(g) => open({ k: 'gate-edit', g }, gateLight)} onMove={toStage}
                 onParallel={(p, o) => askReason({ title: t('wfe.parallel_title', { code: p.task_code, other: o.task_code }), hint: t('wfe.parallel_hint'), run: (reason, cb) => setPreds.mutate({ code: p.task_code, predecessors: o.predecessors ?? [], reason }, cb) })}
                 onClosing={(p, on) => askReason({ title: t(on ? 'wfe.closing_on' : 'wfe.closing_off', { code: p.task_code }), hint: t('wfe.closing_hint'), run: (reason, cb) => setClosing.mutate({ code: p.task_code, closing: on, reason }, cb) })}
