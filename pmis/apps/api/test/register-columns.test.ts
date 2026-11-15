@@ -32,6 +32,9 @@ afterAll(async () => {
   await app.close();
 });
 
+/** One GECOL record per site: the previous one is voided (which frees the slot) before the next is created. */
+const clear = () => db.query(`UPDATE register_records SET state = 'voided' WHERE register_key = 'gecol' AND site_id = $1 AND state <> 'voided'`, [t.site.id]);
+const rec = async (data: Record<string, unknown>) => { await clear(); return createRec(t, data); };
 const REASON = 'The owner asked for a new column';
 const F = '/registers/gecol/fields';
 const add = (body: Record<string, unknown>, who: Actor = admin) => who.api.call('post', F, { reason: REASON, ...body });
@@ -84,7 +87,7 @@ describe('the data types of a new column', () => {
     await bad({ c_link: 'example.test' }, '/data/c_link');
     await bad({ c_percentage: 120 }, '/data/c_percentage');
     await bad({ c_datetime: '2026-13-40 10:00' }, '/data/c_datetime');
-    const ok = await createRec(t, { pr_no: `GF-OK-${Date.now()}`, request_date: '2026-01-05', c_email: 'a.b@example.test', c_phone: '+218 91 000 0000', c_link: 'https://example.test/x',
+    const ok = await rec( { pr_no: `GF-OK-${Date.now()}`, request_date: '2026-01-05', c_email: 'a.b@example.test', c_phone: '+218 91 000 0000', c_link: 'https://example.test/x',
       c_percentage: 42.5, c_currency: 1250.75, c_datetime: '2026-01-05 10:30', c_long_text: 'a long note' });
     expect(ok.data).toMatchObject({ c_email: 'a.b@example.test', c_percentage: 42.5, c_currency: 1250.75 });
   });
@@ -99,10 +102,11 @@ describe('a computed column', () => {
     const r = await add({ code: 'q_sum', label_en: 'Sum', field_type: 'computed', formula: { op: 'sum', a: 'q_a', b: 'q_b' }, in_list: true });
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(await field('q_sum')).toMatchObject({ type: 'computed' });
+    await clear();
     const typed = await t.entry.api.call('post', recPath('gecol'), { site_id: t.site.id, data: { pr_no: `GC-${Date.now()}`, request_date: '2026-01-05', q_sum: 5 } });
     expect(typed.status).toBe(422);
-    const rec = await createRec(t, { pr_no: `GC-OK-${Date.now()}`, request_date: '2026-01-05', q_a: 4, q_b: 6.5 });
-    expect(rec.data.q_sum).toBe(10.5);
+    const made = await rec( { pr_no: `GC-OK-${Date.now()}`, request_date: '2026-01-05', q_a: 4, q_b: 6.5 });
+    expect(made.data.q_sum).toBe(10.5);
     // a computed column keeps its type
     const ch = await admin.api.call('patch', `${F}/q_sum`, { reason: REASON, field_type: 'number' });
     expect(ch.status).toBe(422);
@@ -111,7 +115,9 @@ describe('a computed column', () => {
 
 describe('a list column', () => {
   it('picks an existing catalogue', async () => {
-    const cat = await q<{ code: string }>(db, `SELECT code FROM list_catalogues WHERE is_active AND EXISTS (SELECT 1 FROM list_values v WHERE v.catalogue_code = code AND v.is_active) LIMIT 1`);
+    expect((await admin.api.call('post', '/list-catalogues', { code: 'ExistingProbe', name_en: 'Existing probe', reason: REASON })).status).toBe(201);
+    expect((await admin.api.call('post', '/list-catalogues/ExistingProbe/values', { code: 'One', reason: REASON })).status).toBe(201);
+    const cat = [{ code: 'ExistingProbe' }];
     const r = await add({ code: 'l_existing', label_en: 'Existing list', field_type: 'list', list_catalogue: cat[0]!.code });
     expect(r.status, JSON.stringify(r.body)).toBe(201);
     expect(await field('l_existing')).toMatchObject({ type: 'list', list_catalogue: cat[0]!.code });
@@ -126,8 +132,9 @@ describe('a list column', () => {
     const m = await add({ code: 'l_multi', label_en: 'Tags', field_type: 'multi_list', list_catalogue: f!.list_catalogue });
     expect(m.status).toBe(201);
     expect(await field('l_multi')).toMatchObject({ type: 'multi_list' });
-    const rec = await createRec(t, { pr_no: `GL-${Date.now()}`, request_date: '2026-01-05', l_new: 'High', l_multi: ['High', 'Low'] });
-    expect(rec.data).toMatchObject({ l_new: 'High', l_multi: ['High', 'Low'] });
+    const made = await rec( { pr_no: `GL-${Date.now()}`, request_date: '2026-01-05', l_new: 'High', l_multi: ['High', 'Low'] });
+    expect(made.data).toMatchObject({ l_new: 'High', l_multi: ['High', 'Low'] });
+    await clear();
     expect((await t.entry.api.call('post', recPath('gecol'), { site_id: t.site.id, data: { pr_no: `GL2-${Date.now()}`, request_date: '2026-01-05', l_new: 'Nope' } })).status).toBe(422);
   });
   it('a list column needs a list', async () => {
@@ -152,7 +159,7 @@ describe('a document column', () => {
 
 describe('edit: rename, required, section, order, visibility', () => {
   it('renames in English and Arabic, turns required on (flag, not block) and changes visibility', async () => {
-    await createRec(t, { pr_no: `GR-${Date.now()}`, request_date: '2026-01-05' });
+    await rec( { pr_no: `GR-${Date.now()}`, request_date: '2026-01-05' });
     const before = await field('c_text');
     const r = await admin.api.call('patch', `${F}/c_text`, { reason: REASON, label_en: 'Renamed text', label_ar: 'نص جديد', required: true, in_filter: true, in_template: false, in_export: false }, { 'If-Match': `"${before!.version}"` });
     expect(r.status, JSON.stringify(r.body)).toBe(200);
@@ -207,8 +214,8 @@ describe('the register name', () => {
 describe('type change with a conversion preview', () => {
   it('shows the preview, blocks when a value fails, asks to confirm, converts when all convert, and needs the step-up', async () => {
     expect((await add({ code: 'v_amount', label_en: 'Amount text', field_type: 'text' })).status).toBe(201);
-    const a = await createRec(t, { pr_no: `GT-A-${Date.now()}`, request_date: '2026-01-05', v_amount: '12.5' });
-    const b = await createRec(t, { pr_no: `GT-B-${Date.now()}`, request_date: '2026-01-05', v_amount: 'twelve' });
+    const a = await rec( { pr_no: `GT-A-${Date.now()}`, request_date: '2026-01-05', v_amount: '12.5' });
+    const b = await rec( { pr_no: `GT-B-${Date.now()}`, request_date: '2026-01-05', v_amount: 'twelve' });
     const imp = await admin.api.call('get', `${F}/v_amount/impact?field_type=number`);
     expect(imp.status).toBe(200);
     expect(imp.body.conversion).toMatchObject({ convertible: 1, failed: 1 });

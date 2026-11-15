@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useColumnImpact, useCreateColumn, useReorderColumns, useUpdateColumn } from '@/api/registerColumns';
 import { useListCatalogues } from '@/api/lists';
@@ -26,36 +26,28 @@ export type Place = { code: string; side: 'before' | 'after' } | null;
  * locked with the reason. A change of type shows the conversion preview first: it is allowed when every value converts, and the failing values are listed
  * otherwise. The list type picks a catalogue or creates one with its values in the same dialog.
  */
-export function ColumnDialog({ open, onClose, registerKey, column, columns, sections, place }: {
-  open: boolean; onClose: () => void; registerKey: string; column?: RegisterColumn; columns: RegisterColumn[]; sections: RegisterSection[]; place?: Place;
-}) {
+type Props = { open: boolean; onClose: () => void; registerKey: string; column?: RegisterColumn; columns: RegisterColumn[]; sections: RegisterSection[]; place?: Place };
+export function ColumnDialog(p: Props) {
+  // the form state starts from the column each time the dialog opens: a fresh instance, not an effect that resets it
+  return p.open ? <ColumnForm key={p.column?.code ?? `new-${p.place?.code ?? ''}-${p.place?.side ?? ''}`} {...p} /> : null;
+}
+
+function ColumnForm({ open, onClose, registerKey, column, columns, sections, place }: Props) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const edit = !!column;
   const locked = !!column?.is_system;
   const create = useCreateColumn(registerKey), update = useUpdateColumn(registerKey), reorder = useReorderColumns(registerKey);
   const lists = useListCatalogues(false);
-  const [label_en, setEn] = useState(''), [label_ar, setAr] = useState(''), [code, setCode] = useState(''), [codeTouched, setCodeTouched] = useState(false);
-  const [type, setType] = useState<RegisterColumnType>('text');
-  const [required, setRequired] = useState(false), [section, setSection] = useState('');
-  const [catalogue, setCatalogue] = useState(''), [newList, setNewList] = useState(false), [listName, setListName] = useState(''), [listValues, setListValues] = useState('');
+  const [label_en, setEn] = useState(column?.label_en ?? ''), [label_ar, setAr] = useState(column?.label_ar ?? ''), [code, setCode] = useState(''), [codeTouched, setCodeTouched] = useState(false);
+  const [type, setType] = useState<RegisterColumnType>(column?.type ?? 'text');
+  const [required, setRequired] = useState(!!column?.required), [section, setSection] = useState(column?.section ?? '');
+  const [catalogue, setCatalogue] = useState(column?.list_catalogue ?? ''), [newList, setNewList] = useState(false), [listName, setListName] = useState(''), [listValues, setListValues] = useState('');
   const [op, setOp] = useState<(typeof FORMULA_OPS)[number]>('sum'), [fa, setFa] = useState(''), [fb, setFb] = useState('');
-  const [vis, setVis] = useState({ in_list: true, in_filter: true, in_template: true, in_export: true });
+  const [vis, setVis] = useState({ in_list: column?.in_list ?? true, in_filter: column?.in_filter ?? true, in_template: column?.in_template ?? true, in_export: column?.in_export ?? true });
   const [confirm, setConfirm] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [blocked, setBlocked] = useState<{ record_id?: string; value?: unknown; message?: string }[] | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    setErr(null); setConfirm(false); setBlocked(null);
-    if (column) {
-      setEn(column.label_en); setAr(column.label_ar ?? ''); setType(column.type); setRequired(!!column.required); setSection(column.section ?? '');
-      setCatalogue(column.list_catalogue ?? ''); setNewList(false); setVis({ in_list: !!column.in_list, in_filter: !!column.in_filter, in_template: !!column.in_template, in_export: !!column.in_export });
-    } else {
-      setEn(''); setAr(''); setCode(''); setCodeTouched(false); setType('text'); setRequired(false); setSection(''); setCatalogue(''); setNewList(false); setListName(''); setListValues('');
-      setOp('sum'); setFa(''); setFb(''); setVis({ in_list: true, in_filter: true, in_template: true, in_export: true });
-    }
-  }, [open, column]);
 
   const typeChanged = edit && !locked && type !== column!.type;
   const impact = useColumnImpact(registerKey, typeChanged ? column!.code : null, typeChanged ? type : undefined);

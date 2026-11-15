@@ -181,8 +181,8 @@ CREATE OR REPLACE FUNCTION reg_field_usage(p_register text, p_code text) RETURNS
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
   SELECT jsonb_build_object(
     'records_with_value', count(*) FILTER (WHERE public.rcol_present(r.data -> p_code)),
-    'records_missing_value', count(*) FILTER (WHERE r.is_current AND r.state <> 'voided' AND NOT public.rcol_present(r.data -> p_code)),
-    'records_current', count(*) FILTER (WHERE r.is_current AND r.state <> 'voided'))
+    'records_missing_value', count(*) FILTER (WHERE r.state <> 'voided' AND (r.is_current OR r.state <> 'approved') AND NOT public.rcol_present(r.data -> p_code)),
+    'records_current', count(*) FILTER (WHERE r.state <> 'voided' AND (r.is_current OR r.state <> 'approved')))
   FROM public.register_records r WHERE r.register_key = p_register
 $$;
 
