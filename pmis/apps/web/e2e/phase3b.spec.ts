@@ -23,7 +23,7 @@ for (const locale of ['en', 'ar'] as const) {
       await page.getByTestId('holiday-confirm-dialog-submit').click();
       await expect(page.getByTestId('cal-banner-tentative')).toHaveCount(0);
 
-      await page.getByTestId('settings-tab-notifications').click();
+      await page.getByTestId('settings-tab-alerts').click();
       await page.getByTestId('np-th-approval_remind_hours').fill('168');
       await page.getByTestId('np-th-approval_escalate_days').fill('3');
       await expect(page.getByTestId('np-save')).toBeDisabled();
@@ -31,7 +31,7 @@ for (const locale of ['en', 'ar'] as const) {
       await expect(page.getByTestId('np-save')).toBeEnabled();
       await expect(page.getByTestId('np-lock-audit_integrity_failure')).toBeVisible();
 
-      await page.getByTestId('settings-tab-retention').click();
+      await page.getByTestId('settings-tab-security').click(); await page.getByTestId('settings-section-security-retention').click();
       await page.getByTestId('ret-security').fill('400');
       await expect(page.getByTestId('ret-warning')).toBeVisible();
       await page.getByTestId('ret-save').click();
@@ -39,7 +39,7 @@ for (const locale of ['en', 'ar'] as const) {
       await withStepUp(page, () => page.getByTestId('ret-dialog-submit').click());
       await expect(page.getByTestId('toast').first()).toBeVisible();
 
-      await page.getByTestId('settings-tab-freeze').click();
+      await page.getByTestId('settings-tab-workflow').click(); await page.getByTestId('settings-section-workflow-freeze').click();
       await page.getByTestId('freeze-lift').click();
       await page.getByTestId('freeze-confirm').fill('structural-freeze');
       await page.getByTestId('freeze-dialog-reason').fill('Pilot ended early');

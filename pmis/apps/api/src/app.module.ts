@@ -7,6 +7,8 @@ import { AssignmentsController } from './assignments/assignments.controller';
 import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
+import { SearchController } from './search/search.controller';
+import { SearchService } from './search/search.service';
 import { AsBuiltItemsService } from './warehouse/as-built-items.service';
 import { AsBuiltItemsController, NumberSequencesController, WarehouseController } from './warehouse/warehouse.controller';
 import { WarehouseService } from './warehouse/warehouse.service';
@@ -65,6 +67,7 @@ import { TxInterceptor } from './db/tx.interceptor';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
 import { SiteMapService } from './dashboard/site-map.service';
+import { DashboardExtrasService } from './dashboard/dashboard-extras.service';
 import { DelayPeriodsController } from './dashboard/delay-periods.controller';
 import { DelayPeriodsService } from './dashboard/delay-periods.service';
 import { ProjectStatusService } from './dashboard/project-status.service';
@@ -157,6 +160,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportController, TemplateMappingController,
       ContractorsController,
       SavedViewsController,
+      SearchController, // 0.15.17 (F4)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -166,7 +170,7 @@ export function appModuleFor(config: AppConfig) {
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
       AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
       NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, StructuralFreezeService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
+      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, StructuralFreezeService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
@@ -174,6 +178,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportService, MappingService,
       ContractorsService,
       SavedViewsService,
+      SearchService, // 0.15.17 (F4)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

@@ -75,7 +75,7 @@ describe('rules screens', () => {
   it('lifting the freeze needs the typed confirmation, a reason and step-up', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    settings('freeze');
+    settings('workflow/freeze');
     await u.click(await screen.findByTestId('freeze-lift'));
     await u.type(screen.getByTestId('freeze-dialog-reason'), 'Pilot is over early');
     expect(screen.getByTestId('freeze-dialog-submit')).toBeDisabled();
@@ -97,7 +97,7 @@ describe('rules screens', () => {
   it('DLP lists versions and publishes a new one; idle days validate 1 to 30', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
-    settings('dlp');
+    settings('sla/dlp');
     expect(await screen.findByTestId('dlp-version-2')).toBeInTheDocument();
     await u.clear(screen.getByTestId('dlp-cw')); await u.type(screen.getByTestId('dlp-cw'), '6');
     await u.type(screen.getByTestId('dlp-from'), '2026-12-01');
@@ -110,7 +110,7 @@ describe('rules screens', () => {
   it('idle days: the form blocks 0 and 31', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    settings('idle');
+    settings('workflow/idle');
     const input = await screen.findByTestId('idle-days');
     await u.clear(input); await u.type(input, '31');
     expect(screen.getByTestId('idle-save')).toBeDisabled();
@@ -122,7 +122,7 @@ describe('notification policy', () => {
   it('shows ranges, blocks the cross-field violation, and locks security and mandatory types', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    settings('notifications');
+    settings('alerts');
     expect(await screen.findByTestId('np-range-approval_remind_hours')).toHaveTextContent('4');
     expect(screen.getByTestId('np-range-approval_remind_hours')).toHaveTextContent('168');
     const remind = screen.getByTestId('np-th-approval_remind_hours');
@@ -142,7 +142,7 @@ describe('notification policy', () => {
     await signIn('pm');
     const u = userEvent.setup();
     server.use(http.put(`${API_BASE}/settings/notification-policy`, () => problem(422, 'validation_failed', { errors: [{ path: '/timezone', code: 'invalid_timezone' }] })));
-    settings('notifications');
+    settings('alerts');
     await u.clear(await screen.findByTestId('np-timezone')); await u.type(screen.getByTestId('np-timezone'), 'Mars/Base');
     await u.click(screen.getByTestId('np-save'));
     await reasonAndSave(u, 'np-dialog');
@@ -172,7 +172,7 @@ describe('log retention', () => {
   it('shows minimums and the fixed audit log, and warns on a reduction', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    settings('retention');
+    settings('security/retention');
     expect(await screen.findByTestId('ret-system-min')).toHaveTextContent('90');
     expect(screen.getByTestId('ret-security-min')).toHaveTextContent('365');
     expect(screen.getByTestId('ret-audit')).toHaveTextContent('10');
@@ -415,7 +415,7 @@ describe('staff field visibility', () => {
   it('saves deny lists with a reason and hides a field for one employee on the card', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
-    settings('staff-visibility');
+    settings('security/staff');
     await u.click(await screen.findByTestId('sv-hide-emp'));
     await u.type(screen.getByTestId('sv-hide-emp'), '1103');
     await u.click(screen.getByTestId('sv-hide-email'));
@@ -435,7 +435,7 @@ describe('SLA rule sets', () => {
   it('draft, inline min>max, save, preview, publish with apply off by default and step-up', async () => {
     await signIn('pm'); await stepUpDone();
     const u = userEvent.setup();
-    settings('sla');
+    settings('sla/rules');
     await screen.findByTestId('sla-version-2');
     await u.click(screen.getByTestId('sla-create-draft'));
     await reasonAndSave(u, 'sla-create-dialog', 'Tighten A2');

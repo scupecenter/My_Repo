@@ -1,10 +1,10 @@
-import { Download, PencilLine, RotateCcw } from 'lucide-react';
+import { Download, PencilLine, Printer, RotateCcw } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
-import { downloadDashboard, useDashboard, type Dashboard as Dash, type DashboardQuery, type ExportFormat } from '@/api/dashboard';
+import { downloadDashboard, useDashboard, useDashboardExtras, type Dashboard as Dash, type DashboardExtras, type DashboardQuery, type ExportFormat } from '@/api/dashboard';
 import type { PipelineNode } from '@/api/types';
 import { EChart, type Palette } from '@/components/EChart';
 import { errText } from '@/components/FormDialog';
@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/States';
 import { useToast } from '@/components/Toast';
 import { streamName } from '@/lib/streams';
 import { tripoliToday } from '@/lib/today';
+import { DASH_TABS, readRemembered, resolveTab, tabView, teamTabs, writeRemembered, type DashTab } from './dashboardTabs';
 
 type DashMilestone = Dash['pipeline']['nodes'][number];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'] as const;
@@ -57,6 +58,128 @@ function Kpi({ title, value, sub, to, testid, tone }: { title: string; value: Re
     : <div className="card p-4" data-testid={testid}>{body}</div>;
 }
 
+const BAND_CELL: Record<string, string> = { low: 'bg-doneBg text-doneInk', medium: 'bg-waitBg text-waitInk', high: 'bg-lateBg text-lateInk', critical: 'bg-lateBg text-lateInk font-bold' };
+
+/** F13 (owner decisions 2026-11-15): the sections added to the dashboard. Read only; each figure links to the grid it counts. */
+function F13Panel({ ex, sitesLink }: { ex: DashboardExtras | undefined; sitesLink: (extra?: Record<string, string>) => string }) {
+  const { t } = useTranslation();
+  if (!ex) return <p className="text-mute" role="status" data-testid="dash-f13-loading">{t('common.loading')}</p>;
+  const rm = ex.risk_matrix;
+  const dq = ex.data_quality;
+  const sw = ex.swap_relocation;
+  const dec = ex.decisions;
+  return (
+    <div className="grid gap-3 print:gap-2 md:grid-cols-2 xl:grid-cols-4" data-testid="dash-f13">
+      <Card title={t('dash.f13.risk_title')} testid="dash-risk-matrix" className="xl:col-span-2 print:break-inside-avoid"
+        aside={rm.available && <Link to="/registers/risks" className="text-sm text-accent underline">{t('dash.f13.open_risks_link')}</Link>}>
+        {!rm.available ? <p className="text-mute">{t('dash.f13.risk_unavailable')}</p> : (
+          <>
+            <p className="mb-2 text-xs text-mute">{t('dash.f13.risk_hint')}</p>
+            <table className="w-full table-fixed text-center text-sm" data-testid="dash-risk-grid">
+              <thead><tr><th className="p-1 text-start text-xs text-mute">{t('dash.f13.probability')} / {t('dash.f13.impact')}</th>{[1, 2, 3, 4, 5].map((i) => <th key={i} className="p-1 text-xs text-mute">{i}</th>)}</tr></thead>
+              <tbody>
+                {[5, 4, 3, 2, 1].map((p) => (
+                  <tr key={p}>
+                    <th className="p-1 text-start text-xs text-mute">{p}</th>
+                    {[1, 2, 3, 4, 5].map((i) => {
+                      const c = (rm.cells ?? []).find((x) => x.probability === p && x.impact === i);
+                      return (
+                        <td key={i} className={`h-9 rounded-sm tnum ${BAND_CELL[c?.band ?? 'low']}`} data-testid={`dash-risk-cell-${p}-${i}`} data-band={c?.band} title={`${p} x ${i} = ${p * i}`}>
+                          {c?.count ?? 0}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {(rm.bands ?? []).map((b) => <span key={b.band} className={`chip ${BAND_CELL[b.band]}`}>{t(`dash.f13.band.${b.band}`)}: {b.count}</span>)}
+            </div>
+            <p className="mt-2 text-sm" data-testid="dash-risk-open">{t('dash.f13.open_total', { n: rm.open_total ?? 0 })}{(rm.invalid_total ?? 0) > 0 && <> · {t('dash.f13.invalid', { n: rm.invalid_total })}</>}</p>
+            <h3 className="mt-3 mb-1 text-sm font-semibold">{t('dash.f13.top_risks')}</h3>
+            {(rm.top_open_risks ?? []).length === 0 ? <p className="text-sm text-mute">{t('dash.f13.no_risks')}</p> : (
+              <ol className="space-y-1 text-sm" data-testid="dash-risk-top">
+                {(rm.top_open_risks ?? []).map((r) => (
+                  <li key={r.risk_code} className="flex flex-wrap items-center gap-2" data-testid="dash-risk-item">
+                    <span className="font-mono text-xs">{r.risk_code}</span>
+                    <span className="flex-1">{r.statement}</span>
+                    <span className={`chip ${BAND_CELL[r.band]}`}>{t(`dash.f13.band.${r.band}`)} {r.score}</span>
+                    {r.risk_owner && <span className="text-xs text-mute">{t('dash.f13.owner', { owner: r.risk_owner })}</span>}
+                  </li>
+                ))}
+              </ol>
+            )}
+          </>
+        )}
+      </Card>
+
+      <Card title={t('dash.f13.dq_title')} testid="dash-data-quality" className="print:break-inside-avoid">
+        {!dq.available ? <p className="text-mute">{t('dash.f13.dq_unavailable')}</p> : (
+          <>
+            <dl className="grid grid-cols-3 gap-2 text-center">
+              <div><dt className="text-xs text-mute">{t('dash.f13.dq_checked')}</dt><dd className="text-2xl font-bold tnum"><Link to={sitesLink()}>{dq.sites_checked}</Link></dd></div>
+              <div><dt className="text-xs text-mute">{t('dash.f13.dq_with_gaps')}</dt><dd className="text-2xl font-bold tnum" data-testid="dash-dq-with-gaps">{dq.sites_with_gaps}</dd></div>
+              <div><dt className="text-xs text-mute">{t('dash.f13.dq_gaps')}</dt><dd className="text-2xl font-bold tnum" data-testid="dash-dq-gaps">{dq.gaps_total}</dd></div>
+            </dl>
+            {(dq.by_kind ?? []).length === 0 ? <p className="mt-2 text-sm text-mute">{t('dash.f13.dq_none')}</p> : (
+              <ul className="mt-2 space-y-1 text-sm">
+                {(dq.by_kind ?? []).map((k) => (
+                  <li key={`${k.kind}|${k.field ?? ''}`} className="flex justify-between gap-2">
+                    <span>{k.kind === 'missing_field' ? t('dash.f13.dq_missing_field', { field: k.field ?? '' }) : t('dash.f13.dq_missing_date')}</span>
+                    <b className="tnum">{k.count}</b>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
+      </Card>
+
+      <Card title={t('dash.f13.decisions_title')} testid="dash-decisions" className="print:break-inside-avoid">
+        {!dec.available ? <p className="text-mute">{t('dash.f13.decisions_unavailable')}</p> : (
+          <>
+            {(dec.items ?? []).length === 0 ? <p className="text-sm text-mute">{t('dash.f13.no_decisions')}</p> : (
+              <ul className="space-y-2 text-sm" data-testid="dash-decision-list">
+                {(dec.items ?? []).map((d) => (
+                  <li key={d.risk_code} className="flex flex-wrap items-start gap-2" data-testid="dash-decision-item" data-tag={d.tag}>
+                    <span className={`chip ${d.tag === 'act_now' ? 'bg-lateBg text-lateInk' : 'bg-waitBg text-waitInk'}`}>{t(`dash.f13.${d.tag}`)}</span>
+                    <span className="flex-1">{d.statement}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-xs text-mute">{t('dash.f13.decisions_note')}</p>
+          </>
+        )}
+      </Card>
+
+      <Card title={t('dash.f13.sw_title')} testid="dash-swap" className="xl:col-span-2 print:break-inside-avoid">
+        {!sw.available ? <p className="text-mute">{t('dash.f13.sw_unavailable')}</p> : (
+          <>
+            <table className="w-full text-sm" data-testid="dash-swap-table">
+              <thead><tr className="text-start text-mute"><th className="text-start">{t('dash.f13.sw_scenario')}</th><th className="text-end">{t('dash.f13.sw_total')}</th><th className="text-end">{t('dash.f13.overall.in_progress')}</th><th className="text-end">{t('dash.f13.overall.completed')}</th><th className="text-end">{t('dash.f13.overall.on_hold')}</th><th className="text-end">{t('dash.f13.overall.cancelled')}</th></tr></thead>
+              <tbody>
+                {(sw.rows ?? []).map((r) => (
+                  <tr key={r.scenario} className="border-t border-line" data-testid="dash-swap-row" data-scenario={r.scenario}>
+                    <td>{t(`dash.f13.scen.${r.scenario}`)}</td>
+                    <td className="text-end tnum"><Link to={sitesLink({ scenario: r.scenario })} className="underline">{r.sites_total}</Link></td>
+                    <td className="text-end tnum">{r.by_overall_status.in_progress}</td>
+                    <td className="text-end tnum">{r.by_overall_status.completed}</td>
+                    <td className="text-end tnum">{r.by_overall_status.on_hold}</td>
+                    <td className="text-end tnum">{r.by_overall_status.cancelled}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {(sw.unscenarioed ?? 0) > 0 && <p className="mt-2 text-xs text-waitInk">{t('dash.f13.sw_unscenarioed', { n: sw.unscenarioed })}</p>}
+          </>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export function Dashboard() {
   const { t, i18n } = useTranslation();
   const ar = i18n.language === 'ar';
@@ -65,16 +188,21 @@ export function Dashboard() {
   const [sp, setSp] = useSearchParams();
   const me = useMe(true);
   const today = tripoliToday();
-  const q: DashboardQuery = { ref_date: sp.get('ref_date') ?? '', region_id: sp.get('region_id') ?? '', cluster_code: sp.get('cluster_code') ?? '', scenario: sp.get('scenario') ?? '', stream: sp.get('stream') ?? '', view: sp.get('view') ?? '' };
+  const userId = me.data?.user?.id;
+  // F6: the tab (PMO, CW, TE) is the view filter; an explicit ?tab= wins, then the team, then the last tab used
+  const tab: DashTab = resolveTab(sp.get('tab'), readRemembered(userId), teamTabs((me.data?.assignments ?? []).map((a) => a.team)));
+  const q: DashboardQuery = { ref_date: sp.get('ref_date') ?? '', region_id: sp.get('region_id') ?? '', cluster_code: sp.get('cluster_code') ?? '', scenario: sp.get('scenario') ?? '', stream: sp.get('stream') ?? '', view: tab === 'pmo' ? (sp.get('view') ?? '') : tabView(tab) };
   const refDate = q.ref_date || today;
   const dash = useDashboard(q);
   const d = dash.data;
+  const extras = useDashboardExtras(q, !!d);
   const [exporting, setExporting] = useState(false);
   const [format, setFormat] = useState<ExportFormat>('xlsx');
   // Q116: a local preview of the other pipeline style; the style in force is the setting (meta.pipeline_variant)
   const [preview, setPreview] = useState<'A' | 'B' | null>(null);
   const canExport = !!me.data && (!!me.data.is_system_admin || me.data.effective.grants.some((g) => g.module_key === 'dashboard' && (g.action as string) === 'export'));
   const setParam = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
+  const selectTab = (next: DashTab) => { writeRemembered(userId, next); setParam({ tab: next }); };
   const activeFilters = ['region_id', 'cluster_code', 'scenario', 'stream', 'view'].filter((k) => sp.get(k)).length + (q.ref_date ? 1 : 0);
   const name = (x: { name_en: string; name_ar?: string | null }) => (ar && x.name_ar ? x.name_ar : x.name_en);
 
@@ -213,8 +341,22 @@ export function Dashboard() {
         <p className="text-mute">{t('dash.subtitle')}</p>
       </header>
 
+      {/* F6: the three sections, as tabs (the tab sets the view filter) */}
+      <div role="tablist" aria-label={t('dash.tabs.label')} className="flex flex-wrap gap-2 print:hidden" data-testid="dash-tabs">
+        {DASH_TABS.map((k) => {
+          const on = tab === k;
+          const available = k === 'pmo' || !d || (d.filters.views ?? []).some((v) => v.code === tabView(k));
+          return (
+            <button key={k} role="tab" aria-selected={on} disabled={!available} title={available ? undefined : t('dash.tabs.unavailable')}
+              className={`btn ${on ? 'btn-primary' : ''}`} data-testid={`dash-tab-${k}`} onClick={() => selectTab(k)}>
+              {t(`dash.tabs.${k}`)}
+            </button>
+          );
+        })}
+      </div>
+
       {/* filters, reference date, export */}
-      <div role="toolbar" aria-label={t('dash.filters.label')} className="card flex flex-wrap items-end gap-3 p-3" data-testid="dash-filters">
+      <div role="toolbar" aria-label={t('dash.filters.label')} className="card flex flex-wrap items-end gap-3 p-3 print:hidden" data-testid="dash-filters">
         <label className="text-sm font-semibold">{t('dash.filters.region')}
           <select className="input mt-1 w-auto font-normal" data-testid="dash-filter-region" value={q.region_id} onChange={(e) => setParam({ region_id: e.target.value })}>
             <option value="">{t('sites.all_regions')}</option>
@@ -240,7 +382,7 @@ export function Dashboard() {
           </select>
         </label>
         <label className="text-sm font-semibold">{t('dash.filters.view')}
-          <select className="input mt-1 w-auto font-normal" data-testid="dash-filter-view" value={q.view} onChange={(e) => setParam({ view: e.target.value })}>
+          <select className="input mt-1 w-auto font-normal" data-testid="dash-filter-view" disabled={tab !== 'pmo'} value={q.view} onChange={(e) => setParam({ view: e.target.value })}>
             <option value="">{t('dash.filters.all_views')}</option>
             {(d?.filters.views ?? []).map((v) => <option key={v.code} value={v.code}>{name(v)}</option>)}
           </select>
@@ -258,6 +400,7 @@ export function Dashboard() {
               <select className="input w-auto" aria-label={t('dash.export_format')} data-testid="dash-export-format" value={format} onChange={(e) => setFormat(e.target.value as ExportFormat)}>
                 {(['xlsx', 'csv'] as const).map((f) => <option key={f} value={f}>{t(`dash.format.${f}`)}</option>)}
               </select>
+              <button className="btn print:hidden" data-testid="dash-print" onClick={() => window.print()}><Printer size={16} />{t('dash.print')}</button>
               <button className="btn btn-primary" data-testid="dash-export" disabled={exporting || !d} onClick={doExport}><Download size={16} />{t('dash.export')}</button>
             </span>
           )}
@@ -285,6 +428,9 @@ export function Dashboard() {
         <>
           {/* OV-12 (first card, owner request 2026-11-06): the sites on the map (contract 0.14.5); the dashboard filters above narrow it too */}
           <SiteMap testid="dash-site-map" height={520} outer={{ region_id: q.region_id, cluster_code: q.cluster_code, scenario: q.scenario, stream: q.stream === 'DISMANTLE' ? '' : q.stream }} />
+
+          {/* F13 (contract 0.15.16): risk matrix, data quality, swap and relocation, decisions; A4 landscape when printed */}
+          <F13Panel ex={extras.data} sitesLink={sites} />
 
           {/* headline */}
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

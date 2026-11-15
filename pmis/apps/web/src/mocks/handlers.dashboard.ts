@@ -91,6 +91,49 @@ export const dashboardHandlers = [
     return bad(q) ?? HttpResponse.json(buildDashboard(q, null, (code, on) => manualInForce(code, on), { variant: S().variant, plan: (code, on) => { const pl = planOf(code); return pl ? planPct(pl.points, on) : undefined; } }));
   }),
   // 0.14.5 (OV-12): the site map, built from the synthetic mock sites with synthetic coordinates spread over Libya. The mock accounts see every region.
+  // 0.15.16 (F13): the risk matrix, data quality, swap and relocation and decisions (synthetic figures)
+  http.get(`${B}/dashboard/extras`, () => {
+    const g = guard(); if (g) return g;
+    if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');
+    const risks = [
+      { risk_code: 'RSK-001', statement: 'Access permit delay near the airport', probability: 4, impact: 4, status: 'open', risk_owner: 'Project Manager', region_id: 1, is_global: false },
+      { risk_code: 'RSK-002', statement: 'Vendor crew shortage in the south', probability: 3, impact: 5, status: 'in_progress', risk_owner: 'TE Team Lead', region_id: 7, is_global: false },
+      { risk_code: 'RSK-003', statement: 'Power supply interruptions at two sites', probability: 2, impact: 3, status: 'open', risk_owner: 'Power Engineer', region_id: null, is_global: true },
+      { risk_code: 'RSK-004', statement: 'Late delivery of warehouse items', probability: 2, impact: 2, status: 'open', risk_owner: 'Inventory Supervisor', region_id: 2, is_global: false },
+    ];
+    const cells = Array.from({ length: 25 }, (_, i) => {
+      const probability = Math.floor(i / 5) + 1; const impact = (i % 5) + 1; const score = probability * impact;
+      const band = score <= 4 ? 'low' : score <= 9 ? 'medium' : score <= 16 ? 'high' : 'critical';
+      return { probability, impact, score, band, count: risks.filter((r) => r.probability === probability && r.impact === impact).length };
+    });
+    const bandCount = (b: string) => cells.filter((c) => c.band === b).reduce((n, c) => n + c.count, 0);
+    const top = [...risks].map((r) => ({ ...r, score: r.probability * r.impact, band: r.probability * r.impact >= 10 ? 'high' : r.probability * r.impact >= 5 ? 'medium' : 'low' }))
+      .sort((a, b) => b.score - a.score || a.risk_code.localeCompare(b.risk_code));
+    const scen = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
+    return HttpResponse.json({
+      as_of: new Date().toISOString(), scope_regions: null,
+      risk_matrix: {
+        available: true, open_total: risks.length, invalid_total: 0, cells,
+        bands: [
+          { band: 'low', min: 1, max: 4, count: bandCount('low') }, { band: 'medium', min: 5, max: 9, count: bandCount('medium') },
+          { band: 'high', min: 10, max: 16, count: bandCount('high') }, { band: 'critical', min: 20, max: 25, count: bandCount('critical') },
+        ],
+        top_open_risks: top,
+      },
+      data_quality: {
+        available: true, sites_checked: 120, sites_with_gaps: 14, gaps_total: 19,
+        by_kind: [{ kind: 'missing_actual_date', field: null, count: 15 }, { kind: 'missing_field', field: 'delivery_scenario', count: 4 }],
+      },
+      swap_relocation: {
+        available: true, unscenarioed: 4,
+        rows: scen.map((sc, i) => ({ scenario: sc, sites_total: 20 + i * 5, by_overall_status: { not_started: 4, in_progress: 10 + i, on_hold: 1, completed: 5, cancelled: 0 } })),
+      },
+      decisions: {
+        available: true,
+        items: top.slice(0, 4).map((r) => ({ tag: r.band === 'high' ? 'act_now' : 'watch', risk_code: r.risk_code, statement: r.statement, score: r.score, band: r.band, risk_owner: r.risk_owner, region_id: r.region_id })),
+      },
+    });
+  }),
   http.get(`${B}/dashboard/site-map`, () => {
     const g = guard(); if (g) return g;
     if (!canUse()) return problem(403, 'module_forbidden', 'You cannot use dashboard');

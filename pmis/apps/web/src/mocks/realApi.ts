@@ -299,6 +299,7 @@ export const REAL_API_AUTH_USERS = [
   ['patch', '/list-catalogues/:code'],
   ['post', '/list-catalogues/:code/values'],
   ['patch', '/list-catalogues/:code/values/:valueId'],
+  ['delete', '/list-catalogues/:code/values/:valueId'],
   ['get', '/registers/:key/records/:id/legacy-conversion'],
   ['post', '/registers/:key/records/:id/legacy-conversion'],
   // Contract 0.12.6 (P8, migration 0058): the code mailed to a new email address, the phone change request and its decision (apps/api: me).
