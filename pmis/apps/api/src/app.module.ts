@@ -155,7 +155,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportController, TemplateMappingController,
       ContractorsController,
       SavedViewsController,
-      SearchController, // 0.15.16 (F4)
+      SearchController, // 0.15.17 (F4)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -173,7 +173,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportService, MappingService,
       ContractorsService,
       SavedViewsService,
-      SearchService, // 0.15.16 (F4)
+      SearchService, // 0.15.17 (F4)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

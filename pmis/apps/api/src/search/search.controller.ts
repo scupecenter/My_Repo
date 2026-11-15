@@ -4,7 +4,7 @@ import { Auth } from '../auth/decorators';
 import type { Query as QueryParams } from '../common/query';
 import { SearchService } from './search.service';
 
-/** Global search (Ctrl+K) and the Site ID list lookup (contract 0.15.16, plan F4). Read only. */
+/** Global search (Ctrl+K) and the Site ID list lookup (contract 0.15.17, plan F4). Read only. */
 @Controller('search')
 export class SearchController {
   constructor(private readonly search: SearchService) {}
