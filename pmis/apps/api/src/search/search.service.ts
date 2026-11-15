@@ -43,7 +43,7 @@ interface Row {
 }
 
 /**
- * Global search (plan F4, contract 0.15.17). Read only. Each group checks its own module and regions with the database resolvers
+ * Global search (plan F4, contract 0.15.19). Read only. Each group checks its own module and regions with the database resolvers
  * (the same as the list screens) and row-level security still applies beneath. A group the caller cannot read is left out, never 403.
  */
 @Injectable()

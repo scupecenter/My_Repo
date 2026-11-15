@@ -7,7 +7,7 @@ import { G } from './reg-helpers';
 import { Actor, actor, makeSite, plainAdmin } from './wf-helpers';
 
 /**
- * Global search (plan F4, migration 0099, contract 0.15.17): Arabic-normalised matching, highlight offsets, the group visibility rules
+ * Global search (plan F4, migration 0099, contract 0.15.19): Arabic-normalised matching, highlight offsets, the group visibility rules
  * (module and region, never a 403 for a group), and the Site ID list (found, not found, out of reach reported as not found).
  */
 let app: NestExpressApplication;

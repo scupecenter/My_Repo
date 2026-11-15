@@ -40,8 +40,9 @@ ALTER TABLE register_records ADD COLUMN search_text text GENERATED ALWAYS AS (
 ) STORED;
 CREATE INDEX register_records_search_trgm ON register_records USING gin (search_text gin_trgm_ops);
 
+-- original_name only: stored_name may change on a stored file (guard in 037), a generated column must not change with it
 ALTER TABLE document_files ADD COLUMN search_text text GENERATED ALWAYS AS (
-  search_norm(coalesce(original_name, '') || ' ' || coalesce(stored_name, ''))
+  search_norm(coalesce(original_name, ''))
 ) STORED;
 CREATE INDEX document_files_search_trgm ON document_files USING gin (search_text gin_trgm_ops);
 

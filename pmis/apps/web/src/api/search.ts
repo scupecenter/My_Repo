@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from './client';
 
-/** Global search (contract 0.15.17, plan F4). Read only; the server applies visibility per group. */
+/** Global search (contract 0.15.19, plan F4). Read only; the server applies visibility per group. */
 export type SearchType = 'sites' | 'registers' | 'documents' | 'meetings' | 'people' | 'contractors';
 
 export interface SearchHit {
