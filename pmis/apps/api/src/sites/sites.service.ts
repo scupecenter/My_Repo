@@ -238,6 +238,10 @@ export class SitesService {
     const where: Prisma.Sql[] = [Prisma.sql`s.is_active`];
     if (regions !== null) where.push(Prisma.sql`s.region_id = ANY(${regions}::int[])`);
     if (regionIds.length > 0) where.push(Prisma.sql`s.region_id = ANY(${regionIds}::int[])`);
+    // 0.15.16 (F4): a pasted list of Site IDs (commas, spaces or new lines), at most 500; the match ignores case
+    const siteCodes = (oneParam(q, 'site_codes') ?? '').split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
+    if (siteCodes.length > 500) throw problems.validation([{ path: '/site_codes', code: 'invalid', message: 'At most 500 Site IDs.' }]);
+    if (siteCodes.length > 0) where.push(Prisma.sql`upper(s.site_code) = ANY(${siteCodes}::text[])`);
     if (text) where.push(Prisma.sql`(s.site_code ILIKE ${likePattern(text)} OR s.owner_site_id ILIKE ${likePattern(text)} OR s.name ILIKE ${likePattern(text)})`);
     if (scenario) where.push(Prisma.sql`s.delivery_scenario::text = ${scenario}`);
     if (status) where.push(Prisma.sql`s.overall_status::text = ${status}`);
