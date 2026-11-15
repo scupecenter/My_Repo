@@ -30,7 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
-    - 0.15.21 (2026-11-15): SITE 360 restructure, the Master view (F15; migration 0101; CHANGELOG 146). Additive. (1) `GET /site360/sections` (`getSite360Sections`): the eight SITE 360 menus (`master` replaces "All sites", `design_acq`, `sow` (new), `cw`, `te`, `hoto`, `dismantle`, `om`), each with its Master columns in Master order, the 3-level grid header (`bands`: phase band, then `groups`: group, then the column ords), the frozen identity columns (# to Site Name) and `can_move`. A column carries a set of menus (`sections`, may be in several menus); the status columns are in every menu. (2) `PATCH /site360/columns/{ord}/sections` (`setSite360ColumnSections`): a System Admin (`admin.settings` edit, checked in the database) replaces the menus of one Master column; a step-up and a reason; audited with before and after; the status columns cannot be changed. (3) The grid shows the same columns in every menu. No new store: the values are still written through the site and task paths.
+    - 0.15.21 (2026-11-15): SITE 360 restructure, the Master view (F15; migration 0101; CHANGELOG 146). Additive. (1) `GET /site360/sections` (`getSite360Sections`): the eight SITE 360 menus (`master` replaces "All sites", `design_acq`, `sow` (new), `cw`, `te`, `hoto`, `dismantle`, `om`), each with its Master columns in Master order, the 3-level grid header (`bands`: phase band, then `groups`: group, then the column ords), the frozen identity columns (# to Site Name) and `can_move`. A column carries a set of menus (`sections`, may be in several menus); the status columns are in every menu. (2) `PATCH /site360/columns/{ord}/sections` (`setSite360ColumnSections`): a System Admin (`admin.settings` edit, checked in the database) replaces the menus of one Master column; a step-up and a reason; audited with before and after; the status columns cannot be changed. (3) The grid shows the same columns in every menu. No new store: the values are still written through the site and task paths. (4) `GET /site360/{menu}/rows` (`getSite360Rows`, F15, migration 0104): the grid rows of one menu, one page at a time, from the set-based view `site360_master_values` (no per-site path); filters, sort and paging in the database; `total` and `filtered` counts; B3 region scope. The contractor filter is not in this version.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
     - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RSK) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
     - 0.15.10 (2026-11-13): the workflow editor (owner decision 4 of 2026-11-12; migration 0090; CHANGELOG 132). Additive. (1) New paths: `POST /workflow/versions/{version}/tasks` (`createTaskDefinition`), `PATCH /workflow/versions/{version}/tasks/{task_code}` (`updateTaskDefinition`: rename EN/AR, counts toward the milestone, deactivate, move in a draft), `PUT /workflow/versions/{version}/tasks/{task_code}/predecessors` (`replaceTaskPredecessors`, a cycle is 422 `validation_failed` on `/predecessors` with code `cycle`), `PUT /workflow/versions/{version}/milestones/{code}/task-order` (`reorderMilestoneTasks`). (2) The declared `/workflow/*` and `/settings/task-definitions` operations are implemented; every write needs System Admin or an all-regions delegate (403), a reason, `If-Match` with the `version_etag` (412/428) and a step-up (401); publish needs `confirm_text` equal to `v<version>` (422 `confirmation_mismatch`). (3) `WorkflowVersion` gains `can_edit` and `can_publish`, `TaskPlacement` gains `name_en`, `name_ar`, `is_active`, `is_milestone_task`, `has_documents`, `task_version`, `WorkflowMilestone.is_active`. (4) New `ErrorCode` values `workflow_invalid`, `master_impact_unconfirmed`, `stale_preview`. Not yet implemented: `PUT /workflow/versions/{version}` (replace structure), `POST .../migrations` and the revert of a site migration.
@@ -8132,6 +8132,38 @@ paths:
               schema: { $ref: '#/components/schemas/Site360Sections' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /site360/{menu}/rows:
+    get:
+      tags: [sites]
+      operationId: getSite360Rows
+      summary: The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
+      description: |
+        0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter is not in this version. `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+      parameters:
+        - { name: menu, in: path, required: true, description: 'The SITE 360 menu.', schema: { type: string, enum: [master, design_acq, sow, cw, te, hoto, dismantle, om] } }
+        - { name: site_code, in: query, required: false, description: 'Site IDs, comma-separated (multi Site ID search, exact match).', schema: { type: string, maxLength: 4000 } }
+        - { name: region_id, in: query, required: false, description: 'Region numbers 1 to 7, comma-separated.', schema: { type: string, maxLength: 40 } }
+        - { name: sub_region, in: query, required: false, schema: { type: string, maxLength: 4000 } }
+        - { name: phase, in: query, required: false, description: 'Project phase, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: batch, in: query, required: false, description: 'Delivery batch, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: scenario, in: query, required: false, schema: { type: string, maxLength: 200 } }
+        - { name: delivery_model, in: query, required: false, description: 'CW delivery model (outsourced or internal).', schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, required: false, description: 'Overall status, comma-separated.', schema: { type: string, maxLength: 400 } }
+        - { name: milestone, in: query, required: false, description: 'Current milestone, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: sort, in: query, required: false, description: 'site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu.', schema: { type: string, maxLength: 40 } }
+        - { name: dir, in: query, required: false, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: The page of rows with the menu's columns and the counts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Rows' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /site360/columns/{ord}/sections:
     patch:
       tags: [settings]
@@ -13058,6 +13090,30 @@ components:
             type: string
             enum: [design_acq, sow, cw, te, hoto, dismantle, om]
         reason: { type: string, minLength: 3, maxLength: 1000 }
+    Site360Rows:
+      type: object
+      additionalProperties: false
+      required: [menu, total, filtered, offset, limit, rows]
+      properties:
+        menu: { $ref: '#/components/schemas/Site360MenuItem' }
+        total: { type: integer, minimum: 0, description: 'Sites the caller may see.' }
+        filtered: { type: integer, minimum: 0, description: 'Sites that match the filters.' }
+        offset: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 1, maximum: 200 }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [site_id, site_code, row_no, values]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              row_no: { type: integer, minimum: 1, description: 'Running number of the row in view (the # column).' }
+              values:
+                type: object
+                description: 'Master value of each column of the menu, keyed by the column order (ord) as a string; null when the column has no source yet.'
+                additionalProperties: { type: [string, 'null'] }
     UserPickerItem:
       type: object
       additionalProperties: false
