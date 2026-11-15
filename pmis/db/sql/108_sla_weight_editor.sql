@@ -210,4 +210,4 @@ END $$;
 INSERT INTO audit_log (action, entity_type, entity_id, after, reason)
 VALUES ('sla_weight_editor_applied', 'workflow', NULL,
         jsonb_build_object('decision', 'owner request 2026-11-15: SLA and project weight in the workflow editor', 'functions', 'admin_sla_rule_save, admin_sla_rule_remove, admin_wf_task_weight'),
-        'Migration 0099: SLA options on rules, weight columns on tasks, weight totals, and the doors that write them.');
+        'Migration 0109: SLA options on rules, weight columns on tasks, weight totals, and the doors that write them.');

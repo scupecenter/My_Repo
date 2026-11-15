@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Columns3,
+  Ellipsis,
   Minus,
   Rows3,
   Rows4,
@@ -238,16 +239,73 @@ type SelectProps = {
   label: string;
   testid: string;
 };
+export type HeaderMenuItem = {
+  id: string;
+  label: string;
+  testid: string;
+  onSelect: () => void;
+  disabled?: boolean;
+};
+
+function HeaderMenu({ col, name, items }: { col: string; name: string; items: HeaderMenuItem[] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          data-testid={`col-menu-${col}`}
+          aria-label={t("regcols.grid_menu", { col: name })}
+          className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 hover:bg-hover"
+        >
+          <Ellipsis size={14} />
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={4}
+          role="menu"
+          className="card z-50 min-w-48 p-1 shadow-lg"
+          data-testid={`col-menu-panel-${col}`}
+        >
+          {items.map((i) => (
+            <button
+              key={i.id}
+              type="button"
+              role="menuitem"
+              disabled={i.disabled}
+              data-testid={i.testid}
+              className="flex w-full items-center rounded px-2 py-1.5 text-start text-sm hover:bg-hover disabled:opacity-50"
+              onClick={() => {
+                setOpen(false);
+                i.onSelect();
+              }}
+            >
+              {i.label}
+            </button>
+          ))}
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
+
 export function HeaderRow({
   api,
   label,
   select,
   testid,
+  colMenu,
 }: {
   api: TableApi;
   label: (id: string) => string;
   select?: SelectProps;
   testid?: string;
+  /** Items of the menu in a column header (add before or after, rename, hide); a column with no items has no menu. */
+  colMenu?: (id: string) => HeaderMenuItem[];
 }) {
   const { t } = useTranslation();
   const [drag, setDrag] = useState<string | null>(null);
@@ -316,10 +374,13 @@ export function HeaderRow({
               setDrag(null);
               setOver(null);
             }}
-            className={`relative truncate px-2 py-2 ${over === c.id ? "bg-accentSoft" : "bg-inherit"} ${p.className}`}
+            className={`relative truncate py-2 ps-2 ${colMenu ? "pe-7" : "pe-2"} ${over === c.id ? "bg-accentSoft" : "bg-inherit"} ${p.className}`}
             style={p.style}
           >
             <Trunc text={label(c.id)} />
+            {colMenu && (
+              <HeaderMenu col={c.id} name={label(c.id)} items={colMenu(c.id)} />
+            )}
             <span
               role="separator"
               aria-orientation="vertical"

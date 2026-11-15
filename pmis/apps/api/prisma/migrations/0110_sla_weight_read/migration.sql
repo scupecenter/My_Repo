@@ -2,7 +2,7 @@
 --
 -- WHY. The editor's detail panel must show the SLA and the weight of a draft task. The version read (0090) does not carry them, and the SLA list (0005/0017) reads
 -- only the published workflow. This function answers per task: the weight columns and the base SLA rule in force today in that version.
--- Read only; it writes nothing. The rule shape is the one wf_sla_rule_json (0099) returns.
+-- Read only; it writes nothing. The rule shape is the one wf_sla_rule_json (0109) returns.
 
 CREATE OR REPLACE FUNCTION wf_sla_weight_items(p_version integer) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$

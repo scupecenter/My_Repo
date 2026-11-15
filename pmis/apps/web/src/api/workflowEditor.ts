@@ -46,7 +46,7 @@ export const useReorderTasks = (v: number, etag: number) => useWrite<{ stage: st
 export const useMilestoneLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/milestones/${code}`, { body, version: e }));
 export const useGateLight = (v: number, etag: number) => useWrite<{ code: string } & LightInput, unknown>(v, etag, ({ code, ...body }, e) => api.patch(`${base(v)}/gates/${code}`, { body, version: e }));
 export const usePublish = (v: number, etag: number) => useWrite<{ reason: string; confirm_text: string; confirm_master_impact?: string }, WorkflowVersion>(v, etag, (body, e) => api.post(`${base(v)}/publish`, { body, version: e }));
-/** 0.15.15 (migration 0096): the task that closes its milestone, chosen in a draft. */
+/** 0.15.16 (migration 0096): the task that closes its milestone, chosen in a draft. */
 export const useSetClosing = (v: number, etag: number) => useWrite<{ code: string; closing: boolean; reason: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/closing`, { body, version: e }));
 export type InsertInput = TaskCreateInput & { successors?: string[]; remove_direct_links?: boolean; add_to_open_sites?: boolean };
 export type TaskInsertPreview = S['TaskInsertPreview'];
@@ -117,7 +117,7 @@ export function useBulkTaskPatch(version: number, etag: number) {
   });
 }
 
-/** F14 (migration 0099, contract 0.15.20): the base SLA rule of a task, saved as a new effective-dated version. */
+/** F14 (migration 0109, contract 0.15.20): the base SLA rule of a task, saved as a new effective-dated version. */
 export type SlaRuleInput = {
   min_working_days: number; max_working_days: number; start_event: string; unit: 'working' | 'calendar'; calendar_code: string;
   warning_pct?: number | null; breach_owner_role?: string | null; escalation_role?: string | null; pause_on_client_wait: boolean; reason: string;
@@ -134,7 +134,7 @@ export type WeightTotal = { group: string; total: number; tasks: number; ok: boo
 /** Live totals of the weight groups of a version (warns in the draft; publishing is refused while a group is not 100). */
 export const useWeightTotals = (v: number | null) =>
   useQuery({ queryKey: ['wf-weight-totals', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: WeightTotal[] }>(`/workflow/versions/${v}/weight-totals`) });
-/** Migration 0100: the SLA rule and the weight of every task of a version (drafts included). */
+/** Migration 0110: the SLA rule and the weight of every task of a version (drafts included). */
 export type SlaWeightItem = { task_code: string; counts_in_weight: boolean; weight_value: number; weight_group: string | null;
   sla: { id: string; min_working_days: number; max_working_days: number; start_event: string; unit: 'working' | 'calendar'; calendar_code: string; warning_pct: number | null;
     breach_owner_role: string | null; escalation_role: string | null; pause_on_client_wait: boolean } | null };

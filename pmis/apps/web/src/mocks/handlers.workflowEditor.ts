@@ -187,7 +187,7 @@ export const workflowEditorHandlers = [
     v.etag += 1;
     return HttpResponse.json({ task_code: b.code, warnings: pl.warnings, rewiring: pl.rewiring, open_sites_added: b.add_to_open_sites && v.status === 'published' ? 12 : 0, version: json(v) }, { status: 201, headers: { ETag: `"${v.etag}"` } });
   }),
-  // F14 (migration 0099/0100, contract 0.15.20): SLA rule and weight of a task; the mock keeps them per task code.
+  // F14 (migration 0109/0110, contract 0.15.26): SLA rule and weight of a task; the mock keeps them per task code.
   http.get(`${B}/workflow/versions/:version/sla-weight`, ({ params }) => {
     const v = state.find((x) => x.version === Number(params.version));
     if (!v) return problem(404, 'not_found', 'The workflow version does not exist.');

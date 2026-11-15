@@ -1796,6 +1796,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Global search across sites, registers, documents, meetings, people and contractors (0.15.19, F4)
+         * @description Ctrl+K and the top-bar search. Each group is limited to what the caller may read: `sites` needs `view` on `sites` in the site's region; `registers` needs `view` on the register's module in the record's region; `documents` need `view` on `sites` in the site's region; `meetings` need `view` on `meetings` (a global meeting, or one of the caller's regions); `contractors` need `view` on `contractors`; `people` need `view` on `admin.users`. A group the caller cannot read is absent (no 403). Matching ignores case, the Arabic letter forms (alef, taa marbuta, yaa and alef maqsura), tashkeel, tatweel, Arabic-Indic digits and Latin diacritics. Read only: an item carries the route to open, and nothing changes.
+         */
+        get: operations["globalSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/site-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Many Site IDs at once, found and not found (0.15.19, F4)
+         * @description The paste of a list of Site IDs (new lines, commas or spaces) in Ctrl+K. Matching ignores case and surrounding spaces. Only sites the caller may read (`view` on `sites`, in their regions) are found; any other ID, including one that exists but is out of reach, is listed in `not_found`, so the answer never shows whether a site exists elsewhere. Read only. Duplicates in the input are answered once.
+         */
+        post: operations["lookupSiteIds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites": {
         parameters: {
             query?: never;
@@ -2544,6 +2584,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/grid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Excel-like grid, sites in rows and document types in columns, one status per cell (0097)
+         * @description Region scope applies (a site outside the caller's regions is not listed) and so does the register scope of each document type. Needs `view` on the Documents screen.
+         *     Columns are the active document types that have a placement (task, QC or register), grouped by stage, register or QC. Each cell has one status: missing, pending (uploaded or in review), approved, expired (approved, past its expiry date), rejected, not_required (a site override, or a slot marked not required), generatable (a generated form that can be issued now; generation itself is not in this version), blocked (a generated form that cannot be issued yet, with `reason`) or not_applicable (the type does not apply to the site).
+         *     `site_code` takes many Site IDs at once, separated by commas, spaces or new lines (at most 500). `status`, `uploaded_from` and `uploaded_to` keep a row when at least one of its cells has that status or a current file uploaded in the range; the server reads ahead until the page is full. `download_allowed` says whether the caller may download the files of the row.
+         */
+        get: operations["getDocumentsGrid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/grid/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's saved grid columns */
+        get: operations["getDocumentsGridView"];
+        /** Save the caller's grid columns (personal, never shared) */
+        put: operations["saveDocumentsGridView"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/document-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a document not required for one site (0097)
+         * @description Needs `sites.edit` for the site's region. Open slots of that type on the site become not_required, as a placement change does. Audited with the reason.
+         */
+        post: operations["createSiteDocumentOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-overrides/{override_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                override_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a not-required override (0097)
+         * @description The slots go back to missing, or to uploaded when a current file exists. Audited with the reason.
+         */
+        post: operations["revertSiteDocumentOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/{file_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a misplaced file (all its versions) to another slot of the same site (0097)
+         * @description Needs `sites.edit` for the site's region. Refused for approved files and slots, for another site, and for a format the target document does not accept. Both slots are recomputed. Audited with before and after.
+         */
+        post: operations["moveDocumentFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-library/{doc_type_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * System Admin. Hard delete when no file was ever uploaded, otherwise deactivation (0097)
+         * @description A type with no file and no blank form is deleted with its placements, versions, drafts and empty slots. A type with any file (or blank form) is deactivated with the reason and kept. Needs System Admin and step-up. Audited with before and after.
+         *     This amends the rule "documents are deactivated, never deleted" for types that never held a file.
+         */
+        post: operations["deleteDocumentType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/zip": {
         parameters: {
             query?: never;
@@ -2956,7 +3126,7 @@ export interface paths {
         };
         /**
          * SLA rule and weight of every task of a workflow version
-         * @description Migration 0100. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.
+         * @description Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.
          */
         get: {
             parameters: {
@@ -2996,7 +3166,7 @@ export interface paths {
         };
         /**
          * Weight group totals of a workflow version (live check)
-         * @description Migration 0099. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
+         * @description Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
          */
         get: {
             parameters: {
@@ -3046,7 +3216,7 @@ export interface paths {
         get?: never;
         /**
          * Save the base SLA rule of a task (versioned)
-         * @description Migration 0099. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
+         * @description Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
          */
         put: {
             parameters: {
@@ -3113,7 +3283,7 @@ export interface paths {
         put?: never;
         /**
          * Delete an SLA rule no task uses, or deactivate it
-         * @description Migration 0099. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
+         * @description Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
          */
         post: {
             parameters: {
@@ -3166,7 +3336,7 @@ export interface paths {
         get?: never;
         /**
          * Counts in project weight, weight value and weight group of a task (draft)
-         * @description Migration 0099 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
+         * @description Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
          */
         put: {
             parameters: {
@@ -4971,7 +5141,7 @@ export interface paths {
         get: operations["getStructuralFreeze"];
         /**
          * Set the freeze window (pilot start to end of the parallel-run month)
-         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.15).
+         * @description While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.16).
          */
         put: operations["setStructuralFreeze"];
         post?: never;
@@ -5360,6 +5530,162 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        /** The columns, sections and name of a register, for the admin (also inactive columns, with usage) */
+        get: operations["getRegisterColumns"];
+        put?: never;
+        /**
+         * Add a column to a register
+         * @description The type is one of `RegisterColumnType`. A `list` or `multi_list` column names a catalogue (`list_catalogue`) or creates one with its values (`new_list`) in the same call.
+         *     A `document` column creates a Document Library document type placed on the register (mandatory only when `required`). A `computed` column needs `formula`.
+         */
+        post: operations["createRegisterColumn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/fields/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a column (hard when no record ever held a value, otherwise deactivate) */
+        delete: operations["deleteRegisterColumn"];
+        options?: never;
+        head?: never;
+        /**
+         * Edit a column (rename, required, section, order, visibility, deactivate, reactivate, change of type)
+         * @description A protected column (`is_system`) accepts only `label_en`, `label_ar`, `section`, `sort_order`, `in_list`, `in_filter`, `in_template`, `in_export`; any other key is 409 `system_field`.
+         *     A change of `field_type` or `list_catalogue` converts the stored values: 409 `conversion_blocked` when some value fails (the answer lists them), 409 `conversion_unconfirmed`
+         *     when every value converts (send `confirm_conversion` true). Turning `required` on never blocks: the answer counts the records without a value (`records_missing_value`).
+         *     A type change, a change of list and a deactivation or reactivation need a step-up.
+         */
+        patch: operations["updateRegisterColumn"];
+        trace?: never;
+    };
+    "/registers/{register_key}/fields/{code}/impact": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        /** The preview of a change or a delete (nothing is written) */
+        get: operations["getRegisterColumnImpact"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/fields-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the order of columns (the list is the new order) */
+        put: operations["reorderRegisterColumns"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a section to a register form */
+        post: operations["createRegisterSection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/sections/{section_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a section (only when it holds no column; 409 `section_not_empty`) */
+        delete: operations["deleteRegisterSection"];
+        options?: never;
+        head?: never;
+        /** Rename or reorder a section (its columns follow a rename) */
+        patch: operations["updateRegisterSection"];
+        trace?: never;
+    };
+    "/registers/{register_key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename a register (English and Arabic) */
+        patch: operations["renameRegister"];
         trace?: never;
     };
     "/registers/{register_key}/records": {
@@ -6729,7 +7055,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Hard delete of a value that is not used (F17)
+         * @description Allowed only when the value is unused, that is not in a register record, a child-list column, a dependent value of a child list and not the default value. The `reason` is a query parameter. If-Match is optional. Audited with the before state and the reason.
+         */
+        delete: operations["deleteListValue"];
         options?: never;
         head?: never;
         /**
@@ -7425,6 +7755,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How long a register record has sat in its current state (0.15.17, F1)
+         * @description Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+         */
+        get: operations["getRegisterRecordTimeInState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/state-durations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+         * @description Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+         */
+        get: operations["getStateDurationsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/blocked-by": {
         parameters: {
             query?: never;
@@ -7766,6 +8141,35 @@ export interface paths {
          *     cluster, late only, search) are applied in the browser.
          */
         get: operations["getDashboardSiteMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/extras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The F13 sections of the dashboard in one read (0.15.18)
+         * @description The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+         *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
+         *     `stream` is accepted and ignored. The figures are current (no reference date).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
+         *     may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
+         *     filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
+         *     **Bands (default of the owner, 2026-11-15, a setting for the administrator).** A risk score is probability times impact, each from 1 to 5. Low 1 to 4, medium 5 to 9, high 10 to 16,
+         *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
+         *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
+         *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+         */
+        get: operations["getDashboardExtras"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8193,6 +8597,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors";
+        SearchHit: {
+            id: string;
+            /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
+            title: string;
+            subtitle: string | null;
+            region_id: number | null;
+            /** @description The app route to open (a relative path). */
+            href: string;
+            match_ranges: number[][];
+        };
+        SearchGroup: {
+            type: components["schemas"]["SearchType"];
+            /** @description Visible matches in the group (every match, not only those returned). */
+            total: number;
+            /** @description True when more matches exist than the items returned. */
+            truncated: boolean;
+            items: components["schemas"]["SearchHit"][];
+        };
+        SearchResponse: {
+            q: string;
+            groups: components["schemas"]["SearchGroup"][];
+        };
+        SiteIdLookupInput: {
+            ids: string[];
+        };
+        SiteIdLookupResult: {
+            found: {
+                id: string;
+                site_code: string;
+                name: string;
+                region_id: number;
+                href: string;
+            }[];
+            not_found: string[];
+        };
         UserPickerItem: {
             /** Format: uuid */
             id: string;
@@ -9938,7 +10379,7 @@ export interface components {
             /** @description For permits, an approved N/A satisfies (D36). For `date_field` and a task date, a task that is N/A or skipped satisfies. */
             accept_na?: boolean;
             /**
-             * @description `date_field` only (0.15.15, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
+             * @description `date_field` only (0.15.16, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
              *     `site.rf_survey_date`, `site.acquisition_date` or `site.custom.<code>` (a date custom field). A date that is not set holds the gate (`condition_not_met`); the gate date is the later of its
              *     other conditions and this date plus the offset.
              */
@@ -11230,6 +11671,24 @@ export interface components {
             mode?: "submit" | "draft";
             /** @description D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed. */
             file_template_version?: number | null;
+            /** @description 0.15.13. The summary of an older register file (tolerant upload): the columns removed since the file was made (ignored), the new ones (empty) and the renamed ones. */
+            older_template?: {
+                file_version?: number;
+                current_version?: number;
+                removed_columns?: {
+                    key?: string;
+                    header?: string | null;
+                }[];
+                added_columns?: {
+                    key?: string;
+                    header?: string | null;
+                }[];
+                renamed_columns?: {
+                    key?: string;
+                    from?: string | null;
+                    to?: string | null;
+                }[];
+            } | null;
             /** @description Q462 (0.14.3): set when a System Admin marked the batch "accept without documents" under the open waiver. Null otherwise. */
             historical_load?: components["schemas"]["HistoricalLoadMark"] | null;
             counts: {
@@ -12087,6 +12546,137 @@ export interface components {
             effective_from: string;
         };
         /** @enum {string} */
+        RegisterColumnType: "text" | "long_text" | "number" | "currency" | "percentage" | "date" | "datetime" | "yes_no" | "list" | "multi_list" | "user" | "multi_user" | "site" | "multi_site" | "external_party" | "warehouse_item" | "email" | "phone" | "link" | "document" | "computed" | "child_list";
+        /** @description A computed column over two other columns (`days_between` over two date columns, the others over two number columns). */
+        RegisterColumnFormula: {
+            /** @enum {string} */
+            op: "sum" | "diff" | "product" | "ratio" | "days_between";
+            a: string;
+            b: string;
+        };
+        RegisterColumnUsage: {
+            records_with_value?: number;
+            records_missing_value?: number;
+            records_current?: number;
+        };
+        RegisterColumn: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            type: components["schemas"]["RegisterColumnType"];
+            required?: boolean;
+            list_catalogue?: string | null;
+            list_catalogue_name?: string | null;
+            section?: string | null;
+            sort_order?: number;
+            in_list?: boolean;
+            in_filter?: boolean;
+            in_template?: boolean;
+            in_export?: boolean;
+            is_active: boolean;
+            /** @description Protected: code or a derived rule depends on it. */
+            is_system: boolean;
+            system_reason?: string | null;
+            derived?: boolean;
+            usage?: components["schemas"]["RegisterColumnUsage"];
+            version: number;
+        };
+        RegisterSection: {
+            /** Format: uuid */
+            id: string;
+            name_en: string;
+            name_ar?: string | null;
+            sort_order: number;
+            version: number;
+            field_count: number;
+        };
+        RegisterColumnsScreen: {
+            register: {
+                register_key: string;
+                name_en: string;
+                name_ar?: string | null;
+                version: number;
+            };
+            sections: components["schemas"]["RegisterSection"][];
+            fields: components["schemas"]["RegisterColumn"][];
+        };
+        RegisterColumnNewList: {
+            /** @description Optional; generated from the name when absent. */
+            code?: string;
+            name_en: string;
+            name_ar?: string | null;
+            values: {
+                label_en: string;
+                label_ar?: string | null;
+            }[];
+        };
+        RegisterColumnCreate: {
+            code: string;
+            label_en: string;
+            label_ar?: string | null;
+            field_type: components["schemas"]["RegisterColumnType"];
+            required?: boolean;
+            section?: string | null;
+            sort_order?: number;
+            list_catalogue?: string | null;
+            new_list?: components["schemas"]["RegisterColumnNewList"];
+            formula?: components["schemas"]["RegisterColumnFormula"];
+            /** @description Only for child_list. */
+            columns?: Record<string, never>[];
+            in_list?: boolean;
+            in_filter?: boolean;
+            in_template?: boolean;
+            in_export?: boolean;
+            reason: components["schemas"]["Reason"];
+        };
+        RegisterColumnPatch: {
+            label_en?: string;
+            label_ar?: string | null;
+            field_type?: components["schemas"]["RegisterColumnType"];
+            confirm_conversion?: boolean;
+            required?: boolean;
+            section?: string | null;
+            sort_order?: number;
+            list_catalogue?: string | null;
+            new_list?: components["schemas"]["RegisterColumnNewList"];
+            formula?: components["schemas"]["RegisterColumnFormula"];
+            is_active?: boolean;
+            in_list?: boolean;
+            in_filter?: boolean;
+            in_template?: boolean;
+            in_export?: boolean;
+            reason: components["schemas"]["Reason"];
+        };
+        RegisterColumnResult: {
+            code: string;
+            version: number;
+            /** @description Values rewritten by a type change. */
+            converted?: number;
+            /** @description When required was turned on: records that lack a value (asked for at their next submit). */
+            records_missing_value?: number | null;
+        };
+        RegisterColumnConversion: {
+            convertible?: number;
+            failed?: number;
+            rewritten?: number;
+            failures?: {
+                /** Format: uuid */
+                record_id?: string;
+                value?: unknown;
+                message?: string;
+            }[];
+        };
+        RegisterColumnImpact: {
+            code: string;
+            is_system?: boolean;
+            system_reason?: string | null;
+            usage: components["schemas"]["RegisterColumnUsage"];
+            /** @enum {string} */
+            delete_mode: "hard" | "deactivate" | "blocked";
+            conversion?: components["schemas"]["RegisterColumnConversion"] | null;
+            required_missing?: number | null;
+        };
+        /** @enum {string} */
         RegisterKey: "procurement" | "contractors" | "gecol" | "hlc" | "permits_hse" | "warehouse" | "quality" | "issues" | "risks" | "change_control" | "readiness_handover" | "as_built" | "meetings" | "dismantle" | "car_dispatcher" | "financial_advances";
         RegisterField: {
             code: string;
@@ -12175,6 +12765,10 @@ export interface components {
             groups: string[];
             sort_order: number;
             is_active: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
+            deactivate_reason?: string | null;
             version: number;
         };
         ListCatalogue: {
@@ -12190,6 +12784,11 @@ export interface components {
              */
             status: "pending" | "confirmed";
             allow_other: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
+            dependent_lists?: string[];
             is_active: boolean;
             /** @description ETag (If-Match). */
             version: number;
@@ -12208,6 +12807,10 @@ export interface components {
             description?: string | null;
             critical?: boolean;
             allow_other?: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
             reason: string;
         };
         ListCataloguePatch: {
@@ -12218,6 +12821,10 @@ export interface components {
             /** @enum {string} */
             status?: "pending" | "confirmed";
             allow_other?: boolean;
+            /** @enum {string} */
+            value_type?: "text" | "number" | "date" | "person" | "site" | "vendor";
+            multi_select?: boolean;
+            parent_catalogue?: string | null;
             is_active?: boolean;
             reason: string;
         };
@@ -12229,6 +12836,9 @@ export interface components {
             groups?: string[];
             sort_order?: number;
             is_active?: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
             reason: string;
         };
         ListValuePatch: {
@@ -12238,6 +12848,9 @@ export interface components {
             groups?: string[];
             sort_order?: number;
             is_active?: boolean;
+            colour?: string | null;
+            is_default?: boolean;
+            parent_code?: string | null;
             reason: string;
         };
         LegacyConversionProposal: {
@@ -14579,6 +15192,42 @@ export interface components {
          * @enum {string}
          */
         InStateKind: "entry" | "review" | "approve";
+        StatusTransition: {
+            from_state: string | null;
+            to_state: string;
+            /** Format: date-time */
+            at: string;
+            actor?: components["schemas"]["UserRef"] | null;
+            /** @enum {string} */
+            level: "L1" | "L2";
+            admin_override: boolean;
+        };
+        RecordTimeInState: {
+            /** Format: uuid */
+            record_id: string;
+            register_key: string;
+            current_state: string;
+            /**
+             * Format: date-time
+             * @description At the last recorded transition into the current state.
+             */
+            since: string | null;
+            working_days_in_state: number | null;
+            transitions: components["schemas"]["StatusTransition"][];
+        };
+        StateDurationsReport: {
+            /** @enum {string} */
+            entity_type: "task" | "register_record";
+            items: {
+                region_id: number | null;
+                /** @description The stage code of a task, the register key of a record. */
+                group_key: string | null;
+                state: string;
+                count: number;
+                median_working_days: number;
+                p85_working_days: number;
+            }[];
+        };
         TaskTimeInState: {
             /** Format: uuid */
             task_id: string;
@@ -15587,6 +16236,98 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** @description 0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15). */
+        DashboardExtras: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions the figures cover (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            risk_matrix: components["schemas"]["DashboardRiskMatrix"];
+            data_quality: components["schemas"]["DashboardDataQuality"];
+            swap_relocation: components["schemas"]["DashboardSwapRelocation"];
+            decisions: components["schemas"]["DashboardDecisions"];
+        };
+        DashboardRiskMatrix: {
+            /** @description False when the caller may not see the risk register; the other fields are then null. */
+            available: boolean;
+            open_total: number | null;
+            /** @description Open risks whose probability or impact is outside 1 to 5 (left out of the cells). */
+            invalid_total?: number | null;
+            /** @description The 25 cells, probability 1 to 5 by impact 1 to 5. */
+            cells: components["schemas"]["DashboardRiskCell"][] | null;
+            bands: components["schemas"]["DashboardRiskBand"][] | null;
+            /** @description The open risks of the highest score first (ties by code). */
+            top_open_risks: components["schemas"]["DashboardRiskItem"][] | null;
+        };
+        DashboardRiskCell: {
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            count: number;
+        };
+        DashboardRiskBand: {
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            min: number;
+            max: number;
+            count: number;
+        };
+        DashboardRiskItem: {
+            risk_code: string;
+            statement: string;
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            /** @enum {string} */
+            status: "open" | "in_progress";
+            risk_owner?: string | null;
+            region_id?: number | null;
+            is_global: boolean;
+        };
+        DashboardDataQuality: {
+            available: boolean;
+            sites_checked: number | null;
+            sites_with_gaps: number | null;
+            gaps_total: number | null;
+            by_kind: {
+                /** @enum {string} */
+                kind: "missing_actual_date" | "missing_field";
+                field: string | null;
+                count: number;
+            }[] | null;
+        };
+        DashboardSwapRelocation: {
+            available: boolean;
+            /** @description Active sites with no delivery scenario yet. */
+            unscenarioed: number | null;
+            /** @description One row per delivery scenario, in the order of the list (new build, expansion, hot swap, cold swap, relocation). */
+            rows: {
+                scenario: components["schemas"]["DeliveryScenario"];
+                sites_total: number;
+                /** @description Keys not_started, in_progress, on_hold, completed and cancelled. */
+                by_overall_status: {
+                    [key: string]: number;
+                };
+            }[] | null;
+        };
+        DashboardDecisions: {
+            available: boolean;
+            items: {
+                /** @enum {string} */
+                tag: "act_now" | "watch";
+                risk_code: string;
+                statement: string;
+                score: number;
+                /** @enum {string} */
+                band: "low" | "medium" | "high" | "critical";
+                risk_owner: string | null;
+                region_id: number | null;
+            }[] | null;
+        };
         /** @description 0.14.5: one site of the dashboard map (OV-12). */
         SiteMapItem: {
             /** Format: uuid */
@@ -15790,6 +16531,8 @@ export interface components {
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
+        /** @description A register key (see `GET /registers`). */
+        RegisterKeyAny: string;
         /** @description The ETag last read. */
         IfMatch: string;
         IdempotencyKey: string;
@@ -18729,11 +19472,68 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    globalSearch: {
+        parameters: {
+            query: {
+                /** @description Text to find, 2 to 100 characters. */
+                q: string;
+                /** @description Groups to search (default: all six). */
+                types?: components["schemas"]["SearchType"][];
+                /** @description Items per group (1 to 10). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups in the order of `types`, each with its visible total. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    lookupSiteIds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteIdLookupInput"];
+            };
+        };
+        responses: {
+            /** @description The sites found (with the route to open) and the IDs not found, in input order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteIdLookupResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSites: {
         parameters: {
             query?: {
                 /** @description Site code, owner ID or name. */
                 q?: string;
+                /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
+                site_codes?: string;
                 region_id?: components["schemas"]["RegionId"][];
                 /** @description Current milestone/stage code (stable code, ADR 0010). */
                 stage_code?: string;
@@ -20079,6 +20879,277 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDocumentsGrid: {
+        parameters: {
+            query?: {
+                /** @description Site IDs, separated by commas, spaces or new lines. */
+                site_code?: string;
+                region_id?: components["schemas"]["RegionId"][];
+                stage_code?: string;
+                doc_code?: string[];
+                status?: "missing" | "pending" | "approved" | "expired" | "rejected" | "not_required" | "generatable" | "blocked" | "not_applicable";
+                uploaded_from?: string;
+                uploaded_to?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Grid page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            doc_code: string;
+                            name_en: string;
+                            name_ar?: string | null;
+                            kind?: string;
+                            /** @description True for a generated form (status generatable or blocked only; issuing is not in this version). */
+                            generated?: boolean;
+                            /** @description stage:<code>, register:<key> or qc. */
+                            group_key: string;
+                            group_label: string;
+                        }[];
+                        rows: {
+                            /** Format: uuid */
+                            site_id: string;
+                            site_code: string;
+                            site_name?: string | null;
+                            region_id: number;
+                            download_allowed: boolean;
+                            /** @description Keyed by doc_code. */
+                            cells: {
+                                [key: string]: {
+                                    /** @enum {string} */
+                                    status: "missing" | "pending" | "approved" | "expired" | "rejected" | "not_required" | "generatable" | "blocked" | "not_applicable";
+                                    /** @description Why the cell is blocked or not required. */
+                                    reason?: string | null;
+                                    slots: number;
+                                    /** @description Current files. */
+                                    files: number;
+                                };
+                            };
+                        }[];
+                        page: components["schemas"]["PageInfo"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDocumentsGridView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved columns (empty list when none saved). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: string[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveDocumentsGridView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    columns: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createSiteDocumentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Override created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        slots_changed?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revertSiteDocumentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                override_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reverted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        slots_changed?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    moveDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    target_slot_id: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Moved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        file_id?: string;
+                        /** Format: uuid */
+                        source_slot_id?: string;
+                        /** Format: uuid */
+                        target_slot_id?: string;
+                        versions_moved?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteDocumentType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        mode?: "deleted" | "deactivated";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     startZipExport: {
@@ -24825,6 +25896,381 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    getRegisterColumns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The screen. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterColumnsScreen"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterColumnCreate"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    /** @description The version of the column. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterColumnResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted or deactivated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        mode: "deleted" | "deactivated";
+                        code: string;
+                        records_with_value: number;
+                        version?: number;
+                        detail?: string;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    updateRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterColumnPatch"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    /** @description The new version of the column. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterColumnResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getRegisterColumnImpact: {
+        parameters: {
+            query?: {
+                field_type?: components["schemas"]["RegisterColumnType"];
+                list_catalogue?: string;
+                required?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The impact. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterColumnImpact"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    reorderRegisterColumns: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    codes: string[];
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Ordered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ordered: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createRegisterSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name_en: string;
+                    name_ar?: string | null;
+                    sort_order?: number;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteRegisterSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Deleted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        deleted: boolean;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    updateRegisterSection: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+                section_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name_en?: string;
+                    name_ar?: string | null;
+                    sort_order?: number;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    renameRegister: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description A register key (see `GET /registers`). */
+                register_key: components["parameters"]["RegisterKeyAny"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name_en?: string;
+                    name_ar?: string | null;
+                    reason: components["schemas"]["Reason"];
+                };
+            };
+        };
+        responses: {
+            /** @description Renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: string;
+                        name_en: string;
+                        name_ar?: string | null;
+                        version: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listRegisterRecords: {
         parameters: {
             query?: {
@@ -27393,6 +28839,40 @@ export interface operations {
             422: components["responses"]["Unprocessable"];
         };
     };
+    deleteListValue: {
+        parameters: {
+            query: {
+                reason: string;
+            };
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                /** @description List catalogue code (for example `TeamSpecialization`). */
+                catalogue_code: components["parameters"]["CatalogueCode"];
+                /** @description List value. */
+                value_id: components["parameters"]["ListValueId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted; the list with its values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListCatalogue"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     updateListValue: {
         parameters: {
             query?: never;
@@ -28805,6 +30285,60 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getRegisterRecordTimeInState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current state and transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTimeInState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStateDurationsReport: {
+        parameters: {
+            query: {
+                entity_type: "task" | "register_record";
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateDurationsReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getTaskBlockedBy: {
         parameters: {
             query?: never;
@@ -29319,6 +30853,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboardExtras: {
+        parameters: {
+            query?: {
+                region_id?: components["schemas"]["RegionId"];
+                cluster_code?: string;
+                scenario?: components["schemas"]["DeliveryScenario"];
+                /** @description Accepted as in `GET /dashboard`; the sections do not depend on it. */
+                stream?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardExtras"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     exportDashboard: {
