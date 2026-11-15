@@ -2544,6 +2544,136 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/documents/grid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Excel-like grid, sites in rows and document types in columns, one status per cell (0097)
+         * @description Region scope applies (a site outside the caller's regions is not listed) and so does the register scope of each document type. Needs `view` on the Documents screen.
+         *     Columns are the active document types that have a placement (task, QC or register), grouped by stage, register or QC. Each cell has one status: missing, pending (uploaded or in review), approved, expired (approved, past its expiry date), rejected, not_required (a site override, or a slot marked not required), generatable (a generated form that can be issued now; generation itself is not in this version), blocked (a generated form that cannot be issued yet, with `reason`) or not_applicable (the type does not apply to the site).
+         *     `site_code` takes many Site IDs at once, separated by commas, spaces or new lines (at most 500). `status`, `uploaded_from` and `uploaded_to` keep a row when at least one of its cells has that status or a current file uploaded in the range; the server reads ahead until the page is full. `download_allowed` says whether the caller may download the files of the row.
+         */
+        get: operations["getDocumentsGrid"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/documents/grid/view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's saved grid columns */
+        get: operations["getDocumentsGridView"];
+        /** Save the caller's grid columns (personal, never shared) */
+        put: operations["saveDocumentsGridView"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sites/{site_id}/document-overrides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a document not required for one site (0097)
+         * @description Needs `sites.edit` for the site's region. Open slots of that type on the site become not_required, as a placement change does. Audited with the reason.
+         */
+        post: operations["createSiteDocumentOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-overrides/{override_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                override_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End a not-required override (0097)
+         * @description The slots go back to missing, or to uploaded when a current file exists. Audited with the reason.
+         */
+        post: operations["revertSiteDocumentOverride"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/files/{file_id}/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move a misplaced file (all its versions) to another slot of the same site (0097)
+         * @description Needs `sites.edit` for the site's region. Refused for approved files and slots, for another site, and for a format the target document does not accept. Both slots are recomputed. Audited with before and after.
+         */
+        post: operations["moveDocumentFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/document-library/{doc_type_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * System Admin. Hard delete when no file was ever uploaded, otherwise deactivation (0097)
+         * @description A type with no file and no blank form is deleted with its placements, versions, drafts and empty slots. A type with any file (or blank form) is deactivated with the reason and kept. Needs System Admin and step-up. Audited with before and after.
+         *     This amends the rule "documents are deactivated, never deleted" for types that never held a file.
+         */
+        post: operations["deleteDocumentType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/exports/zip": {
         parameters: {
             query?: never;
@@ -19785,6 +19915,277 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDocumentsGrid: {
+        parameters: {
+            query?: {
+                /** @description Site IDs, separated by commas, spaces or new lines. */
+                site_code?: string;
+                region_id?: components["schemas"]["RegionId"][];
+                stage_code?: string;
+                doc_code?: string[];
+                status?: "missing" | "pending" | "approved" | "expired" | "rejected" | "not_required" | "generatable" | "blocked" | "not_applicable";
+                uploaded_from?: string;
+                uploaded_to?: string;
+                limit?: components["parameters"]["Limit"];
+                /** @description Opaque cursor from `page.next_cursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Grid page. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: {
+                            doc_code: string;
+                            name_en: string;
+                            name_ar?: string | null;
+                            kind?: string;
+                            /** @description True for a generated form (status generatable or blocked only; issuing is not in this version). */
+                            generated?: boolean;
+                            /** @description stage:<code>, register:<key> or qc. */
+                            group_key: string;
+                            group_label: string;
+                        }[];
+                        rows: {
+                            /** Format: uuid */
+                            site_id: string;
+                            site_code: string;
+                            site_name?: string | null;
+                            region_id: number;
+                            download_allowed: boolean;
+                            /** @description Keyed by doc_code. */
+                            cells: {
+                                [key: string]: {
+                                    /** @enum {string} */
+                                    status: "missing" | "pending" | "approved" | "expired" | "rejected" | "not_required" | "generatable" | "blocked" | "not_applicable";
+                                    /** @description Why the cell is blocked or not required. */
+                                    reason?: string | null;
+                                    slots: number;
+                                    /** @description Current files. */
+                                    files: number;
+                                };
+                            };
+                        }[];
+                        page: components["schemas"]["PageInfo"];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getDocumentsGridView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Saved columns (empty list when none saved). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        columns: string[];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveDocumentsGridView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    columns: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    createSiteDocumentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                site_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    doc_code: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Override created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        slots_changed?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    revertSiteDocumentOverride: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                override_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Reverted. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id?: string;
+                        slots_changed?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    moveDocumentFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                file_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    target_slot_id: string;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Moved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        file_id?: string;
+                        /** Format: uuid */
+                        source_slot_id?: string;
+                        /** Format: uuid */
+                        target_slot_id?: string;
+                        versions_moved?: number;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    deleteDocumentType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Document Library definition. */
+                doc_type_id: components["parameters"]["DocTypeId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        mode?: "deleted" | "deactivated";
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            428: components["responses"]["PreconditionRequired"];
         };
     };
     startZipExport: {
