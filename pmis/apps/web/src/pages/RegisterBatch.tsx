@@ -1,3 +1,4 @@
+import { OlderTemplateNote } from '@/components/OlderTemplateNote';
 import { ArrowRight, Check, Send, ShieldCheck, Trash2, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -157,6 +158,7 @@ export function RegisterBatch() {
               <li key={n} aria-current={step === n ? 'step' : undefined} data-step={n} className={`chip ${step === n ? 'bg-accentSoft text-accentText' : step > n ? 'bg-doneBg text-doneInk' : 'bg-card2 text-mute'}`}>{n}. {t(`batch.step_${n}`)}</li>
             ))}
           </ol>
+          {b.older_template && <OlderTemplateNote info={b.older_template} />}
           <BatchProgress batch={b} job={job} site={siteBatch} />
           <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="batch-counts">
             <span className="chip bg-lockBg text-lockInk" data-testid="batch-status">{t(`batchStatus.${b.status}`, { defaultValue: b.status })}</span>

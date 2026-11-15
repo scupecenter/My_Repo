@@ -14,11 +14,12 @@ import { MailKinds } from './MailKinds';
 import { useMe } from '@/api/hooks';
 import { ContractorRules } from './ContractorRules';
 import { Lists } from './Lists';
+import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { Workflow } from './Workflow';
 
-export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow'] as const;
+export const SETTINGS_TABS = ['calendar', 'sla', 'weights', 'freeze', 'dlp', 'idle', 'notifications', 'retention', 'staff-visibility', 'documents', 'team-scope', 'lists', 'contractor-rules', 'gecol-order', 'mail-kinds', 'historical-waiver', 'imports', 'workflow', 'register-columns'] as const;
 
 function Layout() {
   const { t } = useTranslation();
@@ -58,6 +59,7 @@ export function SettingsRoutes() {
         <Route path="historical-waiver" element={<HistoricalWaiver />} />
         <Route path="imports" element={<Imports />} />
         <Route path="workflow" element={<Workflow />} />
+        <Route path="register-columns" element={<RegisterColumns />} />
       </Route>
     </Routes>
   );
