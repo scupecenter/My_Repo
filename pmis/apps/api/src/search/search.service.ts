@@ -134,7 +134,7 @@ export class SearchService {
       const reach = regions === null ? Prisma.empty : Prisma.sql`AND s.region_id = ANY(${regions}::int[])`;
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT s.id::text AS id, s.site_code || ' - ' || s.name || coalesce(' - ' || nullif(s.name_ar, ''), '') AS title, NULL::text AS subtitle, s.region_id,
           concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total
-        FROM sites s WHERE s.is_active AND s.search_text LIKE ${pattern} ${reach}
+        FROM sites s WHERE s.is_active AND search_sites_text(s.site_code, s.owner_site_id, s.name, s.name_ar) LIKE ${pattern} ${reach}
         ORDER BY s.site_code LIMIT ${limit}`);
     }
     if (type === 'registers') {
@@ -153,7 +153,7 @@ export class SearchService {
           coalesce(nullif(r.data ->> 'title', ''), nullif(r.data ->> 'name', ''), r.record_type, rd.name_en) AS title,
           rd.name_en AS subtitle, r.region_id, '/registers/' || r.register_key AS href, (COUNT(*) OVER())::int AS total
         FROM register_records r JOIN register_definitions rd ON rd.register_key = r.register_key
-        WHERE r.is_current AND r.voided_at IS NULL AND r.search_text LIKE ${pattern} AND (${Prisma.join(clauses, ' OR ')})
+        WHERE r.is_current AND r.voided_at IS NULL AND search_register_text(r.register_key, r.record_type, r.data) LIKE ${pattern} AND (${Prisma.join(clauses, ' OR ')})
         ORDER BY title LIMIT ${limit}`);
     }
     if (type === 'documents') {
@@ -163,7 +163,7 @@ export class SearchService {
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT f.id::text AS id, f.original_name AS title, s.site_code AS subtitle, s.region_id,
           concat('/sites/', s.id::text) AS href, (COUNT(*) OVER())::int AS total
         FROM document_files f JOIN document_slots sl ON sl.id = f.slot_id JOIN sites s ON s.id = sl.site_id
-        WHERE f.is_current AND s.is_active AND f.search_text LIKE ${pattern} ${reach}
+        WHERE f.is_current AND s.is_active AND search_document_text(f.original_name) LIKE ${pattern} ${reach}
         ORDER BY f.original_name LIMIT ${limit}`);
     }
     if (type === 'meetings') {
@@ -172,21 +172,21 @@ export class SearchService {
       const reach = regions === null ? Prisma.empty : Prisma.sql`AND (m.is_global OR m.region_id = ANY(${regions}::int[]))`;
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT m.id::text AS id, m.title, to_char(m.meeting_date, 'YYYY-MM-DD') AS subtitle,
           m.region_id, '/registers/meetings' AS href, (COUNT(*) OVER())::int AS total
-        FROM meetings m WHERE m.search_text LIKE ${pattern} ${reach}
+        FROM meetings m WHERE search_meeting_text(m.title) LIKE ${pattern} ${reach}
         ORDER BY m.meeting_date DESC LIMIT ${limit}`);
     }
     if (type === 'people') {
       if (!(await this.access.hasGrant(auth, 'admin.users', 'view'))) return null;
       return tx.$queryRaw<Row[]>(Prisma.sql`SELECT u.id::text AS id, u.display_name AS title, u.email AS subtitle, NULL::int AS region_id,
           concat('/admin/users/', u.id::text) AS href, (COUNT(*) OVER())::int AS total
-        FROM users u WHERE u.deleted_at IS NULL AND u.purged_at IS NULL AND u.search_text LIKE ${pattern}
+        FROM users u WHERE u.deleted_at IS NULL AND u.purged_at IS NULL AND search_user_text(u.display_name, u.email, u.employee_id) LIKE ${pattern}
         ORDER BY u.display_name LIMIT ${limit}`);
     }
     // contractors
     if (!(await this.access.hasGrant(auth, 'contractors', 'view'))) return null;
     return tx.$queryRaw<Row[]>(Prisma.sql`SELECT e.id::text AS id, e.name AS title, e.type::text AS subtitle, NULL::int AS region_id,
         '/registers/contractors' AS href, (COUNT(*) OVER())::int AS total
-      FROM external_parties e WHERE e.is_active AND e.search_text LIKE ${pattern}
+      FROM external_parties e WHERE e.is_active AND search_party_text(e.name, e.contract_ref) LIKE ${pattern}
       ORDER BY e.name LIMIT ${limit}`);
   }
 }
