@@ -21,7 +21,7 @@ function useWrite<I, O>(version: number, etag: number, run: (input: I, etag: num
   const qc = useQueryClient();
   return useMutation<O, ApiError, I>({
     mutationFn: (input) => run(input, etag),
-    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); },
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); void qc.invalidateQueries({ queryKey: ['wf-sla-weight'] }); void qc.invalidateQueries({ queryKey: ['wf-weight-totals'] }); },
   });
 }
 
@@ -113,6 +113,30 @@ export function useBulkTaskPatch(version: number, etag: number) {
       }
       return { done };
     },
-    onSettled: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['wf-version', version] }); void qc.invalidateQueries({ queryKey: ['wf-versions'] }); void qc.invalidateQueries({ queryKey: ['task-definitions'] }); void qc.invalidateQueries({ queryKey: ['wf-sla-weight'] }); void qc.invalidateQueries({ queryKey: ['wf-weight-totals'] }); },
   });
 }
+
+/** F14 (migration 0109, contract 0.15.20): the base SLA rule of a task, saved as a new effective-dated version. */
+export type SlaRuleInput = {
+  min_working_days: number; max_working_days: number; start_event: string; unit: 'working' | 'calendar'; calendar_code: string;
+  warning_pct?: number | null; breach_owner_role?: string | null; escalation_role?: string | null; pause_on_client_wait: boolean; reason: string;
+};
+export const useSaveSlaRule = (v: number, etag: number) =>
+  useWrite<SlaRuleInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/sla-rule`, { body, version: e }));
+/** Deleted when no task uses the rule, deactivated (with the reason) when one does. */
+export const useRemoveSlaRule = (v: number, etag: number) =>
+  useWrite<{ code: string; rule: string; reason: string }, unknown>(v, etag, ({ code, rule, ...body }, e) => api.post(`${base(v)}/tasks/${code}/sla-rules/${rule}/remove`, { body, version: e }));
+export type WeightInput = { counts_in_weight: boolean; weight_value?: number; weight_group?: string | null; reason: string };
+export const useSetWeight = (v: number, etag: number) =>
+  useWrite<WeightInput & { code: string }, unknown>(v, etag, ({ code, ...body }, e) => api.put(`${base(v)}/tasks/${code}/weight`, { body, version: e }));
+export type WeightTotal = { group: string; total: number; tasks: number; ok: boolean };
+/** Live totals of the weight groups of a version (warns in the draft; publishing is refused while a group is not 100). */
+export const useWeightTotals = (v: number | null) =>
+  useQuery({ queryKey: ['wf-weight-totals', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: WeightTotal[] }>(`/workflow/versions/${v}/weight-totals`) });
+/** Migration 0110: the SLA rule and the weight of every task of a version (drafts included). */
+export type SlaWeightItem = { task_code: string; counts_in_weight: boolean; weight_value: number; weight_group: string | null;
+  sla: { id: string; min_working_days: number; max_working_days: number; start_event: string; unit: 'working' | 'calendar'; calendar_code: string; warning_pct: number | null;
+    breach_owner_role: string | null; escalation_role: string | null; pause_on_client_wait: boolean } | null };
+export const useSlaWeight = (v: number | null) =>
+  useQuery({ queryKey: ['wf-sla-weight', v], enabled: v !== null, retry: false, queryFn: () => api.get<{ items: SlaWeightItem[] }>(`/workflow/versions/${v}/sla-weight`) });

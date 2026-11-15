@@ -96,6 +96,13 @@ export async function superDbWfe(): Promise<PgClient> {
 }
 
 /** Superuser connection to the workflow-gaps database (migration 0096; see global-setup). */
+/** F14 (migrations 0109 and 0110): the SLA and weight suite's own database. */
+export async function superDbSla(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_SLA });
+  await c.connect();
+  return c;
+}
+
 export async function superDbWfg(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFG });
   await c.connect();
@@ -105,6 +112,13 @@ export async function superDbWfg(): Promise<PgClient> {
 /** Superuser connection to the register-columns database (migration 0095; see global-setup). */
 export async function superDbRcols(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RCOLS });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the template-streams database (see global-setup). */
+export async function superDbTplst(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_TPLST });
   await c.connect();
   return c;
 }

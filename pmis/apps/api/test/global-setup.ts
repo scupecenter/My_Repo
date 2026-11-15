@@ -183,11 +183,21 @@ export default async function setup(): Promise<() => Promise<void>> {
   const wfgDb = await buildDatabase(adminUrl, wfg, appPassword);
   process.env.TEST_DATABASE_URL_WFG = wfgDb.appUrl;
   process.env.TEST_SUPER_URL_WFG = wfgDb.superUrl;
+  // The SLA and weight database (F14, migrations 0109 and 0110): the suite saves SLA rules and weights, drafts and publish-checks a version.
+  const slaDb_ = `${dbName}_sla`;
+  const slaDb = await buildDatabase(adminUrl, slaDb_, appPassword);
+  process.env.TEST_DATABASE_URL_SLA = slaDb.appUrl;
+  process.env.TEST_SUPER_URL_SLA = slaDb.superUrl;
   // The register-columns database (migration 0095): the suite adds, converts and deletes register columns, which issues new register template versions.
   const rcols = `${dbName}_rcols`;
   const rcolsDb = await buildDatabase(adminUrl, rcols, appPassword);
   process.env.TEST_DATABASE_URL_RCOLS = rcolsDb.appUrl;
   process.env.TEST_SUPER_URL_RCOLS = rcolsDb.superUrl;
+  // The template-streams database: the suite changes the tasks of workflow 1 and issues template versions, which other suites on the main database would see.
+  const tplst = `${dbName}_tplst`;
+  const tplstDb = await buildDatabase(adminUrl, tplst, appPassword);
+  process.env.TEST_DATABASE_URL_TPLST = tplstDb.appUrl;
+  process.env.TEST_SUPER_URL_TPLST = tplstDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -234,6 +244,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
     await a.end();
   };
 }
