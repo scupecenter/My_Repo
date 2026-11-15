@@ -320,7 +320,7 @@ describe('hybrid mode list', () => {
       'PUT /settings/documents-qc',
       // contract 0.12.5 (P5): the list catalogue and the conversion of the old text of a meeting
       'GET /list-catalogues', 'POST /list-catalogues', 'GET /list-catalogues/:code', 'PATCH /list-catalogues/:code', 'POST /list-catalogues/:code/values',
-      'PATCH /list-catalogues/:code/values/:valueId', 'GET /registers/:key/records/:id/legacy-conversion', 'POST /registers/:key/records/:id/legacy-conversion',
+      'PATCH /list-catalogues/:code/values/:valueId', 'DELETE /list-catalogues/:code/values/:valueId', 'GET /registers/:key/records/:id/legacy-conversion', 'POST /registers/:key/records/:id/legacy-conversion',
       // contract 0.12.6 (P8): email code, phone change and its decision
       'POST /me/email-change/verify', 'POST /me/email-change/resend', 'POST /me/phone-change', 'DELETE /me/phone-change',
       'GET /phone-change-requests', 'POST /phone-change-requests/:id/decide',

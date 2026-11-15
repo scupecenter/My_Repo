@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.19
+  version: 0.15.23
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.23 (2026-11-15): dropdown lists (F17, owner request 2026-11-15 for maximum flexibility; migration 0102, mirror `db/sql/101_dropdown_lists.sql`; CHANGELOG 148). Additive, one change of behaviour. (1) A list has a value type (`value_type`: text, number, date, person, site or vendor; a number or a date is checked at creation, a person, a site or a vendor must be a real user, site or external party; the type cannot change while the list has values, 422 `value_type_locked`), `multi_select`, and an optional `parent_catalogue` (a dependent list: each value names a `parent_code`, the active value of the parent list; a cycle is 422; the parent cannot change while the list has values, 422 `parent_locked`). (2) A value has `colour` (`#RRGGBB`), `is_default` (one active default per list), `parent_code`, and `deactivate_reason` with `deactivated_at`. A value used by a dependent value or the default cannot be deactivated (422 `has_dependents` or `is_default`). `ListCatalogue.dependent_lists` names the lists that depend on it and `used_by` names the fields that read it. (3) New path `DELETE /list-catalogues/{catalogue_code}/values/{value_id}` (`deleteListValue`): a hard delete with a `reason` query parameter; If-Match is optional; allowed only when the value is unused (not in a register record, a child-list column, a dependent value or the default); otherwise 422 `in_use` (or `is_default`). Audited with before and the reason.
     - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
     - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
@@ -10795,6 +10796,32 @@ paths:
     parameters:
     - {$ref: '#/components/parameters/CatalogueCode'}
     - {$ref: '#/components/parameters/ListValueId'}
+    delete:
+      tags: [lists]
+      operationId: deleteListValue
+      summary: Hard delete of a value that is not used (F17)
+      description: Allowed only when the value is unused, that is not in a register record, a child-list column, a dependent value of a child list and not the default value. The `reason` is a query parameter. If-Match is optional. Audited with the before state and the reason.
+      x-db-path: admin_delete_list_value
+      parameters:
+      - name: reason
+        in: query
+        required: true
+        schema: {type: string, minLength: 3}
+      - name: If-Match
+        in: header
+        required: false
+        schema: {type: string}
+      responses:
+        '200':
+          description: Deleted; the list with its values.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
     patch:
       tags: [lists]
       operationId: updateListValue
@@ -17361,6 +17388,10 @@ components:
         groups: { type: array, items: { type: string } }
         sort_order: { type: integer }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'] }
+        deactivate_reason: { type: [string, 'null'] }
         version: { type: integer }
     ListCatalogue:
       type: object
@@ -17373,6 +17404,10 @@ components:
         critical: { type: boolean, description: 'Drives a calculation, a rule or a permission: only its own values, and approval waits until it has one.' }
         status: { type: string, enum: [pending, confirmed], description: 'pending = a draft for the owner''s review (Q104).' }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'] }
+        dependent_lists: { type: array, items: { type: string } }
         is_active: { type: boolean }
         version: { type: integer, description: 'ETag (If-Match).' }
         values: { type: array, items: { $ref: '#/components/schemas/ListValue' } }
@@ -17396,6 +17431,9 @@ components:
         description: { type: [string, 'null'] }
         critical: { type: boolean }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'], pattern: '^[A-Z][A-Za-z0-9]{1,40}$' }
         reason: { type: string, minLength: 3 }
     ListCataloguePatch:
       type: object
@@ -17408,6 +17446,9 @@ components:
         critical: { type: boolean }
         status: { type: string, enum: [pending, confirmed] }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'], pattern: '^[A-Z][A-Za-z0-9]{1,40}$' }
         is_active: { type: boolean }
         reason: { type: string, minLength: 3 }
     ListValueInput:
@@ -17422,6 +17463,9 @@ components:
         groups: { type: array, maxItems: 10, items: { type: string } }
         sort_order: { type: integer, minimum: 0 }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'], maxLength: 80 }
         reason: { type: string, minLength: 3 }
     ListValuePatch:
       type: object
@@ -17434,6 +17478,9 @@ components:
         groups: { type: array, maxItems: 10, items: { type: string } }
         sort_order: { type: integer, minimum: 0 }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'], maxLength: 80 }
         reason: { type: string, minLength: 3 }
     LegacyConversionProposal:
       type: object
