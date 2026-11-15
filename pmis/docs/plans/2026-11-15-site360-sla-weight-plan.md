@@ -103,6 +103,20 @@ Old routes redirect to the new tab and section. CHANGELOG 149, no contract chang
 - New counters: SLA breaches and at-risk (warning %) per stage; weighted progress vs plan (from F14 weights); sites per SITE 360 menu stage; locked rows/sites count; data quality (empty mandatory cells per menu); advances open after work closed and vehicle-ready rate (Car Dispatcher, Financial Advances); dismantle CW/TE pending; As-Built submitted vs PAC; time-in-state median/P85 (F1); stale tasks (idle N days).
 - CHANGELOG 150, contract next free number at build time.
 
+## Migration number registry (assign here before use)
+
+| Number | Owner |
+|---|---|
+| 0099 | #139 F4 search (merged) |
+| 0101 | F15 SITE 360 sections |
+| 0102, 0105 | F17 dropdown lists |
+| 0103 | F16 register locks |
+| 0104, 0106, 0107 | F15 rows view and sources, calc columns |
+| 0108 | F20 dashboard |
+| 0109, 0110 | F14 SLA and weight (renumbered from 0099 and 0100, which clashed with #139) |
+
+Next free: 0111.
+
 ## Merge order and fixed numbers
 
 | PR | CHANGELOG | Contract |
