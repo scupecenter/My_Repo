@@ -10,7 +10,7 @@ import { SettingsRoutes } from './settings/Settings';
 /** Settings, Workflow: the three-column editor (milestones, tasks, gate, detail), the lock panel, the closing task, date conditions, the table view, the mobile back step, preview then publish. */
 type U = ReturnType<typeof userEvent.setup>;
 const stepUpDone = () => api.post('/__mock/step-up');
-const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/workflow' });
+const page = () => renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/workflow/editor' });
 const REASON = 'The owner asked for it';
 const reasonAndSave = async (u: U, dlg: string) => { await u.type(await screen.findByTestId(`${dlg}-reason`), REASON); await u.click(screen.getByTestId(`${dlg}-submit`)); };
 const openDraft = async (u: U) => {

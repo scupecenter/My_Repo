@@ -2,9 +2,9 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import ExcelJS from 'exceljs';
 import { createHash } from 'node:crypto';
 import { Client as PgClient } from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { q } from './calc-helpers';
-import { Api, startApp, superDb } from './helpers';
+import { Api, startApp, superDbTplst } from './helpers';
 import { G } from './reg-helpers';
 import { day, downloadTemplate, fillTemplate, load, uploadFile } from './tpl-helpers';
 import { SOUT, SR, SITE_ENTRY_GRANTS, filled, moreSite, streamTeam, taskRow } from './tpl-stream-helpers';
@@ -12,14 +12,15 @@ import { actor, addAssignment, makeSite, makeTask, plainAdmin, setCell } from '.
 
 /**
  * Migration 0051: the Site Register stream templates (TPL-SITE-DA, -CW, -TE, -CL). The tasks A2, A5, B4 ... of workflow v1 in region 7, where no other suite sets
- * matrix cells. Dates are fixed past dates; nothing depends on the weekday or the collation. The suites that issue new template versions share the advisory lock 770101.
+ * matrix cells. Dates are fixed past dates; nothing depends on the weekday or the collation. The suite has its own database (TEST_DATABASE_URL_TPLST): it changes
+ * the tasks of workflow v1 and the template versions, which the other suites of the main database would otherwise see in the middle of a test.
  */
 let app: NestExpressApplication;
 let db: PgClient;
 
 beforeAll(async () => {
-  app = await startApp();
-  db = await superDb();
+  app = await startApp({ databaseUrl: process.env.TEST_DATABASE_URL_TPLST as string });
+  db = await superDbTplst();
 });
 afterAll(async () => {
   await db.end();
@@ -636,12 +637,10 @@ describe('submit into the flow, and L2 decisions', () => {
 });
 
 describe('template versions', () => {
-  beforeEach(async () => { await db.query('SELECT pg_advisory_lock(770101)'); });
-  afterEach(async () => { await db.query('SELECT pg_advisory_unlock(770101)'); });
-
   it('issues the next version when a task field changes, refuses the old file with both versions in the message, and audits the new version', async () => {
     const t = await streamTeam(app, db, { B4: 'open' });
     const admin = await plainAdmin(app, db);
+    await db.query('SELECT tpl_sync_all()');   // settle the stored versions first: the first sync after the migrations re-issues TPL-MASTER (0095 changed tpl_columns)
     const v0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
     const m0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-MASTER'`))[0]!.v;
     const te0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-TE'`))[0]!.v;
@@ -684,6 +683,7 @@ describe('template versions', () => {
   it('issues a new version of the stream template and of TPL-MASTER when a task is added to a stage of the stream', async () => {
     const t = await streamTeam(app, db, {});
     expect(t.region).toBe(SR);
+    await db.query('SELECT tpl_sync_all()');   // settle the stored versions first (see the first test of this describe)
     const cw0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-SITE-CW'`))[0]!.v;
     const m0 = (await q<{ v: number }>(db, `SELECT current_version AS v FROM template_definitions WHERE template_id = 'TPL-MASTER'`))[0]!.v;
     const stage = await q<{ id: string; workflow_id: string }>(db, `SELECT sd.id::text AS id, sd.workflow_id::text AS workflow_id FROM stage_definitions sd JOIN workflow_definitions w ON w.id = sd.workflow_id AND w.version = 1 WHERE sd.code = 'MS3'`);

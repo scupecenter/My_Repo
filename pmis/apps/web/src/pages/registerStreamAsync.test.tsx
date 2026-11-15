@@ -119,14 +119,14 @@ describe('the Master import apply in the background (Reconciliation)', () => {
 });
 
 describe('Settings, Imports: the background threshold', () => {
-  const open = (locale?: 'ar') => renderApp(<Routed />, { route: '/admin/settings/imports', ...(locale ? { locale } : {}) });
+  const open = (locale?: 'ar') => renderApp(<Routed />, { route: '/admin/settings/data/imports', ...(locale ? { locale } : {}) });
 
   it('a System Admin reads 50 (default 50), cannot save a value out of range, and saves 20 with a reason; who and when are shown', async () => {
     await signIn('pm');
     open();
     const u = userEvent.setup();
     expect(await screen.findByTestId('page-imports-settings')).toHaveTextContent('Imports / Background processing');
-    expect(screen.getByTestId('settings-tab-imports')).toHaveTextContent('Imports');
+    expect(screen.getByTestId('settings-section-data-imports')).toHaveTextContent('Imports');
     const input = screen.getByTestId('imports-async-rows');
     expect(input).toHaveValue(50);
     expect(screen.getByLabelText('Process in the background from N rows')).toBe(input);

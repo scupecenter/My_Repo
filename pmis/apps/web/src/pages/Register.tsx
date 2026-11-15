@@ -64,7 +64,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   // contract 0.7.0: every register has its own approved template (Template.register_key)
   const tpl = templates.data?.find((x) => x.register_key === key);
   const setRecord = (id: string | null) => setSp((p) => { const n = new URLSearchParams(p); if (id) n.set('record', id); else n.delete('record'); return n; }, { replace: true });
-  const rname = (id?: number | null) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || '—'; };
+  const rname = (id?: number | null) => { const r = regions.data?.find((x) => x.id === id); return (i18n.language === 'ar' && r?.name_ar) || r?.name_en || '-'; };
   const name = (i18n.language === 'ar' && def.name_ar) || def.name_en;
 
   const down = (prefill: boolean) => tpl && downloadTemplate(tpl.template_id, { prefill, regionId: f.region_id || undefined }).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'));
@@ -92,9 +92,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   };
   useAutoFit(tbl, label, items, fitText, i18n.language);
   const cell = (id: string, r: (typeof items)[number]) => {
-    if (id.startsWith('f:')) { const c = fieldCols.find((x) => `f:${x.code}` === id); const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : '—'; return txt === '—' ? <Empty /> : <Trunc text={txt} />; }
+    if (id.startsWith('f:')) { const c = fieldCols.find((x) => `f:${x.code}` === id); const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : '-'; return txt === '-' ? <Empty /> : <Trunc text={txt} />; }
     switch (id) {
-      case 'site': return <b className="mono">{r.site_code ?? '—'}</b>;
+      case 'site': return <b className="mono">{r.site_code ?? '-'}</b>;
       case 'region': return <Trunc text={rname(r.region_id as number | null)} />;
       case 'type': return r.record_type ? <span>{r.record_type.toUpperCase()}</span> : <Empty />;
       case 'state': return <StatusChip tone={STATE_TONE[r.state]} testid={`reg-state-${r.id}`} text={t(`regState.${r.state}`)}>{t(`regState.${r.state}`)}</StatusChip>;
@@ -139,7 +139,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
           ...(grid.admin ? [
             { id: 'col-add', label: t('regcols.add'), icon: <Plus size={16} />, testid: 'register-column-add', onSelect: grid.openAdd },
-            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/register-columns?register=${key}`) },
+            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/registers/columns?register=${key}`) },
           ] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />
