@@ -92,6 +92,7 @@ export function Site360Grid({
   filtered,
   testid = "site360-grid",
   onEditCell,
+  onSelectRows,
 }: {
   menu: Site360MenuItem;
   rows: Site360GridRow[];
@@ -102,6 +103,8 @@ export function Site360Grid({
   testid?: string;
   /** Saves an inline edit of a task-backed cell; read-only cells never call it. */
   onEditCell?: (edit: Site360CellEdit) => void;
+  /** The rows of the selected rectangle (empty when none), so a toolbar can act on those sites (lock, unlock). */
+  onSelectRows?: (rows: Site360GridRow[]) => void;
 }) {
   const { i18n, t } = useTranslation();
   const ar = i18n.language === "ar";
@@ -603,6 +606,13 @@ export function Site360Grid({
     }
   }
   const hiddenCount = hidden.length;
+  // Report the rows of the selection to the toolbar; keyed by the rectangle and the view, so it runs on change only.
+  const selKey = rect ? `${rect.r0}:${rect.r1}:${rect.c0}:${rect.c1}` : "";
+  useEffect(() => {
+    if (!onSelectRows) return;
+    onSelectRows(rect ? shown.slice(rect.r0, rect.r1 + 1).map((x) => x.row) : []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey, rows, sort, filters, hidden]);
 
   return (
     <div

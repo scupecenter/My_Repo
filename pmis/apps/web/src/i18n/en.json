@@ -27,7 +27,8 @@
     "hide": "Hide column",
     "show_hidden": "{{count}} hidden column(s): show all",
     "resize": "Drag to resize; double-click to fit the text",
-    "selection": "{{count}} cells selected, {{numbers}} numeric, sum {{sum}}"
+    "selection": "{{count}} cells selected, {{numbers}} numeric, sum {{sum}}",
+    "template_upload": "Template upload"
   },
   "nav": {
     "group_work": "Work",

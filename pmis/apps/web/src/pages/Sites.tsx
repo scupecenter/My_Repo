@@ -1,6 +1,6 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
 import { errText } from '@/components/FormDialog';
-import { Site360Grid } from '@/components/Site360Grid';
+import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -98,6 +98,7 @@ export function Sites() {
   const siteCodes = sp.get('site_codes') ?? '';
   const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}) };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
+  const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
   const sel = sp.get('sel') ?? '';
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
@@ -271,7 +272,15 @@ export function Sites() {
             <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
           </div>
           {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
-          <Site360Grid menu={menu} testid="site360-grid" total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells }))} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          <div className="flex flex-wrap items-center gap-2" data-testid="site360-toolbar">
+            <ExportViewButton testid="site360-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
+            <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site360-template-link">{t('site360.template_upload')}</Link>
+            {canUnlock && gridSel.length > 0 && <>
+              <button type="button" className="btn" data-testid="site360-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
+              <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
+            </>}
+          </div>
+          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells }))} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
         </div>
       ) : (
@@ -306,7 +315,7 @@ export function Sites() {
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
-      {locksDlg !== null && <LocksDialog target={{ site_ids: items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={picked.size} testid="sites-locks-dialog"
+      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}

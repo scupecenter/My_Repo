@@ -27,7 +27,8 @@
     "hide": "إخفاء العمود",
     "show_hidden": "{{count}} عمود مخفي: إظهار الكل",
     "resize": "اسحب لتغيير العرض؛ انقر مرتين للملاءمة مع النص",
-    "selection": "{{count}} خلية محددة، {{numbers}} رقمية، المجموع {{sum}}"
+    "selection": "{{count}} خلية محددة، {{numbers}} رقمية، المجموع {{sum}}",
+    "template_upload": "رفع قالب"
   },
   "nav": {
     "group_work": "العمل",
