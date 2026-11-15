@@ -188,6 +188,11 @@ export default async function setup(): Promise<() => Promise<void>> {
   const rcolsDb = await buildDatabase(adminUrl, rcols, appPassword);
   process.env.TEST_DATABASE_URL_RCOLS = rcolsDb.appUrl;
   process.env.TEST_SUPER_URL_RCOLS = rcolsDb.superUrl;
+  // The template-streams database: the suite changes the tasks of workflow 1 and issues template versions, which other suites on the main database would see.
+  const tplst = `${dbName}_tplst`;
+  const tplstDb = await buildDatabase(adminUrl, tplst, appPassword);
+  process.env.TEST_DATABASE_URL_TPLST = tplstDb.appUrl;
+  process.env.TEST_SUPER_URL_TPLST = tplstDb.superUrl;
   process.env.TEST_DATABASE_URL_LOGS = logsDb.appUrl;
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
@@ -234,6 +239,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     await a.query(`DROP DATABASE IF EXISTS ${wfe} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${wfg} WITH (FORCE)`);
     await a.query(`DROP DATABASE IF EXISTS ${rcols} WITH (FORCE)`);
+    await a.query(`DROP DATABASE IF EXISTS ${tplst} WITH (FORCE)`);
     await a.end();
   };
 }
