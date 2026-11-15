@@ -12,6 +12,7 @@
 --   reg_column_lock_set(...)    the administer grant in every region locks or unlocks one column; a reason is required
 --   reg_save_record             the 9-argument writer of 0026, byte-identical except for two reg_lock_check calls (create and edit)
 --   reg_void_record             the writer of 0019, byte-identical except for one reg_lock_check call (a locked record cannot be voided)
+--   reg_transition_record       the dispatcher of 0019 with one reg_lock_check call: a locked record takes no submit, review, approve or reject step for non-admins
 -- Every lock and unlock is audited with before and after and the reason. Step-up is required by the API for both lock routes (x-step-up).
 -- A locked column refuses only a value that changes the stored value (an unchanged value resent with the form is accepted).
 -- Only the definer functions write the lock tables (reg_backstop); pmis_app reads them.
@@ -225,19 +226,32 @@ BEGIN
   PERFORM public.reg_audit('register_record_void', p_record, before, public.reg_snap(p_record), p_reason);
 END $$;
 -- ---------------------------------------------------------------------------------------------------------------------
+-- The workflow dispatcher (copy of 0019, one lock check added): a locked record takes no step for non-admins.
+-- ---------------------------------------------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION reg_transition_record(p_record uuid, p_version int, p_action text, p_note text, p_stepup boolean) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public AS $$
+BEGIN
+  -- 0103 (0.15.22): a locked record takes no workflow step (submit, review, approve, reject); System Admins are exempt in reg_lock_check
+  PERFORM public.reg_lock_check(NULL, p_record, NULL, NULL);
+  IF p_action = 'reject' THEN RETURN public.reg_reject(p_record, p_version, p_note); END IF;
+  IF p_action NOT IN ('submit', 'review', 'approve') THEN PERFORM public.wf_err('invalid_transition', jsonb_build_object('detail', 'Unknown action.')); END IF;
+  RETURN public.reg_complete(p_record, p_version, p_action, p_note, p_stepup);
+END $$;
+
+-- ---------------------------------------------------------------------------------------------------------------------
 -- Ownership and execute rights, as for the other reg_* functions. The lock functions are new; the writers keep their grants.
 -- ---------------------------------------------------------------------------------------------------------------------
 DO $$
 DECLARE f text;
 BEGIN
   FOREACH f IN ARRAY ARRAY['reg_lock_check(text,uuid,jsonb,jsonb)', 'reg_record_lock_set(uuid,int,boolean,text)', 'reg_column_lock_set(text,text,boolean,text)',
-    'reg_save_record(text,uuid,int,uuid,text,jsonb,jsonb,uuid,boolean)', 'reg_void_record(uuid,int,text)'] LOOP
+    'reg_save_record(text,uuid,int,uuid,text,jsonb,jsonb,uuid,boolean)', 'reg_void_record(uuid,int,text)', 'reg_transition_record(uuid,int,text,text,boolean)'] LOOP
     EXECUTE format('ALTER FUNCTION %s OWNER TO pmis_definer', f);
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC', f);
   END LOOP;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pmis_app') THEN
     FOREACH f IN ARRAY ARRAY['reg_record_lock_set(uuid,int,boolean,text)', 'reg_column_lock_set(text,text,boolean,text)',
-      'reg_save_record(text,uuid,int,uuid,text,jsonb,jsonb,uuid,boolean)', 'reg_void_record(uuid,int,text)'] LOOP
+      'reg_save_record(text,uuid,int,uuid,text,jsonb,jsonb,uuid,boolean)', 'reg_void_record(uuid,int,text)', 'reg_transition_record(uuid,int,text,text,boolean)'] LOOP
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO pmis_app', f);
     END LOOP;
     GRANT SELECT ON register_record_locks, register_column_locks TO pmis_app;

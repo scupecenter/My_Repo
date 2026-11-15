@@ -1,7 +1,8 @@
-import { ArrowRightLeft, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Lock, Plus, RotateCcw, Unlock, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
+import { ArrowRightLeft, Columns3, Download, FileDown, FileSpreadsheet, FileUp, ListChecks, Lock, Plus, RotateCcw, Unlock, Warehouse as WarehouseIcon, Ruler } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useMe } from '@/api/hooks';
 import { downloadTemplate, useColumnLock, useRecordLock, useRecordOp, useRegisterDefs, useRegisterRecords, useTemplates, useUpdateRecord, type RecordFilters } from '@/api/registers';
 import { useRegions } from '@/api/sites';
 import type { RegisterDefinition, RegisterRecord } from '@/api/types';
@@ -12,6 +13,7 @@ import { RejectDialog } from '@/components/RejectDialog';
 import { TemplateUploadDialog } from '@/components/TemplateUploadDialog';
 import { ViewModeToggle, type ViewMode } from '@/components/ViewModeToggle';
 import { Holders } from '@/components/HolderChip';
+import { canEditColumns, useGridColumnMenu } from '@/components/GridColumnAdmin';
 import { HlcLegacyDialog } from '@/components/P4cPanels';
 import { fieldLabel, showValue } from '@/components/RegisterFields';
 import { RegisterDrawer, STATE_TONE } from '@/components/RegisterDrawer';
@@ -61,6 +63,9 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const tab = f.record_type;
   const list = useRegisterRecords(key, { ...f, record_type: tab });
   const save = useUpdateRecord(key);
+  // 0.15.22: a System Admin edits a locked row or column (the database exempts admins too); everyone else sees it read-only.
+  const me = useMe(true).data;
+  const admin = !!me?.is_system_admin;
   const [editing, setEditing] = useState<{ id: string; col: string } | null>(null);
   const templates = useTemplates();
   const [uploading, setUploading] = useState(false);
@@ -73,6 +78,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const fieldCols = def.fields.filter((x) => x.in_list);
   const defs: ColDef[] = [{ id: 'site', w: 100, min: 70, pinned: true }, { id: 'region', w: 110, min: 70, max: 240 }, { id: 'type', w: 80, min: 60 }, ...fieldCols.map((c, i) => ({ id: `f:${c.code}`, w: 150, min: 70, max: 320, off: i >= 4 })), { id: 'state', w: 130, min: 90 }, { id: 'ball', w: 180, min: 90, max: 320 }];
   const tbl = useTablePrefs(`register-${key}`, defs);
+  const grid = useGridColumnMenu(key, tbl);   // header menu: hide and personal order for all, add, rename, delete and global order for the admin
 
   // contract 0.7.0: every register has its own approved template (Template.register_key)
   const tpl = templates.data?.find((x) => x.register_key === key);
@@ -139,7 +145,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
   const cell = (id: string, r: (typeof items)[number]) => {
     if (id.startsWith('f:')) { const c = fieldCols.find((x) => `f:${x.code}` === id); const txt = c ? showValue(c, r.data[c.code], i18n.language, t) : '—'; return txt === '—' ? <Empty /> : <Trunc text={txt} />; }
     switch (id) {
-      case 'site': return <b className="mono">{r.site_code ?? '—'}</b>;
+      case 'site': return <><b className="mono">{r.site_code ?? '-'}</b>{r.locked && <span data-testid="reg-locked-badge" className="ms-2 rounded bg-hover px-1.5 text-xs text-mute">{t('registers.locked_badge')}</span>}</>;
       case 'region': return <Trunc text={rname(r.region_id as number | null)} />;
       case 'type': return r.record_type ? <span>{r.record_type.toUpperCase()}</span> : <Empty />;
       case 'state': return <StatusChip tone={STATE_TONE[r.state]} testid={`reg-state-${r.id}`} text={t(`regState.${r.state}`)}>{t(`regState.${r.state}`)}</StatusChip>;
@@ -156,6 +162,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           <option value="">{t('registers.column_lock_select')}</option>
           {def.fields.filter((x) => !x.read_only && !x.locked).map((x) => <option key={x.code} value={x.code}>{fieldLabel(x, i18n.language)}</option>)}
         </select>
+        {canEditColumns(me) && <Link className="btn" to="/admin/settings/register-columns" data-testid="register-columns-settings">{t('settings.tab_register-columns')}</Link>}
         <button type="button" className="btn" disabled={!colPick} data-testid="register-column-lock" onClick={() => setColDlg({ code: colPick, locked: true })}><Lock size={16} />{t('registers.column_lock')}</button>
         {def.fields.filter((x) => x.locked).map((x) => (
           <button key={x.code} type="button" className="btn" data-testid={`register-column-unlock-${x.code}`} onClick={() => setColDlg({ code: x.code, locked: false })}>
@@ -205,18 +212,23 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ...(key === 'as_built' ? [{ id: 'items', label: t('asb.items_link'), icon: <Ruler size={16} />, testid: 'register-asbuilt-items', onSelect: () => nav('/as-built/items') }] : []),
           ...(key === 'hlc' ? [{ id: 'hlc-legacy', label: t('p4c.legacy_menu'), icon: <ArrowRightLeft size={16} />, testid: 'register-hlc-legacy', onSelect: () => setLegacy(true) }] : []),
           ...(key === 'warehouse' ? [{ id: 'wh', label: t('wh.title'), icon: <WarehouseIcon size={16} />, testid: 'register-warehouse-screen', onSelect: () => nav('/warehouse') }] : []),
+          ...(grid.admin ? [
+            { id: 'col-add', label: t('regcols.add'), icon: <Plus size={16} />, testid: 'register-column-add', onSelect: grid.openAdd },
+            { id: 'col-manage', label: t('regcols.manage'), icon: <Columns3 size={16} />, testid: 'register-columns-manage', onSelect: () => nav(`/admin/settings/register-columns?register=${key}`) },
+          ] : []),
           { id: 'reset', label: t('table.reset'), icon: <RotateCcw size={16} />, testid: 'register-reset-cols', onSelect: tbl.reset },
         ]} />
         </>} />
       {tpl && <TemplateUploadDialog open={uploading} onClose={() => setUploading(false)} templateId={tpl.template_id} templateName={`${name} · v${tpl.current_version}`}
         onDone={(b) => { setUploading(false); toast(t('grid.uploaded')); nav(`/registers/${key}/batches/${b.id}`); }} />}
+      {grid.dialogs}
       {key === 'hlc' && <HlcLegacyDialog open={legacy} onClose={() => setLegacy(false)} />}
       <ActiveChips chips={chips} onClear={clearAll} />
       {view === 'grid' && (
         <RegisterGrid testid="register-grid" rows={real} columns={[{ id: 'site', label: label('site') }, { id: 'region', label: label('region') }, { id: 'type', label: label('type') },
           ...fieldCols.map((c) => ({ id: `f:${c.code}`, label: label(`f:${c.code}`) })), { id: 'state', label: label('state') }, { id: 'ball', label: label('ball') }]}
           cell={cell} onOpen={setRecord}
-          canEdit={(cid, r) => { const fc = inlineField(cid); return !!fc && INLINE_TYPES.includes(fc.type) && !fc.read_only && !fc.locked && !r.locked && !!r.allowed_actions?.includes('edit'); }}
+          canEdit={(cid, r) => { const fc = inlineField(cid); return !!fc && INLINE_TYPES.includes(fc.type) && !fc.read_only && (admin || (!fc.locked && !r.locked)) && !!r.allowed_actions?.includes('edit'); }}
           editing={editing} onStartEdit={(id, col) => setEditing({ id, col })}
           renderEditor={(cid, r) => {
             const fc = inlineField(cid);
@@ -228,7 +240,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
       {view === 'vertical' && <>
       <div className="card gx overflow-hidden" data-density={tbl.density}>
         <div className="relative max-h-[calc(100vh-18rem)] min-h-40 overflow-auto" data-testid="register-scroll">
-          <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
+          <HeaderRow api={tbl} label={label} colMenu={grid.colMenu} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(real.map((r) => r.id))), label: t('table.select_all'), testid: 'register-select-all' }} />
           <div data-testid="register-list" role="list" style={{ minWidth: W }}>
             {items.map((r, i) => {
               const tmp = r.id.startsWith('tmp-'), on = picked.has(r.id), cur = recordId === r.id;
@@ -237,7 +249,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
                 <div key={r.id} role="listitem" tabIndex={0} aria-selected={on || cur} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); if (!tmp) setRecord(r.id); } }} data-testid={`reg-row-${r.id}`} data-state={r.state} data-locked={r.locked || undefined} data-current={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} onClick={() => !tmp && setRecord(r.id)}
                   style={{ gridTemplateColumns: tracks(tbl.cols, true) }}
                   className={`grid w-full cursor-pointer items-center border-b border-line text-start text-sm ${rowPad(tbl.density)} ${g.className}`}>
-                  <div className="sticky start-0 z-10 flex justify-center bg-inherit">{!tmp && <SelectBox checked={on} onChange={() => flip(r.id)} label={t('table.select_row', { code: r.site_code ?? r.id })} testid={`reg-select-${r.id}`} />}</div>
+                  <div className="sticky start-0 z-10 flex items-center justify-center gap-1 bg-inherit">{!tmp && <SelectBox checked={on} onChange={() => flip(r.id)} label={t('table.select_row', { code: r.site_code ?? r.id })} testid={`reg-select-${r.id}`} />}<span data-testid="reg-row-no" className="tabular-nums text-xs text-mute">{i + 1}</span></div>
                   {tbl.cols.map((c) => { const p = pin(c, true, tbl.cols); return <div key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, r)}</div>; })}
                 </div>
               );

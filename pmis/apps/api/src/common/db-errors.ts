@@ -152,6 +152,13 @@ export function mapWfError(message: string): ProblemException | null {
       });
     case 'freeze_active':
       return new ProblemException(409, 'freeze_active', { detail: detail ?? 'Structural changes are frozen.' });
+    case 'system_field':
+      return new ProblemException(409, 'system_field', { detail: detail ?? 'This column is protected.', extra: { reason: typeof extra.reason === 'string' ? extra.reason : null } });
+    case 'conversion_blocked':
+    case 'conversion_unconfirmed':
+      return new ProblemException(409, m[1], { detail: detail ?? 'The values must be converted.', extra: { conversion: extra.conversion ?? null } });
+    case 'section_not_empty':
+      return new ProblemException(409, 'section_not_empty', { detail: detail ?? 'The section still holds columns.', extra: { count: Number(extra.count ?? 0) } });
     case 'stale_preview':
       return new ProblemException(409, 'stale_preview', { detail: detail ?? 'The preview is out of date. Preview again.' });
     case 'workflow_invalid':
