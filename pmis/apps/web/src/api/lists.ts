@@ -24,6 +24,20 @@ export const useUpdateListValue = () =>
 export const useDeleteListValue = () =>
   useListWrite<{ code: string; id: string; reason: string }>(({ code, id, reason }) => api.del(`/list-catalogues/${code}/values/${id}`, { query: { reason } }));
 
+/** F17 follow-up: the values of one list from the approved TPL-LISTVALUES file. Every row applies or none does (the server answers 422 with the rows). */
+export const useImportListValues = () => {
+  const qc = useQueryClient();
+  return useMutation<ListCatalogue & { imported?: number }, ApiError, { code: string; file: File; reason: string }>({
+    mutationFn: ({ code, file, reason }) => {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('reason', reason);
+      return api.post(`/list-catalogues/${code}/values/import`, { body });
+    },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['list-catalogues'] }); void qc.invalidateQueries({ queryKey: ['register-defs'] }); },
+  });
+};
+
 /** Q111: the proposal from the old free text of a meeting (nothing is saved) and the reviewed conversion (once per meeting). */
 export const useLegacyProposal = (key: string, id: string | null, enabled: boolean) =>
   useQuery({ queryKey: ['legacy-conversion', key, id], enabled: enabled && !!id, queryFn: () => api.get<LegacyConversionProposal>(`/registers/${key}/records/${id}/legacy-conversion`) });

@@ -1,4 +1,4 @@
--- Migration 0103 (F17 follow-up): the approved template of a list's values (kind list_values, TPL-LISTVALUES) and a wider usage check.
+-- Migration 0105 (F17 follow-up): the approved template of a list's values (kind list_values, TPL-LISTVALUES) and a wider usage check.
 --   1. The template kind list_values and its one version. The Excel import of a list's values accepts this template only (its _tpl sheet names
 --      TPL-LISTVALUES and the current version); any other file is rejected and the rejection is written to the System Log.
 --   2. list_value_in_use also looks at the custom values of sites and tasks (sites.custom, task_instances.custom). The check is a text match on
@@ -37,7 +37,7 @@ FROM template_definitions d
 WHERE d.template_id = 'TPL-LISTVALUES' AND NOT EXISTS (SELECT 1 FROM template_versions v WHERE v.template_def_id = d.id);
 UPDATE template_definitions SET current_version = 1, updated_at = now() WHERE template_id = 'TPL-LISTVALUES' AND current_version < 1;
 
--- tpl_sync as built in 0070, with the kind list_values (0103): an unknown kind must never fall through to the Master columns.
+-- tpl_sync as built in 0070, with the kind list_values (0105): an unknown kind must never fall through to the Master columns.
 CREATE OR REPLACE FUNCTION tpl_sync(p_template text, p_reason text DEFAULT NULL) RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
 DECLARE d public.template_definitions%ROWTYPE; cols jsonb; h text; cs text; cur public.template_versions%ROWTYPE; fsv integer; nv integer; why text;

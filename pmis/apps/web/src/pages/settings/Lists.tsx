@@ -1,15 +1,19 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   useAddListValue,
   useCreateList,
   useDeleteListValue,
+  useImportListValues,
   useListCatalogues,
   useUpdateList,
   useUpdateListValue,
 } from "@/api/lists";
-import type { ListCatalogue, ListCatalogueInput, ListValue } from "@/api/types";
+import { useRegisterColumns, useUpdateColumn } from "@/api/registerColumns";
+import { useRegisterDefs } from "@/api/registers";
+import { downloadFile } from "@/api/client";
+import type { ListCatalogue, ListCatalogueInput, ListValue, RegisterColumnPatch } from "@/api/types";
 import { errText, FormDialog } from "@/components/FormDialog";
 import { useToast } from "@/components/Toast";
 import { fieldErrors } from "@/lib/fields";
@@ -352,6 +356,8 @@ export function Lists() {
           </table>
         </div>
       )}
+      {cur && !mirrored(cur) && <ImportValues list={cur} />}
+      {cur && !mirrored(cur) && <BindColumn list={cur} />}
       {dlg && (
         <ListDialog
           dlg={dlg}
@@ -365,6 +371,105 @@ export function Lists() {
         />
       )}
     </section>
+  );
+}
+
+/** F17 follow-up: the approved template of the values (TPL-LISTVALUES) is downloaded, filled, and uploaded again; every row applies or none does. */
+function ImportValues({ list }: { list: ListCatalogue }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const imp = useImportListValues();
+  const [file, setFile] = useState<File | null>(null);
+  const [reason, setReason] = useState("");
+  const [dlErr, setDlErr] = useState<string | null>(null);
+  const template = async () => {
+    setDlErr(null);
+    try {
+      await downloadFile("/templates/TPL-LISTVALUES/download");
+    } catch (e) {
+      setDlErr(errText(e, t));
+    }
+  };
+  const submit = () => {
+    if (!file) return;
+    imp.mutate(
+      { code: list.code, file, reason: reason.trim() },
+      {
+        onSuccess: (r) => {
+          toast(t("lists.import_done", { count: r.imported ?? 0 }));
+          setFile(null);
+          setReason("");
+        },
+      },
+    );
+  };
+  return (
+    <div className="card space-y-2 p-4" data-testid="lists-import">
+      <h4 className="font-semibold">{t("lists.import_title")}</h4>
+      <p className="text-xs text-mute">{t("lists.import_hint")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" className="btn" data-testid="lists-template" onClick={() => void template()}>
+          <Download size={14} />
+          {t("lists.template_download")}
+        </button>
+        <input type="file" accept=".xlsx" data-testid="lists-import-file" aria-label={t("lists.import_file")} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        <input className="input max-w-64" data-testid="lists-import-reason" aria-label={t("lists.reason_short")} placeholder={t("lists.reason_short")} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <button type="button" className="btn btn-accent" data-testid="lists-import-submit" disabled={!file || reason.trim().length < 3 || imp.isPending} onClick={submit}>
+          {t("lists.import_submit")}
+        </button>
+      </div>
+      {dlErr && <p role="alert" className="text-xs text-lateInk" data-testid="lists-template-error">{dlErr}</p>}
+      {imp.isError && <p role="alert" className="text-xs text-lateInk" data-testid="lists-import-error">{errText(imp.error, t)}</p>}
+    </div>
+  );
+}
+
+/** F17 follow-up: binds this list to a list column of a register, from the list page (the same PATCH as the column dialog). */
+function BindColumn({ list }: { list: ListCatalogue }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const defs = useRegisterDefs();
+  const [reg, setReg] = useState("");
+  const [field, setField] = useState("");
+  const [reason, setReason] = useState("");
+  const cols = useRegisterColumns(reg, !!reg);
+  const bind = useUpdateColumn(reg);
+  const listCols = (cols.data?.fields ?? []).filter((c) => c.type === "list" || c.type === "multi_list");
+  const submit = () => {
+    bind.mutate(
+      { code: field, patch: { list_catalogue: list.code, reason: reason.trim() } as RegisterColumnPatch },
+      {
+        onSuccess: () => {
+          toast(t("lists.bind_done"));
+          setField("");
+          setReason("");
+        },
+      },
+    );
+  };
+  return (
+    <div className="card space-y-2 p-4" data-testid="lists-bind">
+      <h4 className="font-semibold">{t("lists.bind_title")}</h4>
+      <div className="flex flex-wrap items-center gap-2">
+        <select className="input max-w-64" data-testid="lists-bind-register" aria-label={t("lists.bind_pick_register")} value={reg} onChange={(e) => { setReg(e.target.value); setField(""); }}>
+          <option value="">{t("lists.bind_pick_register")}</option>
+          {(defs.data ?? []).map((d) => (
+            <option key={d.register_key} value={d.register_key}>{d.name_en}</option>
+          ))}
+        </select>
+        <select className="input max-w-64" data-testid="lists-bind-field" aria-label={t("lists.bind_pick_field")} value={field} disabled={!reg} onChange={(e) => setField(e.target.value)}>
+          <option value="">{t("lists.bind_pick_field")}</option>
+          {listCols.map((c) => (
+            <option key={c.code} value={c.code}>{c.label_en}</option>
+          ))}
+        </select>
+        <input className="input max-w-64" data-testid="lists-bind-reason" aria-label={t("lists.reason_short")} placeholder={t("lists.reason_short")} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <button type="button" className="btn btn-accent" data-testid="lists-bind-submit" disabled={!field || reason.trim().length < 3 || bind.isPending} onClick={submit}>
+          {t("lists.bind_submit")}
+        </button>
+      </div>
+      {bind.isError && <p role="alert" className="text-xs text-lateInk" data-testid="lists-bind-error">{errText(bind.error, t)}</p>}
+    </div>
   );
 }
 

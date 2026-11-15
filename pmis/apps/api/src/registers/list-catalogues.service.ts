@@ -298,7 +298,7 @@ export class ListCataloguesService {
   }
 
   /**
-   * 0103 (F17): the values of one list from the approved template TPL-LISTVALUES. The _tpl sheet must name that template and its current
+   * 0105 (F17): the values of one list from the approved template TPL-LISTVALUES. The _tpl sheet must name that template and its current
    * version, and the header row must be the issued one. Any other file is rejected and the rejection goes to the System Log. Every row applies
    * or none does (admin_save_list_value per row, one transaction).
    */
@@ -357,7 +357,7 @@ export class ListCataloguesService {
     if (headers.some((h, i) => cellText(header.getCell(i + 1)) !== h))
       return reject("checksum_mismatch", "The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.");
 
-    // the columns of TPL-LISTVALUES, in order (migration 0103)
+    // the columns of TPL-LISTVALUES, in order (migration 0105)
     const keys = ["code", "label_en", "label_ar", "aliases", "colour", "parent_code", "sort_order"];
     const rows: { line: number; body: Record<string, unknown> }[] = [];
     for (let r = 2; r <= data.rowCount; r++) {

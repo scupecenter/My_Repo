@@ -143,7 +143,7 @@ export class TemplatesService {
       if (regs !== null && regs.length === 0) return false;
       return (await this.access.hasGrant(auth, 'templates', 'import')) || (await this.access.hasGrant(auth, 'templates', 'download_documents'));
     }
-    // 0103 (F17): the values of a list, only for those who may edit the lists (fields)
+    // 0105 (F17): the values of a list, only for those who may edit the lists (fields)
     if (t.kind === 'list_values') return this.access.hasGrant(auth, 'fields', 'edit');
     return false;
   }
@@ -246,7 +246,7 @@ export class TemplatesService {
     return { buffer, fileName: `${t.template_id}_v${t.current_version}_${issuedAt.toISOString().slice(0, 10)}.xlsx` };
   }
 
-  /** 0103 (F17): the approved template of a list's values. One row per value; the import reads it back (list-catalogues service). */
+  /** 0105 (F17): the approved template of a list's values. One row per value; the import reads it back (list-catalogues service). */
   private async downloadListValues(auth: AuthContext, t: TemplateRow): Promise<{ buffer: Buffer; fileName: string }> {
     await this.access.requireAdmin('fields', 'edit');
     if (!(await this.access.hasGrant(auth, 'templates', 'download_documents'))) throw problems.forbidden('action_forbidden', 'You need to download documents on templates.');
