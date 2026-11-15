@@ -1796,6 +1796,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Global search across sites, registers, documents, meetings, people and contractors (0.15.19, F4)
+         * @description Ctrl+K and the top-bar search. Each group is limited to what the caller may read: `sites` needs `view` on `sites` in the site's region; `registers` needs `view` on the register's module in the record's region; `documents` need `view` on `sites` in the site's region; `meetings` need `view` on `meetings` (a global meeting, or one of the caller's regions); `contractors` need `view` on `contractors`; `people` need `view` on `admin.users`. A group the caller cannot read is absent (no 403). Matching ignores case, the Arabic letter forms (alef, taa marbuta, yaa and alef maqsura), tashkeel, tatweel, Arabic-Indic digits and Latin diacritics. Read only: an item carries the route to open, and nothing changes.
+         */
+        get: operations["globalSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search/site-ids": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Many Site IDs at once, found and not found (0.15.19, F4)
+         * @description The paste of a list of Site IDs (new lines, commas or spaces) in Ctrl+K. Matching ignores case and surrounding spaces. Only sites the caller may read (`view` on `sites`, in their regions) are found; any other ID, including one that exists but is out of reach, is listed in `not_found`, so the answer never shows whether a site exists elsewhere. Read only. Duplicates in the input are answered once.
+         */
+        post: operations["lookupSiteIds"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sites": {
         parameters: {
             query?: never;
@@ -7448,6 +7488,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/registers/{register_key}/records/{record_id}/time-in-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * How long a register record has sat in its current state (0.15.17, F1)
+         * @description Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+         */
+        get: operations["getRegisterRecordTimeInState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/state-durations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+         * @description Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+         */
+        get: operations["getStateDurationsReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks/{task_id}/blocked-by": {
         parameters: {
             query?: never;
@@ -7789,6 +7874,35 @@ export interface paths {
          *     cluster, late only, search) are applied in the browser.
          */
         get: operations["getDashboardSiteMap"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard/extras": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The F13 sections of the dashboard in one read (0.15.18)
+         * @description The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+         *     quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
+         *     `stream` is accepted and ignored. The figures are current (no reference date).
+         *     **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
+         *     may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
+         *     filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
+         *     **Bands (default of the owner, 2026-11-15, a setting for the administrator).** A risk score is probability times impact, each from 1 to 5. Low 1 to 4, medium 5 to 9, high 10 to 16,
+         *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
+         *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
+         *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+         */
+        get: operations["getDashboardExtras"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8216,6 +8330,43 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        SearchType: "sites" | "registers" | "documents" | "meetings" | "people" | "contractors";
+        SearchHit: {
+            id: string;
+            /** @description Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text. */
+            title: string;
+            subtitle: string | null;
+            region_id: number | null;
+            /** @description The app route to open (a relative path). */
+            href: string;
+            match_ranges: number[][];
+        };
+        SearchGroup: {
+            type: components["schemas"]["SearchType"];
+            /** @description Visible matches in the group (every match, not only those returned). */
+            total: number;
+            /** @description True when more matches exist than the items returned. */
+            truncated: boolean;
+            items: components["schemas"]["SearchHit"][];
+        };
+        SearchResponse: {
+            q: string;
+            groups: components["schemas"]["SearchGroup"][];
+        };
+        SiteIdLookupInput: {
+            ids: string[];
+        };
+        SiteIdLookupResult: {
+            found: {
+                id: string;
+                site_code: string;
+                name: string;
+                region_id: number;
+                href: string;
+            }[];
+            not_found: string[];
+        };
         UserPickerItem: {
             /** Format: uuid */
             id: string;
@@ -14774,6 +14925,42 @@ export interface components {
          * @enum {string}
          */
         InStateKind: "entry" | "review" | "approve";
+        StatusTransition: {
+            from_state: string | null;
+            to_state: string;
+            /** Format: date-time */
+            at: string;
+            actor?: components["schemas"]["UserRef"] | null;
+            /** @enum {string} */
+            level: "L1" | "L2";
+            admin_override: boolean;
+        };
+        RecordTimeInState: {
+            /** Format: uuid */
+            record_id: string;
+            register_key: string;
+            current_state: string;
+            /**
+             * Format: date-time
+             * @description At the last recorded transition into the current state.
+             */
+            since: string | null;
+            working_days_in_state: number | null;
+            transitions: components["schemas"]["StatusTransition"][];
+        };
+        StateDurationsReport: {
+            /** @enum {string} */
+            entity_type: "task" | "register_record";
+            items: {
+                region_id: number | null;
+                /** @description The stage code of a task, the register key of a record. */
+                group_key: string | null;
+                state: string;
+                count: number;
+                median_working_days: number;
+                p85_working_days: number;
+            }[];
+        };
         TaskTimeInState: {
             /** Format: uuid */
             task_id: string;
@@ -15781,6 +15968,98 @@ export interface components {
             by_milestone?: {
                 [key: string]: number;
             };
+        };
+        /** @description 0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15). */
+        DashboardExtras: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description The regions the figures cover (null = every region). */
+            scope_regions: components["schemas"]["RegionId"][] | null;
+            risk_matrix: components["schemas"]["DashboardRiskMatrix"];
+            data_quality: components["schemas"]["DashboardDataQuality"];
+            swap_relocation: components["schemas"]["DashboardSwapRelocation"];
+            decisions: components["schemas"]["DashboardDecisions"];
+        };
+        DashboardRiskMatrix: {
+            /** @description False when the caller may not see the risk register; the other fields are then null. */
+            available: boolean;
+            open_total: number | null;
+            /** @description Open risks whose probability or impact is outside 1 to 5 (left out of the cells). */
+            invalid_total?: number | null;
+            /** @description The 25 cells, probability 1 to 5 by impact 1 to 5. */
+            cells: components["schemas"]["DashboardRiskCell"][] | null;
+            bands: components["schemas"]["DashboardRiskBand"][] | null;
+            /** @description The open risks of the highest score first (ties by code). */
+            top_open_risks: components["schemas"]["DashboardRiskItem"][] | null;
+        };
+        DashboardRiskCell: {
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            count: number;
+        };
+        DashboardRiskBand: {
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            min: number;
+            max: number;
+            count: number;
+        };
+        DashboardRiskItem: {
+            risk_code: string;
+            statement: string;
+            probability: number;
+            impact: number;
+            score: number;
+            /** @enum {string} */
+            band: "low" | "medium" | "high" | "critical";
+            /** @enum {string} */
+            status: "open" | "in_progress";
+            risk_owner?: string | null;
+            region_id?: number | null;
+            is_global: boolean;
+        };
+        DashboardDataQuality: {
+            available: boolean;
+            sites_checked: number | null;
+            sites_with_gaps: number | null;
+            gaps_total: number | null;
+            by_kind: {
+                /** @enum {string} */
+                kind: "missing_actual_date" | "missing_field";
+                field: string | null;
+                count: number;
+            }[] | null;
+        };
+        DashboardSwapRelocation: {
+            available: boolean;
+            /** @description Active sites with no delivery scenario yet. */
+            unscenarioed: number | null;
+            /** @description One row per delivery scenario, in the order of the list (new build, expansion, hot swap, cold swap, relocation). */
+            rows: {
+                scenario: components["schemas"]["DeliveryScenario"];
+                sites_total: number;
+                /** @description Keys not_started, in_progress, on_hold, completed and cancelled. */
+                by_overall_status: {
+                    [key: string]: number;
+                };
+            }[] | null;
+        };
+        DashboardDecisions: {
+            available: boolean;
+            items: {
+                /** @enum {string} */
+                tag: "act_now" | "watch";
+                risk_code: string;
+                statement: string;
+                score: number;
+                /** @enum {string} */
+                band: "low" | "medium" | "high" | "critical";
+                risk_owner: string | null;
+                region_id: number | null;
+            }[] | null;
         };
         /** @description 0.14.5: one site of the dashboard map (OV-12). */
         SiteMapItem: {
@@ -18926,11 +19205,68 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
         };
     };
+    globalSearch: {
+        parameters: {
+            query: {
+                /** @description Text to find, 2 to 100 characters. */
+                q: string;
+                /** @description Groups to search (default: all six). */
+                types?: components["schemas"]["SearchType"][];
+                /** @description Items per group (1 to 10). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups in the order of `types`, each with its visible total. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    lookupSiteIds: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SiteIdLookupInput"];
+            };
+        };
+        responses: {
+            /** @description The sites found (with the route to open) and the IDs not found, in input order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SiteIdLookupResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     listSites: {
         parameters: {
             query?: {
                 /** @description Site code, owner ID or name. */
                 q?: string;
+                /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
+                site_codes?: string;
                 region_id?: components["schemas"]["RegionId"][];
                 /** @description Current milestone/stage code (stable code, ADR 0010). */
                 stage_code?: string;
@@ -29682,6 +30018,60 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    getRegisterRecordTimeInState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current state and transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordTimeInState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getStateDurationsReport: {
+        parameters: {
+            query: {
+                entity_type: "task" | "register_record";
+                region_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Groups. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateDurationsReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
     getTaskBlockedBy: {
         parameters: {
             query?: never;
@@ -30196,6 +30586,35 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getDashboardExtras: {
+        parameters: {
+            query?: {
+                region_id?: components["schemas"]["RegionId"];
+                cluster_code?: string;
+                scenario?: components["schemas"]["DeliveryScenario"];
+                /** @description Accepted as in `GET /dashboard`; the sections do not depend on it. */
+                stream?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardExtras"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     exportDashboard: {

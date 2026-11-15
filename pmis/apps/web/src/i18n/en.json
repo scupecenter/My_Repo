@@ -96,8 +96,24 @@
   },
   "palette": {
     "title": "Go to",
-    "placeholder": "Type a page name",
-    "empty": "No match"
+    "placeholder": "Search sites, records, documents, people, or type a page name. Paste Site IDs to check a list",
+    "empty": "No match",
+    "searching": "Searching...",
+    "error": "Search failed. Try again.",
+    "nav": "Pages",
+    "group": {
+      "sites": "Sites",
+      "registers": "Register records",
+      "documents": "Documents",
+      "meetings": "Meetings",
+      "people": "People",
+      "contractors": "Contractors"
+    },
+    "site_list": "Site ID in list",
+    "site_list_found": "{{count}} found",
+    "site_list_open": "Open these sites",
+    "not_found": "Not found ({{count}}):",
+    "too_many": "Only the first {{max}} IDs are checked"
   },
   "login": {
     "title": "Sign in to GSDN Workspace",
@@ -2471,6 +2487,66 @@
     "empty_hint": "Leads publish one update per region or team each week."
   },
   "dash": {
+    "tabs": {
+      "label": "Dashboard sections",
+      "pmo": "PMO and management",
+      "cw": "CW follow-up",
+      "te": "TE follow-up",
+      "unavailable": "This tab is not set up for this workflow."
+    },
+    "print": "Print A4 sheet",
+    "f13": {
+      "risk_title": "Risk matrix (5 x 5)",
+      "risk_hint": "Open risks by probability and impact. Bands: low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25.",
+      "risk_unavailable": "You cannot see the risk register.",
+      "probability": "Probability",
+      "impact": "Impact",
+      "open_total": "Open risks: {{n}}",
+      "invalid": "{{n}} with a value outside 1 to 5 (not in the matrix)",
+      "top_risks": "Top open risks",
+      "no_risks": "No open risks.",
+      "owner": "Owner: {{owner}}",
+      "open_risks_link": "Open the risk register",
+      "band": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "critical": "Critical"
+      },
+      "dq_title": "Data quality",
+      "dq_unavailable": "You cannot see the sites.",
+      "dq_checked": "Sites checked",
+      "dq_with_gaps": "Sites with gaps",
+      "dq_gaps": "Gaps in total",
+      "dq_missing_date": "Task without its actual date",
+      "dq_missing_field": "Missing field: {{field}}",
+      "dq_none": "No gaps found.",
+      "sw_title": "Swap and relocation by delivery scenario",
+      "sw_unavailable": "You cannot see the sites.",
+      "sw_scenario": "Delivery scenario",
+      "sw_total": "Sites",
+      "sw_unscenarioed": "Active sites without a delivery scenario: {{n}}",
+      "scen": {
+        "new_build": "New Build",
+        "expansion": "Expansion",
+        "hot_swap": "Hot Swap",
+        "cold_swap": "Cold Swap",
+        "relocation": "Relocation"
+      },
+      "overall": {
+        "not_started": "Not Started",
+        "in_progress": "In Progress",
+        "on_hold": "On Hold",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "decisions_title": "Decisions",
+      "decisions_unavailable": "You cannot see the risk register.",
+      "act_now": "Act now",
+      "watch": "Watch",
+      "no_decisions": "Nothing to decide on: no open risks.",
+      "decisions_note": "Read only. The tags change no status, owner or date."
+    },
     "title": "Dashboard",
     "subtitle": "Progress of the project against the baseline, for the regions and modules you may see.",
     "forbidden": "You cannot view the dashboard.",
