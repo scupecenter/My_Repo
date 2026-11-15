@@ -1,13 +1,20 @@
 import { Injectable } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import ExcelJS from "exceljs";
 import { z } from "zod";
 import { AccessService } from "../access/access.service";
+import type { AuthContext } from "../auth/auth.types";
+import { SyslogService } from "../auth/syslog.service";
 import { mapDbError } from "../common/db-errors";
 import { parseIfMatch } from "../common/etag";
 import { ProblemException, problems } from "../common/problem";
 import { boolParam, Query } from "../common/query";
 import { parse, uuidSchema } from "../common/zod";
 import { DbService } from "../db/db.service";
+import { DATA_SHEET, TPL_SHEET } from "../templates/templates.service";
+import type { UploadedFile } from "../templates/upload.interceptor";
+import { importMaxRows } from "../templates/upload.interceptor";
+import { guardXlsx } from "../templates/xlsx-guard";
 
 const CODE = /^[A-Z][A-Za-z0-9]{1,40}$/;
 const reason = z.string().trim().min(3).max(1000);
@@ -121,6 +128,7 @@ export class ListCataloguesService {
   constructor(
     private readonly db: DbService,
     private readonly access: AccessService,
+    private readonly syslog: SyslogService,
   ) {}
 
   private async rows(
@@ -258,7 +266,7 @@ export class ListCataloguesService {
     await this.call(
       Prisma.sql`SELECT admin_delete_list_value(${code}::text, ${rawId}::uuid, ${why}::text, ${version}::int)`,
     );
-    return { deleted: true };
+    return this.get(code);
   }
 
   async addValue(code: string, raw: unknown): Promise<Record<string, unknown>> {
@@ -287,5 +295,102 @@ export class ListCataloguesService {
       Prisma.sql`SELECT admin_save_list_value(${code}::text, ${rawId}::uuid, ${JSON.stringify(b)}::jsonb, ${why}::text, ${version}::int)`,
     );
     return this.get(code);
+  }
+
+  /**
+   * 0103 (F17): the values of one list from the approved template TPL-LISTVALUES. The _tpl sheet must name that template and its current
+   * version, and the header row must be the issued one. Any other file is rejected and the rejection goes to the System Log. Every row applies
+   * or none does (admin_save_list_value per row, one transaction).
+   */
+  async importValues(
+    auth: AuthContext,
+    code: string,
+    file: UploadedFile | undefined,
+    rawReason: unknown,
+    requestId: string | undefined,
+  ): Promise<Record<string, unknown>> {
+    await this.access.requireAdmin("fields", "edit");
+    await this.get(code);
+    const why = parse(reason, rawReason);
+    if (!file || file.size === 0)
+      throw problems.validation([{ path: "/file", code: "required", message: 'Send the filled template as the form field "file".' }]);
+    const reject = async (reasonCode: string, detail: string, ctx: Record<string, unknown> = {}): Promise<never> => {
+      await this.syslog.write("warn", `list values import rejected: ${reasonCode}`, { reason: reasonCode, detail, list: code, file_name: file.originalname.slice(0, 200), ...ctx }, auth.user.id, requestId, "list-import");
+      throw new ProblemException(422, "template_rejected", { detail, extra: { reason: reasonCode }, commit: true });
+    };
+
+    const guard = guardXlsx(file.originalname, file.buffer);
+    if (!guard.ok) return reject(guard.reason ?? "not_xlsx", guard.detail ?? "The file is not accepted.");
+    const wb = new ExcelJS.Workbook();
+    try {
+      await wb.xlsx.load(file.buffer as unknown as ExcelJS.Buffer);
+    } catch {
+      return reject("not_xlsx", "The file is not a valid .xlsx workbook.");
+    }
+    const cellText = (cell: ExcelJS.Cell) => (cell.text ?? "").toString().trim();
+
+    const tpl = wb.getWorksheet(TPL_SHEET);
+    if (!tpl) return reject("tpl_missing", "This file is not an approved PMIS template: the hidden _tpl sheet is missing.");
+    const kv = new Map<string, string>();
+    tpl.eachRow((row) => {
+      const k = cellText(row.getCell(1));
+      if (k) kv.set(k, cellText(row.getCell(2)));
+    });
+    const templateId = (kv.get("template_id") ?? "").slice(0, 60);
+    const versionText = (kv.get("version") ?? "").slice(0, 12);
+    if (templateId !== "TPL-LISTVALUES" || !/^[0-9]{1,6}$/.test(versionText))
+      return reject("wrong_template", `This file is not the list values template (TPL-LISTVALUES); it names ${templateId || "no template"}.`, { template_id: templateId });
+
+    const cur = await this.db.tx.$queryRaw<{ current_version: number; columns: { header: string }[] }[]>(Prisma.sql`
+      SELECT d.current_version, v.columns FROM template_definitions d
+      JOIN template_versions v ON v.template_def_id = d.id AND v.is_current
+      WHERE d.template_id = 'TPL-LISTVALUES' AND d.is_active`);
+    if (!cur[0]) return reject("template_unknown_or_inactive", "The list values template is not in use.");
+    const version = Number(versionText);
+    if (version !== cur[0].current_version)
+      return reject("outdated_version", `This file was made from version ${version} of TPL-LISTVALUES; the current version is ${cur[0].current_version}. Download the template again.`, { version, current_version: cur[0].current_version });
+
+    const data = wb.getWorksheet(DATA_SHEET);
+    if (!data) return reject("checksum_mismatch", "The Data sheet is missing.");
+    const headers = cur[0].columns.map((c) => c.header);
+    const header = data.getRow(1);
+    if (headers.some((h, i) => cellText(header.getCell(i + 1)) !== h))
+      return reject("checksum_mismatch", "The header row of the file was changed. Use the template as it was issued, without adding, moving or renaming columns.");
+
+    // the columns of TPL-LISTVALUES, in order (migration 0103)
+    const keys = ["code", "label_en", "label_ar", "aliases", "colour", "parent_code", "sort_order"];
+    const rows: { line: number; body: Record<string, unknown> }[] = [];
+    for (let r = 2; r <= data.rowCount; r++) {
+      const cells = keys.map((_, i) => cellText(data.getRow(r).getCell(i + 1)));
+      if (cells.every((v) => v === "")) continue;
+      if (rows.length >= importMaxRows())
+        return reject("size_or_rows_exceeded", `At most ${importMaxRows()} values per file.`);
+      const body: Record<string, unknown> = {};
+      cells.forEach((v, i) => {
+        if (v === "") return;
+        const key = keys[i] ?? "";
+        if (key === "aliases") body.aliases = v.split(";").map((x) => x.trim()).filter(Boolean);
+        else if (key === "sort_order") body.sort_order = Number(v);
+        else body[key] = v;
+      });
+      rows.push({ line: r, body });
+    }
+
+    const errors: { path: string; code: string; message: string }[] = [];
+    let applied = 0;
+    for (const row of rows) {
+      try {
+        await this.call(
+          Prisma.sql`SELECT admin_save_list_value(${code}::text, NULL::uuid, ${JSON.stringify(row.body)}::jsonb, ${why}::text, NULL::int)`,
+        );
+        applied++;
+      } catch (e) {
+        if (!(e instanceof ProblemException)) throw e;
+        errors.push({ path: `/line ${row.line}`, code: "invalid", message: e.message });
+      }
+    }
+    if (errors.length > 0) throw problems.validation(errors.slice(0, 50));
+    await this.syslog.write("info", "list values imported", { list: code, applied, version }, auth.user.id, requestId, "list-import");
+    return { ...(await this.get(code)), imported: applied };
   }
 }

@@ -1,6 +1,7 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import type { Client as PgClient } from "pg";
 import { randomBytes } from "node:crypto";
+import ExcelJS from "exceljs";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, superDb } from "./helpers";
 import { plainAdmin } from "./wf-helpers";
@@ -37,6 +38,19 @@ const patch = async (path: string, body: Record<string, unknown>) => {
   };
   const version = m[2] ? got.values.find((v) => v.id === m[2])!.version : got.version;
   return admin.api.call("patch", path, body, { "If-Match": `"${version}"` });
+};
+
+// a workbook like the ones the template issues: the Data sheet with the issued header row, and the hidden _tpl sheet
+const workbook = async (tplId: string, version: number, rows: (string | number)[][]) => {
+  const wb = new ExcelJS.Workbook();
+  const data = wb.addWorksheet("Data");
+  data.addRow(["Value code", "Label EN", "Label AR", "Aliases (separate with ;)", "Colour (#RRGGBB)", "Parent value", "Sort order"]);
+  for (const r of rows) data.addRow(r);
+  const tpl = wb.addWorksheet("_tpl");
+  tpl.addRow(["template_id", tplId]);
+  tpl.addRow(["version", String(version)]);
+  tpl.state = "hidden";
+  return Buffer.from(await wb.xlsx.writeBuffer());
 };
 
 const createList = (c: string, extra: Record<string, unknown> = {}) =>
@@ -234,5 +248,40 @@ describe("dropdown lists (migration 0102)", () => {
       reason: "Make a loop",
     });
     expect(loop.status).toBe(422);
+  });
+  it("the values import accepts only the issued list values template; a bad file is refused and nothing is applied", async () => {
+    const L = code("Imported");
+    await createList(L);
+    const wrong = await workbook("TPL-SITE-NEW", 1, [["Gamma", "Gamma", "", "", "", "", ""]]);
+    const refused = await admin.api
+      .call("post", `/list-catalogues/${L}/values/import`, undefined)
+      .attach("file", wrong, "wrong.xlsx")
+      .field("reason", "F17 wrong template");
+    expect(refused.status).toBe(422);
+    expect((await listOf(L)).values).toHaveLength(0);
+
+    const badRow = await workbook("TPL-LISTVALUES", 1, [
+      ["Delta", "Delta", "", "", "", "", ""],
+      ["Epsilon", "Epsilon", "", "", "red", "", ""],
+    ]);
+    const badRes = await admin.api
+      .call("post", `/list-catalogues/${L}/values/import`, undefined)
+      .attach("file", badRow, "bad.xlsx")
+      .field("reason", "F17 bad colour");
+    expect(badRes.status).toBe(422);
+    expect((await listOf(L)).values).toHaveLength(0);
+
+    const good = await workbook("TPL-LISTVALUES", 1, [
+      ["Alpha", "Alpha EN", "", "a1;a2", "#2E86C1", "", 10],
+      ["Beta", "Beta EN", "", "", "", "", ""],
+    ]);
+    const ok = await admin.api
+      .call("post", `/list-catalogues/${L}/values/import`, undefined)
+      .attach("file", good, "good.xlsx")
+      .field("reason", "F17 import");
+    expect(ok.status).toBe(200);
+    const alpha = (await listOf(L)).values.find((x) => x.code === "Alpha");
+    expect(alpha?.colour).toBe("#2E86C1");
+    expect((await listOf(L)).values.map((x) => x.code).sort()).toEqual(["Alpha", "Beta"]);
   });
 });

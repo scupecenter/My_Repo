@@ -20,6 +20,10 @@ export const useAddListValue = () => useListWrite<{ code: string; body: ListValu
 export const useUpdateListValue = () =>
   useListWrite<{ code: string; id: string; version: number; body: ListValuePatch }>(({ code, id, version, body }) => api.patch(`/list-catalogues/${code}/values/${id}`, { version, body }));
 
+/** F17: a hard delete of a value that is not used (the server refuses a value in use or the default; the reason is a query parameter). */
+export const useDeleteListValue = () =>
+  useListWrite<{ code: string; id: string; reason: string }>(({ code, id, reason }) => api.del(`/list-catalogues/${code}/values/${id}`, { query: { reason } }));
+
 /** Q111: the proposal from the old free text of a meeting (nothing is saved) and the reviewed conversion (once per meeting). */
 export const useLegacyProposal = (key: string, id: string | null, enabled: boolean) =>
   useQuery({ queryKey: ['legacy-conversion', key, id], enabled: enabled && !!id, queryFn: () => api.get<LegacyConversionProposal>(`/registers/${key}/records/${id}/legacy-conversion`) });

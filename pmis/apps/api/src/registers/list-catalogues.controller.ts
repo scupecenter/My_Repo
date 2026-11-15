@@ -9,12 +9,16 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   Res,
+  UploadedFile as Upload,
+  UseInterceptors,
 } from "@nestjs/common";
-import type { Response } from "express";
+import type { Request, Response } from "express";
 import type { AuthContext } from "../auth/auth.types";
 import { Auth } from "../auth/decorators";
 import { etagHeader } from "../common/etag";
+import { UploadInterceptor, type UploadedFile } from "../templates/upload.interceptor";
 import { ListCataloguesService } from "./list-catalogues.service";
 
 /** The list catalogue (contract tag `lists`, 0.12.5, Q104). */
@@ -74,6 +78,19 @@ export class ListCataloguesController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.tag(res, await this.lists.addValue(code, body));
+  }
+
+  @Post(":code/values/import")
+  @HttpCode(200)
+  @UseInterceptors(UploadInterceptor)
+  async importValues(
+    @Auth() auth: AuthContext,
+    @Param("code") code: string,
+    @Upload() file: UploadedFile | undefined,
+    @Body() body: { reason?: unknown } | undefined,
+    @Req() req: Request & { id?: string },
+  ) {
+    return this.lists.importValues(auth, code, file, body?.reason, req.id);
   }
 
   @Delete(":code/values/:id")
