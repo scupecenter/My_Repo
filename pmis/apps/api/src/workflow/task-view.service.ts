@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { AuthContext } from '../auth/auth.types';
+import { problems } from '../common/problem';
+import { boolParam } from '../common/query';
 import { DbService } from '../db/db.service';
 
 export interface UserRefDto {
@@ -33,6 +35,10 @@ export interface BallInCourtDto {
   votes_needed?: number;
   external_party?: { id: string; name: string; type: string };
   no_eligible_holder: boolean;
+  /** F2 (0.15.30): when the current level opened (the ball landed with its holders). */
+  since?: string | null;
+  /** F2 (0.15.30): working days from `since` to today (weekend Friday and Saturday plus the holidays of the task's calendar). */
+  held_wd?: number | null;
 }
 
 export interface TaskSummaryDto {
@@ -73,6 +79,10 @@ export interface TaskSummaryDto {
     /** 0052 (D4b): tentative holidays counted inside the SLA period; non-empty = the due date carries a "tentative date" badge. */
     tentative_holidays: string[];
     due_date_tentative: boolean;
+    /** F2 (0.15.30): working days past the SLA maximum (0 when not late); null without a measured clock. */
+    late_wd: number | null;
+    /** F2 (0.15.30): working days left to the SLA maximum of a running task (0 when late); null when approved or without a measured clock. */
+    left_wd: number | null;
   };
   slots_filled: number;
   slots_required: number;
@@ -89,6 +99,14 @@ export interface TaskSummaryDto {
   /** 0092: approved directly by the historical Master import (admin override, no L2): the "Admin override" badge. */
   historical_direct_approved: boolean;
   holder_account_status?: 'active' | 'deactivated' | 'deleted';
+  /** F2 (0.15.30): the last time a person acted on the open task (task_last_activity); null when the task is not open. */
+  last_activity_at: string | null;
+  /** F2 (0.15.30): working days since last_activity_at. */
+  idle_working_days: number | null;
+  /** F2 (0.15.30): idle for at least stale_after_wd working days (the stale badge). */
+  stale: boolean;
+  /** F2 (0.15.30): the idle limit in force (dashboard setting stale_idle_days, default 2). */
+  stale_after_wd: number;
   lock_reasons: { kind: string; ref_code: string | null; message: string; count: number | null }[];
   /** Only in the Site Register task grid: register-owned fields shown read-through, editable through the source register (spec 2.7). */
   register_fields?: Record<string, unknown>[];
@@ -157,6 +175,44 @@ export interface TaskRow {
   slots_filled: bigint;
   slots_required: bigint;
   template_id: string | null;
+  ball_since: Date | null;
+  ball_held_wd: number | null;
+  last_activity_at: Date | null;
+  idle_wd: number | null;
+  stale_after: number;
+}
+
+/** The task states the stale flag looks at: the open ones, as the dashboard counter of stale tasks (F20) counts them. */
+export const STALE_STATES = ['open', 'entry', 'in_review', 'in_approval', 'rejected'];
+
+/** F2: the SLA overrun of a task, in working days, from the elapsed working days and the SLA maximum (min = green, max = limit, above = late). */
+export function slaOverrun(state: string, elapsed: number | null, max: number | null, measured: boolean): { late_wd: number | null; left_wd: number | null } {
+  if (!measured || elapsed === null || max === null) return { late_wd: null, left_wd: null };
+  const late = Math.max(0, elapsed - max);
+  return { late_wd: late, left_wd: state === 'approved' ? null : Math.max(0, max - elapsed) };
+}
+
+const SLA_COLOURS = ['green', 'amber', 'red', 'none'];
+
+/**
+ * F2 (0.15.30): the list filters on the timing of a task, as conditions on the aliases of taskSelect (sl, act, cfg):
+ *  - `sla_colour`: one or more of green, amber, red, none (repeated or comma separated);
+ *  - `stale`: true = idle for at least the stale limit, false = not stale.
+ */
+export function timingFilters(q: Record<string, unknown>): Prisma.Sql[] {
+  const out: Prisma.Sql[] = [];
+  const raw = q.sla_colour;
+  if (raw !== undefined) {
+    const list = (Array.isArray(raw) ? raw : [raw]).flatMap((x) => (typeof x === 'string' ? x.split(',') : [x])).map((x) => (typeof x === 'string' ? x.trim() : x));
+    if (list.length === 0 || list.some((x) => typeof x !== 'string' || !SLA_COLOURS.includes(x))) {
+      throw problems.validation([{ path: '/sla_colour', code: 'invalid', message: 'sla_colour is one or more of green, amber, red and none.' }]);
+    }
+    out.push(Prisma.sql`coalesce(sl.colour, 'none') = ANY(${[...new Set(list as string[])]}::text[])`);
+  }
+  const stale = boolParam(q, 'stale');
+  if (stale === true) out.push(Prisma.sql`coalesce(act.idle_wd >= cfg.stale_after, false)`);
+  if (stale === false) out.push(Prisma.sql`NOT coalesce(act.idle_wd >= cfg.stale_after, false)`);
+  return out;
 }
 
 interface AssigneeRow {
@@ -204,7 +260,8 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
          WHERE ds.task_id = t.id AND dt.is_mandatory AND ds.status::text <> 'not_required') AS slots_required,
       -- the approved template that enters this task's register (0037): the task's own register source, if it has one
       (SELECT tpl.template_id FROM register_task_sources rts JOIN template_definitions tpl ON tpl.register_key = rts.register_key AND tpl.is_active
-         WHERE rts.task_code = td.code AND rts.is_active ORDER BY rts.sort_order LIMIT 1) AS template_id
+         WHERE rts.task_code = td.code AND rts.is_active ORDER BY rts.sort_order LIMIT 1) AS template_id,
+      bc.since AS ball_since, bc.held_wd AS ball_held_wd, act.last_at AS last_activity_at, act.idle_wd, cfg.stale_after
     FROM task_instances t
     JOIN sites s ON s.id = t.site_id
     JOIN workflow_definitions wd ON wd.id = s.workflow_version_id
@@ -229,6 +286,18 @@ export function taskSelect(extraWhere: Prisma.Sql, tail: Prisma.Sql = Prisma.emp
       FROM (SELECT CASE WHEN t.state IN ('open', 'entry', 'in_review', 'in_approval') THEN wf_kind(lv.n, greatest(t.current_level, 1)) END AS kind) x
       WHERE x.kind IS NOT NULL
     ) k ON true
+    LEFT JOIN LATERAL (
+      -- F2: the ball at the current level since the level opened (older rows: the last approved transition, then the last update), in working days
+      SELECT x.since, cal_workdays_between(cal_local_date(x.since), cal_today(), r.calendar_id) AS held_wd
+      FROM (SELECT CASE WHEN k.kind IS NOT NULL THEN coalesce(t.level_opened_at,
+                     (SELECT max(tr.at) FROM status_transitions tr WHERE tr.entity_type = 'task' AND tr.entity_id = t.id), t.updated_at) END AS since) x
+    ) bc ON true
+    LEFT JOIN LATERAL (
+      -- F2: the stale flag: working days since the last activity of a person on the open task (0116)
+      SELECT y.last_at, cal_workdays_between(cal_local_date(y.last_at), cal_today(), r.calendar_id) AS idle_wd
+      FROM (SELECT CASE WHEN t.state::text = ANY(${STALE_STATES}::text[]) THEN task_last_activity(t.id) END AS last_at) y
+    ) act ON true
+    CROSS JOIN (SELECT task_stale_idle_days() AS stale_after) cfg
     WHERE ${extraWhere}
     ${tail}`;
 }
@@ -313,6 +382,7 @@ export class TaskViewService {
           measured: r.sla_measured !== false,
           tentative_holidays: r.sla_tentative ?? [],
           due_date_tentative: (r.sla_tentative ?? []).length > 0,
+          ...slaOverrun(r.state, r.sla_elapsed, r.sla_max, r.sla_measured !== false && r.sla_rule_id !== null),
         },
         slots_filled: Number(r.slots_filled),
         slots_required: Number(r.slots_required),
@@ -324,6 +394,10 @@ export class TaskViewService {
         lock_bypassed: r.lock_bypassed === true,
         lock_bypass_reason: r.lock_bypass_reason ?? null,
         historical_direct_approved: r.historical_direct_approved === true,
+        last_activity_at: r.last_activity_at ? r.last_activity_at.toISOString() : null,
+        idle_working_days: r.idle_wd ?? null,
+        stale: r.idle_wd !== null && r.idle_wd !== undefined && r.idle_wd >= r.stale_after,
+        stale_after_wd: r.stale_after,
         lock_reasons: [],
         version: r.version,
       };
@@ -337,6 +411,8 @@ export class TaskViewService {
           holders: r.cell_id ? (byCell.get(r.cell_id) ?? []) : [],
           rule: (r.rule as BallInCourtDto['rule']) ?? 'any_one',
           no_eligible_holder: r.has_holder === false,
+          since: r.ball_since ? r.ball_since.toISOString() : null,
+          held_wd: r.ball_held_wd ?? null,
         };
         if (pinned) {
           dto.ball_in_court.claimed_by = { id: pinned.id, display_name: pinned.display_name, employee_id: pinned.employee_id?.trim() ?? null };

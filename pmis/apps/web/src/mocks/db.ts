@@ -219,7 +219,33 @@ export function toSummary(t: MockTask): TaskSummary {
   void [_cb, _as, _s, _w, _l, _d, _e, _b, _g, _sl, _st, _c, _lk];
   const ball = ballFor(t), away = absentOn('2026-10-25');
   const bad = ball.holders.find((h) => h.account_status && h.account_status !== 'active');
-  return { ...rest, ball_in_court: ball, ...(bad ? { holder_account_status: bad.account_status } : {}), lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [], holder_absent: rest.holder_absent || (ball.holders.some((h) => !!h.employee_id && away.has(h.employee_id))) };
+  const f2 = timingOf(t);
+  return { ...rest, ...f2.task, ball_in_court: { ...ball, ...f2.ball }, ...(bad ? { holder_account_status: bad.account_status } : {}), lock_reasons: t.state === 'locked' ? (t.locks ?? []) : [], holder_absent: rest.holder_absent || (ball.holders.some((h) => !!h.employee_id && away.has(h.employee_id))) };
+}
+
+/** F2 (0.15.30): the stale idle limit of the mock (the default of the setting stale_idle_days). */
+export const MOCK_STALE_AFTER = 2;
+const OPEN_STATES = ['open', 'entry', 'in_review', 'in_approval'];
+
+/** F2 (0.15.30): ball since and its working days, the SLA overrun, and the stale flag, derived from the mock task as the API derives them. */
+export function timingOf(t: MockTask): { task: Pick<TaskSummary, 'sla' | 'idle_working_days' | 'last_activity_at' | 'stale' | 'stale_after_wd'>; ball: Pick<BallInCourt, 'since' | 'held_wd'> } {
+  const open = OPEN_STATES.includes(t.state);
+  const s = t.sla;
+  const clock = !!s && s.measured !== false && s.elapsed_wd != null && s.max_wd != null;
+  const sla = s ? { ...s, late_wd: clock ? Math.max(0, s.elapsed_wd! - s.max_wd!) : null, left_wd: clock && t.state !== 'approved' ? Math.max(0, s.max_wd! - s.elapsed_wd!) : null } : s;
+  const idle = open ? (t.idle_working_days ?? 0) : null;
+  const since = open ? (t.waiting_since ?? null) : null;
+  return {
+    task: { sla, idle_working_days: idle, last_activity_at: since, stale: idle !== null && idle >= MOCK_STALE_AFTER, stale_after_wd: MOCK_STALE_AFTER },
+    ball: { since, held_wd: open ? (t.ball_in_court?.held_wd ?? idle ?? 0) : null },
+  };
+}
+
+/** F2 (0.15.30): the sla_colour and stale filters of GET /approvals and GET /me/tasks, on summaries. */
+export function timingFilter(u: URLSearchParams): (x: TaskSummary) => boolean {
+  const colours = u.getAll('sla_colour').flatMap((c) => c.split(',')).filter(Boolean);
+  const stale = u.get('stale');
+  return (x) => (!colours.length || colours.includes(x.sla?.colour ?? 'none')) && (stale === null || (stale === 'true') === !!x.stale);
 }
 
 export function toApproval(t: MockTask): ApprovalItem {

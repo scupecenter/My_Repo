@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw';
 import { API_BASE } from '@/api/client';
 import type { Problem } from '@/api/types';
 import { uid } from './ids';
-import { ACCOUNTS, STAFF, approvalsFor, canAct, cred, db, meBody, save, sessionBody, skipPath, stepUpValid, tfLabel, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
+import { ACCOUNTS, STAFF, approvalsFor, canAct, cred, db, meBody, save, sessionBody, skipPath, stepUpValid, tfLabel, timingFilter, toApproval, toDetail, toSummary, viewer, type MockTask } from './db';
 import { touch } from './sites';
 
 const B = API_BASE;
@@ -103,11 +103,12 @@ export const handlers = [
   http.get(`${B}/me/tasks`, ({ request }) => {
     const g = guard(); if (g) return g;
     const v = viewer()!;
-    const bucket = new URL(request.url).searchParams.get('bucket');
-    if (bucket === 'late') return page(v.key === 'pm' ? db().extra.filter((t) => t.sla?.colour === 'red').map(toSummary) : []);
-    if (bucket === 'do_now') return page(approvalsFor().map(toSummary));
+    const u = new URL(request.url).searchParams, bucket = u.get('bucket');
+    const keep = timingFilter(u); // F2 (0.15.30): sla_colour and stale
+    if (bucket === 'late') return page(v.key === 'pm' ? db().extra.filter((t) => t.sla?.colour === 'red').map(toSummary).filter(keep) : []);
+    if (bucket === 'do_now') return page(approvalsFor().map(toSummary).filter(keep));
     const waiting = db().tasks.filter((t) => (t.state === 'in_review' || t.state === 'in_approval') && t.submitted_by === v.employee_id && !canAct(t.level_kind));
-    return page(waiting.map(toSummary));
+    return page(waiting.map(toSummary).filter(keep));
   }),
 
   // ---- approvals
@@ -115,8 +116,9 @@ export const handlers = [
     const g = guard(); if (g) return g;
     const u = new URL(request.url).searchParams;
     const tab = u.get('tab') ?? 'all', q = (u.get('q') ?? '').toLowerCase();
+    const keep = timingFilter(u); // F2 (0.15.30): sla_colour and stale
     const items = approvalsFor().filter((t) => (tab === 'all' || t.level_kind === tab) && (!q || `${t.site_code} ${t.name_en} ${t.task_code}`.toLowerCase().includes(q)));
-    return page(items.map(toApproval));
+    return page(items.map(toApproval).filter((a) => keep(a.task)));
   }),
   http.post(`${B}/approvals/bulk`, async ({ request }) => {
     const g = guard(); if (g) return g;

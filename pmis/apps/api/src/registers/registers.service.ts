@@ -117,6 +117,8 @@ interface RecordRow {
   votes_done: bigint | null;
   entry_holder: boolean;
   pin_holds: boolean | null;
+  ball_since: Date | null;
+  ball_held_wd: number | null;
   has_open: boolean;
   locked: boolean;
   warnings: unknown[] | null;
@@ -336,6 +338,9 @@ export class RegistersService {
         k.kind, k.cell_id::text AS cell_id, k.rule::text AS rule, k.has_holder, k.is_holder, k.votes_needed, k.votes_done,
         reg_is_eligible(r.id, 'entry', ${actor}::uuid) AS entry_holder,
         CASE WHEN r.ball_in_court_user_id IS NOT NULL AND r.state = 'entry' THEN reg_is_eligible(r.id, 'entry', r.ball_in_court_user_id) END AS pin_holds,
+        -- F2 (0.15.30): the ball at the current level since the level opened, in working days (the default calendar; registers have no SLA rule)
+        CASE WHEN r.state IN ('entry', 'in_review', 'in_approval') THEN coalesce(r.level_opened_at, r.submitted_at, r.updated_at) END AS ball_since,
+        CASE WHEN r.state IN ('entry', 'in_review', 'in_approval') THEN cal_workdays_between(cal_local_date(coalesce(r.level_opened_at, r.submitted_at, r.updated_at)), cal_today()) END AS ball_held_wd,
         reg_warnings(r.id) AS warnings,
         CASE WHEN r.register_key = 'hlc' THEN hlc_pr_view(r.id) END AS purchase_requests,
         EXISTS (SELECT 1 FROM register_records o WHERE o.entity_id = r.entity_id AND o.state IN ('entry', 'in_review', 'in_approval')) AS has_open,
@@ -567,6 +572,8 @@ export class RegistersService {
           holders: r.cell_id ? (byCell.get(r.cell_id) ?? []) : [],
           rule: r.rule ?? 'any_one',
           no_eligible_holder: r.has_holder === false,
+          since: r.ball_since ? r.ball_since.toISOString() : null,
+          held_wd: r.ball_held_wd ?? null,
           ...(pinned ? { claimed_by: pinned } : {}),
           ...(r.rule === 'all_members' ? { votes_needed: Number(r.votes_needed ?? 0), votes_done: Number(r.votes_done ?? 0) } : {}),
         };

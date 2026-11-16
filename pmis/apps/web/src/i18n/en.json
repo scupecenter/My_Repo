@@ -4894,5 +4894,26 @@
     "col": "Column",
     "header": "Header",
     "menus": "SITE 360 menus"
+  },
+  "timing": {
+    "late": "+{{count}} wd late",
+    "left": "{{count}} wd left",
+    "overrun_title": "SLA {{min}}–{{max}} working days; {{elapsed}} used. Green up to the minimum, amber up to the maximum, red after it.",
+    "held": "{{count}} wd",
+    "held_title": "With the current holders since {{date}}: {{count}} working days (weekends and holidays not counted).",
+    "party_title": "External party responsible",
+    "stale": "Stale",
+    "stale_title": "No activity for {{count}} working days (limit {{limit}}).",
+    "filter_stale": "Stale",
+    "filter_amber": "Near the SLA limit",
+    "filter_green": "Within target",
+    "filter_red": "Late",
+    "holder": "Ball holder",
+    "holder_all": "All holders",
+    "sort": "Sort",
+    "sort_": "Default order",
+    "sort_held": "Held longest",
+    "sort_overrun": "Most overdue",
+    "filters": "Timing filters"
   }
 }

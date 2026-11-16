@@ -329,7 +329,8 @@ export class DashboardExtrasService {
    *  - as_built_submitted: sites with the TE PAC milestone approved whose As-Built TE part is submitted, in % of those sites.
    *  - time_in_state_p85: the 85th percentile, in working days, of the closed intervals of the task transitions (status_transitions, migration
    *    0098) in a working state (not approved, n/a or skipped); the interval runs to the next transition of the same task.
-   *  - stale_tasks: open tasks idle for at least stale_idle_days working days (since their last update), in % of the open tasks.
+   *  - stale_tasks: open tasks idle for at least stale_idle_days working days (since the last activity of a person, task_last_activity of
+   *    migration 0116, the same rule as the stale badge of the task lists), in % of the open tasks.
    *  - on_air_vs_target: sites whose On-Air milestone is approved in the current month, in % of the monthly target (null without a target).
    */
   private async counterSources(
@@ -413,8 +414,9 @@ export class DashboardExtrasService {
         { open_total: bigint; stale: bigint }[]
       >(Prisma.sql`
       SELECT count(*) AS open_total,
-             count(*) FILTER (WHERE cal_workdays_between(cal_local_date(ti.updated_at), cal_today()) >= ${cfg.stale_idle_days}::int) AS stale
+             count(*) FILTER (WHERE cal_workdays_between(cal_local_date(task_last_activity(ti.id)), cal_today(), r.calendar_id) >= ${cfg.stale_idle_days}::int) AS stale
       FROM task_instances ti
+      LEFT JOIN sla_rules r ON r.id = ti.sla_rule_id
       JOIN sites s ON s.id = ti.site_id
       LEFT JOIN clusters c ON c.id = s.cluster_id
       WHERE ti.state::text IN ('open', 'entry', 'in_review', 'in_approval', 'rejected')

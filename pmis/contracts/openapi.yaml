@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.29
+  version: 0.15.30
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.30 (2026-11-16): ball in court with its duration, the SLA overrun in working days and the stale flag (F2 of the 2026-11-14 features plan; migration 0116; CHANGELOG 153). Additive and read only. (1) `BallInCourt.since` (when the current level opened) and `BallInCourt.held_wd` (working days from then to today: weekend Friday and Saturday plus the holidays of the task's SLA calendar, the default calendar for register records; never calendar days), on tasks and on register records in approval. (2) `SlaInfo.late_wd` (working days past the SLA maximum, 0 when not late) and `SlaInfo.left_wd` (working days left to the maximum of a running task, null once approved); the colour stays the rule's: green up to the minimum, amber up to the maximum, red above it. (3) `TaskSummary.last_activity_at` (the last action of a person on the open task: an audit row, a workflow step, a comment, a file upload or the opening of its level; not a system recalculation), `idle_working_days` (now filled), `stale` and `stale_after_wd` (the existing setting `stale_idle_days` of `PUT /settings/dashboard`, default 2; the dashboard counter `stale_tasks` uses the same rule). (4) Filters `sla_colour` (repeated or comma separated: green, amber, red, none) and `stale` (true or false) on `GET /approvals` and `GET /me/tasks`; an unknown value is 422. (5) `GET /me/tasks` is now served by the API (it was mock only): `do_now` = at a level I can act on now and not late, `late` = the same past the SLA maximum, `waiting` = submitted by me last and now at a level I do not hold; without a bucket do_now and late together; oldest level first; the Sites region scope applies.
     - 0.15.29 (2026-11-16, was 0.15.27 before the merge of #141): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16). (4) Amended 2026-11-15 (migration 0113, CHANGELOG 150, additive): the seven counters that had no source now have one (`vehicle_ready`, `advances_open_after_close`, `dismantle_pending`, `as_built_submitted`, `time_in_state_p85` in working days, `stale_tasks`, `on_air_vs_target`); `pending_kpis` lists only the KPIs whose value is null (no base, or no monthly target). `stale_idle_days` is the idle limit of `stale_tasks` (an integer from 1 to 30, default 2; optional on `PUT /settings/dashboard`, a save without it keeps the stored value; always returned). `counters.site360_menus` counts the sites per SITE 360 view (the workflow views CW, TE and OM; Design and Acquisition, Handover and Closure and Dismantle have no view and are not counted).
     - 0.15.28 (2026-11-15): SITE 360 columns screen in Settings and Excel-style working features (F15 items 4 and 5; CHANGELOG 146). Merge of origin/main (F19 Settings tabs, CHANGELOG 149; F17, F4 and F1 entries kept below). Additive. Settings > Site360 is the column-to-menu screen (the old route redirects). (2) Migration 0112: the rows endpoint `GET /site360/{menu}/rows` returns the Master values of PR Status (AH) and PO / WO Status (AI) (register procurement, B3) and the gate readiness columns (the date of the milestone before each gate once it is approved). (3) Grid working features and the toolbar (export of the current view, lock and unlock of the selected sites through the existing endpoints) are web only. No new path or schema; contract text only.
     - 0.15.26 (2026-11-15): SLA and project weight in the workflow editor (F14; owner request 2026-11-15; migration 0109 (was 0099; SLA and weight tables 0109 and 0110); CHANGELOG 145). Additive. New paths `GET /workflow/versions/{version}/weight-totals`, `PUT /workflow/versions/{version}/tasks/{task_code}/sla-rule` (`admin_sla_rule_save`, effective-dated version), `POST /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove` (`admin_sla_rule_remove`, delete when unused else deactivate) and `PUT /workflow/versions/{version}/tasks/{task_code}/weight` (`admin_wf_task_weight`, draft only). Publishing answers 409 `invalid_transition` with `weights_not_100` detail while a weight group does not total 100. Versions 0.15.16 to 0.15.19 are used by other PRs.
@@ -1391,11 +1392,14 @@ paths:
       tags: [me]
       operationId: listMyTasks
       summary: My Work (tasks where I am an eligible holder or the claimant)
+      description: '0.15.30 (F2): served by the API. Needs `sites.view` (the region scope of the Sites module applies). do_now and late are the open tasks at a level the caller may act on now (an eligible holder not blocked by another claim, the claimant, or an all-members voter who has not voted); waiting are those the caller submitted last that now sit at a level the caller does not hold. Without a bucket: do_now and late together. Oldest level first.'
       parameters:
         - name: bucket
           in: query
           description: late = over SLA max; do_now = at my level; waiting = submitted by me, at a later level.
           schema: { type: string, enum: [late, do_now, waiting] }
+        - $ref: '#/components/parameters/SlaColourFilter'
+        - $ref: '#/components/parameters/StaleFilter'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -4346,6 +4350,8 @@ paths:
         - { name: stage_code, in: query, schema: { type: string } }
         - { name: q, in: query, schema: { type: string } }
         - { name: group_only, in: query, schema: { type: boolean } }
+        - $ref: '#/components/parameters/SlaColourFilter'
+        - $ref: '#/components/parameters/StaleFilter'
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses:
@@ -13560,6 +13566,18 @@ components:
       schema: { type: string, examples: ['"7"'] }
 
   parameters:
+    SlaColourFilter:
+      name: sla_colour
+      in: query
+      description: '0.15.30 (F2). Only tasks whose SLA colour is one of these: green (within the minimum), amber (between the minimum and the maximum), red (past the maximum), none (no measured clock). Repeat the parameter or separate with commas.'
+      style: form
+      explode: true
+      schema: { type: array, items: { type: string, enum: [green, amber, red, none] } }
+    StaleFilter:
+      name: stale
+      in: query
+      description: '0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale.'
+      schema: { type: boolean }
     Limit:
       name: limit
       in: query
@@ -15209,6 +15227,8 @@ components:
         matrix_row: { type: string, description: '0.12.4: the Matrix row a QC snag takes this level from (quality or quality_te).' }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
         no_eligible_holder: { type: boolean }
+        since: { type: [string, 'null'], format: date-time, description: '0.15.30 (F2). When the current level opened: the ball has been with these holders since then.' }
+        held_wd: { type: [integer, 'null'], minimum: 0, description: '0.15.30 (F2). Working days from `since` to today (weekend Friday and Saturday and the holidays table of the task''s SLA calendar; the default calendar for a register record). Never calendar days.' }
     ExternalPartyRef:
       type: [object, 'null']
       required: [id, name, type]
@@ -15245,6 +15265,8 @@ components:
         measured: { type: boolean, description: '0.12.0 (Q2). False when the scenario rules say this SLA is not measured on the site (D-1 for Hot / Cold Swap): the task applies but has no clock.' }
         tentative_holidays: { type: array, items: { type: string, format: date }, description: '0.12.0 (D4b). Tentative (not yet confirmed) holidays inside the SLA period. They count as holidays now and are corrected when confirmed.' }
         due_date_tentative: { type: boolean, description: '0.12.0 (D4b). True when `tentative_holidays` is not empty: the due date shows a "tentative date" badge.' }
+        late_wd: { type: [integer, 'null'], minimum: 0, description: '0.15.30 (F2). Working days past the SLA maximum ("+N wd late"); 0 when not late; null without a measured clock (no rule, no start or not measured on the site). An approved task keeps the value of its closed clock.' }
+        left_wd: { type: [integer, 'null'], minimum: 0, description: '0.15.30 (F2). Working days left to the SLA maximum of a running task ("N wd left"); 0 when late; null once approved or without a measured clock.' }
     TaskSummary:
       type: object
       required: [id, site_id, site_code, task_code, name_en, stage_code, state, version]
@@ -15277,7 +15299,10 @@ components:
         historical_direct_approved: { type: boolean, description: '0.15.11: approved directly by the historical Master import (`historical_load.approve_directly`), an admin override with no L2 step. Shown as the "Admin override" badge; treated like an admin override in the SLA and on-time KPIs but counted in progress; cleared when the task leaves the approved state.' }
         holder_absent: { type: boolean, description: 'The holder has an active absence ("absent" badge, B12b).' }
         holder_account_status: { $ref: '#/components/schemas/UserAccountStatus' }
-        idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting.' }
+        idle_working_days: { type: [integer, 'null'], description: 'Working days without activity; alerts the lead at the idle-task setting. 0.15.30 (F2): filled for an open task (open, entry, in review, in approval, returned): working days since `last_activity_at`, on the task''s SLA calendar; null otherwise.' }
+        last_activity_at: { type: [string, 'null'], format: date-time, description: '0.15.30 (F2). The last action of a person on the open task: an audit row with an actor (entry save, transition, override, reassignment), a workflow step, a comment, a document file upload, or the opening of its current level. A system recalculation (for example of the due dates after a holiday change) is not an activity. Null when the task is not open.' }
+        stale: { type: boolean, description: '0.15.30 (F2). The "stale" badge: `idle_working_days` is at least `stale_after_wd`.' }
+        stale_after_wd: { type: integer, minimum: 1, description: '0.15.30 (F2). The idle limit in force: the setting `stale_idle_days` of the dashboard settings (default 2, CLAUDE.md B12b).' }
         lock_reasons: { type: array, items: { $ref: '#/components/schemas/LockReason' }, description: 'Why the task is locked (empty when it is not), so "Why locked?" needs no extra call.' }
         register_fields: { type: array, items: { $ref: '#/components/schemas/TaskRegisterField' }, description: '0.4.9. Only in the Site Register task grid. Register-owned fields shown read-through; edit them in the source register (Q73, Q99).' }
         version: { type: integer }

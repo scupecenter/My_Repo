@@ -7,6 +7,7 @@ import type { TaskSummary } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
 import { TaskDrawer } from '@/components/TaskDrawer';
+import { BallSince, ExternalParty, SlaOverrun, StaleBadge } from '@/components/TaskTiming';
 
 const SLA_CHIP: Record<string, string> = { green: 'bg-doneBg text-doneInk', amber: 'bg-waitBg text-waitInk', red: 'bg-lateBg text-lateInk', none: 'bg-lockBg text-lockInk' };
 
@@ -20,8 +21,10 @@ export function TaskCard({ task, onOpen }: { task: TaskSummary; onOpen?: (id: st
       <div><button type="button" className="sr-only" data-testid={`task-card-open-${task.id}`} onClick={() => onOpen?.(task.id)}>{task.site_code} {task.task_code}</button><b className="mono">{task.site_code}</b> {task.task_code} · {name}</div>
       <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mute">
         {task.sla?.colour && <span className={`chip ${SLA_CHIP[task.sla.colour]}`}>{t('approvals.sla')} {task.sla.elapsed_wd ?? '–'}/{task.sla.max_wd ?? '–'} {t('approvals.wd')}</span>}
+        <SlaOverrun task={task} />
         {claimed ? <PersonTag name={claimed.display_name} employeeId={claimed.employee_id} />
           : <Holders holders={task.ball_in_court?.holders ?? []} />}
+        <ExternalParty task={task} /><BallSince task={task} /><StaleBadge task={task} />
       </div>
       {task.last_return_note && <div className="mt-1 text-sm text-lateInk">{t('approvals.returned_note', { note: task.last_return_note })}</div>}
     </li>

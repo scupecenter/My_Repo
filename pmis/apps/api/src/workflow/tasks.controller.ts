@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/auth.types';
 import { Auth } from '../auth/decorators';
 import { etagHeader } from '../common/etag';
 import { ApprovalsService } from './approvals.service';
+import { MyWorkService } from './my-work.service';
 import { OverridesService } from './overrides.service';
 import { TaskDetailDto, TaskDetailService } from './task-detail.service';
 import { TransitionAction, TransitionResultDto, WorkflowService } from './workflow.service';
@@ -15,6 +16,7 @@ export class TasksController {
     private readonly workflow: WorkflowService,
     private readonly approvals: ApprovalsService,
     private readonly overrides: OverridesService,
+    private readonly myWork: MyWorkService,
   ) {}
 
   @Get('tasks/:id')
@@ -139,6 +141,12 @@ export class TasksController {
   @HttpCode(201)
   addComment(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown) {
     return this.workflow.addComment(auth, id, body);
+  }
+
+  /** My Work (contract 0.2; built with F2, 0.15.30): the caller's open tasks in the buckets late, do_now and waiting. */
+  @Get('me/tasks')
+  myTasks(@Auth() auth: AuthContext, @Query() q: Record<string, unknown>) {
+    return this.myWork.list(auth, q);
   }
 
   @Get('approvals')

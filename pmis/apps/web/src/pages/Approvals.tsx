@@ -7,10 +7,13 @@ import type { ApprovalItem } from '@/api/types';
 import { Holders } from '@/components/HolderChip';
 import { PersonTag } from '@/components/PersonTag';
 import { RejectDialog } from '@/components/RejectDialog';
+import { QuickFilter } from '@/components/TableKit';
+import { BallSince, ExternalParty, SlaOverrun, StaleBadge, TIMING_SORTS, sortByTiming, type TimingSort } from '@/components/TaskTiming';
 import { useToast } from '@/components/Toast';
 import { taskErrorMessage } from '@/lib/taskErrors';
 
 const TABS = ['all', 'review', 'approve'] as const;
+const COLOURS = ['red', 'amber', 'green'] as const;
 
 export function Approvals() {
   const { t } = useTranslation();
@@ -20,10 +23,14 @@ export function Approvals() {
   const [sel, setSel] = useState<string | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [rejecting, setRejecting] = useState<ApprovalItem | null>(null);
-  const list = useApprovals(tab, q);
+  // F2 (0.15.30): colour and stale filter on the server; the timing sort orders the loaded page
+  const [colours, setColours] = useState<string[]>([]);
+  const [stale, setStale] = useState(false);
+  const [sort, setSort] = useState<TimingSort>('');
+  const list = useApprovals(tab, q, { colours, stale });
   const decide = useDecide();
   const bulk = useBulk();
-  const items = list.data?.items ?? [];
+  const items = sortByTiming(list.data?.items ?? [], sort, (i) => i.task);
   const current = items.find((i) => i.task.id === sel) ?? null;
 
   const onError = (e: unknown) => { const m = taskErrorMessage(t, e); if (m) toast(m, 'err'); };
@@ -64,6 +71,15 @@ export function Approvals() {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="approval-select-all" checked={allChecked} onChange={() => setChecked(allChecked ? new Set() : new Set(items.map((i) => i.task.id)))} />{t('approvals.select_all')}</label>
             <input className="input" data-testid="approvals-filter" placeholder={t('approvals.filter')} value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
+          <div role="toolbar" aria-label={t('timing.filters')} className="flex flex-wrap items-center gap-2 border-b border-line p-3" data-testid="approvals-timing">
+            {COLOURS.map((c) => <QuickFilter key={c} testid={`approvals-colour-${c}`} on={colours.includes(c)} onClick={() => setColours((x) => (x.includes(c) ? x.filter((y) => y !== c) : [...x, c]))}>{t(`timing.filter_${c}`)}</QuickFilter>)}
+            <QuickFilter testid="approvals-stale" on={stale} onClick={() => setStale((x) => !x)}>{t('timing.filter_stale')}</QuickFilter>
+            <label className="ms-auto flex items-center gap-1 text-sm"><span className="text-mute">{t('timing.sort')}</span>
+              <select className="input py-1" data-testid="approvals-sort" value={sort} onChange={(e) => setSort(e.target.value as TimingSort)}>
+                {TIMING_SORTS.map((k) => <option key={k} value={k}>{t(`timing.sort_${k}`)}</option>)}
+              </select>
+            </label>
+          </div>
           {picked.length > 0 && (
             <div className="flex items-center gap-2 border-b border-line bg-accentSoft p-3" data-testid="bulk-bar">
               <span className="flex-1 text-sm font-semibold">{t('approvals.selected', { count: picked.length })}</span>
@@ -86,6 +102,7 @@ export function Approvals() {
                 <button className="flex-1 text-start" data-testid={`approval-open-${i.task.id}`} onClick={() => setSel(i.task.id)}>
                   <div><b className="mono">{i.task.site_code}</b> {i.task.task_code} {i.task.name_en}</div>
                   <div className="text-sm text-mute">{t('approvals.entered_by')} {i.submitted_by?.display_name}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-1"><SlaOverrun task={i.task} /><BallSince task={i.task} /><StaleBadge task={i.task} /></div>
                 </button>
                 <span className={`chip ${i.level_kind === 'approve' ? 'bg-waitBg text-waitInk' : 'bg-openBg text-openInk'}`}>{t(`approvals.level_${i.level_kind}`)}</span>
               </li>
@@ -115,8 +132,8 @@ function Detail({ item, onAct, onReject, busy }: { item: ApprovalItem; onAct: (i
       <dl className="grid grid-cols-2 gap-4 p-4 text-sm">
         <div><dt className="text-mute">{t('approvals.entered_by')}</dt><dd className="font-semibold">{item.submitted_by && <PersonTag name={item.submitted_by.display_name} employeeId={item.submitted_by.employee_id} />}</dd></div>
         <div><dt className="text-mute">{t('approvals.actual_date')}</dt><dd className="mono font-semibold">{tk.actual_date} <span className="font-normal text-mute">({t('approvals.plan')} {tk.planned_date})</span></dd></div>
-        <div><dt className="text-mute">{t('grid.ball')}</dt><dd data-testid="approval-holders"><Holders holders={tk.ball_in_court?.holders ?? []} /></dd></div>
-        <div><dt className="text-mute">{t('approvals.sla')}</dt><dd className="font-semibold">{tk.sla?.min_wd}–{tk.sla?.max_wd} {t('approvals.wd')}</dd></div>
+        <div><dt className="text-mute">{t('grid.ball')}</dt><dd data-testid="approval-holders"><Holders holders={tk.ball_in_court?.holders ?? []} /><div className="mt-1 flex flex-wrap items-center gap-1"><ExternalParty task={tk} /><BallSince task={tk} testid="approval-ball-since" /><StaleBadge task={tk} testid="approval-stale" /></div></dd></div>
+        <div><dt className="text-mute">{t('approvals.sla')}</dt><dd className="font-semibold">{tk.sla?.min_wd}–{tk.sla?.max_wd} {t('approvals.wd')} <SlaOverrun task={tk} testid="approval-overrun" /></dd></div>
       </dl>
       <div className="px-4 pb-2 text-sm">
         <div className="font-semibold">{t('approvals.documents', { count: item.documents_summary?.length ?? tk.slots_filled ?? 0 })}</div>
