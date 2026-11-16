@@ -228,7 +228,7 @@ afterAll(async () => {
 describe("F20 counters: the seven former gaps and the SITE 360 counts (contract 0.15.29)", () => {
   it("the administrator sees a value for every counter that had no source, and none is pending", async () => {
     const res = await admin.api.call("get", "/dashboard/extras");
-    expect(res.status).toBe(200);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
     const body = res.body as J;
     expect(body.counters.available).toBe(true);
 
@@ -264,7 +264,7 @@ describe("F20 counters: the seven former gaps and the SITE 360 counts (contract 
 
   it("applies the B3 region scope: a Tripoli reader sees only the Tripoli figures", async () => {
     const res = await tripoli.api.call("get", "/dashboard/extras");
-    expect(res.status).toBe(200);
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
     const body = res.body as J;
     expect(kpi(body, "vehicle_ready").value).toBe(100); // P1 only
     expect(kpi(body, "advances_open_after_close").value).toBe(1);
