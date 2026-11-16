@@ -1,8 +1,9 @@
--- 0115: the counts of an import batch keep the region rule of its rows (security review of 0114, CHANGELOG 152).
+-- 0115: the counts of an import batch keep the region rule of its rows, on every server (security review of 0114, CHANGELOG 152).
 --
--- WHY. imp_batch_counts (0114) counted every row of a visible batch. Before 0114 the list counted through v_import_rows, so the row rule of
--- import_batch_rows (rls_select, 0037: a row of a region outside the caller's regions is not visible) applied: a person who may see a batch never
--- learnt how many rows it had in another region. 0114 was merged before this fix, so the fix is its own migration (an applied migration never changes).
+-- WHY. imp_batch_counts as first merged in 0114 (#147) counted every row of a visible batch. Before 0114 the list counted through v_import_rows, so the row
+-- rule of import_batch_rows (rls_select, 0037: a row of a region outside the caller's regions is not visible) applied. The fix was then merged into the
+-- file of 0114 itself (#148). The installer records migrations by name, so a server that ran 0114 before #148 keeps the first version: this migration
+-- applies the fixed definition there; on any other server it changes nothing (the same definition).
 --
 -- WHAT. imp_batch_counts counts only the rows whose region is NULL or passes app_region_check, as rls_select does. The status of the batch is still decided
 -- from every row, as imp_status_of always did. CREATE OR REPLACE keeps the owner (pmis_definer), the search_path and the grants of 0114.
