@@ -321,6 +321,7 @@ export class DashboardExtrasService {
   /**
    * F20 (migration 0113, contract 0.15.29): the sources of the seven counters that had none before. Each reads the existing tables; the B3
    * scope applies (the regions of the caller; the site-based ones also the cluster and scenario filters). A count with no base answers null.
+   *  The latest approved versions are read inline from register_records (not fa_latest, which is definer-only), so the reader's row security applies.
    *  - vehicle_ready: approved field assignments (assignment_readiness) whose vehicle is ready (ready_to_mobilize or awaiting_advance), in % of all.
    *  - advances_open_after_close: approved advances still open (approved for disbursement, disbursed, settlement in progress) of an assignment
    *    whose actual end is set; a count.
@@ -342,7 +343,7 @@ export class DashboardExtrasService {
 
     const veh = (
       await this.db.tx.$queryRaw<{ total: bigint; ready: bigint }[]>(Prisma.sql`
-      WITH cur AS MATERIALIZED (SELECT entity_id, region_id FROM fa_latest('procurement'))
+      WITH cur AS MATERIALIZED (SELECT entity_id, region_id FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r WHERE r.register_key = 'procurement' AND r.state = 'approved' ORDER BY r.entity_id, r.version_no DESC) lp)
       SELECT count(*) AS total,
              count(*) FILTER (WHERE ar.readiness IN ('ready_to_mobilize', 'awaiting_advance')) AS ready
       FROM assignment_readiness ar
@@ -353,8 +354,8 @@ export class DashboardExtrasService {
     const advances = (
       await this.db.tx.$queryRaw<{ n: bigint }[]>(Prisma.sql`
       WITH proc AS MATERIALIZED (
-        SELECT entity_id FROM fa_latest('procurement') WHERE nullif(data ->> 'actual_end', '') IS NOT NULL),
-      adv AS (SELECT a.region_id, a.data FROM fa_latest('financial_advances') a WHERE a.record_type = 'advance')
+        SELECT entity_id FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r WHERE r.register_key = 'procurement' AND r.state = 'approved' ORDER BY r.entity_id, r.version_no DESC) lp WHERE nullif(data ->> 'actual_end', '') IS NOT NULL),
+      adv AS (SELECT a.region_id, a.data FROM (SELECT DISTINCT ON (r.entity_id) r.* FROM register_records r WHERE r.register_key = 'financial_advances' AND r.state = 'approved' ORDER BY r.entity_id, r.version_no DESC) a WHERE a.record_type = 'advance')
       SELECT count(*) AS n
       FROM adv JOIN proc ON proc.entity_id::text = adv.data ->> 'procurement_record_id'
       WHERE adv.data ->> 'advance_state' IN ('approved_for_disbursement', 'disbursed', 'settlement_in_progress')

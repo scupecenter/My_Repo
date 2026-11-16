@@ -216,6 +216,12 @@ beforeAll(async () => {
     grants: [
       ["dashboard", "view"],
       ["sites", "view"],
+      // the register counters read register_records under row security, so the reader needs view on those registers
+      ["procurement", "view"],
+      ["financial_advances", "view"],
+      ["car_dispatcher", "view"],
+      ["dismantle", "view"],
+      ["as_built", "view"],
     ],
   });
   denied = await actor(app, db, { regions: null, grants: [] });
