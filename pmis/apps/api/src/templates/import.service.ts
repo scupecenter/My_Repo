@@ -674,32 +674,32 @@ export class ImportService {
     return out;
   }
 
+  /**
+   * The batches matching `where`, then (0114) their status and counts from imp_batch_counts, computed only for the rows kept by `tail` (the page): the list
+   * no longer counts the rows of every batch through v_import_rows before it sorts and cuts the page (P2028 after a big load, owner report 2026-11-16).
+   */
   private batchSelect(where: Prisma.Sql, tail: Prisma.Sql = Prisma.empty): Prisma.Sql {
     return Prisma.sql`
-      SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, imp_status_of(b.id) AS status, b.uploaded_by::text AS uploaded_by, b.created_at,
-        b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
-        b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
-        b.historical_marked_at, c.c_create, c.c_update, c.c_unchanged, c.c_error, c.c_pending, c.c_approved, c.c_rejected, c.c_held, c.c_saved, a.c_admin_approved, a.c_incomplete,
-        imp_batch_job_json(b.id) AS progress,
-        to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
-      FROM import_batches b
-      JOIN template_versions v ON v.id = b.template_version_id
-      JOIN template_definitions d ON d.id = v.template_def_id
-      LEFT JOIN register_definitions rd ON rd.register_key = b.register_key
-      CROSS JOIN LATERAL (
-        SELECT count(*) FILTER (WHERE x.action = 'create') AS c_create, count(*) FILTER (WHERE x.action = 'update') AS c_update,
-          count(*) FILTER (WHERE x.action = 'unchanged') AS c_unchanged, count(*) FILTER (WHERE x.action = 'error') AS c_error,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending') AS c_pending,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'approved') AS c_approved,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'rejected') AS c_rejected,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'pending_previous_approval') AS c_held,
-          count(*) FILTER (WHERE x.action IN ('create', 'update') AND x.eff_decision = 'saved') AS c_saved
-        FROM v_import_rows x WHERE x.batch_id = b.id) c
-      CROSS JOIN LATERAL (
-        SELECT count(*) FILTER (WHERE q.admin_approved) AS c_admin_approved, count(*) FILTER (WHERE q.admin_approved AND q.incomplete) AS c_incomplete
-        FROM import_batch_rows q WHERE q.batch_id = b.id) a
-      WHERE ${where}
-      ${tail}`;
+      SELECT p.*, (k.cnt ->> 'status') AS status,
+        (k.cnt ->> 'c_create')::bigint AS c_create, (k.cnt ->> 'c_update')::bigint AS c_update, (k.cnt ->> 'c_unchanged')::bigint AS c_unchanged,
+        (k.cnt ->> 'c_error')::bigint AS c_error, (k.cnt ->> 'c_pending')::bigint AS c_pending, (k.cnt ->> 'c_approved')::bigint AS c_approved,
+        (k.cnt ->> 'c_rejected')::bigint AS c_rejected, (k.cnt ->> 'c_held')::bigint AS c_held, (k.cnt ->> 'c_saved')::bigint AS c_saved,
+        (k.cnt ->> 'c_admin_approved')::bigint AS c_admin_approved, (k.cnt ->> 'c_incomplete')::bigint AS c_incomplete,
+        imp_batch_job_json(p.id::uuid) AS progress
+      FROM (
+        SELECT b.id::text AS id, d.template_id, v.version AS template_version, b.source, b.file_name, b.uploaded_by::text AS uploaded_by, b.created_at,
+          b.version, b.task_id::text AS task_id, b.site_id::text AS site_id, b.register_key, b.entity, b.stream_code, b.group_id::text AS group_id, b.part_sheet, b.note, coalesce(rd.module_key, CASE WHEN b.stream_code IS NOT NULL OR b.entity = 'site' THEN 'sites' END) AS module_key,
+          b.mode, b.file_template_version, b.historical_load, b.historical_cutoff::text AS historical_cutoff, b.historical_reason, b.historical_marked_by::text AS historical_marked_by,
+          b.historical_marked_at,
+          to_char(b.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS ts
+        FROM import_batches b
+        JOIN template_versions v ON v.id = b.template_version_id
+        JOIN template_definitions d ON d.id = v.template_def_id
+        LEFT JOIN register_definitions rd ON rd.register_key = b.register_key
+        WHERE ${where}
+        ${tail}) p
+      CROSS JOIN LATERAL (SELECT imp_batch_counts(p.id::uuid) AS cnt) k
+      ORDER BY p.created_at DESC, p.id DESC`;
   }
 
   /** The summary of an older file (owner decision 2026-11-14): what was removed (ignored), what is new (empty) and what was renamed since the file was made. */
