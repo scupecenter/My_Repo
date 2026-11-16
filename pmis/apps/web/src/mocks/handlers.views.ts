@@ -23,20 +23,22 @@ const S = (): State => {
 const me = () => viewer()!;
 const shareScope = (): 'none' | 'limited' | 'all' => (['pm', 'reviewer'].includes(me().key) ? 'all' : 'none');
 const isManager = () => me().key === 'pm';
-const nonEmpty = (a?: SavedViewAudience) => !!a && (!!a.everyone || !!a.role_ids?.length || !!a.group_ids?.length || !!a.user_ids?.length);
+const nonEmpty = (a?: SavedViewAudience) => !!a && (!!a.everyone || !!a.role_ids?.length || !!a.group_ids?.length || !!a.user_ids?.length || !!a.region_ids?.length);
+const REGION_NAMES = ['Tripoli', 'Middle', 'WM', 'Zawia', 'Benghazi', 'GM', 'Sebha'];
 const myId = () => uid(me().employee_id ?? '9999');
 const now = () => new Date().toISOString();
 const invalid = (path: string, code = 'invalid') => problem(422, 'validation_failed', 'Validation failed', { errors: [{ path, code, message: code }] });
 
-/** Shared views reach everyone in the mock when `everyone` is set, or the accounts named by id. */
-const addressed = (v: Row) => v.audience_in.everyone || (v.audience_in.user_ids ?? []).includes(myId());
+/** Shared views reach everyone in the mock when `everyone` is set, the accounts named by id, or (0.15.31) any account when a region is named (mock viewers see every region). */
+const addressed = (v: Row) => v.audience_in.everyone || (v.audience_in.user_ids ?? []).includes(myId()) || !!v.audience_in.region_ids?.length;
 const canRead = (v: Row) => v.owner_key === me().key || (v.is_active && v.shared && addressed(v));
 const out = (v: Row): SavedView => {
   const mine = v.owner_key === me().key, mgr = v.shared && isManager();
   const a = v.audience_in, rest = omit(v, 'owner_key', 'audience_in') as unknown as SavedView;
   return {
     ...rest, is_owner: mine, can_edit: mine || mgr, can_share: (mine && shareScope() !== 'none') || mgr,
-    audience: mine || mgr ? { everyone: !!a.everyone, roles: [], groups: [], users: (a.user_ids ?? []).map((id) => ({ id, display_name: id })) } : null,
+    audience: mine || mgr ? { everyone: !!a.everyone, roles: [], groups: [], users: (a.user_ids ?? []).map((id) => ({ id, display_name: id })),
+      regions: (a.region_ids ?? []).map((id) => ({ id, name_en: REGION_NAMES[id - 1] ?? String(id), name_ar: null })) } : null,
   };
 };
 function versionOk(req: Request, v: Row) {
@@ -57,7 +59,45 @@ function make(screen: string, b: { name: string; filters?: Record<string, unknow
   };
 }
 
+// 0.15.31 (F3): the whitelist of the filter builder. The real server builds it from the configuration and leaves hidden fields out.
+type FF = { key: string; label_en: string; label_ar: string; type: 'text' | 'enum' | 'number' | 'date' | 'bool'; options?: { value: string; label_en: string; label_ar?: string | null }[] };
+const OPS = {
+  text: ['is', 'is_not', 'in', 'not_in', 'contains', 'not_contains', 'empty', 'not_empty'],
+  enum: ['is', 'is_not', 'in', 'not_in', 'empty', 'not_empty'],
+  number: ['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'between', 'empty', 'not_empty'],
+  date: ['is', 'before', 'after', 'between', 'in_last_days', 'in_next_days', 'empty', 'not_empty'],
+  bool: ['is', 'empty', 'not_empty'],
+} as const;
+const REGION_OPTS = REGION_NAMES.map((n, i) => ({ value: String(i + 1), label_en: n }));
+const en = (v: string[]) => v.map((x) => ({ value: x, label_en: x.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()) }));
+const SITE_FIELDS: FF[] = [
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+  { key: 'name', label_en: 'Site name', label_ar: 'اسم الموقع', type: 'text' },
+  { key: 'region_id', label_en: 'Region', label_ar: 'المنطقة', type: 'enum', options: REGION_OPTS },
+  { key: 'delivery_scenario', label_en: 'Delivery scenario', label_ar: 'سيناريو التسليم', type: 'enum', options: en(['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation']) },
+  { key: 'overall_status', label_en: 'Overall status', label_ar: 'الحالة العامة', type: 'enum', options: en(['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled']) },
+  { key: 'tower_height_m', label_en: 'Tower height (m)', label_ar: 'ارتفاع البرج (م)', type: 'number' },
+  { key: 'rf_survey_date', label_en: 'RF survey date', label_ar: 'تاريخ المسح الراديوي', type: 'date' },
+  { key: 'workflow_locks', label_en: 'Workflow locks on', label_ar: 'أقفال التسلسل مفعّلة', type: 'bool' },
+];
+const REGISTER_FIELDS: FF[] = [
+  { key: 'site_code', label_en: 'Site ID', label_ar: 'رمز الموقع', type: 'text' },
+  { key: 'region_id', label_en: 'Region', label_ar: 'المنطقة', type: 'enum', options: REGION_OPTS },
+  { key: 'state', label_en: 'State', label_ar: 'الحالة', type: 'enum', options: en(['entry', 'in_review', 'in_approval', 'approved', 'voided']) },
+  { key: 'created_at', label_en: 'Created on', label_ar: 'تاريخ الإنشاء', type: 'date' },
+];
+
 export const viewsHandlers = [
+  http.get(`${B}/saved-views/filter-fields`, ({ request }) => {
+    const g = guard(); if (g) return g;
+    const screen = new URL(request.url).searchParams.get('screen_key') ?? '';
+    const items = screen === 'sites' || screen === 'sites-stream' ? SITE_FIELDS : /^register-/.test(screen) ? REGISTER_FIELDS : null;
+    if (!items) return invalid('/screen_key');
+    return HttpResponse.json({
+      screen_key: screen, items: items.map((f) => ({ ...f, operators: OPS[f.type] })), operators: OPS,
+      limits: { max_depth: 2, max_items_per_group: 20, max_groups: 10, max_conditions: 50, max_values: 100 },
+    });
+  }),
   http.get(`${B}/saved-views`, ({ request }) => {
     const g = guard(); if (g) return g;
     const q = new URL(request.url).searchParams, screen = q.get('screen_key'), inactive = q.get('include_inactive') === 'true';

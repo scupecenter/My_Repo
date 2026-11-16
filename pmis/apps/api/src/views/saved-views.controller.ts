@@ -26,6 +26,12 @@ export class SavedViewsController {
     return this.tag(res, await this.svc.create(auth, body));
   }
 
+  /** F3 (0.15.31): the whitelist of filter fields of a list screen, for the filter builder. */
+  @Get('saved-views/filter-fields')
+  filterFields(@Query() q: Record<string, unknown>) {
+    return this.svc.filterFields(q);
+  }
+
   @Post('saved-views/import')
   @HttpCode(200)
   import(@Auth() auth: AuthContext, @Body() body: unknown) {

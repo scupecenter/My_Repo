@@ -34,6 +34,7 @@ import {
   useUpdateRecord,
   type RecordFilters,
 } from "@/api/registers";
+import { decodeFilter, encodeFilter, type FilterTree } from "@/api/views";
 import { useRegions } from "@/api/sites";
 import type { RegisterDefinition, RegisterRecord } from "@/api/types";
 import { ExportViewButton } from "@/components/ExportDialog";
@@ -92,8 +93,12 @@ const VIEW_EMPTY: RecordFilters = {
 // delays the first paint of the list.
 const SavedViews = lazy(() =>
   import("@/components/SavedViews").then((m) => ({
-    default: m.SavedViews<RecordFilters>,
+    default: m.SavedViews<RecordFilters & { advanced?: FilterTree }>,
   })),
+);
+// F3 (0.15.31): the AND/OR filter builder loads with the saved views.
+const FilterBuilder = lazy(() =>
+  import("@/components/FilterBuilder").then((m) => ({ default: m.FilterBuilder })),
 );
 
 export function RegisterSoon({ name }: { name: string }) {
@@ -120,7 +125,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     state: sp.get("state") ?? "",
     record_type: sp.get("record_type") ?? "",
   };
-  const activeFilters = Object.values(f).filter(Boolean).length;
+  // F3 (0.15.31): the AND/OR filter tree lives in the URL as JSON (adv) and goes to the server as `filter`, which compiles it
+  const adv = sp.get("adv") ?? "";
+  const advTree = decodeFilter(adv);
+  const activeFilters =
+    Object.values(f).filter(Boolean).length + (advTree ? 1 : 0);
   const setParams = (kv: Record<string, string>) =>
     setSp(
       (p) => {
@@ -135,7 +144,7 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
     );
   const set = (k: keyof RecordFilters) => (v: string) => setParams({ [k]: v });
   const clearAll = () =>
-    setParams(Object.fromEntries(RF_KEYS.map((k) => [k, ""])));
+    setParams({ ...Object.fromEntries(RF_KEYS.map((k) => [k, ""])), adv: "" });
   // F16: the view is kept in the URL (view=grid; vertical is the default and leaves no parameter), so Back and shared links restore it.
   const view: ViewMode = sp.get("view") === "grid" ? "grid" : "vertical";
   const setView = (v: ViewMode) =>
@@ -159,7 +168,11 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
           ]
         : [];
   const tab = f.record_type;
-  const list = useRegisterRecords(key, { ...f, record_type: tab });
+  const list = useRegisterRecords(key, {
+    ...f,
+    record_type: tab,
+    ...(adv ? { filter: adv } : {}),
+  });
   const save = useUpdateRecord(key);
   // 0.15.22: a System Admin edits a locked row or column (the database exempts admins too); everyone else sees it read-only.
   const me = useMe(true).data;
@@ -530,19 +543,25 @@ function RegisterList({ def }: { def: RegisterDefinition }) {
               <Suspense fallback={null}>
                 <SavedViews
                   screen={`register-${key}`}
-                  value={f}
+                  value={{ ...f, ...(advTree ? { advanced: advTree } : {}) }}
                   empty={VIEW_EMPTY}
                   table={tbl}
                   onApply={(v) =>
-                    setParams(
-                      Object.fromEntries(
+                    setParams({
+                      ...Object.fromEntries(
                         RF_KEYS.map((k) => [
                           k,
                           String((v as Record<string, unknown>)[k] ?? ""),
                         ]),
                       ),
-                    )
+                      adv: encodeFilter(v.advanced),
+                    })
                   }
+                />
+                <FilterBuilder
+                  screen={`register-${key}`}
+                  value={advTree}
+                  onChange={(tree) => setParams({ adv: encodeFilter(tree) })}
                 />
               </Suspense>
             )}

@@ -11,6 +11,7 @@ import { ProblemException, problems } from '../common/problem';
 import { TS_TEXT, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { setVia, viaSchema } from '../common/via';
 import { resolveMentions } from '../common/mentions';
 import { DocumentsService } from '../documents/documents.service';
@@ -187,6 +188,7 @@ export class RegistersService {
     private readonly view: TaskViewService,
     private readonly workflow: WorkflowService,
     private readonly documents: DocumentsService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   // ------------------------------------------------------------------ catalogue
@@ -410,6 +412,9 @@ export class RegistersService {
     if (oneParam(q, 'all_versions') !== 'true' && entity === undefined) {
       conds.push(Prisma.sql`NOT EXISTS (SELECT 1 FROM register_records n WHERE n.entity_id = r.entity_id AND n.version_no > r.version_no)`);
     }
+    // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the register's whitelist; the visibility above stays
+    const adv = await this.filters.fromQuery(`register-${key}`, q);
+    if (adv) conds.push(adv);
     if (cursor) conds.push(Prisma.sql`(r.created_at, r.id) < (${cursor[0] as string}::timestamptz, ${cursor[1] as string}::uuid)`);
     const rows = await this.db.tx.$queryRaw<RecordRow[]>(
       this.baseSelect(auth, Prisma.join(conds, ' AND '), Prisma.sql`ORDER BY r.created_at DESC, r.id DESC LIMIT ${limit + 1}`));

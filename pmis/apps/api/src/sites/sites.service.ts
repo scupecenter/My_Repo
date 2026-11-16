@@ -10,6 +10,7 @@ import { parse, uuidSchema } from '../common/zod';
 import { ProblemException, problems } from '../common/problem';
 import { oneParam } from '../common/query';
 import { DbService } from '../db/db.service';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { HAS_COORDINATES } from '../dashboard/site-map.service';
 import { RegistersService } from '../registers/registers.service';
 import { TaskSummaryDto, TaskViewService, taskSelect } from '../workflow/task-view.service';
@@ -160,6 +161,7 @@ export class SitesService {
     private readonly access: AccessService,
     private readonly view: TaskViewService,
     private readonly registers: RegistersService,
+    private readonly filters: FilterCatalogService,
   ) {}
 
   private intList(q: Record<string, unknown>, key: string, min: number, max: number): number[] {
@@ -253,6 +255,9 @@ export class SitesService {
     // 0.14.5: the sites the dashboard map cannot draw (no valid coordinates, OV-12; not cancelled, the map's count), and the others
     if (coords === 'missing') where.push(Prisma.sql`NOT coalesce(${HAS_COORDINATES}, false) AND s.overall_status <> 'cancelled'`);
     else if (coords === 'valid') where.push(Prisma.sql`coalesce(${HAS_COORDINATES}, false)`);
+    // F3 (0.15.31): the AND/OR filter of a saved view, compiled on the server against the sites whitelist (alias s); the region scope above stays
+    const adv = await this.filters.fromQuery('sites', q);
+    if (adv) where.push(adv);
     for (const pair of this.customPairs(q)) {
       where.push(Prisma.sql`EXISTS (SELECT 1 FROM field_definitions fd WHERE fd.entity_type = 'site' AND fd.code = ${pair[0]} AND fd.is_active AND fd.in_list_filters
         AND coalesce(app_resolve_field_access(${auth.user.id}::uuid, fd.id)::text, 'edit') <> 'hidden') AND s.custom ->> ${pair[0]} = ${pair[1]}`);
@@ -715,8 +720,10 @@ export class SitesService {
     const stages = await this.db.tx.$queryRaw<{ id: string; code: string; stream_code: string | null; name_en: string; name_ar: string | null }[]>(Prisma.sql`
       SELECT id::text AS id, code, stream_code, name_en, name_ar FROM stage_definitions
       WHERE workflow_id = ${site.workflow_id}::uuid AND is_active ${stream ? Prisma.sql`AND stream_code = ${stream}` : Prisma.empty} ${stageInView(view, 'stage_definitions.id')} ORDER BY seq`);
+    // F3 (0.15.31): the AND/OR filter of a saved view of the task list (screen site-tasks), compiled on the server
+    const adv = await this.filters.fromQuery('site-tasks', q);
     const rows = await this.view.rows(taskSelect(
-      Prisma.sql`t.site_id = ${site.id}::uuid ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'td.id')}`,
+      Prisma.sql`t.site_id = ${site.id}::uuid ${stream ? Prisma.sql`AND st.stream_code = ${stream}` : Prisma.empty} ${inView(view, 'td.id')} ${adv ? Prisma.sql`AND ${adv}` : Prisma.empty}`,
       Prisma.sql`ORDER BY st.seq, td.sort_order, td.code`,
     ));
     const summaries = await this.view.withLockReasons(rows);
