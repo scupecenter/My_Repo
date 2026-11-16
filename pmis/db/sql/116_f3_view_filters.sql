@@ -22,7 +22,7 @@
 --   4. Two safe casts for the compiled SQL of custom values kept as text (sv_try_numeric, sv_try_date): a malformed value is NULL, never an
 --      error that stops the list.
 -- Every function written here is SECURITY DEFINER (but the two casts), owner pmis_definer, search_path pg_catalog, public, pg_temp, PUBLIC
--- revoked; the redefined functions are copied from 0065 (the latest definition) with the additions marked "0115".
+-- revoked; the redefined functions are copied from 0065 (the latest definition) with the additions marked "0117".
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- 1. The regions a view is shared with
