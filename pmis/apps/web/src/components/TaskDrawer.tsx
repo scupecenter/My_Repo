@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Clock, ExternalLink, HandMetal, Play, Save, ShieldAlert, Undo2, UserMinus, UserX, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useTask } from '@/api/hooks';
@@ -46,13 +46,20 @@ function History({ task }: { task: TaskDetail }) {
   );
 }
 
-function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterField[] }) {
+/** F5 (0.15.32): the action a card dropped on the tasks board asks for. The drawer only opens it: nothing runs until the person confirms with the usual button. */
+export type DrawerIntent = 'submit' | 'review' | 'approve' | 'reject';
+
+function Body({ task, regFields, intent }: { task: TaskDetail; regFields: TaskRegisterField[]; intent?: DrawerIntent }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const op = useTaskOp(task.site_id), date = useDatePatch(task.site_id);
-  const [rejecting, setRejecting] = useState(false);
   const [tab, setTab] = useState('data');
   const act = (a: string) => task.allowed_actions.find((x) => x.action === a);
+  // F5: a drop on Rejected opens the existing reject dialog (its note is mandatory); a drop on another column focuses its button
+  const [rejecting, setRejecting] = useState(intent === 'reject' && !!act('reject'));
+  const intended = intent && intent !== 'reject' && act(intent) ? intent : null;
+  const intentBtn = useRef<HTMLButtonElement>(null);
+  useEffect(() => { if (intended) intentBtn.current?.focus(); }, [intended]);
   const edit = !!act('edit'), submit = act('submit');
   const missing = task.slots.some((s) => s.mandatory && (s.status === 'missing' || s.status === 'rejected'));
   const DONE: Partial<Record<TaskOp, string>> = { start: 'drawer.started', claim: 'drawer.claimed', release: 'drawer.released' };
@@ -153,6 +160,7 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
         <div {...panelProps('delay', tab)}>{tab === 'delay' && <DelayPeriodsPanel taskId={task.id} />}</div>
       </div>
       <footer className="space-y-2 border-t border-line p-4">
+        {intended && <p role="status" className="rounded-md bg-accentSoft p-2 text-sm" data-testid="drawer-intent">{t('board.intent', { action: t(`board.action_${intended}`) })}</p>}
         {submit && (final(submit) || submit.will_skip_to) && <p className="text-sm text-waitInk" data-testid="drawer-skip-note">{final(submit) ? t('drawer.self_approval_note') : t('drawer.skip_note', { level: submit.will_skip_to })}</p>}
         {submit && (missing || !!task.missing_for_submit?.length) && <p className="text-sm text-mute" data-testid="drawer-missing">{missing ? t('drawer.slots_missing') : t('taskErrors.mandatory_fields_missing_list', { list: task.missing_for_submit?.join(', ') })}</p>}
         <div className="flex gap-2">
@@ -160,9 +168,9 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
           {claim && <button className="btn" data-testid="drawer-claim" disabled={op.isPending} onClick={() => run('claim')}><HandMetal size={16} />{t('drawer.claim')}</button>}
           {release && <button className="btn" data-testid="drawer-release" disabled={op.isPending} onClick={() => run('release')}><UserMinus size={16} />{t('drawer.release')}</button>}
           {(act('reject')) && <button className="btn btn-danger" data-testid="drawer-reject" disabled={op.isPending} onClick={() => setRejecting(true)}><Undo2 size={16} />{t('approvals.reject')}</button>}
-          {submit && <button className="btn btn-primary ms-auto" data-testid="drawer-submit" disabled={missing || !!submit.disabled_reason || op.isPending} onClick={() => run('submit')}><Check size={16} />{final(submit) ? t('drawer.submit_final') : t('drawer.submit')}</button>}
-          {review && <button className="btn btn-primary ms-auto" data-testid="drawer-review" disabled={op.isPending} onClick={() => run('review')}><Check size={16} />{t('approvals.pass')}</button>}
-          {approve && <button className="btn btn-primary ms-auto" data-testid="drawer-approve" disabled={op.isPending} onClick={() => run('approve')}><Check size={16} />{t('approvals.approve')}</button>}
+          {submit && <button className="btn btn-primary ms-auto" ref={intended === 'submit' ? intentBtn : undefined} data-testid="drawer-submit" disabled={missing || !!submit.disabled_reason || op.isPending} onClick={() => run('submit')}><Check size={16} />{final(submit) ? t('drawer.submit_final') : t('drawer.submit')}</button>}
+          {review && <button className="btn btn-primary ms-auto" ref={intended === 'review' ? intentBtn : undefined} data-testid="drawer-review" disabled={op.isPending} onClick={() => run('review')}><Check size={16} />{t('approvals.pass')}</button>}
+          {approve && <button className="btn btn-primary ms-auto" ref={intended === 'approve' ? intentBtn : undefined} data-testid="drawer-approve" disabled={op.isPending} onClick={() => run('approve')}><Check size={16} />{t('approvals.approve')}</button>}
         </div>
       </footer>
       <RejectDialog open={rejecting} title={t('approvals.reject_title', { site: task.site_code })} onClose={() => setRejecting(false)} onSend={(note) => run('reject', note)} />
@@ -171,12 +179,12 @@ function Body({ task, regFields }: { task: TaskDetail; regFields: TaskRegisterFi
 }
 
 /** `registerFields` come from the Site Register grid (contract 0.4.9: only the grid carries them). `nav` = the ids of the list the drawer was opened from, for next/previous. */
-export function TaskDrawer({ taskId, onClose, registerFields = [], nav }: { taskId: string | null; onClose: () => void; registerFields?: TaskRegisterField[]; nav?: Pick<DrawerNav, 'ids' | 'onGo'> }) {
+export function TaskDrawer({ taskId, onClose, registerFields = [], nav, intent }: { taskId: string | null; onClose: () => void; registerFields?: TaskRegisterField[]; nav?: Pick<DrawerNav, 'ids' | 'onGo'>; intent?: DrawerIntent }) {
   const { t } = useTranslation();
   const q = useTask(taskId);
   return (
     <DrawerFrame name="task" testid="task-drawer" open={!!taskId} onClose={onClose} nav={nav && { ...nav, current: taskId }}>
-      {q.data ? <Body key={q.data.id} task={q.data} regFields={registerFields} /> : <div className="p-4"><Dialog.Title className="font-bold">{t('common.loading')}</Dialog.Title></div>}
+      {q.data ? <Body key={`${q.data.id}:${intent ?? ''}`} task={q.data} regFields={registerFields} intent={intent} /> : <div className="p-4"><Dialog.Title className="font-bold">{t('common.loading')}</Dialog.Title></div>}
     </DrawerFrame>
   );
 }

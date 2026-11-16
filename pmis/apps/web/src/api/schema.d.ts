@@ -929,6 +929,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sites board by milestone (read only)
+         * @description 0.15.32 (F5). Needs `sites.view`; the caller's regions (B3) and row security apply. One column per milestone (the stable stage code of the workflow versions in use,
+         *     ordered by sequence, named by the newest version) and a last column `closed`. A site sits in the first milestone of its own workflow version that is neither done nor
+         *     N/A (the current stage of `GET /sites`); a site without tasks yet sits in the first milestone; it is `closed` when its overall status is completed or every stage with
+         *     work is done. Cancelled sites are left out unless `include_cancelled=true` or `overall_status=cancelled`. Ageing (`ageing_wd`) is the number of working days (weekend and
+         *     holidays of the default calendar) from `entered_on` to today; `entered_on` is the latest milestone date of the milestones before the column (the actual date, else the
+         *     approval of F1, else the approved date), else the day the site was created (open question Q570). Swimlanes: `none`, `region`, or `contractor` (the external party of
+         *     the site's tasks in its column, open ones first, else of its latest task with one; Q571). Cards are the oldest in the column first, `card_limit` per cell; `count` is
+         *     always the full count. A column whose count is above its WIP limit (`GET /settings/kanban-wip`) has `over_wip` true: a warning only, nothing is refused (Q572).
+         *     The filters are those of `GET /sites` (the F3 tree included). There is no write on the board: a site moves only through its tasks.
+         */
+        get: operations["getSitesBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tasks board by approval state (read only)
+         * @description 0.15.32 (F5). Needs `sites.view`; the caller's regions (B3) and row security apply. Four columns: `entry` (open or at L1 Data Entry), `review` (at L2: in review or in
+         *     approval), `rejected` (sent back to L1 by a rejection and not yet resubmitted) and `approved`. Locked, N/A, skipped and suspended tasks are not on the board. Cards are
+         *     `TaskSummary` items with the F2 timing; the ball held longest first, the latest approvals first in `approved`; `card_limit` per column, `count` is the full count.
+         *     The board only reads. In the web app a card dropped on a column only **opens** the task's existing action (submit, review, approve, or reject with its mandatory note)
+         *     when `GET /tasks/{task_id}` lists it in `allowed_actions`; otherwise the drop is refused with a message. The action itself is the existing endpoint, which checks
+         *     everything again. `mine=true` keeps the tasks the caller acted on, holds the ball of, or may act on now. The F3 tree is the one of the screen `tasks-board` (the
+         *     whitelist of `site-tasks`).
+         */
+        get: operations["getTasksBoard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -5027,6 +5081,34 @@ export interface paths {
          *     409 `invalid_transition`. Audited as `imports_async_rows_update` with the value, who and when before and after. The next send or decision reads the new value.
          */
         put: operations["setImportsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/kanban-wip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The WIP limits of the sites board (kanban.wip_limits)
+         * @description 0.15.32 (F5). Every signed-in user may read it. `limits` maps a milestone (stable stage code) to its WIP limit; a column without one has no limit (the default: none).
+         *     A limit is a warning on the board only, never a block. `columns` lists the milestones a limit may name. `can_edit` is true for a System Admin or a delegate of
+         *     `settings` edit for all regions.
+         */
+        get: operations["getKanbanWip"];
+        /**
+         * Change the WIP limits of the sites board (reason, If-Match, audited)
+         * @description 0.15.32 (F5). A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). The whole map is replaced: a stage code of a workflow
+         *     version (422 `unknown_stage`), a whole number from 1 to 10000 or null for no limit (422 `out_of_range`), at most 100 entries, a reason and If-Match. Saving the map in
+         *     force is 409 `invalid_transition`. Audited as `kanban_wip_limits_update` with the map, who and when before and after.
+         */
+        put: operations["setKanbanWip"];
         post?: never;
         delete?: never;
         options?: never;
@@ -13273,6 +13355,114 @@ export interface components {
             order_status?: string;
             external_party?: components["schemas"]["ExternalPartyRef"];
         };
+        /** @description 0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only. */
+        KanbanWip: {
+            /** @description Stage code to limit; a column not named has no limit. */
+            limits: {
+                [key: string]: number;
+            };
+            columns: {
+                code: string;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
+            /** @description 1 */
+            min: number;
+            /** @description 10000 */
+            max: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            /** @description The ETag value. */
+            version: number;
+            can_edit: boolean;
+        };
+        KanbanWipInput: {
+            limits: {
+                [key: string]: number | null;
+            };
+            reason: string;
+        };
+        /** @description 0.15.32 (F5). A site on the sites board. */
+        SiteBoardCard: {
+            /** Format: uuid */
+            id: string;
+            site_code: string;
+            name: string;
+            name_ar?: string | null;
+            region_id: components["schemas"]["RegionId"];
+            overall_status: components["schemas"]["OverallStatus"];
+            delivery_scenario?: string | null;
+            contractor?: {
+                /** Format: uuid */
+                id: string;
+                name: string;
+            } | null;
+            /**
+             * Format: date
+             * @description The day the site entered its column (see getSitesBoard).
+             */
+            entered_on: string;
+            /** @description Working days from entered_on to today. */
+            ageing_wd: number;
+            /**
+             * @description F2: the worst SLA colour of the open tasks of the site in its column.
+             * @enum {string|null}
+             */
+            sla_colour?: "green" | "amber" | "red" | null;
+            /** @description Open tasks of the column at L1. */
+            at_l1: number;
+            /** @description Open tasks of the column at L2. */
+            at_l2: number;
+            /** @description Open tasks of the column past their SLA maximum. */
+            late_count: number;
+        };
+        /** @description 0.15.32 (F5). The sites board: columns, lanes and the cells where they meet (only cells with sites are listed). */
+        SitesBoard: {
+            /** @enum {string} */
+            swimlane: "none" | "region" | "contractor";
+            card_limit: number;
+            total: number;
+            columns: {
+                /** @description A stage code, or `closed`. */
+                key: string;
+                /** @enum {string} */
+                kind: "milestone" | "closed";
+                name_en: string;
+                name_ar?: string | null;
+                count: number;
+                wip_limit: number | null;
+                /** @description count is above wip_limit: a warning only. */
+                over_wip: boolean;
+            }[];
+            lanes: {
+                /** @description `all` without swimlanes; a region id; an external party id or `none`. */
+                key: string;
+                label_en: string;
+                label_ar?: string | null;
+                count: number;
+            }[];
+            cells: {
+                column: string;
+                lane: string;
+                count: number;
+                /** @description Some sites of the cell are not in cards (card_limit). */
+                more: boolean;
+                cards: components["schemas"]["SiteBoardCard"][];
+            }[];
+        };
+        /** @description 0.15.32 (F5). The tasks board by approval state. */
+        TasksBoard: {
+            card_limit: number;
+            total: number;
+            columns: {
+                /** @enum {string} */
+                key: "entry" | "review" | "rejected" | "approved";
+                count: number;
+                more: boolean;
+                items: components["schemas"]["TaskSummary"][];
+            }[];
+        };
         /** @description 0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background. */
         ImportsSettings: {
             async_rows: number;
@@ -15280,7 +15470,7 @@ export interface components {
                 max_values: number;
             };
         };
-        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2). */
+        /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
         SavedViewColumns: {
@@ -18250,6 +18440,82 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
+        };
+    };
+    getSitesBoard: {
+        parameters: {
+            query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
+                swimlane?: "none" | "region" | "contractor";
+                /** @description Cards per cell (column and lane). */
+                card_limit?: number;
+                include_cancelled?: boolean;
+                /** @description Site code, owner ID or name. */
+                q?: string;
+                /** @description A pasted list of Site IDs (as on `GET /sites`). */
+                site_codes?: string;
+                region_id?: components["schemas"]["RegionId"][];
+                scenario?: components["schemas"]["DeliveryScenario"];
+                overall_status?: components["schemas"]["OverallStatus"];
+                cluster_code?: string;
+                delivery_batch?: string;
+                workflow_version?: number;
+                workflow_locks?: "locked" | "open";
+                data_gaps?: "with" | "without";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SitesBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    getTasksBoard: {
+        parameters: {
+            query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
+                site_id?: string;
+                stage_code?: string;
+                /** @description Site code or name, task code or name. */
+                q?: string;
+                mine?: boolean;
+                region_id?: components["schemas"]["RegionId"][];
+                /** @description Cards per column. */
+                card_limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The board. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TasksBoard"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     listUsers: {
@@ -25861,6 +26127,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImportsSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getKanbanWip: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KanbanWip"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    setKanbanWip: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KanbanWipInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KanbanWip"];
                 };
             };
             401: components["responses"]["Unauthorized"];

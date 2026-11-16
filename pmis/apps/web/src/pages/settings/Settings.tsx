@@ -17,6 +17,7 @@ import { Lists } from './Lists';
 import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
+import { KanbanWip } from './KanbanWip';
 import { Workflow } from './Workflow';
 import { Site360Columns } from './Site360Columns';
 import { DashboardSettings } from './DashboardSettings';
@@ -27,7 +28,7 @@ export interface SettingsTab { key: string; sections: SettingsSection[] }
 /** The tabs of Administration > Settings (F19, and the dashboard tab of F20). Tabs with sections show a sub-navigation inside the tab. */
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'calendar', sections: [] },
-  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'freeze' }, { key: 'idle' }] },
+  { key: 'workflow', sections: [{ key: 'editor' }, { key: 'freeze' }, { key: 'idle' }, { key: 'board' }] },
   { key: 'sla', sections: [{ key: 'rules' }, { key: 'dlp' }] },
   { key: 'weights', sections: [] },
   { key: 'registers', sections: [{ key: 'columns' }, { key: 'contractors' }, { key: 'gecol' }, { key: 'team-scope' }] },
@@ -114,6 +115,7 @@ export function SettingsRoutes() {
           <Route path="editor" element={<Workflow />} />
           <Route path="freeze" element={<Freeze />} />
           <Route path="idle" element={<Idle />} />
+          <Route path="board" element={<KanbanWip />} />
         </Route>
         <Route path="sla" element={<TabFrame tab="sla" />}>
           <Route index element={<Navigate to="rules" replace />} />

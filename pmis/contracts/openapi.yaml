@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.31
+  version: 0.15.32
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.32 (2026-11-16): sites board by milestone and tasks board by approval state (F5 of the features build plan of 2026-11-14; migration 0118; CHANGELOG 156). Additive and read only. (1) `GET /boards/sites` (`getSitesBoard`): one column per milestone plus `closed`, swimlanes by region or contractor, ageing in working days, WIP warnings, the filters of `GET /sites` with the F3 tree. (2) `GET /boards/tasks` (`getTasksBoard`): columns entry, review, rejected and approved with `TaskSummary` cards; a drop in the web app only opens the task's existing action (no new write endpoint). (3) `GET`/`PUT /settings/kanban-wip` (`getKanbanWip`, `setKanbanWip`): the WIP limits per milestone (default none; a warning, never a block; reason, If-Match, audited). (4) `SavedViewScreenKey` gains `tasks-board` (module sites, the filter whitelist of `site-tasks`).
     - 0.15.31 (2026-11-16): AND/OR filter builder in saved views and views shared with a region (F3 of the features build plan of 2026-11-14; migration 0117; CHANGELOG 154). Additive. (1) `GET /saved-views/filter-fields` (`listFilterFields`): the whitelist of filter fields of `sites`, `sites-stream`, `site-tasks` and `register-<key>` for the caller (hidden fields left out), with the operators per type and the limits. (2) The query parameter `filter` (a `FilterTree` as JSON) on `GET /sites`, `GET /site360/{menu}/rows`, `GET /sites/{site_id}/tasks` and `GET /registers/{register_key}/records`: compiled on the server to parameterised SQL, two levels, at most 20 items per group, 10 groups and 50 conditions; the caller's regions and row security still apply. (3) A saved view may keep the tree in `filters.advanced` (checked on save; stripped condition by condition for a reader who may not see a field, counted in `stripped_columns`). (4) `audience.region_ids` and `audience.regions`: a view shared with regions reaches the users whose own view right covers them; recipients read only. Numbered 0.15.31 because 0.15.30 is reserved for F2.
     - 0.15.30 (2026-11-16): ball in court with its duration, the SLA overrun in working days and the stale flag (F2 of the 2026-11-14 features plan; migration 0116; CHANGELOG 153). Additive and read only. (1) `BallInCourt.since` (when the current level opened) and `BallInCourt.held_wd` (working days from then to today: weekend Friday and Saturday plus the holidays of the task's SLA calendar, the default calendar for register records; never calendar days), on tasks and on register records in approval. (2) `SlaInfo.late_wd` (working days past the SLA maximum, 0 when not late) and `SlaInfo.left_wd` (working days left to the maximum of a running task, null once approved); the colour stays the rule's: green up to the minimum, amber up to the maximum, red above it. (3) `TaskSummary.last_activity_at` (the last action of a person on the open task: an audit row, a workflow step, a comment, a file upload or the opening of its level; not a system recalculation), `idle_working_days` (now filled), `stale` and `stale_after_wd` (the existing setting `stale_idle_days` of `PUT /settings/dashboard`, default 2; the dashboard counter `stale_tasks` uses the same rule). (4) Filters `sla_colour` (repeated or comma separated: green, amber, red, none) and `stale` (true or false) on `GET /approvals` and `GET /me/tasks`; an unknown value is 422. (5) `GET /me/tasks` is now served by the API (it was mock only): `do_now` = at a level I can act on now and not late, `late` = the same past the SLA maximum, `waiting` = submitted by me last and now at a level I do not hold; without a bucket do_now and late together; oldest level first; the Sites region scope applies.
     - 0.15.29 (2026-11-16, was 0.15.27 before the merge of #141): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16). (4) Amended 2026-11-15 (migration 0113, CHANGELOG 150, additive): the seven counters that had no source now have one (`vehicle_ready`, `advances_open_after_close`, `dismantle_pending`, `as_built_submitted`, `time_in_state_p85` in working days, `stale_tasks`, `on_air_vs_target`); `pending_kpis` lists only the KPIs whose value is null (no base, or no monthly target). `stale_idle_days` is the idle limit of `stale_tasks` (an integer from 1 to 30, default 2; optional on `PUT /settings/dashboard`, a save without it keeps the stored value; always returned). `counters.site360_menus` counts the sites per SITE 360 view (the workflow views CW, TE and OM; Design and Acquisition, Handover and Closure and Dismantle have no view and are not counted).
@@ -1416,6 +1417,85 @@ paths:
                       items: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ------------------------------------------------------------------ boards (F5, 0.15.32)
+  /boards/sites:
+    get:
+      tags: [sites]
+      operationId: getSitesBoard
+      summary: Sites board by milestone (read only)
+      description: |
+        0.15.32 (F5). Needs `sites.view`; the caller's regions (B3) and row security apply. One column per milestone (the stable stage code of the workflow versions in use,
+        ordered by sequence, named by the newest version) and a last column `closed`. A site sits in the first milestone of its own workflow version that is neither done nor
+        N/A (the current stage of `GET /sites`); a site without tasks yet sits in the first milestone; it is `closed` when its overall status is completed or every stage with
+        work is done. Cancelled sites are left out unless `include_cancelled=true` or `overall_status=cancelled`. Ageing (`ageing_wd`) is the number of working days (weekend and
+        holidays of the default calendar) from `entered_on` to today; `entered_on` is the latest milestone date of the milestones before the column (the actual date, else the
+        approval of F1, else the approved date), else the day the site was created (open question Q570). Swimlanes: `none`, `region`, or `contractor` (the external party of
+        the site's tasks in its column, open ones first, else of its latest task with one; Q571). Cards are the oldest in the column first, `card_limit` per cell; `count` is
+        always the full count. A column whose count is above its WIP limit (`GET /settings/kanban-wip`) has `over_wip` true: a warning only, nothing is refused (Q572).
+        The filters are those of `GET /sites` (the F3 tree included). There is no write on the board: a site moves only through its tasks.
+      parameters:
+        - $ref: '#/components/parameters/FilterTree'
+        - { name: swimlane, in: query, schema: { type: string, enum: [none, region, contractor], default: none } }
+        - { name: card_limit, in: query, description: 'Cards per cell (column and lane).', schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+        - { name: include_cancelled, in: query, schema: { type: boolean, default: false } }
+        - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
+        - { name: site_codes, in: query, description: 'A pasted list of Site IDs (as on `GET /sites`).', schema: { type: string, maxLength: 8000 } }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: scenario, in: query, schema: { $ref: '#/components/schemas/DeliveryScenario' } }
+        - { name: overall_status, in: query, schema: { $ref: '#/components/schemas/OverallStatus' } }
+        - { name: cluster_code, in: query, schema: { type: string } }
+        - { name: delivery_batch, in: query, schema: { type: string } }
+        - { name: workflow_version, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: workflow_locks, in: query, schema: { type: string, enum: [locked, open] } }
+        - { name: data_gaps, in: query, schema: { type: string, enum: [with, without] } }
+      responses:
+        '200':
+          description: The board.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SitesBoard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /boards/tasks:
+    get:
+      tags: [sites]
+      operationId: getTasksBoard
+      summary: Tasks board by approval state (read only)
+      description: |
+        0.15.32 (F5). Needs `sites.view`; the caller's regions (B3) and row security apply. Four columns: `entry` (open or at L1 Data Entry), `review` (at L2: in review or in
+        approval), `rejected` (sent back to L1 by a rejection and not yet resubmitted) and `approved`. Locked, N/A, skipped and suspended tasks are not on the board. Cards are
+        `TaskSummary` items with the F2 timing; the ball held longest first, the latest approvals first in `approved`; `card_limit` per column, `count` is the full count.
+        The board only reads. In the web app a card dropped on a column only **opens** the task's existing action (submit, review, approve, or reject with its mandatory note)
+        when `GET /tasks/{task_id}` lists it in `allowed_actions`; otherwise the drop is refused with a message. The action itself is the existing endpoint, which checks
+        everything again. `mine=true` keeps the tasks the caller acted on, holds the ball of, or may act on now. The F3 tree is the one of the screen `tasks-board` (the
+        whitelist of `site-tasks`).
+      parameters:
+        - $ref: '#/components/parameters/FilterTree'
+        - { name: site_id, in: query, schema: { type: string, format: uuid } }
+        - { name: stage_code, in: query, schema: { type: string } }
+        - { name: q, in: query, description: 'Site code or name, task code or name.', schema: { type: string } }
+        - { name: mine, in: query, schema: { type: boolean, default: false } }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: card_limit, in: query, description: 'Cards per column.', schema: { type: integer, minimum: 1, maximum: 100, default: 30 } }
+      responses:
+        '200':
+          description: The board.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TasksBoard' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ users
   /users:
@@ -7994,6 +8074,55 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ImportsSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/kanban-wip:
+    get:
+      tags: [settings]
+      operationId: getKanbanWip
+      summary: The WIP limits of the sites board (kanban.wip_limits)
+      description: |
+        0.15.32 (F5). Every signed-in user may read it. `limits` maps a milestone (stable stage code) to its WIP limit; a column without one has no limit (the default: none).
+        A limit is a warning on the board only, never a block. `columns` lists the milestones a limit may name. `can_edit` is true for a System Admin or a delegate of
+        `settings` edit for all regions.
+      x-db-path: kanban_wip_json
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KanbanWip'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+    put:
+      tags: [settings]
+      operationId: setKanbanWip
+      summary: Change the WIP limits of the sites board (reason, If-Match, audited)
+      description: |
+        0.15.32 (F5). A System Admin, or a delegate of `settings` edit for all regions (403 `action_forbidden` otherwise). The whole map is replaced: a stage code of a workflow
+        version (422 `unknown_stage`), a whole number from 1 to 10000 or null for no limit (422 `out_of_range`), at most 100 entries, a reason and If-Match. Saving the map in
+        force is 409 `invalid_transition`. Audited as `kanban_wip_limits_update` with the map, who and when before and after.
+      x-db-path: admin_set_kanban_wip_limits
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/KanbanWipInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/KanbanWip'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
@@ -18311,6 +18440,123 @@ components:
         po_wo_date: { type: string, format: date }
         order_status: { type: string }
         external_party: { $ref: '#/components/schemas/ExternalPartyRef' }
+    KanbanWip:
+      type: object
+      description: '0.15.32 (F5). The setting `kanban.wip_limits`: the WIP limit of each milestone column of the sites board, a warning only.'
+      required: [limits, columns, min, max, version, can_edit]
+      properties:
+        limits: { type: object, additionalProperties: { type: integer, minimum: 1, maximum: 10000 }, description: 'Stage code to limit; a column not named has no limit.' }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [code, name_en]
+            properties:
+              code: { type: string }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+        min: { type: integer, description: '1' }
+        max: { type: integer, description: '10000' }
+        updated_at: { type: [string, 'null'], format: date-time }
+        updated_by: { oneOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+        version: { type: integer, description: The ETag value. }
+        can_edit: { type: boolean }
+    KanbanWipInput:
+      type: object
+      additionalProperties: false
+      required: [limits, reason]
+      properties:
+        limits:
+          type: object
+          maxProperties: 100
+          propertyNames: { pattern: '^[A-Z][A-Z0-9_]{0,30}$' }
+          additionalProperties: { type: [integer, 'null'], minimum: 1, maximum: 10000 }
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    SiteBoardCard:
+      type: object
+      description: '0.15.32 (F5). A site on the sites board.'
+      required: [id, site_code, name, region_id, overall_status, entered_on, ageing_wd, at_l1, at_l2, late_count]
+      properties:
+        id: { type: string, format: uuid }
+        site_code: { type: string }
+        name: { type: string }
+        name_ar: { type: [string, 'null'] }
+        region_id: { $ref: '#/components/schemas/RegionId' }
+        overall_status: { $ref: '#/components/schemas/OverallStatus' }
+        delivery_scenario: { type: [string, 'null'] }
+        contractor:
+          oneOf:
+            - type: object
+              required: [id, name]
+              properties:
+                id: { type: string, format: uuid }
+                name: { type: string }
+            - type: 'null'
+        entered_on: { type: string, format: date, description: 'The day the site entered its column (see getSitesBoard).' }
+        ageing_wd: { type: integer, minimum: 0, description: 'Working days from entered_on to today.' }
+        sla_colour: { type: [string, 'null'], enum: [green, amber, red, null], description: 'F2: the worst SLA colour of the open tasks of the site in its column.' }
+        at_l1: { type: integer, description: 'Open tasks of the column at L1.' }
+        at_l2: { type: integer, description: 'Open tasks of the column at L2.' }
+        late_count: { type: integer, description: 'Open tasks of the column past their SLA maximum.' }
+    SitesBoard:
+      type: object
+      description: '0.15.32 (F5). The sites board: columns, lanes and the cells where they meet (only cells with sites are listed).'
+      required: [swimlane, card_limit, total, columns, lanes, cells]
+      properties:
+        swimlane: { type: string, enum: [none, region, contractor] }
+        card_limit: { type: integer }
+        total: { type: integer }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [key, kind, name_en, count, wip_limit, over_wip]
+            properties:
+              key: { type: string, description: 'A stage code, or `closed`.' }
+              kind: { type: string, enum: [milestone, closed] }
+              name_en: { type: string }
+              name_ar: { type: [string, 'null'] }
+              count: { type: integer }
+              wip_limit: { type: [integer, 'null'] }
+              over_wip: { type: boolean, description: 'count is above wip_limit: a warning only.' }
+        lanes:
+          type: array
+          items:
+            type: object
+            required: [key, label_en, count]
+            properties:
+              key: { type: string, description: '`all` without swimlanes; a region id; an external party id or `none`.' }
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+              count: { type: integer }
+        cells:
+          type: array
+          items:
+            type: object
+            required: [column, lane, count, more, cards]
+            properties:
+              column: { type: string }
+              lane: { type: string }
+              count: { type: integer }
+              more: { type: boolean, description: 'Some sites of the cell are not in cards (card_limit).' }
+              cards: { type: array, items: { $ref: '#/components/schemas/SiteBoardCard' } }
+    TasksBoard:
+      type: object
+      description: '0.15.32 (F5). The tasks board by approval state.'
+      required: [card_limit, total, columns]
+      properties:
+        card_limit: { type: integer }
+        total: { type: integer }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [key, count, more, items]
+            properties:
+              key: { type: string, enum: [entry, review, rejected, approved] }
+              count: { type: integer }
+              more: { type: boolean }
+              items: { type: array, items: { $ref: '#/components/schemas/TaskSummary' } }
     ImportsSettings:
       type: object
       description: '0.14.6. The setting `imports.async_rows`: above this number of rows a send or a decision of a batch runs in the background.'
@@ -20128,7 +20374,7 @@ components:
     SavedViewScreenKey:
       type: string
       pattern: '^[a-z][a-z0-9_-]{1,80}$'
-      description: 'A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2).'
+      description: 'A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2), `tasks-board` (0.15.32, F5).'
     SavedViewColumns:
       type: object
       additionalProperties: false
