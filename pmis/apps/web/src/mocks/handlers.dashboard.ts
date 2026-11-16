@@ -9,6 +9,27 @@ import { MAP_MILESTONES, mapItem, SITE_COUNT, STREAMS as SITE_STREAMS } from './
 
 const B = API_BASE;
 
+const COUNTERS_MOCK = {
+  available: true,
+  kpis: [
+
+  ],
+  pending_kpis: [] as string[],
+  site360_menus: [
+    { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sites: 96 },
+    { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sites: 88 },
+    { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sites: 40 },
+  ],
+  sla_totals: { open_tasks: 160, breach: 20, at_risk: 13 },
+  sla_by_stage: [
+    { stage_code: 'SITE_ACQ', stage_name: 'Site acquisition', stage_name_ar: 'اقتناء الموقع', open_tasks: 48, breach: 6, at_risk: 4, breach_pct: 12.5, at_risk_pct: 8.3 },
+    { stage_code: 'CIVIL', stage_name: 'Civil works', stage_name_ar: 'الأعمال المدنية', open_tasks: 70, breach: 9, at_risk: 6, breach_pct: 12.9, at_risk_pct: 8.6 },
+    { stage_code: 'COMMISSION', stage_name: 'Commissioning', stage_name_ar: 'التشغيل والتجهيز', open_tasks: 42, breach: 5, at_risk: 3, breach_pct: 11.9, at_risk_pct: 7.1 },
+  ],
+  sites_total: 120,
+};
+
+
 /** The mock accounts see every region; the module comes from their navigation list (the real API checks `dashboard.view`). */
 const canUse = (): boolean => !!viewer()?.nav.includes('dashboard');
 /** In the mock the Project Manager account (`pm`, a System Admin) enters manual values and decides delay periods; the real API decides by role, grant and matrix. */
@@ -111,7 +132,7 @@ export const dashboardHandlers = [
       .sort((a, b) => b.score - a.score || a.risk_code.localeCompare(b.risk_code));
     const scen = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
     return HttpResponse.json({
-      as_of: new Date().toISOString(), scope_regions: null,
+      as_of: new Date().toISOString(), scope_regions: null, counters: COUNTERS_MOCK,
       risk_matrix: {
         available: true, open_total: risks.length, invalid_total: 0, cells,
         bands: [
@@ -140,7 +161,7 @@ export const dashboardHandlers = [
     const items = Array.from({ length: SITE_COUNT }, (_, i) => mapItem(i));
     const live = items.filter((x) => x.overall_status !== 'cancelled');
     return HttpResponse.json({
-      as_of: new Date().toISOString(), scope_regions: null,
+      as_of: new Date().toISOString(), scope_regions: null, counters: COUNTERS_MOCK,
       counts: { total: items.length, cancelled: items.length - live.length, with_coordinates: live.filter((x) => x.has_coordinates).length, without_coordinates: live.filter((x) => !x.has_coordinates).length },
       streams: SITE_STREAMS, milestones: MAP_MILESTONES, items,
     });

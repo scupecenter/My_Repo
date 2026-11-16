@@ -19,11 +19,12 @@ import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { Workflow } from './Workflow';
 import { Site360Columns } from './Site360Columns';
+import { DashboardSettings } from './DashboardSettings';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
 
-/** The 11 tabs of Administration > Settings (F19). Tabs with sections show a sub-navigation inside the tab. */
+/** The tabs of Administration > Settings (F19, and the dashboard tab of F20). Tabs with sections show a sub-navigation inside the tab. */
 export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'calendar', sections: [] },
   { key: 'workflow', sections: [{ key: 'editor' }, { key: 'freeze' }, { key: 'idle' }] },
@@ -36,6 +37,7 @@ export const SETTINGS_TABS: readonly SettingsTab[] = [
   { key: 'data', sections: [{ key: 'imports' }, { key: 'historical' }] },
   { key: 'alerts', sections: [] },
   { key: 'security', sections: [{ key: 'staff' }, { key: 'retention' }] },
+  { key: 'dashboard', sections: [] },
 ];
 
 /**
@@ -106,6 +108,7 @@ export function SettingsRoutes() {
         <Route path="ddl" element={<Lists />} />
         <Route path="alerts" element={<Notifications />} />
         <Route path="site360" element={<Site360Columns />} />
+        <Route path="dashboard" element={<DashboardSettings />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Workflow />} />

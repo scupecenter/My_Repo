@@ -5377,6 +5377,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/settings/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dashboard settings, targets, KPI thresholds and cards per tab (0.15.24)
+         * @description 0.15.24 (F20, owner decisions 2026-11-15). Global settings of the dashboard, kept in the settings table as `dashboard.settings`. `targets`:
+         *     sites per batch and the monthly On-Air target (null = no target). `thresholds`: green and amber for each KPI of `catalogue.kpis`. `tabs`: for each tab
+         *     (PMO, CW, TE) the card codes in display order and the codes it hides; a card in `catalogue.cards` that no list names is shown at the end. The per-user
+         *     layout and the saved filter sets stay in the browser. The health index bands stay in `dashboard.health_bands` (no duplicate setting).
+         *     Reads need `dashboard.view` (403 `module_forbidden` otherwise), so every dashboard reader gets the thresholds.
+         */
+        get: operations["getDashboardSettings"];
+        /**
+         * Save the dashboard settings (reason, If-Match, audited, versioned)
+         * @description 0.15.24. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole setting.
+         *     Field errors (422 `validation_failed`): `unknown_key`, `unknown_kpi` (a threshold for a code the catalogue does not hold), `missing_kpi` (a catalogue KPI without a threshold),
+         *     `invalid_order` (green is worse than amber for the KPI's direction), `invalid`, `unknown_card` (in an order or hidden list), `duplicate` (a card listed twice in one tab), `too_many`.
+         *     Each save writes one audit row with before and after values and the reason.
+         */
+        put: operations["setDashboardSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/mail-notification-kinds": {
         parameters: {
             query?: never;
@@ -8123,6 +8154,7 @@ export interface paths {
          *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
          *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
          *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
         put?: never;
@@ -13299,6 +13331,59 @@ export interface components {
             updated_at?: string | null;
             updated_by?: components["schemas"]["UserRef"] | null;
         };
+        DashboardTabLayout: {
+            /** @description Card codes in display order. */
+            order: string[];
+            /** @description Card codes this tab does not show. */
+            hidden: string[];
+        };
+        DashboardSettingsInput: {
+            targets: {
+                /** @description Target sites per batch; null = no target. */
+                sites_per_batch: number | null;
+                /** @description Monthly On-Air target in sites; null = no target. */
+                monthly_on_air: number | null;
+            };
+            /** @description One entry per KPI code of the catalogue (every KPI is required). green and amber are in the unit of the KPI; for a higher-is-better KPI green >= amber, for a lower-is-better KPI green <= amber. */
+            thresholds: {
+                [key: string]: {
+                    green: number;
+                    amber: number;
+                };
+            };
+            tabs: {
+                pmo: components["schemas"]["DashboardTabLayout"];
+                cw: components["schemas"]["DashboardTabLayout"];
+                te: components["schemas"]["DashboardTabLayout"];
+            };
+            /** @description 0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
+            stale_idle_days?: number;
+        };
+        /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
+        DashboardSettings: components["schemas"]["DashboardSettingsInput"] & {
+            version: number;
+            /** Format: date-time */
+            updated_at?: string | null;
+            updated_by?: components["schemas"]["UserRef"] | null;
+            catalogue: {
+                kpis: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                    /** @enum {string} */
+                    unit: "pct" | "days" | "count";
+                    /** @enum {string} */
+                    direction: "higher" | "lower";
+                    default_green: number;
+                    default_amber: number;
+                }[];
+                cards: {
+                    code: string;
+                    label_en: string;
+                    label_ar: string;
+                }[];
+            };
+        };
         GecolOrderWarningsInput: {
             enabled: boolean;
             chains: string[][];
@@ -16288,6 +16373,58 @@ export interface components {
             data_quality: components["schemas"]["DashboardDataQuality"];
             swap_relocation: components["schemas"]["DashboardSwapRelocation"];
             decisions: components["schemas"]["DashboardDecisions"];
+            counters: components["schemas"]["DashboardCounters"];
+        };
+        /** @description 0.15.24: the counters of the dashboard (F20). Each KPI is coloured by the saved thresholds (dashboard settings). */
+        DashboardCounters: {
+            /** @description False when the caller may not see the sites; the other fields are then null. */
+            available: boolean;
+            /** @description Every KPI of the dashboard catalogue, in catalogue order. A KPI with no source yet has a null value and is listed in pending_kpis. */
+            kpis: components["schemas"]["DashboardKpi"][] | null;
+            pending_kpis: string[] | null;
+            sla_totals: {
+                open_tasks: number;
+                /** @description Open tasks past the SLA maximum (colour red). */
+                breach: number;
+                /** @description Open tasks past the warning share (colour amber). */
+                at_risk: number;
+            } | null;
+            /** @description The open tasks of the caller's sites by stage, in stage order. */
+            sla_by_stage: components["schemas"]["DashboardSlaStage"][] | null;
+            /** @description Active sites in scope (cancelled sites left out). */
+            sites_total: number | null;
+            /** @description 0.15.29: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
+            site360_menus: {
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+                sites: number;
+            }[] | null;
+        };
+        DashboardKpi: {
+            code: string;
+            /** @enum {string} */
+            unit: "pct" | "days" | "count";
+            /** @enum {string} */
+            direction: "higher" | "lower";
+            value: number | null;
+            green: number;
+            amber: number;
+            /**
+             * @description none when the value is null.
+             * @enum {string}
+             */
+            colour: "green" | "amber" | "red" | "none";
+        };
+        DashboardSlaStage: {
+            stage_code: string;
+            stage_name: string;
+            stage_name_ar: string;
+            open_tasks: number;
+            breach: number;
+            at_risk: number;
+            breach_pct: number | null;
+            at_risk_pct: number | null;
         };
         DashboardRiskMatrix: {
             /** @description False when the caller may not see the risk register; the other fields are then null. */
@@ -26126,6 +26263,62 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GecolOrderWarnings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    getDashboardSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setting. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    setDashboardSettings: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"] & components["schemas"]["DashboardSettingsInput"];
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSettings"];
                 };
             };
             401: components["responses"]["Unauthorized"];

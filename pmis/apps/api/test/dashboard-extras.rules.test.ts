@@ -5,8 +5,32 @@ import {
   decisionTag,
   riskBand,
   riskScore,
+  roundDays,
+  sharePct,
   sortRisksForTop,
+  targetPct,
 } from "../src/dashboard/dashboard-extras.rules";
+
+describe("dashboard extras: F20 counter rules (migration 0113)", () => {
+  it("the On-Air share is against the monthly target; no target or a zero target gives null", () => {
+    expect(targetPct(12, 15)).toBe(80);
+    expect(targetPct(3, 2)).toBe(150);
+    expect(targetPct(5, null)).toBeNull();
+    expect(targetPct(5, 0)).toBeNull();
+  });
+
+  it("the time in state is rounded to one decimal; no interval gives null", () => {
+    expect(roundDays(12.34)).toBe(12.3);
+    expect(roundDays(0)).toBe(0);
+    expect(roundDays(null)).toBeNull();
+    expect(roundDays(Number.NaN)).toBeNull();
+  });
+
+  it("a share with no base is null, so a counter with nothing to count is pending", () => {
+    expect(sharePct(1, 0)).toBeNull();
+    expect(sharePct(1, 4)).toBe(25);
+  });
+});
 
 describe("dashboard extras: risk bands (F13 item 3)", () => {
   it("bands follow the owner default: low 1-4, medium 5-9, high 10-16, critical 20-25", () => {
