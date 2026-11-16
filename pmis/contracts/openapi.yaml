@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.26
+  version: 0.15.28
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,9 +30,11 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.28 (2026-11-15): SITE 360 columns screen in Settings and Excel-style working features (F15 items 4 and 5; CHANGELOG 146). Merge of origin/main (F19 Settings tabs, CHANGELOG 149; F17, F4 and F1 entries kept below). Additive. Settings > Site360 is the column-to-menu screen (the old route redirects). (2) Migration 0112: the rows endpoint `GET /site360/{menu}/rows` returns the Master values of PR Status (AH) and PO / WO Status (AI) (register procurement, B3) and the gate readiness columns (the date of the milestone before each gate once it is approved). (3) Grid working features and the toolbar (export of the current view, lock and unlock of the selected sites through the existing endpoints) are web only. No new path or schema; contract text only.
     - 0.15.26 (2026-11-15): SLA and project weight in the workflow editor (F14; owner request 2026-11-15; migration 0109 (was 0099; SLA and weight tables 0109 and 0110); CHANGELOG 145). Additive. New paths `GET /workflow/versions/{version}/weight-totals`, `PUT /workflow/versions/{version}/tasks/{task_code}/sla-rule` (`admin_sla_rule_save`, effective-dated version), `POST /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove` (`admin_sla_rule_remove`, delete when unused else deactivate) and `PUT /workflow/versions/{version}/tasks/{task_code}/weight` (`admin_wf_task_weight`, draft only). Publishing answers 409 `invalid_transition` with `weights_not_100` detail while a weight group does not total 100. Versions 0.15.16 to 0.15.19 are used by other PRs.
     - 0.15.25 (2026-11-15): register locks (F16; migration 0103 `register_locks`; CHANGELOG 147). Additive. A System Admin or a holder of the administer grant locks or unlocks one record (`POST` and `DELETE` on `/registers/{register_key}/records/{record_id}/lock`) and one column for every record (`POST` and `DELETE` on `/registers/{register_key}/columns/{field_code}/lock`). A locked record refuses changes for everyone except a System Admin; a locked column refuses a changed value. A reason and step-up are required, and every lock change is audited.
     - 0.15.23 (2026-11-15): dropdown lists (F17, owner request 2026-11-15 for maximum flexibility; migration 0102, mirror `db/sql/101_dropdown_lists.sql`; CHANGELOG 148). Additive, one change of behaviour. (1) A list has a value type (`value_type`: text, number, date, person, site or vendor; a number or a date is checked at creation, a person, a site or a vendor must be a real user, site or external party; the type cannot change while the list has values, 422 `value_type_locked`), `multi_select`, and an optional `parent_catalogue` (a dependent list: each value names a `parent_code`, the active value of the parent list; a cycle is 422; the parent cannot change while the list has values, 422 `parent_locked`). (2) A value has `colour` (`#RRGGBB`), `is_default` (one active default per list), `parent_code`, and `deactivate_reason` with `deactivated_at`. A value used by a dependent value or the default cannot be deactivated (422 `has_dependents` or `is_default`). `ListCatalogue.dependent_lists` names the lists that depend on it and `used_by` names the fields that read it. (3) New path `DELETE /list-catalogues/{catalogue_code}/values/{value_id}` (`deleteListValue`): a hard delete with a `reason` query parameter; If-Match is optional; allowed only when the value is unused (not in a register record, a child-list column, a dependent value or the default); otherwise 422 `in_use` (or `is_default`). Audited with before and the reason.
+    - 0.15.21 (2026-11-15): SITE 360 restructure, the Master view (F15; migration 0101; CHANGELOG 146). Additive. (1) `GET /site360/sections` (`getSite360Sections`): the eight SITE 360 menus (`master` replaces "All sites", `design_acq`, `sow` (new), `cw`, `te`, `hoto`, `dismantle`, `om`), each with its Master columns in Master order, the 3-level grid header (`bands`: phase band, then `groups`: group, then the column ords), the frozen identity columns (# to Site Name) and `can_move`. A column carries a set of menus (`sections`, may be in several menus); the status columns are in every menu. (2) `PATCH /site360/columns/{ord}/sections` (`setSite360ColumnSections`): a System Admin (`admin.settings` edit, checked in the database) replaces the menus of one Master column; a step-up and a reason; audited with before and after; the status columns cannot be changed. (3) The grid shows the same columns in every menu. No new store: the values are still written through the site and task paths. (4) `GET /site360/{menu}/rows` (`getSite360Rows`, F15, migration 0104): the grid rows of one menu, one page at a time, from the set-based view `site360_master_values` (no per-site path); filters, sort and paging in the database; `total` and `filtered` counts; B3 region scope. (3) Inline edit of task-backed cells: each row of `GET /site360/{menu}/rows` carries `cells` (keyed by ord) with the task, its If-Match version and the field; the save goes through the existing `PATCH /tasks/{task_id}` (the L1 rules, gates and audit of the task screen), nothing new on the server for writes. (5) Calc columns (migration 0107): Contractor Name (AJ) and Contractor Team (AK) of the first active CW procurement order, and GECOL Status (BW) of the GECOL record; each is a register value (the register's module view applies). The contractor filter `contractor` on the rows endpoint. PR Status, PO / WO Status, CW Access Date, HLC Fiber Status and the gate readiness columns stay empty until their Master formulas are settled.
     - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
     - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
@@ -8331,6 +8333,79 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /site360/sections:
+    get:
+      tags: [sites]
+      operationId: getSite360Sections
+      summary: The SITE 360 menus and the Master columns of each (0.15.21, F15)
+      description: |
+        0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
+      responses:
+        '200':
+          description: The menus.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Sections' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /site360/{menu}/rows:
+    get:
+      tags: [sites]
+      operationId: getSite360Rows
+      summary: The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
+      description: |
+        0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+      parameters:
+        - { name: menu, in: path, required: true, description: 'The SITE 360 menu.', schema: { type: string, enum: [master, design_acq, sow, cw, te, hoto, dismantle, om] } }
+        - { name: site_code, in: query, required: false, description: 'Site IDs, comma-separated (multi Site ID search, exact match).', schema: { type: string, maxLength: 4000 } }
+        - { name: region_id, in: query, required: false, description: 'Region numbers 1 to 7, comma-separated.', schema: { type: string, maxLength: 40 } }
+        - { name: sub_region, in: query, required: false, schema: { type: string, maxLength: 4000 } }
+        - { name: phase, in: query, required: false, description: 'Project phase, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: batch, in: query, required: false, description: 'Delivery batch, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: scenario, in: query, required: false, schema: { type: string, maxLength: 200 } }
+        - { name: delivery_model, in: query, required: false, description: 'CW delivery model (outsourced or internal).', schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, required: false, description: 'Overall status, comma-separated.', schema: { type: string, maxLength: 400 } }
+        - { name: milestone, in: query, required: false, description: 'Current milestone, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: contractor, in: query, required: false, description: 'Contractor Name (Master AJ) of the first active CW procurement order, comma-separated. A caller without the procurement view matches no site.', schema: { type: string, maxLength: 4000 } }
+        - { name: sort, in: query, required: false, description: 'site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu.', schema: { type: string, maxLength: 40 } }
+        - { name: dir, in: query, required: false, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: The page of rows with the menu's columns and the counts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Rows' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /site360/columns/{ord}/sections:
+    patch:
+      tags: [settings]
+      operationId: setSite360ColumnSections
+      summary: Replace the SITE 360 menus of one Master column (0.15.21, F15)
+      description: |
+        0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may change the menus of a column. The body replaces the whole set; a column may be in several menus. The step-up is required and the reason is mandatory. The status columns are in every menu and cannot be changed (422 `validation_failed`, `/sections`). Audited with the menus before and after.
+      x-db-path: site360_set_sections
+      parameters:
+        - { name: ord, in: path, required: true, description: 'The Master column order (1 to 187, A = 1).', schema: { type: integer, minimum: 1, maximum: 187 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Site360ColumnSectionsRequest' }
+      responses:
+        '200':
+          description: The column with its new menus; the menus are read again with `GET /site360/sections`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Column' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/gecol-order-warnings:
     get:
       tags: [settings]
@@ -13704,6 +13779,121 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    Site360Section:
+      type: string
+      description: The section of a Master column. `status` columns are in every menu.
+      enum: [design_acq, sow, cw, te, hoto, dismantle, om, status]
+    Site360Menu:
+      type: string
+      enum: [master, design_acq, sow, cw, te, hoto, dismantle, om]
+    Site360Column:
+      type: object
+      additionalProperties: false
+      required: [ord, letter, group_top, group_mid, header, sections, is_phase_gate]
+      properties:
+        ord: { type: integer, minimum: 1, maximum: 187 }
+        letter: { type: string, description: 'The column letter in the Master sheet (A to GE).' }
+        group_top: { type: [string, 'null'], description: 'The phase band (row 1 of the Master sheet).' }
+        group_mid: { type: [string, 'null'], description: 'The group (row 2 of the Master sheet).' }
+        header: { type: string, description: 'The field (row 3 of the Master sheet).' }
+        sections:
+          type: array
+          description: 'The SITE 360 menus of the column (a set). `status` means every menu.'
+          items: { $ref: '#/components/schemas/Site360Section' }
+        is_phase_gate: { type: boolean, description: 'True for a Phase Gate column (highlighted in the grid).' }
+    Site360Band:
+      type: object
+      additionalProperties: false
+      required: [name, is_phase_gate, groups]
+      properties:
+        name: { type: [string, 'null'] }
+        is_phase_gate: { type: boolean }
+        groups:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, ords]
+            properties:
+              name: { type: [string, 'null'] }
+              ords: { type: array, items: { type: integer, minimum: 1, maximum: 187 } }
+    Site360MenuItem:
+      type: object
+      additionalProperties: false
+      required: [key, name_en, name_ar, columns, bands, frozen_ords]
+      properties:
+        key: { $ref: '#/components/schemas/Site360Menu' }
+        name_en: { type: string }
+        name_ar: { type: string }
+        columns:
+          type: array
+          description: The columns of the menu in Master order (status columns included).
+          items: { $ref: '#/components/schemas/Site360Column' }
+        bands:
+          type: array
+          description: The 3-level header of the menu (phase band, group, field).
+          items: { $ref: '#/components/schemas/Site360Band' }
+        frozen_ords:
+          type: array
+          description: The identity columns frozen by default (# to Site Name, ords 1 to 4).
+          items: { type: integer, minimum: 1, maximum: 187 }
+    Site360Sections:
+      type: object
+      additionalProperties: false
+      required: [items, can_move]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Site360MenuItem' } }
+        can_move: { type: boolean, description: 'True for a System Admin.' }
+    Site360ColumnSectionsRequest:
+      type: object
+      additionalProperties: false
+      required: [sections, reason]
+      properties:
+        sections:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items:
+            type: string
+            enum: [design_acq, sow, cw, te, hoto, dismantle, om]
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    Site360Rows:
+      type: object
+      additionalProperties: false
+      required: [menu, total, filtered, offset, limit, rows]
+      properties:
+        menu: { $ref: '#/components/schemas/Site360MenuItem' }
+        total: { type: integer, minimum: 0, description: 'Sites the caller may see.' }
+        filtered: { type: integer, minimum: 0, description: 'Sites that match the filters.' }
+        offset: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 1, maximum: 200 }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [site_id, site_code, row_no, values, cells]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              row_no: { type: integer, minimum: 1, description: 'Running number of the row in view (the # column).' }
+              values:
+                type: object
+                description: 'Master value of each column of the menu, keyed by the column order (ord) as a string; null when the column has no source yet.'
+                additionalProperties: { type: [string, 'null'] }
+              cells:
+                type: object
+                description: 'Task-backed columns only (0.15.21 item 3), keyed by ord. Edit a cell with PATCH /tasks/{task_id} (If-Match the version; body planned_date, actual_date or actual_start, or values with the key). A locked or N/A task, or a task that is not the only source of its column, is read-only (editable false).'
+                additionalProperties:
+                  type: object
+                  required: [task_id, version, editable]
+                  properties:
+                    task_id: { type: string, format: uuid }
+                    version: { type: integer, minimum: 1 }
+                    editable: { type: boolean }
+                    field: { type: string, enum: [planned_date, actual_date, actual_start] }
+                    values: { type: string, description: 'The key of the task values map (a typed field).' }
     SearchType:
       type: string
       enum: [sites, registers, documents, meetings, people, contractors]

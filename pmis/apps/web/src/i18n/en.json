@@ -2,6 +2,34 @@
   "app": {
     "name": "GSDN Workspace"
   },
+  "site360": {
+    "layout": "SITE 360 layout",
+    "menus": "SITE 360 menus",
+    "gate": "gate",
+    "freeze": "Freeze or unfreeze this column",
+    "rows": "Rows: {{count}}",
+    "of": "{{count}} of {{total}} sites",
+    "grid": "Grid",
+    "vertical": "Vertical",
+    "more": "Load more sites",
+    "site_ids": "Site IDs to find",
+    "site_ids_placeholder": "Paste Site IDs, one per line or comma separated",
+    "site_ids_apply": "Apply",
+    "menu": "Column menu",
+    "sort_asc": "Sort A to Z",
+    "sort_desc": "Sort Z to A",
+    "sort_clear": "Clear sort",
+    "filter": "Filter by value",
+    "filter_search": "Search values",
+    "blanks": "(Blanks)",
+    "all": "Select all",
+    "none_value": "Clear all",
+    "hide": "Hide column",
+    "show_hidden": "{{count}} hidden column(s): show all",
+    "resize": "Drag to resize; double-click to fit the text",
+    "selection": "{{count}} cells selected, {{numbers}} numeric, sum {{sum}}",
+    "template_upload": "Template upload"
+  },
   "nav": {
     "group_work": "Work",
     "group_data": "Data entry",
@@ -954,9 +982,7 @@
     "section_data_imports": "Imports",
     "section_data_historical": "Historical load",
     "section_security_staff": "Staff field visibility",
-    "section_security_retention": "Log retention",
-    "site360_title": "Site 360 columns",
-    "site360_pending": "Column-to-menu mapping: coming in F15."
+    "section_security_retention": "Log retention"
   },
   "scopeMatch": {
     "title": "Team / scope match (Procurement)",
@@ -4784,5 +4810,17 @@
       "blocked": "Blocked",
       "not_applicable": "Not applicable"
     }
+  },
+  "site360cols": {
+    "title": "SITE 360 columns",
+    "hint": "Each Master column belongs to one or more SITE 360 menus. Status columns are in every menu and cannot change.",
+    "edit": "Edit menus",
+    "reason_title": "Change the SITE 360 menus of {{column}}",
+    "saved": "Menus saved",
+    "status_fixed": "Status (every menu)",
+    "none": "No menu",
+    "col": "Column",
+    "header": "Header",
+    "menus": "SITE 360 menus"
   }
 }

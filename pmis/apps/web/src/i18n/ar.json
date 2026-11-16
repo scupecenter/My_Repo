@@ -2,6 +2,34 @@
   "app": {
     "name": "GSDN Workspace"
   },
+  "site360": {
+    "layout": "عرض الموقع 360",
+    "menus": "قوائم الموقع 360",
+    "gate": "بوابة",
+    "freeze": "تجميد هذا العمود أو فكّه",
+    "rows": "الصفوف: {{count}}",
+    "of": "{{count}} من {{total}} موقعاً",
+    "grid": "شبكة",
+    "vertical": "عمودي",
+    "more": "تحميل المزيد من المواقع",
+    "site_ids": "معرّفات المواقع للبحث",
+    "site_ids_placeholder": "الصق معرّفات المواقع، واحدًا في كل سطر أو مفصولة بفواصل",
+    "site_ids_apply": "تطبيق",
+    "menu": "قائمة العمود",
+    "sort_asc": "ترتيب من A إلى Z",
+    "sort_desc": "ترتيب من Z إلى A",
+    "sort_clear": "إلغاء الترتيب",
+    "filter": "تصفية حسب القيمة",
+    "filter_search": "ابحث في القيم",
+    "blanks": "(فارغ)",
+    "all": "تحديد الكل",
+    "none_value": "إلغاء الكل",
+    "hide": "إخفاء العمود",
+    "show_hidden": "{{count}} عمود مخفي: إظهار الكل",
+    "resize": "اسحب لتغيير العرض؛ انقر مرتين للملاءمة مع النص",
+    "selection": "{{count}} خلية محددة، {{numbers}} رقمية، المجموع {{sum}}",
+    "template_upload": "رفع قالب"
+  },
   "nav": {
     "group_work": "العمل",
     "group_data": "إدخال البيانات",
@@ -954,9 +982,7 @@
     "section_data_imports": "الاستيراد",
     "section_data_historical": "التحميل التاريخي",
     "section_security_staff": "ظهور حقول الموظفين",
-    "section_security_retention": "الاحتفاظ بالسجلات",
-    "site360_title": "أعمدة SITE 360",
-    "site360_pending": "ربط الأعمدة بالقوائم: قادم في F15."
+    "section_security_retention": "الاحتفاظ بالسجلات"
   },
   "scopeMatch": {
     "title": "مطابقة الفريق والنطاق (المشتريات)",
@@ -4824,5 +4850,17 @@
       "blocked": "محجوب",
       "not_applicable": "لا ينطبق"
     }
+  },
+  "site360cols": {
+    "title": "أعمدة SITE 360",
+    "hint": "كل عمود في الماستر ينتمي إلى قائمة واحدة أو أكثر من قوائم SITE 360. أعمدة الحالة في كل قائمة ولا تتغير.",
+    "edit": "تعديل القوائم",
+    "reason_title": "تغيير قوائم SITE 360 للعمود {{column}}",
+    "saved": "حُفظت القوائم",
+    "status_fixed": "الحالة (في كل قائمة)",
+    "none": "بلا قائمة",
+    "col": "العمود",
+    "header": "الرأس",
+    "menus": "قوائم SITE 360"
   }
 }

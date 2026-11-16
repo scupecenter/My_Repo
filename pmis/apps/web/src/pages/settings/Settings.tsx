@@ -18,7 +18,7 @@ import { RegisterColumns } from './RegisterColumns';
 import { HistoricalWaiver } from './HistoricalWaiver';
 import { Imports } from './Imports';
 import { Workflow } from './Workflow';
-import { Site360 } from './Site360';
+import { Site360Columns } from './Site360Columns';
 
 export interface SettingsSection { key: string; adminOnly?: boolean }
 export interface SettingsTab { key: string; sections: SettingsSection[] }
@@ -57,6 +57,7 @@ export const LEGACY_SETTINGS_PATHS: Readonly<Record<string, string>> = {
   'mail-kinds': 'documents/mail',
   imports: 'data/imports',
   'historical-waiver': 'data/historical',
+  'site360-columns': 'site360',
 };
 
 function Layout() {
@@ -104,7 +105,7 @@ export function SettingsRoutes() {
         <Route path="weights" element={<WeightSets />} />
         <Route path="ddl" element={<Lists />} />
         <Route path="alerts" element={<Notifications />} />
-        <Route path="site360" element={<Site360 />} />
+        <Route path="site360" element={<Site360Columns />} />
         <Route path="workflow" element={<TabFrame tab="workflow" />}>
           <Route index element={<Navigate to="editor" replace />} />
           <Route path="editor" element={<Workflow />} />

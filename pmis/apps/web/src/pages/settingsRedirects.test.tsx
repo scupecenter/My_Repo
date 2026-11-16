@@ -65,10 +65,16 @@ describe('F19: Settings tabs and old routes', () => {
     expect(screen.getByTestId('settings-tab-registers')).toHaveClass('btn-accent');
   });
 
-  it('shows the Site360 placeholder until F15 lands', async () => {
+  it('opens the SITE 360 columns screen in the Site360 tab', async () => {
     at('/admin/settings/site360');
-    expect(await screen.findByTestId('settings-site360')).toHaveTextContent('coming in F15');
+    expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
     expect(screen.getByTestId('settings-tab-site360')).toHaveTextContent('Site360');
+  });
+
+  it('redirects the old SITE 360 columns route to the Site360 tab', async () => {
+    at('/admin/settings/site360-columns');
+    expect(await screen.findByTestId('site360-columns')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-tab-site360')).toHaveClass('btn-accent');
   });
 
   it('hides the mail kinds section from a user who is not a System Admin, and keeps the Documents tab', async () => {
