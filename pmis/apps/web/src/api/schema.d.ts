@@ -3117,6 +3117,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workflow/versions/{version}/sla-weight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * SLA rule and weight of every task of a workflow version
+         * @description Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.
+         */
+        get: operations["getWorkflowSlaWeight"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/weight-totals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Weight group totals of a workflow version (live check)
+         * @description Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
+         */
+        get: operations["getWorkflowWeightTotals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/sla-rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save the base SLA rule of a task (versioned)
+         * @description Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
+         */
+        put: operations["putTaskSlaRule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete an SLA rule no task uses, or deactivate it
+         * @description Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
+         */
+        post: operations["removeTaskSlaRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/workflow/versions/{version}/tasks/{task_code}/weight": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Counts in project weight, weight value and weight group of a task (draft)
+         * @description Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
+         */
+        put: operations["putTaskWeight"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workflow/versions/{version}/tasks/{task_code}/closing": {
         parameters: {
             query?: never;
@@ -5726,6 +5826,68 @@ export interface paths {
         /** Void a record (never hard-deleted) */
         post: operations["voidRegisterRecord"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/records/{record_id}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a record (read-only except for a System Admin) (0.15.22)
+         * @description 0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+         *     `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+         *     (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+         */
+        post: operations["lockRegisterRecord"];
+        /**
+         * Unlock a record (0.15.22)
+         * @description 0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+         *     `register_record_unlock` with before and after.
+         */
+        delete: operations["unlockRegisterRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/registers/{register_key}/columns/{field_code}/lock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lock a column for every record of the register (0.15.22)
+         * @description 0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+         *     (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+         */
+        post: operations["lockRegisterColumn"];
+        /**
+         * Unlock a column (0.15.22)
+         * @description 0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+         */
+        delete: operations["unlockRegisterColumn"];
         options?: never;
         head?: never;
         patch?: never;
@@ -11600,7 +11762,7 @@ export interface components {
             apply_mode?: "submit" | "draft" | null;
             /**
              * Format: uuid
-             * @description The import batches the apply created (`GET /import-batches?group_id=`).
+             * @description The import batches the apply created (GET /import-batches?group_id=).
              */
             group_id?: string | null;
             outcome?: components["schemas"]["MasterImportOutcome"] | null;
@@ -12449,6 +12611,8 @@ export interface components {
             label_ar?: string | null;
             /** @enum {string} */
             type: "text" | "number" | "date" | "list" | "multi_list" | "yes_no" | "user" | "external_party" | "file" | "multi_user" | "multi_site" | "child_list" | "warehouse_item";
+            /** @description Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes. */
+            locked?: boolean;
             required?: boolean;
             /** @description Field-level rule for the caller. */
             read_only?: boolean;
@@ -12713,6 +12877,8 @@ export interface components {
             site_code?: string | null;
             region_id?: components["schemas"]["RegionId"] | null;
             state: components["schemas"]["RegisterRecordState"];
+            /** @description Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version. */
+            locked?: boolean;
             current_level?: number;
             levels_required?: number;
             ball_in_court?: components["schemas"]["BallInCourt"];
@@ -21821,6 +21987,178 @@ export interface operations {
             428: components["responses"]["PreconditionRequired"];
         };
     };
+    getWorkflowSlaWeight: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The items, sorted by task code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getWorkflowWeightTotals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        items?: {
+                            group?: string;
+                            total?: number;
+                            tasks?: number;
+                            ok?: boolean;
+                        }[];
+                    };
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    putTaskSlaRule: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    min_working_days: number;
+                    max_working_days: number;
+                    /** @description PRED (previous task done), OPEN (record created) or G<n> (gate passed) */
+                    start_event: string;
+                    /** @enum {string} */
+                    unit?: "working" | "calendar";
+                    calendar_code?: string;
+                    warning_pct?: number | null;
+                    breach_owner_role?: string | null;
+                    escalation_role?: string | null;
+                    pause_on_client_wait?: boolean;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The saved rule, the weight totals and the version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    removeTaskSlaRule: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description outcome deleted or deactivated, with why */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            412: components["responses"]["PreconditionFailed"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    putTaskWeight: {
+        parameters: {
+            query?: never;
+            header: {
+                "If-Match": string;
+            };
+            path: {
+                version: number;
+                task_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    counts_in_weight: boolean;
+                    weight_value?: number;
+                    weight_group?: string | null;
+                    reason: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The version and the weight totals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
     setTaskClosing: {
         parameters: {
             query?: never;
@@ -26716,6 +27054,163 @@ export interface operations {
             412: components["responses"]["PreconditionFailed"];
             422: components["responses"]["Unprocessable"];
             428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    unlockRegisterRecord: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description The ETag last read. */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description Register record. */
+                record_id: components["parameters"]["RegisterRecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    ETag: components["headers"]["ETag"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisterRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            412: components["responses"]["PreconditionFailed"];
+            422: components["responses"]["Unprocessable"];
+            428: components["responses"]["PreconditionRequired"];
+        };
+    };
+    lockRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Locked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: components["schemas"]["RegisterKey"];
+                        field_code: string;
+                        /** @constant */
+                        locked: true;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    unlockRegisterColumn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Register key. */
+                register_key: components["parameters"]["RegisterKeyPath"];
+                /** @description The column code (register_fields.code). */
+                field_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WithReason"];
+            };
+        };
+        responses: {
+            /** @description Unlocked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        register_key: components["schemas"]["RegisterKey"];
+                        field_code: string;
+                        /** @constant */
+                        locked: false;
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            422: components["responses"]["Unprocessable"];
         };
     };
     cancelQualitySnagRecord: {

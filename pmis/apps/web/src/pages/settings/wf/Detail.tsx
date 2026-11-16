@@ -5,9 +5,12 @@ import { Act, type Can } from './Columns';
 import { conditionLabel } from './Conditions';
 import { findCycle, parallelGroups, successorsOf, type G, type M, type P, type Sel } from './model';
 import { Flag, Link2, Pencil } from 'lucide-react';
+import type { SlaWeightItem, WeightTotal } from '../../../api/workflowEditor';
+import { SlaWeightSection } from './SlaWeightSection';
 
 type Props = {
   sel: Sel; placements: P[]; milestones: M[]; gates: G[]; nm: (x: { name_en?: string; name_ar?: string | null }) => string; can: Can; sla: Map<string, { min: number; max: number }>;
+  wf?: { version: number; etag: number; byCode: Map<string, SlaWeightItem>; totals: WeightTotal[] };
   onPreds: (p: P) => void; onParallel: (p: P, other: P) => void; onClosing: (p: P, on: boolean) => void; onCounts: (p: P, on: boolean) => void; onMove: (p: P, stage: string) => void; onGate: (g: G) => void;
 };
 
@@ -62,8 +65,14 @@ export function DetailPanel(p: Props) {
       <label className="flex items-start gap-2 text-sm"><input type="checkbox" data-testid="wfe-detail-closing" checked={!!task.is_milestone_task} disabled={!p.can.struct} title={!p.can.struct ? p.can.why ?? '' : undefined} onChange={(e) => p.onClosing(task, e.target.checked)} />
         <span><Flag size={12} className="me-1 inline" aria-hidden />{t('wfe.closes_milestone')}{!p.can.struct && p.can.why ? <span className="block text-xs text-mute">{p.can.why}</span> : null}</span></label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" data-testid="wfe-detail-counts" checked={!!task.counts_toward_milestone} disabled={!p.can.edit} onChange={(e) => p.onCounts(task, e.target.checked)} />{t('wfe.counts_hint')}</label>
-      <div className="text-sm"><span className="font-semibold">{t('wfe.sla')}: </span><span data-testid="wfe-detail-sla">{sla ? `${sla.min}/${sla.max} ${t('wfe.working_days')}` : t('wfe.none')}</span>
-        <Link className="ms-2 underline" to="/settings?tab=sla" data-testid="wfe-detail-sla-link">{t('wfe.sla_edit')}</Link></div>
+      {p.wf ? (() => {
+        const it = p.wf.byCode.get(task.task_code);
+        return <SlaWeightSection version={p.wf.version} etag={p.wf.etag} code={task.task_code} canEdit={p.can.edit} why={p.can.why} totals={p.wf.totals}
+          sla={it?.sla ? { min: it.sla.min_working_days, max: it.sla.max_working_days, rule_id: it.sla.id, unit: it.sla.unit, start_event: it.sla.start_event, calendar_code: it.sla.calendar_code,
+            warning_pct: it.sla.warning_pct, breach_owner_role: it.sla.breach_owner_role, escalation_role: it.sla.escalation_role, pause_on_client_wait: it.sla.pause_on_client_wait } : undefined}
+          weight={{ counts: !!it?.counts_in_weight, value: Number(it?.weight_value ?? 0), group: it?.weight_group ?? null }} />;
+      })() : <div className="text-sm"><span className="font-semibold">{t('wfe.sla')}: </span><span data-testid="wfe-detail-sla">{sla ? `${sla.min}/${sla.max} ${t('wfe.working_days')}` : t('wfe.none')}</span>
+        <Link className="ms-2 underline" to="/settings?tab=sla" data-testid="wfe-detail-sla-link">{t('wfe.sla_edit')}</Link></div>}
       <p className="text-sm"><span className="font-semibold">{t('wfe.documents')}: </span><span data-testid="wfe-detail-docs">{task.has_documents ? t('common.yes') : t('common.no')}</span></p>
       <label className="block text-sm">{t('wfe.move_to')}
         <span className="ms-2 inline-flex gap-1"><select className="input" data-testid="wfe-detail-stage" value={stage} onChange={(e) => setStage(e.target.value)}><option value="">-</option>

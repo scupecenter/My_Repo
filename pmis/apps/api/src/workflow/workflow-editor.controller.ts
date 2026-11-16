@@ -90,6 +90,37 @@ export class WorkflowEditorController {
     return r;
   }
 
+  /** Migration 0110: the SLA rule and the weight of each task of a version. */
+  @Get('versions/:version/sla-weight')
+  slaWeightItems(@Param('version', ParseIntPipe) version: number): Promise<Json> {
+    return this.editor.slaWeightItems(version);
+  }
+
+  /** Migration 0109: the weight totals of a version (live check in the editor). */
+  @Get('versions/:version/weight-totals')
+  weightTotals(@Param('version', ParseIntPipe) version: number): Promise<Json> {
+    return this.editor.weightTotals(version);
+  }
+
+  /** Migration 0109: the base SLA rule of a task (new effective-dated version; step-up; If-Match). */
+  @Put('versions/:version/tasks/:task/sla-rule')
+  async setSlaRule(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.saveSlaRule(auth, version, task, ifMatch, body));
+  }
+
+  /** Migration 0109: delete an unused SLA rule, or deactivate it with the reason. */
+  @Post('versions/:version/tasks/:task/sla-rules/:rule/remove')
+  @HttpCode(200)
+  async removeSlaRule(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Param('rule') rule: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.removeSlaRule(auth, version, task, rule, ifMatch, body));
+  }
+
+  /** Migration 0109: counts in project weight, percent and group of a task in a draft. */
+  @Put('versions/:version/tasks/:task/weight')
+  async setWeight(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
+  }
+
   @Put('versions/:version/tasks/:task/closing')
   async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
     return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));

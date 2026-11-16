@@ -31,12 +31,15 @@ info:
 
     ## Versions
     - 0.15.27 (2026-11-15): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16). (4) Amended 2026-11-15 (migration 0113, CHANGELOG 150, additive): the seven counters that had no source now have one (`vehicle_ready`, `advances_open_after_close`, `dismantle_pending`, `as_built_submitted`, `time_in_state_p85` in working days, `stale_tasks`, `on_air_vs_target`); `pending_kpis` lists only the KPIs whose value is null (no base, or no monthly target). `stale_idle_days` is the idle limit of `stale_tasks` (an integer from 1 to 30, default 2; optional on `PUT /settings/dashboard`, a save without it keeps the stored value; always returned). `counters.site360_menus` counts the sites per SITE 360 view (the workflow views CW, TE and OM; Design and Acquisition, Handover and Closure and Dismantle have no view and are not counted).
+    - 0.15.26 (2026-11-15): SLA and project weight in the workflow editor (F14; owner request 2026-11-15; migration 0109 (was 0099; SLA and weight tables 0109 and 0110); CHANGELOG 145). Additive. New paths `GET /workflow/versions/{version}/weight-totals`, `PUT /workflow/versions/{version}/tasks/{task_code}/sla-rule` (`admin_sla_rule_save`, effective-dated version), `POST /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove` (`admin_sla_rule_remove`, delete when unused else deactivate) and `PUT /workflow/versions/{version}/tasks/{task_code}/weight` (`admin_wf_task_weight`, draft only). Publishing answers 409 `invalid_transition` with `weights_not_100` detail while a weight group does not total 100. Versions 0.15.16 to 0.15.19 are used by other PRs.
+    - 0.15.25 (2026-11-15): register locks (F16; migration 0103 `register_locks`; CHANGELOG 147). Additive. A System Admin or a holder of the administer grant locks or unlocks one record (`POST` and `DELETE` on `/registers/{register_key}/records/{record_id}/lock`) and one column for every record (`POST` and `DELETE` on `/registers/{register_key}/columns/{field_code}/lock`). A locked record refuses changes for everyone except a System Admin; a locked column refuses a changed value. A reason and step-up are required, and every lock change is audited.
     - 0.15.23 (2026-11-15): dropdown lists (F17, owner request 2026-11-15 for maximum flexibility; migration 0102, mirror `db/sql/101_dropdown_lists.sql`; CHANGELOG 148). Additive, one change of behaviour. (1) A list has a value type (`value_type`: text, number, date, person, site or vendor; a number or a date is checked at creation, a person, a site or a vendor must be a real user, site or external party; the type cannot change while the list has values, 422 `value_type_locked`), `multi_select`, and an optional `parent_catalogue` (a dependent list: each value names a `parent_code`, the active value of the parent list; a cycle is 422; the parent cannot change while the list has values, 422 `parent_locked`). (2) A value has `colour` (`#RRGGBB`), `is_default` (one active default per list), `parent_code`, and `deactivate_reason` with `deactivated_at`. A value used by a dependent value or the default cannot be deactivated (422 `has_dependents` or `is_default`). `ListCatalogue.dependent_lists` names the lists that depend on it and `used_by` names the fields that read it. (3) New path `DELETE /list-catalogues/{catalogue_code}/values/{value_id}` (`deleteListValue`): a hard delete with a `reason` query parameter; If-Match is optional; allowed only when the value is unused (not in a register record, a child-list column, a dependent value or the default); otherwise 422 `in_use` (or `is_default`). Audited with before and the reason.
     - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
     - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
     - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
     - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.13 (2026-11-14): the admin manages the columns of every register (owner request 2026-11-13 and the flexibility follow-up; migration 0095; CHANGELOG 137). Additive. New paths under `/registers/{register_key}`: `GET /fields` (`getRegisterColumns`, the screen: register, sections and every column with usage), `POST /fields` (`createRegisterColumn`), `PATCH /fields/{code}` (`updateRegisterColumn`: rename EN/AR, required as a flag, section, order, visibility in list, filter, template and export, deactivate and reactivate, change of type with the conversion preview), `DELETE /fields/{code}` (`deleteRegisterColumn`: a hard delete when no record of the register ever held a value, otherwise a deactivation with the reason), `GET /fields/{code}/impact` (`getRegisterColumnImpact`: usage, delete mode and the type-conversion preview), `PUT /fields-order` (`reorderRegisterColumns`), `POST /sections`, `PATCH` and `DELETE /sections/{section_id}` (add, rename, reorder, delete when empty), `PATCH /registers/{register_key}` (`renameRegister`, EN and AR). Types of a column: short and long text, number, currency, percentage, date, date and time, yes/no, list, multi list, user, multi user, site, sites, external party, warehouse item, e-mail, phone, link, document (creates its Document Library slot), computed (read-only, from two columns), child list. A list column picks a catalogue or creates one with its values in the same call (`new_list`). Protected columns (`is_system`, with `system_reason`) can be renamed, reordered, moved between sections and shown or hidden, but their deletion, deactivation, type change and requirement answer 409 `system_field`. A type change needs a step-up; it answers 409 `conversion_blocked` (with the failing values) or 409 `conversion_unconfirmed` (every value converts: repeat with `confirm_conversion`). Needs `fields.edit` for all regions (System Admin or a delegate), a reason, optional `If-Match`; a delete, a type change and a deactivation also need a step-up. Every change issues the new register template version (`field_set_version`). Tolerant upload (owner decision 2026-11-14): a file of an older version of a register template is accepted when its columns can be matched by code; a removed column is ignored with a warning, a new column stays empty, and only a change of the type of a column refuses it (`outdated_version`); `ImportBatch.older_template` is the summary shown before the confirm. Version 0.15.12 is the workflow editor phase 2.
+    - 0.15.15 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 139). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
     - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
     - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RSK) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
     - 0.15.10 (2026-11-13): the workflow editor (owner decision 4 of 2026-11-12; migration 0090; CHANGELOG 132). Additive. (1) New paths: `POST /workflow/versions/{version}/tasks` (`createTaskDefinition`), `PATCH /workflow/versions/{version}/tasks/{task_code}` (`updateTaskDefinition`: rename EN/AR, counts toward the milestone, deactivate, move in a draft), `PUT /workflow/versions/{version}/tasks/{task_code}/predecessors` (`replaceTaskPredecessors`, a cycle is 422 `validation_failed` on `/predecessors` with code `cycle`), `PUT /workflow/versions/{version}/milestones/{code}/task-order` (`reorderMilestoneTasks`). (2) The declared `/workflow/*` and `/settings/task-definitions` operations are implemented; every write needs System Admin or an all-regions delegate (403), a reason, `If-Match` with the `version_etag` (412/428) and a step-up (401); publish needs `confirm_text` equal to `v<version>` (422 `confirmation_mismatch`). (3) `WorkflowVersion` gains `can_edit` and `can_publish`, `TaskPlacement` gains `name_en`, `name_ar`, `is_active`, `is_milestone_task`, `has_documents`, `task_version`, `WorkflowMilestone.is_active`. (4) New `ErrorCode` values `workflow_invalid`, `master_impact_unconfirmed`, `stale_preview`. Not yet implemented: `PUT /workflow/versions/{version}` (replace structure), `POST .../migrations` and the revert of a site migration.
@@ -5015,6 +5018,126 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/sla-weight:
+    get:
+      operationId: getWorkflowSlaWeight
+      tags: [workflow]
+      summary: SLA rule and weight of every task of a workflow version
+      description: 'Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.'
+      x-db-path: wf_sla_weight_items
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'The items, sorted by task code' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /workflow/versions/{version}/weight-totals:
+    get:
+      operationId: getWorkflowWeightTotals
+      tags: [workflow]
+      summary: Weight group totals of a workflow version (live check)
+      description: Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
+      x-db-path: wf_weight_totals
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'The totals', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, properties: { group: { type: string }, total: { type: number }, tasks: { type: integer }, ok: { type: boolean } } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /workflow/versions/{version}/tasks/{task_code}/sla-rule:
+    put:
+      operationId: putTaskSlaRule
+      tags: [workflow]
+      summary: Save the base SLA rule of a task (versioned)
+      description: Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
+      x-db-path: admin_sla_rule_save (app_actor_is_admin('sla_rules', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [min_working_days, max_working_days, start_event, reason]
+              properties:
+                min_working_days: { type: integer, minimum: 0, maximum: 365 }
+                max_working_days: { type: integer, minimum: 0, maximum: 365 }
+                start_event: { type: string, description: 'PRED (previous task done), OPEN (record created) or G<n> (gate passed)' }
+                unit: { type: string, enum: [working, calendar] }
+                calendar_code: { type: string }
+                warning_pct: { type: [integer, "null"], minimum: 0, maximum: 100 }
+                breach_owner_role: { type: [string, "null"] }
+                escalation_role: { type: [string, "null"] }
+                pause_on_client_wait: { type: boolean }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The saved rule, the weight totals and the version' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove:
+    post:
+      operationId: removeTaskSlaRule
+      tags: [workflow]
+      summary: Delete an SLA rule no task uses, or deactivate it
+      description: Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
+      x-db-path: admin_sla_rule_remove (app_actor_is_admin('sla_rules', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: rule_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, required: [reason], properties: { reason: { type: string, minLength: 3 } } }
+      responses:
+        '200': { description: 'outcome deleted or deactivated, with why' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/weight:
+    put:
+      operationId: putTaskWeight
+      tags: [workflow]
+      summary: Counts in project weight, weight value and weight group of a task (draft)
+      description: Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
+      x-db-path: admin_wf_task_weight (app_actor_is_admin('weights', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [counts_in_weight, reason]
+              properties:
+                counts_in_weight: { type: boolean }
+                weight_value: { type: number, minimum: 0, maximum: 100 }
+                weight_group: { type: [string, "null"], maxLength: 20, pattern: '^[A-Z0-9_-]{1,20}$' }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The version and the weight totals' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/tasks/{task_code}/closing:
     put:
       tags: [workflow]
@@ -9127,6 +9250,137 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterRecord
+      summary: Lock a record (read-only except for a System Admin) (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+        `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+        (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterRecord
+      summary: Unlock a record (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+        `register_record_unlock` with before and after.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/columns/{field_code}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {name: field_code, in: path, required: true, schema: {type: string}, description: 'The column code (register_fields.code).'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterColumn
+      summary: Lock a column for every record of the register (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+        (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterColumn
+      summary: Unlock a column (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: false}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/quality/records/{record_id}/cancel-snag:
     parameters:
     - {$ref: '#/components/parameters/RegisterRecordId'}
@@ -16538,7 +16792,7 @@ components:
         applied_at: { type: [string, 'null'], format: date-time }
         apply_reason: { type: [string, 'null'] }
         apply_mode: { type: [string, 'null'], enum: [submit, draft, null] }
-        group_id: { type: [string, 'null'], format: uuid, description: The import batches the apply created (`GET /import-batches?group_id=`). }
+        group_id: { type: [string, 'null'], format: uuid, description: 'The import batches the apply created (GET /import-batches?group_id=).' }
         outcome: { oneOf: [{ $ref: '#/components/schemas/MasterImportOutcome' }, { type: 'null' }] }
         has_file: { type: boolean, description: The original file is stored. }
         progress: { oneOf: [{ $ref: '#/components/schemas/MasterImportRunProgress' }, { type: 'null' }], description: '0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied).' }
@@ -17359,6 +17613,7 @@ components:
         label_en: { type: string }
         label_ar: { type: [string, 'null'] }
         type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file, multi_user, multi_site, child_list, warehouse_item] }
+        locked: { type: boolean, description: 'Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes.' }
         required: { type: boolean }
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         list: { $ref: '#/components/schemas/ListRef' }
@@ -17643,6 +17898,7 @@ components:
         site_code: { type: [string, 'null'] }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
         state: { $ref: '#/components/schemas/RegisterRecordState' }
+        locked: { type: boolean, description: 'Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version.' }
         current_level: { type: integer }
         levels_required: { type: integer }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
