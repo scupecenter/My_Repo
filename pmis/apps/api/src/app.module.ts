@@ -7,6 +7,8 @@ import { AssignmentsController } from './assignments/assignments.controller';
 import { AssignmentsService } from './assignments/assignments.service';
 import { CalendarController } from './calendar/calendar.controller';
 import { CalendarService } from './calendar/calendar.service';
+import { SearchController } from './search/search.controller';
+import { SearchService } from './search/search.service';
 import { AsBuiltItemsService } from './warehouse/as-built-items.service';
 import { AsBuiltItemsController, NumberSequencesController, WarehouseController } from './warehouse/warehouse.controller';
 import { WarehouseService } from './warehouse/warehouse.service';
@@ -17,6 +19,8 @@ import { ImportBatchesController, TemplatesController } from './templates/templa
 import { TemplatesService } from './templates/templates.service';
 import { UploadInterceptor } from './templates/upload.interceptor';
 import { RegistersController } from './registers/registers.controller';
+import { RegisterColumnsController } from './registers/register-columns.controller';
+import { RegisterColumnsService } from './registers/register-columns.service';
 import { RegistersService } from './registers/registers.service';
 // P5 (migration 0057): the list catalogue
 import { ListCataloguesController } from './registers/list-catalogues.controller';
@@ -48,6 +52,8 @@ import { IdempotencyService } from './common/idempotency.service';
 import { ProblemFilter } from './common/problem.filter';
 import { APP_CONFIG, AppConfig } from './config/config';
 import { DocumentsController, LibraryController } from './documents/documents.controller';
+import { DocumentsGridController } from './documents/grid.controller';
+import { DocsGridService } from './documents/grid.service';
 import { DocumentsService } from './documents/documents.service';
 import { LibraryService } from './documents/library.service';
 import { StorageService } from './documents/storage.service';
@@ -60,7 +66,10 @@ import { JobsService } from './jobs/jobs.service';
 import { TxInterceptor } from './db/tx.interceptor';
 import { DashboardController } from './dashboard/dashboard.controller';
 import { DashboardService } from './dashboard/dashboard.service';
+import { DashboardSettingsController } from './dashboard/dashboard-settings.controller';
+import { DashboardSettingsService } from './dashboard/dashboard-settings.service';
 import { SiteMapService } from './dashboard/site-map.service';
+import { DashboardExtrasService } from './dashboard/dashboard-extras.service';
 import { DelayPeriodsController } from './dashboard/delay-periods.controller';
 import { DelayPeriodsService } from './dashboard/delay-periods.service';
 import { ProjectStatusService } from './dashboard/project-status.service';
@@ -76,8 +85,12 @@ import { NavLayoutController } from './settings/nav-layout.controller';
 import { NavLayoutService } from './settings/nav-layout.service';
 import { MailKindsController } from './settings/mail-kinds.controller';
 import { MailKindsService } from './settings/mail-kinds.service';
+import { StructuralFreezeController } from './settings/structural-freeze.controller';
+import { StructuralFreezeService } from './settings/structural-freeze.service';
 import { HistoricalWaiverController } from './settings/historical-waiver.controller';
 import { HistoricalWaiverService } from './settings/historical-waiver.service';
+import { Site360Controller } from './site360/site360.controller';
+import { Site360Service } from './site360/site360.service';
 import { P4cController } from './registers/p4c.controller';
 import { FleetController } from './registers/fleet.controller';
 import { FleetService } from './registers/fleet.service';
@@ -142,15 +155,16 @@ export function appModuleFor(config: AppConfig) {
       InvitationsController, PublicInvitationsController, // 0091: before UsersController, so /users/invitations is not read as /users/{user_id}
       AuthController, MeController, EmailChangeRequestsController, PhoneChangeRequestsController, UsersController, GroupsController, DepartmentsController, MessagesController,
       AnnouncementsController, MeAnnouncementsController, RegionsController, RolesController, PermissionsController, AssignmentsController,
-      DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, RegistersController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
-      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, LibraryController, SnagsController,
-      DashboardController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, NavLayoutController, HistoricalWaiverController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
+      DelegationsController, SitesController, SiteDraftsController, TasksController, WorkflowEditorController, TaskDefinitionsController, CalendarController, SlaController, RegistersController, RegisterColumnsController, MatrixController, WarehouseController, AsBuiltItemsController, NumberSequencesController,
+      NotificationsController, FollowController, StatusUpdatesController, InsightsController, TemplatesController, ImportBatchesController, DocumentsController, DocumentsGridController, LibraryController, SnagsController,
+      DashboardController, DashboardSettingsController, DelayPeriodsController, WeightsController, TeamScopeMatchController, GecolOrderWarningsController, MailKindsController, ImportsSettingsController, NavLayoutController, HistoricalWaiverController, Site360Controller, StructuralFreezeController, P4cController, FleetController, AuditLogController, SecurityLogController, LogsAdminController,
       ScenarioSettingsController, SiteApplicabilityController, // P1 (0052)
       MailController, HealthController,
       ListCataloguesController,
       MasterImportController, TemplateMappingController,
       ContractorsController,
       SavedViewsController,
+      SearchController, // 0.15.17 (F4)
     ],
     providers: [
       { provide: APP_CONFIG, useValue: config },
@@ -158,9 +172,9 @@ export function appModuleFor(config: AppConfig) {
       InvitationsService, // 0091
       AccessService, AuthService, UsersRepo, MeService, ProfileService, EmailChangesService, PhoneChangesService, UsersService, GroupsService,
       DepartmentsService, MessagesService, AnnouncementsService, IdempotencyService, RegionsService, RolesService, PermissionsService,
-      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
-      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, LibraryService, ZipService, StorageJobsService, SnagsService,
-      DashboardService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService,
+      AssignmentsService, DelegationsService, SitesService, SiteLocksService, SiteDraftsService, TaskViewService, TaskDetailService, WorkflowEditorService, WorkflowService, ApprovalsService, OverridesService, CalendarService, SlaService, JobsService, RegistersService, RegisterColumnsService, MatrixService, WarehouseService, WarehouseConfigService, AsBuiltItemsService,
+      NotificationsService, FollowService, StatusUpdatesService, InsightsService, TemplatesService, ImportService, ImportJobsService, UploadInterceptor, StorageService, DocumentsService, DocsGridService, LibraryService, ZipService, StorageJobsService, SnagsService,
+      DashboardService, DashboardSettingsService, SiteMapService, ProjectStatusService, DelayPeriodsService, WeightsService, TeamScopeMatchService, GecolOrderWarningsService, MailKindsService, ImportsSettingsService, NavLayoutService, HistoricalWaiverService, Site360Service, StructuralFreezeService, P4cService, FleetService, LogsService, SecurityLogService, JobRunsService, MailService, IntegrityService, DashboardExtrasService,
       ScenarioService, // P1 (0052)
       ListCataloguesService,
       // P8 mails (MailPort) go through P9's mail outbox
@@ -168,6 +182,7 @@ export function appModuleFor(config: AppConfig) {
       MasterImportService, MappingService,
       ContractorsService,
       SavedViewsService,
+      SearchService, // 0.15.17 (F4)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },
       { provide: APP_FILTER, useClass: ProblemFilter },

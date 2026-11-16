@@ -1,6 +1,9 @@
 import type { SiteListItem, SitesExportColumnCode } from '@/api/types';
+import { errText } from '@/components/FormDialog';
+import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
+import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
@@ -14,7 +17,9 @@ import { registerErrorMessage } from '@/lib/registerErrors';
 import { ExportDialog, ExportViewButton } from '@/components/ExportDialog';
 import { SavedViews } from '@/components/SavedViews';
 import { MoreMenu, PageHeader, Toolbar } from '@/components/PageHeader';
-import { ActiveChips, BulkBar, ColumnMenu, Empty, HeaderRow, pin, QuickFilter, SelectBox, tracks, totalWidth, Trunc, useTablePrefs } from '@/components/TableKit';
+import { ActiveChips, BulkBar, ColumnMenu, DensityToggle, Empty, gxRow, HeaderRow, pin, QuickFilter, SelectBox, StatusChip, tracks, totalWidth, Trunc, useAutoFit, useTablePrefs } from '@/components/TableKit';
+import { Tip } from '@/components/Tip';
+import type { FitSample } from '@/lib/tablePrefs';
 import { useToast } from '@/components/Toast';
 import type { ColDef } from '@/lib/tablePrefs';
 import { EmptyState, NoResults } from '@/components/States';
@@ -24,14 +29,16 @@ import { useVirtual } from '@/components/useVirtual';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, DISMANTLE_CODE, isRealStream, statusOf, streamName, viewName } from '@/lib/streams';
 
 const ROWS = { comfortable: 52, compact: 38 } as const;
-const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
-const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100 }, { id: 'region', w: 120, min: 80 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
+const DEFS_ALL: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'scenario', w: 120, min: 80 }, { id: 'status', w: 130, min: 90 }, { id: 'pipeline', w: 170, min: 120 }, { id: 'late', w: 80, min: 60 }, { id: 'locks', w: 100, min: 70 }, { id: 'gaps', w: 100, min: 70 }];
+const DEFS_STREAM: ColDef[] = [{ id: 'code', w: 100, min: 70, pinned: true }, { id: 'name', w: 220, min: 100, max: 340, pinned: true }, { id: 'region', w: 120, min: 80, max: 240 }, { id: 'stream_status', w: 130, min: 90 }, { id: 'stage', w: 150, min: 90 }, { id: 'progress', w: 90, min: 60 }, { id: 'late', w: 80, min: 60 }, { id: 'milestone', w: 120, min: 90 }];
 const LABEL: Record<string, string> = { code: 'sites.code', name: 'sites.name', region: 'sites.region', scenario: 'sites.scenario', status: 'sites.status', pipeline: 'sites.pipeline', late: 'sites.late', stream_status: 'sites.stream_status', stage: 'sites.current_stage', progress: 'sites.progress', milestone: 'sites.milestone', locks: 'sites.locks', gaps: 'sites.gaps' };
 const F_KEYS = ['q', 'region_id', 'scenario', 'overall_status', 'stage_code'] as const;
 // P10: what a saved view of the Site Register keeps (the filters of the URL, the quick filter included).
 const VIEW_EMPTY = { q: '', region_id: '', scenario: '', overall_status: '', stage_code: '', bucket: '' };
 // ExportColumnCode values (stable codes of the `sites` part).
 const SITE_COLUMNS: SitesExportColumnCode[] = ['site_code', 'site_name', 'region', 'scenario', 'overall_status', 'current_stage'];
+// Extra pixels of a status chip (its own padding and border) when columns are sized to content.
+const CHIP_PX = 24;
 const SCENARIOS = ['new_build', 'expansion', 'hot_swap', 'cold_swap', 'relocation'];
 const STATUSES = ['not_started', 'in_progress', 'on_hold', 'completed', 'cancelled'];
 const TONE: Record<string, string> = { completed: 'bg-doneBg text-doneInk', in_progress: 'bg-openBg text-openInk', on_hold: 'bg-waitBg text-waitInk', not_started: 'bg-lockBg text-lockInk', cancelled: 'bg-lateBg text-lateInk' };
@@ -51,6 +58,33 @@ export function Sites() {
   const [sp, setSp] = useSearchParams();
   const stream = sp.get('stream') ?? '';
   const view = sp.get('view') ?? '';
+  // SITE 360 menus (F15): ?section= picks a menu; ?layout=vertical shows the list, the default is the Grid.
+  const section = sp.get('section') ?? '';
+  const layout = sp.get('layout') === 'vertical' ? 'vertical' : 'grid';
+  const site360Q = useSite360Sections();
+  const menu = section ? site360Q.data?.items.find((m) => m.key === section) : undefined;
+  // The grid reads its rows from GET /site360/{menu}/rows (one page, the same URL filters as the list), so the grid and the list share the source.
+  // Multi Site ID search (paste a list, comma or newline separated) is kept in the URL as site_code, like the other filters.
+  const gridQuery = {
+    site_code: sp.get('site_code') || undefined,
+    region_id: sp.get('region_id') || undefined,
+    scenario: sp.get('scenario') || undefined,
+    overall_status: sp.get('overall_status') || undefined,
+    sort: 'site_code',
+  };
+  const gridRowsQ = useSite360RowsPaged(menu ? section : undefined, gridQuery);
+  const saveCell = useSaveSite360Cell(menu ? section : undefined, gridQuery);
+  const gridPages = gridRowsQ.data?.pages ?? [];
+  const gridTotal = gridPages[0]?.total;
+  const gridFiltered = gridPages[0]?.filtered;
+  const gridRows = gridPages.flatMap((p) => p.rows);
+  // Stable identity per fetched page: Site360Grid reports its selection from an effect keyed on `rows`, so a new array on every render loops forever.
+  const grid360Rows = useMemo(() => gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells })), [gridRowsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [siteIdsDraft, setSiteIdsDraft] = useState(() => (sp.get('site_code') ?? '').split(',').join('\n'));
+  const applySiteIds = () => {
+    const codes = siteIdsDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
+    setSp((prev) => { const n = new URLSearchParams(prev); if (codes.length) n.set('site_code', codes.join(',')); else n.delete('site_code'); return n; }, { replace: true });
+  };
   const [exp, setExp] = useState(false);
   const [showNa, setShowNa] = useState(false);
   // Filters, quick filter and the selected row live in the URL, so Back and shared links restore them (plan F9).
@@ -62,13 +96,16 @@ export function Sites() {
   // 0.15.4 (migration 0085): the workflow locks (locked / open) and the sites with data gaps
   const locks = ['locked', 'open'].includes(sp.get('workflow_locks') ?? '') ? (sp.get('workflow_locks') as string) : '';
   const gaps = sp.get('data_gaps') === 'with' ? 'with' : '';
-  const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}) };
+  // 0.15.17 (F4): the Site IDs pasted into Ctrl+K ("Site ID in list"), kept in the URL so Back and shared links restore them
+  const siteCodes = sp.get('site_codes') ?? '';
+  const extra = { ...(locks ? { workflow_locks: locks } : {}), ...(gaps ? { data_gaps: gaps } : {}), ...(siteCodes ? { site_codes: siteCodes } : {}) };
   const [locksDlg, setLocksDlg] = useState<null | boolean>(null);
+  const [gridSel, setGridSel] = useState<Site360GridRow[]>([]);
   const sel = sp.get('sel') ?? '';
   const activeFilters = Object.values(f).filter(Boolean).length + (bucket ? 1 : 0) + (coordinates ? 1 : 0) + (locks ? 1 : 0) + (gaps ? 1 : 0);
   const setParams = (kv: Record<string, string>) => setSp((p) => { const n = new URLSearchParams(p); for (const [k, v] of Object.entries(kv)) { if (v) n.set(k, v); else n.delete(k); } return n; }, { replace: true });
   const set = (k: keyof typeof f) => (v: string) => setParams({ [k]: v, sel: '' });
-  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', sel: '' });
+  const clearAll = () => setParams({ ...Object.fromEntries(F_KEYS.map((k) => [k, ''])), bucket: '', coordinates: '', workflow_locks: '', data_gaps: '', site_codes: '', sel: '' });
   const toast = useToast();
   const nav = useNavigate();
   // Site creation (contract 0.14.0, Q460): the New sites template is listed only for those who may create sites
@@ -135,37 +172,62 @@ export function Sites() {
     ...(bucket ? [{ key: 'bucket', label: t('table.filter_bucket', { v: t(bucket === 'mine' ? 'table.mine' : 'table.late') }), onRemove: () => setParams({ bucket: '' }) }] : []),
   ];
 
+  // The text each cell shows, for sizing the columns to their content (null = not measurable: the pipeline rail keeps its default width).
+  const fitText = (id: string, s: SiteListItem): FitSample | null => {
+    const st = statusOf(s.streams, stream);
+    switch (id) {
+      case 'code': return s.site_code;
+      case 'name': return s.name_ar ? `${s.name}  ${s.name_ar}` : s.name;
+      case 'region': return rname(s.region_id);
+      case 'scenario': return s.delivery_scenario ? t(`scenario.${s.delivery_scenario}`) : null;
+      case 'status': return [t(`status.${s.overall_status}`), CHIP_PX];
+      case 'stream_status': return [t(`streamState.${st?.state ?? 'na'}`), CHIP_PX];
+      case 'stage': return stageName(st?.current_stage);
+      case 'progress': return st ? `${st.done_tasks}/${st.total_tasks}` : null;
+      case 'milestone': return st?.milestone_date ?? null;
+      case 'locks': return [t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked'), CHIP_PX];
+      case 'gaps': return s.data_gaps ? [String(s.data_gaps), CHIP_PX] : null;
+      case 'late': { const n = real ? st?.late_count : s.late_task_count; return n ? [String(n), CHIP_PX] : null; }
+      default: return null;
+    }
+  };
+  useAutoFit(tbl, label, items, fitText, i18n.language);
+
   const cell = (id: string, s: SiteListItem) => {
     const st = statusOf(s.streams, stream);
     switch (id) {
       case 'code': return <b className="mono">{s.site_code}</b>;
-      case 'name': return <span className="flex min-w-0 items-baseline gap-2"><Trunc text={s.name} />{s.name_ar && <span dir="rtl" lang="ar" className="truncate text-xs text-mute" data-testid={`site-name-ar-${s.site_code}`}>{s.name_ar}</span>}</span>;
+      case 'name': return <span className="flex min-w-0 items-baseline gap-2"><Trunc text={s.name} />{s.name_ar && <Tip text={s.name_ar}><span dir="rtl" lang="ar" className="truncate text-xs text-mute" data-testid={`site-name-ar-${s.site_code}`}>{s.name_ar}</span></Tip>}</span>;
       case 'region': return <Trunc text={rname(s.region_id)} />;
-      case 'stream_status': return <span className={`chip ${STREAM_TONE[st?.state ?? 'na']}`} data-testid={`stream-state-${s.site_code}`}>{t(`streamState.${st?.state ?? 'na'}`)}</span>;
+      case 'stream_status': return <StatusChip tone={STREAM_TONE[st?.state ?? 'na']} testid={`stream-state-${s.site_code}`} text={t(`streamState.${st?.state ?? 'na'}`)}>{t(`streamState.${st?.state ?? 'na'}`)}</StatusChip>;
       case 'stage': return <span data-testid={`stream-stage-${s.site_code}`}><Trunc text={stageName(st?.current_stage)} /></span>;
       case 'progress': return <span className="mono" data-testid={`stream-progress-${s.site_code}`}>{st ? `${st.done_tasks}/${st.total_tasks}` : <Empty />}</span>;
       case 'milestone': return <span className="mono" data-testid={`stream-ms-${s.site_code}`}>{st?.milestone_date ?? <Empty />}</span>;
       case 'scenario': return s.delivery_scenario ? <Trunc text={t(`scenario.${s.delivery_scenario}`)} /> : <Empty />;
-      case 'status': return <span className={`chip ${TONE[s.overall_status]}`}>{t(`status.${s.overall_status}`)}</span>;
+      case 'status': return <StatusChip tone={TONE[s.overall_status]} text={t(`status.${s.overall_status}`)}>{t(`status.${s.overall_status}`)}</StatusChip>;
       case 'pipeline': return <MiniRail rail={s.rail} />;
-      case 'locks': return <span className={`chip ${s.workflow_locks === false ? 'bg-waitBg text-waitInk' : 'bg-lockBg text-lockInk'}`} data-testid={`site-locks-${s.site_code}`}>{t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}</span>;
-      case 'gaps': return s.data_gaps ? <span className="chip bg-lateBg text-lateInk" data-testid={`site-gaps-${s.site_code}`}>{s.data_gaps}</span> : <Empty />;
+      case 'locks': return <StatusChip tone={s.workflow_locks === false ? 'bg-waitBg text-waitInk' : 'bg-lockBg text-lockInk'} testid={`site-locks-${s.site_code}`} text={t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}>{t(s.workflow_locks === false ? 'locks.col_open' : 'locks.col_locked')}</StatusChip>;
+      case 'gaps': return s.data_gaps ? <StatusChip tone="bg-lateBg text-lateInk" testid={`site-gaps-${s.site_code}`}>{s.data_gaps}</StatusChip> : <Empty />;
       default: { // late
         const n = real ? st?.late_count : s.late_task_count;
-        return n ? <span className="chip bg-lateBg text-lateInk" data-testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</span> : <Empty />;
+        return n ? <StatusChip tone="bg-lateBg text-lateInk" testid={real ? `stream-late-${s.site_code}` : undefined}>{n}</StatusChip> : <Empty />;
       }
     }
   };
 
   return (
     <div data-testid="page-sites">
-      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={(canCreate || newTpl) && (
+      <PageHeader title={subMenu ? `${t('sites.title')}: ${subMenu}` : t('sites.title')} subtitle={t('sites.subtitle')} context={<>{menu && (
+        <span className="inline-flex gap-1" role="group" aria-label={t('site360.layout')} data-testid="site360-layout">
+          <button type="button" aria-pressed={layout === 'grid'} data-testid="site360-layout-grid" onClick={() => setParams({ layout: 'grid' })} className={`btn px-2 py-1 text-xs ${layout === 'grid' ? 'btn-primary' : ''}`}>{t('site360.grid')}</button>
+          <button type="button" aria-pressed={layout === 'vertical'} data-testid="site360-layout-vertical" onClick={() => setParams({ layout: 'vertical' })} className={`btn px-2 py-1 text-xs ${layout === 'vertical' ? 'btn-primary' : ''}`}>{t('site360.vertical')}</button>
+        </span>)}{(canCreate || newTpl) && (
         <span className="ms-auto flex flex-wrap gap-1" data-testid="sites-create-actions">
           {canCreate && <Link className="btn btn-primary px-2 py-1 text-xs" to="/sites/new" data-testid="sites-new"><FilePlus2 size={14} />{t('sites.new_site')}</Link>}
           {newTpl && <><button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-download"
             onClick={() => downloadTemplate(newTpl.template_id).then((n) => toast(t('grid.downloaded', { name: n })), (e) => toast(registerErrorMessage(t, e), 'err'))}><FileDown size={14} />{t('sites.download_template')}</button>
           <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-template-upload" onClick={() => setUpSites(true)}><FileUp size={14} />{t('sites.upload_template')}</button></>}
-        </span>)} />
+        </span>)}</>} />
       <Toolbar activeFilters={activeFilters} activeLabel={t('states.filters')}
         filters={<>
         <SavedViews screen={real ? 'sites-stream' : 'sites'} value={{ ...f, bucket }} empty={VIEW_EMPTY} table={tbl}
@@ -191,6 +253,7 @@ export function Sites() {
         <button type="button" className="btn px-2 py-1 text-xs" data-testid="sites-layout" aria-pressed={asMap} onClick={() => setParams({ layout: asMap ? '' : 'map', sel: '' })}>
           {asMap ? <><Table2 size={14} />{t('sites.table')}</> : <><MapIcon size={14} />{t('sites.map')}</>}
         </button>
+        <DensityToggle api={tbl} />
         <ColumnMenu api={tbl} label={label} />
         <ExportViewButton testid="sites-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
         <MoreMenu items={[
@@ -204,20 +267,40 @@ export function Sites() {
       ) : asMap ? (
         // SC-10: the same map as the dashboard; a stream sub-menu shows the sites whose current stream it is
         <SiteMap testid="sites-map" height={560} outer={{ region_id: f.region_id, scenario: f.scenario, ...(real ? { stream } : {}) }} />
+      ) : menu && layout === 'grid' ? (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-start gap-2">
+            <textarea rows={2} className="input min-w-[240px] font-mono text-xs" value={siteIdsDraft} onChange={(e) => setSiteIdsDraft(e.target.value)} placeholder={t('site360.site_ids_placeholder')} aria-label={t('site360.site_ids')} data-testid="site360-site-ids" />
+            <button type="button" className="btn" data-testid="site360-site-ids-apply" onClick={applySiteIds}>{t('site360.site_ids_apply')}</button>
+          </div>
+          {saveCell.isError && <p role="alert" className="text-sm text-red-600" data-testid="site360-cell-error">{errText(saveCell.error, t)}</p>}
+          <div className="flex flex-wrap items-center gap-2" data-testid="site360-toolbar">
+            <ExportViewButton testid="site360-export-view" source="sites" filters={Object.fromEntries(Object.entries({ ...f, ...(bucket ? { bucket } : {}), ...(real ? { stream } : {}) }).filter(([, x]) => x))} columns={SITE_COLUMNS} />
+            <Link className="btn px-2 py-1 text-xs" to="/templates" data-testid="site360-template-link">{t('site360.template_upload')}</Link>
+            {canUnlock && gridSel.length > 0 && <>
+              <button type="button" className="btn" data-testid="site360-locks-open" onClick={() => setLocksDlg(false)}>{t('locks.bulk_open')}</button>
+              <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
+            </>}
+          </div>
+          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
+        </div>
       ) : (
-        <div className="card overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
+        <div className="card gx overflow-hidden" data-stream={stream || 'ALL'} data-density={tbl.density}>
           <div ref={scroller} data-testid="sites-scroll" className="relative overflow-auto" style={{ height: viewport }} onScroll={(e) => { v.onScroll(e); sessionStorage.setItem(scrollKey, String(e.currentTarget.scrollTop)); }}>
             <HeaderRow api={tbl} label={label} select={{ checked: allPicked, indeterminate: picked.size > 0, onChange: () => setPicked(allPicked ? new Set() : new Set(allCodes)), label: t('table.select_all'), testid: 'sites-select-all' }} />
             <div data-testid="sites-list" role="list" className="relative" style={{ height: v.total, minWidth: W }}>
               {items.slice(v.start, v.end).map((s, k) => {
                 const st = statusOf(s.streams, stream);
                 const na = real && st?.state === 'na', on = picked.has(s.site_code), cur = sel === s.site_code;
+                const g = gxRow(v.start + k, { picked: on, current: cur, muted: na });
                 return (
-                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} className={`absolute inset-x-0 border-b border-line text-sm ${on ? 'bg-accentSoft' : 'bg-card hover:bg-hover'} ${cur ? 'ring-2 ring-inset ring-accent' : ''} ${na ? 'opacity-60' : ''}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
-                    <span className="absolute inset-y-0 start-0 z-20 flex w-9 items-center justify-center"><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span>
+                  <div key={s.id} role="listitem" aria-selected={on || cur} data-selected={cur || undefined} data-zebra={g['data-zebra']} data-picked={g['data-picked']} className={`absolute inset-x-0 border-b border-line text-sm ${g.className}`} style={{ insetBlockStart: (v.start + k) * ROW, height: ROW }}>
+                    {/* the checkbox cell is frozen with the identity columns; it has no height of its own, so the link below fills the row */}
+                    <div className="sticky start-0 z-20 h-0 w-9"><span className="absolute start-0 top-0 flex w-9 items-center justify-center bg-inherit" style={{ height: ROW }}><SelectBox checked={on} onChange={() => flip(s.site_code)} label={t('table.select_row', { code: s.site_code })} testid={`site-select-${s.site_code}`} /></span></div>
                     <Link to={linkTo(s)} data-testid={`site-row-${s.site_code}`} data-stream-state={st?.state} onClick={() => setParams({ sel: s.site_code })} className="grid h-full items-center bg-inherit" style={{ gridTemplateColumns: tracks(cols, true) }}>
                       <span aria-hidden />
-                      {cols.map((c) => { const p = pin(c, true); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
+                      {cols.map((c) => { const p = pin(c, true, cols); return <span key={c.id} data-col={c.id} className={`min-w-0 px-2 ${p.className}`} style={p.style}>{cell(c.id, s)}</span>; })}
                     </Link>
                   </div>
                 );
@@ -234,7 +317,7 @@ export function Sites() {
         <button type="button" className="btn" data-testid="sites-bulk-copy" onClick={() => { void navigator.clipboard?.writeText([...picked].join('\n')); toast(t('table.copied', { count: picked.size })); }}>{t('table.copy_codes')}</button>
       </BulkBar>
       <ExportDialog open={exp} onClose={() => setExp(false)} />
-      {locksDlg !== null && <LocksDialog target={{ site_ids: items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={picked.size} testid="sites-locks-dialog"
+      {locksDlg !== null && <LocksDialog target={{ site_ids: menu && layout === 'grid' ? gridSel.map((r) => r.id) : items.filter((x) => picked.has(x.site_code)).map((x) => x.id) }} locked={locksDlg} count={menu && layout === 'grid' ? gridSel.length : picked.size} testid="sites-locks-dialog"
         onClose={() => { setLocksDlg(null); setPicked(new Set()); }} />}
       {upSites && newTpl && <TemplateUploadDialog open onClose={() => setUpSites(false)} templateId={newTpl.template_id} templateName={`${(i18n.language === 'ar' && newTpl.name_ar) || newTpl.name_en} · v${newTpl.current_version}`}
         kind="sites" onDone={(b) => { setUpSites(false); toast(t('grid.uploaded')); nav(batchPath(b)); }} />}

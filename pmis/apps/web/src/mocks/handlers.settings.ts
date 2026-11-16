@@ -308,7 +308,52 @@ export function validatePolicy(b: NotificationPolicyInput & Record<string, unkno
   return errs;
 }
 
+/** F20 (contract 0.15.24): the dashboard settings in memory. The catalogue mirrors migration 0108; the values are the seed. */
+const DASH_CATALOGUE = {
+  kpis: [
+    { code: 'sla_breach', label_en: 'SLA breaches (open tasks past the maximum)', label_ar: 'تجاوزات SLA', unit: 'pct', direction: 'lower', default_green: 5, default_amber: 10 },
+    { code: 'sla_at_risk', label_en: 'SLA at risk (past the warning share)', label_ar: 'SLA معرّض للخطر', unit: 'pct', direction: 'lower', default_green: 10, default_amber: 20 },
+    { code: 'data_quality_gap', label_en: 'Empty mandatory cells', label_ar: 'خلايا إلزامية فارغة', unit: 'pct', direction: 'lower', default_green: 2, default_amber: 5 },
+    { code: 'vehicle_ready', label_en: 'Vehicle-ready rate of assignments', label_ar: 'نسبة جاهزية المركبة', unit: 'pct', direction: 'higher', default_green: 90, default_amber: 75 },
+    { code: 'advances_open_after_close', label_en: 'Advances open after the work closed', label_ar: 'سلفيات مفتوحة بعد إغلاق العمل', unit: 'count', direction: 'lower', default_green: 0, default_amber: 3 },
+    { code: 'dismantle_pending', label_en: 'Dismantle CW and TE pending', label_ar: 'تفكيك CW وTE المعلّق', unit: 'count', direction: 'lower', default_green: 0, default_amber: 5 },
+    { code: 'as_built_submitted', label_en: 'As-Built submitted against PAC', label_ar: 'As-Built المقدَّم مقابل PAC', unit: 'pct', direction: 'higher', default_green: 90, default_amber: 70 },
+    { code: 'time_in_state_p85', label_en: 'Time in state, 85th percentile', label_ar: 'الزمن في الحالة، المئين 85', unit: 'days', direction: 'lower', default_green: 10, default_amber: 20 },
+    { code: 'stale_tasks', label_en: 'Stale tasks (idle for N working days)', label_ar: 'مهام راكدة', unit: 'pct', direction: 'lower', default_green: 5, default_amber: 10 },
+    { code: 'on_air_vs_target', label_en: 'On-Air against the monthly target', label_ar: 'الربط On-Air مقابل الهدف', unit: 'pct', direction: 'higher', default_green: 100, default_amber: 80 },
+  ],
+  cards: [
+    { code: 'site_map', label_en: 'Site map', label_ar: 'خريطة المواقع' },
+    { code: 'f13', label_en: 'Risk matrix, data quality, decisions, swap and relocation', label_ar: 'مصفوفة المخاطر وجودة البيانات والقرارات والاستبدال والنقل' },
+    { code: 'headline', label_en: 'Headline KPIs', label_ar: 'المؤشرات الرئيسية' },
+    { code: 'pipeline', label_en: 'Milestone pipeline', label_ar: 'مسار المعالم' },
+    { code: 'health_ps', label_en: 'Health index and Project Status', label_ar: 'مؤشر الصحة وحالة المشروع' },
+    { code: 'streams', label_en: 'Streams', label_ar: 'المسارات' },
+    { code: 'sla', label_en: 'SLA per stage and top late tasks', label_ar: 'SLA لكل مرحلة' },
+    { code: 'gates_issues_delay', label_en: 'Blocked gates, issues and delay attribution', label_ar: 'البوابات المعطلة والقضايا والتأخير' },
+    { code: 'regions', label_en: 'Regions', label_ar: 'المناطق' },
+  ],
+};
+const dashSeedThresholds = Object.fromEntries(DASH_CATALOGUE.kpis.map((k) => [k.code, { green: k.default_green, amber: k.default_amber }]));
+let dashState = {
+  version: 0,
+  targets: { sites_per_batch: null as number | null, monthly_on_air: null as number | null },
+  thresholds: dashSeedThresholds as Record<string, { green: number; amber: number }>,
+  tabs: { pmo: { order: [] as string[], hidden: [] as string[] }, cw: { order: [] as string[], hidden: [] as string[] }, te: { order: [] as string[], hidden: [] as string[] } },
+  updated_at: null as string | null,
+  updated_by: null as null | { id: string; display_name: string; employee_id: string | null },
+};
+const dashView = () => ({ ...dashState, catalogue: DASH_CATALOGUE });
+
 export const settingsHandlers = [
+  // ------------------------------------------------------------------ dashboard settings (F20, contract 0.15.24)
+  http.get(`${B}/settings/dashboard`, () => { const g = guard(); if (g) return g; return HttpResponse.json(dashView(), tag(dashState.version)); }),
+  http.put(`${B}/settings/dashboard`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    const b = (await request.json()) as { targets: typeof dashState.targets; thresholds: typeof dashState.thresholds; tabs: typeof dashState.tabs };
+    dashState = { ...dashState, version: dashState.version + 1, targets: b.targets, thresholds: b.thresholds, tabs: b.tabs, updated_at: new Date().toISOString() };
+    return HttpResponse.json(dashView(), tag(dashState.version));
+  }),
   // ------------------------------------------------------------------ calendar
   http.get(`${B}/settings/holidays`, ({ request }) => {
     const g = guard(); if (g) return g;
@@ -622,6 +667,18 @@ export const settingsHandlers = [
 
   // ------------------------------------------------------------------ freeze
   http.get(`${B}/settings/structural-freeze`, () => { const g = guard(); if (g) return g; return HttpResponse.json(C().freeze, tag(C().freeze.version)); }),
+  http.put(`${B}/settings/structural-freeze`, async ({ request }) => {
+    const g = needAdmin(); if (g) return g;
+    if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');
+    const f = C().freeze, p = ver(request, f.version); if (p) return p;
+    if (!stepUpValid()) return stepUp();
+    const b = await body<{ starts_on?: string; ends_on?: string; reason?: string }>(request);
+    const r = reasonErr(b.reason); if (r) return r;
+    if (!b.starts_on) return fields({ path: '/starts_on', code: 'required' });
+    if (!b.ends_on || b.ends_on < b.starts_on) return fields({ path: '/ends_on', code: 'before_start' });
+    Object.assign(f, { active: true, starts_on: b.starts_on, ends_on: b.ends_on, lifted: false, lifted_at: null, lifted_by: null, lift_reason: null, version: f.version + 1 }); save();
+    return HttpResponse.json(f, tag(f.version));
+  }),
   http.post(`${B}/settings/structural-freeze/lift`, async ({ request }) => {
     const g = needAdmin(); if (g) return g;
     if (!request.headers.get('If-Match')) return problem(428, 'precondition_required', 'If-Match is required');

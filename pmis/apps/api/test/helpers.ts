@@ -53,6 +53,13 @@ export async function superDb(solo = false): Promise<PgClient> {
   return c;
 }
 
+/** Superuser connection to the F20 counters database (migration 0113; see global-setup). */
+export async function superDbF20K(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_F20K });
+  await c.connect();
+  return c;
+}
+
 /** Superuser connection to the third database (suites that change SLA versions or calendars; see global-setup). */
 export async function superDbCalc(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_CALC });
@@ -91,6 +98,34 @@ export async function superDbHreg(): Promise<PgClient> {
 /** Superuser connection to the workflow-editor database (migration 0090; see global-setup). */
 export async function superDbWfe(): Promise<PgClient> {
   const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFE });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the workflow-gaps database (migration 0096; see global-setup). */
+/** F14 (migrations 0109 and 0110): the SLA and weight suite's own database. */
+export async function superDbSla(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_SLA });
+  await c.connect();
+  return c;
+}
+
+export async function superDbWfg(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_WFG });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the register-columns database (migration 0095; see global-setup). */
+export async function superDbRcols(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_RCOLS });
+  await c.connect();
+  return c;
+}
+
+/** Superuser connection to the template-streams database (see global-setup). */
+export async function superDbTplst(): Promise<PgClient> {
+  const c = new PgClient({ connectionString: process.env.TEST_SUPER_URL_TPLST });
   await c.connect();
   return c;
 }

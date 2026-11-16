@@ -135,10 +135,10 @@ describe('Q139: the legacy HLC requests into Procurement drafts', () => {
 describe('Q151: the GECOL order warnings (Settings)', () => {
   it('is off by default, saves with a reason, and then warns the reviewer of an out-of-order GECOL record', async () => {
     await signIn('pm');
-    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/gecol-order' });
+    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/registers/gecol' });
     const u = userEvent.setup();
     const on = await screen.findByTestId('gow-enabled') as HTMLInputElement;
-    expect(screen.getByTestId('settings-tab-gecol-order')).toHaveTextContent('GECOL order warnings');
+    expect(screen.getByTestId('settings-section-registers-gecol')).toHaveTextContent('GECOL order warnings');
     expect(on.checked).toBe(false);
     expect(screen.getByTestId('gow-step-0-1')).toHaveTextContent('Survey Date');
     const g = await api.post<RegisterRecord>('/registers/gecol/records', { body: { site_id: siteIdOf(3), data: { pr_no: 'GP-T', request_date: '2026-10-05', survey_date: '2026-10-01' } } });

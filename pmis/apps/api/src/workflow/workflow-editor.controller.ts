@@ -33,6 +33,35 @@ export class WorkflowEditorController {
     return this.tag(res, await this.editor.get(version));
   }
 
+  @Put('versions/:version')
+  async replaceStructure(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.replaceStructure(auth, version, ifMatch, body));
+  }
+
+  @Post('versions/:version/remove')
+  @HttpCode(200)
+  async removeItem(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.removeItem(auth, version, ifMatch, body);
+  }
+
+  @Post('versions/:version/discard')
+  @HttpCode(200)
+  async discardDraft(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown): Promise<Json> {
+    return this.editor.discardDraft(auth, version, ifMatch, body);
+  }
+
+  @Post('versions/:version/migrations')
+  @HttpCode(200)
+  migrate(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.migrate(auth, version, body);
+  }
+
+  @Post('site-migrations/:id/revert')
+  @HttpCode(200)
+  revert(@Auth() auth: AuthContext, @Param('id') id: string, @Body() body: unknown): Promise<Json> {
+    return this.editor.revertMigration(auth, id, body);
+  }
+
   @Post('versions/:version/publish')
   @HttpCode(200)
   async publish(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
@@ -45,6 +74,61 @@ export class WorkflowEditorController {
     const r = await this.editor.createTask(auth, version, ifMatch, body);
     this.tag(res, (r.version ?? {}) as Json);
     return r;
+  }
+
+  @Post('versions/:version/tasks/insert-preview')
+  @HttpCode(200)
+  previewInsert(@Param('version', ParseIntPipe) version: number, @Body() body: unknown): Promise<Json> {
+    return this.editor.previewInsert(version, body);
+  }
+
+  @Post('versions/:version/tasks/insert')
+  @HttpCode(201)
+  async insertTask(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    const r = await this.editor.insertTask(auth, version, ifMatch, body);
+    this.tag(res, (r.version ?? {}) as Json);
+    return r;
+  }
+
+  /** Migration 0110: the SLA rule and the weight of each task of a version. */
+  @Get('versions/:version/sla-weight')
+  slaWeightItems(@Param('version', ParseIntPipe) version: number): Promise<Json> {
+    return this.editor.slaWeightItems(version);
+  }
+
+  /** Migration 0109: the weight totals of a version (live check in the editor). */
+  @Get('versions/:version/weight-totals')
+  weightTotals(@Param('version', ParseIntPipe) version: number): Promise<Json> {
+    return this.editor.weightTotals(version);
+  }
+
+  /** Migration 0109: the base SLA rule of a task (new effective-dated version; step-up; If-Match). */
+  @Put('versions/:version/tasks/:task/sla-rule')
+  async setSlaRule(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.saveSlaRule(auth, version, task, ifMatch, body));
+  }
+
+  /** Migration 0109: delete an unused SLA rule, or deactivate it with the reason. */
+  @Post('versions/:version/tasks/:task/sla-rules/:rule/remove')
+  @HttpCode(200)
+  async removeSlaRule(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Param('rule') rule: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.removeSlaRule(auth, version, task, rule, ifMatch, body));
+  }
+
+  /** Migration 0109: counts in project weight, percent and group of a task in a draft. */
+  @Put('versions/:version/tasks/:task/weight')
+  async setWeight(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setWeight(auth, version, task, ifMatch, body));
+  }
+
+  @Put('versions/:version/tasks/:task/closing')
+  async setClosing(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setClosing(auth, version, task, ifMatch, body));
+  }
+
+  @Put('versions/:version/tasks/:task/successors')
+  async setSuccessors(@Auth() auth: AuthContext, @Param('version', ParseIntPipe) version: number, @Param('task') task: string, @Headers('if-match') ifMatch: string | undefined, @Body() body: unknown, @Res({ passthrough: true }) res: Response): Promise<Json> {
+    return this.tag(res, await this.editor.setSuccessors(auth, version, task, ifMatch, body));
   }
 
   @Patch('versions/:version/tasks/:task')

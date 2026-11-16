@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.11
+  version: 0.15.29
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,19 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.29 (2026-11-16, was 0.15.27 before the merge of #141): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16). (4) Amended 2026-11-15 (migration 0113, CHANGELOG 150, additive): the seven counters that had no source now have one (`vehicle_ready`, `advances_open_after_close`, `dismantle_pending`, `as_built_submitted`, `time_in_state_p85` in working days, `stale_tasks`, `on_air_vs_target`); `pending_kpis` lists only the KPIs whose value is null (no base, or no monthly target). `stale_idle_days` is the idle limit of `stale_tasks` (an integer from 1 to 30, default 2; optional on `PUT /settings/dashboard`, a save without it keeps the stored value; always returned). `counters.site360_menus` counts the sites per SITE 360 view (the workflow views CW, TE and OM; Design and Acquisition, Handover and Closure and Dismantle have no view and are not counted).
+    - 0.15.28 (2026-11-15): SITE 360 columns screen in Settings and Excel-style working features (F15 items 4 and 5; CHANGELOG 146). Merge of origin/main (F19 Settings tabs, CHANGELOG 149; F17, F4 and F1 entries kept below). Additive. Settings > Site360 is the column-to-menu screen (the old route redirects). (2) Migration 0112: the rows endpoint `GET /site360/{menu}/rows` returns the Master values of PR Status (AH) and PO / WO Status (AI) (register procurement, B3) and the gate readiness columns (the date of the milestone before each gate once it is approved). (3) Grid working features and the toolbar (export of the current view, lock and unlock of the selected sites through the existing endpoints) are web only. No new path or schema; contract text only.
+    - 0.15.26 (2026-11-15): SLA and project weight in the workflow editor (F14; owner request 2026-11-15; migration 0109 (was 0099; SLA and weight tables 0109 and 0110); CHANGELOG 145). Additive. New paths `GET /workflow/versions/{version}/weight-totals`, `PUT /workflow/versions/{version}/tasks/{task_code}/sla-rule` (`admin_sla_rule_save`, effective-dated version), `POST /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove` (`admin_sla_rule_remove`, delete when unused else deactivate) and `PUT /workflow/versions/{version}/tasks/{task_code}/weight` (`admin_wf_task_weight`, draft only). Publishing answers 409 `invalid_transition` with `weights_not_100` detail while a weight group does not total 100. Versions 0.15.16 to 0.15.19 are used by other PRs.
+    - 0.15.25 (2026-11-15): register locks (F16; migration 0103 `register_locks`; CHANGELOG 147). Additive. A System Admin or a holder of the administer grant locks or unlocks one record (`POST` and `DELETE` on `/registers/{register_key}/records/{record_id}/lock`) and one column for every record (`POST` and `DELETE` on `/registers/{register_key}/columns/{field_code}/lock`). A locked record refuses changes for everyone except a System Admin; a locked column refuses a changed value. A reason and step-up are required, and every lock change is audited.
+    - 0.15.23 (2026-11-15): dropdown lists (F17, owner request 2026-11-15 for maximum flexibility; migration 0102, mirror `db/sql/101_dropdown_lists.sql`; CHANGELOG 148). Additive, one change of behaviour. (1) A list has a value type (`value_type`: text, number, date, person, site or vendor; a number or a date is checked at creation, a person, a site or a vendor must be a real user, site or external party; the type cannot change while the list has values, 422 `value_type_locked`), `multi_select`, and an optional `parent_catalogue` (a dependent list: each value names a `parent_code`, the active value of the parent list; a cycle is 422; the parent cannot change while the list has values, 422 `parent_locked`). (2) A value has `colour` (`#RRGGBB`), `is_default` (one active default per list), `parent_code`, and `deactivate_reason` with `deactivated_at`. A value used by a dependent value or the default cannot be deactivated (422 `has_dependents` or `is_default`). `ListCatalogue.dependent_lists` names the lists that depend on it and `used_by` names the fields that read it. (3) New path `DELETE /list-catalogues/{catalogue_code}/values/{value_id}` (`deleteListValue`): a hard delete with a `reason` query parameter; If-Match is optional; allowed only when the value is unused (not in a register record, a child-list column, a dependent value or the default); otherwise 422 `in_use` (or `is_default`). Audited with before and the reason.
+    - 0.15.21 (2026-11-15): SITE 360 restructure, the Master view (F15; migration 0101; CHANGELOG 146). Additive. (1) `GET /site360/sections` (`getSite360Sections`): the eight SITE 360 menus (`master` replaces "All sites", `design_acq`, `sow` (new), `cw`, `te`, `hoto`, `dismantle`, `om`), each with its Master columns in Master order, the 3-level grid header (`bands`: phase band, then `groups`: group, then the column ords), the frozen identity columns (# to Site Name) and `can_move`. A column carries a set of menus (`sections`, may be in several menus); the status columns are in every menu. (2) `PATCH /site360/columns/{ord}/sections` (`setSite360ColumnSections`): a System Admin (`admin.settings` edit, checked in the database) replaces the menus of one Master column; a step-up and a reason; audited with before and after; the status columns cannot be changed. (3) The grid shows the same columns in every menu. No new store: the values are still written through the site and task paths. (4) `GET /site360/{menu}/rows` (`getSite360Rows`, F15, migration 0104): the grid rows of one menu, one page at a time, from the set-based view `site360_master_values` (no per-site path); filters, sort and paging in the database; `total` and `filtered` counts; B3 region scope. (3) Inline edit of task-backed cells: each row of `GET /site360/{menu}/rows` carries `cells` (keyed by ord) with the task, its If-Match version and the field; the save goes through the existing `PATCH /tasks/{task_id}` (the L1 rules, gates and audit of the task screen), nothing new on the server for writes. (5) Calc columns (migration 0107): Contractor Name (AJ) and Contractor Team (AK) of the first active CW procurement order, and GECOL Status (BW) of the GECOL record; each is a register value (the register's module view applies). The contractor filter `contractor` on the rows endpoint. PR Status, PO / WO Status, CW Access Date, HLC Fiber Status and the gate readiness columns stay empty until their Master formulas are settled.
+    - 0.15.19 (2026-11-15): global search (Ctrl+K and the top-bar button; owner plan F4 of 2026-11-14; migration 0099; CHANGELOG 144). Additive. New paths: `GET /search` (six groups: sites, registers, documents, meetings, people, contractors; Arabic-normalised matching with `match_ranges` for highlighting; read-only, each group limited to what the caller may read) and `POST /search/site-ids` (many Site IDs at once: `found` with the route to open, `not_found`; a site out of reach is reported as not found). `GET /sites` gains `site_codes` (a pasted list of Site IDs, keeps only those sites). New schemas `SearchType`, `SearchHit`, `SearchGroup`, `SearchResponse`, `SiteIdLookupInput`, `SiteIdLookupResult`. No existing field or behaviour changes.
+    - 0.15.18 (2026-11-15): dashboard in three sections and the reference-dashboard gaps (F6 and F13 of the features build plan, owner decisions 2026-11-15; CHANGELOG 143; no migration). Additive. (1) The three tabs PMO and management, CW follow-up and TE follow-up are the existing `GET /dashboard` read with no `view`, `view=CW` and `view=TE` (the tab sets the `view` filter; the default tab follows the caller's teams and the last tab used is remembered in the browser); no new path for them. (2) New `GET /dashboard/extras` (`getDashboardExtras`): the F13 sections in one read, `DashboardExtras`: `risk_matrix` (the 5x5 matrix of open risks with the bands low 1 to 4, medium 5 to 9, high 10 to 16, critical 20 to 25, and the top open risks; needs `risks.view`), `data_quality` (the missing actual dates and required values of the sites, from `site_data_gaps`), `swap_relocation` (the sites by delivery scenario and overall status), and `decisions` (the open risks tagged `act_now` or `watch`). Each section the caller may not see answers `available: false`. Read only; not audited. (3) The contract has no SLA median or 85th percentile and no filters for stage, batch, type or owner yet (not built in this version).
+    - 0.15.17 (2026-11-15): approved status transitions and time in state (F1, migration 0098; CHANGELOG 142). Additive. (1) `GET /registers/{register_key}/records/{record_id}/time-in-state`: the current state of a register record, the working days it has spent in it and its recorded approved transitions. (2) `GET /reports/state-durations`: median and P85 working days per state, per stage (tasks) or per register (records), per region; needs `view` on `reports` and `sites` for tasks, and `view` on the register's module for records; admin overrides are left out. The transitions come from the approval steps (trigger) and a backfill of the history before 0098; `GET /tasks/{task_id}/time-in-state` is unchanged.
+    - 0.15.16 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 141). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
+    - 0.15.13 (2026-11-14): the admin manages the columns of every register (owner request 2026-11-13 and the flexibility follow-up; migration 0095; CHANGELOG 137). Additive. New paths under `/registers/{register_key}`: `GET /fields` (`getRegisterColumns`, the screen: register, sections and every column with usage), `POST /fields` (`createRegisterColumn`), `PATCH /fields/{code}` (`updateRegisterColumn`: rename EN/AR, required as a flag, section, order, visibility in list, filter, template and export, deactivate and reactivate, change of type with the conversion preview), `DELETE /fields/{code}` (`deleteRegisterColumn`: a hard delete when no record of the register ever held a value, otherwise a deactivation with the reason), `GET /fields/{code}/impact` (`getRegisterColumnImpact`: usage, delete mode and the type-conversion preview), `PUT /fields-order` (`reorderRegisterColumns`), `POST /sections`, `PATCH` and `DELETE /sections/{section_id}` (add, rename, reorder, delete when empty), `PATCH /registers/{register_key}` (`renameRegister`, EN and AR). Types of a column: short and long text, number, currency, percentage, date, date and time, yes/no, list, multi list, user, multi user, site, sites, external party, warehouse item, e-mail, phone, link, document (creates its Document Library slot), computed (read-only, from two columns), child list. A list column picks a catalogue or creates one with its values in the same call (`new_list`). Protected columns (`is_system`, with `system_reason`) can be renamed, reordered, moved between sections and shown or hidden, but their deletion, deactivation, type change and requirement answer 409 `system_field`. A type change needs a step-up; it answers 409 `conversion_blocked` (with the failing values) or 409 `conversion_unconfirmed` (every value converts: repeat with `confirm_conversion`). Needs `fields.edit` for all regions (System Admin or a delegate), a reason, optional `If-Match`; a delete, a type change and a deactivation also need a step-up. Every change issues the new register template version (`field_set_version`). Tolerant upload (owner decision 2026-11-14): a file of an older version of a register template is accepted when its columns can be matched by code; a removed column is ignored with a warning, a new column stays empty, and only a change of the type of a column refuses it (`outdated_version`); `ImportBatch.older_template` is the summary shown before the confirm. Version 0.15.12 is the workflow editor phase 2.
+    - 0.15.15 (2026-11-14): three-column workflow editor (owner request 2026-11-14; migration 0096; CHANGELOG 139). Additive. New path `PUT /workflow/versions/{version}/tasks/{task_code}/closing` (`setTaskClosing`). `GateCondition.offset_wd` and the `date_field` condition work end to end (a date of a task, of the site or a date custom field plus working days). The structural freeze endpoints `GET` and `PUT /settings/structural-freeze` and `POST /settings/structural-freeze/lift` are now implemented by the API (they were contract and mock only); setting a window after a lift locks again; the freeze now also stops replacing the structure, removing a milestone or gate, moving a task to another milestone and choosing the closing task. Version 0.15.13 is reserved for PR 132.
+    - 0.15.12 (2026-11-13): workflow editor phase 2 (owner request 2026-11-13; migration 0094; CHANGELOG 136). Additive. New paths: `POST /workflow/versions/{version}/tasks/insert-preview` (`previewTaskInsert`), `POST /workflow/versions/{version}/tasks/insert` (`insertTaskDefinition`: a new task between existing tasks with cascade rewiring, optionally added to the open sites), `PUT /workflow/versions/{version}/tasks/{task_code}/successors` (`replaceTaskSuccessors`). New schemas `TaskInsertPreview`, `TaskInsertResult`. The structural edit and the site migration are implemented (owner decisions 2026-11-13, maximum flexibility; the pilot is complete and the freeze B9 is off unless a window is set): `PUT /workflow/versions/{version}` (`replaceWorkflowDraft`, `WorkflowStructure` is now milestones, gates with conditions and SLA, task_moves, reason), `POST /workflow/versions/{version}/migrations` (`migrateSites`, synchronous 200, no job), `POST /workflow/site-migrations/{migration_id}/revert` (`revertSiteMigration`, `SiteMigration.revertible`). Version 0.15.11 is reserved for PR 123.
     - 0.15.11 (2026-11-13): the historical Master load approved directly, with the register sheets of the same file (two owner decisions of 2026-11-12; migrations 0092 and 0093; CHANGELOG 134 and 135; renumbered after the merge with main). Additive. Part A, the historical load of the Master approved directly (owner decision 2026-11-12 "Direct approval"; migration 0087; CHANGELOG 129). Additive. (1) `MasterImportApplyRequest.historical_load.approve_directly` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason) and `mode` submit (422 `validation_failed` otherwise; outside `historical_load` the field is unknown, 422). Every task row of the run's batches that is submitted (a row with an actual date) is then approved at once as an admin override, with no L2 step: state `approved`, approved date, a workflow step `approve` with the note "historical load: approved directly (admin override)", the level actors, the SLA closed, the successors unlocked, milestones and gates recalculated; the documents are treated as the historical waiver treats them. Rows without an actual date stay saved; a refused row stays an error of its own. The batches and their rows read approved. It works the same for an apply in the background (0.15.5) and for a batch sent in chunks (0.14.6): the choice is stored with the run and the batch, never taken from a later call. Every normal task keeps L1 then L2. (2) `TaskSummary.historical_direct_approved`: the "Admin override" badge, an audit row `task_historical_direct_approval` per task (`is_admin_override`, the reason of the load); cleared when the task leaves the approved state. (3) KPIs: counted in `KpiMeta.override_flagged_count` and in the new `KpiMeta.historical_direct_flagged_count`; treated like the other overrides in the SLA and on-time figures (left out when `exclude_overrides` is on) and in the health factors D and F; counted in progress, Project Status, milestones and site status like any approved task. (4) `MasterImportOutcome.approve_directly` and `MasterImportOutcome.batches[].approved`. Part B, the register sheets of the historical Master load, from the same file (owner decision 2026-11-12 "Everything from the one file"; migration 0088; CHANGELOG 130). Additive. (1) `MasterImportApplyRequest.historical_load.registers` (default false = exactly as before): only with the historical-load option (a System Admin, a step-up, the waiver open, a reason, `mode` submit; 422 / 403 otherwise). The API reads the register sheets of the file stored with the run (RF & Design, Acquisition, Permission Log, PR-PO, GECOL, HLC, As-Built, Risk Register; its SHA-256 checked) and maps them onto the register templates (TPL-RF ... TPL-RSK) with the maps of `tools/master-import` (one source of truth, shipped with the API): mechanical normalisation only (spaces, Site IDs, dates and numbers typed as text, list case, N/A / Pending / Cancelled in a date or number cell to blank, an ambiguous dd/mm read day first and noted). Personal columns (landlord, contact person, phone, e-mail; Q469) are never read. Each sheet becomes a register batch of the run's `group_id` (`source` `master_import`, the historical mark), sent after the Master batches, in chunks when big (0.14.6) and in the background with the apply (0.15.5); a row the register cannot read is an error row of its batch; a sheet that is missing or cannot be read is listed in `outcome.skipped` with its reason; nothing stops the apply. Site-scoped registers check the Site ID against GSDN Workspace sites; the Risk Register is keyed by its Risk ID. A record from a register sheet of the historical load is approved on its register row only (it never closes its source task: the task dates come from the Master sheet). (2) With `approve_directly` the register rows are approved at once like the tasks (admin override, no L2): the data effects of an L2 approval (the version in force, the typed table, the register's own approval effects), `RegisterRecord.historical_direct_approved`, an audit row `register_record_historical_direct_approval` per record with `is_admin_override`, no notice; a Procurement record approved this way opens no booking or advance request. Without it the register rows wait for L2 like any register batch. (3) `MasterImportOutcome`: `registers`, `register_notes`, and per batch `kind`, `sheet`, `rows` (all its rows) and `skipped` (rows that change nothing).
     - 0.15.10 (2026-11-13): the workflow editor (owner decision 4 of 2026-11-12; migration 0090; CHANGELOG 132). Additive. (1) New paths: `POST /workflow/versions/{version}/tasks` (`createTaskDefinition`), `PATCH /workflow/versions/{version}/tasks/{task_code}` (`updateTaskDefinition`: rename EN/AR, counts toward the milestone, deactivate, move in a draft), `PUT /workflow/versions/{version}/tasks/{task_code}/predecessors` (`replaceTaskPredecessors`, a cycle is 422 `validation_failed` on `/predecessors` with code `cycle`), `PUT /workflow/versions/{version}/milestones/{code}/task-order` (`reorderMilestoneTasks`). (2) The declared `/workflow/*` and `/settings/task-definitions` operations are implemented; every write needs System Admin or an all-regions delegate (403), a reason, `If-Match` with the `version_etag` (412/428) and a step-up (401); publish needs `confirm_text` equal to `v<version>` (422 `confirmation_mismatch`). (3) `WorkflowVersion` gains `can_edit` and `can_publish`, `TaskPlacement` gains `name_en`, `name_ar`, `is_active`, `is_milestone_task`, `has_documents`, `task_version`, `WorkflowMilestone.is_active`. (4) New `ErrorCode` values `workflow_invalid`, `master_impact_unconfirmed`, `stale_preview`. Not yet implemented: `PUT /workflow/versions/{version}` (replace structure), `POST .../migrations` and the revert of a site migration.
     - 0.15.9 (2026-11-12): System Admin approve all as is for upload batches (owner decision 1 of 2026-11-12; migration 0087; CHANGELOG 129). Additive. `ImportDecisionRequest.action` gains `admin_approve` (`scope` all, `note` the reason of at least 3 characters) on `POST /import-batches/{batch_id}/decisions`: a final approval of every open row of a task-stream batch (also a Save Draft / Planning one) by a System Admin only (403 `action_forbidden`), with a step-up (401) and without the check of the L2 holders; a row that lacks an actual date, a document or another required value is approved too and flagged `incomplete`; every task is flagged `admin_override` (KPIs treat it as an override) and audited per row. New: `ImportBatchOutcome.incomplete`, `ImportBatch.counts.admin_approved` / `counts.incomplete`, `ImportBatchProgress.incomplete`, `action` `admin_approve` in the progress of a run.
@@ -135,6 +148,8 @@ tags:
     description: "Threads between an employee and their direct manager; a System Admin may write to anyone (ADR 0013)."
   - name: announcements
     description: "Announcements to everyone or to chosen users, groups, roles and departments, answered agree or disagree (ADR 0013)."
+  - name: search
+    description: "Global search and the Site ID list lookup (plan F4, 0.15.19): read only, visibility applied by the server."
   - name: departments
     description: "Admin-managed list of departments (ADR 0013)."
   - name: auth
@@ -2811,6 +2826,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ------------------------------------------------------------------ sites
+  /search:
+    get:
+      tags: [search]
+      operationId: globalSearch
+      summary: Global search across sites, registers, documents, meetings, people and contractors (0.15.19, F4)
+      description: |
+        Ctrl+K and the top-bar search. Each group is limited to what the caller may read: `sites` needs `view` on `sites` in the site's region; `registers` needs `view` on the register's module in the record's region; `documents` need `view` on `sites` in the site's region; `meetings` need `view` on `meetings` (a global meeting, or one of the caller's regions); `contractors` need `view` on `contractors`; `people` need `view` on `admin.users`. A group the caller cannot read is absent (no 403). Matching ignores case, the Arabic letter forms (alef, taa marbuta, yaa and alef maqsura), tashkeel, tatweel, Arabic-Indic digits and Latin diacritics. Read only: an item carries the route to open, and nothing changes.
+      parameters:
+        - { name: q, in: query, required: true, description: 'Text to find, 2 to 100 characters.', schema: { type: string, minLength: 2, maxLength: 100 } }
+        - name: types
+          in: query
+          description: 'Groups to search (default: all six).'
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/SearchType' } }
+        - { name: limit, in: query, description: 'Items per group (1 to 10).', schema: { type: integer, minimum: 1, maximum: 10, default: 5 } }
+      responses:
+        '200':
+          description: Groups in the order of `types`, each with its visible total.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /search/site-ids:
+    post:
+      tags: [search]
+      operationId: lookupSiteIds
+      summary: Many Site IDs at once, found and not found (0.15.19, F4)
+      description: |
+        The paste of a list of Site IDs (new lines, commas or spaces) in Ctrl+K. Matching ignores case and surrounding spaces. Only sites the caller may read (`view` on `sites`, in their regions) are found; any other ID, including one that exists but is out of reach, is listed in `not_found`, so the answer never shows whether a site exists elsewhere. Read only. Duplicates in the input are answered once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SiteIdLookupInput' }
+      responses:
+        '200':
+          description: The sites found (with the route to open) and the IDs not found, in input order.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SiteIdLookupResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /sites:
     get:
       tags: [sites]
@@ -2821,6 +2880,7 @@ paths:
         Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
         - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
+        - { name: site_codes, in: query, description: '0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found).', schema: { type: string, maxLength: 8000 } }
         - name: region_id
           in: query
           style: form
@@ -3974,6 +4034,251 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '422': { $ref: '#/components/responses/Unprocessable' }
+  /documents/grid:
+    get:
+      tags: [documents]
+      operationId: getDocumentsGrid
+      summary: Excel-like grid, sites in rows and document types in columns, one status per cell (0097)
+      description: |
+        Region scope applies (a site outside the caller's regions is not listed) and so does the register scope of each document type. Needs `view` on the Documents screen.
+        Columns are the active document types that have a placement (task, QC or register), grouped by stage, register or QC. Each cell has one status: missing, pending (uploaded or in review), approved, expired (approved, past its expiry date), rejected, not_required (a site override, or a slot marked not required), generatable (a generated form that can be issued now; generation itself is not in this version), blocked (a generated form that cannot be issued yet, with `reason`) or not_applicable (the type does not apply to the site).
+        `site_code` takes many Site IDs at once, separated by commas, spaces or new lines (at most 500). `status`, `uploaded_from` and `uploaded_to` keep a row when at least one of its cells has that status or a current file uploaded in the range; the server reads ahead until the page is full. `download_allowed` says whether the caller may download the files of the row.
+      parameters:
+        - { name: site_code, in: query, schema: { type: string, maxLength: 6000 }, description: 'Site IDs, separated by commas, spaces or new lines.' }
+        - name: region_id
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { $ref: '#/components/schemas/RegionId' } }
+        - { name: stage_code, in: query, schema: { type: string } }
+        - name: doc_code
+          in: query
+          style: form
+          explode: true
+          schema: { type: array, items: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [missing, pending, approved, expired, rejected, not_required, generatable, blocked, not_applicable] } }
+        - { name: uploaded_from, in: query, schema: { type: string, format: date } }
+        - { name: uploaded_to, in: query, schema: { type: string, format: date } }
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Grid page.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [columns, rows, page]
+                properties:
+                  columns:
+                    type: array
+                    items:
+                      type: object
+                      required: [doc_code, name_en, group_key, group_label]
+                      properties:
+                        doc_code: { type: string }
+                        name_en: { type: string }
+                        name_ar: { type: [string, 'null'] }
+                        kind: { type: string }
+                        generated: { type: boolean, description: 'True for a generated form (status generatable or blocked only; issuing is not in this version).' }
+                        group_key: { type: string, description: 'stage:<code>, register:<key> or qc.' }
+                        group_label: { type: string }
+                  rows:
+                    type: array
+                    items:
+                      type: object
+                      required: [site_id, site_code, region_id, download_allowed, cells]
+                      properties:
+                        site_id: { type: string, format: uuid }
+                        site_code: { type: string }
+                        site_name: { type: [string, 'null'] }
+                        region_id: { type: integer }
+                        download_allowed: { type: boolean }
+                        cells:
+                          type: object
+                          description: Keyed by doc_code.
+                          additionalProperties:
+                            type: object
+                            required: [status, slots, files]
+                            properties:
+                              status: { type: string, enum: [missing, pending, approved, expired, rejected, not_required, generatable, blocked, not_applicable] }
+                              reason: { type: [string, 'null'], description: 'Why the cell is blocked or not required.' }
+                              slots: { type: integer }
+                              files: { type: integer, description: 'Current files.' }
+                  page: { $ref: '#/components/schemas/PageInfo' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /documents/grid/view:
+    get:
+      tags: [documents]
+      operationId: getDocumentsGridView
+      summary: The caller's saved grid columns
+      responses:
+        '200':
+          description: Saved columns (empty list when none saved).
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [columns]
+                properties:
+                  columns: { type: array, items: { type: string } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [documents]
+      operationId: saveDocumentsGridView
+      summary: Save the caller's grid columns (personal, never shared)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [columns]
+              additionalProperties: false
+              properties:
+                columns: { type: array, maxItems: 300, items: { type: string, maxLength: 40 } }
+      responses:
+        '204': { description: Saved. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /sites/{site_id}/document-overrides:
+    parameters:
+    - { name: site_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: createSiteDocumentOverride
+      summary: Mark a document not required for one site (0097)
+      description: Needs `sites.edit` for the site's region. Open slots of that type on the site become not_required, as a placement change does. Audited with the reason.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [doc_code, reason]
+              additionalProperties: false
+              properties:
+                doc_code: { type: string, maxLength: 31 }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '201':
+          description: Override created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slots_changed: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /document-overrides/{override_id}/revert:
+    parameters:
+    - { name: override_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: revertSiteDocumentOverride
+      summary: End a not-required override (0097)
+      description: The slots go back to missing, or to uploaded when a current file exists. Audited with the reason.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Reverted.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  slots_changed: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /files/{file_id}/move:
+    parameters:
+    - { name: file_id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [documents]
+      operationId: moveDocumentFile
+      summary: Move a misplaced file (all its versions) to another slot of the same site (0097)
+      description: Needs `sites.edit` for the site's region. Refused for approved files and slots, for another site, and for a format the target document does not accept. Both slots are recomputed. Audited with before and after.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_slot_id, reason]
+              additionalProperties: false
+              properties:
+                target_slot_id: { type: string, format: uuid }
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Moved.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  file_id: { type: string, format: uuid }
+                  source_slot_id: { type: string, format: uuid }
+                  target_slot_id: { type: string, format: uuid }
+                  versions_moved: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /document-library/{doc_type_id}/delete:
+    parameters:
+    - {$ref: '#/components/parameters/DocTypeId'}
+    post:
+      tags: [document-library]
+      operationId: deleteDocumentType
+      summary: System Admin. Hard delete when no file was ever uploaded, otherwise deactivation (0097)
+      description: |
+        A type with no file and no blank form is deleted with its placements, versions, drafts and empty slots. A type with any file (or blank form) is deactivated with the reason and kept. Needs System Admin and step-up. Audited with before and after.
+        This amends the rule "documents are deactivated, never deleted" for types that never held a file.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              additionalProperties: false
+              properties:
+                reason: { type: string, minLength: 3, maxLength: 1000 }
+      responses:
+        '200':
+          description: Result.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode: { type: string, enum: [deleted, deactivated] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /exports/zip:
     post:
       tags: [documents]
@@ -4258,7 +4563,12 @@ paths:
       tags: [workflow]
       operationId: replaceWorkflowDraft
       summary: Replace the structure of a draft (add, remove, reorder milestones and gates; move tasks)
-      description: Only for `status = draft`. Codes of existing nodes are kept; new nodes get new codes that are never reused.
+      description: |
+        Migration 0094 (owner decisions 2026-11-13). Only for `status = draft` (409 `invalid_transition` otherwise). Needs `workflow_versions.edit` for all regions (403), a reason, `If-Match`
+        and a step-up. Field errors are 422 on `/milestones/{i}/...`, `/gates/{i}/...` or `/task_moves` (`missing`, `has_active_tasks`, `duplicate`, `invalid`, `inactive`, `unknown`).
+        Codes are never reused. The structural freeze (B9) is off unless an admin set a window; the publish checks it.
+      x-step-up: true
+      x-db-path: admin_wf_structure_replace (app_actor_is_admin('workflow_versions', 'edit'))
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -4274,6 +4584,91 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/remove:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    post:
+      tags: [workflow]
+      operationId: removeWorkflowItem
+      summary: Remove a task, milestone or gate (deleted if no site data refers to it, otherwise deactivated)
+      description: |
+        Migration 0094, owner rule 2026-11-13. In a draft, an item that no site data refers to is deleted for real (`outcome` = `deleted`). An item that is referenced
+        (`why` lists `site_tasks`, `matrix`, `sla_rules`, `document_types`, `baselines`, `gates`, `gate_history`, `other_version`, `has_tasks`) or that sits in a published version
+        (`published_version`) is deactivated instead (`outcome` = `deactivated`), so history and KPIs stay intact. A milestone with active tasks is refused (422 `has_active_tasks`).
+        Needs `workflow_versions.edit` for all regions, a reason, `If-Match` and a step-up.
+      x-step-up: true
+      x-db-path: admin_wf_item_remove (app_actor_is_admin('workflow_versions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, code, reason]
+              properties:
+                kind: { type: string, enum: [task, milestone, gate] }
+                code: { type: string }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Removed or deactivated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome, why, version]
+                properties:
+                  outcome: { type: string, enum: [deleted, deactivated] }
+                  why: { type: array, items: { type: string } }
+                  version: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/discard:
+    parameters:
+      - $ref: '#/components/parameters/WorkflowVersionNo'
+    post:
+      tags: [workflow]
+      operationId: discardWorkflowDraft
+      summary: Discard a draft that no site uses
+      description: 'Migration 0094. Only a draft (409 `invalid_transition` otherwise; a published version is kept). Needs `workflow_versions.edit`, a reason, `If-Match` and a step-up.'
+      x-step-up: true
+      x-db-path: admin_wf_discard_draft (app_actor_is_admin('workflow_versions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Discarded.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version, discarded]
+                properties:
+                  version: { type: integer }
+                  discarded: { type: boolean }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -4540,6 +4935,288 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/insert-preview:
+    post:
+      tags: [workflow]
+      operationId: previewTaskInsert
+      summary: Preview the chain affected by inserting a task between existing tasks (nothing is written)
+      description: |
+        Migration 0094. Needs `task_definitions.create` for all regions (403). Answers the successors that would wait for the new task, the direct links that would be removed
+        (`remove_direct_links`), a cycle as `valid` false with `errors[0].code` `cycle` on `/successors`, the number of open sites that could receive the task, and the B8 warning.
+      x-db-path: admin_wf_task_insert_preview
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code]
+              properties:
+                stage_code: { type: string }
+                predecessors: { type: array, items: { type: string } }
+                successors: { type: array, items: { type: string } }
+                remove_direct_links: { type: boolean, default: false }
+                counts_toward_milestone: { type: boolean, default: true }
+      responses:
+        '200':
+          description: The preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskInsertPreview' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /workflow/versions/{version}/tasks/insert:
+    post:
+      tags: [workflow]
+      operationId: insertTaskDefinition
+      summary: Insert a task into a milestone among existing tasks, with cascade rewiring (decision B8; B9 does not block it)
+      description: |
+        Migration 0094. Like `createTaskDefinition` plus `successors`: each chosen successor gets the new task added to its predecessors and, with `remove_direct_links`, loses its
+        direct link to the chosen predecessors. A cycle is 422 `validation_failed` on `/successors` (code `cycle`). With `add_to_open_sites` (published version only; needs
+        `task_definitions.edit`) the task is added to the open sites of the version (`admin_add_task_to_open_sites`) and released where everything before it is done; otherwise it
+        applies to new site tasks only. Needs a reason, `If-Match` and a step-up; audited with the rewiring.
+      x-step-up: true
+      x-db-path: admin_wf_task_insert (app_actor_is_admin('task_definitions', 'create'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stage_code, code, name_en, reason]
+              properties:
+                stage_code: { type: string }
+                code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'], maxLength: 200 }
+                counts_toward_milestone: { type: boolean, default: true }
+                has_documents: { type: boolean, default: true }
+                after_task_code: { type: [string, 'null'] }
+                predecessors: { type: array, items: { type: string } }
+                successors: { type: array, items: { type: string } }
+                remove_direct_links: { type: boolean, default: false }
+                add_to_open_sites: { type: boolean, default: false }
+                reason: { $ref: '#/components/schemas/Reason' }
+                confirm_master_impact: { type: string }
+      responses:
+        '201':
+          description: Inserted.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TaskInsertResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/sla-weight:
+    get:
+      operationId: getWorkflowSlaWeight
+      tags: [workflow]
+      summary: SLA rule and weight of every task of a workflow version
+      description: 'Migration 0109. Per task: counts_in_weight, weight_value, weight_group and the base SLA rule in force today (null when none). Drafts included.'
+      x-db-path: wf_sla_weight_items
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'The items, sorted by task code' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /workflow/versions/{version}/weight-totals:
+    get:
+      operationId: getWorkflowWeightTotals
+      tags: [workflow]
+      summary: Weight group totals of a workflow version (live check)
+      description: Migration 0109. Per group, the total of the active tasks that count in project weight. ok is true when the total is 100.
+      x-db-path: wf_weight_totals
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'The totals', content: { application/json: { schema: { type: object, properties: { items: { type: array, items: { type: object, properties: { group: { type: string }, total: { type: number }, tasks: { type: integer }, ok: { type: boolean } } } } } } } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /workflow/versions/{version}/tasks/{task_code}/sla-rule:
+    put:
+      operationId: putTaskSlaRule
+      tags: [workflow]
+      summary: Save the base SLA rule of a task (versioned)
+      description: Migration 0109. Needs sla_rules.edit, a step-up and If-Match. The open rule ends the day before today and a new rule starts today; a task keeps the rule it took at opening. Unit, warning threshold, breach owner and escalation role and pause on client wait are stored; the due-date and alert engine does not read them yet.
+      x-db-path: admin_sla_rule_save (app_actor_is_admin('sla_rules', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [min_working_days, max_working_days, start_event, reason]
+              properties:
+                min_working_days: { type: integer, minimum: 0, maximum: 365 }
+                max_working_days: { type: integer, minimum: 0, maximum: 365 }
+                start_event: { type: string, description: 'PRED (previous task done), OPEN (record created) or G<n> (gate passed)' }
+                unit: { type: string, enum: [working, calendar] }
+                calendar_code: { type: string }
+                warning_pct: { type: [integer, "null"], minimum: 0, maximum: 100 }
+                breach_owner_role: { type: [string, "null"] }
+                escalation_role: { type: [string, "null"] }
+                pause_on_client_wait: { type: boolean }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The saved rule, the weight totals and the version' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/sla-rules/{rule_id}/remove:
+    post:
+      operationId: removeTaskSlaRule
+      tags: [workflow]
+      summary: Delete an SLA rule no task uses, or deactivate it
+      description: Migration 0109. A rule that no task refers to is deleted; a used rule is deactivated with the reason and answers why. Needs sla_rules.edit, a step-up and If-Match.
+      x-db-path: admin_sla_rule_remove (app_actor_is_admin('sla_rules', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: rule_id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false, required: [reason], properties: { reason: { type: string, minLength: 3 } } }
+      responses:
+        '200': { description: 'outcome deleted or deactivated, with why' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/weight:
+    put:
+      operationId: putTaskWeight
+      tags: [workflow]
+      summary: Counts in project weight, weight value and weight group of a task (draft)
+      description: Migration 0109 (admin_wf_task_weight). Needs weights.edit, a step-up and If-Match. A draft only; a group that does not total 100 is a warning in the draft and blocks publishing.
+      x-db-path: admin_wf_task_weight (app_actor_is_admin('weights', 'edit'))
+      parameters:
+        - { name: version, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [counts_in_weight, reason]
+              properties:
+                counts_in_weight: { type: boolean }
+                weight_value: { type: number, minimum: 0, maximum: 100 }
+                weight_group: { type: [string, "null"], maxLength: 20, pattern: '^[A-Z0-9_-]{1,20}$' }
+                reason: { type: string, minLength: 3 }
+      responses:
+        '200': { description: 'The version and the weight totals' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/closing:
+    put:
+      tags: [workflow]
+      operationId: setTaskClosing
+      summary: Choose (or clear) the task that closes its milestone
+      description: |
+        Migration 0096. Draft versions only (a published version answers 409 `invalid_transition`). A milestone has one closing task: choosing one clears the previous one. Needs `task_definitions.edit`
+        (all regions), a reason, a step-up and `If-Match`. Answers 409 `freeze_active` during the structural freeze, 409 `invalid_transition` when nothing changes, 422 `inactive` for an inactive task.
+      x-step-up: true
+      x-db-path: admin_wf_task_closing (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [closing, reason]
+              properties:
+                closing: { type: boolean }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
+  /workflow/versions/{version}/tasks/{task_code}/successors:
+    put:
+      tags: [workflow]
+      operationId: replaceTaskSuccessors
+      summary: Replace the successors of a task (the tasks that wait for it)
+      description: |
+        Migration 0094. Same rules as `replaceTaskPredecessors`, seen from the other end: errors are on `/successors` with the codes `cycle`, `self`, `duplicate`, `unknown`, `inactive`.
+      x-step-up: true
+      x-db-path: admin_wf_task_successors (app_actor_is_admin('task_definitions', 'edit'))
+      parameters:
+        - $ref: '#/components/parameters/WorkflowVersionNo'
+        - { name: task_code, in: path, required: true, schema: { type: string } }
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [successors, reason]
+              properties:
+                successors: { type: array, items: { type: string } }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkflowVersion' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '428': { $ref: '#/components/responses/PreconditionRequired' }
   /workflow/versions/{version}/milestones/{code}/task-order:
     put:
       tags: [workflow]
@@ -4603,12 +5280,12 @@ paths:
     post:
       tags: [workflow]
       operationId: migrateSites
-      summary: Migrate the previewed sites (job, one transaction per site)
+      summary: Migrate the previewed sites to this published version (one transaction)
       x-step-up: true
-      x-db-path: admin_migrate_site_workflow (app_actor_is_admin('workflow.migrate'))
+      description: 'Migration 0094 wires the doors of 0090. The preview hash must still match (422 `stale_preview`); `workflow_versions.administer` for all or the delegated regions; reason and step-up. Sites never move silently.'
+      x-db-path: admin_wf_migrate_sites
       parameters:
         - $ref: '#/components/parameters/WorkflowVersionNo'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -4622,15 +5299,16 @@ paths:
                 reason: { $ref: '#/components/schemas/Reason' }
                 confirm_master_impact: { type: string }
       responses:
-        '202':
-          description: Job started.
+        '200':
+          description: Migrated.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Job' }
+              schema: { type: object, required: [sites_migrated, to_version], properties: { id: { type: string, format: uuid }, sites_migrated: { type: integer }, to_version: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /workflow/site-migrations:
     get:
       tags: [workflow]
@@ -4660,7 +5338,7 @@ paths:
       operationId: revertSiteMigration
       summary: Move a site back to its previous version (only if nothing was approved since)
       x-step-up: true
-      x-db-path: admin_migrate_site_workflow (revert)
+      x-db-path: admin_wf_revert_migration
       parameters:
         - name: migration_id
           in: path
@@ -4677,14 +5355,15 @@ paths:
                 reason: { $ref: '#/components/schemas/Reason' }
       responses:
         '200':
-          description: Reverted.
+          description: Reverted (the site is moved back to the previous version).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/SiteMigration' }
+              schema: { type: object, required: [id, site_id, reverted_to_version], properties: { id: { type: string, format: uuid }, site_id: { type: string, format: uuid }, site_code: { type: string }, reverted_to_version: { type: integer } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
 
   # ------------------------------------------------------------------ audit
   /audit-log:
@@ -7204,8 +7883,8 @@ paths:
       tags: [settings]
       operationId: setStructuralFreeze
       summary: Set the freeze window (pilot start to end of the parallel-run month)
-      description: While active, adding, removing or reordering a milestone or gate and moving tasks between stages answer 409 `freeze_active`. Light changes and new tasks inside an existing stage stay allowed.
-      x-step-up: when the new window starts later or ends earlier than the current one (it shortens the freeze)
+      description: While active, publishing, replacing the structure of a draft, removing a milestone or gate, moving a task to another milestone and choosing the closing task answer 409 `freeze_active`. Light changes and new tasks inside an existing milestone stay allowed. Setting a window after a lift locks again (0.15.16).
+      x-step-up: true
       x-db-path: admin_set_structural_freeze
       parameters:
       - {$ref: '#/components/parameters/IfMatch'}
@@ -7655,6 +8334,79 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /site360/sections:
+    get:
+      tags: [sites]
+      operationId: getSite360Sections
+      summary: The SITE 360 menus and the Master columns of each (0.15.21, F15)
+      description: |
+        0.15.21. The seven menus of SITE 360 in the order of the menu. Each menu lists the Master columns of its section, in Master order, and the status columns (in every menu). `bands` is the 3-level grid header: a phase band, its groups, and the Master column ords of each group. `frozen_ords` are the identity columns that stay on screen when the grid scrolls (# to Site Name by default; the user can change them on screen). `can_move` is true for a System Admin, who may move a column with `PATCH /site360/columns/{ord}/section`. Needs the `sites` view in a region.
+      responses:
+        '200':
+          description: The menus.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Sections' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /site360/{menu}/rows:
+    get:
+      tags: [sites]
+      operationId: getSite360Rows
+      summary: The grid rows of one SITE 360 menu, one page at a time (0.15.21, F15)
+      description: |
+        0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
+      parameters:
+        - { name: menu, in: path, required: true, description: 'The SITE 360 menu.', schema: { type: string, enum: [master, design_acq, sow, cw, te, hoto, dismantle, om] } }
+        - { name: site_code, in: query, required: false, description: 'Site IDs, comma-separated (multi Site ID search, exact match).', schema: { type: string, maxLength: 4000 } }
+        - { name: region_id, in: query, required: false, description: 'Region numbers 1 to 7, comma-separated.', schema: { type: string, maxLength: 40 } }
+        - { name: sub_region, in: query, required: false, schema: { type: string, maxLength: 4000 } }
+        - { name: phase, in: query, required: false, description: 'Project phase, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: batch, in: query, required: false, description: 'Delivery batch, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: scenario, in: query, required: false, schema: { type: string, maxLength: 200 } }
+        - { name: delivery_model, in: query, required: false, description: 'CW delivery model (outsourced or internal).', schema: { type: string, maxLength: 200 } }
+        - { name: status, in: query, required: false, description: 'Overall status, comma-separated.', schema: { type: string, maxLength: 400 } }
+        - { name: milestone, in: query, required: false, description: 'Current milestone, comma-separated.', schema: { type: string, maxLength: 4000 } }
+        - { name: contractor, in: query, required: false, description: 'Contractor Name (Master AJ) of the first active CW procurement order, comma-separated. A caller without the procurement view matches no site.', schema: { type: string, maxLength: 4000 } }
+        - { name: sort, in: query, required: false, description: 'site_code (default), name, region, status, milestone, phase, or ord:<n> of a column of the menu.', schema: { type: string, maxLength: 40 } }
+        - { name: dir, in: query, required: false, schema: { type: string, enum: [asc, desc], default: asc } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: The page of rows with the menu's columns and the counts.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Rows' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /site360/columns/{ord}/sections:
+    patch:
+      tags: [settings]
+      operationId: setSite360ColumnSections
+      summary: Replace the SITE 360 menus of one Master column (0.15.21, F15)
+      description: |
+        0.15.21. Only a System Admin (`admin.settings` edit, checked in the database) may change the menus of a column. The body replaces the whole set; a column may be in several menus. The step-up is required and the reason is mandatory. The status columns are in every menu and cannot be changed (422 `validation_failed`, `/sections`). Audited with the menus before and after.
+      x-db-path: site360_set_sections
+      parameters:
+        - { name: ord, in: path, required: true, description: 'The Master column order (1 to 187, A = 1).', schema: { type: integer, minimum: 1, maximum: 187 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Site360ColumnSectionsRequest' }
+      responses:
+        '200':
+          description: The column with its new menus; the menus are read again with `GET /site360/sections`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Site360Column' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /settings/gecol-order-warnings:
     get:
       tags: [settings]
@@ -7700,6 +8452,60 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/GecolOrderWarnings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /settings/dashboard:
+    get:
+      tags: [settings]
+      operationId: getDashboardSettings
+      summary: The dashboard settings, targets, KPI thresholds and cards per tab (0.15.24)
+      description: |
+        0.15.24 (F20, owner decisions 2026-11-15). Global settings of the dashboard, kept in the settings table as `dashboard.settings`. `targets`:
+        sites per batch and the monthly On-Air target (null = no target). `thresholds`: green and amber for each KPI of `catalogue.kpis`. `tabs`: for each tab
+        (PMO, CW, TE) the card codes in display order and the codes it hides; a card in `catalogue.cards` that no list names is shown at the end. The per-user
+        layout and the saved filter sets stay in the browser. The health index bands stay in `dashboard.health_bands` (no duplicate setting).
+        Reads need `dashboard.view` (403 `module_forbidden` otherwise), so every dashboard reader gets the thresholds.
+      responses:
+        '200':
+          description: The setting.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardSettings'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    put:
+      tags: [settings]
+      operationId: setDashboardSettings
+      summary: Save the dashboard settings (reason, If-Match, audited, versioned)
+      description: |
+        0.15.24. System Admin, or a delegation of `admin.settings` edit for all regions (403 `action_forbidden` otherwise). The body replaces the whole setting.
+        Field errors (422 `validation_failed`): `unknown_key`, `unknown_kpi` (a threshold for a code the catalogue does not hold), `missing_kpi` (a catalogue KPI without a threshold),
+        `invalid_order` (green is worse than amber for the KPI's direction), `invalid`, `unknown_card` (in an order or hidden list), `duplicate` (a card listed twice in one tab), `too_many`.
+        Each save writes one audit row with before and after values and the reason.
+      x-db-path: admin_save_dashboard_settings
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+              - {$ref: '#/components/schemas/WithReason'}
+              - {$ref: '#/components/schemas/DashboardSettingsInput'}
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardSettings'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '412': {$ref: '#/components/responses/PreconditionFailed'}
@@ -7773,6 +8579,319 @@ paths:
                     type: array
                     items: {$ref: '#/components/schemas/RegisterDefinition'}
         '401': {$ref: '#/components/responses/Unauthorized'}
+  /registers/{register_key}/fields:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    get:
+      tags: [registers]
+      operationId: getRegisterColumns
+      summary: The columns, sections and name of a register, for the admin (also inactive columns, with usage)
+      x-db-path: reg_fields_admin_json (calc_require_admin fields)
+      responses:
+        '200':
+          description: The screen.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterColumnsScreen' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [registers]
+      operationId: createRegisterColumn
+      summary: Add a column to a register
+      description: |
+        The type is one of `RegisterColumnType`. A `list` or `multi_list` column names a catalogue (`list_catalogue`) or creates one with its values (`new_list`) in the same call.
+        A `document` column creates a Document Library document type placed on the register (mandatory only when `required`). A `computed` column needs `formula`.
+      x-db-path: admin_reg_field_save (create)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterColumnCreate' }
+      responses:
+        '201':
+          description: Created.
+          headers:
+            ETag: { description: The version of the column., schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterColumnResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/fields/{code}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+      - { name: code, in: path, required: true, schema: { type: string } }
+    patch:
+      tags: [registers]
+      operationId: updateRegisterColumn
+      summary: Edit a column (rename, required, section, order, visibility, deactivate, reactivate, change of type)
+      description: |
+        A protected column (`is_system`) accepts only `label_en`, `label_ar`, `section`, `sort_order`, `in_list`, `in_filter`, `in_template`, `in_export`; any other key is 409 `system_field`.
+        A change of `field_type` or `list_catalogue` converts the stored values: 409 `conversion_blocked` when some value fails (the answer lists them), 409 `conversion_unconfirmed`
+        when every value converts (send `confirm_conversion` true). Turning `required` on never blocks: the answer counts the records without a value (`records_missing_value`).
+        A type change, a change of list and a deactivation or reactivation need a step-up.
+      x-step-up: conditional
+      x-db-path: admin_reg_field_save
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterColumnPatch' }
+      responses:
+        '200':
+          description: Saved.
+          headers:
+            ETag: { description: The new version of the column., schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterColumnResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [registers]
+      operationId: deleteRegisterColumn
+      summary: Delete a column (hard when no record ever held a value, otherwise deactivate)
+      x-step-up: true
+      x-db-path: admin_reg_field_delete
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Deleted or deactivated.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, code, records_with_value]
+                properties:
+                  mode: { type: string, enum: [deleted, deactivated] }
+                  code: { type: string }
+                  records_with_value: { type: integer }
+                  version: { type: integer }
+                  detail: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/fields/{code}/impact:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+      - { name: code, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [registers]
+      operationId: getRegisterColumnImpact
+      summary: The preview of a change or a delete (nothing is written)
+      x-db-path: admin_reg_field_impact
+      parameters:
+        - { name: field_type, in: query, required: false, schema: { $ref: '#/components/schemas/RegisterColumnType' } }
+        - { name: list_catalogue, in: query, required: false, schema: { type: string } }
+        - { name: required, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200':
+          description: The impact.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RegisterColumnImpact' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/fields-order:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    put:
+      tags: [registers]
+      operationId: reorderRegisterColumns
+      summary: Set the order of columns (the list is the new order)
+      x-db-path: admin_reg_fields_order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [codes, reason]
+              properties:
+                codes: { type: array, items: { type: string }, minItems: 1 }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Ordered.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ordered]
+                properties:
+                  ordered: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/sections:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    post:
+      tags: [registers]
+      operationId: createRegisterSection
+      summary: Add a section to a register form
+      x-db-path: admin_reg_section_save
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name_en, reason]
+              properties:
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'] }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, version]
+                properties:
+                  id: { type: string, format: uuid }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /registers/{register_key}/sections/{section_id}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+      - { name: section_id, in: path, required: true, schema: { type: string, format: uuid } }
+    patch:
+      tags: [registers]
+      operationId: updateRegisterSection
+      summary: Rename or reorder a section (its columns follow a rename)
+      x-db-path: admin_reg_section_save
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'] }
+                sort_order: { type: integer, minimum: 0, maximum: 100000 }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, version]
+                properties:
+                  id: { type: string, format: uuid }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+    delete:
+      tags: [registers]
+      operationId: deleteRegisterSection
+      summary: Delete a section (only when it holds no column; 409 `section_not_empty`)
+      x-db-path: admin_reg_section_delete
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Deleted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted]
+                properties:
+                  deleted: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /registers/{register_key}:
+    parameters:
+      - $ref: '#/components/parameters/RegisterKeyAny'
+    patch:
+      tags: [registers]
+      operationId: renameRegister
+      summary: Rename a register (English and Arabic)
+      x-db-path: admin_reg_definition_rename
+      parameters:
+        - { name: If-Match, in: header, required: false, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                name_en: { type: string, minLength: 1, maxLength: 200 }
+                name_ar: { type: [string, 'null'] }
+                reason: { $ref: '#/components/schemas/Reason' }
+      responses:
+        '200':
+          description: Renamed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, name_en, version]
+                properties:
+                  register_key: { type: string }
+                  name_en: { type: string }
+                  name_ar: { type: [string, 'null'] }
+                  version: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
   /registers/{register_key}/records:
     parameters:
     - {$ref: '#/components/parameters/RegisterKeyPath'}
@@ -8206,6 +9325,137 @@ paths:
         '412': {$ref: '#/components/responses/PreconditionFailed'}
         '422': {$ref: '#/components/responses/Unprocessable'}
         '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/records/{record_id}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterRecord
+      summary: Lock a record (read-only except for a System Admin) (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register (or a delegate with it) locks one record. A reason (at least 3 characters) and step-up are required;
+        `If-Match` is the record's version. The lock does not change the version. The lock and the reason are audited with before and after
+        (`register_record_lock`). A locked record refuses edits and voids (403 `register_locked`) for everyone except a System Admin.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterRecord
+      summary: Unlock a record (0.15.22)
+      description: |
+        0.15.22. The administer grant of the register unlocks one record. A reason and step-up are required; `If-Match` is the record's version. Audited as
+        `register_record_unlock` with before and after.
+      x-step-up: true
+      x-db-path: reg_record_lock_set
+      parameters:
+      - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          headers:
+            ETag: {$ref: '#/components/headers/ETag'}
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RegisterRecord'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '412': {$ref: '#/components/responses/PreconditionFailed'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+        '428': {$ref: '#/components/responses/PreconditionRequired'}
+  /registers/{register_key}/columns/{field_code}/lock:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {name: field_code, in: path, required: true, schema: {type: string}, description: 'The column code (register_fields.code).'}
+    post:
+      tags: [registers]
+      operationId: lockRegisterColumn
+      summary: Lock a column for every record of the register (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region locks one column. Locked columns refuse a changed value for everyone except a System Admin
+        (403 `register_locked`). A reason and step-up are required. Audited as `register_column_lock` with before and after.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Locked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: true}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
+    delete:
+      tags: [registers]
+      operationId: unlockRegisterColumn
+      summary: Unlock a column (0.15.22)
+      description: |
+        0.15.22. The administer grant in every region unlocks one column. A reason and step-up are required. Audited as `register_column_unlock`.
+      x-step-up: true
+      x-db-path: reg_column_lock_set
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/WithReason'}
+      responses:
+        '200':
+          description: Unlocked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [register_key, field_code, locked]
+                properties:
+                  register_key: {$ref: '#/components/schemas/RegisterKey'}
+                  field_code: {type: string}
+                  locked: {type: boolean, const: false}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /registers/quality/records/{record_id}/cancel-snag:
     parameters:
     - {$ref: '#/components/parameters/RegisterRecordId'}
@@ -9930,6 +11180,32 @@ paths:
     parameters:
     - {$ref: '#/components/parameters/CatalogueCode'}
     - {$ref: '#/components/parameters/ListValueId'}
+    delete:
+      tags: [lists]
+      operationId: deleteListValue
+      summary: Hard delete of a value that is not used (F17)
+      description: Allowed only when the value is unused, that is not in a register record, a child-list column, a dependent value of a child list and not the default value. The `reason` is a query parameter. If-Match is optional. Audited with the before state and the reason.
+      x-db-path: admin_delete_list_value
+      parameters:
+      - name: reason
+        in: query
+        required: true
+        schema: {type: string, minLength: 3}
+      - name: If-Match
+        in: header
+        required: false
+        schema: {type: string}
+      responses:
+        '200':
+          description: Deleted; the list with its values.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ListCatalogue'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
     patch:
       tags: [lists]
       operationId: updateListValue
@@ -11053,6 +12329,42 @@ paths:
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
         '404': {$ref: '#/components/responses/NotFound'}
+  /registers/{register_key}/records/{record_id}/time-in-state:
+    parameters:
+    - {$ref: '#/components/parameters/RegisterKeyPath'}
+    - {$ref: '#/components/parameters/RegisterRecordId'}
+    get:
+      tags: [insights]
+      operationId: getRegisterRecordTimeInState
+      summary: How long a register record has sat in its current state (0.15.17, F1)
+      description: Working days (weekend Friday and Saturday, holidays) since the last recorded approved transition into the current state. `since` and `working_days_in_state` are null when no transition into the current state is recorded. Readable by anyone who can view the record (B3).
+      responses:
+        '200':
+          description: Current state and transitions.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RecordTimeInState'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /reports/state-durations:
+    get:
+      tags: [insights]
+      operationId: getStateDurationsReport
+      summary: Median and P85 working days per state, per stage or register, per region (0.15.17, F1)
+      description: Completed stays only (a stay runs from one recorded approved transition to the next one of the same entity). Admin-override transitions are left out. For tasks needs `view` on `reports` and `sites`; for records needs `view` on `reports` and on the module of the register. Counts only the regions the caller may read.
+      parameters:
+      - {name: entity_type, in: query, required: true, schema: {type: string, enum: [task, register_record]}}
+      - {name: region_id, in: query, schema: {type: integer, minimum: 1, maximum: 7}}
+      responses:
+        '200':
+          description: Groups.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/StateDurationsReport'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /tasks/{task_id}/blocked-by:
     parameters:
     - {$ref: '#/components/parameters/TaskId'}
@@ -11523,6 +12835,46 @@ paths:
               schema: {$ref: '#/components/schemas/SiteMap'}
         '401': {$ref: '#/components/responses/Unauthorized'}
         '403': {$ref: '#/components/responses/Forbidden'}
+  /dashboard/extras:
+    get:
+      tags: [dashboard]
+      operationId: getDashboardExtras
+      summary: The F13 sections of the dashboard in one read (0.15.18)
+      description: |
+        The sections added to the dashboard with the three tabs (F13 of the features build plan; owner decisions 2026-11-15): the 5x5 risk matrix with the top open risks, the data
+        quality panel, the swap and relocation breakdown by delivery scenario, and the decisions card. Read only. The filters `region_id` (risks and sites), `cluster_code` and `scenario` (sites only) narrow the figures as in `GET /dashboard`;
+        `stream` is accepted and ignored. The figures are current (no reference date).
+        **Who sees what (B3).** Needs `dashboard.view` (403 `module_forbidden` otherwise). The risk matrix needs `risks.view`, the other sections need `sites.view`; a section the caller
+        may not see answers `available: false` with null figures. Risks are those of the caller's regions and the global risks; sites are those of the caller's regions (the row-level
+        filter applies as for `GET /sites`). Not audited (a read, like `GET /dashboard`).
+        **Bands (default of the owner, 2026-11-15, a setting for the administrator).** A risk score is probability times impact, each from 1 to 5. Low 1 to 4, medium 5 to 9, high 10 to 16,
+        critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
+        **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
+        **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
+        **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.29 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
+      parameters:
+      - name: region_id
+        in: query
+        schema: {$ref: '#/components/schemas/RegionId'}
+      - name: cluster_code
+        in: query
+        schema: {type: string, minLength: 1, maxLength: 40}
+      - name: scenario
+        in: query
+        schema: {$ref: '#/components/schemas/DeliveryScenario'}
+      - name: stream
+        in: query
+        schema: {type: string, pattern: '^[A-Z][A-Z0-9_]{1,30}$'}
+        description: Accepted as in `GET /dashboard`; the sections do not depend on it.
+      responses:
+        '200':
+          description: The sections.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DashboardExtras'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /dashboard/export:
     get:
       tags: [dashboard]
@@ -12217,6 +13569,12 @@ components:
       in: query
       description: Opaque cursor from `page.next_cursor`.
       schema: { type: string }
+    RegisterKeyAny:
+      name: register_key
+      in: path
+      required: true
+      description: A register key (see `GET /registers`).
+      schema: { type: string }
     IfMatch:
       name: If-Match
       in: header
@@ -12477,6 +13835,177 @@ components:
           schema: { $ref: '#/components/schemas/TransitionResult' }
 
   schemas:
+    Site360Section:
+      type: string
+      description: The section of a Master column. `status` columns are in every menu.
+      enum: [design_acq, sow, cw, te, hoto, dismantle, om, status]
+    Site360Menu:
+      type: string
+      enum: [master, design_acq, sow, cw, te, hoto, dismantle, om]
+    Site360Column:
+      type: object
+      additionalProperties: false
+      required: [ord, letter, group_top, group_mid, header, sections, is_phase_gate]
+      properties:
+        ord: { type: integer, minimum: 1, maximum: 187 }
+        letter: { type: string, description: 'The column letter in the Master sheet (A to GE).' }
+        group_top: { type: [string, 'null'], description: 'The phase band (row 1 of the Master sheet).' }
+        group_mid: { type: [string, 'null'], description: 'The group (row 2 of the Master sheet).' }
+        header: { type: string, description: 'The field (row 3 of the Master sheet).' }
+        sections:
+          type: array
+          description: 'The SITE 360 menus of the column (a set). `status` means every menu.'
+          items: { $ref: '#/components/schemas/Site360Section' }
+        is_phase_gate: { type: boolean, description: 'True for a Phase Gate column (highlighted in the grid).' }
+    Site360Band:
+      type: object
+      additionalProperties: false
+      required: [name, is_phase_gate, groups]
+      properties:
+        name: { type: [string, 'null'] }
+        is_phase_gate: { type: boolean }
+        groups:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [name, ords]
+            properties:
+              name: { type: [string, 'null'] }
+              ords: { type: array, items: { type: integer, minimum: 1, maximum: 187 } }
+    Site360MenuItem:
+      type: object
+      additionalProperties: false
+      required: [key, name_en, name_ar, columns, bands, frozen_ords]
+      properties:
+        key: { $ref: '#/components/schemas/Site360Menu' }
+        name_en: { type: string }
+        name_ar: { type: string }
+        columns:
+          type: array
+          description: The columns of the menu in Master order (status columns included).
+          items: { $ref: '#/components/schemas/Site360Column' }
+        bands:
+          type: array
+          description: The 3-level header of the menu (phase band, group, field).
+          items: { $ref: '#/components/schemas/Site360Band' }
+        frozen_ords:
+          type: array
+          description: The identity columns frozen by default (# to Site Name, ords 1 to 4).
+          items: { type: integer, minimum: 1, maximum: 187 }
+    Site360Sections:
+      type: object
+      additionalProperties: false
+      required: [items, can_move]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/Site360MenuItem' } }
+        can_move: { type: boolean, description: 'True for a System Admin.' }
+    Site360ColumnSectionsRequest:
+      type: object
+      additionalProperties: false
+      required: [sections, reason]
+      properties:
+        sections:
+          type: array
+          minItems: 1
+          maxItems: 7
+          uniqueItems: true
+          items:
+            type: string
+            enum: [design_acq, sow, cw, te, hoto, dismantle, om]
+        reason: { type: string, minLength: 3, maxLength: 1000 }
+    Site360Rows:
+      type: object
+      additionalProperties: false
+      required: [menu, total, filtered, offset, limit, rows]
+      properties:
+        menu: { $ref: '#/components/schemas/Site360MenuItem' }
+        total: { type: integer, minimum: 0, description: 'Sites the caller may see.' }
+        filtered: { type: integer, minimum: 0, description: 'Sites that match the filters.' }
+        offset: { type: integer, minimum: 0 }
+        limit: { type: integer, minimum: 1, maximum: 200 }
+        rows:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [site_id, site_code, row_no, values, cells]
+            properties:
+              site_id: { type: string, format: uuid }
+              site_code: { type: string }
+              row_no: { type: integer, minimum: 1, description: 'Running number of the row in view (the # column).' }
+              values:
+                type: object
+                description: 'Master value of each column of the menu, keyed by the column order (ord) as a string; null when the column has no source yet.'
+                additionalProperties: { type: [string, 'null'] }
+              cells:
+                type: object
+                description: 'Task-backed columns only (0.15.21 item 3), keyed by ord. Edit a cell with PATCH /tasks/{task_id} (If-Match the version; body planned_date, actual_date or actual_start, or values with the key). A locked or N/A task, or a task that is not the only source of its column, is read-only (editable false).'
+                additionalProperties:
+                  type: object
+                  required: [task_id, version, editable]
+                  properties:
+                    task_id: { type: string, format: uuid }
+                    version: { type: integer, minimum: 1 }
+                    editable: { type: boolean }
+                    field: { type: string, enum: [planned_date, actual_date, actual_start] }
+                    values: { type: string, description: 'The key of the task values map (a typed field).' }
+    SearchType:
+      type: string
+      enum: [sites, registers, documents, meetings, people, contractors]
+    SearchHit:
+      type: object
+      additionalProperties: false
+      required: [id, title, subtitle, region_id, href, match_ranges]
+      properties:
+        id: { type: string }
+        title: { type: string, description: 'Shown as is. `match_ranges` are offsets (UTF-16 code units, start inclusive, end exclusive) into this text.' }
+        subtitle: { type: [string, 'null'] }
+        region_id: { type: [integer, 'null'] }
+        href: { type: string, description: 'The app route to open (a relative path).' }
+        match_ranges:
+          type: array
+          items: { type: array, minItems: 2, maxItems: 2, items: { type: integer, minimum: 0 } }
+    SearchGroup:
+      type: object
+      additionalProperties: false
+      required: [type, total, truncated, items]
+      properties:
+        type: { $ref: '#/components/schemas/SearchType' }
+        total: { type: integer, minimum: 0, description: 'Visible matches in the group (every match, not only those returned).' }
+        truncated: { type: boolean, description: 'True when more matches exist than the items returned.' }
+        items: { type: array, items: { $ref: '#/components/schemas/SearchHit' } }
+    SearchResponse:
+      type: object
+      additionalProperties: false
+      required: [q, groups]
+      properties:
+        q: { type: string }
+        groups: { type: array, items: { $ref: '#/components/schemas/SearchGroup' } }
+    SiteIdLookupInput:
+      type: object
+      additionalProperties: false
+      required: [ids]
+      properties:
+        ids: { type: array, minItems: 1, maxItems: 500, items: { type: string, minLength: 1, maxLength: 40 } }
+    SiteIdLookupResult:
+      type: object
+      additionalProperties: false
+      required: [found, not_found]
+      properties:
+        found:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, site_code, name, region_id, href]
+            properties:
+              id: { type: string }
+              site_code: { type: string }
+              name: { type: string }
+              region_id: { type: integer }
+              href: { type: string }
+        not_found: { type: array, items: { type: string } }
     UserPickerItem:
       type: object
       additionalProperties: false
@@ -14164,7 +15693,15 @@ components:
       properties:
         type: { type: string, enum: [milestone, task, permit, date_field, stop_work_blocks] }
         ref: { type: string, description: 'Milestone code, task code, permit type, or date field key.' }
-        accept_na: { type: boolean, description: 'For permits, an approved N/A satisfies (D36).' }
+        accept_na: { type: boolean, description: 'For permits, an approved N/A satisfies (D36). For `date_field` and a task date, a task that is N/A or skipped satisfies.' }
+        offset_wd:
+          type: integer
+          minimum: -365
+          maximum: 365
+          description: |
+            `date_field` only (0.15.16, migration 0096). Working days (calendar of the project) added to the date `ref` names. `ref` is `task:<CODE>.<actual_start|actual_date|planned_date|baseline_date>`,
+            `site.rf_survey_date`, `site.acquisition_date` or `site.custom.<code>` (a date custom field). A date that is not set holds the gate (`condition_not_met`); the gate date is the later of its
+            other conditions and this date plus the offset.
     WorkflowGate:
       type: object
       required: [code, from_milestone, to_milestone, name_en, conditions]
@@ -14196,33 +15733,43 @@ components:
         task_version: { type: integer }
     WorkflowStructure:
       type: object
-      required: [milestones, gates, placements]
+      required: [milestones, gates, reason]
+      description: 'The complete structure of a draft (migration 0094). The list order is the order. A milestone or gate that is not in its list is refused (milestones: 422 `missing`) or deactivated (gates); history is never deleted.'
       properties:
         milestones:
           type: array
+          description: 'Every milestone of the version, in the new order. A code that does not exist yet adds a milestone (name_en required). `is_active` false removes (deactivates) one.'
           items:
             type: object
-            required: [name_en]
+            required: [code]
             properties:
-              code: { type: string, description: 'Omit for a new milestone; a new code is assigned.' }
-              name_en: { type: string }
-              name_ar: { type: string }
-              master_export_column: { type: [string, 'null'] }
+              code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
+              name_en: { type: string, maxLength: 200 }
+              name_ar: { type: [string, 'null'], maxLength: 200 }
+              is_active: { type: boolean, default: true }
               counts_in_project_status: { type: boolean }
         gates:
           type: array
+          description: 'The gates, in the new order; a new code adds one (name_en, from_milestone and to_milestone required); an existing gate that is omitted is deactivated.'
           items:
             type: object
-            required: [from_milestone, to_milestone, name_en]
+            required: [code]
             properties:
-              code: { type: string }
+              code: { type: string, pattern: '^[A-Z][A-Z0-9_-]{0,19}$' }
               from_milestone: { type: string }
               to_milestone: { type: string }
-              name_en: { type: string }
-              name_ar: { type: string }
+              name_en: { type: string, maxLength: 200 }
+              name_ar: { type: [string, 'null'], maxLength: 200 }
+              is_active: { type: boolean, default: true }
               conditions: { type: array, items: { $ref: '#/components/schemas/GateCondition' } }
-              master_export_column: { type: [string, 'null'] }
-        placements: { type: array, items: { $ref: '#/components/schemas/TaskPlacement' } }
+              sla_min_wd: { type: integer, minimum: 0 }
+              sla_max_wd: { type: integer, minimum: 0 }
+        task_moves:
+          type: array
+          description: 'Tasks that move to another milestone (placed last in it).'
+          items: { type: object, required: [task_code, stage_code], properties: { task_code: { type: string }, stage_code: { type: string } } }
+        reason: { $ref: '#/components/schemas/Reason' }
+        confirm_master_impact: { type: string }
     WorkflowVersion:
       allOf:
         - $ref: '#/components/schemas/WorkflowVersionSummary'
@@ -14265,6 +15812,41 @@ components:
         code: { type: string }
         before: { type: [string, 'null'], format: date }
         after: { type: [string, 'null'], format: date }
+    TaskInsertRewiring:
+      type: object
+      required: [successor, predecessors_before, removed_links, predecessors_after]
+      properties:
+        successor: { type: string }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        stage_code: { type: string }
+        predecessors_before: { type: array, items: { type: string } }
+        removed_links: { type: array, items: { type: string }, description: 'Direct links from the chosen predecessors that go (only with remove_direct_links).' }
+        predecessors_after: { type: array, items: { type: string }, description: 'Without the new task, which is added to every successor.' }
+    TaskInsertPreview:
+      type: object
+      required: [valid, errors, predecessors, successors, rewiring, removed_link_count, warnings, version_status, open_sites]
+      properties:
+        valid: { type: boolean }
+        errors: { type: array, items: { type: object, required: [path, code, message], properties: { path: { type: string }, code: { type: string }, message: { type: string } } } }
+        predecessors: { type: array, items: { type: string } }
+        successors: { type: array, items: { type: string } }
+        rewiring: { type: array, items: { $ref: '#/components/schemas/TaskInsertRewiring' } }
+        removed_link_count: { type: integer }
+        warnings: { type: array, items: { type: string } }
+        version_status: { type: string }
+        open_sites: { type: integer, description: 'Open sites of the version that could receive the task (published versions only).' }
+        master_confirmation_needed: { type: boolean }
+        confirmation_phrase: { type: [string, 'null'] }
+    TaskInsertResult:
+      type: object
+      required: [task_code, warnings, rewiring, open_sites_added, version]
+      properties:
+        task_code: { type: string }
+        warnings: { type: array, items: { type: string } }
+        rewiring: { type: array, items: { $ref: '#/components/schemas/TaskInsertRewiring' } }
+        open_sites_added: { type: integer }
+        version: { $ref: '#/components/schemas/WorkflowVersion' }
     MigrationPreview:
       type: object
       required: [preview_hash, to_version, sites]
@@ -15292,6 +16874,15 @@ components:
         note: { type: [string, 'null'], description: The last note of a return. }
         mode: { type: string, enum: [submit, draft], description: 'Q206 (0.12.8): `submit` enters and submits every row; `draft` (Save Draft / Planning) saves the rows without submission.' }
         file_template_version: { type: [integer, 'null'], description: 'D112 (0.12.8): the template version of the file when it was older than the current one and only non-input columns had changed.' }
+        older_template:
+          type: [object, 'null']
+          description: '0.15.13. The summary of an older register file (tolerant upload): the columns removed since the file was made (ignored), the new ones (empty) and the renamed ones.'
+          properties:
+            file_version: { type: integer }
+            current_version: { type: integer }
+            removed_columns: { type: array, items: { type: object, properties: { key: { type: string }, header: { type: [string, 'null'] } } } }
+            added_columns: { type: array, items: { type: object, properties: { key: { type: string }, header: { type: [string, 'null'] } } } }
+            renamed_columns: { type: array, items: { type: object, properties: { key: { type: string }, from: { type: [string, 'null'] }, to: { type: [string, 'null'] } } } }
         historical_load: { oneOf: [ { $ref: '#/components/schemas/HistoricalLoadMark' }, { type: 'null' } ], description: 'Q462 (0.14.3): set when a System Admin marked the batch "accept without documents" under the open waiver. Null otherwise.' }
         counts:
           type: object
@@ -15391,7 +16982,7 @@ components:
         applied_at: { type: [string, 'null'], format: date-time }
         apply_reason: { type: [string, 'null'] }
         apply_mode: { type: [string, 'null'], enum: [submit, draft, null] }
-        group_id: { type: [string, 'null'], format: uuid, description: The import batches the apply created (`GET /import-batches?group_id=`). }
+        group_id: { type: [string, 'null'], format: uuid, description: 'The import batches the apply created (GET /import-batches?group_id=).' }
         outcome: { oneOf: [{ $ref: '#/components/schemas/MasterImportOutcome' }, { type: 'null' }] }
         has_file: { type: boolean, description: The original file is stored. }
         progress: { oneOf: [{ $ref: '#/components/schemas/MasterImportRunProgress' }, { type: 'null' }], description: '0.14.6: the background sends of the batches of an applied run; null when every batch was sent in the request (or the run is not applied).' }
@@ -16046,6 +17637,160 @@ components:
             cw_months: { type: integer, minimum: 0, maximum: 120 }
             te_months: { type: integer, minimum: 0, maximum: 120 }
             effective_from: { type: string, format: date }
+    # ---------------------------------------------------------- register columns admin (0.15.13)
+    RegisterColumnType:
+      type: string
+      enum: [text, long_text, number, currency, percentage, date, datetime, yes_no, list, multi_list, user, multi_user, site, multi_site, external_party, warehouse_item, email, phone, link, document, computed, child_list]
+    RegisterColumnFormula:
+      type: object
+      required: [op, a, b]
+      description: A computed column over two other columns (`days_between` over two date columns, the others over two number columns).
+      properties:
+        op: { type: string, enum: [sum, diff, product, ratio, days_between] }
+        a: { type: string }
+        b: { type: string }
+    RegisterColumnUsage:
+      type: object
+      properties:
+        records_with_value: { type: integer }
+        records_missing_value: { type: integer }
+        records_current: { type: integer }
+    RegisterColumn:
+      type: object
+      required: [code, label_en, type, is_active, is_system, version]
+      properties:
+        code: { type: string }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        type: { $ref: '#/components/schemas/RegisterColumnType' }
+        required: { type: boolean }
+        list_catalogue: { type: [string, 'null'] }
+        list_catalogue_name: { type: [string, 'null'] }
+        section: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        in_list: { type: boolean }
+        in_filter: { type: boolean }
+        in_template: { type: boolean }
+        in_export: { type: boolean }
+        is_active: { type: boolean }
+        is_system: { type: boolean, description: 'Protected: code or a derived rule depends on it.' }
+        system_reason: { type: [string, 'null'] }
+        derived: { type: boolean }
+        usage: { $ref: '#/components/schemas/RegisterColumnUsage' }
+        version: { type: integer }
+    RegisterSection:
+      type: object
+      required: [id, name_en, sort_order, version, field_count]
+      properties:
+        id: { type: string, format: uuid }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        version: { type: integer }
+        field_count: { type: integer }
+    RegisterColumnsScreen:
+      type: object
+      required: [register, sections, fields]
+      properties:
+        register:
+          type: object
+          required: [register_key, name_en, version]
+          properties:
+            register_key: { type: string }
+            name_en: { type: string }
+            name_ar: { type: [string, 'null'] }
+            version: { type: integer }
+        sections: { type: array, items: { $ref: '#/components/schemas/RegisterSection' } }
+        fields: { type: array, items: { $ref: '#/components/schemas/RegisterColumn' } }
+    RegisterColumnNewList:
+      type: object
+      required: [name_en, values]
+      properties:
+        code: { type: string, description: Optional; generated from the name when absent. }
+        name_en: { type: string }
+        name_ar: { type: [string, 'null'] }
+        values:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [label_en]
+            properties:
+              label_en: { type: string }
+              label_ar: { type: [string, 'null'] }
+    RegisterColumnCreate:
+      type: object
+      required: [code, label_en, field_type, reason]
+      properties:
+        code: { type: string, pattern: '^[a-z][a-z0-9_]{0,40}$' }
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        field_type: { $ref: '#/components/schemas/RegisterColumnType' }
+        required: { type: boolean }
+        section: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        list_catalogue: { type: [string, 'null'] }
+        new_list: { $ref: '#/components/schemas/RegisterColumnNewList' }
+        formula: { $ref: '#/components/schemas/RegisterColumnFormula' }
+        columns: { type: array, description: 'Only for child_list.', items: { type: object } }
+        in_list: { type: boolean }
+        in_filter: { type: boolean }
+        in_template: { type: boolean }
+        in_export: { type: boolean }
+        reason: { $ref: '#/components/schemas/Reason' }
+    RegisterColumnPatch:
+      type: object
+      required: [reason]
+      properties:
+        label_en: { type: string }
+        label_ar: { type: [string, 'null'] }
+        field_type: { $ref: '#/components/schemas/RegisterColumnType' }
+        confirm_conversion: { type: boolean }
+        required: { type: boolean }
+        section: { type: [string, 'null'] }
+        sort_order: { type: integer }
+        list_catalogue: { type: [string, 'null'] }
+        new_list: { $ref: '#/components/schemas/RegisterColumnNewList' }
+        formula: { $ref: '#/components/schemas/RegisterColumnFormula' }
+        is_active: { type: boolean }
+        in_list: { type: boolean }
+        in_filter: { type: boolean }
+        in_template: { type: boolean }
+        in_export: { type: boolean }
+        reason: { $ref: '#/components/schemas/Reason' }
+    RegisterColumnResult:
+      type: object
+      required: [code, version]
+      properties:
+        code: { type: string }
+        version: { type: integer }
+        converted: { type: integer, description: Values rewritten by a type change. }
+        records_missing_value: { type: [integer, 'null'], description: 'When required was turned on: records that lack a value (asked for at their next submit).' }
+    RegisterColumnConversion:
+      type: object
+      properties:
+        convertible: { type: integer }
+        failed: { type: integer }
+        rewritten: { type: integer }
+        failures:
+          type: array
+          items:
+            type: object
+            properties:
+              record_id: { type: string, format: uuid }
+              value: {}
+              message: { type: string }
+    RegisterColumnImpact:
+      type: object
+      required: [code, delete_mode, usage]
+      properties:
+        code: { type: string }
+        is_system: { type: boolean }
+        system_reason: { type: [string, 'null'] }
+        usage: { $ref: '#/components/schemas/RegisterColumnUsage' }
+        delete_mode: { type: string, enum: [hard, deactivate, blocked] }
+        conversion: { oneOf: [{ $ref: '#/components/schemas/RegisterColumnConversion' }, { type: 'null' }] }
+        required_missing: { type: [integer, 'null'] }
     # ---------------------------------------------------------- registers (B11) and Dismantle
     RegisterKey:
       type: string
@@ -16058,6 +17803,7 @@ components:
         label_en: { type: string }
         label_ar: { type: [string, 'null'] }
         type: { type: string, enum: [text, number, date, list, multi_list, yes_no, user, external_party, file, multi_user, multi_site, child_list, warehouse_item] }
+        locked: { type: boolean, description: 'Locked for every record of the register (0.15.22): read-only except for a System Admin. Set by the column lock routes.' }
         required: { type: boolean }
         read_only: { type: boolean, description: 'Field-level rule for the caller.' }
         list: { $ref: '#/components/schemas/ListRef' }
@@ -16143,6 +17889,10 @@ components:
         groups: { type: array, items: { type: string } }
         sort_order: { type: integer }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'] }
+        deactivate_reason: { type: [string, 'null'] }
         version: { type: integer }
     ListCatalogue:
       type: object
@@ -16155,6 +17905,10 @@ components:
         critical: { type: boolean, description: 'Drives a calculation, a rule or a permission: only its own values, and approval waits until it has one.' }
         status: { type: string, enum: [pending, confirmed], description: 'pending = a draft for the owner''s review (Q104).' }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'] }
+        dependent_lists: { type: array, items: { type: string } }
         is_active: { type: boolean }
         version: { type: integer, description: 'ETag (If-Match).' }
         values: { type: array, items: { $ref: '#/components/schemas/ListValue' } }
@@ -16178,6 +17932,9 @@ components:
         description: { type: [string, 'null'] }
         critical: { type: boolean }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'], pattern: '^[A-Z][A-Za-z0-9]{1,40}$' }
         reason: { type: string, minLength: 3 }
     ListCataloguePatch:
       type: object
@@ -16190,6 +17947,9 @@ components:
         critical: { type: boolean }
         status: { type: string, enum: [pending, confirmed] }
         allow_other: { type: boolean }
+        value_type: { type: string, enum: [text, number, date, person, site, vendor] }
+        multi_select: { type: boolean }
+        parent_catalogue: { type: [string, 'null'], pattern: '^[A-Z][A-Za-z0-9]{1,40}$' }
         is_active: { type: boolean }
         reason: { type: string, minLength: 3 }
     ListValueInput:
@@ -16204,6 +17964,9 @@ components:
         groups: { type: array, maxItems: 10, items: { type: string } }
         sort_order: { type: integer, minimum: 0 }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'], maxLength: 80 }
         reason: { type: string, minLength: 3 }
     ListValuePatch:
       type: object
@@ -16216,6 +17979,9 @@ components:
         groups: { type: array, maxItems: 10, items: { type: string } }
         sort_order: { type: integer, minimum: 0 }
         is_active: { type: boolean }
+        colour: { type: [string, 'null'], pattern: '^#[0-9A-Fa-f]{6}$' }
+        is_default: { type: boolean }
+        parent_code: { type: [string, 'null'], maxLength: 80 }
         reason: { type: string, minLength: 3 }
     LegacyConversionProposal:
       type: object
@@ -16322,6 +18088,7 @@ components:
         site_code: { type: [string, 'null'] }
         region_id: { oneOf: [{ $ref: '#/components/schemas/RegionId' }, { type: 'null' }] }
         state: { $ref: '#/components/schemas/RegisterRecordState' }
+        locked: { type: boolean, description: 'Locked (0.15.22): read-only except for a System Admin until unlocked. A lock does not change the version.' }
         current_level: { type: integer }
         levels_required: { type: integer }
         ball_in_court: { $ref: '#/components/schemas/BallInCourt' }
@@ -16626,6 +18393,84 @@ components:
         version: { type: integer, minimum: 0 }
         updated_at: { type: [string, 'null'], format: date-time }
         updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+    DashboardTabLayout:
+      type: object
+      required: [order, hidden]
+      additionalProperties: false
+      properties:
+        order: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes in display order.' }
+        hidden: { type: array, maxItems: 60, items: { type: string, minLength: 1, maxLength: 60 }, description: 'Card codes this tab does not show.' }
+    DashboardSettingsInput:
+      type: object
+      required: [targets, thresholds, tabs]
+      additionalProperties: false
+      properties:
+        targets:
+          type: object
+          required: [sites_per_batch, monthly_on_air]
+          additionalProperties: false
+          properties:
+            sites_per_batch: { type: [integer, 'null'], minimum: 0, maximum: 100000, description: 'Target sites per batch; null = no target.' }
+            monthly_on_air: { type: [integer, 'null'], minimum: 0, maximum: 100000, description: 'Monthly On-Air target in sites; null = no target.' }
+        thresholds:
+          type: object
+          description: 'One entry per KPI code of the catalogue (every KPI is required). green and amber are in the unit of the KPI; for a higher-is-better KPI green >= amber, for a lower-is-better KPI green <= amber.'
+          additionalProperties:
+            type: object
+            required: [green, amber]
+            additionalProperties: false
+            properties:
+              green: { type: number }
+              amber: { type: number }
+        tabs:
+          type: object
+          required: [pmo, cw, te]
+          additionalProperties: false
+          properties:
+            pmo: { $ref: '#/components/schemas/DashboardTabLayout' }
+            cw: { $ref: '#/components/schemas/DashboardTabLayout' }
+            te: { $ref: '#/components/schemas/DashboardTabLayout' }
+        stale_idle_days:
+          type: integer
+          minimum: 1
+          maximum: 30
+          description: '0.15.29 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value.'
+    DashboardSettings:
+      description: '0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order.'
+      allOf:
+      - $ref: '#/components/schemas/DashboardSettingsInput'
+      - type: object
+        required: [version, catalogue, stale_idle_days]
+        properties:
+          version: { type: integer, minimum: 0 }
+          updated_at: { type: [string, 'null'], format: date-time }
+          updated_by: { anyOf: [{ $ref: '#/components/schemas/UserRef' }, { type: 'null' }] }
+          catalogue:
+            type: object
+            required: [kpis, cards]
+            properties:
+              kpis:
+                type: array
+                items:
+                  type: object
+                  required: [code, label_en, label_ar, unit, direction, default_green, default_amber]
+                  properties:
+                    code: { type: string }
+                    label_en: { type: string }
+                    label_ar: { type: string }
+                    unit: { type: string, enum: [pct, days, count] }
+                    direction: { type: string, enum: [higher, lower] }
+                    default_green: { type: number }
+                    default_amber: { type: number }
+              cards:
+                type: array
+                items:
+                  type: object
+                  required: [code, label_en, label_ar]
+                  properties:
+                    code: { type: string }
+                    label_en: { type: string }
+                    label_ar: { type: string }
     GecolOrderWarningsInput:
       type: object
       required: [enabled, chains, billing_after]
@@ -18264,6 +20109,43 @@ components:
       type: string
       enum: [entry, review, approve]
       description: 'The level a task sits at.'
+    StatusTransition:
+      type: object
+      required: [from_state, to_state, at, level, admin_override]
+      properties:
+        from_state: {type: [string, 'null']}
+        to_state: {type: string}
+        at: {type: string, format: date-time}
+        actor: {oneOf: [{$ref: '#/components/schemas/UserRef'}, {type: 'null'}]}
+        level: {type: string, enum: [L1, L2]}
+        admin_override: {type: boolean}
+    RecordTimeInState:
+      type: object
+      required: [record_id, register_key, current_state, since, working_days_in_state, transitions]
+      properties:
+        record_id: {type: string, format: uuid}
+        register_key: {type: string}
+        current_state: {type: string}
+        since: {type: [string, 'null'], format: date-time, description: 'At the last recorded transition into the current state.'}
+        working_days_in_state: {type: [integer, 'null']}
+        transitions: {type: array, items: {$ref: '#/components/schemas/StatusTransition'}}
+    StateDurationsReport:
+      type: object
+      required: [entity_type, items]
+      properties:
+        entity_type: {type: string, enum: [task, register_record]}
+        items:
+          type: array
+          items:
+            type: object
+            required: [region_id, group_key, state, count, median_working_days, p85_working_days]
+            properties:
+              region_id: {type: [integer, 'null']}
+              group_key: {type: [string, 'null'], description: 'The stage code of a task, the register key of a record.'}
+              state: {type: string}
+              count: {type: integer}
+              median_working_days: {type: number}
+              p85_working_days: {type: number}
     TaskTimeInState:
       type: object
       required: [task_id, current_state, items, segments]
@@ -19291,6 +21173,185 @@ components:
         progress_pct: {type: number}
         health_score: {type: [number, 'null']}
         by_milestone: {type: object, additionalProperties: {type: integer}, description: 'Sites that reached each milestone, by code.'}
+    DashboardExtras:
+      type: object
+      description: '0.15.18: the F13 sections of the dashboard (owner decisions 2026-11-15).'
+      required: [as_of, scope_regions, risk_matrix, data_quality, swap_relocation, decisions, counters]
+      properties:
+        as_of: {type: string, format: date-time}
+        scope_regions:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/RegionId'}
+          description: The regions the figures cover (null = every region).
+        risk_matrix: {$ref: '#/components/schemas/DashboardRiskMatrix'}
+        data_quality: {$ref: '#/components/schemas/DashboardDataQuality'}
+        swap_relocation: {$ref: '#/components/schemas/DashboardSwapRelocation'}
+        decisions: {$ref: '#/components/schemas/DashboardDecisions'}
+        counters: {$ref: '#/components/schemas/DashboardCounters'}
+    DashboardCounters:
+      type: object
+      description: '0.15.24: the counters of the dashboard (F20). Each KPI is coloured by the saved thresholds (dashboard settings).'
+      required: [available, kpis, pending_kpis, sla_totals, sla_by_stage, sites_total, site360_menus]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the sites; the other fields are then null.}
+        kpis:
+          type: [array, 'null']
+          description: Every KPI of the dashboard catalogue, in catalogue order. A KPI with no source yet has a null value and is listed in pending_kpis.
+          items: {$ref: '#/components/schemas/DashboardKpi'}
+        pending_kpis:
+          type: [array, 'null']
+          items: {type: string}
+        sla_totals:
+          type: [object, 'null']
+          required: [open_tasks, breach, at_risk]
+          properties:
+            open_tasks: {type: integer}
+            breach: {type: integer, description: Open tasks past the SLA maximum (colour red).}
+            at_risk: {type: integer, description: Open tasks past the warning share (colour amber).}
+        sla_by_stage:
+          type: [array, 'null']
+          description: The open tasks of the caller's sites by stage, in stage order.
+          items: {$ref: '#/components/schemas/DashboardSlaStage'}
+        sites_total: {type: [integer, 'null'], description: Active sites in scope (cancelled sites left out).}
+        site360_menus:
+          type: [array, 'null']
+          description: '0.15.29: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view.'
+          items:
+            type: object
+            required: [code, name_en, name_ar, sites]
+            properties:
+              code: {type: string}
+              name_en: {type: string}
+              name_ar: {type: [string, 'null']}
+              sites: {type: integer}
+    DashboardKpi:
+      type: object
+      required: [code, unit, direction, value, green, amber, colour]
+      properties:
+        code: {type: string}
+        unit: {type: string, enum: [pct, days, count]}
+        direction: {type: string, enum: [higher, lower]}
+        value: {type: [number, 'null']}
+        green: {type: number}
+        amber: {type: number}
+        colour: {type: string, enum: [green, amber, red, none], description: none when the value is null.}
+    DashboardSlaStage:
+      type: object
+      required: [stage_code, stage_name, stage_name_ar, open_tasks, breach, at_risk, breach_pct, at_risk_pct]
+      properties:
+        stage_code: {type: string}
+        stage_name: {type: string}
+        stage_name_ar: {type: string}
+        open_tasks: {type: integer}
+        breach: {type: integer}
+        at_risk: {type: integer}
+        breach_pct: {type: [number, 'null']}
+        at_risk_pct: {type: [number, 'null']}
+    DashboardRiskMatrix:
+      type: object
+      required: [available, open_total, cells, bands, top_open_risks]
+      properties:
+        available: {type: boolean, description: False when the caller may not see the risk register; the other fields are then null.}
+        open_total: {type: [integer, 'null']}
+        invalid_total: {type: [integer, 'null'], description: Open risks whose probability or impact is outside 1 to 5 (left out of the cells).}
+        cells:
+          type: [array, 'null']
+          description: The 25 cells, probability 1 to 5 by impact 1 to 5.
+          items: {$ref: '#/components/schemas/DashboardRiskCell'}
+        bands:
+          type: [array, 'null']
+          items: {$ref: '#/components/schemas/DashboardRiskBand'}
+        top_open_risks:
+          type: [array, 'null']
+          maxItems: 10
+          description: The open risks of the highest score first (ties by code).
+          items: {$ref: '#/components/schemas/DashboardRiskItem'}
+    DashboardRiskCell:
+      type: object
+      required: [probability, impact, score, band, count]
+      properties:
+        probability: {type: integer, minimum: 1, maximum: 5}
+        impact: {type: integer, minimum: 1, maximum: 5}
+        score: {type: integer}
+        band: {type: string, enum: [low, medium, high, critical]}
+        count: {type: integer}
+    DashboardRiskBand:
+      type: object
+      required: [band, min, max, count]
+      properties:
+        band: {type: string, enum: [low, medium, high, critical]}
+        min: {type: integer}
+        max: {type: integer}
+        count: {type: integer}
+    DashboardRiskItem:
+      type: object
+      required: [risk_code, statement, probability, impact, score, band, status, is_global]
+      properties:
+        risk_code: {type: string}
+        statement: {type: string}
+        probability: {type: integer}
+        impact: {type: integer}
+        score: {type: integer}
+        band: {type: string, enum: [low, medium, high, critical]}
+        status: {type: string, enum: [open, in_progress]}
+        risk_owner: {type: [string, 'null']}
+        region_id: {type: [integer, 'null']}
+        is_global: {type: boolean}
+    DashboardDataQuality:
+      type: object
+      required: [available, sites_checked, sites_with_gaps, gaps_total, by_kind]
+      properties:
+        available: {type: boolean}
+        sites_checked: {type: [integer, 'null']}
+        sites_with_gaps: {type: [integer, 'null']}
+        gaps_total: {type: [integer, 'null']}
+        by_kind:
+          type: [array, 'null']
+          items:
+            type: object
+            required: [kind, field, count]
+            properties:
+              kind: {type: string, enum: [missing_actual_date, missing_field]}
+              field: {type: [string, 'null']}
+              count: {type: integer}
+    DashboardSwapRelocation:
+      type: object
+      required: [available, rows, unscenarioed]
+      properties:
+        available: {type: boolean}
+        unscenarioed: {type: [integer, 'null'], description: Active sites with no delivery scenario yet.}
+        rows:
+          type: [array, 'null']
+          description: One row per delivery scenario, in the order of the list (new build, expansion, hot swap, cold swap, relocation).
+          items:
+            type: object
+            required: [scenario, sites_total, by_overall_status]
+            properties:
+              scenario: {$ref: '#/components/schemas/DeliveryScenario'}
+              sites_total: {type: integer}
+              by_overall_status:
+                type: object
+                additionalProperties: {type: integer}
+                description: Keys not_started, in_progress, on_hold, completed and cancelled.
+    DashboardDecisions:
+      type: object
+      required: [available, items]
+      properties:
+        available: {type: boolean}
+        items:
+          type: [array, 'null']
+          maxItems: 10
+          items:
+            type: object
+            required: [tag, risk_code, statement, score, band, risk_owner, region_id]
+            properties:
+              tag: {type: string, enum: [act_now, watch]}
+              risk_code: {type: string}
+              statement: {type: string}
+              score: {type: integer}
+              band: {type: string, enum: [low, medium, high, critical]}
+              risk_owner: {type: [string, 'null']}
+              region_id: {type: [integer, 'null']}
     SiteMapItem:
       type: object
       description: '0.14.5: one site of the dashboard map (OV-12).'

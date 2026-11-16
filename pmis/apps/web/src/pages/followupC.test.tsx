@@ -139,7 +139,7 @@ describe('Q260: the Severity list is the snag severities; Q291: external attende
   it('Settings, lists: the Severity list says it follows the snag severities and offers no add or edit; another list does', async () => {
     await signIn('pm');
     const u = userEvent.setup();
-    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/lists' });
+    renderApp(<Routes><Route path="/admin/settings/*" element={<SettingsRoutes />} /></Routes>, { route: '/admin/settings/ddl' });
     await u.click(await screen.findByTestId('lists-row-Severity'));
     expect(await screen.findByTestId('lists-mirrored')).toHaveTextContent('follows the snag severities');
     expect(screen.queryByTestId('lists-add-value')).toBeNull();

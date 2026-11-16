@@ -11,7 +11,18 @@ import { boolParam, oneParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
 
+const condition = z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional(), offset_wd: z.number().int().min(-365).max(365).optional() }).strict();
 const reason = z.string().trim().min(3).max(1000);
+const closingBody = z.object({ closing: z.boolean(), reason }).strict();
+const slaRuleBody = z.object({
+  min_working_days: z.number().int().min(0).max(365), max_working_days: z.number().int().min(0).max(365), start_event: z.string().trim().min(1).max(60),
+  unit: z.enum(['working', 'calendar']).default('working'), calendar_code: z.string().trim().min(1).max(60).default('default'),
+  warning_pct: z.number().int().min(0).max(100).nullable().optional(), breach_owner_role: z.string().trim().max(60).nullable().optional(),
+  escalation_role: z.string().trim().max(60).nullable().optional(), pause_on_client_wait: z.boolean().default(false), reason,
+}).strict();
+const weightBody = z.object({
+  counts_in_weight: z.boolean(), weight_value: z.number().min(0).max(100).optional(), weight_group: z.string().trim().max(20).nullable().optional(), reason,
+}).strict();
 const confirmImpact = z.string().max(200).optional();
 const code = z.string().trim().min(1).max(40);
 const nameEn = z.string().trim().min(1).max(200);
@@ -24,7 +35,7 @@ const milestoneBody = z.object({
   custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
 const gateBody = z.object({
-  name_en: nameEn.optional(), name_ar: nameAr.optional(), conditions: z.array(z.object({ type: z.string(), ref: z.string().optional(), accept_na: z.boolean().optional() }).strict()).max(30).optional(),
+  name_en: nameEn.optional(), name_ar: nameAr.optional(), conditions: z.array(condition).max(30).optional(),
   sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
   custom: z.record(z.unknown()).optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
@@ -37,13 +48,38 @@ const taskPatchBody = z.object({
   name_en: z.string().trim().max(400).optional(), name_ar: z.string().trim().max(400).nullable().optional(), counts_toward_milestone: z.boolean().optional(),
   is_active: z.boolean().optional(), stage_code: code.optional(), reason, confirm_master_impact: confirmImpact,
 }).strict().refine((b) => Object.keys(b).some((k) => !['reason', 'confirm_master_impact'].includes(k)), { message: 'send at least one field to change', path: ['name_en'] });
-const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
-const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
+const insertFields = {
+  stage_code: code, code: z.string().trim().max(40), name_en: z.string().trim().max(400), name_ar: z.string().trim().max(400).nullable().optional(),
+  counts_toward_milestone: z.boolean().optional(), has_documents: z.boolean().optional(), after_task_code: code.nullable().optional(),
+  predecessors: z.array(code).max(100).optional(), successors: z.array(code).max(100).optional(), remove_direct_links: z.boolean().optional(),
+};
+const insertPreviewBody = z.object({
+  stage_code: code, predecessors: z.array(code).max(100).optional(), successors: z.array(code).max(100).optional(), remove_direct_links: z.boolean().optional(),
+  counts_toward_milestone: z.boolean().optional(),
+}).strict();
+const taskInsertBody = z.object({ ...insertFields, add_to_open_sites: z.boolean().optional(), reason, confirm_master_impact: confirmImpact }).strict();
+const successorsBody = z.object({ successors: z.array(code).max(100), reason }).strict();
 const selection = z.object({
   site_ids: z.array(uuidSchema).max(1000).optional(),
   filter: z.object({ region_id: z.array(z.number().int()).optional(), from_version: z.number().int().optional(), overall_status: z.array(z.string()).optional() }).strict().optional(),
 }).strict();
 
+const structureBody = z.object({
+  milestones: z.array(z.object({ code, name_en: nameEn.optional(), name_ar: nameAr.optional(), is_active: z.boolean().optional(), counts_in_project_status: z.boolean().optional() }).strict()).max(60),
+  gates: z.array(z.object({
+    code, name_en: nameEn.optional(), name_ar: nameAr.optional(), from_milestone: code.optional(), to_milestone: code.optional(), is_active: z.boolean().optional(),
+    conditions: z.array(condition).max(30).optional(),
+    sla_min_wd: z.number().int().min(0).optional(), sla_max_wd: z.number().int().min(0).optional(),
+  }).strict()).max(80),
+  task_moves: z.array(z.object({ task_code: code, stage_code: code }).strict()).max(500).optional(),
+  reason, confirm_master_impact: confirmImpact,
+}).strict();
+const migrateBody = z.object({ preview_hash: z.string().min(8).max(100), selection, reason, confirm_master_impact: confirmImpact }).strict();
+const revertBody = z.object({ reason }).strict();
+const removeBody = z.object({ kind: z.enum(['task', 'milestone', 'gate']), code, reason }).strict();
+const discardBody = z.object({ reason }).strict();
+const predecessorsBody = z.object({ predecessors: z.array(code).max(100), reason }).strict();
+const orderBody = z.object({ task_codes: z.array(code).max(500), reason }).strict();
 type Json = Record<string, unknown>;
 
 /**
@@ -101,6 +137,19 @@ export class WorkflowEditorService {
       ${b.confirm_master_impact ?? null}::text) AS r`);
   }
 
+  /** Owner rule 2026-11-13: an item no site data refers to is deleted for real (draft only); a referenced one is deactivated and the answer says why. */
+  async removeItem(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(removeBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_item_remove(${version}::int, ${etag}::int, ${b.kind}::text, ${b.code}::text, ${b.reason}::text) AS r`);
+  }
+
+  async discardDraft(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(discardBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_discard_draft(${version}::int, ${etag}::int, ${b.reason}::text) AS r`);
+  }
+
   async updateTask(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(taskPatchBody, raw);
     const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
@@ -108,10 +157,65 @@ export class WorkflowEditorService {
     return this.one(Prisma.sql`SELECT admin_wf_task_update(${version}::int, ${etag}::int, ${task}::text, ${JSON.stringify(patch)}::jsonb, ${why}::text, ${confirm ?? null}::text) AS r`);
   }
 
+  /** Migration 0096: the task that closes its milestone (one per milestone) is chosen in a draft; the structural freeze stops it. */
+  async setClosing(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(closingBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_closing(${version}::int, ${etag}::int, ${task}::text, ${b.closing}::boolean, ${b.reason}::text) AS r`);
+  }
+
   async setPredecessors(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(predecessorsBody, raw);
     const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
     return this.one(Prisma.sql`SELECT admin_wf_task_predecessors(${version}::int, ${etag}::int, ${task}::text, ${b.predecessors}::text[], ${b.reason}::text) AS r`);
+  }
+
+  /** Phase 2 (migration 0094): the preview of the affected chain of an insert; nothing is written. */
+  async previewInsert(version: number, raw: unknown): Promise<Json> {
+    const b = parse(insertPreviewBody, raw);
+    await this.access.requireAdmin('task_definitions', 'create');
+    return this.one(Prisma.sql`SELECT admin_wf_task_insert_preview(${version}::int, ${b.stage_code}::text, ${b.predecessors ?? []}::text[], ${b.successors ?? []}::text[],
+      ${b.remove_direct_links ?? false}::boolean, ${b.counts_toward_milestone ?? true}::boolean) AS r`);
+  }
+
+  /** A new task between existing tasks, with the cascade rewiring and (optionally) the open sites, in one transaction. */
+  async insertTask(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(taskInsertBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'create', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_insert(${version}::int, ${etag}::int, ${b.stage_code}::text, ${b.code}::text, ${b.name_en}::text, ${b.name_ar ?? null}::text,
+      ${b.counts_toward_milestone ?? null}::boolean, ${b.has_documents ?? null}::boolean, ${b.after_task_code ?? null}::text, ${b.predecessors ?? []}::text[], ${b.successors ?? []}::text[],
+      ${b.remove_direct_links ?? false}::boolean, ${b.add_to_open_sites ?? false}::boolean, ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
+  }
+
+  async setSuccessors(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(successorsBody, raw);
+    const etag = await this.gate(auth, 'task_definitions', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_successors(${version}::int, ${etag}::int, ${task}::text, ${b.successors}::text[], ${b.reason}::text) AS r`);
+  }
+
+  /** The structural edit of a draft: the complete list of milestones and gates (the order is the list order), and tasks moved between milestones. */
+  async replaceStructure(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(structureBody, raw);
+    const etag = await this.gate(auth, 'workflow_versions', 'edit', ifMatch);
+    const { reason: why, confirm_master_impact: confirm, ...structure } = b;
+    return this.one(Prisma.sql`SELECT admin_wf_structure_replace(${version}::int, ${etag}::int, ${JSON.stringify(structure)}::jsonb, ${why}::text, ${confirm ?? null}::text) AS r`);
+  }
+
+  /** The move of the previewed sites: the hash of the preview must still match (422 stale_preview otherwise). One transaction. */
+  async migrate(auth: AuthContext, version: number, raw: unknown): Promise<Json> {
+    const b = parse(migrateBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_migrate_sites(admin_wf_migration_sites(${JSON.stringify(b.selection)}::jsonb, ${version}::int), ${version}::int, ${b.preview_hash}::text,
+      ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
+  }
+
+  async revertMigration(auth: AuthContext, id: string, raw: unknown): Promise<Json> {
+    if (!uuidSchema.safeParse(id).success) throw problems.notFound('The migration does not exist.');
+    const b = parse(revertBody, raw);
+    await this.access.requireAdmin('workflow_versions', 'administer');
+    await this.stepUp.require(auth);
+    return this.one(Prisma.sql`SELECT admin_wf_revert_migration(${id}::uuid, ${b.reason}::text) AS r`);
   }
 
   async reorder(auth: AuthContext, version: number, stage: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
@@ -138,6 +242,41 @@ export class WorkflowEditorService {
   }
 
   /** Typed confirmation (CLAUDE.md): `v<version>`. Checked before the step-up so a typo costs no password prompt. */
+  /** Migration 0110: the weight and the base SLA rule of every task of a version (the editor's detail panel reads it, drafts included). */
+  async slaWeightItems(version: number): Promise<Json> {
+    return this.one(Prisma.sql`SELECT jsonb_build_object('items', wf_sla_weight_items(${version}::int)) AS r`);
+  }
+
+  /** Migration 0109: the weight totals of a version (per group, over the active tasks that count). */
+  async weightTotals(version: number): Promise<Json> {
+    const r = await this.one(Prisma.sql`SELECT jsonb_build_object('items', wf_weight_totals(w.id)) AS r FROM workflow_definitions w WHERE w.version = ${version}::int`);
+    if (Object.keys(r).length === 0) throw problems.notFound('The workflow version does not exist.');
+    return r;
+  }
+
+  /** Migration 0109: the base SLA rule of a task, saved as a new effective-dated version (the open one ends the day before). Draft or published version. */
+  async saveSlaRule(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(slaRuleBody, raw);
+    const etag = await this.gate(auth, 'sla_rules', 'edit', ifMatch);
+    const { reason: why, ...payload } = b;
+    return this.one(Prisma.sql`SELECT admin_sla_rule_save(${version}::int, ${etag}::int, ${task}::text, ${JSON.stringify(payload)}::jsonb, ${why}::text) AS r`);
+  }
+
+  /** Migration 0109: an unused rule is deleted; a used one is deactivated and the answer says why. */
+  async removeSlaRule(auth: AuthContext, version: number, task: string, rule: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(discardBody, raw);
+    const etag = await this.gate(auth, 'sla_rules', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_sla_rule_remove(${version}::int, ${etag}::int, ${task}::text, ${rule}::uuid, ${b.reason}::text) AS r`);
+  }
+
+  /** Migration 0109: counts in project weight, the percent and the weight group of a task (draft only; the draft shows the totals, publishing blocks them). */
+  async setWeight(auth: AuthContext, version: number, task: string, ifMatch: string | undefined, raw: unknown): Promise<Json> {
+    const b = parse(weightBody, raw);
+    const etag = await this.gate(auth, 'weights', 'edit', ifMatch);
+    return this.one(Prisma.sql`SELECT admin_wf_task_weight(${version}::int, ${etag}::int, ${task}::text, ${b.counts_in_weight}::boolean, ${b.weight_value ?? 0}::numeric,
+      ${b.weight_group ?? null}::text, ${b.reason}::text) AS r`);
+  }
+
   async publish(auth: AuthContext, version: number, ifMatch: string | undefined, raw: unknown): Promise<Json> {
     const b = parse(publishBody, raw);
     await this.access.requireAdmin('workflow_versions', 'administer');
@@ -145,6 +284,12 @@ export class WorkflowEditorService {
       throw new ProblemException(422, 'confirmation_mismatch', { detail: `Type v${version} to confirm.`, errors: [{ path: '/confirm_text', code: 'confirmation_mismatch' }] });
     }
     const etag = await this.gate(auth, 'workflow_versions', 'administer', ifMatch);
+    // Migration 0109 (owner 2026-11-15): a weight group must total 100 before the version is published.
+    const totals = await this.weightTotals(version);
+    const open = ((totals.items as { group: string; total: string; ok: boolean }[] | undefined) ?? []).filter((g) => !g.ok);
+    if (open.length > 0) {
+      throw new ProblemException(409, 'invalid_transition', { detail: 'Every weight group must total 100 before publishing.', errors: open.map((g) => ({ path: `/weight_groups/${g.group}`, code: 'not_100', message: `${g.group} totals ${g.total}.` })) });
+    }
     return this.one(Prisma.sql`SELECT admin_wf_publish(${version}::int, ${etag}::int, ${b.reason}::text, ${b.confirm_master_impact ?? null}::text) AS r`);
   }
 

@@ -125,20 +125,20 @@ describe('accepting', () => {
   it('shows the entered data, creates the user with the assignments, works once only', async () => {
     const email = fresh();
     const roleId = await role();
-    const created = await invite(admin, email, { employee_id: '7345', assignments: [row(roleId)], require_two_factor: true });
+    const created = await invite(admin, email, { employee_id: '9345', assignments: [row(roleId)], require_two_factor: true });
     expect(created.status).toBe(201);
     const token = tokenOf(email);
     const p = pub();
     const peek = await p.call('get', `/invitations/${token}`);
     expect(peek.status).toBe(200);
-    expect(peek.body).toMatchObject({ display_name: 'Invited Person', email, employee_id: '7345' });
+    expect(peek.body).toMatchObject({ display_name: 'Invited Person', email, employee_id: '9345' });
     expect(peek.body.assignments).toBeUndefined();
     expect(peek.headers['cache-control']).toBe('no-store');
 
     const weak = await p.call('post', `/invitations/${token}/accept`, { password: 'short' });
     expect(weak.status).toBe(422);
     expect(weak.body.code).toBe('weak_password');
-    const withId = await p.call('post', `/invitations/${token}/accept`, { password: 'Harbor-Lantern-7345-xx' });
+    const withId = await p.call('post', `/invitations/${token}/accept`, { password: 'Harbor-Lantern-9345-xx' });
     expect(withId.status).toBe(422);
 
     const ok = await p.call('post', `/invitations/${token}/accept`, { password: STRONG });
@@ -147,7 +147,7 @@ describe('accepting', () => {
 
     const u = (await db.query('SELECT id, status, employee_id FROM users WHERE email = $1', [email])).rows[0];
     expect(u.status).toBe('active');
-    expect(u.employee_id).toBe('7345');
+    expect(u.employee_id).toBe('9345');
     const a = (await db.query('SELECT permission_level, team, all_regions, all_modules, is_primary FROM user_role_assignments WHERE user_id = $1', [u.id])).rows;
     expect(a).toEqual([{ permission_level: 'entry', team: 'cw', all_regions: false, all_modules: true, is_primary: true }]);
     const regions = (await db.query('SELECT region_id FROM user_role_assignment_regions r JOIN user_role_assignments a ON a.id = r.assignment_id WHERE a.user_id = $1 ORDER BY 1', [u.id])).rows;

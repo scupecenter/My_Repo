@@ -8,6 +8,7 @@ import { ICONS, ICON_PROPS } from '@/lib/icons';
 import { loadPref, savePref } from '@/lib/localPref';
 import { headingIcon, headingName, keysOf, resolveLayout, type NavHead, type NavSub } from '@/lib/navLayout';
 import { DEFAULT_STREAMS, DEFAULT_VIEWS, streamName, viewName, withDismantle } from '@/lib/streams';
+import { SITE360_NAV } from '@/lib/site360Menus';
 import { NavLayoutEditor } from './NavLayoutEditor';
 import { SITE_OM_VIEW, SITE_STREAM_SUBMENUS, type NavItem } from './navItems';
 
@@ -21,10 +22,10 @@ const RECENT_MAX = 5;
 const loadList = (key: string): string[] => { const v = loadPref<unknown>(key, []); return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []; };
 
 /** What the Site Register URL selects: a stream (`?stream=`), a work view (`?view=`) or everything. */
-export function siteSelection(pathname: string, search: string): { stream: string; view: string } {
-  if (!pathname.startsWith('/sites')) return { stream: '', view: '' };
+export function siteSelection(pathname: string, search: string): { stream: string; view: string; section: string } {
+  if (!pathname.startsWith('/sites')) return { stream: '', view: '', section: '' };
   const p = new URLSearchParams(search);
-  return { stream: p.get('stream') ?? '', view: p.get('view') ?? '' };
+  return { stream: p.get('stream') ?? '', view: p.get('view') ?? '', section: p.get('section') ?? '' };
 }
 
 /** Sub-menus of the Site Register (owner request 2026-11-05): four streams, Dismantle (its own register), O&M (the OM view). */
@@ -42,11 +43,16 @@ function SiteSubmenus({ onNavigate, dismantle }: { onNavigate?: () => void; dism
       className={`block rounded-md px-2 py-1.5 text-sm ${on ? 'bg-sideOn font-semibold text-accentText' : 'text-mute hover:bg-hover'}`}>{text}</Link>
   );
   return (
+    <>
+    <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('site360.menus')} data-testid="nav-site360-menus">
+      {SITE360_NAV.map((m) => item(`nav-site360-${m.key}`, `/sites?section=${m.key}`, sel.section === m.key, i18n.language === 'ar' ? m.ar : m.en))}
+    </div>
     <div className="ms-6 border-s border-line ps-1" role="group" aria-label={t('nav.site_submenus')} data-testid="nav-sites-views">
       {streams.map((st) => item(`nav-sites-stream-${st.code}`, `/sites?stream=${st.code}`, sel.stream === st.code && !sel.view, streamName(t, i18n.language, st)))}
       {dismantle && item('nav-dismantle', dismantle.to, loc.pathname.startsWith(dismantle.to), t('nav.dismantle'))}
       {item(`nav-sites-view-${om.code}`, `/sites?view=${om.code}`, sel.view === om.code && !sel.stream, viewName(i18n.language, om))}
     </div>
+    </>
   );
 }
 

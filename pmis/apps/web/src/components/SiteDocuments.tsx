@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ApiError } from '@/api/client';
 import { downloadDocument, useDocuments, zipDownload, type DocFilters, type DocumentListItem } from '@/api/documents';
 import type { PipelineNode } from '@/api/types';
+import { DocumentsGrid } from './DocumentsGrid';
 import { useToast } from './Toast';
 
 const TONE: Record<string, string> = { approved: 'bg-doneBg text-doneInk', uploaded: 'bg-openBg text-openInk', in_review: 'bg-waitBg text-waitInk', rejected: 'bg-lateBg text-lateInk', missing: 'bg-lockBg text-lockInk', not_required: 'bg-lockBg text-lockInk' };
@@ -20,6 +21,7 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
   const [f, setF] = useState({ stage_code: '', doc_code: '', kind: '', slot_status: '', q: '', history: false, all: false });
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [view, setView] = useState<'list' | 'grid'>('list');
   const filters: DocFilters = {
     ...(f.all ? {} : { site_id: siteId }), ...(f.stage_code ? { stage_code: f.stage_code } : {}), ...(f.doc_code ? { doc_code: f.doc_code.trim() } : {}),
     ...(f.kind ? { kind: f.kind } : {}), ...(f.slot_status ? { slot_status: f.slot_status } : {}), ...(f.q.trim() ? { q: f.q.trim() } : {}), include_superseded: f.history,
@@ -37,8 +39,16 @@ export function SiteDocuments({ siteId, stages }: { siteId: string; stages: Pipe
   const name = (r: DocumentListItem) => (i18n.language === 'ar' && r.doc_name_ar) || r.doc_name_en;
   const stageOptions = stages.filter((n) => n.kind === 'milestone');
   const toggle = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const viewToggle = (
+    <div className="mb-2 flex gap-1" role="group" aria-label={t('docsGrid.title')}>
+      <button type="button" className={`btn ${view === 'list' ? 'btn-accent' : ''}`} data-testid="docs-view-list" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('docsGrid.toggle_list')}</button>
+      <button type="button" className={`btn ${view === 'grid' ? 'btn-accent' : ''}`} data-testid="docs-view-grid" aria-pressed={view === 'grid'} onClick={() => setView('grid')}>{t('docsGrid.toggle_grid')}</button>
+    </div>
+  );
+  if (view === 'grid') return <>{viewToggle}<DocumentsGrid /></>;
   return (
     <section data-testid="site-documents" aria-label={t('docs.tab')}>
+      {viewToggle}
       <div className="mb-3 flex flex-wrap items-end gap-2" data-testid="docs-filters">
         <label className="text-sm">{t('docs.f_stage')}
           <select className="input mt-1" data-testid="docs-filter-stage" value={f.stage_code} onChange={(e) => set('stage_code', e.target.value)}>
