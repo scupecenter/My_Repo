@@ -47,3 +47,32 @@ const dpath = (key: string) => `/me/drafts/${key}`;
 export const getDraft = (key: string) => api.get<Draft>(dpath(key)).catch((e: unknown) => { if (e instanceof ApiError && e.status === 404) return null; throw e; });
 export const saveDraft = (key: string, payload: Record<string, unknown>, base: number | null) => api.put<Draft>(dpath(key), { body: { payload, base_version: base } });
 export const discardDraft = (key: string) => api.del<void>(dpath(key));
+
+// ---------------------------------------------------------------------------------------------------------------- filter builder (F3, 0.15.31)
+export type FilterTree = S['FilterTree'];
+export type FilterSubGroup = S['FilterSubGroup'];
+export type FilterCondition = S['FilterCondition'];
+export type FilterValue = S['FilterValue'];
+export type FilterOperator = S['FilterOperator'];
+export type FilterField = S['FilterField'];
+export type FilterFieldList = S['FilterFieldList'];
+
+/** The screens whose lists accept the `filter` parameter (the others keep their simple filters). */
+export const hasFilterBuilder = (screen: string) => screen === 'sites' || screen === 'sites-stream' || screen === 'site-tasks' || /^register-[a-z0-9_]{2,60}$/.test(screen);
+
+/** The whitelist of the screen for the caller (the server leaves hidden fields out). */
+export const useFilterFields = (screen: string, enabled = true) =>
+  useQuery({ queryKey: ['filter-fields', screen], enabled: enabled && hasFilterBuilder(screen), staleTime: 300_000,
+    queryFn: () => api.get<FilterFieldList>('/saved-views/filter-fields', { query: { screen_key: screen } }) });
+
+/** A tree for the URL and the `filter` parameter; an empty tree is no filter. */
+export const encodeFilter = (t: FilterTree | null | undefined): string => (t && t.items.length ? JSON.stringify(t) : '');
+export function decodeFilter(s: string | null | undefined): FilterTree | null {
+  if (!s) return null;
+  try {
+    const v = JSON.parse(s) as FilterTree;
+    return v && (v.op === 'and' || v.op === 'or') && Array.isArray(v.items) ? v : null;
+  } catch {
+    return null;
+  }
+}

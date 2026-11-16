@@ -29,6 +29,7 @@ import { FollowController } from './follow/follow.controller';
 import { FollowService } from './follow/follow.service';
 import { SavedViewsController } from './views/saved-views.controller';
 import { SavedViewsService } from './views/saved-views.service';
+import { FilterCatalogService } from './views/filter-catalog.service';
 import { InsightsController } from './insights/insights.controller';
 import { InsightsService } from './insights/insights.service';
 import { NotificationsController } from './notifications/notifications.controller';
@@ -182,7 +183,7 @@ export function appModuleFor(config: AppConfig) {
       { provide: MailPort, useClass: OutboxMail },
       MasterImportService, MappingService,
       ContractorsService,
-      SavedViewsService,
+      SavedViewsService, FilterCatalogService,
       SearchService, // 0.15.17 (F4)
       { provide: APP_GUARD, useClass: SessionGuard },
       { provide: APP_INTERCEPTOR, useClass: TxInterceptor },

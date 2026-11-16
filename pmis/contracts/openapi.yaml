@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: GSDN Workspace API
-  version: 0.15.30
+  version: 0.15.31
   summary: Contract for the web app mock phase (v0.2). P1 (sign-in, users and roles, visibility, sites, tasks, approval engine, matrix, workflow versions, audit log, settings read) plus staff registry, absences and reassignment, calendar, freeze, DLP, registers, Document Library, templates and imports, generated forms, warehouse, QC snags, custom fields, notifications, System Log and dashboard KPIs.
   description: |
     Owner: tech-lead. This file is the single source of truth for the HTTP API (CLAUDE.md "Contract first").
@@ -30,6 +30,7 @@ info:
     - **Audit**: every state change and every file download or export writes an audit row (ADR 0006). This is not repeated per operation.
 
     ## Versions
+    - 0.15.31 (2026-11-16): AND/OR filter builder in saved views and views shared with a region (F3 of the features build plan of 2026-11-14; migration 0117; CHANGELOG 154). Additive. (1) `GET /saved-views/filter-fields` (`listFilterFields`): the whitelist of filter fields of `sites`, `sites-stream`, `site-tasks` and `register-<key>` for the caller (hidden fields left out), with the operators per type and the limits. (2) The query parameter `filter` (a `FilterTree` as JSON) on `GET /sites`, `GET /site360/{menu}/rows`, `GET /sites/{site_id}/tasks` and `GET /registers/{register_key}/records`: compiled on the server to parameterised SQL, two levels, at most 20 items per group, 10 groups and 50 conditions; the caller's regions and row security still apply. (3) A saved view may keep the tree in `filters.advanced` (checked on save; stripped condition by condition for a reader who may not see a field, counted in `stripped_columns`). (4) `audience.region_ids` and `audience.regions`: a view shared with regions reaches the users whose own view right covers them; recipients read only. Numbered 0.15.31 because 0.15.30 is reserved for F2.
     - 0.15.30 (2026-11-16): ball in court with its duration, the SLA overrun in working days and the stale flag (F2 of the 2026-11-14 features plan; migration 0116; CHANGELOG 153). Additive and read only. (1) `BallInCourt.since` (when the current level opened) and `BallInCourt.held_wd` (working days from then to today: weekend Friday and Saturday plus the holidays of the task's SLA calendar, the default calendar for register records; never calendar days), on tasks and on register records in approval. (2) `SlaInfo.late_wd` (working days past the SLA maximum, 0 when not late) and `SlaInfo.left_wd` (working days left to the maximum of a running task, null once approved); the colour stays the rule's: green up to the minimum, amber up to the maximum, red above it. (3) `TaskSummary.last_activity_at` (the last action of a person on the open task: an audit row, a workflow step, a comment, a file upload or the opening of its level; not a system recalculation), `idle_working_days` (now filled), `stale` and `stale_after_wd` (the existing setting `stale_idle_days` of `PUT /settings/dashboard`, default 2; the dashboard counter `stale_tasks` uses the same rule). (4) Filters `sla_colour` (repeated or comma separated: green, amber, red, none) and `stale` (true or false) on `GET /approvals` and `GET /me/tasks`; an unknown value is 422. (5) `GET /me/tasks` is now served by the API (it was mock only): `do_now` = at a level I can act on now and not late, `late` = the same past the SLA maximum, `waiting` = submitted by me last and now at a level I do not hold; without a bucket do_now and late together; oldest level first; the Sites region scope applies.
     - 0.15.29 (2026-11-16, was 0.15.27 before the merge of #141): dashboard settings and dashboard counters (F20 of the site 360 and SLA plan, owner decisions 2026-11-15; migration 0108; CHANGELOG 150). Additive. (1) `GET /settings/dashboard` (`getDashboardSettings`) and `PUT /settings/dashboard` (`setDashboardSettings`, reason, If-Match, audited): the global dashboard settings in the settings table (key `dashboard.settings`): `targets` (sites per batch, monthly On-Air target), `thresholds` (green and amber per KPI), and `tabs` (for PMO, CW and TE the card codes in display order and the hidden ones). A card not listed is shown at the end. The health index bands stay in `dashboard.health_bands`. Reads need `dashboard.view`; a write needs `admin.settings` edit for all regions. The response carries the `catalogue` of the KPI and card codes the server accepts. (2) Dashboard counters added to `GET /dashboard/extras` as the section `counters` (see that path). (3) Not built: weighted progress vs plan and locked rows or sites (they wait for F14 and F16). (4) Amended 2026-11-15 (migration 0113, CHANGELOG 150, additive): the seven counters that had no source now have one (`vehicle_ready`, `advances_open_after_close`, `dismantle_pending`, `as_built_submitted`, `time_in_state_p85` in working days, `stale_tasks`, `on_air_vs_target`); `pending_kpis` lists only the KPIs whose value is null (no base, or no monthly target). `stale_idle_days` is the idle limit of `stale_tasks` (an integer from 1 to 30, default 2; optional on `PUT /settings/dashboard`, a save without it keeps the stored value; always returned). `counters.site360_menus` counts the sites per SITE 360 view (the workflow views CW, TE and OM; Design and Acquisition, Handover and Closure and Dismantle have no view and are not counted).
     - 0.15.28 (2026-11-15): SITE 360 columns screen in Settings and Excel-style working features (F15 items 4 and 5; CHANGELOG 146). Merge of origin/main (F19 Settings tabs, CHANGELOG 149; F17, F4 and F1 entries kept below). Additive. Settings > Site360 is the column-to-menu screen (the old route redirects). (2) Migration 0112: the rows endpoint `GET /site360/{menu}/rows` returns the Master values of PR Status (AH) and PO / WO Status (AI) (register procurement, B3) and the gate readiness columns (the date of the milestone before each gate once it is approved). (3) Grid working features and the toolbar (export of the current view, lock and unlock of the selected sites through the existing endpoints) are web only. No new path or schema; contract text only.
@@ -2883,6 +2884,7 @@ paths:
         Only sites in the caller's regions for the `sites` module are returned (RLS and decision B3: each assignment counts for its own regions and modules).
         Every item carries `streams`: the status of the site in each stream of its workflow version.
       parameters:
+        - $ref: '#/components/parameters/FilterTree'
         - { name: q, in: query, description: 'Site code, owner ID or name.', schema: { type: string } }
         - { name: site_codes, in: query, description: '0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found).', schema: { type: string, maxLength: 8000 } }
         - name: region_id
@@ -3431,6 +3433,7 @@ paths:
       operationId: listSiteTasks
       summary: Task grid of a site, grouped by stage (site's workflow version)
       parameters:
+        - $ref: '#/components/parameters/FilterTree'
         - name: stream
           in: query
           description: Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have.
@@ -8363,6 +8366,7 @@ paths:
       description: |
         0.15.21. The rows of one menu (`master`, `design_acq`, `sow`, `cw`, `te`, `hoto`, `dismantle`, `om`) with the Master values of its columns, read from the set-based view `site360_master_values` (one query per page, no per-site path). `menu` gives the columns, bands and frozen columns as `GET /site360/sections`. Each row has `row_no`, the running number of the rows in view (the # column), and `values` keyed by the Master column order (ord); a value is `null` when the column has no source yet. `total` counts the sites the caller may see (region scope, B3); `filtered` counts the sites that match the filters. Filters are multi-value (comma-separated): Site ID, region, sub region, phase, batch, scenario, delivery model, status, milestone. The contractor filter (`contractor`) is in 0.15.21 item (5). `sort` takes a site field or `ord:<n>` of a column of the menu. Needs the `sites` view in a region; reading only, every value is written through the site and task paths.
       parameters:
+        - $ref: '#/components/parameters/FilterTree'
         - { name: menu, in: path, required: true, description: 'The SITE 360 menu.', schema: { type: string, enum: [master, design_acq, sow, cw, te, hoto, dismantle, om] } }
         - { name: site_code, in: query, required: false, description: 'Site IDs, comma-separated (multi Site ID search, exact match).', schema: { type: string, maxLength: 4000 } }
         - { name: region_id, in: query, required: false, description: 'Region numbers 1 to 7, comma-separated.', schema: { type: string, maxLength: 40 } }
@@ -8907,6 +8911,7 @@ paths:
       summary: Records of a register
       description: 'Same visibility as sites: outside the caller''s regions answers 404 for a row, and an empty list for a list.'
       parameters:
+      - $ref: '#/components/parameters/FilterTree'
       - name: site_id
         in: query
         schema: {type: string, format: uuid}
@@ -13265,6 +13270,26 @@ paths:
         '403': {$ref: '#/components/responses/Forbidden'}
         '409': {$ref: '#/components/responses/Conflict'}
         '422': {$ref: '#/components/responses/Unprocessable'}
+  /saved-views/filter-fields:
+    get:
+      tags: [saved-views]
+      operationId: listFilterFields
+      summary: The filter fields of a list screen the caller may filter on (0.15.31, F3)
+      description: |
+        The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks` and `register-<key>`, with the operators of each type and the
+        limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list filters are left out. Needs the view right on
+        the screen's module (403 `module_forbidden`); another screen answers 422.
+      parameters:
+      - {name: screen_key, in: query, required: true, schema: {$ref: '#/components/schemas/SavedViewScreenKey'}}
+      responses:
+        '200':
+          description: The fields.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FilterFieldList'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Unprocessable'}
   /saved-views/import:
     post:
       tags: [saved-views]
@@ -13578,6 +13603,12 @@ components:
       in: query
       description: '0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale.'
       schema: { type: boolean }
+    FilterTree:
+      name: filter
+      in: query
+      required: false
+      description: '0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller''s regions and row security still apply.'
+      schema: {type: string, maxLength: 8000}
     Limit:
       name: limit
       in: query
@@ -20011,6 +20042,89 @@ components:
       properties:
         note: {type: string, maxLength: 2000, description: 'Mandatory on reject.'}
         via: {$ref: '#/components/schemas/WorkflowVia'}
+    FilterTree:
+      type: object
+      additionalProperties: false
+      required: [op, items]
+      description: |
+        0.15.31 (F3): an AND/OR filter of a list, two levels at most: the root group holds conditions and groups of conditions. At most 20 items per group,
+        10 groups, 50 conditions, 100 values per condition and 200 characters per value. The server checks every field against the whitelist of the list
+        screen and compiles the tree to parameterised SQL; the caller's row security and regions (B3) always apply as well, so a filter only narrows.
+      properties:
+        op: {type: string, enum: [and, or]}
+        items:
+          type: array
+          maxItems: 20
+          items:
+            oneOf:
+            - {$ref: '#/components/schemas/FilterCondition'}
+            - {$ref: '#/components/schemas/FilterSubGroup'}
+    FilterSubGroup:
+      type: object
+      additionalProperties: false
+      required: [op, items]
+      properties:
+        op: {type: string, enum: [and, or]}
+        items: {type: array, maxItems: 20, items: {$ref: '#/components/schemas/FilterCondition'}}
+    FilterRelativeDate:
+      type: object
+      additionalProperties: false
+      required: [rel]
+      description: 'Today in the business time zone (calc.timezone), moved by offset days (-3650..3650).'
+      properties:
+        rel: {type: string, enum: [today]}
+        offset: {type: integer, minimum: -3650, maximum: 3650}
+    FilterValue:
+      oneOf:
+      - {type: string, maxLength: 200}
+      - {type: number}
+      - {type: boolean}
+      - {$ref: '#/components/schemas/FilterRelativeDate'}
+    FilterCondition:
+      type: object
+      additionalProperties: false
+      required: [field, operator]
+      description: 'One condition. `value` is one value, a list (in, not_in), a pair [from, to] (between), a number of days (in_last_days, in_next_days) or absent (empty, not_empty).'
+      properties:
+        field: {type: string, pattern: '^([a-z][a-z0-9_]{0,60}|[fc]:[a-z][a-z0-9_]{0,60}|ms:[A-Z][A-Z0-9_]{0,30})$', description: 'A key of `GET /saved-views/filter-fields`.'}
+        operator: {$ref: '#/components/schemas/FilterOperator'}
+        value:
+          oneOf:
+          - {$ref: '#/components/schemas/FilterValue'}
+          - {type: array, maxItems: 100, items: {$ref: '#/components/schemas/FilterValue'}}
+          - {type: 'null'}
+    FilterOperator:
+      type: string
+      enum: [is, is_not, in, not_in, contains, not_contains, empty, not_empty, eq, ne, lt, lte, gt, gte, between, before, after, in_last_days, in_next_days]
+    FilterFieldType:
+      type: string
+      enum: [text, enum, number, date, bool]
+    FilterField:
+      type: object
+      required: [key, label_en, label_ar, type, operators]
+      properties:
+        key: {type: string, description: 'Built-in key, `f:<code>` (register field), `c:<code>` (site custom field) or `ms:<STAGE>` (approved milestone date).'}
+        label_en: {type: string}
+        label_ar: {type: [string, 'null']}
+        type: {$ref: '#/components/schemas/FilterFieldType'}
+        operators: {type: array, items: {$ref: '#/components/schemas/FilterOperator'}}
+        options: {type: array, description: 'The allowed values of an enum field.', items: {type: object, required: [value, label_en], properties: {value: {type: string}, label_en: {type: string}, label_ar: {type: [string, 'null']}}}}
+    FilterFieldList:
+      type: object
+      required: [screen_key, items, operators, limits]
+      properties:
+        screen_key: {type: string}
+        items: {type: array, items: {$ref: '#/components/schemas/FilterField'}}
+        operators: {type: object, description: 'The operators of each field type.', additionalProperties: {type: array, items: {$ref: '#/components/schemas/FilterOperator'}}}
+        limits:
+          type: object
+          required: [max_depth, max_items_per_group, max_groups, max_conditions, max_values]
+          properties:
+            max_depth: {type: integer}
+            max_items_per_group: {type: integer}
+            max_groups: {type: integer}
+            max_conditions: {type: integer}
+            max_values: {type: integer}
     SavedViewScreenKey:
       type: string
       pattern: '^[a-z][a-z0-9_-]{1,80}$'
@@ -20040,6 +20154,7 @@ components:
         role_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
         group_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
         user_ids: {type: array, maxItems: 100, items: {type: string, format: uuid}}
+        region_ids: {type: array, maxItems: 100, items: {type: integer, minimum: 1}, description: '0.15.31 (F3): regions. The view reaches every user whose own view right on the screen''s module covers the region (all regions = every region). A region-limited sharer names only their own regions (403 `action_forbidden`).'}
     SavedViewInput:
       type: object
       additionalProperties: false
@@ -20047,7 +20162,7 @@ components:
       properties:
         screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
         name: {type: string, minLength: 1, maxLength: 120}
-        filters: {type: object, additionalProperties: true, description: 'The screen''s filter values (at most 50 keys, 16 KB).'}
+        filters: {type: object, additionalProperties: true, properties: {advanced: {$ref: '#/components/schemas/FilterTree'}}, description: 'The screen''s filter values (at most 50 keys, 16 KB). Since 0.15.31 (F3) the key `advanced` may hold a `FilterTree`, validated against the whitelist of the screen (`GET /saved-views/filter-fields`); 422 for an unknown or hidden field, a wrong operator or value, more than two levels or more than the limits.'}
         columns: {$ref: '#/components/schemas/SavedViewColumns'}
         sort: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/SavedViewSort'}}
         audience: {$ref: '#/components/schemas/SavedViewAudience'}
@@ -20057,7 +20172,7 @@ components:
       additionalProperties: false
       properties:
         name: {type: string, minLength: 1, maxLength: 120}
-        filters: {type: object, additionalProperties: true}
+        filters: {type: object, additionalProperties: true, properties: {advanced: {$ref: '#/components/schemas/FilterTree'}}}
         columns: {$ref: '#/components/schemas/SavedViewColumns'}
         sort: {type: array, maxItems: 5, items: {$ref: '#/components/schemas/SavedViewSort'}}
         audience: {$ref: '#/components/schemas/SavedViewAudience'}
@@ -20075,6 +20190,7 @@ components:
         roles: {type: array, items: {type: object, required: [id, name_en], properties: {id: {type: string, format: uuid}, name_en: {type: string}, name_ar: {type: [string, 'null']}}}}
         groups: {type: array, items: {type: object, required: [id, name], properties: {id: {type: string, format: uuid}, name: {type: string}}}}
         users: {type: array, items: {$ref: '#/components/schemas/UserRef'}}
+        regions: {type: array, description: '0.15.31 (F3).', items: {type: object, required: [id, name_en], properties: {id: {type: integer}, name_en: {type: string}, name_ar: {type: [string, "null"]}}}}
     SavedView:
       type: object
       required: [id, screen_key, name, filters, columns, sort, stripped_columns, owner, owner_left, is_owner, shared, can_edit, can_share, is_active, version, imported, created_at, updated_at]
@@ -20082,7 +20198,7 @@ components:
         id: {type: string, format: uuid}
         screen_key: {$ref: '#/components/schemas/SavedViewScreenKey'}
         name: {type: string}
-        filters: {type: object, additionalProperties: true}
+        filters: {type: object, additionalProperties: true, properties: {advanced: {$ref: '#/components/schemas/FilterTree'}}, description: 'As the reader may see them: conditions of `advanced` on fields hidden from the reader are removed (counted in stripped_columns).'}
         columns: {$ref: '#/components/schemas/SavedViewColumns'}
         sort: {type: array, items: {$ref: '#/components/schemas/SavedViewSort'}}
         stripped_columns: {type: integer, description: 'How many columns, filters or sort keys were removed because they are hidden for the caller.'}

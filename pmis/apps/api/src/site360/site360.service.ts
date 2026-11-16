@@ -7,6 +7,7 @@ import { ProblemException } from '../common/problem';
 import { parse } from '../common/zod';
 import { AccessService } from '../access/access.service';
 import { DbService } from '../db/db.service';
+import { FilterCatalogService } from '../views/filter-catalog.service';
 import { buildMenu, buildSite360, SITE360_MOVABLE, type Site360ColumnRow, type Site360Menu, type Site360MenuItem } from './site360-sections';
 
 const setSchema = z.object({
@@ -21,7 +22,7 @@ export interface Site360ColumnDto extends Site360ColumnRow {
 /** SITE 360 menus (contract 0.15.21, F15). The column metadata is the one source; no second store. */
 @Injectable()
 export class Site360Service {
-  constructor(private readonly db: DbService, private readonly stepUp: StepUpService, private readonly access: AccessService) {}
+  constructor(private readonly db: DbService, private readonly stepUp: StepUpService, private readonly access: AccessService, private readonly filters: FilterCatalogService) {}
 
   async sections(): Promise<{ items: Site360MenuItem[]; can_move: boolean }> {
     const rows = await this.db.tx.$queryRaw<Site360ColumnRow[]>`
@@ -114,6 +115,9 @@ export class Site360Service {
     }
     const milestones = csvParam(q, 'milestone', 50);
     if (milestones.length) filters.push(Prisma.sql`s.current_milestone = ANY(${milestones}::text[])`);
+    // F3 (0.15.31): the AND/OR filter of a saved view (the sites whitelist, alias s); the region scope of `base` stays
+    const adv = await this.filters.fromQuery('sites', q);
+    if (adv) filters.push(adv);
     const all = filters.length ? Prisma.sql`${base} AND ${Prisma.join(filters, ' AND ')}` : base;
 
     const counts = await this.db.tx.$queryRaw<{ total: number; filtered: number }[]>(Prisma.sql`

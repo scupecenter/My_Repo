@@ -9,6 +9,7 @@ import { ProblemException, problems } from '../common/problem';
 import { boolParam } from '../common/query';
 import { parse, uuidSchema } from '../common/zod';
 import { DbService } from '../db/db.service';
+import { FilterCatalogService } from './filter-catalog.service';
 
 /**
  * P10 (owner answers Q115 and Q117, migration 0065): saved views of the list screens, kept on the server, and the caller's drafts.
@@ -31,6 +32,8 @@ const audienceSchema = z.object({
   role_ids: z.array(uuidSchema).max(100).optional(),
   group_ids: z.array(uuidSchema).max(100).optional(),
   user_ids: z.array(uuidSchema).max(100).optional(),
+  // F3 (0.15.31): a view shared with regions reaches the users whose own view right covers the region
+  region_ids: z.array(z.number().int().min(1).max(999)).max(100).optional(),
 }).strict();
 const reason = z.string().trim().max(1000).optional();
 
@@ -64,11 +67,25 @@ export interface SavedViewDto {
 }
 
 type Audience = z.infer<typeof audienceSchema>;
-const nonEmpty = (a: Audience | undefined): boolean => !!a && (!!a.everyone || !!a.role_ids?.length || !!a.group_ids?.length || !!a.user_ids?.length);
+const nonEmpty = (a: Audience | undefined): boolean => !!a && (!!a.everyone || !!a.role_ids?.length || !!a.group_ids?.length || !!a.user_ids?.length || !!a.region_ids?.length);
+
+/** The region values a filter tree pins (conditions region_id is / in, at any level): a shared view may only pin the sharer's regions. */
+function treeRegions(tree: unknown): unknown[] {
+  if (!tree || typeof tree !== 'object' || !Array.isArray((tree as { items?: unknown }).items)) return [];
+  const out: unknown[] = [];
+  for (const it of (tree as { items: unknown[] }).items) {
+    if (it && typeof it === 'object' && Array.isArray((it as { items?: unknown }).items)) out.push(...treeRegions(it));
+    else {
+      const c = it as { field?: unknown; operator?: unknown; value?: unknown };
+      if (c?.field === 'region_id' && (c.operator === 'is' || c.operator === 'in')) out.push(...(Array.isArray(c.value) ? c.value : [c.value]));
+    }
+  }
+  return out;
+}
 
 @Injectable()
 export class SavedViewsService {
-  constructor(private readonly db: DbService, private readonly access: AccessService) {}
+  constructor(private readonly db: DbService, private readonly access: AccessService, private readonly catalog: FilterCatalogService) {}
 
   private async run<T>(sql: Prisma.Sql): Promise<T> {
     try {
@@ -103,19 +120,21 @@ export class SavedViewsService {
    */
   private async checkRegionScope(screen: string, filters: Record<string, unknown> | undefined): Promise<void> {
     const raw = filters?.region_id;
-    if (raw === undefined || raw === null || raw === '') return;
-    const values = (Array.isArray(raw) ? raw : [raw]).map((x) => Number(x));
+    const fromTree = treeRegions(filters?.advanced);
+    if ((raw === undefined || raw === null || raw === '') && fromTree.length === 0) return;
+    const values = [...(raw === undefined || raw === null || raw === '' ? [] : Array.isArray(raw) ? raw : [raw]), ...fromTree].map((x) => Number(x));
     const mod = await this.run<string | null>(Prisma.sql`SELECT sv_screen_module(${screen}::text) AS r`);
     if (!mod) return;
     const regs = await this.access.regions(mod, 'view');
     if (regs === null) return;
     if (values.some((v) => !Number.isInteger(v) || !regs.includes(v))) {
-      throw problems.validation([{ path: '/filters/region_id', code: 'out_of_scope', message: 'A shared view may only filter on your own regions.' }]);
+      throw problems.validation([{ path: raw === undefined || raw === null || raw === '' ? '/filters/advanced' : '/filters/region_id', code: 'out_of_scope', message: 'A shared view may only filter on your own regions.' }]);
     }
   }
 
   async create(auth: AuthContext, raw: unknown): Promise<SavedViewDto> {
     const b = parse(createSchema, raw);
+    await this.catalog.validate(b.screen_key, b.filters?.advanced);
     if (nonEmpty(b.audience)) await this.checkRegionScope(b.screen_key, b.filters);
     const { reason: why, ...body } = b;
     return this.run<SavedViewDto>(Prisma.sql`SELECT sv_save(NULL::uuid, NULL::int, ${JSON.stringify(body)}::jsonb, ${why ?? null}::text) AS r`);
@@ -125,6 +144,7 @@ export class SavedViewsService {
     const version = parseIfMatch(ifMatch);
     const b = parse(patchSchema, raw);
     const cur = await this.get(auth, id);
+    if (b.filters !== undefined) await this.catalog.validate(cur.screen_key, b.filters.advanced);
     const shared = b.audience === undefined ? cur.shared : nonEmpty(b.audience);
     if (shared && (b.filters !== undefined || b.audience !== undefined)) await this.checkRegionScope(cur.screen_key, b.filters ?? cur.filters);
     const { reason: why, ...body } = b;
@@ -152,7 +172,22 @@ export class SavedViewsService {
 
   async import(_auth: AuthContext, raw: unknown): Promise<unknown> {
     const b = parse(importSchema, raw);
+    // the browser's old local views never held a filter tree (F3); one that claims to is refused rather than stored unchecked
+    const adv = b.items.findIndex((it) => it.filters?.advanced !== undefined);
+    if (adv >= 0) throw problems.validation([{ path: `/items/${adv}/filters/advanced`, code: 'invalid', message: 'An imported view has no filter tree.' }]);
     return this.run<unknown>(Prisma.sql`SELECT sv_import(${b.screen_key}::text, ${JSON.stringify(b.items)}::jsonb) AS r`);
+  }
+
+  /** F3: the filter fields of a list screen the caller may filter on (the whitelist, hidden fields left out). */
+  async filterFields(q: Record<string, unknown>): Promise<Record<string, unknown>> {
+    const screen = typeof q.screen_key === 'string' ? q.screen_key : '';
+    if (!SCREEN.safeParse(screen).success || !FilterCatalogService.supports(screen)) {
+      throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'This list has no filter builder.' }]);
+    }
+    const mod = await this.run<string | null>(Prisma.sql`SELECT sv_screen_module(${screen}::text) AS r`);
+    if (!mod) throw problems.validation([{ path: '/screen_key', code: 'invalid', message: 'Not a list screen with saved views.' }]);
+    await this.access.requireRegions(mod, 'view');
+    return this.catalog.describe(screen);
   }
 
   // ------------------------------------------------------------------ drafts (Q115)

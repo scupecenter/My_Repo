@@ -8408,6 +8408,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/saved-views/filter-fields": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The filter fields of a list screen the caller may filter on (0.15.31, F3)
+         * @description The whitelist of the AND/OR filter builder for `sites`, `sites-stream`, `site-tasks` and `register-<key>`, with the operators of each type and the
+         *     limits. Fields hidden from the caller by a field rule, inactive fields and fields not offered in list filters are left out. Needs the view right on
+         *     the screen's module (403 `module_forbidden`); another screen answers 422.
+         */
+        get: operations["listFilterFields"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/saved-views/import": {
         parameters: {
             query?: never;
@@ -15196,6 +15218,68 @@ export interface components {
             note?: string;
             via?: components["schemas"]["WorkflowVia"];
         };
+        /**
+         * @description 0.15.31 (F3): an AND/OR filter of a list, two levels at most: the root group holds conditions and groups of conditions. At most 20 items per group,
+         *     10 groups, 50 conditions, 100 values per condition and 200 characters per value. The server checks every field against the whitelist of the list
+         *     screen and compiles the tree to parameterised SQL; the caller's row security and regions (B3) always apply as well, so a filter only narrows.
+         */
+        FilterTree: {
+            /** @enum {string} */
+            op: "and" | "or";
+            items: (components["schemas"]["FilterCondition"] | components["schemas"]["FilterSubGroup"])[];
+        };
+        FilterSubGroup: {
+            /** @enum {string} */
+            op: "and" | "or";
+            items: components["schemas"]["FilterCondition"][];
+        };
+        /** @description Today in the business time zone (calc.timezone), moved by offset days (-3650..3650). */
+        FilterRelativeDate: {
+            /** @enum {string} */
+            rel: "today";
+            offset?: number;
+        };
+        FilterValue: string | number | boolean | components["schemas"]["FilterRelativeDate"];
+        /** @description One condition. `value` is one value, a list (in, not_in), a pair [from, to] (between), a number of days (in_last_days, in_next_days) or absent (empty, not_empty). */
+        FilterCondition: {
+            /** @description A key of `GET /saved-views/filter-fields`. */
+            field: string;
+            operator: components["schemas"]["FilterOperator"];
+            value?: components["schemas"]["FilterValue"] | components["schemas"]["FilterValue"][] | null;
+        };
+        /** @enum {string} */
+        FilterOperator: "is" | "is_not" | "in" | "not_in" | "contains" | "not_contains" | "empty" | "not_empty" | "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "between" | "before" | "after" | "in_last_days" | "in_next_days";
+        /** @enum {string} */
+        FilterFieldType: "text" | "enum" | "number" | "date" | "bool";
+        FilterField: {
+            /** @description Built-in key, `f:<code>` (register field), `c:<code>` (site custom field) or `ms:<STAGE>` (approved milestone date). */
+            key: string;
+            label_en: string;
+            label_ar: string | null;
+            type: components["schemas"]["FilterFieldType"];
+            operators: components["schemas"]["FilterOperator"][];
+            /** @description The allowed values of an enum field. */
+            options?: {
+                value: string;
+                label_en: string;
+                label_ar?: string | null;
+            }[];
+        };
+        FilterFieldList: {
+            screen_key: string;
+            items: components["schemas"]["FilterField"][];
+            /** @description The operators of each field type. */
+            operators: {
+                [key: string]: components["schemas"]["FilterOperator"][];
+            };
+            limits: {
+                max_depth: number;
+                max_items_per_group: number;
+                max_groups: number;
+                max_conditions: number;
+                max_values: number;
+            };
+        };
         /** @description A list screen (0.12.12): `sites`, `sites-stream`, `site-tasks`, `register-<register key>`, `audit-log`, `field-changes`, `security-log`, `system-log` (0.15.2). */
         SavedViewScreenKey: string;
         /** @description Column control of the screen: order, hidden columns, widths in px and density. Hiding a column never changes a permission. */
@@ -15219,12 +15303,16 @@ export interface components {
             role_ids?: string[];
             group_ids?: string[];
             user_ids?: string[];
+            /** @description 0.15.31 (F3): regions. The view reaches every user whose own view right on the screen's module covers the region (all regions = every region). A region-limited sharer names only their own regions (403 `action_forbidden`). */
+            region_ids?: number[];
         };
         SavedViewInput: {
             screen_key: components["schemas"]["SavedViewScreenKey"];
             name: string;
-            /** @description The screen's filter values (at most 50 keys, 16 KB). */
+            /** @description The screen's filter values (at most 50 keys, 16 KB). Since 0.15.31 (F3) the key `advanced` may hold a `FilterTree`, validated against the whitelist of the screen (`GET /saved-views/filter-fields`); 422 for an unknown or hidden field, a wrong operator or value, more than two levels or more than the limits. */
             filters?: {
+                advanced?: components["schemas"]["FilterTree"];
+            } & {
                 [key: string]: unknown;
             };
             columns?: components["schemas"]["SavedViewColumns"];
@@ -15235,6 +15323,8 @@ export interface components {
         SavedViewPatch: {
             name?: string;
             filters?: {
+                advanced?: components["schemas"]["FilterTree"];
+            } & {
                 [key: string]: unknown;
             };
             columns?: components["schemas"]["SavedViewColumns"];
@@ -15261,13 +15351,22 @@ export interface components {
                 name: string;
             }[];
             users: components["schemas"]["UserRef"][];
+            /** @description 0.15.31 (F3). */
+            regions?: {
+                id: number;
+                name_en: string;
+                name_ar?: string | null;
+            }[];
         };
         SavedView: {
             /** Format: uuid */
             id: string;
             screen_key: components["schemas"]["SavedViewScreenKey"];
             name: string;
+            /** @description As the reader may see them: conditions of `advanced` on fields hidden from the reader are removed (counted in stripped_columns). */
             filters: {
+                advanced?: components["schemas"]["FilterTree"];
+            } & {
                 [key: string]: unknown;
             };
             columns: components["schemas"]["SavedViewColumns"];
@@ -16734,6 +16833,8 @@ export interface components {
         SlaColourFilter: ("green" | "amber" | "red" | "none")[];
         /** @description 0.15.30 (F2). true = only stale tasks (idle for at least `stale_after_wd` working days); false = only tasks that are not stale. */
         StaleFilter: boolean;
+        /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+        FilterTree: string;
         Limit: number;
         /** @description Opaque cursor from `page.next_cursor`. */
         Cursor: string;
@@ -19740,6 +19841,8 @@ export interface operations {
     listSites: {
         parameters: {
             query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 /** @description Site code, owner ID or name. */
                 q?: string;
                 /** @description 0.15.19 (F4): a pasted list of Site IDs, separated by commas, spaces or new lines (at most 500). Keeps only those sites; the match ignores case. IDs out of reach or unknown simply match nothing here (see POST /search/site-ids for the list of IDs not found). */
@@ -20383,6 +20486,8 @@ export interface operations {
     listSiteTasks: {
         parameters: {
             query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 /** @description Only the stages of this stream (default all). 422 `validation_failed` for a code the site's workflow version does not have. */
                 stream?: string;
                 /** @description 0.4.7. View code (for example `CW`, `TE`, `OM`). Shows only the tasks of that view: on `GET /sites`, rail, late and waiting counts, `stage_code` and `bucket` are computed over the view's tasks and sites with no task in the view are left out; on the task grid, only those tasks and their stages. Combined with `stream`, the tasks in both. 422 `validation_failed` for an unknown code (for the grid: a code the site's workflow version does not have). Region and module scope are unchanged. */
@@ -26172,6 +26277,8 @@ export interface operations {
     getSite360Rows: {
         parameters: {
             query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 /** @description Site IDs, comma-separated (multi Site ID search, exact match). */
                 site_code?: string;
                 /** @description Region numbers 1 to 7, comma-separated. */
@@ -26820,6 +26927,8 @@ export interface operations {
     listRegisterRecords: {
         parameters: {
             query?: {
+                /** @description 0.15.31 (F3): a `FilterTree` as one JSON string (at most 8000 characters), compiled on the server against the whitelist of this list. 422 `validation_failed` with `unknown_field` (also for a field hidden from the caller by a field rule), `invalid_operator`, `invalid_value`, `too_deep` or `too_many`. The caller's regions and row security still apply. */
+                filter?: components["parameters"]["FilterTree"];
                 site_id?: string;
                 region_id?: components["schemas"]["RegionId"];
                 state?: components["schemas"]["RegisterRecordState"];
@@ -32022,6 +32131,31 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
+            422: components["responses"]["Unprocessable"];
+        };
+    };
+    listFilterFields: {
+        parameters: {
+            query: {
+                screen_key: components["schemas"]["SavedViewScreenKey"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fields. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FilterFieldList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             422: components["responses"]["Unprocessable"];
         };
     };

@@ -2,6 +2,7 @@ import { Bookmark, Save, Share2, Trash2, UserCheck } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGroups, useRoles } from '@/api/admin';
+import { useRegions } from '@/api/sites';
 import type { UserPickerItem } from '@/api/types';
 import { importLocalViews, useSavedViewOps, useSavedViews, type LocalView, type SavedView, type SavedViewAudience, type SavedViewColumns, type SavedViewSort } from '@/api/views';
 import { loadPref } from '@/lib/localPref';
@@ -105,12 +106,15 @@ function ShareDialog({ view, scope, manager, onClose, onSave, busy }: {
   const [people, setPeople] = useState<UserPickerItem[]>((a?.users ?? []).map((u) => ({ id: u.id, display_name: u.display_name, employee_id: u.employee_id ?? null }) as UserPickerItem));
   const [roles, setRoles] = useState<Set<string>>(new Set((a?.roles ?? []).map((r) => r.id)));
   const [groups, setGroups] = useState<Set<string>>(new Set((a?.groups ?? []).map((g) => g.id)));
-  const rolesQ = useRoles(), groupsQ = useGroups();
+  // F3 (0.15.31): regions of the audience
+  const [regions, setRegions] = useState<Set<number>>(new Set((a?.regions ?? []).map((r) => r.id)));
+  const rolesQ = useRoles(), groupsQ = useGroups(), regionsQ = useRegions();
+  const flipN = (s: Set<number>, id: number) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; };
   const flip = (s: Set<string>, id: string) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; };
   const other = !view.is_owner;
   return (
     <FormDialog open onClose={onClose} title={t('savedViews.share_title', { name: view.name })} testid="views-share-dialog" withReason={other} busy={busy} submitLabel={t('savedViews.share_save')}
-      onSubmit={(reason) => onSave({ everyone, user_ids: people.map((p) => p.id), role_ids: [...roles], group_ids: [...groups] }, reason)}>
+      onSubmit={(reason) => onSave({ everyone, user_ids: people.map((p) => p.id), role_ids: [...roles], group_ids: [...groups], region_ids: [...regions].sort((x, y) => x - y) }, reason)}>
       <p className="text-sm text-mute">{t('savedViews.share_hint')}</p>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" data-testid="views-share-everyone" checked={everyone} disabled={scope !== 'all' && !manager} onChange={(e) => setEveryone(e.target.checked)} />
@@ -121,6 +125,14 @@ function ShareDialog({ view, scope, manager, onClose, onSave, busy }: {
       {rolesQ.isSuccess && !!rolesQ.data.length && (
         <fieldset className="max-h-32 overflow-y-auto text-sm" data-testid="views-share-roles"><legend className="font-semibold">{t('savedViews.roles')}</legend>
           {rolesQ.data.filter((r) => r.is_active).map((r) => <label key={r.id} className="flex items-center gap-2"><input type="checkbox" checked={roles.has(r.id)} onChange={() => setRoles((s) => flip(s, r.id))} />{(i18n.language === 'ar' && r.name_ar) || r.name_en}</label>)}
+        </fieldset>
+      )}
+      {regionsQ.isSuccess && !!regionsQ.data.length && (
+        <fieldset className="text-sm" data-testid="views-share-regions"><legend className="font-semibold">{t('savedViews.regions')}</legend>
+          <p className="text-xs text-mute">{t('savedViews.regions_hint')}</p>
+          <div className="flex flex-wrap gap-x-4">
+            {regionsQ.data.map((r) => <label key={r.id} className="flex items-center gap-2"><input type="checkbox" data-testid={`views-share-region-${r.id}`} checked={regions.has(r.id)} onChange={() => setRegions((s) => flipN(s, r.id))} />{(i18n.language === 'ar' && r.name_ar) || r.name_en}</label>)}
+          </div>
         </fieldset>
       )}
       {groupsQ.isSuccess && !!groupsQ.data.length && (

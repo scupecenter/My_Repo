@@ -3,7 +3,7 @@ import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClie
 import { api, ApiError, downloadFile } from './client';
 import type { ImportBatch, Job, ImportBatchResult, ImportDecisionRequest, ImportRow, Page, RegisterDefinition, RegisterRecord, RegisterRecordInput, RegisterRecordPatch, RegisterRecordState, RegisterRecordStep, Template, UploadedBatch, UserRef } from './types';
 
-export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string };
+export type RecordFilters = { q: string; region_id: string; state: string; record_type: string; site_id?: string; /** 0.15.31 (F3): the AND/OR filter tree as JSON */ filter?: string };
 export type RecordOp = 'submit' | 'review' | 'approve' | 'reject' | 'void';
 
 /** `GET /registers`: the catalogue with the fields the caller may see (the form is built from it, never hard-coded). */
