@@ -169,3 +169,14 @@ export function sharePct(part: number, base: number): number | null {
   return Math.round((part / base) * 1000) / 10;
 }
 
+/** F20 (migration 0113): the On-Air count of the month against the monthly target, in percent; null when there is no target (or it is zero). */
+export function targetPct(count: number, target: number | null): number | null {
+  if (target === null || target <= 0) return null;
+  return Math.round((count / target) * 1000) / 10;
+}
+
+/** F20: the 85th percentile of a time in state, in working days, to one decimal; null when there is no interval. */
+export function roundDays(days: number | null): number | null {
+  if (days === null || !Number.isFinite(days)) return null;
+  return Math.round(days * 10) / 10;
+}

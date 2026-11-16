@@ -12,6 +12,7 @@ interface SettingsJson {
   targets: { sites_per_batch: number | null; monthly_on_air: number | null };
   thresholds: Record<string, { green: number; amber: number }>;
   tabs: Record<string, { order: string[]; hidden: string[] }>;
+  stale_idle_days: number;
   updated_at: string | null;
   updated_by: string | null;
   catalogue: unknown;
@@ -50,6 +51,7 @@ export class DashboardSettingsService {
       targets: j.targets,
       thresholds: j.thresholds,
       tabs: j.tabs,
+      stale_idle_days: j.stale_idle_days,
       catalogue: j.catalogue,
       updated_at: j.updated_at,
       updated_by,
@@ -74,6 +76,10 @@ export class DashboardSettingsService {
       targets: b.targets,
       thresholds: b.thresholds,
       tabs: b.tabs,
+      // absent = the stored value (the database keeps it)
+      ...(b.stale_idle_days !== undefined
+        ? { stale_idle_days: b.stale_idle_days }
+        : {}),
     };
     const r = await this.db.tx.$queryRaw<{ j: SettingsJson }[]>(Prisma.sql`
       SELECT admin_save_dashboard_settings(${JSON.stringify(config)}::jsonb, ${b.reason}::text, ${version}::int) AS j`);

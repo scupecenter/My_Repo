@@ -14,7 +14,12 @@ const COUNTERS_MOCK = {
   kpis: [
 
   ],
-  pending_kpis: ['vehicle_ready', 'advances_open_after_close', 'dismantle_pending', 'as_built_submitted', 'time_in_state_p85', 'stale_tasks', 'on_air_vs_target'],
+  pending_kpis: [] as string[],
+  site360_menus: [
+    { code: 'CW', name_en: 'Civil Works', name_ar: 'الأعمال المدنية', sites: 96 },
+    { code: 'TE', name_en: 'Installation (TE)', name_ar: 'التركيبات', sites: 88 },
+    { code: 'OM', name_en: 'O&M', name_ar: 'التشغيل والصيانة', sites: 40 },
+  ],
   sla_totals: { open_tasks: 160, breach: 20, at_risk: 13 },
   sla_by_stage: [
     { stage_code: 'SITE_ACQ', stage_name: 'Site acquisition', stage_name_ar: 'اقتناء الموقع', open_tasks: 48, breach: 6, at_risk: 4, breach_pct: 12.5, at_risk_pct: 8.3 },

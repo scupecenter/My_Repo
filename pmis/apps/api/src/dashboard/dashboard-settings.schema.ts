@@ -21,5 +21,7 @@ export const dashboardSettingsPutSchema = z
       z.object({ green: z.number(), amber: z.number() }).strict(),
     ),
     tabs: z.object({ pmo: layout, cw: layout, te: layout }).strict(),
+    // 0.15.27 (migration 0113): optional; absent keeps the stored value
+    stale_idle_days: z.number().int().min(1).max(30).optional(),
   })
   .strict();

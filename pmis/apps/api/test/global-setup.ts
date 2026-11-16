@@ -197,6 +197,12 @@ export default async function setup(): Promise<() => Promise<void>> {
   process.env.TEST_SUPER_URL_LOGS = logsDb.superUrl;
   process.env.TEST_DATABASE_URL_DOCS = docsDb.appUrl;
   process.env.TEST_SUPER_URL_DOCS = docsDb.superUrl;
+  // The F20 counters database (migration 0113): the suite writes a small synthetic set of sites, assignments, advances, Dismantle parts and task
+  // transitions, and changes the dashboard settings (the On-Air target, the idle limit); it counts every site it holds, so no other suite may meet it.
+  const f20k = `${dbName}_f20k`;
+  const f20kDb = await buildDatabase(adminUrl, f20k, appPassword);
+  process.env.TEST_DATABASE_URL_F20K = f20kDb.appUrl;
+  process.env.TEST_SUPER_URL_F20K = f20kDb.superUrl;
   process.env.TEST_DATABASE_URL = main.appUrl;
   process.env.TEST_SUPER_URL = main.superUrl;
   process.env.TEST_DATABASE_URL_SOLO = one.appUrl;

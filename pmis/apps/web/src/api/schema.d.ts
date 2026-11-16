@@ -7932,7 +7932,7 @@ export interface paths {
          *     critical 20 to 25. Only open and in-progress risks are counted. Closed and N/A risks are left out.
          *     **Decisions.** `act_now` is an open risk in band high or critical; `watch` is any other open risk. The tags change no status, owner or date.
          *     **Data quality.** The gaps of each site as `site_data_gaps` reports them (a task without its actual date, a missing delivery scenario). Cancelled sites are left out.
-         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no source yet is listed in `pending_kpis` and has a null value. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
+         *     **Counters (0.15.24).** `counters` holds the SLA breaches and at-risk tasks of the open tasks (task states open, entry, in review, in approval and rejected), by stage, using the SLA status of each task (red past the maximum, amber past the warning share); the data quality KPI (sites with a gap of the sites checked); and every KPI of the dashboard catalogue with its value, its saved thresholds and its colour. A KPI with no value (no base, or no monthly target) is listed in `pending_kpis` and has a null value; since 0.15.27 all seven former gaps have a source, and `site360_menus` counts the sites per SITE 360 view. The same B3 scope applies (sites of the caller's regions; `available: false` without `sites.view`).
          */
         get: operations["getDashboardExtras"];
         put?: never;
@@ -13047,6 +13047,8 @@ export interface components {
                 cw: components["schemas"]["DashboardTabLayout"];
                 te: components["schemas"]["DashboardTabLayout"];
             };
+            /** @description 0.15.27 (migration 0113): the working days a task may stay idle before the stale-task counter counts it (default 2). Optional on a save; absent keeps the stored value. */
+            stale_idle_days?: number;
         };
         /** @description 0.15.24 (F20). Seed: no targets; thresholds are the defaults of the catalogue (owner to confirm); every card shown in its default order. */
         DashboardSettings: components["schemas"]["DashboardSettingsInput"] & {
@@ -16082,6 +16084,13 @@ export interface components {
             sla_by_stage: components["schemas"]["DashboardSlaStage"][] | null;
             /** @description Active sites in scope (cancelled sites left out). */
             sites_total: number | null;
+            /** @description 0.15.27: the sites per SITE 360 view (workflow views CW, TE, OM), in view order. A site counts once per view when it has a task of the view that is not n/a or skipped. Null without sites.view. */
+            site360_menus: {
+                code: string;
+                name_en: string;
+                name_ar: string | null;
+                sites: number;
+            }[] | null;
         };
         DashboardKpi: {
             code: string;
