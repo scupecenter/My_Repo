@@ -3,7 +3,7 @@ import { errText } from '@/components/FormDialog';
 import { Site360Grid, type Site360GridRow } from '@/components/Site360Grid';
 import { useSaveSite360Cell, useSite360RowsPaged, useSite360Sections } from '@/api/site360';
 import { Download, FileDown, FilePlus2, FileUp, Map as MapIcon, RotateCcw, Table2 } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe } from '@/api/hooks';
@@ -78,6 +78,8 @@ export function Sites() {
   const gridTotal = gridPages[0]?.total;
   const gridFiltered = gridPages[0]?.filtered;
   const gridRows = gridPages.flatMap((p) => p.rows);
+  // Stable identity per fetched page: Site360Grid reports its selection from an effect keyed on `rows`, so a new array on every render loops forever.
+  const grid360Rows = useMemo(() => gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells })), [gridRowsQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const [siteIdsDraft, setSiteIdsDraft] = useState(() => (sp.get('site_code') ?? '').split(',').join('\n'));
   const applySiteIds = () => {
     const codes = siteIdsDraft.split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
@@ -280,7 +282,7 @@ export function Sites() {
               <button type="button" className="btn" data-testid="site360-locks-lock" onClick={() => setLocksDlg(true)}>{t('locks.bulk_lock')}</button>
             </>}
           </div>
-          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={gridRows.map((r) => ({ id: r.site_id, site_code: r.site_code, row_no: r.row_no, values: r.values, cells: r.cells }))} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
+          <Site360Grid menu={menu} testid="site360-grid" onSelectRows={setGridSel} total={gridTotal} filtered={gridFiltered} rows={grid360Rows} onEditCell={(e) => saveCell.mutate({ task_id: e.target.task_id, version: e.target.version, field: e.target.field, values: e.target.values, value: e.value })} />
           {gridRowsQ.hasNextPage ? <button type="button" className="btn" data-testid="site360-more" disabled={gridRowsQ.isFetchingNextPage} onClick={() => void gridRowsQ.fetchNextPage()}>{t('site360.more')}</button> : null}
         </div>
       ) : (
