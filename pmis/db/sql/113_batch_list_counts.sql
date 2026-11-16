@@ -6,9 +6,9 @@
 -- apply, 3 batches, 10,340 rows): 3.5 to 5.8 s for the list of 3 batches; the owner's server has more batches and the register rows too.
 --
 -- WHAT. imp_batch_counts(batch) gives the status and every count of a batch in one pass over its rows, by the batch_id index, with the same rules as
--- v_import_rows (eff_decision) and imp_status_of (status). It answers only for a batch the caller may see (imp_batch_visible), NULL otherwise. The counts
--- keep the row rule of import_batch_rows (rls_select, 0037): a row of a region outside the caller's regions is not counted, as before. The status is
--- decided from every row of the batch, as imp_status_of always did. The API now reads the page of batches first and counts only those.
+-- v_import_rows (eff_decision) and imp_status_of (status). It is a definer function, as imp_status_of already is, so the counts are those of the batch
+-- (imp_status_of never saw them through row security either; the per-row lists still do). It answers only for a batch the caller may see
+-- (imp_batch_visible), NULL otherwise. The API now reads the page of batches first and counts only those.
 -- Function rules: SECURITY DEFINER, search_path = pg_catalog, public, pg_temp, owner pmis_definer, PUBLIC revoked, EXECUTE for pmis_app.
 
 CREATE OR REPLACE FUNCTION imp_batch_counts(p_batch uuid) RETURNS jsonb
@@ -19,7 +19,7 @@ BEGIN
   SELECT * INTO b FROM public.import_batches WHERE id = p_batch;
   IF NOT FOUND THEN RETURN NULL; END IF;
   WITH x AS (
-    SELECT r.action, r.admin_approved, r.incomplete, (r.region_id IS NULL OR public.app_region_check(r.region_id)) AS vis,   -- the row rule of 0037
+    SELECT r.action, r.admin_approved, r.incomplete,
       CASE WHEN r.action IN ('error', 'unchanged') THEN r.decision
            WHEN r.task_instance_id IS NOT NULL THEN
              CASE WHEN r.decision = 'pending' AND r.task_submitted_at IS NOT NULL AND ti.state = 'approved' THEN 'approved'
@@ -33,25 +33,21 @@ BEGIN
     LEFT JOIN public.register_records rr ON rr.id = r.register_record_id
     LEFT JOIN public.task_instances ti ON ti.id = r.task_instance_id
     WHERE r.batch_id = p_batch)
-  SELECT count(*) FILTER (WHERE vis AND action = 'create') AS c_create, count(*) FILTER (WHERE vis AND action = 'update') AS c_update,
-         count(*) FILTER (WHERE vis AND action = 'unchanged') AS c_unchanged, count(*) FILTER (WHERE vis AND action = 'error') AS c_error,
-         count(*) FILTER (WHERE vis AND action IN ('create', 'update') AND eff = 'pending') AS c_pending,
-         count(*) FILTER (WHERE vis AND action IN ('create', 'update') AND eff = 'approved') AS c_approved,
-         count(*) FILTER (WHERE vis AND action IN ('create', 'update') AND eff = 'rejected') AS c_rejected,
-         count(*) FILTER (WHERE vis AND action IN ('create', 'update') AND eff = 'pending_previous_approval') AS c_held,
-         count(*) FILTER (WHERE vis AND action IN ('create', 'update') AND eff = 'saved') AS c_saved,
-         count(*) FILTER (WHERE vis AND admin_approved) AS c_admin_approved, count(*) FILTER (WHERE vis AND admin_approved AND incomplete) AS c_incomplete,
-         -- the status of the batch, from every row (as imp_status_of)
-         count(*) FILTER (WHERE action IN ('create', 'update') AND eff IN ('pending', 'pending_previous_approval')) AS s_open,
-         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'approved') AS s_ok,
-         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'rejected') AS s_rej
+  SELECT count(*) FILTER (WHERE action = 'create') AS c_create, count(*) FILTER (WHERE action = 'update') AS c_update,
+         count(*) FILTER (WHERE action = 'unchanged') AS c_unchanged, count(*) FILTER (WHERE action = 'error') AS c_error,
+         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'pending') AS c_pending,
+         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'approved') AS c_approved,
+         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'rejected') AS c_rejected,
+         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'pending_previous_approval') AS c_held,
+         count(*) FILTER (WHERE action IN ('create', 'update') AND eff = 'saved') AS c_saved,
+         count(*) FILTER (WHERE admin_approved) AS c_admin_approved, count(*) FILTER (WHERE admin_approved AND incomplete) AS c_incomplete
     INTO c FROM x;
   -- the status, as imp_status_of (0074) decides it
   IF EXISTS (SELECT 1 FROM public.import_batch_jobs j WHERE j.batch_id = p_batch AND j.state = 'running') THEN st := 'processing';
   ELSIF b.status NOT IN ('in_approval', 'partially_approved', 'approved', 'rejected') THEN st := b.status;
   ELSE
-    st := CASE WHEN c.s_open > 0 AND c.s_ok + c.s_rej = 0 THEN 'in_approval' WHEN c.s_open > 0 THEN 'partially_approved'
-               WHEN c.s_ok > 0 THEN 'approved' ELSE 'rejected' END;
+    st := CASE WHEN c.c_pending + c.c_held > 0 AND c.c_approved + c.c_rejected = 0 THEN 'in_approval' WHEN c.c_pending + c.c_held > 0 THEN 'partially_approved'
+               WHEN c.c_approved > 0 THEN 'approved' ELSE 'rejected' END;
   END IF;
   RETURN jsonb_build_object('status', st, 'c_create', c.c_create, 'c_update', c.c_update, 'c_unchanged', c.c_unchanged, 'c_error', c.c_error,
     'c_pending', c.c_pending, 'c_approved', c.c_approved, 'c_rejected', c.c_rejected, 'c_held', c.c_held, 'c_saved', c.c_saved,
